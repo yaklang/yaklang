@@ -1,0 +1,176 @@
+is_build_in_struct: false
+libname: xpath
+struct_name: palm/common/utils/htmlquery.NodeNavigator
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: Copy
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: xpath.NodeNavigator
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: Current
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*html.Node'
+  relative_struct_name:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: LocalName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveTo
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: xpath.NodeNavigator
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToChild
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToFirst
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToNext
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToNextAttribute
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToParent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToPrevious
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: MoveToRoot
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: NodeType
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: xpath.NodeType
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: Prefix
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/htmlquery.NodeNavigator
+  name: Value
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

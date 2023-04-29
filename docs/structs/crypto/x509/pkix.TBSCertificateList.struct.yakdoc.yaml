@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.TBSCertificateList
+description: ""
+fields:
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: Extensions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.Extension
+  type_str: '[]pkix.Extension'
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: Issuer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.AttributeTypeAndValue
+  type_str: pkix.RDNSequence
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: NextUpdate
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: Raw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: asn1.RawContent
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: RevokedCertificates
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.RevokedCertificate
+  type_str: '[]pkix.RevokedCertificate'
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: Signature
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.AlgorithmIdentifier
+  type_str: pkix.AlgorithmIdentifier
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: ThisUpdate
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: crypto/x509/pkix.TBSCertificateList
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

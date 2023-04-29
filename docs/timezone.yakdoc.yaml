@@ -1,0 +1,50 @@
+name: timezone
+functions:
+- name: timezone.Get
+  type_str: 'func (v1: string) return(*time.Location, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: '[timezone]:time.Location'
+    type_str: '*time.Location'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: time.Location
+    isbuildinstruct: true
+- name: timezone.Now
+  type_str: 'func (v1: string) return(time.Time) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: '[timezone]:time.Time'
+    type_str: time.Time
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+variables: []

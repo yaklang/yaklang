@@ -1,0 +1,75 @@
+name: mmdb
+functions:
+- name: mmdb.Open
+  type_str: 'func (v1: string) return(*maxminddb.Reader, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/oschwald/maxminddb-golang.Reader
+    type_str: '*maxminddb.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/oschwald/maxminddb-golang.Reader
+    isbuildinstruct: true
+  - structname: github.com/oschwald/maxminddb-golang.Metadata
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: github.com/oschwald/maxminddb-golang.Networks
+    isbuildinstruct: true
+- name: mmdb.QueryIPCity
+  type_str: 'func (v1: *maxminddb.Reader, v2: string) return(*geo.City, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/oschwald/maxminddb-golang.Reader
+    type_str: '*maxminddb.Reader'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/geo.City
+    type_str: '*geo.City'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/oschwald/maxminddb-golang.Reader
+    isbuildinstruct: true
+  - structname: github.com/oschwald/maxminddb-golang.Metadata
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: github.com/oschwald/maxminddb-golang.Networks
+    isbuildinstruct: true
+  - structname: palm/common/geo.City
+    isbuildinstruct: false
+  - structname: .
+    isbuildinstruct: true
+variables: []

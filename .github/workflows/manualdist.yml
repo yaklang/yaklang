@@ -1,0 +1,98 @@
+name: ManualDist
+
+on:
+  push:
+    branches:
+      - "ci/dist/*"
+
+jobs:
+  build_and_release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/') }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Yak Version by Tag
+        uses: mad9000/actions-find-and-replace-string@1
+        id: fetchtag
+        with:
+          source: ${{ github.ref }}
+          find: 'refs/tags/'
+          replace: ''
+      - name: Print RELEASE_VERSION
+        run: |
+          echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19
+      #      - name: Download Npcap SDK (Windows)
+      #        run: |
+      #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
+      #          Expand-Archive C:\NpcapSDK.zip -DestinationPath ..\wpdpack
+      #        if: runner.os == 'Windows'
+      - name: Install libpcap (macOS)
+        run: |
+          brew install libpcap
+        if: runner.os == 'macOS'
+
+      - name: Install libpcap (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install libpcap-dev
+        if: runner.os == 'Linux'
+
+      - name: Build For Linux
+        run: |
+          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
+        if: runner.os == 'Linux'
+
+      - name: Build For MacOS
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
+        if: runner.os == 'macOS'
+
+      - name: Build For Windows
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
+        if: runner.os == 'Windows'
+
+      - name: Build For Windows(i386)
+        run: |
+          GOARCH=386 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_386.exe -v common/yak/cmd/yak.go
+        if: runner.os == 'Windows'
+
+      - name: Upload Artifacts Windows(x86)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Windows'
+        with:
+          name: yak_windows_386.exe
+          path: ./yak_windows_386.exe
+
+      - name: Upload Artifacts Windows
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Windows'
+        with:
+          name: yak_windows_i386.exe
+          path: ./yak_windows_amd64.exe
+
+
+      - name: Upload Artifacts MacOS
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_amd64
+          path: ./yak_darwin_amd64
+
+
+      - name: Upload Artifacts Linux
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Linux'
+        with:
+          name: yak_linux_amd64
+          path: ./yak_linux_amd64

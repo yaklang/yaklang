@@ -1,0 +1,274 @@
+is_build_in_struct: true
+libname: bufio
+struct_name: bufio.Reader
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Buffered
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Discard
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Peek
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Read
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadByte
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadBytes
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadLine
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadRune
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadSlice
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: ReadString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Reset
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: Size
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: UnreadByte
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: UnreadRune
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Reader
+  name: WriteTo
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

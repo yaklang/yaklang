@@ -1,0 +1,6 @@
+Probe TCP AMQP q|GET / HTTP/1.0\r\n\r\n|
+ports 5672
+rarity 3
+
+match amqp m|^AMQP\x00\x00\x09\x01$| p/Advanced Message Queue Protocol/ cpe:/a:*:amqp/a cpe:/a:*:rabbitmq/a
+match amqp m|^AMQP\x01\x01\x00\x0a$| p/Advanced Message Queue Protocol/ cpe:/a:*:amqp/a cpe:/a:*:rabbitmq/a

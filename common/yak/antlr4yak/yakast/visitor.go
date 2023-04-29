@@ -1,0 +1,318 @@
+package yakast
+
+import (
+	"bytes"
+	"fmt"
+	"yaklang/common/go-funk"
+	"yaklang/common/log"
+	yak "yaklang/common/yak/antlr4yak/parser"
+	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+)
+
+type Position struct {
+	LineNumber   int
+	ColumnNumber int
+}
+
+type YakCompiler struct {
+	yak.BaseYaklangParserVisitor
+
+	language            CompilerLanguage
+	lexerErrorListener  *ErrorListener
+	parserErrorListener *ErrorListener
+	errorStrategy       *ErrorStrategy
+	// 语法错误的问题处理
+
+	// 新增语句绑定起止位置
+	currentStartPosition, currentEndPosition *Position
+
+	// 格式化
+	formatted                                    *bytes.Buffer
+	indent                                       int
+	sourceCodeFilePathPointer, sourceCodePointer *string
+	codes                                        []*yakvm.Code
+	rootSymtbl                                   *yakvm.SymbolTable
+	currentSymtbl                                *yakvm.SymbolTable
+	programCounter                               int
+	// 为了精简，栈只存 for 开始位置
+	forDepthStack    *vmstack.Stack
+	switchDepthStack *vmstack.Stack
+	tryDepthStack    *vmstack.Stack
+	// 编译过程语法错误的地方
+	lexerErrors    YakMergeError
+	parserErrors   YakMergeError
+	compilerErrors YakMergeError
+
+	// tokenStream
+	AntlrTokenStream antlr.TokenStream
+	lexer            *yak.YaklangLexer
+	parser           *yak.YaklangParser
+	strict           bool
+	extVars          []string
+	extVarsMap       map[string]struct{}
+}
+
+func (y *YakCompiler) SetStrictMode(b bool) {
+	y.strict = b
+}
+
+func (y *YakCompiler) SetExternalVariableNames(extVars []string) {
+	y.extVars = extVars
+	for _, extVar := range y.extVars {
+		y.extVarsMap[extVar] = struct{}{}
+	}
+}
+
+func (y *YakCompiler) SetRootSymTable(tbl *yakvm.SymbolTable) {
+	y.rootSymtbl = tbl
+}
+
+func (y *YakCompiler) SetCurrentSymTable(tbl *yakvm.SymbolTable) {
+	y.currentSymtbl = tbl
+}
+
+func (y *YakCompiler) NowInFor() bool {
+	return y.forDepthStack.Len() > 0
+}
+
+func (y *YakCompiler) NowInSwitch() bool {
+	return y.switchDepthStack.Len() > 0
+}
+
+// peekForStartIndex 检查当前最近的 for 循环的开始位置，一般为了设置 continue
+func (y *YakCompiler) peekForStartIndex() int {
+	result := y.peekForContext()
+	if result == nil {
+		return -1
+	} else {
+		return result.startCodeIndex
+	}
+}
+
+func (y *YakCompiler) peekSwitchStartIndex() int {
+	result := y.peekSwitchContext()
+	if result == nil {
+		return -1
+	} else {
+		return result.startCodeIndex
+	}
+}
+
+func (y *YakCompiler) NewWithSymbolTable(rootSymbol *yakvm.SymbolTable) yakvm.CompilerWrapperInterface {
+	return NewYakCompilerWithSymbolTable(rootSymbol)
+}
+
+func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...CompilerOptionsFun) *YakCompiler {
+	compiler := &YakCompiler{
+		formatted:        new(bytes.Buffer),
+		rootSymtbl:       rootSymbol,
+		currentSymtbl:    rootSymbol,
+		forDepthStack:    vmstack.New(),
+		switchDepthStack: vmstack.New(),
+		tryDepthStack:    vmstack.New(),
+		language:         en,
+		extVarsMap:       make(map[string]struct{}),
+	}
+	for _, o := range options {
+		o(compiler)
+	}
+	compiler.lexerErrorListener = NewErrorListener(func(msg string, start, end Position) {
+		compiler.lexerErrors.Push(NewErrorWithPostion(msg, start, end))
+	})
+	compiler.parserErrorListener = NewErrorListener(func(msg string, start, end Position) {
+		compiler.parserErrors.Push(NewErrorWithPostion(msg, start, end))
+	})
+	return compiler
+}
+
+type CompilerOptionsFun func(*YakCompiler)
+
+func WithLanguage(l CompilerLanguage) CompilerOptionsFun {
+	return func(y *YakCompiler) {
+		y.language = l
+	}
+}
+
+func NewYakCompiler(options ...CompilerOptionsFun) *YakCompiler {
+	root := yakvm.NewSymbolTable()
+	return NewYakCompilerWithSymbolTable(root, options...)
+}
+
+func (y *YakCompiler) GetLexerErrorListener() *ErrorListener {
+	return y.lexerErrorListener
+}
+func (y *YakCompiler) GetParserErrorListener() *ErrorListener {
+	return y.parserErrorListener
+}
+
+func (y *YakCompiler) panicCompilerError(e constError, items ...interface{}) {
+	err := y.newError(y.GetConstError(e), items...)
+	y.compilerErrors.Push(err)
+	panic(err)
+}
+
+func (y *YakCompiler) pushError(yakError *YakError) {
+	y.compilerErrors.Push(yakError)
+}
+
+func (y *YakCompiler) newError(msg string, items ...interface{}) *YakError {
+	if len(items) > 0 {
+		msg = fmt.Sprintf(msg, items...)
+	}
+	return &YakError{
+		StartPos: *y.currentStartPosition,
+		EndPos:   *y.currentEndPosition,
+		Message:  msg,
+	}
+}
+func (y *YakCompiler) Init(lexer *yak.YaklangLexer, parser *yak.YaklangParser) {
+	y.lexer = lexer
+	y.parser = parser
+}
+func (y *YakCompiler) ShowOpcodes() {
+	yakvm.ShowOpcodes(y.codes)
+}
+func (y *YakCompiler) CompileSourceCodeWithPath(code string, fPath *string) bool {
+	y.sourceCodeFilePathPointer = fPath
+	return y.Compiler(code)
+}
+func (y *YakCompiler) Compiler(code string) bool {
+	lexer := yak.NewYaklangLexer(antlr.NewInputStream(code))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(y.lexerErrorListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := yak.NewYaklangParser(tokenStream)
+	y.AntlrTokenStream = tokenStream
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(y.parserErrorListener)
+	parser.SetErrorHandler(NewErrorStrategy())
+	y.Init(lexer, parser)
+	y.sourceCodePointer = &code
+	y.codes = []*yakvm.Code{}
+	raw := y.parser.Program()
+	parseErrors := NewYakMergeError(y.GetLexerErrors(), y.GetParserErrors())
+	if len(*parseErrors) > 0 {
+		return false
+	}
+	y.VisitProgram(raw.(*yak.ProgramContext))
+	lastToken := parser.BaseParser.GetCurrentToken()
+	if lastToken.GetTokenType() != yak.YaklangParserEOF {
+		startColumn := lastToken.GetColumn()
+		if startColumn > 3 {
+			startColumn = lastToken.GetColumn()
+		} else {
+			startColumn = 0
+		}
+		yErr := &YakError{
+			StartPos: Position{
+				LineNumber:   lastToken.GetLine(),
+				ColumnNumber: startColumn,
+			},
+			EndPos: Position{
+				LineNumber:   lastToken.GetLine(),
+				ColumnNumber: startColumn + 6,
+			},
+			Message: y.GetConstError(syntaxUnrecoverableError),
+		}
+		y.pushError(yErr)
+	}
+	compilerErrors := y.GetCompileErrors()
+	if len(compilerErrors) > 0 {
+		return false
+	}
+	return true
+}
+func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) interface{} {
+
+	defer func() {
+		var prefix = y.GetRangeVerbose()
+		if prefix != "" {
+			prefix += ": "
+		}
+		if err := recover(); err != nil {
+			msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)
+			log.Error(msg)
+			//y.errors = append(y.errors, y.NewRangeSyntaxError(msg))
+		}
+		//if err := recover(); err != nil {
+		//	msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)
+		//	log.Error(msg)
+		//	y.errors = append(y.errors, y.NewRangeSyntaxError(msg))
+		//}
+	}()
+
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*yak.ProgramContext)
+	if i == nil {
+		return nil
+	}
+	y.writeAllWS(i.AllWs())
+
+	// 遇到每一个 program 确定是要给人家新开定义域的！
+	y.programCounter++
+
+	noEmptyStmts := funk.Filter(i.StatementList().(*yak.StatementListContext).AllStatement(), func(i yak.IStatementContext) bool {
+		return i.(*yak.StatementContext).Empty() == nil
+	}).([]yak.IStatementContext)
+	if len(noEmptyStmts) <= 0 {
+		return nil
+	}
+
+	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	defer recoverRange()
+	y.VisitStatementList(i.StatementList(), inline...)
+	return nil
+}
+
+func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, inline ...bool) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*yak.ProgramContext)
+	if i == nil {
+		return nil
+	}
+
+	y.writeAllWS(i.AllWs())
+
+	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	defer recoverRange()
+	y.VisitStatementList(i.StatementList(), inline...)
+	return nil
+}
+
+func (y *YakCompiler) GetOpcodes() []*yakvm.Code {
+	return y.codes
+}
+
+func (y *YakCompiler) SetOpcodes(codes []*yakvm.Code) {
+	y.codes = codes
+}
+
+func (y *YakCompiler) GetRootSymbolTable() *yakvm.SymbolTable {
+	return y.rootSymtbl
+}
+func (y *YakCompiler) GetErrors() YakMergeError {
+	return *NewYakMergeError(y.GetLexerErrors(), y.GetParserErrors(), y.GetCompileErrors())
+}
+func (y *YakCompiler) GetNormalErrors() (bool, error) {
+	err := y.GetErrors()
+	return len(err) > 0, err
+}
+func (y *YakCompiler) GetLexerErrors() YakMergeError {
+	return y.lexerErrors
+}
+func (y *YakCompiler) GetParserErrors() YakMergeError {
+	return y.parserErrors
+}
+
+func (y *YakCompiler) GetCompileErrors() YakMergeError {
+	return y.compilerErrors
+}

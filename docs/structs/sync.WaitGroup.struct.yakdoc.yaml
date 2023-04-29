@@ -1,0 +1,28 @@
+is_build_in_struct: true
+libname: sync
+struct_name: sync.WaitGroup
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: sync.WaitGroup
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.WaitGroup
+  name: Done
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.WaitGroup
+  name: Wait
+  relative_struct_name: []
+ptr_methods: []

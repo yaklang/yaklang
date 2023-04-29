@@ -1,0 +1,118 @@
+name: bot
+functions:
+- name: bot.FromEnv
+  type_str: 'func () return(*bot.Client) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/bot.Client
+    type_str: '*bot.Client'
+  relative_structs:
+  - structname: palm/common/utils/bot.Client
+    isbuildinstruct: false
+  - structname: palm/common/utils/bot.Config
+    isbuildinstruct: false
+- name: bot.New
+  type_str: 'func (v1 ...func ConfigOpt(v1: *bot.Client) ) return(*bot.Client) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]bot.ConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/bot.Client
+    type_str: '*bot.Client'
+  relative_structs:
+  - structname: palm/common/utils/bot.Client
+    isbuildinstruct: false
+  - structname: palm/common/utils/bot.Config
+    isbuildinstruct: false
+- name: bot.ding
+  type_str: 'func (v1: string, v2: string) return(func ConfigOpt(v1: *bot.Client)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *bot.Client) '
+- name: bot.webhook
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *bot.Client) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *bot.Client) '
+- name: bot.webhookWithSecret
+  type_str: 'func (v1: string, v2: string) return(func ConfigOpt(v1: *bot.Client)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *bot.Client) '
+- name: bot.workwx
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *bot.Client) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *bot.Client) '
+variables: []

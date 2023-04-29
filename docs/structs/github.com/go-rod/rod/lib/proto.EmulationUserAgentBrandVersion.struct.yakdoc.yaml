@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+  name: Brand
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

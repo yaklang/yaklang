@@ -1,0 +1,97 @@
+is_build_in_struct: false
+libname: report
+struct_name: palm/common/yakgrpc/yakit.ReportRecord
+description: ""
+fields:
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: From
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: Hash
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: Model
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.Model
+  type_str: gorm.Model
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: Owner
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: PublishedAt
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: QuotedJson
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: Title
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: BeforeSave
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: CalcHash
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: ToGRPCModel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/ypb.Report
+    type_str: '*ypb.Report'
+  relative_struct_name:
+  - structname: palm/common/yakgrpc/ypb.Report
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/yakgrpc/yakit.ReportRecord
+  name: ToReport
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*yakit.Report'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

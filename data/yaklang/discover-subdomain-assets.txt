@@ -1,0 +1,20 @@
+//
+// 调用子域名扫描然后进行资产绘制
+//
+params = str.JsonToMap(DATA)
+targets = str.ParamsGetOr(params, "Domain", "")
+assert(targets != "")
+
+targetList = str.Split(targets, ",")
+assert(len(targetList) > 0, "empty target", targets)
+
+log("输入参数为:%v", targets)
+
+log("正在启动子域名扫描")
+domainC, err = scan.ScanSubDomain(CTX, targetList...)
+assertNil(err)
+filter = str.NewFilter()
+for domain = range domainC {
+    db.SaveDomainAsset(domain.Domain, domain.IP)
+}
+log("子域名扫描结束")

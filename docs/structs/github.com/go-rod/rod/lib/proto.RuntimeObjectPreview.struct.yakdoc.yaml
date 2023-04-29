@@ -1,0 +1,45 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Entries
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
+  type_str: '[]*proto.RuntimeEntryPreview'
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Overflow
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Properties
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimePropertyPreview
+  type_str: '[]*proto.RuntimePropertyPreview'
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Subtype
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeObjectPreviewSubtype
+- structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeObjectPreviewType
+methods: []
+ptr_methods: []

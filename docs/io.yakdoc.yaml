@@ -1,0 +1,279 @@
+name: io
+functions:
+- name: io.Copy
+  type_str: 'func (v1: io.Writer, v2: io.Reader) return(int64, error) '
+  long_description: ""
+  description: 把一个 `io.Reader` 中的内容对接到 `io.Writer` 中
+  params:
+  - name: v1
+    param_alias: dstWriter
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  - name: v2
+    param_alias: srcReader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: io.CopyN
+  type_str: 'func (v1: io.Writer, v2: io.Reader, v3: int64) return(int64, error) '
+  long_description: ""
+  description: 从 srcReader 中复制固定长度的字节到 dstWriter
+  params:
+  - name: v1
+    param_alias: dstWriter
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  - name: v2
+    param_alias: srcReader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  - name: v3
+    param_alias: copyLen
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: io.LimitReader
+  type_str: 'func (v1: io.Reader, v2: int64) return(io.Reader) '
+  long_description: ""
+  description: 创建一个新的 `io.Reader` 这个 Reader 只读固定长度
+  params:
+  - name: v1
+    param_alias: srcReader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  - name: v2
+    param_alias: length
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+- name: io.MultiReader
+  type_str: 'func (v1 ...io.Reader) return(io.Reader) '
+  long_description: ""
+  description: 把多个 Reader 合并成一个
+  params:
+  - name: v1
+    param_alias: readers
+    type_alias: ""
+    description: ""
+    type_str: '[]io.Reader'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+- name: io.NopCloser
+  type_str: 'func (v1: io.Reader) return(io.ReadCloser) '
+  long_description: ""
+  description: 把一个 io.Reader 包装成 io.ReadCloser，遇到 Nop/EOF 即关闭
+  params:
+  - name: v1
+    param_alias: reader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.ReadCloser
+- name: io.Pipe
+  type_str: 'func () return(*io.PipeReader, *io.PipeWriter) '
+  long_description: ""
+  description: 创建一个 io 管道
+  returns:
+  - name: r0
+    param_alias: reader
+    type_alias: ""
+    description: ""
+    relative_structname: io.PipeReader
+    type_str: '*io.PipeReader'
+  - name: r1
+    param_alias: writer
+    type_alias: ""
+    description: ""
+    relative_structname: io.PipeWriter
+    type_str: '*io.PipeWriter'
+  relative_structs:
+  - structname: io.PipeReader
+    isbuildinstruct: true
+  - structname: io.PipeWriter
+    isbuildinstruct: true
+- name: io.ReadAll
+  type_str: 'func (v1: io.Reader) return([]uint8, error) '
+  long_description: ""
+  description: 把一个 reader 中的内容全部读出来
+  params:
+  - name: v1
+    param_alias: reader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: io.ReadEvery1s
+  type_str: 'func (v1: context.Context, v2: io.Reader, v3: func (v1: []uint8) return(bool)
+    ) '
+  long_description: ""
+  description: 使用一个 ctx 控制生命周期，每隔一秒钟读一次 Reader，每隔一秒钟执行一次回调函数，回调函数如果返回 false，则立即停止读取
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: reader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  - name: v3
+    param_alias: callback
+    type_alias: ""
+    description: 回调函数，如果回调函数返回 false，立即停止，如果想继续执行则需要返回 true
+    type_str: 'func (v1: []uint8) return(bool) '
+- name: io.ReadFile
+  type_str: 'func (v1: string) return([]uint8, error) '
+  long_description: ""
+  description: 把一个文件中的内容全部读出来
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: io.ReadStable
+  type_str: 'func (v1: net.Conn, v2: float64) return([]uint8) '
+  long_description: ""
+  description: 增加一个【稳定即可】的 Reader
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: net.Conn
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: io.TeeReader
+  type_str: 'func (v1: io.Reader, v2: io.Writer) return(io.Reader) '
+  long_description: ""
+  description: reader 分流，把 srcReader 读出来的内容会同步写到 teeWriter，通过返回值的 reader 来驱动
+  params:
+  - name: v1
+    param_alias: srcReader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  - name: v2
+    param_alias: teeWriter
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+- name: io.WriteString
+  type_str: 'func (v1: io.Writer, v2: string) return(int, error) '
+  long_description: ""
+  description: 把一个 string 写到 writer 中
+  params:
+  - name: v1
+    param_alias: writer
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  - name: v2
+    param_alias: content
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables:
+- name: io.Discard
+  typestr: io.discard
+  description: //
+  relative_struct:
+  - structname: io.discard
+    isbuildinstruct: true
+- name: io.EOF
+  typestr: '*errors.errorString'
+  description: 结束符
+  relative_struct:
+  - structname: errors.errorString
+    isbuildinstruct: true

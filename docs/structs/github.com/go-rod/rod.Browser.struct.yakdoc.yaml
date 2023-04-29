@@ -1,0 +1,861 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.Browser
+description: ""
+fields:
+- structname: github.com/go-rod/rod.Browser
+  name: BrowserContextID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.BrowserBrowserContextID
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: CancelTimeout
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Client
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.CDPClient
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Close
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Connect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Context
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: ControlURL
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: DefaultDevice
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: devices.Device
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/devices.Device
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/devices.Screen
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/devices.ScreenSize
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PageViewport
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.NetworkSetUserAgentOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: DisableDomain
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetSessionID
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Request
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: EachEvent
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: EnableDomain
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetSessionID
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Request
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Event
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod.Message
+    type_str: <-chan *rod.Message
+  relative_struct_name:
+  - structname: github.com/go-rod/rod.Message
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: GetContext
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: GetCookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.NetworkCookie
+    type_str: '[]*proto.NetworkCookie'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.NetworkCookie
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: HandleAuth
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () return(error) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: HijackRequests
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod.HijackRouter
+    type_str: '*rod.HijackRouter'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod.HijackRouter
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: IgnoreCertErrors
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Incognito
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: LoadState
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetSessionID
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Request
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Logger
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: utils.Logger
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Monitor
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustClose
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustConnect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustGetCookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*proto.NetworkCookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustHandleAuth
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustIgnoreCertErrors
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustIncognito
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustPage
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustPageFromTargetID
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetTargetID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustPages
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Pages
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustSetCookies
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*proto.NetworkCookie'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustVersion
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.BrowserGetVersionResult
+    type_str: '*proto.BrowserGetVersionResult'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.BrowserGetVersionResult
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: MustWaitDownload
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () return([]uint8) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: NoDefaultDevice
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Page
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetCreateTarget
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: PageFromSession
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetSessionID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: PageFromTarget
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetTargetID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Pages
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Pages
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: RemoveState
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: ServeMonitor
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: SetCookies
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.NetworkCookieParam
+    type_str: '[]*proto.NetworkCookieParam'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.NetworkCookieParam
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Sleeper
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () return(func Sleeper(v1: context.Context) return(error) ) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: SlowMotion
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Timeout
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Trace
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: Version
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.BrowserGetVersionResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: WaitDownload
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () return(*proto.PageDownloadWillBegin) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: WaitEvent
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Event
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: WithCancel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Browser
+  name: WithPanic
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Browser'
+  relative_struct_name: []
+ptr_methods: []

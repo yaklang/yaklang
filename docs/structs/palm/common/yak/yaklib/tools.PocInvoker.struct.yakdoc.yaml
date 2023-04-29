@@ -1,0 +1,33 @@
+is_build_in_struct: false
+libname: tools
+struct_name: palm/common/yak/yaklib/tools.PocInvoker
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/tools.PocInvoker
+  name: Exec
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib/tools.PocVul
+    type_str: '[]*tools.PocVul'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: palm/common/yak/yaklib/tools.PocVul
+    isbuildinstruct: false
+ptr_methods: []

@@ -1,0 +1,37 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.PageViewport
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.PageViewport
+  name: Height
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.PageViewport
+  name: Scale
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.PageViewport
+  name: Width
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.PageViewport
+  name: X
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.PageViewport
+  name: "Y"
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+methods: []
+ptr_methods: []

@@ -1,0 +1,502 @@
+name: fuzz
+functions:
+- name: fuzz.HTTPRequest
+  type_str: 'func (v1: interface {}, v2 ...func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig)
+    ) return(*mutate.FuzzHTTPRequest, error) '
+  long_description: ""
+  description: HTTP模糊测试核心函数，构建一个模糊测试 HTTP 请求
+  params:
+  - name: v1
+    param_alias: originRequest
+    type_alias: '[]byte|string|http.Request|*http.Request'
+    description: 可以构建一个新的 HTTP Fuzz 请求的原材料。支持以上多种类型
+    type_str: interface {}
+  - name: v2
+    param_alias: extraParams
+    type_alias: '...fuzzHTTPRequestOpt'
+    description: 额外参数，
+    type_str: '[]mutate.BuildFuzzHTTPRequestOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/mutate.FuzzHTTPRequest
+    type_str: '*mutate.FuzzHTTPRequest'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: palm/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: palm/common/mutate.FuzzHTTPRequestParam
+    isbuildinstruct: false
+- name: fuzz.ProtobufBytes
+  type_str: 'func (v1: interface {}) return(*yaklib.ProtobufRecords) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.ProtobufRecords
+    type_str: '*yaklib.ProtobufRecords'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.ProtobufRecords
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.ProtobufRecord
+    isbuildinstruct: false
+  - structname: gopkg.in/yaml.v3.Node
+    isbuildinstruct: true
+- name: fuzz.ProtobufHex
+  type_str: 'func (v1: interface {}) return(*yaklib.ProtobufRecords) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.ProtobufRecords
+    type_str: '*yaklib.ProtobufRecords'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.ProtobufRecords
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.ProtobufRecord
+    isbuildinstruct: false
+  - structname: gopkg.in/yaml.v3.Node
+    isbuildinstruct: true
+- name: fuzz.ProtobufJSON
+  type_str: 'func (v1: interface {}) return(*yaklib.ProtobufRecords) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.ProtobufRecords
+    type_str: '*yaklib.ProtobufRecords'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.ProtobufRecords
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.ProtobufRecord
+    isbuildinstruct: false
+  - structname: gopkg.in/yaml.v3.Node
+    isbuildinstruct: true
+- name: fuzz.ProtobufYAML
+  type_str: 'func (v1: interface {}) return(*yaklib.ProtobufRecords) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.ProtobufRecords
+    type_str: '*yaklib.ProtobufRecords'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.ProtobufRecords
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.ProtobufRecord
+    isbuildinstruct: false
+  - structname: gopkg.in/yaml.v3.Node
+    isbuildinstruct: true
+- name: fuzz.Strings
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 执行 Fuzz 模版，可以支持把一个模版字符串渲染多个字符串，参考 [web/http fuzz教程](/docs/buildinlibs/lib_fuzz)
+  params:
+  - name: v1
+    param_alias: fuzzTemplate
+    type_alias: '[]byte|string|[]string'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: fuzz.StringsFunc
+  type_str: 'func (v1: interface {}, v2: func (v1: *mutate.MutateResult) , v3 ...interface
+    {}) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *mutate.MutateResult) '
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: fuzz.StringsWithParam
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]string) '
+  long_description: ""
+  description: 新增带参数的 fuzz
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: fuzz.UrlToHTTPRequest
+  type_str: 'func (v1: string, v2: interface {}) return(*mutate.FuzzHTTPRequest, error) '
+  long_description: ""
+  description: 使用 URL 构造一个 Fuzz 请求包
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/mutate.FuzzHTTPRequest
+    type_str: '*mutate.FuzzHTTPRequest'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: palm/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: palm/common/mutate.FuzzHTTPRequestParam
+    isbuildinstruct: false
+- name: fuzz.UrlsToHTTPRequests
+  type_str: 'func (v1 ...interface {}) return(*mutate.FuzzHTTPRequestBatch, error) '
+  long_description: ""
+  description: 把多个 URL 变成可以批量 Fuzz 的请求组(Batch)
+  params:
+  - name: v1
+    param_alias: urlTemplate
+    type_alias: '[]byte|string|[]string'
+    description: 支持 URL/域名/IP 输入，使用 `str.ParseStringToUrlsWith3W`
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/mutate.FuzzHTTPRequestBatch
+    type_str: '*mutate.FuzzHTTPRequestBatch'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/mutate.FuzzHTTPRequestBatch
+    isbuildinstruct: false
+  - structname: palm/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: palm/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: palm/common/mutate.FuzzHTTPRequestParam
+    isbuildinstruct: false
+- name: fuzz.WithConcurrentLimit
+  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: fuzz.WithDelay
+  type_str: 'func (v1: float64) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: fuzz.WithNamingContext
+  type_str: 'func (v1: string) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: fuzz.https
+  type_str: 'func (v1: bool) return(func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig)
+    ) '
+  long_description: ""
+  description: '`http.HTTPRequest` 的 extraParams 中的额外选项之一'
+  params:
+  - name: v1
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: fuzzHTTPRequestOpt
+    description: ""
+    type_str: 'func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig) '
+variables: []

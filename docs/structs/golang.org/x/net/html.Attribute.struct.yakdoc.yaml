@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: xpath
+struct_name: golang.org/x/net/html.Attribute
+description: ""
+fields:
+- structname: golang.org/x/net/html.Attribute
+  name: Key
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: golang.org/x/net/html.Attribute
+  name: Namespace
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: golang.org/x/net/html.Attribute
+  name: Val
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

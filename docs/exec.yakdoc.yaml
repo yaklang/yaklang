@@ -1,0 +1,398 @@
+name: exec
+functions:
+- name: exec.CheckCrash
+  type_str: 'func (v1: *exec.Cmd) return(bool, error) '
+  long_description: ""
+  description: 检查这个进程是否崩溃
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: os/exec.Cmd
+    type_str: '*exec.Cmd'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: os/exec.Cmd
+    isbuildinstruct: true
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: syscall.SysProcAttr
+    isbuildinstruct: true
+  - structname: syscall.Credential
+    isbuildinstruct: true
+  - structname: os.Process
+    isbuildinstruct: true
+  - structname: os.ProcessState
+    isbuildinstruct: true
+- name: exec.Command
+  type_str: 'func (v1: string) return(*exec.Cmd, error) '
+  long_description: |
+    该命令就是最基础的命令执行，但是是 Golang 风格的，使用案例如下
+
+    ```go
+    cmd, err := exec.Command("ls -lh" )
+    die(err)
+
+    cmd.Stdout = os.Stdout
+    die(cmd.Run())
+    ```
+  description: 最基础的，创建一个 `*exec.Cmd` 对象，可以执行，这个功能就是 Golang 原生的 `exec.Command`
+  params:
+  - name: v1
+    param_alias: cmd
+    type_alias: ""
+    description: 想要执行的命令，字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: cmdInstance
+    type_alias: ""
+    description: 命令行执行程序，不是立即执行，需要执行 `cmdInstance.Run()` 来执行
+    relative_structname: os/exec.Cmd
+    type_str: '*exec.Cmd'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: os/exec.Cmd
+    isbuildinstruct: true
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: syscall.SysProcAttr
+    isbuildinstruct: true
+  - structname: syscall.Credential
+    isbuildinstruct: true
+  - structname: os.Process
+    isbuildinstruct: true
+  - structname: os.ProcessState
+    isbuildinstruct: true
+- name: exec.CommandContext
+  type_str: 'func (v1: context.Context, v2: string) return(*exec.Cmd, error) '
+  long_description: ""
+  description: 同 `exec.Command` 函数，但是增加了 context 的配置，可以使用 context.Context 来解决生命周期管理的问题
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: 控制命令执行生命周期的上下文
+    type_str: context.Context
+  - name: v2
+    param_alias: cmd
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: cmdInstance
+    type_alias: ""
+    description: ""
+    relative_structname: os/exec.Cmd
+    type_str: '*exec.Cmd'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: os/exec.Cmd
+    isbuildinstruct: true
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: syscall.SysProcAttr
+    isbuildinstruct: true
+  - structname: syscall.Credential
+    isbuildinstruct: true
+  - structname: os.Process
+    isbuildinstruct: true
+  - structname: os.ProcessState
+    isbuildinstruct: true
+- name: exec.System
+  type_str: 'func (v1: string) return([]uint8, error) '
+  long_description: |
+    使用案例如下
+
+    ```go
+    res, err := exec.System("ls -lh" )
+    die(err)
+
+    println(string(res))
+    ```
+  description: 直接执行一条系统命令，把结果标准输出和标准错误流一起输出出来，bytes 数据流作为结果
+  params:
+  - name: v1
+    param_alias: cmd
+    type_alias: ""
+    description: 想要执行的命令
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: results
+    type_alias: ""
+    description: 执行的结果的命令行输出
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: exec.SystemBatch
+  type_str: 'func (v1: string, v2 ...func poolOpt(v1: *yaklib._execPoolConfig) ) '
+  long_description: |
+    直接执行一条系统命令，该命令支持 fuzz 字符串，具体案例如下:
+
+    ```go
+    exec.SystemBatch("echo {{net:(192.168.1.1/24,example.com)}}" , exec.callback(func(cmd, results){
+        println("exec: ", "results: ", codec.EncodeASCII(string(results)))
+    }))
+    ```
+
+    执行结果如下
+
+    ```
+    exec:  results:  "192.168.1.15\n"
+    exec:  results:  "192.168.1.16\n"
+    exec:  results:  "192.168.1.0\n"
+    exec:  results:  "192.168.1.7\n"
+    exec:  results:  "192.168.1.13\n"
+    ...
+    ...
+    ...
+    exec:  results:  "192.168.1.251\n"
+    exec:  results:  "192.168.1.255\n"
+    exec:  results:  "example.com\n"
+    ```
+
+    不熟悉 `{{net:(xxx)}}` 的朋友可以详细学习一下 fuzz 这个包。
+  description: 批量执行系统命令，cmd 会经过 `fuzz.Strings` 进行变异
+  params:
+  - name: v1
+    param_alias: cmd
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: params
+    type_alias: ""
+    description: 对批量执行命令的后续操作，或者执行池的配置，常见参数有 `callback / concurrent / timeout`
+    type_str: '[]yaklib.poolOpt'
+    is_variadic: true
+- name: exec.SystemContext
+  type_str: 'func (v1: context.Context, v2: string) return([]uint8, error) '
+  long_description: ""
+  description: 带 context 控制生命周期的 `exec.System`
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: cmd
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: results
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: exec.WatchOutput
+  type_str: 'func (v1: string, v2: float64, v3: func (v1: []uint8) return(bool) )
+    return(error) '
+  long_description: |
+    该命令在执行过程中，会把结果每秒输出一次，通过回调函数 `func callback(results: bytes) bool` 来输出结果，
+
+    案例如下：
+
+    ```go
+    exec.WatchOutput("ping 8.8.8.8" , 10, def callback(result) {
+        println(now())
+        println(string(result))
+        return true
+    })
+    ```
+
+    执行结果如下
+
+    ```go
+    2021-06-25 14:28:47.516709 +0800 CST m=+1.035775209
+    PING 8.8.8.8 (8.8.8.8): 56 data bytes
+    64 bytes from 8.8.8.8: icmp_seq=0 ttl=113 time=75.586 ms
+
+    2021-06-25 14:28:48.515702 +0800 CST m=+2.034775042
+    PING 8.8.8.8 (8.8.8.8): 56 data bytes
+    64 bytes from 8.8.8.8: icmp_seq=0 ttl=113 time=75.586 ms
+    64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=124.303 ms
+
+    2021-06-25 14:28:49.516388 +0800 CST m=+3.035467376
+    PING 8.8.8.8 (8.8.8.8): 56 data bytes
+    64 bytes from 8.8.8.8: icmp_seq=0 ttl=113 time=75.586 ms
+    64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=124.303 ms
+    64 bytes from 8.8.8.8: icmp_seq=2 ttl=113 time=90.452 ms
+
+    2021-06-25 14:28:50.514747 +0800 CST m=+4.033832667
+    PING 8.8.8.8 (8.8.8.8): 56 data bytes
+    64 bytes from 8.8.8.8: icmp_seq=0 ttl=113 time=75.586 ms
+    64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=124.303 ms
+    64 bytes from 8.8.8.8: icmp_seq=2 ttl=113 time=90.452 ms
+    64 bytes from 8.8.8.8: icmp_seq=3 ttl=113 time=85.585 ms
+    ```
+  description: 监控一个命令执行的中间结果，一般用于检测这个命令是否得到了想要的结果，或者获取一个命令的中间结果。该函数监控命令执行的标准输出流+标准错误流结果
+  params:
+  - name: v1
+    param_alias: cmd
+    type_alias: ""
+    description: 想要执行的命令
+    type_str: string
+  - name: v2
+    param_alias: timeout
+    type_alias: ""
+    description: 这个命令最多执行多少秒
+    type_str: float64
+  - name: v3
+    param_alias: callback
+    type_alias: ""
+    description: 每一个间隔的时候，命令行是技术出了什么？`func(results bytes) bool`,参数是 `[]byte`, 返回值为
+      true 说明命令继续，返回值为 false，说明命令应该立即停止
+    type_str: 'func (v1: []uint8) return(bool) '
+  returns:
+  - name: r0
+    param_alias: Err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: exec.WatchStderr
+  type_str: 'func (v1: string, v2: float64, v3: func (v1: []uint8) return(bool) )
+    return(error) '
+  long_description: 使用方法同 `exec.WatchStdout` 但是只是监控的输出是标准错误流
+  description: 使用方法同 `exec.WatchOutput` 只是监控的输出是标准错误流
+  params:
+  - name: v1
+    param_alias: cmd
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: timeout
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: v3
+    param_alias: callback
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: []uint8) return(bool) '
+  returns:
+  - name: r0
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: exec.WatchStdout
+  type_str: 'func (v1: string, v2: float64, v3: func (v1: []uint8) return(bool) )
+    return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: []uint8) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: exec.callback
+  type_str: 'func (v1: func (v1: string, v2: []uint8) ) return(func poolOpt(v1: *yaklib._execPoolConfig)
+    ) '
+  long_description: ""
+  description: 设置 SystemBatch 批量执行的回调函数，命令执行结束后会执行的函数
+  params:
+  - name: v1
+    param_alias: callbackFunc
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string, v2: []uint8) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func poolOpt(v1: *yaklib._execPoolConfig) '
+- name: exec.concurrent
+  type_str: 'func (v1: int) return(func poolOpt(v1: *yaklib._execPoolConfig) ) '
+  long_description: ""
+  description: 设置 SystemBatch 批量执行的并发量
+  params:
+  - name: v1
+    param_alias: poolSize
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func poolOpt(v1: *yaklib._execPoolConfig) '
+- name: exec.timeout
+  type_str: 'func (v1: float64) return(func poolOpt(v1: *yaklib._execPoolConfig) ) '
+  long_description: ""
+  description: 设置 SystemBatch 批量执行的 timeout
+  params:
+  - name: v1
+    param_alias: timeout
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func poolOpt(v1: *yaklib._execPoolConfig) '
+variables: []

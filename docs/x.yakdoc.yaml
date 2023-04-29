@@ -1,0 +1,739 @@
+name: x
+functions:
+- name: x.All
+  type_str: 'func (v1 ...interface {}) return(bool) '
+  long_description: ""
+  description: 所有元素都存在且为 true
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Any
+  type_str: 'func (v1 ...interface {}) return(bool) '
+  long_description: ""
+  description: 元素中至少有一个为 true
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Chunk
+  type_str: 'func (v1: interface {}, v2: int) return(interface {}) '
+  long_description: ""
+  description: 把集合按数量分组
+  params:
+  - name: v1
+    param_alias: sliceOrigin
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: groupSize
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Contains
+  type_str: 'func (v1: interface {}, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 集合中是否包含某一个元素
+  params:
+  - name: v1
+    param_alias: slice
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: element
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.ConvertToMap
+  type_str: 'func (v1: interface {}) return(map[string][]string) '
+  long_description: ""
+  description: 把一个对象尽可能转换为 map[string][]string
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string][]string
+- name: x.Difference
+  type_str: 'func (v1: interface {}, v2: interface {}) return(interface {}, interface
+    {}) '
+  long_description: ""
+  description: 计算两个元素的差分
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Drop
+  type_str: 'func (v1: interface {}, v2: int) return(interface {}) '
+  long_description: ""
+  description: 丢弃数组
+  params:
+  - name: v1
+    param_alias: slice
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: size
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Equal
+  type_str: 'func (v1: interface {}, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断两个元素是否相等
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Every
+  type_str: 'func (v1: interface {}, v2 ...interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Filter
+  type_str: 'func (v1: interface {}, v2: func (v1: interface {}) return(bool) ) return(interface
+    {}) '
+  long_description: ""
+  description: '使用一个函数 func(i): bool 过滤某数组'
+  params:
+  - name: v1
+    param_alias: slice
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Find
+  type_str: 'func (v1: interface {}, v2: func (v1: interface {}) return(bool) ) return(interface
+    {}) '
+  long_description: ""
+  description: 寻找符合要求的某个元素
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Foreach
+  type_str: 'func (v1: interface {}, v2: func (v1: interface {}) ) '
+  long_description: ""
+  description: For 循环的函数式编程支持
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) '
+- name: x.ForeachRight
+  type_str: 'func (v1: interface {}, v2: func (v1: interface {}) ) '
+  long_description: ""
+  description: 反向 For 循环
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) '
+- name: x.Head
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取第一个元素
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.If
+  type_str: 'func (v1: bool, v2: interface {}, v3: interface {}) return(interface
+    {}) '
+  long_description: ""
+  description: 类似 SQL 中的 IF 函数
+  params:
+  - name: v1
+    param_alias: condition
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: v2
+    param_alias: obj1
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: obj2
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.IndexOf
+  type_str: 'func (v1: interface {}, v2: interface {}) return(int) '
+  long_description: ""
+  description: 判断元素在数组中的位置
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: x.Intersect
+  type_str: 'func (v1: interface {}, v2: interface {}) return(interface {}) '
+  long_description: ""
+  description: 计算交集
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.IsSubset
+  type_str: 'func (v1: interface {}, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断子集关系
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Keys
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取 Map 的所有 Key
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Map
+  type_str: 'func (v1: interface {}, v2: func funkGeneralFuncType(v1: interface {})
+    return(interface {}) ) return(interface {}) '
+  long_description: ""
+  description: 批处理
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func funkGeneralFuncType(v1: interface {}) return(interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Max
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取最大值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Min
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取最小值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Range
+  type_str: 'func (v1: int) return([]interface {}) '
+  long_description: ""
+  description: 生成一个范围数组/Slice
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+- name: x.Reduce
+  type_str: 'func (v1: interface {}, v2: func funkGeneralReduceFuncType(v1: interface
+    {}, v2: interface {}) return(interface {}) , v3: interface {}) return(interface
+    {}) '
+  long_description: ""
+  description: 函数式编程 Reducer 支持
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func funkGeneralReduceFuncType(v1: interface {}, v2: interface {})
+      return(interface {}) '
+  - name: v3
+    param_alias: initValue
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.RemoveRepeat
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 移除数组/Slice中重复元素
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Reverse
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 数组反向
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Shift
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取出第一个数组元素
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Shuffle
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 打乱集合顺序
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Some
+  type_str: 'func (v1: interface {}, v2 ...interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.Sort
+  type_str: 'func (v1: interface {}, v2: func (v1: int, v2: int) return(bool) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: int, v2: int) return(bool) '
+- name: x.Subtract
+  type_str: 'func (v1: interface {}, v2: interface {}) return(interface {}) '
+  long_description: ""
+  description: 集合相减
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Sum
+  type_str: 'func (v1: interface {}) return(float64) '
+  long_description: ""
+  description: 取和
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: x.Tail
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 出去第一个元素之外的所有数组
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.ToFloat64
+  type_str: 'func (v1: interface {}) return(float64, bool) '
+  long_description: ""
+  description: 解析成数字（double/float64）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: x.ToMap
+  type_str: 'func (v1: interface {}, v2: string) return(interface {}) '
+  long_description: ""
+  description: 数字根据某一个字段生成 Map
+  params:
+  - name: v1
+    param_alias: slice
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: fieldName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.Values
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 取 Map 中的 Value
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: x.WaitConnect
+  type_str: 'func (v1: string, v2: float64) return(error) '
+  long_description: ""
+  description: 等待一个链接具体多少秒钟
+  params:
+  - name: v1
+    param_alias: addr
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: timeoutSeconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: x.Zip
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]funk.Tuple) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/go-funk.Tuple
+    type_str: '[]funk.Tuple'
+  relative_structs:
+  - structname: palm/common/go-funk.Tuple
+    isbuildinstruct: false
+variables: []

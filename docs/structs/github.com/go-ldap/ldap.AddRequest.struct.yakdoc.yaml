@@ -1,0 +1,42 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.AddRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.AddRequest
+  name: Attributes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-ldap/ldap.Attribute
+  type_str: '[]ldap.Attribute'
+- structname: github.com/go-ldap/ldap.AddRequest
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.AddRequest
+  name: DN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.AddRequest
+  name: Attribute
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+ptr_methods: []

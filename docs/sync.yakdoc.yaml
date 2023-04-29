@@ -1,0 +1,135 @@
+name: sync
+functions:
+- name: sync.NewCond
+  type_str: 'func () return(*sync.Cond) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Cond
+    type_str: '*sync.Cond'
+  relative_structs:
+  - structname: sync.Cond
+    isbuildinstruct: true
+- name: sync.NewLock
+  type_str: 'func () return(*sync.Mutex) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Mutex
+    type_str: '*sync.Mutex'
+  relative_structs:
+  - structname: sync.Mutex
+    isbuildinstruct: true
+- name: sync.NewMap
+  type_str: 'func () return(*sync.Map) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Map
+    type_str: '*sync.Map'
+  relative_structs:
+  - structname: sync.Map
+    isbuildinstruct: true
+- name: sync.NewMutex
+  type_str: 'func () return(*sync.Mutex) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Mutex
+    type_str: '*sync.Mutex'
+  relative_structs:
+  - structname: sync.Mutex
+    isbuildinstruct: true
+- name: sync.NewOnce
+  type_str: 'func () return(*sync.Once) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Once
+    type_str: '*sync.Once'
+  relative_structs:
+  - structname: sync.Once
+    isbuildinstruct: true
+- name: sync.NewPool
+  type_str: 'func () return(*sync.Pool) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.Pool
+    type_str: '*sync.Pool'
+  relative_structs:
+  - structname: sync.Pool
+    isbuildinstruct: true
+- name: sync.NewRWMutex
+  type_str: 'func () return(*sync.RWMutex) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.RWMutex
+    type_str: '*sync.RWMutex'
+  relative_structs:
+  - structname: sync.RWMutex
+    isbuildinstruct: true
+- name: sync.NewSizedWaitGroup
+  type_str: 'func (v1: int) return(*utils.SizedWaitGroup) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils.SizedWaitGroup
+    type_str: '*utils.SizedWaitGroup'
+  relative_structs:
+  - structname: palm/common/utils.SizedWaitGroup
+    isbuildinstruct: false
+- name: sync.NewWaitGroup
+  type_str: 'func () return(*sync.WaitGroup) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: sync.WaitGroup
+    type_str: '*sync.WaitGroup'
+  relative_structs:
+  - structname: sync.WaitGroup
+    isbuildinstruct: true
+variables: []

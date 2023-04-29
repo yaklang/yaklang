@@ -1,0 +1,42 @@
+log("正在启动 Webhook 服务器")
+hook = NewWebHook(os.GetRandomAvailableTCPPort(), fn(data) {
+    mapRaw, err = str.JsonRawByteToMap(data)
+    if err != nil {
+        return
+    }
+
+    type = mapRaw.type
+
+    if f("%v", type) == "web_vuln" {
+        dump(f("recv [%s]", type))
+        err = db.SaveVulnFromXrayRawMap(mapRaw, TASK_ID, RUNTIME_ID)
+        if err != nil {
+            dump(err, mapRaw)
+        }
+    }else{
+        dump(mapRaw)
+    }
+})
+addr = hook.Addr()
+hook.Start()
+
+log("默认 webhook 启动： %v, 1 秒后启动扫描进程", addr)
+sleep(1)
+
+args = [
+    "--config", xray.FetchDefaultXrayConfig(),
+    "servicescan", "--target", DATA,
+    "--webhook-output", addr,
+]
+log("启动 XRAY 进程: %v", str.Join(args, " "))
+
+subprocess, err = GetXraySubProcess(
+    CTX,
+    args...,
+)
+assertNil(err)
+output, err = subprocess.CombinedOutput()
+if err != nil {
+    log(string(output))
+}
+log("XRAY 进程结束: %v", err)

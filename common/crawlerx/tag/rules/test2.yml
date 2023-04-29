@@ -1,0 +1,9 @@
+host: localhost:3306
+user: root
+pwd: 123456
+dbname: test
+devs:
+  - 10.37.51.2:20008
+  - 10.37.51.3:20008
+filter_types:
+  813-http: 0

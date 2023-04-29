@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.KeyAction
+description: ""
+fields:
+- structname: github.com/go-rod/rod.KeyAction
+  name: Key
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: input.Key
+- structname: github.com/go-rod/rod.KeyAction
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: rod.KeyActionType
+methods: []
+ptr_methods: []

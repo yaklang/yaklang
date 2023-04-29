@@ -1,0 +1,11 @@
+version: "2.2"
+
+services:
+  builder:
+    build: docker_builder/
+    volumes:
+      - ../:/go/src/palm
+    working_dir:
+      /go/src/palm
+    command:
+      ./scripts/build_nodes_in_docker.sh

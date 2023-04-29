@@ -1,0 +1,76 @@
+name: rdp
+functions:
+- name: rdp.Login
+  type_str: 'func (v1: string, v2: string, v3: string, v4: string, v5: int) return(bool,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: rdp.Version
+  type_str: 'func (v1: string, v2: time.Duration) return(string, []string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables: []

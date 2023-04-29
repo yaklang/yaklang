@@ -1,0 +1,675 @@
+name: poc
+functions:
+- name: poc.FixHTTPPacketCRLF
+  type_str: 'func (v1: []uint8, v2: bool) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.FixHTTPRequest
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: 修复可能有问题的 http request 数据包
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.FixHTTPResponse
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: 修复可能有问题的 http response 数据包
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.HTTP
+  type_str: 'func (v1: interface {}, v2 ...func pocConfig(v1: *yaklib._pocConfig)
+    ) return([]uint8, []uint8, error) '
+  long_description: ""
+  description: 直接使用一个数据包，发送 HTTP 请求
+  params:
+  - name: v1
+    param_alias: packet
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: extraParams
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib.pocConfig'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: responsePacket
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: requestPacket
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: poc.HTTPPacketForceChunked
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.ParseBytesToHTTPRequest
+  type_str: 'func (v1: []uint8) return(*http.Request, error) '
+  long_description: ""
+  description: 把一个原始数据包 bytes 转变成 HTTP 请求
+  params:
+  - name: v1
+    param_alias: requestRaw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: req
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: poc.ParseBytesToHTTPResponse
+  type_str: 'func (v1: []uint8) return(*http.Response, error) '
+  long_description: ""
+  description: 把一个数据包转变成可用的 HTTP Response 对象
+  params:
+  - name: v1
+    param_alias: raw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: rsp
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: poc.ParseUrlToHTTPRequestRaw
+  type_str: 'func (v1: string, v2: interface {}) return(bool, []uint8, error) '
+  long_description: ""
+  description: 把 URL 解析成原始数据包
+  params:
+  - name: v1
+    param_alias: method
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: url
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: https
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: packet
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: poc.ReplaceBody
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: bool) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.Split
+  type_str: 'func (v1: []uint8, v2 ...func (v1: string) ) return(string, []uint8) '
+  long_description: ""
+  description: 把一个数据包的 Header 部分和 Body 分开，Header 是 string，body 部分是 bytes
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func(string)'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: poc.Websocket
+  type_str: 'func (v1: interface {}, v2 ...func pocConfig(v1: *yaklib._pocConfig)
+    ) return([]uint8, []uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib.pocConfig'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: poc.host
+  type_str: 'func (v1: string) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 强制指定连接 Host（一般用于 host）
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.http2
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.https
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: forceHttps
+  params:
+  - name: v1
+    param_alias: b
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.jsRedirect
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 控制 js 跳转是否启用
+  params:
+  - name: v1
+    param_alias: enable
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.noFixContentLength
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 不修复 ContentLength 控制开关
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.noRedirect
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.params
+  type_str: 'func (v1: interface {}) return(func pocConfig(v1: *yaklib._pocConfig)
+    ) '
+  long_description: ""
+  description: 构造数据包时的参数，需要一个 map[string]any
+  params:
+  - name: v1
+    param_alias: params
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.port
+  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 强行设置远端连接的端口（默认可以自动设置）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.proxy
+  type_str: 'func (v1 ...string) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 设置代理
+  params:
+  - name: v1
+    param_alias: proxyUrl
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.redirectHandler
+  type_str: 'func (v1: func (v1: bool, v2: []uint8, v3: []uint8) return(bool) ) return(func
+    pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 设置重定向处理函数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: bool, v2: []uint8, v3: []uint8) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.redirectTimes
+  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 设置重定向的次数
+  params:
+  - name: v1
+    param_alias: maxRetry
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.retryInStatusCode
+  type_str: 'func (v1 ...int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.retryNotInStatusCode
+  type_str: 'func (v1 ...int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.retryTimes
+  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.timeout
+  type_str: 'func (v1: float64) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: 设置 PoC Timeout
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.websocket
+  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.websocketFromServer
+  type_str: 'func (v1: func (v1: []uint8, v2: func () ) ) return(func pocConfig(v1:
+    *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: []uint8, v2: func () ) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+- name: poc.websocketOnClient
+  type_str: 'func (v1: func (v1: *lowhttp.WebsocketClient) ) return(func pocConfig(v1:
+    *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *lowhttp.WebsocketClient) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+variables: []

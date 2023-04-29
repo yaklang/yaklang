@@ -1,0 +1,345 @@
+is_build_in_struct: true
+libname: udp
+struct_name: net/netip.Addr
+description: ""
+fields: []
+methods:
+- description: ""
+  structname: net/netip.Addr
+  name: AppendTo
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: As16
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[16]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: As4
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[4]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: AsSlice
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: BitLen
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Compare
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Is4
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Is4In6
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Is6
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsGlobalUnicast
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsInterfaceLocalMulticast
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsLinkLocalMulticast
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsLinkLocalUnicast
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsLoopback
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsMulticast
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsPrivate
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsUnspecified
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: IsValid
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Less
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: MarshalBinary
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: MarshalText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Next
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Prefix
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/netip.Prefix
+    type_str: netip.Prefix
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: net/netip.Prefix
+    isbuildinstruct: true
+- description: ""
+  structname: net/netip.Addr
+  name: Prev
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: StringExpanded
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Unmap
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: WithZone
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.Addr
+  relative_struct_name: []
+- description: ""
+  structname: net/netip.Addr
+  name: Zone
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

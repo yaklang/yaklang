@@ -1,0 +1,237 @@
+name: tcp
+functions:
+- name: tcp.Connect
+  type_str: 'func (v1: string, v2: interface {}, v3 ...func dialerOpt(v1: *yaklib._tcpDialer)
+    ) return(*yaklib.tcpConnection, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: 要连接的 host
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: 要连接的端口
+    type_str: interface {}
+  - name: v3
+    param_alias: params
+    type_alias: '...clientOpt'
+    description: ""
+    type_str: '[]yaklib.dialerOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: conn
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.tcpConnection
+    type_str: '*yaklib.tcpConnection'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib.tcpConnection
+    isbuildinstruct: false
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: tcp.Forward
+  type_str: 'func (v1: int, v2: string, v3: int) return(error) '
+  long_description: ""
+  description: 转发 TCP 链接，在本地开一个 TCP 服务器，把到这个服务器的链接转发到远程端口上
+  params:
+  - name: v1
+    param_alias: localPort
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v2
+    param_alias: remoteHost
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: remotePort
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: tcp.Serve
+  type_str: 'func (v1: interface {}, v2: int, v3 ...func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig)
+    ) return(error) '
+  long_description: ""
+  description: 启动一个 tcp 服务器
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: params
+    type_alias: '...serverOpt'
+    description: ""
+    type_str: '[]yaklib.tcpServerConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: tcp.cliengProxy
+  type_str: 'func (v1: string) return(func dialerOpt(v1: *yaklib._tcpDialer) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dialerOpt(v1: *yaklib._tcpDialer) '
+- name: tcp.clientLocal
+  type_str: 'func (v1: interface {}) return(func dialerOpt(v1: *yaklib._tcpDialer)
+    ) '
+  long_description: ""
+  description: 【客户端参数】设置客户端本地地址
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: clientOpt
+    description: ""
+    type_str: 'func dialerOpt(v1: *yaklib._tcpDialer) '
+- name: tcp.clientTimeout
+  type_str: 'func (v1: float64) return(func dialerOpt(v1: *yaklib._tcpDialer) ) '
+  long_description: ""
+  description: 【客户端参数】设置超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: clientOpt
+    description: ""
+    type_str: 'func dialerOpt(v1: *yaklib._tcpDialer) '
+- name: tcp.clientTls
+  type_str: 'func (v1: interface {}, v2: interface {}, v3 ...interface {}) return(func
+    dialerOpt(v1: *yaklib._tcpDialer) ) '
+  long_description: ""
+  description: 【客户端参数】设置 TLS/SSL
+  params:
+  - name: v1
+    param_alias: cert
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: caCerts
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dialerOpt(v1: *yaklib._tcpDialer) '
+- name: tcp.serverCallback
+  type_str: 'func (v1: func (v1: *yaklib.tcpConnection) ) return(func tcpServerConfigOpt(v1:
+    *yaklib.tcpServerConfig) ) '
+  long_description: ""
+  description: 【服务端参数】设置服务端连接处理回调函数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yaklib.tcpConnection) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig) '
+- name: tcp.serverContext
+  type_str: 'func (v1: context.Context) return(func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig)
+    ) '
+  long_description: ""
+  description: 【服务端参数】设置服务端上下文，用于控制服务器生命周期
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig) '
+- name: tcp.serverTls
+  type_str: 'func (v1: interface {}, v2: interface {}, v3 ...interface {}) return(func
+    tcpServerConfigOpt(v1: *yaklib.tcpServerConfig) ) '
+  long_description: ""
+  description: 【服务端参数】设置 SSL/TLS 服务器
+  params:
+  - name: v1
+    param_alias: cert
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: caCerts
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig) '
+variables: []

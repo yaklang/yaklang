@@ -1,0 +1,140 @@
+name: redis
+functions:
+- name: redis.New
+  type_str: 'func (v1 ...func redisConfigOpt(v1: *yaklib.redisConfig) ) return(*yaklib.redisClient) '
+  long_description: ""
+  description: 启动一个 Redis 客户端
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib.redisConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.redisClient
+    type_str: '*yaklib.redisClient'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.redisClient
+    isbuildinstruct: false
+- name: redis.addr
+  type_str: 'func (v1: string) return(func redisConfigOpt(v1: *yaklib.redisConfig)
+    ) '
+  long_description: ""
+  description: 设置 Redis 地址
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.host
+  type_str: 'func (v1: string) return(func redisConfigOpt(v1: *yaklib.redisConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.password
+  type_str: 'func (v1: string) return(func redisConfigOpt(v1: *yaklib.redisConfig)
+    ) '
+  long_description: ""
+  description: 设置 Redis 密码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.port
+  type_str: 'func (v1: int) return(func redisConfigOpt(v1: *yaklib.redisConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.retry
+  type_str: 'func (v1: int) return(func redisConfigOpt(v1: *yaklib.redisConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.timeoutSeconds
+  type_str: 'func (v1: int) return(func redisConfigOpt(v1: *yaklib.redisConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+- name: redis.username
+  type_str: 'func (v1: string) return(func redisConfigOpt(v1: *yaklib.redisConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func redisConfigOpt(v1: *yaklib.redisConfig) '
+variables: []

@@ -1,0 +1,90 @@
+points = []
+
+lines = []
+
+cities = db.QueryCitiesByName("北京")
+assert(len(cities) == 1)
+
+beijing,chengdu,shanghai,taiyuan = 0,0,0,0
+for _, i = range cities {
+    points = append(points, geojson.WithNameValue(
+        i.ToGeoJsonPoint(),
+        "beijing", randn(10, 44)),
+    )
+    beijing = i
+
+
+}
+beijing = cities[0]
+
+cities = db.QueryCitiesByName("成都")
+assert(len(cities) == 1)
+for _, i = range cities {
+    points = append(points, geojson.WithNameValue(
+        i.ToGeoJsonPoint(),
+        "chengdu", randn(10, 44)),
+    )
+    chengdu = i
+    lines = append(lines, i.ToGeoJsonLineTo(beijing))
+}
+chengdu = cities[0]
+
+
+cities = db.QueryCitiesByName("上海")
+assert(len(cities) == 1)
+for _, i = range cities {
+    points = append(points, geojson.WithNameValue(
+        i.ToGeoJsonPoint(),
+        "shanghai", randn(10, 44)),
+    )
+    shanghai = i
+    lines = append(lines, i.ToGeoJsonLineTo(chengdu))
+    lines = append(lines, i.ToGeoJsonLineTo(beijing))
+}
+shanghai = cities[0]
+
+cities = db.QueryCitiesByName("太原")
+assert(len(cities) == 1)
+for _, i = range cities {
+    points = append(points, geojson.WithNameValue(
+        i.ToGeoJsonPoint(),
+        "taiyuan", randn(10, 44)),
+    )
+    taiyuan = i
+    lines = append(lines, i.ToGeoJsonLineTo(chengdu))
+    lines = append(lines, i.ToGeoJsonLineTo(shanghai))
+    lines = append(lines, i.ToGeoJsonLineTo(beijing))
+}
+
+polygon = cities[0].ToGeoJsonPolygon(beijing, chengdu, shanghai)
+
+graphData = graph.NewGeoJsonFeatureCollection()
+graphData.AddFeature(polygon, points...)
+item, err = graph.CreateGraphModel("测试地理图", "简单的描述信息", graphData, TASK_ID)
+assert(err == nil, err)
+CreateOrUpdateGraph(item)
+
+
+graphData = graph.NewGeoJsonLineFeatureCollection()
+graphData.AddFeature(lines...)
+graphData.AddFeature(points...)
+item, err = graph.CreateGraphModel("测试地理图 Line", "简单的描述信息", graphData, TASK_ID)
+assert(err == nil, err)
+CreateOrUpdateGraph(item)
+
+
+graphData = graph.NewGeoJsonPointLineFeatureCollection()
+
+// features = append(lines, points...)
+graphData.AddFeature(points...)
+graphData.AddFeature(lines...)
+item, err = graph.CreateGraphModel("测试地理图 Point Line", "简单的描述信息", graphData, TASK_ID)
+assert(err == nil, err)
+CreateOrUpdateGraph(item)
+
+graphData = graph.NewGeoJsonHeatmapFeatureCollection()
+graphData.AddFeature(points...)
+graphData.AddFeature(lines...)
+item, err = graph.CreateGraphModel("测试地理图 Heatmap Line", "简单的描述信息", graphData, TASK_ID)
+assert(err == nil, err)
+CreateOrUpdateGraph(item)

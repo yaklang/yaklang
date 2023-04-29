@@ -1,0 +1,13 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
+  name: Data
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

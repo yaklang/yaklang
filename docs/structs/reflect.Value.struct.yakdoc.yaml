@@ -1,0 +1,859 @@
+is_build_in_struct: true
+libname: dyn
+struct_name: reflect.Value
+description: ""
+fields: []
+methods:
+- description: ""
+  structname: reflect.Value
+  name: Addr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Bytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CallSlice
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanAddr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanComplex
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanConvert
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Type
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanFloat
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanInt
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanInterface
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanSet
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: CanUint
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Cap
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Close
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Complex
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: complex128
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Convert
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Type
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Elem
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Field
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: FieldByIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: FieldByIndexErr
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: FieldByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: FieldByNameFunc
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Float
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Index
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Interface
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: InterfaceData
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[2]uintptr'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: IsNil
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: IsValid
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: IsZero
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Kind
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Kind
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Len
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: MapIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: MapKeys
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: MapRange
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: reflect.MapIter
+    type_str: '*reflect.MapIter'
+  relative_struct_name:
+  - structname: reflect.MapIter
+    isbuildinstruct: true
+- description: ""
+  structname: reflect.Value
+  name: Method
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: MethodByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: NumField
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: NumMethod
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: OverflowComplex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: complex128
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: OverflowFloat
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: OverflowInt
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: OverflowUint
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Pointer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uintptr
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Recv
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Send
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetBool
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetBytes
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetCap
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetComplex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: complex128
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetFloat
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetInt
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetIterKey
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*reflect.MapIter'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetIterValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*reflect.MapIter'
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetLen
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetMapIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetPointer
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: unsafe.Pointer
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetUint
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Slice
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Slice3
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: TryRecv
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: TrySend
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Type
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Type
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Uint
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: UnsafeAddr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uintptr
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: UnsafePointer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: unsafe.Pointer
+  relative_struct_name: []
+ptr_methods: []

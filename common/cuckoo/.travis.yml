@@ -1,0 +1,11 @@
+language: go
+go:
+  - 1.7
+  - 1.8
+  - tip
+sudo: false
+before_install:
+  - go get github.com/mattn/goveralls
+script:
+  - export PATH=$PATH:$HOME/gopath/bin
+  - make ci

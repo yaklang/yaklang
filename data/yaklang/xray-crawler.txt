@@ -1,0 +1,118 @@
+// author: v1ll4n
+// 使用普通爬虫扫描漏洞
+// json schema 可以用来验证输入
+//
+
+params = str.JsonToMap(DATA)
+url = str.ParamsGetOr(params, "URL", "")
+websiteKeyword = str.ParamsGetOr(params, "Website关键字[针对已生成Website资产]", "")
+urlKeyword = str.ParamsGetOr(params, "URL关键字[针对HTTPRequest资产]", "")
+assert(url != "" || websiteKeyword != "" || urlKeyword != "", "没有明确主动 Web 漏扫目标，退出")
+
+concurrent = parseInt(str.ParamsGetOr(params, "同时并发爬虫数量", "3"))
+assert(concurrent > 0, "并发量参数设置不合理")
+
+swg = sync.NewSizedWaitGroup(concurrent)
+
+subprocess = GetXraySubProcess(CTX, "--config", xray.FetchDefaultXrayConfig(), "version")
+raw, err = subprocess.CombinedOutput()
+assert(err == nil, err, string(raw))
+
+log("XRAY Version: \n%v", string(raw))
+
+log("准备开始开始部署 WebHooks")
+hook = NewWebHook(os.GetRandomAvailableTCPPort(), fn(data) {
+    mapRaw, err = str.JsonRawByteToMap(data)
+    if err != nil {
+        return
+    }
+
+    type = mapRaw.type
+    if type == "web_statistic" {
+
+    } else {
+        dump(f("recv [%s]", type))
+        err = db.SaveVulnFromXrayRawMap(mapRaw, TASK_ID, RUNTIME_ID)
+        if err != nil {
+            dump(err, mapRaw)
+        }
+    }
+})
+addr = hook.Addr()
+
+log("已经启动 WebHooks")
+hook.Start()
+
+log("准备开始进行爬虫漏扫")
+sleep(1)
+
+log("准备 XRAY 实例定义")
+crawlerFunc = fn(u) {
+    defer swg.Done()
+
+    log("URL爬虫漏扫开始执行：%v", u)
+    subprocess = CreateMaterialFileSubProcess(CTX, file,
+        "--config", xray.FetchDefaultXrayConfig(),
+        "webscan", "--basic-crawler", u,
+        "--webhook-output", addr,
+    )
+    err = subprocess.Run()
+    if err != "" {
+        log("扫描失败：%v, Reason: %v", u, err)
+    }else{
+        log("扫描结束：%v", u)
+    }
+}
+
+singleUrlScanFunc = fn(u) {
+    defer swg.Done()
+
+    log("URL 漏扫开始执行：%v", u)
+    subprocess = CreateMaterialFileSubProcess(CTX, file,
+        "--config", xray.FetchDefaultXrayConfig(),
+        "webscan", "--url", u,
+        "--webhook-output", addr,
+    )
+    err = subprocess.Run()
+    if err != "" {
+        log("扫描失败：%v, Reason: %v", u, err)
+    }else{
+        log("扫描结束：%v", u)
+    }
+}
+
+
+// 单个 URL 扫描
+if url != "" {
+    swg.Add()
+    go crawlerFunc(url)
+}
+
+// 从 Website 资产中选择资产扫描
+if websiteKeyword != "" {
+    for website = range db.FuzzQueryWebsitesByKeyword(CTX, websiteKeyword) {
+        log("获取到网站信息：%v", website.WebsiteName)
+        swg.Add()
+        go crawlerFunc(website.WebsiteName)
+    }
+}
+
+if urlKeyword != "" {
+    filter = str.NewFilter()
+    for httpRequest = range db.FuzzQueryHTTPRequestByKeyword(CTX, urlKeyword) {
+        if httpRequest.Method == "GET" {
+            if filter.Exist(httpRequest.Url) {
+                continue
+            }
+            filter.Insert(httpRequest.Url)
+
+            log("针对 URL 扫描：%v", httpRequest.Url)
+            swg.Add()
+            go singleUrlScanFunc(httpRequest.Url)
+        }else{
+            log("暂不支持对[%v] %v 的扫描", httpRequest.Method, httpRequest.Url)
+        }
+    }
+}
+
+swg.Wait()

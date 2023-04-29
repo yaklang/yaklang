@@ -1,0 +1,8 @@
+err = mitm.Bridge(
+    CTX, "127.0.0.1", 8088, "http://127.0.0.1:7890",
+    fn(isHttps, req, rsp) {
+    },
+)
+assertNil(err)
+
+sleep(2000)

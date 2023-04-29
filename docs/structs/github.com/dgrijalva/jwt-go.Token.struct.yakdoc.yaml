@@ -1,0 +1,81 @@
+is_build_in_struct: true
+libname: jwt
+struct_name: github.com/dgrijalva/jwt-go.Token
+description: ""
+fields:
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Claims
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: jwt.Claims
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]interface {}
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Method
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: jwt.SigningMethod
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Raw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Signature
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/dgrijalva/jwt-go.Token
+  name: Valid
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/dgrijalva/jwt-go.Token
+  name: SignedString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/dgrijalva/jwt-go.Token
+  name: SigningString
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

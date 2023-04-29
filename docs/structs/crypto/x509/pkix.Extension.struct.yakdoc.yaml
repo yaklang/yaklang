@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.Extension
+description: ""
+fields:
+- structname: crypto/x509/pkix.Extension
+  name: Critical
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: crypto/x509/pkix.Extension
+  name: Id
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: asn1.ObjectIdentifier
+- structname: crypto/x509/pkix.Extension
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

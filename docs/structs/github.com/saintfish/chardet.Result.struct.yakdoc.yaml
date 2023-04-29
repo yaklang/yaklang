@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: codec
+struct_name: github.com/saintfish/chardet.Result
+description: ""
+fields:
+- structname: github.com/saintfish/chardet.Result
+  name: Charset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/saintfish/chardet.Result
+  name: Confidence
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/saintfish/chardet.Result
+  name: Language
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

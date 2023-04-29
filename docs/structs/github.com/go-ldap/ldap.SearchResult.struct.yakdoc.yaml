@@ -1,0 +1,42 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.SearchResult
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.SearchResult
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.SearchResult
+  name: Entries
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-ldap/ldap.Entry
+  type_str: '[]*ldap.Entry'
+- structname: github.com/go-ldap/ldap.SearchResult
+  name: Referrals
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.SearchResult
+  name: PrettyPrint
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.SearchResult
+  name: Print
+  relative_struct_name: []
+ptr_methods: []

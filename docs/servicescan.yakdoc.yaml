@@ -1,0 +1,494 @@
+name: servicescan
+functions:
+- name: servicescan.Scan
+  type_str: 'func (v1: string, v2: string, v3 ...func ConfigOption(v1: *fp.Config)
+    ) return(chan *fp.MatchResult, error) '
+  long_description: ""
+  description: 扫描服务指纹的核心函数
+  params:
+  - name: v1
+    param_alias: hosts
+    type_alias: ""
+    description: 想要扫描的主机，支持 `,` 分割的网段，IP地址，域名等
+    type_str: string
+  - name: v2
+    param_alias: ports
+    type_alias: ""
+    description: 想要扫描的端口
+    type_str: string
+  - name: v3
+    param_alias: params
+    type_alias: '...opt'
+    description: 额外扫描参数
+    type_str: '[]fp.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChannel
+    type_alias: ""
+    description: 扫描结果的返回点
+    type_str: chan *fp.MatchResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+- name: servicescan.ScanFromPing
+  type_str: 'func (v1: chan *pingutil.PingResult, v2: string, v3 ...func ConfigOption(v1:
+    *fp.Config) ) return(chan *fp.MatchResult, error) '
+  long_description: ""
+  description: 从 Ping 中扫描
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/pingutil.PingResult
+    type_str: chan *pingutil.PingResult
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]fp.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/fp.MatchResult
+    type_str: chan *fp.MatchResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/utils/pingutil.PingResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+- name: servicescan.ScanFromSpaceEngine
+  type_str: 'func (v1: interface {}, v2 ...func ConfigOption(v1: *fp.Config) ) return(chan
+    *fp.MatchResult, error) '
+  long_description: ""
+  description: 从网络空间搜索引擎的结果中扫描指纹信息
+  params:
+  - name: v1
+    param_alias: chanFromSpacengine
+    type_alias: ""
+    description: 从 spacengine 模块中返回的扫描结果 chan
+    type_str: interface {}
+  - name: v2
+    param_alias: params
+    type_alias: '...opt'
+    description: 额外参数
+    type_str: '[]fp.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    type_str: chan *fp.MatchResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+- name: servicescan.ScanFromSynResult
+  type_str: 'func (v1: interface {}, v2 ...func ConfigOption(v1: *fp.Config) ) return(chan
+    *fp.MatchResult, error) '
+  long_description: ""
+  description: 从 synscan 中返回的结果直接进入 servicescan 扫描的通道
+  params:
+  - name: v1
+    param_alias: chanForSynScan
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: params
+    type_alias: '...opt'
+    description: 额外参数
+    type_str: '[]fp.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    type_str: chan *fp.MatchResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+- name: servicescan.ScanOne
+  type_str: 'func (v1: string, v2: int, v3 ...func ConfigOption(v1: *fp.Config) )
+    return(*fp.MatchResult, error) '
+  long_description: ""
+  description: 同步扫描单个目标
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: params
+    type_alias: '...opt'
+    description: ""
+    type_str: '[]fp.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/fp.MatchResult
+    type_str: '*fp.MatchResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+- name: servicescan.active
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】主动扫描模式
+  params:
+  - name: v1
+    param_alias: isActive
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.all
+  type_str: 'func () return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】扫描全部指纹
+  returns:
+  - name: r0
+    param_alias: scanAll
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.cache
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.concurrent
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: concurrentSize
+    type_alias: ""
+    description: 【参数】设置扫描并发量
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.databaseCache
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 设置缓存（数据库中缓存）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.excludeHosts
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 设置排除 hosts
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.excludePorts
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 设置排除端口
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.maxProbes
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】设置每个指纹扫描过程最多主动发送多少个数据包
+  params:
+  - name: v1
+    param_alias: count
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.maxProbesConcurrent
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】每个指纹扫描目标允许的并发量
+  params:
+  - name: v1
+    param_alias: size
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.nmapRarityMax
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】设置nmap规则的最大稀有度
+  params:
+  - name: v1
+    param_alias: max
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.nmapRule
+  type_str: 'func (v1: interface {}) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 【参数】设置 nmap 规则文件（可以自己写）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.probeTimeout
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: 请求超时时间
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.proto
+  type_str: 'func (v1 ...interface {}) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 设置扫描的协议
+  params:
+  - name: v1
+    param_alias: protos
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.proxy
+  type_str: 'func (v1 ...string) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 设置代理！
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.service
+  type_str: 'func () return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 启动服务扫描（nmap 规则库）
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.web
+  type_str: 'func () return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 强制启用 web 扫描
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+- name: servicescan.webRule
+  type_str: 'func (v1: interface {}) return(func ConfigOption(v1: *fp.Config) ) '
+  long_description: ""
+  description: 启用用户自定义 web 规则
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *fp.Config) '
+variables: []

@@ -1,0 +1,710 @@
+name: file
+functions:
+- name: file.Abs
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把相对路径变为绝对路径，如果出错，原样返回
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: absPath
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: file.Cat
+  type_str: 'func (v1: string) '
+  long_description: ""
+  description: 把文件内容 `cat`到显示屏
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: 想要查看内容的文件名
+    type_str: string
+- name: file.Cp
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 复制文件
+  params:
+  - name: v1
+    param_alias: originFile
+    type_alias: ""
+    description: 想要复制的文件
+    type_str: string
+  - name: v2
+    param_alias: targetFile
+    type_alias: ""
+    description: 目标文件
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Create
+  type_str: 'func (v1: string) return(*yaklib._yakFile, error) '
+  long_description: ""
+  description: 创建一个文件，当前用户下读写执行权限均打开
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib._yakFile
+    type_str: '*yaklib._yakFile'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib._yakFile
+    isbuildinstruct: false
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: file.Dir
+  type_str: 'func (v1: string) return([]*utils.FileInfo) '
+  long_description: ""
+  description: 同 `file.Ls`
+  params:
+  - name: v1
+    param_alias: dirName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: fileInfos
+    type_alias: ""
+    description: ""
+    type_str: '[]*utils.FileInfo'
+  relative_structs:
+  - structname: palm/common/utils.FileInfo
+    isbuildinstruct: false
+- name: file.GetDirPath
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: file.IsAbs
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断路径是否是绝对路径名
+  params:
+  - name: v1
+    param_alias: absPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: file.IsDir
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断路径是否是一个文件夹
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: file.IsExisted
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断路径文件是否存在
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: file.IsFile
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断文件是否存在
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: file.IsLink
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个路径是否是一个文件链接/快捷方式
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: file.Join
+  type_str: 'func (v1 ...string) return(string) '
+  long_description: ""
+  description: 拼接路径
+  params:
+  - name: v1
+    param_alias: paths
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: file.Ls
+  type_str: 'func (v1: string) return([]*utils.FileInfo) '
+  long_description: ""
+  description: 查看当前路径下是否有其他文件
+  params:
+  - name: v1
+    param_alias: dirPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*utils.FileInfo'
+  relative_structs:
+  - structname: palm/common/utils.FileInfo
+    isbuildinstruct: false
+- name: file.Lstat
+  type_str: 'func (v1: string) return(fs.FileInfo, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fs.FileInfo
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Mkdir
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 创建一个文件夹，如果无法创建，基本等同于 `mkdir [path]`，则会失败
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.MkdirAll
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 强制创建个文件夹，如果没有父路径，则会强制创建，相当于执行 `mkdir -p [path]`
+  params:
+  - name: v1
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Mv
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 把一个文件 move 到另一个地方，本质上执行 `os.Rename`
+  params:
+  - name: v1
+    param_alias: oldPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: newPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Open
+  type_str: 'func (v1: string) return(*yaklib._yakFile, error) '
+  long_description: ""
+  description: 打开一个文件，如果没有就创建，使用最多权限
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib._yakFile
+    type_str: '*yaklib._yakFile'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib._yakFile
+    isbuildinstruct: false
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: file.OpenFile
+  type_str: 'func (v1: string, v2: int, v3: fs.FileMode) return(*yaklib._yakFile,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fs.FileMode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib._yakFile
+    type_str: '*yaklib._yakFile'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib._yakFile
+    isbuildinstruct: false
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: file.ReadAll
+  type_str: 'func (v1: io.Reader) return([]uint8, error) '
+  long_description: ""
+  description: 把一个 reader 的内容全部读出来
+  params:
+  - name: v1
+    param_alias: ioReader
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: bytes
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.ReadDirInfoInDirectory
+  type_str: 'func (v1: string) return([]*utils.FileInfo, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils.FileInfo
+    type_str: '[]*utils.FileInfo'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/utils.FileInfo
+    isbuildinstruct: false
+- name: file.ReadFile
+  type_str: 'func (v1: string) return([]uint8, error) '
+  long_description: ""
+  description: 把一个文件内容读出来
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: fileContent
+    type_alias: bytes
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.ReadFileInfoInDirectory
+  type_str: 'func (v1: string) return([]*utils.FileInfo, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils.FileInfo
+    type_str: '[]*utils.FileInfo'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/utils.FileInfo
+    isbuildinstruct: false
+- name: file.ReadLines
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: file.Remove
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 把一个文件移除，相当于 `os.RemoveAll`
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Rename
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 把一个路径重命名
+  params:
+  - name: v1
+    param_alias: oldPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: newPath
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Rm
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 同 `file.Remove` / Golang `os.RemoveAll`
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Save
+  type_str: 'func (v1: string, v2: interface {}) return(error) '
+  long_description: ""
+  description: 把 content 中的内容写入文件名为 fileName 中的文件，支持 bytes/string/[]string
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: content
+    type_alias: '[]byte|string|[]string'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.SaveJson
+  type_str: 'func (v1: string, v2: interface {}) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: filePath
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.Split
+  type_str: 'func (v1: string) return(string, string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: file.Stat
+  type_str: 'func (v1: string) return(fs.FileInfo, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fs.FileInfo
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: file.TailF
+  type_str: 'func (v1: string, v2: func (v1: string) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) '
+- name: file.TempFile
+  type_str: 'func (v1 ...string) return(*yaklib._yakFile, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib._yakFile
+    type_str: '*yaklib._yakFile'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib._yakFile
+    isbuildinstruct: false
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: file.TempFileName
+  type_str: 'func () return(string, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables:
+- name: file.O_APPEND
+  typestr: int
+  description: //
+- name: file.O_CREATE
+  typestr: int
+  description: //
+- name: file.O_EXCL
+  typestr: int
+  description: //
+- name: file.O_RDONLY
+  typestr: int
+  description: //
+- name: file.O_RDWR
+  typestr: int
+  description: //
+- name: file.O_SYNC
+  typestr: int
+  description: //
+- name: file.O_TRUNC
+  typestr: int
+  description: //
+- name: file.O_WRONLY
+  typestr: int
+  description: //

@@ -1,0 +1,113 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/tls.ConnectionState
+description: ""
+fields:
+- structname: crypto/tls.ConnectionState
+  name: CipherSuite
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: crypto/tls.ConnectionState
+  name: DidResume
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: crypto/tls.ConnectionState
+  name: HandshakeComplete
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: crypto/tls.ConnectionState
+  name: NegotiatedProtocol
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: crypto/tls.ConnectionState
+  name: NegotiatedProtocolIsMutual
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: crypto/tls.ConnectionState
+  name: OCSPResponse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: crypto/tls.ConnectionState
+  name: PeerCertificates
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509.Certificate
+  type_str: '[]*x509.Certificate'
+- structname: crypto/tls.ConnectionState
+  name: ServerName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: crypto/tls.ConnectionState
+  name: SignedCertificateTimestamps
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[][]uint8'
+- structname: crypto/tls.ConnectionState
+  name: TLSUnique
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: crypto/tls.ConnectionState
+  name: VerifiedChains
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509.Certificate
+  type_str: '[][]*x509.Certificate'
+- structname: crypto/tls.ConnectionState
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods:
+- ptr: true
+  description: ""
+  structname: crypto/tls.ConnectionState
+  name: ExportKeyingMaterial
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

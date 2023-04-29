@@ -1,0 +1,31 @@
+is_build_in_struct: true
+libname: http
+struct_name: mime/multipart.Form
+description: ""
+fields:
+- structname: mime/multipart.Form
+  name: File
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: mime/multipart.FileHeader
+  type_str: map[string][]*multipart.FileHeader
+- structname: mime/multipart.Form
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string][]string
+methods:
+- ptr: true
+  description: ""
+  structname: mime/multipart.Form
+  name: RemoveAll
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

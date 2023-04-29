@@ -1,0 +1,82 @@
+// author: v1ll4n
+// 本脚本用来控制 Palm SIEM 指纹扫描收集结果进入资产库
+// json schema 可以用来验证输入，详情请见 discover-ports-assets.json
+//    https://jsonschema.net/home
+
+/*
+    初始化用户输入的任务参数
+
+    {
+        "目标网络/Networks/Domains": "",
+        "想要扫描的TCP端口": "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25",
+        "并发/同时扫描的端口数": "10",
+        "超时时间(seconds)": "5",
+        "扫描C段网络": "false",
+        "只保留开放端口结果": "true"
+    }
+*/
+params = str.JsonToMap(DATA)
+host = str.ParamsGetOr(params, "目标网络/Networks/Domains", "")
+port = str.ParamsGetOr(params, "想要扫描的TCP端口", "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25")
+concurrent = parseInt(str.ParamsGetOr(params, "并发/同时扫描的端口数", "10"))
+timeoutSeconds = parseInt(str.ParamsGetOr(params, "超时时间(seconds)", "5"))
+scanCClass = parseBool(str.ParamsGetOr(params, "扫描C段网络", "false"))
+onlyOpen = parseBool(str.ParamsGetOr(params, "只保留开放端口结果", "true"))
+
+assert(host != "", "host empty")
+assert(port != "", "port empty")
+
+originHost = host
+if scanCClass {
+    network = make([]string)
+    for _, target = range str.ParseStringToHosts(host) {
+        net, err = str.IPv4ToCClassNetwork(target)
+        if err != nil {
+            network = append(network, target)
+        }else{
+            network = append(network, net)
+        }
+    }
+
+    nets = str.RemoveRepeat(network)
+    host = str.Join(nets, ",")
+}
+assertf(host != "", "host empty handled failed: origin: %v now: %v", originHost, host)
+
+log("scan host: %v", host)
+log("    with port: %v", port)
+log("    with concurrent: %v", concurrent)
+log("    with timeout seconds: %v", timeoutSeconds)
+
+config = scan.GetDefaultScanFingerprintConfig()
+config.Configure(scan.WithScanFpProbeTimeoutSeconds(timeoutSeconds))
+
+log("正在构建指纹扫描引擎")
+portsChan, err = scan.ScanFpWithConcurrent(
+    CTX,
+    config,
+    concurrent,
+    host, port,
+)
+if err != nil {
+    log("scan fp failed: %s", err)
+    exit(1)
+}
+
+assertf(portsChan != undefined, "generate scan chan failed: %s", err)
+for result = range portsChan {
+    if onlyOpen {
+        if f("%v", result.State) != "open" {
+            continue
+        }
+    }
+
+    if f("%v", result.State) == "open" {
+        log("发现开放端口: %v", str.HostPort(result.Target, result.Port))
+    }
+
+    err = db.CreateOrUpdatePortsFromMatchResult(result)
+    if err != nil {
+        log("save result failed: %s, origin: \n%v", err, sdump(result))
+    }
+}

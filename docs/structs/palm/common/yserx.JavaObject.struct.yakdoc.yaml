@@ -1,0 +1,75 @@
+is_build_in_struct: false
+libname: yso
+struct_name: palm/common/yserx.JavaObject
+description: ""
+fields:
+- structname: palm/common/yserx.JavaObject
+  name: Class
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yserx.JavaSerializable
+- structname: palm/common/yserx.JavaObject
+  name: ClassData
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]yserx.JavaSerializable'
+- structname: palm/common/yserx.JavaObject
+  name: Handle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: palm/common/yserx.JavaObject
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: palm/common/yserx.JavaObject
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaObject
+  name: Bytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaObject
+  name: Json
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaObject
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []

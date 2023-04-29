@@ -1,0 +1,45 @@
+is_build_in_struct: true
+libname: http
+struct_name: net/url.Userinfo
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: net/url.Userinfo
+  name: Password
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.Userinfo
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.Userinfo
+  name: Username
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

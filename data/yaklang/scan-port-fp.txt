@@ -1,0 +1,20 @@
+params = str.JsonToMap(DATA)
+dump(DATA, params, TASK_ID, RUNTIME_ID)
+
+ports = params["port"]
+hosts = params["host"]
+
+c, err = scan.ScanManyFp(CTX, hosts, ports)
+if err != nil {
+    panic(err)
+}
+
+stats = db.NewPortStats()
+for port = range c {
+    stats.FeedMatchResult(port)
+}
+
+err = stats.GenerateAndSaveTimelineReport(f("Analyze Host:%v Port:%v Stats", hosts, ports))
+if err != nil {
+    panic(1)
+}

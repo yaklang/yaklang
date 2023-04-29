@@ -1,0 +1,42 @@
+is_build_in_struct: true
+libname: time
+struct_name: time.Timer
+description: ""
+fields:
+- structname: time.Timer
+  name: C
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: <-chan time.Time
+methods:
+- ptr: true
+  description: ""
+  structname: time.Timer
+  name: Reset
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: time.Timer
+  name: Stop
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

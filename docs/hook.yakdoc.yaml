@@ -1,0 +1,283 @@
+name: hook
+functions:
+- name: hook.CallYakitPluginFunc
+  type_str: 'func (v1: string, v2: string) return(interface {}, error) '
+  long_description: ""
+  description: 导出插件特定函数
+  params:
+  - name: v1
+    param_alias: pluginName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: funcName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: caller
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: hook.LoadYakitPlugin
+  type_str: 'func (v1: *yak.YakToCallerManager, v2: string, v3 ...string) return(error) '
+  long_description: ""
+  description: 为 Manager 加载特定类型的 Yakit 插件
+  params:
+  - name: v1
+    param_alias: manager
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.YakToCallerManager
+    type_str: '*yak.YakToCallerManager'
+  - name: v2
+    param_alias: pluginType
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: funcNames
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+- name: hook.LoadYakitPluginByName
+  type_str: 'func (v1: *yak.YakToCallerManager, v2: string, v3 ...string) return(error) '
+  long_description: ""
+  description: 通过插件名加载特定插件
+  params:
+  - name: v1
+    param_alias: manager
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.YakToCallerManager
+    type_str: '*yak.YakToCallerManager'
+  - name: v2
+    param_alias: pluginName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: exportFuncs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+- name: hook.LoadYakitPluginContext
+  type_str: 'func (v1: *yak.YakToCallerManager, v2: context.Context, v3: string, v4
+    ...string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.YakToCallerManager
+    type_str: '*yak.YakToCallerManager'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+- name: hook.NewManager
+  type_str: 'func () return(*yak.YakToCallerManager) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.YakToCallerManager
+    type_str: '*yak.YakToCallerManager'
+  relative_structs:
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+- name: hook.NewMixPluginCaller
+  type_str: 'func () return(*yak.MixPluginCaller, error) '
+  long_description: ""
+  description: 新增用于配合插件资深联动的主程序
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.MixPluginCaller
+    type_str: '*yak.MixPluginCaller'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak.MixPluginCaller
+    isbuildinstruct: false
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+  - structname: palm/common/fp.MatchResult
+    isbuildinstruct: false
+  - structname: palm/common/fp.FingerprintInfo
+    isbuildinstruct: false
+  - structname: palm/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+  - structname: palm/common/fp.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/dlclark/regexp2.Match
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Group
+    isbuildinstruct: true
+  - structname: github.com/dlclark/regexp2.Capture
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: hook.RemoveYakitPluginByName
+  type_str: 'func (v1: *yak.YakToCallerManager, v2 ...string) '
+  long_description: ""
+  description: 移除已经加载的插件（通过插件名）
+  params:
+  - name: v1
+    param_alias: manager
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak.YakToCallerManager
+    type_str: '*yak.YakToCallerManager'
+  - name: v2
+    param_alias: pluginNames
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  relative_structs:
+  - structname: palm/common/yak.YakToCallerManager
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: palm/common/yak.CallerHookDescription
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+variables: []

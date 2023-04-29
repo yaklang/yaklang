@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+  name: MaskLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+  name: Offset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+  name: Orientation
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.EmulationDisplayFeatureOrientation
+methods: []
+ptr_methods: []

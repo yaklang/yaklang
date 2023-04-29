@@ -1,0 +1,669 @@
+is_build_in_struct: false
+libname: http
+struct_name: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+description: ""
+fields:
+- structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Request
+  type_str: '*http.Request'
+methods:
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: AddCookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  relative_struct_name:
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: AddCookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: BasicAuth
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: BasicAuth
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Clone
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Clone
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Cookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Cookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: FormFile
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: multipart.File
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.FileHeader'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: FormFile
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: multipart.File
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.FileHeader'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: FormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: FormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: MultipartReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: MultipartReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ParseForm
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ParseForm
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ParseMultipartForm
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ParseMultipartForm
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: PostFormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: PostFormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Referer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Referer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: SetBasicAuth
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: SetBasicAuth
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: UserAgent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: UserAgent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: WithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: WithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: WriteProxy
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  name: WriteProxy
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

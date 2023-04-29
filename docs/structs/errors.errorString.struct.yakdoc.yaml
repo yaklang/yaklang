@@ -1,0 +1,18 @@
+is_build_in_struct: true
+libname: io
+struct_name: errors.errorString
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: errors.errorString
+  name: Error
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

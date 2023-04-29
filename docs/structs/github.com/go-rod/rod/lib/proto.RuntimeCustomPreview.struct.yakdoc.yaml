@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
+  name: BodyGetterID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeRemoteObjectID
+- structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

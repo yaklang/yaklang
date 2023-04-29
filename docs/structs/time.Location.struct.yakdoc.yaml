@@ -1,0 +1,18 @@
+is_build_in_struct: true
+libname: http
+struct_name: time.Location
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: time.Location
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

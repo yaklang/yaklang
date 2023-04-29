@@ -1,0 +1,1107 @@
+is_build_in_struct: true
+libname: http
+struct_name: math/big.Int
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Abs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: And
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: AndNot
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Append
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Binomial
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Bit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: BitLen
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Bits
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]big.Word'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Bytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Cmp
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: CmpAbs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Div
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: DivMod
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Exp
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: FillBytes
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Format
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fmt.State
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: GCD
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: GobDecode
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: GobEncode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: IsInt64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: IsUint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Lsh
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: MarshalJSON
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: MarshalText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Mod
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: ModInverse
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: ModSqrt
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Mul
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: MulRange
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Neg
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Not
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Or
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: ProbablyPrime
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Quo
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: QuoRem
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Rand
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: math/rand.Rand
+    type_str: '*rand.Rand'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name:
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Rem
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Rsh
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Scan
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fmt.ScanState
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetBit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetBits
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]big.Word'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetBytes
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetInt64
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: SetUint64
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Sign
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Sqrt
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Sub
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Text
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: TrailingZeroBits
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: UnmarshalJSON
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: UnmarshalText
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/big.Int
+  name: Xor
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*big.Int'
+  relative_struct_name: []
+ptr_methods: []

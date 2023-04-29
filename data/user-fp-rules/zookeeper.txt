@@ -1,0 +1,9 @@
+# Sends string 'stats' and matches memcached and zookeeper
+# 修改了rarity 让该应用更容易扫描到
+Probe TCP FixZookeeper q|stats\r\n|
+rarity 3
+ports 2181,11211
+match memcached m|^STAT pid \d+\r\nSTAT uptime (\d+)\r\nSTAT time \d+\r\nSTAT version ([.\d]+)\r\n|s p/Memcached/ v/$2/ i/uptime $1 seconds/ cpe:/a:memcached:memcached:$2/
+match memcached m|^STAT pid \d+\r\nSTAT uptime (\d+)\r\nSTAT time \d+\r\nSTAT version ([.\d]+) \(?Ubuntu\)?\r\n|s p/Memcached/ v/$2/ i/uptime $1 seconds; Ubuntu/ o/Linux/ cpe:/a:memcached:memcached:$2/ cpe:/o:canonical:ubuntu_linux/ cpe:/o:linux:linux_kernel/a
+match zookeeper m|^Zookeeper version: ([\w.]+)(-[0-9A-Fa-f]+)?, built on ([\w./]+)| p/Zookeeper/ v/$1/ i/Built on $3/ cpe:/a:apache:zookeeper:$1/
+softmatch memcached m|^STAT pid \d+\r\n| cpe:/a:memcached:memcached/

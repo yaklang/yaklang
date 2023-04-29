@@ -1,0 +1,147 @@
+name: context
+functions:
+- name: context.Background
+  type_str: 'func () return(context.Context) '
+  long_description: ""
+  description: 创建一个基础的 `context.Context`
+  returns:
+  - name: r0
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+- name: context.New
+  type_str: 'func () return(context.Context) '
+  long_description: ""
+  description: 同 `context.Background()`
+  returns:
+  - name: r0
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+- name: context.Seconds
+  type_str: 'func (v1: float64) return(context.Context) '
+  long_description: ""
+  description: 生成一个几秒结束的 context
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: float
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+- name: context.WithCancel
+  type_str: 'func (v1: context.Context) return(context.Context, func CancelFunc()
+    ) '
+  long_description: ""
+  description: 给 context 增加一个 cancel 手动按钮
+  params:
+  - name: v1
+    param_alias: originCtx
+    type_alias: ""
+    description: 想要增加 cancel 的上下文实例
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CancelFunc() '
+- name: context.WithDeadline
+  type_str: 'func (v1: context.Context, v2: time.Time) return(context.Context, func
+    CancelFunc() ) '
+  long_description: ""
+  description: 给上下文增加一个 ddl
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: ddl
+    type_alias: ""
+    description: 想要设置的 context 的过期时间，使用 time.Time，可以直接用 time 模块创建
+    relative_structname: time.Time
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CancelFunc() '
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: context.WithTimeout
+  type_str: 'func (v1: context.Context, v2: time.Duration) return(context.Context,
+    func CancelFunc() ) '
+  long_description: ""
+  description: 给 context 带一个超时间隔，如果超时就自动取消
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: timeout
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: r1
+    param_alias: cancel
+    type_alias: ""
+    description: ""
+    type_str: 'func CancelFunc() '
+- name: context.WithValue
+  type_str: 'func (v1: context.Context, v2: interface {}, v3: interface {}) return(context.Context) '
+  long_description: ""
+  description: 为上下文绑定一个 kv 对
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: value
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+variables: []

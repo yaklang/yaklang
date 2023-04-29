@@ -1,0 +1,552 @@
+name: crawler
+functions:
+- name: crawler.RequestsFromFlow
+  type_str: 'func (v1: bool, v2: []uint8, v3: []uint8) return([][]uint8, error) '
+  long_description: ""
+  description: 从一个请求中提取可能可以用于扫描的额外请求
+  params:
+  - name: v1
+    param_alias: https
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: v2
+    param_alias: req
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: rsp
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: reqs
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: crawler.Start
+  type_str: 'func (v1: string, v2 ...func configOpt(v1: *crawler.Config) ) return(chan
+    *crawler.Req, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]crawler.configOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/crawler.Req
+    type_str: chan *crawler.Req
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/crawler.Req
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: crawler.autoLogin
+  type_str: 'func (v1: string, v2: string, v3 ...string) return(func configOpt(v1:
+    *crawler.Config) ) '
+  long_description: ""
+  description: 自动登录功能，支持 DVWA 的标准登陆功能
+  params:
+  - name: v1
+    param_alias: username
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: password
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.basicAuth
+  type_str: 'func (v1: string, v2: string) return(func configOpt(v1: *crawler.Config)
+    ) '
+  long_description: |
+    使用案例非常简单，直接 `crawler.basicAuth(user, pass)` 返回的结果直接可以作为 Start 函数的可变参数
+
+    ```go
+    res, err := crawler.Start(`https://example.com`, crawler.basicAuth(`username`, `secret-password`))
+    die(err)
+    ```
+  description: 设置爬虫的基础认证
+  params:
+  - name: v1
+    param_alias: username
+    type_alias: ""
+    description: 基础认证用户名
+    type_str: string
+  - name: v2
+    param_alias: password
+    type_alias: ""
+    description: 基础认证密码
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: 作为 `crawler.Start` 后不定参数的选项
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.bodySize
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: |
+    使用案例，类似 `crawler.basicAuth`，可以设置获取 body 的字节量，一般用于防止 body 太大撑爆内存。
+
+    ```go
+    res, err := crawler.Start(`http://example.com`, crawler.bodySize(1024 * 1024 * 10))
+    ```
+  description: 想要设置每一个 body 最大获取多少页面大小，bytes 的大小，默认为 1024 * 1024 * 10
+  params:
+  - name: v1
+    param_alias: size
+    type_alias: ""
+    description: 设置 body 最大值
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.concurrent
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置爬虫并发请求数
+  params:
+  - name: v1
+    param_alias: maxConcurrent
+    type_alias: ""
+    description: 并发量，可以理解为同时最多多少个 http 请求被发出去
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.connectTimeout
+  type_str: 'func (v1: float64) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 每一次进行 HTTP 连接的超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: 超时时间，以秒为单位
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.cookie
+  type_str: 'func (v1: string, v2: string) return(func configOpt(v1: *crawler.Config)
+    ) '
+  long_description: ""
+  description: 设置 Cookie
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: Cookie 值的 key
+    type_str: string
+  - name: v2
+    param_alias: value
+    type_alias: ""
+    description: Cookie 值的 value
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.disallowSuffix
+  type_str: 'func (v1: []string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.domainExclude
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: |
+    支持 glob 语法，比如
+    1. `*.example.com` 可以匹配 `test1.example.com` 等
+    1. `*example.com` 可以匹配 `1testexample.com`，也可以匹配 `test1.example.com`
+  description: 不扫描的域名，使用 glob 语法
+  params:
+  - name: v1
+    param_alias: excludedDomain
+    type_alias: ""
+    description: 想要排除的域名
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.domainInclude
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 想要扫描的域名，域名白名单，支持 glob 语法
+  params:
+  - name: v1
+    param_alias: includedDomain
+    type_alias: ""
+    description: 想要扫描的域名
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.forbiddenFromParent
+  type_str: 'func (v1: bool) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: 禁止扫描父路径
+  description: 禁止扫描 url 的父路径
+  params:
+  - name: v1
+    param_alias: allow
+    type_alias: ""
+    description: true or false 是否扫描父路径
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.header
+  type_str: 'func (v1: string, v2: string) return(func configOpt(v1: *crawler.Config)
+    ) '
+  long_description: ""
+  description: 设置爬虫的自定义 Header
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: 设置 Header 的 Key
+    type_str: string
+  - name: v2
+    param_alias: value
+    type_alias: ""
+    description: 设置 Header 的值
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.maxDepth
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置爬虫的最大深度，默认为5
+  params:
+  - name: v1
+    param_alias: depth
+    type_alias: ""
+    description: 设置最大深度（int）
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.maxRedirect
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置最大重定向次数，默认为5
+  params:
+  - name: v1
+    param_alias: limit
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.maxRequest
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置爬虫最大发出的请求数量，默认为 1000
+  params:
+  - name: v1
+    param_alias: limit
+    type_alias: ""
+    description: 设置爬虫最多发出的请求数
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.maxRetry
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 最大重试次数（如果失败了就会重试）
+  params:
+  - name: v1
+    param_alias: limit
+    type_alias: ""
+    description: 最大重试次数
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.maxUrls
+  type_str: 'func (v1: int) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 最多获取到多少个 URL 就停止爬虫
+  params:
+  - name: v1
+    param_alias: limit
+    type_alias: ""
+    description: 最大获取 URL 的树木
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.proxy
+  type_str: 'func (v1 ...string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 为爬虫设置代理，如果代理失效，爬虫则请求失败
+  params:
+  - name: v1
+    param_alias: proxyUrl
+    type_alias: ""
+    description: 爬虫代理，例如 `http://196.168.1.1:8080`
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.responseTimeout
+  type_str: 'func (v1: float64) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 响应超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: 超时时间，float 为秒
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.timeout
+  type_str: 'func (v1: float64) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 等效于 `crawler.connectTimeout`
+  params:
+  - name: v1
+    param_alias: timeout
+    type_alias: ""
+    description: 超时时间，float 为秒
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.ua
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置 useragent
+  params:
+  - name: v1
+    param_alias: userAgent
+    type_alias: ""
+    description: 想要设置的 ua
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.urlExtractor
+  type_str: 'func (v1: func (v1: *crawler.Req) return([]interface {}) ) return(func
+    configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *crawler.Req) return([]interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.urlRegexpExclude
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 禁止爬取的 url 正则，用于排除一些 login delete 等状况
+  params:
+  - name: v1
+    param_alias: urlRegexp
+    type_alias: ""
+    description: 正则字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.urlRegexpInclude
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 想要爬 url 的白名单，用于定向爬虫
+  params:
+  - name: v1
+    param_alias: urlRegexp
+    type_alias: ""
+    description: 正则字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+- name: crawler.userAgent
+  type_str: 'func (v1: string) return(func configOpt(v1: *crawler.Config) ) '
+  long_description: ""
+  description: 设置 useragent
+  params:
+  - name: v1
+    param_alias: userAgent
+    type_alias: ""
+    description: 想要设置的 ua
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: crawler.param
+    description: ""
+    type_str: 'func configOpt(v1: *crawler.Config) '
+variables: []

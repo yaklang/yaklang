@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": {},
+  "examples": [
+    {
+      "监控主机": "",
+      "监控端口": "80,443,8080,22,445,3306,3389",
+      "按负责人/监管机构监控": "",
+      "通知前探活": "false",
+      "钉钉通知": "true",
+      "钉钉通知配置名称": "default"
+    }
+  ],
+  "required": [
+    "监控端口"
+  ],
+  "properties": {
+    "监控主机": {
+      "$id": "#/properties/%E7%9B%91%E6%8E%A7%E4%B8%BB%E6%9C%BA",
+      "type": "string",
+      "title": "The 监控主机 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "13.75.75.185/24"
+      ]
+    },
+    "监控端口": {
+      "$id": "#/properties/%E7%9B%91%E6%8E%A7%E7%AB%AF%E5%8F%A3",
+      "type": "string",
+      "title": "The 监控端口 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "80,443,8080"
+      ]
+    },
+    "按负责人/监管机构监控": {
+      "$id": "#/properties/%E6%8C%89%E8%B4%9F%E8%B4%A3%E4%BA%BA/%E7%9B%91%E7%AE%A1%E6%9C%BA%E6%9E%84%E7%9B%91%E6%8E%A7",
+      "type": "string",
+      "title": "The 按负责人/监管机构监控 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "测试"
+      ]
+    },
+    "通知前探活": {
+      "$id": "#/properties/%E9%80%9A%E7%9F%A5%E5%89%8D%E6%8E%A2%E6%B4%BB",
+      "type": "string",
+      "title": "The 通知前探活 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "false"
+      ]
+    },
+    "钉钉通知": {
+      "$id": "#/properties/%E9%92%89%E9%92%89%E9%80%9A%E7%9F%A5",
+      "type": "string",
+      "title": "The 钉钉通知 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "true"
+      ]
+    },
+    "钉钉通知配置名称": {
+      "$id": "#/properties/%E9%92%89%E9%92%89%E9%80%9A%E7%9F%A5%E9%85%8D%E7%BD%AE%E5%90%8D%E7%A7%B0",
+      "type": "string",
+      "title": "The 钉钉通知配置名称 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "default"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,69 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Architecture
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Bitness
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Brands
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+  type_str: '[]*proto.EmulationUserAgentBrandVersion'
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: FullVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: FullVersionList
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+  type_str: '[]*proto.EmulationUserAgentBrandVersion'
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Mobile
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Model
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Platform
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: PlatformVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+  name: Wow64
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods: []
+ptr_methods: []

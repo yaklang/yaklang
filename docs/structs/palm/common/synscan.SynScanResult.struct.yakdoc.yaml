@@ -1,0 +1,35 @@
+is_build_in_struct: false
+libname: synscan
+struct_name: palm/common/synscan.SynScanResult
+description: ""
+fields:
+- structname: palm/common/synscan.SynScanResult
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/synscan.SynScanResult
+  name: Port
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/synscan.SynScanResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/synscan.SynScanResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

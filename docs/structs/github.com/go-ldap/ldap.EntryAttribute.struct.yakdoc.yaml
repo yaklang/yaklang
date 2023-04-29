@@ -1,0 +1,41 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.EntryAttribute
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.EntryAttribute
+  name: ByteValues
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[][]uint8'
+- structname: github.com/go-ldap/ldap.EntryAttribute
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.EntryAttribute
+  name: Values
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.EntryAttribute
+  name: PrettyPrint
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.EntryAttribute
+  name: Print
+  relative_struct_name: []
+ptr_methods: []

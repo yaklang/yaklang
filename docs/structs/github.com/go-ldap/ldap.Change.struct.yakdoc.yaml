@@ -1,0 +1,20 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.Change
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.Change
+  name: Modification
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-ldap/ldap.PartialAttribute
+  type_str: ldap.PartialAttribute
+- structname: github.com/go-ldap/ldap.Change
+  name: Operation
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+methods: []
+ptr_methods: []

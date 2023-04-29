@@ -1,0 +1,111 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.HijackRouter
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.NetworkResourceType
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *rod.Hijack) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: MustAdd
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *rod.Hijack) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.HijackRouter'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: MustRemove
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.HijackRouter'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: MustStop
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: Remove
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: Run
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.HijackRouter
+  name: Stop
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

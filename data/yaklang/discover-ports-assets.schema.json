@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": {},
+  "examples": [
+    {
+      "目标网络/Networks/Domains": "",
+      "想要扫描的TCP端口": "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25",
+      "并发/同时扫描的端口数": "10",
+      "超时时间(seconds)": "5",
+      "扫描C段网络": "false",
+      "只保留开放端口结果": "true"
+    }
+  ],
+  "required": [
+    "目标网络/Networks/Domains",
+    "想要扫描的TCP端口",
+    "并发/同时扫描的端口数",
+    "超时时间(seconds)",
+    "扫描C段网络",
+    "只保留开放端口结果"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "目标网络/Networks/Domains": {
+      "$id": "#/properties/目标网络/Networks/Domains",
+      "type": "string",
+      "title": "The 目标网络/Networks/Domains schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "minLength": 1,
+      "examples": [
+        ""
+      ]
+    },
+    "想要扫描的TCP端口": {
+      "$id": "#/properties/想要扫描的TCP端口",
+      "type": "string",
+      "title": "The 想要扫描的TCP端口 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25"
+      ]
+    },
+    "并发/同时扫描的端口数": {
+      "$id": "#/properties/并发/同时扫描的端口数",
+      "type": "string",
+      "title": "The 并发/同时扫描的端口数 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "10"
+      ]
+    },
+    "超时时间(seconds)": {
+      "$id": "#/properties/超时时间(seconds)",
+      "type": "string",
+      "title": "The 超时时间(seconds) schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "5"
+      ]
+    },
+    "扫描C段网络": {
+      "$id": "#/properties/扫描C段网络",
+      "type": "string",
+      "title": "The 扫描C段网络 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "false"
+      ]
+    },
+    "只保留开放端口结果": {
+      "$id": "#/properties/只保留开放端口结果",
+      "type": "string",
+      "title": "The 只保留开放端口结果 schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "true"
+      ]
+    }
+  }
+}

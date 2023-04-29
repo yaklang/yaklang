@@ -1,0 +1,221 @@
+name: facades
+functions:
+- name: facades.NewFacadeServer
+  type_str: 'func (v1: string, v2: int, v3 ...func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) return(*facades.FacadeServer) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]facades.FacadeServerConfig'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: '[facades]:palm/common/facades.FacadeServer'
+    type_str: '*facades.FacadeServer'
+  relative_structs:
+  - structname: palm/common/facades.FacadeServer
+    isbuildinstruct: false
+  - structname: palm/common/facades.HttpResource
+    isbuildinstruct: false
+- name: facades.Serve
+  type_str: 'func (v1: string, v2: int, v3 ...func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]facades.FacadeServerConfig'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: facades.evilClassResource
+  type_str: 'func (v1: string, v2: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.httpResource
+  type_str: 'func (v1: string, v2: []uint8) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.javaClassName
+  type_str: 'func (v1: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.javaCodeBase
+  type_str: 'func (v1: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.javaFactory
+  type_str: 'func (v1: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.ldapResourceAddr
+  type_str: 'func (v1: string, v2: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.objectClass
+  type_str: 'func (v1: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+- name: facades.rmiResourceAddr
+  type_str: 'func (v1: string, v2: string) return(func FacadeServerConfig(v1: *facades.FacadeServer)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeServerConfig(v1: *facades.FacadeServer) '
+variables: []

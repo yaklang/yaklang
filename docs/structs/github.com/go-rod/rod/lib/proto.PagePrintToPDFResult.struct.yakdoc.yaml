@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
+  name: Data
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
+  name: Stream
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.IOStreamHandle
+methods: []
+ptr_methods: []

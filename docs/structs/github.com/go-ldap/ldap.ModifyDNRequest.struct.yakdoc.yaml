@@ -1,0 +1,31 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.ModifyDNRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.ModifyDNRequest
+  name: DN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.ModifyDNRequest
+  name: DeleteOldRDN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-ldap/ldap.ModifyDNRequest
+  name: NewRDN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.ModifyDNRequest
+  name: NewSuperior
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

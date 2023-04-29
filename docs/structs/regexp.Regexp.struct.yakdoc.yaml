@@ -1,0 +1,704 @@
+is_build_in_struct: true
+libname: re
+struct_name: regexp.Regexp
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Copy
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*regexp.Regexp'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Expand
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ExpandString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Find
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAll
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllStringIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllStringSubmatch
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllStringSubmatchIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllSubmatch
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][][]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindAllSubmatchIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindReaderIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.RuneReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindReaderSubmatchIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.RuneReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindStringIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindStringSubmatch
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindStringSubmatchIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindSubmatch
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: FindSubmatchIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: LiteralPrefix
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Longest
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Match
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: MatchReader
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.RuneReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: MatchString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: NumSubexp
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAll
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAllFunc
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: []uint8) return([]uint8) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAllLiteral
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAllLiteralString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAllString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: ReplaceAllStringFunc
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) return(string) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: Split
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: SubexpIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: regexp.Regexp
+  name: SubexpNames
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+ptr_methods: []

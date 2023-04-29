@@ -1,0 +1,290 @@
+name: Go
+
+on:
+  push:
+    branches:
+      - "ci/*"
+    tags:
+      - "v*"
+
+jobs:
+  build_and_release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/') }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Yak Version by Tag
+        uses: mad9000/actions-find-and-replace-string@1
+        id: fetchtag
+        with:
+          source: ${{ github.ref }}
+          find: 'refs/tags/'
+          replace: ''
+      - name: Print RELEASE_VERSION
+        run: |
+          echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18.7
+      #      - name: Download Npcap SDK (Windows)
+      #        run: |
+      #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
+      #          Expand-Archive C:\NpcapSDK.zip -DestinationPath ..\wpdpack
+      #        if: runner.os == 'Windows'
+      - name: Install libpcap (macOS)
+        run: |
+          brew install libpcap
+        if: runner.os == 'macOS'
+
+      - name: Install libpcap (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install libpcap-dev=1.9.1-3
+        if: runner.os == 'Linux'
+
+      - name: Generate Document
+        run: go run common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+
+      - name: Build For Linux
+        run: |
+          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
+        if: runner.os == 'Linux'
+
+      - name: Build For MacOS
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
+        if: runner.os == 'macOS'
+
+      - name: Build For Windows
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
+        if: runner.os == 'Windows'
+
+      - name: Upload Artifacts Windows
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Windows'
+        with:
+          name: yak_windows_amd64.exe
+          path: ./yak_windows_amd64.exe
+
+
+      - name: Upload Artifacts MacOS
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_amd64
+          path: ./yak_darwin_amd64
+
+
+      - name: Upload Artifacts Linux
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Linux'
+        with:
+          name: yak_linux_amd64
+          path: ./yak_linux_amd64
+
+  download_artifacts_and_release:
+#    if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs:
+      - build_and_release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Yak Version by Tag
+        uses: mad9000/actions-find-and-replace-string@1
+        id: fetchtag_release
+        with:
+          source: ${{ github.ref }}
+          find: 'refs/tags/v'
+          replace: ''
+      - name: Download Windows YAK
+        uses: actions/download-artifact@v2
+        with:
+          name: yak_windows_amd64.exe
+      - name: Download macOS YAK
+        uses: actions/download-artifact@v2
+        with:
+          name: yak_darwin_amd64
+      - name: Download Linux YAK
+        uses: actions/download-artifact@v2
+        with:
+          name: yak_linux_amd64
+      # download yakit
+#      - name: Download Yakit (Darwin Arm64)
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+#      - name: Download Yakit (Darwin Amd64)
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+#      - name: Download Yakit (Windows amd64)
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Run
+        run: ls
+      - name: Update OSS latest file
+        run: echo ${{ steps.fetchtag_release.outputs.value }} > ./version.txt
+      - name: Upload yak to oss Latest
+        uses: tvrcgo/upload-to-oss@master
+        with:
+          key-id: ${{ secrets.OSS_KEY_ID }}
+          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+          region: oss-accelerate
+          bucket: yaklang
+          assets: |
+            ./version.txt:/yak/latest/version.txt
+            yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe
+            yak_windows_amd64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
+            yak_linux_amd64:/yak/latest/yak_linux_amd64
+            yak_linux_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_linux_amd64
+            yak_darwin_amd64:/yak/latest/yak_darwin_amd64
+            yak_darwin_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_amd64
+#      - name: Upload Yakit to oss(MacOS m1)
+#        uses: tvrcgo/upload-to-oss@master
+#        with:
+#          key-id: ${{ secrets.OSS_KEY_ID }}
+#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+#          region: oss-accelerate
+#          bucket: yaklang
+#          assets: |
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+#      - name: Upload Yakit to oss(windows)
+#        uses: tvrcgo/upload-to-oss@master
+#        with:
+#          key-id: ${{ secrets.OSS_KEY_ID }}
+#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+#          region: oss-accelerate
+#          bucket: yaklang
+#          assets: |
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+#      - name: Upload Yakit to oss(MacOS intel)
+#        uses: tvrcgo/upload-to-oss@master
+#        with:
+#          key-id: ${{ secrets.OSS_KEY_ID }}
+#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+#          region: oss-accelerate
+#          bucket: yaklang
+#          assets: |
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+      #      - name: Upload to oss Latest (Windows)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          asset-path: ./yak_windows_amd64.exe
+      #          target-path: /yak/latest/yak_windows_amd64.exe
+
+      #      - name: Upload to oss (Win)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          asset-path: ./yak_windows_amd64.exe
+      #          target-path: /yak/${{ steps.fetchtag.outputs.value }}/yak_windows_amd64.exe
+
+      #      - name: Upload to oss Latest(MacOS)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          asset-path: ./yak_darwin_amd64
+      #          target-path: /yak/latest/yak_darwin_amd64
+      #
+      #      - name: Upload to oss (MacOS)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          asset-path: ./yak_darwin_amd64
+      #          target-path: /yak/${{ steps.fetchtag.outputs.value }}/yak_darwin_amd64
+
+      - name: Upload Release Asset Linux Yak
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./yak_linux_amd64
+          asset_name: yak_linux_amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset macOS
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./yak_darwin_amd64
+          asset_name: yak_darwin_amd64
+          asset_content_type: application/octet-stream
+
+#      - name: Upload Release Yakit(intel) Asset macOS
+#        uses: actions/upload-release-asset@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+#        with:
+#          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+#          asset_path: ./Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg
+#          asset_name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+#          asset_content_type: application/octet-stream
+#
+#      - name: Upload Release Yakit(m1) Asset macOS
+#        uses: actions/upload-release-asset@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+#        with:
+#          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+#          asset_path: ./Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+#          asset_name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+#          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset Windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./yak_windows_amd64.exe
+          asset_name: yak_windows_amd64.exe
+          asset_content_type: application/octet-stream
+
+#      - name: Upload Release Yakit Asset Windows
+#        uses: actions/upload-release-asset@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+#        with:
+#          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+#          asset_path: ./Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe
+#          asset_name: Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+#          asset_content_type: application/octet-stream

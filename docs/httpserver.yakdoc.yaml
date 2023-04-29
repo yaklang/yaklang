@@ -1,0 +1,93 @@
+name: httpserver
+functions:
+- name: httpserver.Serve
+  type_str: 'func (v1: string, v2: int, v3 ...func _httpServerConfigOpt(v1: *yaklib._httpServerConfig)
+    ) return(error) '
+  long_description: ""
+  description: 启动一个 HTTP 服务器
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: 服务器的本地地址
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: 服务器的端口
+    type_str: int
+  - name: v3
+    param_alias: params
+    type_alias: '...opt'
+    description: ""
+    type_str: '[]yaklib._httpServerConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: httpserver.context
+  type_str: 'func (v1: context.Context) return(func _httpServerConfigOpt(v1: *yaklib._httpServerConfig)
+    ) '
+  long_description: ""
+  description: 【参数】为 HTTP Server 增加上下文控制生命周期
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func _httpServerConfigOpt(v1: *yaklib._httpServerConfig) '
+- name: httpserver.handler
+  type_str: 'func (v1: func (v1: http.ResponseWriter, v2: *http.Request) ) return(func
+    _httpServerConfigOpt(v1: *yaklib._httpServerConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: handler
+    type_alias: ""
+    description: 【参数】设置 HTTP 请求的处理回调函数
+    type_str: 'func (v1: http.ResponseWriter, v2: *http.Request) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func _httpServerConfigOpt(v1: *yaklib._httpServerConfig) '
+- name: httpserver.tlsCertAndKey
+  type_str: 'func (v1: interface {}, v2: interface {}, v3 ...interface {}) return(func
+    _httpServerConfigOpt(v1: *yaklib._httpServerConfig) ) '
+  long_description: ""
+  description: 【参数】设置 TLS/SSL，启动一个 HTTPS 服务器
+  params:
+  - name: v1
+    param_alias: cert
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: caCerts
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _httpServerConfigOpt(v1: *yaklib._httpServerConfig) '
+variables: []

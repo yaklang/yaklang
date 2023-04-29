@@ -1,0 +1,271 @@
+is_build_in_struct: false
+libname: yso
+struct_name: palm/common/javaclassparser.ClassObject
+description: ""
+fields:
+- structname: palm/common/javaclassparser.ClassObject
+  name: AccessFlags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: palm/common/javaclassparser.ClassObject
+  name: AccessFlagsVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/javaclassparser.ClassObject
+  name: Attributes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]javaclassparser.AttributeInfo'
+- structname: palm/common/javaclassparser.ClassObject
+  name: ConstantPool
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]javaclassparser.ConstantInfo'
+- structname: palm/common/javaclassparser.ClassObject
+  name: Fields
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: palm/common/javaclassparser.MemberInfo
+  type_str: '[]*javaclassparser.MemberInfo'
+- structname: palm/common/javaclassparser.ClassObject
+  name: Interfaces
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint16'
+- structname: palm/common/javaclassparser.ClassObject
+  name: InterfacesVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/javaclassparser.ClassObject
+  name: Magic
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: palm/common/javaclassparser.ClassObject
+  name: MajorVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: palm/common/javaclassparser.ClassObject
+  name: Methods
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: palm/common/javaclassparser.MemberInfo
+  type_str: '[]*javaclassparser.MemberInfo'
+- structname: palm/common/javaclassparser.ClassObject
+  name: MinorVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: palm/common/javaclassparser.ClassObject
+  name: SuperClass
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: palm/common/javaclassparser.ClassObject
+  name: SuperClassVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/javaclassparser.ClassObject
+  name: ThisClass
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: palm/common/javaclassparser.ClassObject
+  name: ThisClassVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/javaclassparser.ClassObject
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: Bcel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: Bytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: Dump
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: FindConstStringFromPool
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ConstantUtf8Info
+    type_str: '*javaclassparser.ConstantUtf8Info'
+  relative_struct_name:
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: FindFields
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.MemberInfo
+    type_str: '*javaclassparser.MemberInfo'
+  relative_struct_name:
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: FindMethods
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*javaclassparser.MemberInfo'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: GetClassName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: GetInterfacesName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: GetSupperClassName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: Json
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/javaclassparser.ClassObject
+  name: SetClassName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

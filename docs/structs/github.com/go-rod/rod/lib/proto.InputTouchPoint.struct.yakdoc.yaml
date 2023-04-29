@@ -1,0 +1,89 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.InputTouchPoint
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: Force
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: ID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: RadiusX
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: RadiusY
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: RotationAngle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: TangentialPressure
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: TiltX
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: TiltY
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: Twist
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: X
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: "Y"
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+  name: MoveTo
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+ptr_methods: []

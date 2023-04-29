@@ -1,0 +1,60 @@
+name: dictutil
+functions:
+- name: dictutil.Mix
+  type_str: 'func (v1 ...interface {}) return(chan []string, error) '
+  long_description: |
+    一般用于混合 []string
+
+    如下案例:
+
+    ```go
+    res, err := dictutil.Mix([`123`, `15`, `abc`], [`12`,`14`], [`-`, `=`,`.`])
+    die(err)
+
+    for r := range res {
+      println(r)
+    }
+    ```
+
+    返回的结果将会把上面三个集合进行笛卡尔乘积，结果如下：
+
+    ```go
+    [123 12 -]
+    [123 12 =]
+    [123 12 .]
+    [123 14 -]
+    [123 14 =]
+    [123 14 .]
+    [15 12 -]
+    [15 12 =]
+    [15 12 .]
+    [15 14 -]
+    [15 14 =]
+    [15 14 .]
+    [abc 12 -]
+    [abc 12 =]
+    [abc 12 .]
+    [abc 14 -]
+    [abc 14 =]
+    [abc 14 .]
+    ```
+  description: 混合多个 list，进行笛卡尔乘（直积）一般用于字典的混合
+  params:
+  - name: v1
+    param_alias: lists
+    type_alias: '...[]string'
+    description: 是一个可变参数，接收多个字符串构成的数组
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan []string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables: []

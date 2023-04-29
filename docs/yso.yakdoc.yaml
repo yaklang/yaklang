@@ -1,0 +1,1584 @@
+name: yso
+functions:
+- name: yso.GenerateClassObjectFromBytes
+  type_str: 'func (v1: []uint8, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateDNSlogEvilClassObject
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateModifyTomcatMaxHeaderSizeEvilClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateProcessBuilderExecEvilClassObject
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateProcessImplExecEvilClassObject
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateRuntimeExecEvilClassObject
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateSpringEchoEvilClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateTcpReverseEvilClassObject
+  type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateTcpReverseShellEvilClassObject
+  type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: palm/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GetAllGadget
+  type_str: 'func () return([]interface {}) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+- name: yso.GetAllRuntimeExecGadget
+  type_str: 'func () return([]yso.RuntimeExecGadget) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.RuntimeExecGadget'
+- name: yso.GetAllTemplatesGadget
+  type_str: 'func () return([]yso.TemplatesGadget) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.TemplatesGadget'
+- name: yso.GetBeanShell1JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetClick1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsBeanutils183NOCCJavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsBeanutils192NOCCJavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsBeanutils1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections1JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections2JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections3JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections4JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections5JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections6JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections7JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollections8JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollectionsK1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollectionsK2JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollectionsK3JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetCommonsCollectionsK4JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetGadgetNameByFun
+  type_str: 'func (v1: interface {}) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yso.GetGroovy1JavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJBossInterceptors1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJSON1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJavaObjectFromBytes
+  type_str: 'func (v1: []uint8) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJavassistWeld1JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJdk7u21JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetJdk8u20JavaObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetSimplePrincipalCollectionJavaObject
+  type_str: 'func () return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: palm/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.ToBcel
+  type_str: 'func (v1: interface {}) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yso.ToBytes
+  type_str: 'func (v1: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yso.ToJson
+  type_str: 'func (v1: interface {}) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yso.command
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.dnslogDomain
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.dump
+  type_str: 'func (v1: interface {}) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yso.evilClassName
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.obfuscationClassConstantPool
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.springEchoBody
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.springHeader
+  type_str: 'func (v1: string, v2: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.springParam
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.springRuntimeExecAction
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.tcpReverseHost
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.tcpReversePort
+  type_str: 'func (v1: int) return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.tcpReverseToken
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useBase64BytesClass
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useBytesClass
+  type_str: 'func (v1: []uint8) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useBytesEvilClass
+  type_str: 'func (v1: []uint8) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useConstructorExecutor
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useDNSLogEvilClass
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useDNSlogTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useModifyTomcatMaxHeaderSizeTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useProcessBuilderExecEvilClass
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useProcessBuilderExecTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useProcessImplExecEvilClass
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useProcessImplExecTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useRuntimeExecEvilClass
+  type_str: 'func (v1: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useRuntimeExecTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useSpringEchoTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTcpReverseEvilClass
+  type_str: 'func (v1: string, v2: int) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTcpReverseShellEvilClass
+  type_str: 'func (v1: string, v2: int) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTcpReverseShellTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTcpReverseTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+variables: []

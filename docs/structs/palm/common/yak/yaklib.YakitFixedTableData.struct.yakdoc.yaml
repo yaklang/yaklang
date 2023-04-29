@@ -1,0 +1,19 @@
+is_build_in_struct: false
+libname: yakit
+struct_name: palm/common/yak/yaklib.YakitFixedTableData
+description: ""
+fields:
+- structname: palm/common/yak/yaklib.YakitFixedTableData
+  name: Data
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]interface {}
+- structname: palm/common/yak/yaklib.YakitFixedTableData
+  name: TableName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

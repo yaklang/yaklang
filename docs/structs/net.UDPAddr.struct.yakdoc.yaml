@@ -1,0 +1,64 @@
+is_build_in_struct: true
+libname: udp
+struct_name: net.UDPAddr
+description: ""
+fields:
+- structname: net.UDPAddr
+  name: IP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: net.IP
+- structname: net.UDPAddr
+  name: Port
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net.UDPAddr
+  name: Zone
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: net.UDPAddr
+  name: AddrPort
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: netip.AddrPort
+  relative_struct_name:
+  - structname: net/netip.AddrPort
+    isbuildinstruct: true
+  - structname: net/netip.Addr
+    isbuildinstruct: true
+  - structname: net/netip.Prefix
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: net.UDPAddr
+  name: Network
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net.UDPAddr
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

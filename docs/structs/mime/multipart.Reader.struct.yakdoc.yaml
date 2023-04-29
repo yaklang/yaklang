@@ -1,0 +1,67 @@
+is_build_in_struct: true
+libname: http
+struct_name: mime/multipart.Reader
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: mime/multipart.Reader
+  name: NextPart
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: mime/multipart.Part
+    type_str: '*multipart.Part'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: mime/multipart.Reader
+  name: NextRawPart
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.Part'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: mime/multipart.Reader
+  name: ReadForm
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: mime/multipart.Form
+    type_str: '*multipart.Form'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+ptr_methods: []

@@ -1,0 +1,161 @@
+name: smb
+functions:
+- name: smb.Connect
+  type_str: 'func (v1: string, v2 ...func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) return(*smb.Session, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._smbConfigHandler'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/stacktitan/smb/smb.Session
+    type_str: '*smb.Session'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/stacktitan/smb/smb.Session
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.NegotiateReq
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.Header
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenInit
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenInitData
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb/encoder.Metadata
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb/encoder.TagMap
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.SessionSetup2Req
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenResp
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.TreeConnectReq
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+    isbuildinstruct: true
+- name: smb.debug
+  type_str: 'func (v1: bool) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+- name: smb.domain
+  type_str: 'func (v1: string) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+- name: smb.hash
+  type_str: 'func (v1: string) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+- name: smb.password
+  type_str: 'func (v1: string) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+- name: smb.username
+  type_str: 'func (v1: string) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+- name: smb.workstation
+  type_str: 'func (v1: string) return(func _smbConfigHandler(v1: *yaklib._smbConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _smbConfigHandler(v1: *yaklib._smbConfig) '
+variables: []

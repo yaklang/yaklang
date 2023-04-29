@@ -1,0 +1,456 @@
+is_build_in_struct: true
+libname: http
+struct_name: net/http.Request
+description: ""
+fields:
+- structname: net/http.Request
+  name: Body
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: io.ReadCloser
+- structname: net/http.Request
+  name: Cancel
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: .
+  type_str: <-chan struct {}
+- structname: net/http.Request
+  name: Close
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Request
+  name: ContentLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: net/http.Request
+  name: Form
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: url.Values
+- structname: net/http.Request
+  name: GetBody
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func () return(io.ReadCloser, error) '
+- structname: net/http.Request
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.Header
+- structname: net/http.Request
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Request
+  name: Method
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Request
+  name: MultipartForm
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: mime/multipart.Form
+  type_str: '*multipart.Form'
+- structname: net/http.Request
+  name: PostForm
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: url.Values
+- structname: net/http.Request
+  name: Proto
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Request
+  name: ProtoMajor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Request
+  name: ProtoMinor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Request
+  name: RemoteAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Request
+  name: RequestURI
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Request
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Response
+  type_str: '*http.Response'
+- structname: net/http.Request
+  name: TLS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/tls.ConnectionState
+  type_str: '*tls.ConnectionState'
+- structname: net/http.Request
+  name: Trailer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.Header
+- structname: net/http.Request
+  name: TransferEncoding
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: net/http.Request
+  name: URL
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/url.URL
+  type_str: '*url.URL'
+methods:
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: AddCookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: BasicAuth
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Clone
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Cookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Cookie'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: FormFile
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: multipart.File
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: mime/multipart.FileHeader
+    type_str: '*multipart.FileHeader'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: FormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: MultipartReader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*multipart.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: ParseForm
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: ParseMultipartForm
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: PostFormValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Referer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: SetBasicAuth
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: UserAgent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: WithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Request
+  name: WriteProxy
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

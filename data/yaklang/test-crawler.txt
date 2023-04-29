@@ -1,0 +1,22 @@
+// 这个脚本用来测试爬虫的使用，最近本测试用例就是下面内容了
+params = str.JsonToMap(DATA)
+targetsRaw = str.ParamsGetOr(params, "target", "")
+assert(len(targetsRaw) > 0, "empty targets")
+
+targets = str.SplitAndTrim(targetsRaw, ",")
+assert(len(targets) > 0, "empty targets list")
+
+log("原始参数为：%v", params)
+outC, err = crawler.StartWebCrawler(CTX, targets...)
+assert(err == nil, "构建爬虫失败")
+
+for result = range outC {
+    if result.Type == crawler.ResultType_HTTPRequest {
+        db.CreateOrUpdateHTTPRequestFromRecord(result.Data)
+    }
+
+    if result.Type == crawler.ResultType_HTTPResponse {
+        db.CreateOrUpdateHTTPResponseFromRecord(result.Data)
+    }
+}
+

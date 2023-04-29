@@ -1,0 +1,28 @@
+is_build_in_struct: true
+libname: sync
+struct_name: sync.Cond
+description: ""
+fields:
+- structname: sync.Cond
+  name: L
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: sync.Locker
+methods:
+- ptr: true
+  description: ""
+  structname: sync.Cond
+  name: Broadcast
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Cond
+  name: Signal
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Cond
+  name: Wait
+  relative_struct_name: []
+ptr_methods: []

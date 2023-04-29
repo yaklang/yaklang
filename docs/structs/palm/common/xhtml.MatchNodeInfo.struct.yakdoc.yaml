@@ -1,0 +1,83 @@
+is_build_in_struct: false
+libname: xhtml
+struct_name: palm/common/xhtml.MatchNodeInfo
+description: ""
+fields:
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: Key
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: MatchNode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: MatchText
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: Quote
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: TagName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: Val
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.MatchNodeInfo
+  name: Xpath
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/xhtml.MatchNodeInfo
+  name: IsAttr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/xhtml.MatchNodeInfo
+  name: IsCOMMENT
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/xhtml.MatchNodeInfo
+  name: IsText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

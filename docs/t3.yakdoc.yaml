@@ -1,0 +1,145 @@
+name: t3
+functions:
+- name: t3.ExecCommand
+  type_str: 'func (v1: string, v2: string, v3 ...func OptionFun(v1: *t3.T3Paylaod)
+    ) return(string, error) '
+  long_description: ""
+  description: T3 命令执行
+  params:
+  - name: v1
+    param_alias: addr
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: command
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]t3.OptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: t3.GenerateJavaObjectStreamBytes
+  type_str: 'func (v1: string) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: t3.GenerateWeblogicJNDIPayload
+  type_str: 'func (v1: string) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: t3.SendJavaObjectStreamBytes
+  type_str: 'func (v1: string, v2: interface {}, v3 ...func OptionFun(v1: *t3.T3Paylaod)
+    ) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]t3.OptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: t3.clearBackdoor
+  type_str: 'func (v1: bool) return(func OptionFun(v1: *t3.T3Paylaod) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func OptionFun(v1: *t3.T3Paylaod) '
+- name: t3.debugHandler
+  type_str: 'func (v1: func (v1: string) ) return(func OptionFun(v1: *t3.T3Paylaod)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func OptionFun(v1: *t3.T3Paylaod) '
+- name: t3.timeout
+  type_str: 'func (v1: float64) return(func OptionFun(v1: *t3.T3Paylaod) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func OptionFun(v1: *t3.T3Paylaod) '
+variables: []

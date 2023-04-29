@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": {},
+  "examples": [
+    {
+      "host": "",
+      "port": "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25",
+      "concurrent": "10",
+      "xray_concurrent": "5"
+    }
+  ],
+  "required": [
+    "host"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "host": {
+      "$id": "#/properties/host",
+      "type": "string",
+      "minLength": 1,
+      "title": "The host schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        ""
+      ]
+    },
+    "port": {
+      "$id": "#/properties/port",
+      "type": "string",
+      "title": "The port schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "21-23,80-90,389,443,445,636,1080-1090,1158,1433,1521,1527,1630,1883,2181,2888,3306,3389,3888,5432,5671-5672,6379,7474,8000-8010,8080-8090,9000-9010,9090-9100,11211,27017,50000,61613,61616,15672,15671,9200,9300,110,25"
+      ]
+    },
+    "concurrent": {
+      "$id": "#/properties/concurrent",
+      "type": "string",
+      "title": "The concurrent schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "10"
+      ]
+    },
+    "xray_concurrent": {
+      "$id": "#/properties/xray_concurrent",
+      "type": "string",
+      "title": "The xray_concurrent schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "5"
+      ]
+    }
+  }
+}

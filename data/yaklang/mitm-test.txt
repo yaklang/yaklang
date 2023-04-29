@@ -1,0 +1,6 @@
+err = mitm.Start(CTX, "127.0.0.1", "8083", fn(req,rsp) {
+    dump(req)
+})
+assertNil(err)
+
+sleep(2000)

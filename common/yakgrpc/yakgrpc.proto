@@ -1,0 +1,3192 @@
+syntax = "proto3";
+
+package ypb;
+option go_package = "/;ypb";
+
+message Empty {
+}
+
+message VersionResponse {
+  string Version = 1;
+}
+
+message GeneralResponse {
+  bool Ok = 1;
+  string Reason = 2;
+}
+
+message DeleteYakScriptRequest {
+  int64  Id = 3;
+  repeated int64 Ids = 4;
+}
+
+message ExecBatchYakScriptRequest {
+  // 目标会被自动拆分
+  string Target = 1;
+  string TargetFile = 11;
+
+  // 额外参数可以被添加
+  repeated ExecParamItem ExtraParams = 7;
+
+  // 筛选与限制
+  string Keyword = 2;
+  repeated string ExcludedYakScript = 22;
+  bool DisableNucleiWorkflow = 23;
+  int64 Limit = 3;
+
+  // 默认总用时
+  int64 TotalTimeoutSeconds = 4;
+
+  // 模块类型，默认为 nuclei
+  string Type = 5;
+
+  // 并发（进程）
+  int64 Concurrent = 6;
+
+  // 精确使用脚本名称
+  // 要注意，这个 Scripts 和 PluginFilter 是冲突的
+  repeated string ScriptNames = 8;
+
+  // Tags with exclude / include
+  QueryYakScriptRequest PluginFilter = 12;
+  bool EnablePluginFilter = 13;
+
+  // 设置一个代理
+  string Proxy = 14;
+
+  // 每个进程的任务数量
+  int64 ProgressTaskCount = 15;
+
+  // 基础进度 - 这个默认是 0.1 一般别用，只在 Recover 的时候可能才会有用处
+  double BaseProgress = 16;
+  // 这个很关键，不然会报错
+  bool FromRecover = 17;
+
+  string YakScriptOnlineGroup = 18;
+  string TaskName = 19;
+}
+
+message ExecBatchYakScriptResult {
+  string Id = 1;
+  string Status = 2;
+  bool Ok = 4;
+  string Reason = 5;
+  bool Exploitable = 6;
+
+  // 脚本的详细信息
+  YakScript PoC = 7;
+  ExecResult Result = 8;
+
+  // 如果是整体进度信息，则在这儿展示
+  // 处理这几个消息的时候，其他都不应该生效
+  bool ProgressMessage = 9;
+  double ProgressPercent = 10;
+  int64 ProgressTotal = 11;
+  int64 ProgressCount = 12;
+
+  // 正在执行中的进程数
+  int64 ProgressRunning = 17;
+
+  // 正在执行中的扫描任务数量
+  int64 ScanTaskExecutingCount = 18;
+
+  // 任务相关内容
+  string Target = 13;
+  repeated ExecParamItem ExtraParam = 14;
+  string TaskId = 15;
+
+  // 当前时间
+  int64 Timestamp = 16;
+}
+
+message GetYakScriptByIdRequest {
+  int64 Id = 1;
+}
+
+message GetYakScriptByNameRequest {
+  string Name = 1;
+}
+
+message GetYakScriptByOnlineIDRequest {
+  string UUID = 1;
+  int64 OnlineID = 2;
+}
+
+service Yak {
+  // version
+  rpc Version(Empty) returns (VersionResponse);
+
+  // echo 通常用于测试服务是否通畅
+  rpc Echo(EchoRequest) returns(EchoResposne);
+
+  // 中间人劫持
+  rpc MITM(stream MITMRequest) returns (stream MITMResponse);
+  rpc SetMITMFilter(SetMITMFilterRequest) returns (SetMITMFilterResponse);
+  rpc GetMITMFilter(Empty) returns (SetMITMFilterRequest);
+  rpc DownloadMITMCert(Empty) returns (MITMCert);
+
+  // 开启端口
+  rpc OpenPort(stream Input) returns (stream Output);
+
+  // Exec
+  rpc Exec(ExecRequest) returns (stream ExecResult);
+  rpc QueryExecHistory(ExecHistoryRequest) returns (ExecHistoryRecordResponse);
+  rpc RemoveExecHistory(Empty) returns (Empty);
+  rpc LoadNucleiTemplates(Empty) returns (Empty);
+  rpc AutoUpdateYakModule(Empty) returns (stream ExecResult);
+  rpc ExecYakScript(ExecRequest) returns (stream ExecResult);
+  rpc ExecBatchYakScript(ExecBatchYakScriptRequest) returns (stream ExecBatchYakScriptResult);
+  rpc GetExecBatchYakScriptUnfinishedTask(Empty) returns (GetExecBatchYakScriptUnfinishedTaskResponse);
+  rpc GetExecBatchYakScriptUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (ExecBatchYakScriptRequest);
+  rpc PopExecBatchYakScriptUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (ExecBatchYakScriptRequest);
+  rpc RecoverExecBatchYakScriptUnfinishedTask(RecoverExecBatchYakScriptUnfinishedTaskRequest) returns (stream ExecBatchYakScriptResult);
+
+  // yakScript
+  rpc QueryYakScript(QueryYakScriptRequest) returns (QueryYakScriptResponse);
+  rpc QueryYakScriptByYakScriptName(QueryYakScriptRequest) returns (stream YakScript);
+  rpc SaveYakScript(YakScript) returns (YakScript);
+  rpc DeleteYakScript(DeleteYakScriptRequest) returns (Empty);
+  rpc GetYakScriptById(GetYakScriptByIdRequest) returns (YakScript);
+  rpc GetYakScriptByName(GetYakScriptByNameRequest) returns (YakScript);
+  rpc GetYakScriptByOnlineID(GetYakScriptByOnlineIDRequest) returns (YakScript);
+  rpc IgnoreYakScript(DeleteYakScriptRequest) returns (Empty);
+  rpc UnIgnoreYakScript(DeleteYakScriptRequest) returns (Empty);
+  rpc ExportYakScript(ExportYakScriptRequest) returns (ExportYakScriptResponse);
+  rpc ExecutePacketYakScript(ExecutePacketYakScriptParams) returns (stream ExecResult);
+  rpc ExecuteBatchPacketYakScript(ExecuteBatchPacketYakScriptParams) returns (stream ExecBatchYakScriptResult);
+  rpc GetYakScriptTags(Empty) returns (GetYakScriptTagsResponse);
+  rpc QueryYakScriptLocalAndUser(QueryYakScriptLocalAndUserRequest) returns (QueryYakScriptLocalAndUserResponse);
+  rpc QueryYakScriptByOnlineGroup(QueryYakScriptByOnlineGroupRequest) returns (QueryYakScriptLocalAndUserResponse);
+  rpc QueryYakScriptLocalAll(Empty) returns (QueryYakScriptLocalAndUserResponse);
+
+  // HTTPFlow
+  rpc GetHTTPFlowByHash(GetHTTPFlowByHashRequest) returns (HTTPFlow);
+  rpc GetHTTPFlowById(GetHTTPFlowByIdRequest) returns (HTTPFlow);
+  rpc GetHTTPFlowByIds(GetHTTPFlowByIdsRequest) returns (HTTPFlows);
+  rpc QueryHTTPFlows(QueryHTTPFlowRequest) returns (QueryHTTPFlowResponse);
+  rpc DeleteHTTPFlows(DeleteHTTPFlowRequest) returns (Empty);
+  rpc SetTagForHTTPFlow(SetTagForHTTPFlowRequest) returns (Empty);
+  rpc QueryHTTPFlowsIds(QueryHTTPFlowsIdsRequest) returns (QueryHTTPFlowsIdsResponse);
+  rpc HTTPFlowsFieldGroup(HTTPFlowsFieldGroupRequest) returns (HTTPFlowsFieldGroupResponse);
+
+  // 从一个 FuzzerRequest 中提取 Url
+  rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
+
+  // Fuzzer
+  rpc GetHistoryHTTPFuzzerTask(GetHistoryHTTPFuzzerTaskRequest) returns (HistoryHTTPFuzzerTaskDetail);
+  rpc QueryHistoryHTTPFuzzerTask(Empty) returns (HistoryHTTPFuzzerTasks);
+  rpc QueryHistoryHTTPFuzzerTaskEx(QueryHistoryHTTPFuzzerTaskExParams) returns (HistoryHTTPFuzzerTasksResponse);
+  rpc DeleteHistoryHTTPFuzzerTask(DeleteHistoryHTTPFuzzerTaskRequest) returns (Empty);
+  rpc HTTPFuzzer(FuzzerRequest) returns (stream FuzzerResponse);
+  rpc PreloadHTTPFuzzerParams(PreloadHTTPFuzzerParamsRequest) returns (PreloadHTTPFuzzerParamsResponse);
+  rpc MatchHTTPResponse(MatchHTTPResponseParams) returns (MatchHTTPResponseResult);
+  rpc ExtractHTTPResponse(ExtractHTTPResponseParams) returns (ExtractHTTPResponseResult);
+  rpc RedirectRequest(RedirectRequestParams) returns (FuzzerResponse);
+  rpc HTTPRequestMutate(HTTPRequestMutateParams) returns (MutateResult);
+  rpc HTTPResponseMutate(HTTPResponseMutateParams) returns (MutateResult);
+  rpc FixUploadPacket(FixUploadPacketRequest) returns (FixUploadPacketResponse);
+  rpc IsMultipartFormDataRequest(FixUploadPacketRequest) returns (IsMultipartFormDataRequestResult);
+  rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
+  rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
+
+  // HTTPFuzzerResponse
+  // 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
+  rpc QueryHTTPFuzzerResponseByTaskId(QueryHTTPFuzzerResponseByTaskIdRequest) returns (QueryHTTPFuzzerResponseByTaskIdResponse) ;
+
+  // WebSocket
+  rpc CreateWebsocketFuzzer(stream ClientWebsocketRequest) returns (stream ClientWebsocketResponse);
+  rpc QueryWebsocketFlowByHTTPFlowWebsocketHash(QueryWebsocketFlowByHTTPFlowWebsocketHashRequest) returns (WebsocketFlows);
+  rpc DeleteWebsocketFlowByHTTPFlowWebsocketHash(DeleteWebsocketFlowByHTTPFlowWebsocketHashRequest) returns (Empty);
+  rpc DeleteWebsocketFlowAll(Empty) returns (Empty);
+
+  // FuzzerResponse 对象转 HTTPFlow：以便分析和模糊测试
+  rpc ConvertFuzzerResponseToHTTPFlow(FuzzerResponse) returns (HTTPFlow);
+
+  // 渲染 Fuzzer 模版
+  rpc StringFuzzer(StringFuzzerRequest) returns (StringFuzzerResponse);
+
+  // 分析一个 HTTP 请求详情
+  rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
+
+  // 编码解码
+  rpc Codec(CodecRequest) returns (CodecResponse);
+
+  // Payload 相关接口
+  rpc QueryPayload(QueryPayloadRequest) returns (QueryPayloadResponse);
+  rpc DeletePayloadByGroup(DeletePayloadByGroupRequest) returns (Empty);
+  rpc DeletePayload(DeletePayloadRequest) returns (Empty);
+  rpc SavePayload(SavePayloadRequest) returns (Empty);
+  rpc SavePayloadStream(SavePayloadRequest) returns (stream SavePayloadProgress);
+  rpc GetAllPayloadGroup(Empty) returns (GetAllPayloadGroupResponse);
+  rpc UpdatePayload(UpdatePayloadRequest) returns (Empty);
+  rpc GetAllPayload(GetAllPayloadRequest) returns (GetAllPayloadResponse);
+
+  // 自动生成补全
+  rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
+  rpc GetYakVMBuildInMethodCompletion(GetYakVMBuildInMethodCompletionRequest) returns (GetYakVMBuildInMethodCompletionResponse);
+  rpc StaticAnalyzeError(StaticAnalyzeErrorRequest) returns (StaticAnalyzeErrorResponse);
+  rpc YaklangCompileAndFormat(YaklangCompileAndFormatRequest) returns (YaklangCompileAndFormatResponse);
+
+  // 端口扫描的封装
+  rpc PortScan(PortScanRequest) returns (stream ExecResult);
+  rpc ViewPortScanCode(Empty) returns (SimpleScript);
+
+  rpc SimpleDetect(RecordPortScanRequest) returns (stream ExecResult);
+  rpc SaveCancelSimpleDetect(RecordPortScanRequest) returns (Empty);
+
+  rpc GetSimpleDetectUnfinishedTask(Empty) returns (GetSimpleDetectUnfinishedTaskResponse);
+  rpc GetSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
+  rpc PopSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
+  rpc RecoverSimpleDetectUnfinishedTask(RecoverExecBatchYakScriptUnfinishedTaskRequest) returns (stream ExecResult);
+
+
+  // 资产管理
+  rpc QueryPorts(QueryPortsRequest) returns (QueryPortsResponse);
+  rpc DeletePorts(DeletePortsRequest) returns (Empty);
+  rpc QueryHosts(QueryHostsRequest) returns (QueryHostsResponse);
+  rpc DeleteHosts(DeleteHostsRequest) returns (Empty);
+  rpc QueryDomains(QueryDomainsRequest) returns(QueryDomainsResponse);
+  rpc DeleteDomains(DeleteDomainsRequest)returns(Empty);
+
+  // Yakit Store
+  rpc UpdateFromYakitResource(UpdateFromYakitResourceRequest) returns (Empty);
+  rpc UpdateFromGithub(UpdateFromGithubRequest) returns (Empty);
+
+  // Menu
+  rpc AddToMenu(AddToMenuRequest) returns (Empty);
+  rpc RemoveFromMenu(RemoveFromMenuRequest) returns (Empty);
+  rpc YakScriptIsInMenu(YakScriptIsInMenuRequest) returns (Empty);
+  rpc GetAllMenuItem(Empty) returns (MenuByGroup);
+  rpc DeleteAllMenuItem(Empty) returns (Empty);
+  rpc ImportMenuItem(ImportMenuItemRequest) returns (Empty);
+  rpc ExportMenuItem(Empty) returns (ExportMenuItemResult);
+  rpc GetMenuItemById(GetMenuItemByIdRequest) returns (MenuItem);
+  rpc QueryGroupsByYakScriptId(QueryGroupsByYakScriptIdRequest) returns (GroupNames);
+  rpc AddMenus(AddMenuRequest) returns (Empty);
+  rpc QueryAllMenuItem(QueryAllMenuItemRequest) returns (MenuByGroup);
+  rpc DeleteAllMenu(QueryAllMenuItemRequest) returns (Empty);
+
+  // document
+  rpc SaveMarkdownDocument(SaveMarkdownDocumentRequest) returns (Empty);
+  rpc GetMarkdownDocument(GetMarkdownDocumentRequest) returns (GetMarkdownDocumentResponse);
+  rpc DeleteMarkdownDocument(GetMarkdownDocumentRequest) returns (Empty);
+
+  // Crawler
+  rpc StartBasicCrawler(StartBasicCrawlerRequest)returns (ExecResult);
+  rpc ViewBasicCrawlerCode(Empty) returns (SimpleScript);
+  rpc GenerateWebsiteTree(GenerateWebsiteTreeRequest) returns (GenerateWebsiteTreeResponse);
+
+  // 对插件结果的操作
+  rpc QueryYakScriptExecResult(QueryYakScriptExecResultRequest) returns (QueryYakScriptExecResultResponse);
+  rpc QueryYakScriptNameInExecResult(Empty) returns (YakScriptNames);
+  rpc DeleteYakScriptExecResult(DeleteYakScriptExecResultRequest) returns (Empty);
+  rpc DeleteYakScriptExec(Empty) returns (Empty);
+
+  // Bruter
+  rpc StartBrute(StartBruteParams) returns (stream ExecResult);
+  rpc GetAvailableBruteTypes(Empty) returns (GetAvailableBruteTypesResponse);
+
+  // Tunnel Server RMI/DNSLog
+  rpc GetTunnelServerExternalIP(GetTunnelServerExternalIPParams) returns (GetTunnelServerExternalIPResponse);
+  rpc VerifyTunnelServerDomain(VerifyTunnelServerDomainParams) returns (VerifyTunnelServerDomainResponse) ;
+  rpc StartFacades(StartFacadesParams) returns (stream ExecResult);
+  rpc StartFacadesWithYsoObject(StartFacadesWithYsoParams) returns (stream ExecResult);
+  rpc ApplyClassToFacades(ApplyClassToFacadesParamsWithVerbose) returns (Empty);
+  rpc BytesToBase64(BytesToBase64Request) returns (BytesToBase64Response);
+  rpc ConfigGlobalReverse(ConfigGlobalReverseParams) returns (stream Empty);
+  rpc AvailableLocalAddr(Empty) returns (AvailableLocalAddrResponse);
+  rpc GetGlobalReverseServer(Empty) returns (GetGlobalReverseServerResponse);
+
+  // Risk
+  rpc QueryRisks(QueryRisksRequest) returns (QueryRisksResponse);
+  rpc QueryRisk(QueryRiskRequest) returns (Risk);
+  rpc DeleteRisk(DeleteRiskRequest) returns (Empty);
+  rpc QueryAvailableRiskType(Empty) returns (Fields);
+  rpc QueryAvailableRiskLevel(Empty) returns (Fields);
+  rpc QueryRiskTableStats(Empty) returns (RiskTableStats);
+  rpc ResetRiskTableStats(Empty) returns (Empty);
+  rpc QueryAvailableTarget(Empty) returns (Fields);
+  rpc QueryNewRisk(QueryNewRiskRequest) returns (QueryNewRiskResponse);
+  rpc NewRiskRead(NewRiskReadRequest) returns (Empty);
+  rpc UploadRiskToOnline(UploadRiskToOnlineRequest) returns (Empty);
+
+  // Report
+  rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
+  rpc QueryReport(QueryReportRequest) returns (Report);
+  rpc DeleteReport(DeleteReportRequest) returns (Empty);
+  rpc QueryAvailableReportFrom(Empty) returns (Fields);
+
+  rpc DownloadReport(DownloadReportRequest) returns (Empty);
+
+  //Yso
+  rpc GetAllYsoGadgetOptions(Empty) returns (YsoOptionsWithVerbose);
+  rpc GetAllYsoClassOptions(YsoOptionsRequerstWithVerbose) returns (YsoOptionsWithVerbose);
+  rpc GetAllYsoClassGeneraterOptions(YsoOptionsRequerstWithVerbose) returns (YsoClassOptionsResponseWithVerbose);
+  rpc GenerateYsoCode(YsoOptionsRequerstWithVerbose) returns (YsoCodeResponse);
+  rpc GenerateYsoBytes(YsoOptionsRequerstWithVerbose) returns (YsoBytesResponse);
+  rpc YsoDump(YsoBytesObject)returns(YsoDumpResponse);
+
+  // DNSLog / ICMP / RandomTrigger
+  rpc SetYakBridgeLogServer(YakDNSLogBridgeAddr) returns (Empty);
+  rpc GetCurrentYakBridgeLogServer(Empty) returns (YakDNSLogBridgeAddr);
+  rpc RequireDNSLogDomain(YakDNSLogBridgeAddr) returns (DNSLogRootDomain);
+  rpc QueryDNSLogByToken(QueryDNSLogByTokenRequest) returns (QueryDNSLogByTokenResponse);
+  rpc RequireICMPRandomLength(Empty) returns (RequireICMPRandomLengthResponse);
+  rpc QueryICMPTrigger(QueryICMPTriggerRequest) returns (QueryICMPTriggerResponse);
+  rpc RequireRandomPortToken(Empty) returns (RandomPortInfo);
+  rpc QueryRandomPortTrigger(QueryRandomPortTriggerRequest) returns (RandomPortTriggerNotification);
+
+  // 获取 Tags
+  rpc GetAvailableYakScriptTags(Empty) returns (Fields);
+  rpc ForceUpdateAvailableYakScriptTags(Empty) returns (Empty);
+
+  // 通用的漏洞检测技术方案
+  rpc ExecYakitPluginsByYakScriptFilter(ExecYakitPluginsByYakScriptFilterRequest) returns (stream ExecResult);
+
+  // GenerateYakCodeByPacket
+  rpc GenerateYakCodeByPacket(GenerateYakCodeByPacketRequest) returns (GenerateYakCodeByPacketResponse);
+
+  // CSRF Generator
+  rpc GenerateCSRFPocByPacket(GenerateCSRFPocByPacketRequest) returns (GenerateCSRFPocByPacketResponse);
+
+  // MITM 衍生功能：
+  // Replacers 管理
+  rpc ExportMITMReplacerRules(Empty) returns (ExportMITMReplacerRulesResponse);
+  rpc ImportMITMReplacerRules(ImportMITMReplacerRulesRequest) returns (Empty);
+  rpc GetCurrentRules(Empty) returns (MITMContentReplacers);
+  rpc SetCurrentRules(MITMContentReplacers) returns (Empty);
+
+  rpc ExtractDataToFile(stream ExtractDataToFileRequest) returns (stream ExtractDataToFileResult);
+
+  // 尝试自动解码
+  rpc AutoDecode(AutoDecodeRequest) returns (AutoDecodeResponse);
+
+  rpc GetSystemProxy(Empty) returns (GetSystemProxyResult);
+  rpc SetSystemProxy(SetSystemProxyRequest) returns (Empty);
+
+  // 设置通用存储
+  rpc GetKey(GetKeyRequest) returns (GetKeyResult);
+  rpc SetKey(SetKeyRequest) returns (Empty);
+  rpc DelKey(GetKeyRequest) returns (Empty);
+  rpc GetAllProcessEnvKey(Empty) returns (GetProcessEnvKeyResult);
+  rpc SetProcessEnvKey(SetKeyRequest) returns (Empty);
+
+  // Online
+  rpc GetOnlineProfile(Empty) returns (OnlineProfile);
+  rpc SetOnlineProfile(OnlineProfile) returns (Empty);
+  rpc DownloadOnlinePluginById(DownloadOnlinePluginByIdRequest) returns (Empty);
+  rpc DownloadOnlinePluginByIds(DownloadOnlinePluginByIdsRequest) returns (Empty);
+  rpc DownloadOnlinePluginAll(DownloadOnlinePluginByTokenRequest) returns (stream DownloadOnlinePluginProgress);
+  rpc DeletePluginByUserID(DeletePluginByUserIDRequest) returns (Empty);
+  rpc DeleteAllLocalPlugins(Empty) returns (Empty);
+  rpc GetYakScriptTagsAndType(Empty) returns (GetYakScriptTagsAndTypeResponse);
+  rpc DeleteLocalPluginsByWhere(DeleteLocalPluginsByWhereRequest) returns (Empty);
+  rpc DownloadOnlinePluginByScriptNames(DownloadOnlinePluginByScriptNamesRequest) returns (DownloadOnlinePluginByScriptNamesResponse);
+  // 新的扫描模式
+  rpc ExecPacketScan(ExecPacketScanRequest) returns (stream ExecResult);
+
+  rpc GetEngineDefaultProxy(Empty) returns (DefaultProxyResult);
+  rpc SetEngineDefaultProxy(DefaultProxyResult) returns (Empty);
+
+  // machine id
+  rpc GetMachineID(Empty) returns (GetMachineIDResponse);
+
+  // license
+  rpc GetLicense(Empty) returns (GetLicenseResponse);
+  rpc CheckLicense(CheckLicenseRequest) returns (Empty);
+
+  // Response Body 的魔法操作
+  rpc GetRequestBodyByHTTPFlowID(DownloadBodyByHTTPFlowIDRequest) returns (Bytes);
+  rpc GetResponseBodyByHTTPFlowID(DownloadBodyByHTTPFlowIDRequest) returns (Bytes);
+  rpc GetHTTPPacketBody(GetHTTPPacketBodyRequest) returns (Bytes);
+
+  // 注册一个 Facades HTTP 响应
+  rpc RegisterFacadesHTTP(RegisterFacadesHTTPRequest) returns (RegisterFacadesHTTPResponse);
+
+  // 重置到恢复出厂设置
+  rpc ResetAndInvalidUserData(ResetAndInvalidUserDataRequest) returns (Empty);
+
+  // Yaklang Shell
+  // 创建一个交互式 Shell
+  rpc CreateYaklangShell(stream YaklangShellRequest) returns (stream YaklangShellResponse);
+
+  // 接入标准输出和标准错误流
+  rpc AttachCombinedOutput(AttachCombinedOutputRequest) returns (stream ExecResult);
+
+  // 判断当前引擎对网卡是否有操作权限？
+  // 主要是能否发包等敏感操作
+  // Windows 判断是否是管理员即可 I Am Admin
+  // Linux 和 MacOS 应该尝试 pcap 打开网卡就行
+  rpc IsPrivilegedForNetRaw(Empty) returns (IsPrivilegedForNetRawResponse);
+  rpc PromotePermissionForUserPcap(Empty) returns (Empty);
+
+  // 操作项目的相关接口，通过设置 ProjectDatabase
+  rpc SetCurrentProject(SetCurrentProjectRequest) returns (Empty);
+  rpc GetCurrentProject(Empty) returns (ProjectDescription);
+  rpc GetProjects(GetProjectsRequest) returns (GetProjectsResponse);
+  rpc NewProject(NewProjectRequest) returns (NewProjectResponse);
+  rpc IsProjectNameValid(IsProjectNameValidRequest) returns (Empty);
+  rpc RemoveProject(RemoveProjectRequest) returns (Empty);
+
+  rpc DeleteProject(DeleteProjectRequest) returns (Empty);
+  rpc GetDefaultProject(Empty) returns (ProjectDescription);
+  rpc QueryProjectDetail(QueryProjectDetailRequest) returns (ProjectDescription);
+
+  // 导入导出项目，带密码，带进度
+  rpc ExportProject(ExportProjectRequest) returns (stream ProjectIOProgress);
+  rpc ImportProject(ImportProjectRequest) returns (stream ProjectIOProgress);
+  // 迁移旧数据库
+  rpc MigrateLegacyDatabase(Empty) returns (Empty);
+
+  // 从规则中提取数据
+  rpc QueryMITMRuleExtractedData(QueryMITMRuleExtractedDataRequest) returns (QueryMITMRuleExtractedDataResponse);
+
+  /*
+    ChaosMakerRule: Bas
+  */
+  rpc ImportChaosMakerRules(ImportChaosMakerRulesRequest) returns (Empty);
+  rpc QueryChaosMakerRule(QueryChaosMakerRuleRequest) returns (QueryChaosMakerRuleResponse);
+  rpc DeleteChaosMakerRuleByID(DeleteChaosMakerRuleByIDRequest) returns (Empty);
+  rpc ExecuteChaosMakerRule(ExecuteChaosMakerRuleRequest) returns (stream ExecResult);
+  rpc IsRemoteAddrAvailable(IsRemoteAddrAvailableRequest) returns (IsRemoteAddrAvailableResponse);
+
+  // CVE
+  rpc IsCVEDatabaseReady(IsCVEDatabaseReadyRequest) returns (IsCVEDatabaseReadyResponse);
+  rpc UpdateCVEDatabase(UpdateCVEDatabaseRequest) returns (stream ExecResult);
+  rpc ExportsProfileDatabase(ExportsProfileDatabaseRequest) returns (stream ExecResult);
+  rpc ImportsProfileDatabase(ImportsProfileDatabaseRequest) returns (stream ExecResult);
+
+  rpc QueryCVE(QueryCVERequest) returns (QueryCVEResponse);
+  rpc GetCVE(GetCVERequest) returns (CVEDetailEx);
+  rpc SaveTextToTemporalFile(SaveTextToTemporalFileRequest) returns (SaveTextToTemporalFileResponse);
+
+  // Screcorder
+  rpc IsScrecorderReady(IsScrecorderReadyRequest) returns (IsScrecorderReadyResponse);
+  rpc InstallScrecorder(InstallScrecorderRequest) returns (stream ExecResult);
+  rpc StartScrecorder(StartScrecorderRequest) returns (stream ExecResult);
+  rpc QueryScreenRecorders(QueryScreenRecorderRequest) returns (QueryScreenRecorderResponse);
+}
+
+message ScreenRecorder {
+  int64 Id = 1;
+  string Filename = 2;
+  string NoteInfo = 3;
+  string Project = 4;
+  int64 CreatedAt = 5;
+  int64 UpdatedAt = 6;
+}
+
+message QueryScreenRecorderRequest {
+  string Project = 1;
+  Paging Pagination = 2;
+}
+
+message QueryScreenRecorderResponse {
+  repeated ScreenRecorder Data = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message StartScrecorderRequest {
+  int64 Framerate = 1;
+  string ResolutionSize = 2;
+  double CoefficientPTS = 3;
+  bool DisableMouse = 4;
+}
+
+message InstallScrecorderRequest {
+  string Proxy = 1;
+}
+
+message IsScrecorderReadyRequest {
+
+}
+
+message IsScrecorderReadyResponse {
+  bool Ok = 1;
+  string Reason = 2;
+}
+
+message GetCVERequest {
+  string CVE = 1;
+}
+
+message QueryCVERequest {
+  Paging Pagination = 1;
+  // NETWORK/LOCAL/ADJACENT_NETWORK/PHYSICAL
+  string AccessVector = 2;
+  // HIGH/MIDDLE/LOW
+  string AccessComplexity = 3;
+  string CWE = 4;
+  string Year = 5;
+  string Severity = 6;
+  double Score = 7;
+  string Product = 8;
+
+  // by published_date
+  string AfterYear = 9;
+  bool ChineseTranslationFirst = 10;
+  string Keywords = 11;
+}
+
+message CWEDetail {
+  string CWE = 1;
+  string Name = 2;
+  string NameZh = 3;
+  //  repeated CWEDetail InterTo = 4;
+
+  string Status = 5;
+  bool Stable = 6;
+  bool Incomplete = 7;
+  string Description = 8;
+  string DescriptionZh = 9;
+  string LongDescription = 10;
+  string LongDescriptionZh = 11;
+  repeated string RelativeLanguage = 12;
+  string Solution = 13;
+  repeated string RelativeCVE = 14;
+}
+
+message CVEDetailEx {
+  CVEDetail CVE = 1;
+  repeated CWEDetail CWE = 2;
+}
+
+message CVEDetail {
+  string CVE = 1;
+  string DescriptionZh = 2;
+  string DescriptionOrigin = 3;
+  string Title = 4;
+  string Solution = 5;
+  string AccessVector = 7;
+  string AccessComplexity = 8;
+  string Authentication = 9;
+  string ConfidentialityImpact = 10;
+  string IntegrityImpact = 11;
+  string AvailabilityImpact = 12;
+  string Severity = 14;
+  int64 PublishedAt = 15;
+  string CWE = 16;
+  string CVSSVersion = 17;
+  string CVSSVectorString = 18;
+  double BaseCVSSv2Score = 19;
+  double ExploitabilityScore = 20;
+  bool ObtainAllPrivileged = 21;
+  bool ObtainUserPrivileged = 22;
+  bool ObtainOtherPrivileged = 23;
+  bool UserInteractionRequired = 24;
+  string Product = 25;
+  int64  UpdatedAt = 26;
+  int64  LastModifiedData = 27;
+}
+
+message QueryCVEResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated CVEDetail Data = 3;
+}
+
+message SaveTextToTemporalFileRequest {
+  bytes Text = 1;
+}
+
+message SaveTextToTemporalFileResponse {
+  string FileName = 1;
+}
+
+message ImportChaosMakerRulesRequest {
+  string Content = 1;
+  // suricata / http-request / icmp
+  string RuleType = 2;
+}
+
+message ChaosMakerRuleGroup {
+  string Title = 1;
+  string Description = 2;
+  string Keywords = 3;
+  repeated string Protocols = 4;
+  string Solution = 5;
+}
+
+message IsRemoteAddrAvailableRequest {
+  string Addr = 1;
+  int64 Timeout = 2;
+  string Probe = 3;
+}
+
+message IsRemoteAddrAvailableResponse {
+  string Addr = 1;
+  bool IsAvailable = 2;
+  string Reason = 3;
+  string Status = 4;
+}
+
+message ExecuteChaosMakerRuleRequest {
+  repeated ChaosMakerRuleGroup Groups = 1;
+  repeated string ExtraOverrideDestinationAddress = 2;
+
+  // 随机延迟
+  int64 Concurrent = 3;
+  int32 TrafficDelayMinSeconds = 4;
+  int32 TrafficDelayMaxSeconds = 5;
+
+  // 额外重复，如果为 -1 认为是永久重复
+  int64 ExtraRepeat = 6;
+
+  // 每组流量之间重复的次数
+  int64 GroupGapSeconds = 7;
+}
+
+message ChaosMakerRule {
+  int64 Id = 1;
+  string RawTrafficBeyondIpPacketBase64 = 2;
+  string RawTrafficBeyondLinkLayerBase64 = 3;
+  string RawTrafficBeyondHttpBase64 = 4;
+  string RuleType = 5;
+  string SuricataRaw = 6;
+  string Protocol = 7;
+  string Action = 8;
+  string Name = 9;
+  string NameZh = 10;
+  string ClassType = 11;
+  string ClassTypeZh = 12;
+  string Group = 13;
+  string Keywords = 15;
+  string KeywordsZh = 16;
+  string Description = 17;
+  string DescriptionZh = 18;
+  repeated string CVE = 19;
+}
+
+message QueryChaosMakerRuleResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated ChaosMakerRule Data = 3;
+}
+
+message DeleteChaosMakerRuleByIDRequest {
+  int64 Id = 1;
+}
+
+message QueryChaosMakerRuleRequest {
+  Paging Pagination = 1;
+  string RuleType = 2;
+  repeated string Keywords = 3;
+}
+
+message ImportsProfileDatabaseRequest {
+  string LocalProfileFile = 1;
+}
+
+message ExportsProfileDatabaseRequest {
+  string LocalProfileFile = 1;
+}
+
+message UpdateCVEDatabaseRequest {
+  string Proxy = 1;
+  bool JustUpdateLatestCVE = 2;
+}
+
+message IsCVEDatabaseReadyResponse {
+  bool Ok = 1;
+  string Reason = 2;
+  bool ShouldUpdate = 3;
+}
+
+message IsCVEDatabaseReadyRequest {
+
+}
+
+message MITMRuleExtractedData {
+  int64 Id = 1;
+  int64 CreatedAt = 2;
+  string SourceType = 3;
+  string TraceId = 4;
+  string Regexp = 5;
+  string RuleName = 6;
+  string Data = 7;
+}
+
+message QueryMITMRuleExtractedDataResponse {
+  repeated MITMRuleExtractedData Data = 1;
+  int64 Total = 2;
+  Paging Pagination = 3;
+}
+
+message QueryMITMRuleExtractedDataRequest {
+  Paging Pagination = 1;
+  string HTTPFlowHash = 2;
+}
+
+message ExportProjectRequest {
+  string ProjectName = 1;
+  string Password = 2;
+  int64 Id = 3;
+}
+
+message ProjectIOProgress {
+  string TargetPath = 1;
+
+  // 如果未完成，这个是百分比 0-1.0
+  double Percent = 2;
+
+  // 展示的提示语，可能是中断原因或者错误原因之类的
+  string Verbose = 4;
+}
+
+message ImportProjectRequest {
+  string LocalProjectName = 1;
+  string ProjectFilePath = 2;
+  string Password = 3;
+  int64 FolderId = 4;
+  int64 ChildFolderId = 5;
+}
+
+message IsPrivilegedForNetRawResponse {
+  bool IsPrivileged = 1;
+  string Advice = 2;
+  string AdviceVerbose = 3;
+}
+
+message RemoveProjectRequest {
+  string ProjectName = 1;
+}
+
+message IsProjectNameValidRequest {
+  string ProjectName = 1;
+  int64 FolderId = 2;
+  int64 ChildFolderId = 3;
+  string Type = 4;
+}
+
+message NewProjectRequest {
+  string ProjectName = 1;
+  string Description = 2;
+  int64 FolderId = 3;
+  int64 ChildFolderId = 4;
+  string Type = 5;
+  int64  Id = 6;
+}
+
+message NewProjectResponse {
+  int64 Id = 1;
+  string ProjectName = 2;
+}
+
+message GetProjectsRequest {
+  string ProjectName = 1;
+  string Description = 2;
+  Paging Pagination = 3;
+  int64 FolderId = 4;
+  int64 ChildFolderId = 5;
+  string Type = 6;
+}
+
+message ProjectDescription {
+  string ProjectName = 1;
+  string Description = 2;
+
+  int64 Id = 3;
+  string DatabasePath = 4;
+
+  // 创建时间
+  int64 CreatedAt = 5;
+
+  int64 FolderId = 6;
+  int64 ChildFolderId = 7;
+  string Type = 8;
+  int64 UpdateAt = 9;
+  string FolderName = 10;
+  string ChildFolderName = 11;
+}
+
+message GetProjectsResponse {
+  repeated ProjectDescription Projects = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+  int64 TotalPage = 4;
+  int64 ProjectToTal = 9;
+}
+
+message SetCurrentProjectRequest {
+  // ProjectName
+  string ProjectName = 1;
+  int64 Id = 2;
+}
+
+message DeleteProjectRequest {
+  int64 Id = 1;
+  bool IsDeleteLocal = 2;
+}
+
+message QueryProjectDetailRequest {
+  int64 Id = 1;
+}
+
+
+message AttachCombinedOutputRequest {
+
+}
+
+message YaklangShellRequest {
+  string Input = 1;
+}
+
+message YaklangShellKVPair {
+  string Key = 1;
+  bytes Value = 2;
+  string ValueVerbose = 3;
+  int64 SymbolId = 4;
+}
+
+message YaklangShellResponse {
+  ExecResult RawResult = 1;
+  repeated YaklangShellKVPair Scope = 2;
+}
+
+message ResetAndInvalidUserDataRequest {
+
+}
+
+message RegisterFacadesHTTPRequest {
+  // 这个优先级比较高，如果有这个的话，他的响应应该像是
+  // /_yakit/history/<id>
+  int64 HTTPFlowID = 1;
+
+  // 散装 HTTPFlow
+  bytes HTTPResponse = 2;
+  string Url = 3;
+}
+
+message RegisterFacadesHTTPResponse {
+  // http(s)://localhost:<facadesport>/...
+  string FacadesUrl = 1;
+}
+
+message GetHTTPPacketBodyRequest {
+  string Packet = 1;
+  bytes PacketRaw = 2;
+}
+
+message DownloadBodyByHTTPFlowIDRequest {
+  int64 Id = 1;
+}
+
+message Bytes {
+  bytes Raw = 1;
+}
+
+message ExtractDataResponse {
+  string Token = 1;
+  bytes Extracted = 2;
+}
+
+message ExtractDataRequest {
+  bytes Data = 1;
+
+  // regexp mode -> regexp between 模式
+  string Mode = 2;
+
+  // 根据前后缀提取
+  string PrefixRegexp = 3;
+  string SuffixRegexp = 4;
+
+  // 根据一个正则提取
+  string MatchRegexp = 5;
+
+  // Token 用来标注这个数据是谁的，一般可以用来处理提取的数据
+  string Token = 6;
+
+  // 如果不再有数据了，设置这个 flag
+  bool End = 7;
+}
+
+message GenerateExtractRuleRequest {
+  // 要提取规则的样例数据
+  bytes Data = 1 ;
+  // 选择的文本
+  bytes Selected = 2;
+  // 选择前后缀的偏移量
+  int64 OffsetSize = 3;
+}
+
+message GenerateExtractRuleResponse {
+  string PrefixRegexp = 1;
+  string SuffixRegexp = 2;
+  string SelectedRegexp = 3;
+}
+
+message GetMachineIDResponse {
+  string MachineID = 1;
+}
+
+message QueryHTTPFuzzerResponseByTaskIdRequest {
+  // 用来索引对应的请求
+  int64 TaskId = 1;
+  string FuzzRequestToken = 2;
+
+  // 上一个请求的时间戳
+  int64 LastResponseTimestamp = 3;
+
+  Paging Pagination = 4;
+}
+
+message QueryHTTPFuzzerResponseByTaskIdResponse {
+  Paging Pagination = 1;
+  repeated FuzzerResponse Data = 2;
+  int64 Total = 3;
+  int64 TotalPage = 4;
+}
+
+message QueryWebsocketFlowByHTTPFlowWebsocketHashRequest {
+  string WebsocketRequestHash = 1;
+  Paging Pagination = 2;
+}
+
+message DeleteWebsocketFlowByHTTPFlowWebsocketHashRequest {
+  string WebsocketRequestHash = 1;
+}
+
+message ClientWebsocketRequest {
+  bool IsTLS = 1;
+  bytes UpgradeRequest = 2;
+
+  // 要发送到服务器的请求
+  bytes ToServer = 3;
+  repeated string Encode = 4;
+
+  // 是否允许 fuzz 标签渲染，然后发送
+  bool AllowToFuzz = 5;
+  int64 TotalTimeoutSeconds = 6;
+
+  string Proxy = 7;
+}
+
+message ClientWebsocketResponse {
+  // 切换协议是否成功
+  bool SwitchProtocolSucceeded = 2;
+
+  // 是 Websocket 数据帧吗？
+  bool IsDataFrame = 1;
+  // 服务器端返回还是？
+  bool FromServer = 4;
+  // 编码是啥样的？
+  repeated string GuessEncode = 5;
+
+  // 其他状态，以及出现问题的原因
+  string StatusVerbose = 6;
+  string ReasonVerbose = 7;
+
+  // DataLength
+  int64 DataLength = 8;
+  bytes Data = 9;
+
+  bool IsJson = 10;
+  bool IsProtobuf = 11;
+
+  int64 DataFrameIndex = 12;
+  string WebsocketHash = 13;
+
+  // 设置大小
+  string DataSizeVerbose = 14;
+  string DataVerbose = 15;
+
+  // 升级
+  bool IsUpgradeResponse = 16;
+  bytes UpgradeResponse = 17;
+}
+
+message DefaultProxyResult {
+  string Proxy = 1;
+}
+
+message ExecPacketScanRequest {
+  // 选择 HTTPFlow 进行扫描
+  repeated int64 HTTPFlow = 1;
+  bytes HTTPRequest = 2;
+  bool HTTPS = 3;
+
+  // 允许数据包的 Fuzz 打开
+  bool AllowFuzzTag = 5;
+
+  // 扫描进程总超时
+  int64 TotalTimeoutSeconds = 6;
+  // 默认发包的 Timeout
+  int64 Timeout = 7;
+
+  // 并发
+  int64 PluginConcurrent = 8;
+  int64 PacketConcurrent = 9;
+
+  // 插件列表
+  repeated string PluginList = 10;
+
+  // 设置代理
+  string Proxy = 11;
+}
+
+message StaticAnalyzeErrorRequest {
+  bytes Code = 1;
+}
+
+message YaklangCompileAndFormatRequest {
+  string Code = 1;
+}
+
+
+message YaklangCompileAndFormatResponse {
+  string Code = 1;
+  repeated StaticAnalyzeErrorResult Errors = 2;
+}
+
+message StaticAnalyzeErrorResult {
+  bytes Message = 1;
+  int64 StartLineNumber = 2;
+  int64 EndLineNumber = 3;
+  int64 StartColumn = 4;
+  int64 EndColumn = 5;
+  bytes RawMessage = 6;
+  string Severity = 7;
+}
+
+message StaticAnalyzeErrorResponse {
+  repeated StaticAnalyzeErrorResult Result = 1;
+}
+
+message SavePayloadProgress {
+  double Progress = 1;
+  int64 HandledBytes = 2;
+  string HandledBytesVerbose = 3;
+  int64 TotalBytes = 4;
+  string TotalBytesVerbose = 5;
+  double CostDuration = 6;
+  string CostDurationVerbose = 7;
+}
+
+message DeletePluginByUserIDRequest {
+  int64 UserID = 1;
+  string OnlineBaseUrl = 2;
+}
+
+message DeleteLocalPluginsByWhereRequest {
+  string Keywords = 1;
+  string Type = 2;
+  int64  UserId = 3;
+  string UserName = 4;
+}
+
+message DownloadOnlinePluginProgress {
+  // 进度
+  double Progress = 1;
+  string Log = 2;
+}
+
+message DownloadOnlinePluginByTokenRequest {
+  string Token = 1;
+  bool BindMe = 2;
+  string Keywords = 3;
+  string PluginType = 4;
+  string Status = 5;
+  string IsPrivate = 6;
+  string Tags = 7;
+  string UserName = 8;
+  int64  UserId = 9;
+  string TimeSearch = 10;
+  string Group = 11;
+}
+
+message DownloadOnlinePluginByIdRequest {
+  int64 OnlineID = 1;
+  string Token = 2;
+  string UUID = 3;
+}
+
+message DownloadOnlinePluginByIdsRequest {
+  repeated int64 OnlineIDs = 1;
+  string Token = 2;
+  repeated string UUID = 3;
+}
+
+message DownloadOnlinePluginByScriptNamesRequest {
+  repeated string ScriptNames = 1;
+  string Token = 2;
+}
+
+message DownloadOnlinePluginByScriptNamesResponse {
+  repeated DownloadOnlinePluginByScriptName Data = 1;
+}
+
+message DownloadOnlinePluginByScriptName {
+  string ScriptName = 1;
+  int64 Id = 2;
+}
+
+message OnlineProfile {
+  string BaseUrl = 1;
+  string Password = 2;
+  string Proxy = 3;
+  bool   IsCompany = 4;
+}
+
+message SetKeyRequest {
+  string Key = 1;
+  string Value = 2;
+  int64 TTL = 3;
+}
+
+message GetKeyRequest {
+  string Key = 1;
+}
+
+message GetKeyResult {
+  string Value = 1;
+}
+
+message GeneralStorage {
+  string Key = 1;
+  string Value = 2;
+  int64 ExpiredAt = 3;
+  bool ProcessEnv = 4;
+  string Verbose = 5;
+  string Group = 6;
+}
+
+message GetProcessEnvKeyResult {
+  repeated GeneralStorage Results = 1;
+}
+
+message SetSystemProxyRequest {
+  string HttpProxy = 1;
+  bool Enable = 2;
+}
+
+message GetSystemProxyResult {
+  string CurrentProxy = 1;
+  bool Enable = 2;
+}
+
+message GetExecBatchYakScriptUnfinishedTaskByUidRequest {
+  string Uid = 1;
+}
+
+message RecoverExecBatchYakScriptUnfinishedTaskRequest {
+  string Uid = 1;
+}
+
+message ExecBatchYakScriptUnfinishedTask {
+  double Percent = 1;
+  int64 CreatedAt = 2;
+  string Uid = 3;
+  string YakScriptOnlineGroup = 4;
+  string TaskName = 5;
+}
+
+message SimpleDetectUnfinishedTask {
+  double Percent = 1;
+  int64 CreatedAt = 2;
+  string Uid = 3;
+  string YakScriptOnlineGroup = 4;
+  string TaskName = 5;
+  int64  LastRecordPtr = 6;
+}
+
+message GetExecBatchYakScriptUnfinishedTaskResponse {
+  repeated ExecBatchYakScriptUnfinishedTask Tasks = 1;
+}
+
+message    GetSimpleDetectUnfinishedTaskResponse {
+  repeated SimpleDetectUnfinishedTask Tasks = 1;
+}
+
+message FixUploadPacketRequest {
+  bytes Request = 1;
+}
+
+message FixUploadPacketResponse {
+  bytes Request = 1;
+}
+
+message IsMultipartFormDataRequestResult {
+  bool IsMultipartFormData = 1;
+}
+
+message AutoDecodeRequest {
+  string Data = 1;
+}
+
+message AutoDecodeResult {
+  string Type = 1;
+  string TypeVerbose = 2;
+  bytes Origin = 3;
+  bytes Result = 4;
+}
+
+message AutoDecodeResponse {
+  repeated AutoDecodeResult Results = 1;
+}
+
+message ExtractDataToFileResult {
+  string FilePath = 1;
+}
+
+message GetYakScriptTagsResponse {
+  repeated Tags Tag = 1;
+}
+
+message Tags {
+  string Value = 1;
+  int32 Total = 2;
+}
+
+message QueryYakScriptLocalAndUserRequest {
+  string OnlineBaseUrl = 1;
+  int64 UserId = 2;
+}
+
+message QueryYakScriptLocalAndUserResponse {
+  repeated YakScript Data = 1;
+}
+
+message QueryYakScriptByOnlineGroupRequest {
+  string OnlineGroup = 1;
+}
+
+message ExtractDataToFileRequest {
+  bool JsonOutput = 1;
+  bool CSVOutput = 2;
+  string DirName = 3;
+
+  map<string, ExtractableData> Data = 4;
+  string FileNamePattern = 5;
+
+  // 当没有数据的时候，执行这个即可
+  bool Finished = 6;
+}
+
+message ExtractableData {
+  string StringValue = 1;
+  bytes BytesValue = 2;
+}
+
+message MITMContentReplacers {
+  repeated MITMContentReplacer Rules = 1;
+}
+
+message ImportMITMReplacerRulesRequest {
+  bytes JsonRaw = 1;
+  bool ReplaceAll = 2;
+}
+
+message ExportMITMReplacerRulesResponse {
+  bytes JsonRaw = 1;
+}
+
+message ExecYakitPluginsByYakScriptFilterRequest {
+  QueryYakScriptRequest Filter = 1;
+
+  // 这个 Target 很复杂，URL / IP / CIDR / Host / Host:port
+  string Target = 2;
+  string Ports = 3;
+  string TargetFile = 5;
+
+  repeated ExecParamItem ExtraParams = 4;
+}
+
+message GenerateYakCodeByPacketRequest {
+  bool IsHttps = 1;
+  bytes Request = 2;
+  enum Template {
+    Ordinary = 0;
+    Batch = 1;
+  }
+  Template CodeTemplate = 3;
+}
+
+message GenerateCSRFPocByPacketRequest {
+  bool IsHttps = 1;
+  bytes Request = 2;
+}
+
+message GenerateCSRFPocByPacketResponse {
+  bytes Code = 1;
+}
+
+message GenerateYakCodeByPacketResponse {
+  bytes Code = 1;
+}
+
+message QueryReportRequest {
+  int64 Id = 1;
+  string Hash = 2;
+}
+
+message DeleteReportRequest {
+  int64 Id = 1;
+  string Hash = 2;
+  QueryReportsRequest Filter = 3;
+  repeated int64 IDs = 4;
+  bool DeleteAll = 5;
+}
+
+message QueryReportsResponse {
+  repeated Report Data = 1;
+  int64 Total = 2;
+  Paging Pagination = 3;
+}
+
+message QueryReportsRequest {
+  Paging Pagination = 1;
+  string Owner = 2;
+  string From = 3;
+  string Keyword = 4;
+  string Title = 5;
+}
+
+message Report {
+  string Title = 1;
+  uint64 PublishedAt = 2;
+  string Hash = 3;
+  uint64 Id = 4;
+  string Owner = 5;
+  string From = 6;
+  string JsonRaw = 7;
+}
+
+message SetTagForHTTPFlowRequest {
+  int64 Id = 1;
+  string Hash = 2;
+  repeated string Tags = 3;
+  repeated CheckSetTagsHTTPFlow CheckTags = 4;
+}
+
+message CheckSetTagsHTTPFlow {
+  int64 Id = 1;
+  string Hash = 2;
+  repeated string Tags = 3;
+}
+
+message RequireICMPRandomLengthResponse {
+  int32 Length = 1;
+  string ExternalHost = 2;
+}
+
+message RandomPortTriggerNotification {
+  string RemoteAddr = 1;
+  string RemoteIP = 2;
+  int32 RemotePort = 3;
+  int32 LocalPort = 4;
+  repeated string History = 5;
+  int32 CurrentRemoteCachedConnectionCount = 6;
+  int32 LocalPortCachedHistoryConnectionCount = 7;
+  int64 TriggerTimestamp = 8;
+  int64 Timestamp = 9;
+}
+
+message QueryRandomPortTriggerRequest {
+  string Token = 1;
+}
+
+message RandomPortInfo {
+  string Token = 1;
+  string Addr = 2;
+  int32 Port = 3;
+}
+
+message DeleteHistoryHTTPFuzzerTaskRequest {
+  int32 Id = 1;
+}
+
+message RiskTableStats {
+  // 最近一次更新的漏洞信息
+  int64 LatestCreatedAtTimestamp = 1;
+
+  Fields RiskTypeStats = 2;
+  Fields RiskLevelStats = 3;
+}
+
+message MITMCert {
+  bytes CaCerts = 1;
+  string LocalFile = 2;
+}
+
+message FieldName {
+  string Name = 1;
+  string Verbose = 2;
+  int32 Total = 3;
+
+  // 比上一次的增量/变化量
+  int32 Delta = 4;
+}
+
+message Fields {
+  repeated FieldName Values = 1;
+}
+//获取Gadget的Options
+message YsoOption{
+  string Name = 1;
+  string NameVerbose = 2;
+  string Help = 3;
+}
+message YsoOptionsWithVerbose{
+  repeated YsoOption Options = 1;
+}
+//已弃用
+message YsoOptions{
+  repeated string Names = 1;
+}
+//类生成器的参数
+message YsoClassGeneraterOptionsWithVerbose{
+  string Key = 1;
+  string KeyVerbose = 2;
+  string Help = 3;
+  string Value = 4;
+  string Type = 5;
+  map<string, YsoClassOptionsResponseWithVerbose> BindOptions = 6;
+}
+message YsoClassOptionsResponseWithVerbose{
+  repeated YsoClassGeneraterOptionsWithVerbose Options = 1;
+}
+//已弃用
+message YsoClassGeneraterOptions{
+  string Key = 1;
+  string Value = 2;
+  string Type = 3;
+}
+//已弃用
+message YsoClassOptionsResponse{
+  repeated YsoClassGeneraterOptions Options = 1;
+}
+//生成代码和字节码
+message YsoOptionsRequerstWithVerbose{
+  string Gadget = 1;
+  string Class = 2;
+  repeated YsoClassGeneraterOptionsWithVerbose Options = 3;
+}
+//已弃用
+message YsoOptionsRequerst{
+  string Gadget = 1;
+  string Class = 2;
+  repeated YsoClassGeneraterOptions Options = 3;
+}
+message YsoBytesObject{
+  bytes Data = 1;
+}
+message YsoDumpResponse{
+  string Data = 1;
+}
+
+message YsoCodeResponse{
+  string Code = 1;
+}
+message YsoBytesResponse{
+  string FileName = 1;
+  bytes Bytes = 2;
+}
+message BytesToBase64Request{
+  bytes Bytes = 1;
+}
+message BytesToBase64Response{
+  string Base64 = 1;
+}
+message QueryICMPTriggerRequest {
+  int32 Length = 1;
+}
+
+message QueryICMPTriggerResponse {
+  repeated ICMPTriggerNotification Notification = 1;
+}
+
+message ICMPTriggerNotification {
+  int32 Size = 1;
+  string CurrentRemoteAddr = 2;
+  repeated string Histories = 3;
+  int32 CurrentRemoteCachedConnectionCount = 4;
+  int32 SizedCachedHistoryConnectionCount = 5;
+  int64 TriggerTimestamp = 7;
+  int64 Timestamp = 8;
+}
+
+message GetHistoryHTTPFuzzerTaskRequest {
+  int32 Id = 1;
+}
+
+
+message HistoryHTTPFuzzerTaskDetail {
+  HistoryHTTPFuzzerTask BasicInfo = 1;
+  FuzzerRequest OriginRequest = 2;
+}
+
+message HistoryHTTPFuzzerTask {
+  int32 Id = 1;
+  int64 CreatedAt = 2;
+  int32 HTTPFlowTotal = 3;
+  int32 HTTPFlowSuccessCount = 4;
+  int32 HTTPFlowFailedCount = 5;
+  string Host = 6;
+  int32  Port = 7;
+}
+
+message HistoryHTTPFuzzerTasks {
+  repeated HistoryHTTPFuzzerTask Tasks = 1;
+}
+
+message HistoryHTTPFuzzerTasksResponse {
+  repeated HistoryHTTPFuzzerTaskDetail Data = 1;
+  int64 Total = 2;
+  int64 TotalPage = 3;
+  Paging Pagination = 4;
+}
+
+message QueryHistoryHTTPFuzzerTaskExParams {
+  Paging Pagination = 1;
+  string Keyword = 2;
+}
+
+message ExecutePacketYakScriptParams {
+  string ScriptName = 1;
+  bool IsHttps = 2;
+  bytes Request = 3;
+  bytes Response = 4;
+}
+
+message ExecuteBatchPacketYakScriptParams {
+  repeated string ScriptName = 1;
+  bool IsHttps = 2;
+  bytes Request = 3;
+  bytes Response = 4;
+
+  // 并发
+  int32 Concurrent = 5;
+  // 设置单个超时时间
+  double PerTaskTimeout = 6;
+}
+
+message YakDNSLogBridgeAddr {
+  string DNSLogAddr = 1;
+  string DNSLogAddrSecret = 2;
+}
+
+message QueryDNSLogByTokenRequest {
+  string Token = 1;
+  string DNSLogAddr = 2;
+}
+
+message QueryDNSLogByTokenResponse {
+  repeated DNSLogEvent Events = 1;
+}
+
+message DNSLogEvent {
+  string DNSType = 1;
+  string Token = 2;
+  string Domain = 3;
+  string RemoteAddr = 4;
+  string RemoteIP = 5;
+  int32 RemotePort = 6;
+  bytes Raw = 7;
+  int64 Timestamp = 8;
+}
+
+message DNSLogRootDomain {
+  string Domain = 1;
+  string Token = 2;
+}
+
+message GetGlobalReverseServerResponse {
+  string PublicReverseIP = 1;
+  int32 PublicReversePort = 2;
+  string LocalReverseAddr = 3;
+  int32 LocalReversePort = 4;
+}
+
+message AvailableLocalAddrResponse {
+  repeated NetInterface Interfaces = 1;
+}
+
+message NetInterface {
+  string Name = 1;
+  string Addr = 2;
+  string IP = 3;
+}
+
+message ConfigGlobalReverseParams {
+  GetTunnelServerExternalIPParams ConnectParams = 1;
+  string LocalAddr = 2;
+}
+
+message DeleteRiskRequest {
+  int64 Id = 1;
+  string Hash = 2;
+  repeated int64 Ids = 4;
+  QueryRisksRequest Filter = 3;
+  bool DeleteAll = 5;
+  bool DeleteRepetition = 6;
+}
+
+message QueryRiskRequest {
+  int64 Id = 1;
+  string Hash = 2;
+  repeated int64 Ids = 4;
+  QueryRisksRequest Filter = 3;
+}
+
+message Risk {
+  string Hash = 1;
+
+  string IP = 2;
+  string Url = 3;
+  int32  Port = 4;
+  string Host = 5;
+
+  string Title = 6;
+  string TitleVerbose = 7;
+  string RiskType = 8;
+  string RiskTypeVerbose = 9;
+  string Parameter = 10;
+  string Payload = 11;
+  string Details = 12;
+
+  string FromYakScript = 13;
+  bool WaitingVerified = 14;
+  string ReverseToken = 15;
+
+  int64 Id = 18;
+  int64 CreatedAt = 16;
+  int64 UpdatedAt = 17;
+
+  string Severity = 19;
+
+  // 数据包提取出来！
+  bytes Request = 20;
+  bytes Response = 21;
+
+  // 这个一般用于生成报告追踪报告中产生的漏洞
+  string RuntimeId = 22;
+
+  string CVE = 23;
+  string Description = 24;
+  string Solution = 25;
+  string TaskName = 26;
+}
+
+message QueryRisksRequest {
+  Paging Pagination = 1;
+
+  string Search = 2;
+  string Network = 3;
+  string Ports = 4;
+  string RiskType = 5;
+  string Token = 6;
+  bool WaitingVerified = 7;
+  string Severity = 8;
+}
+
+message QueryRisksResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated Risk Data = 3;
+}
+
+message QueryNewRiskRequest {
+  int64 AfterId = 1;
+}
+
+message QueryNewRiskResponse {
+  repeated NewRisk Data = 1;
+  int64 NewRiskTotal = 2;
+  int64 Total = 3;
+}
+
+message NewRisk {
+  string Title = 1;
+  int64 Id = 2;
+  int64 CreatedAt = 3;
+  int64 UpdatedAt = 4;
+  string Verbose = 5;
+  string TitleVerbose = 6;
+  bool IsRead = 7;
+}
+
+message NewRiskReadRequest {
+  int64 AfterId = 1;
+  repeated int64 Ids = 2;
+}
+
+message UploadRiskToOnlineRequest {
+  string Token = 1;
+}
+
+message VerifyTunnelServerDomainParams {
+  GetTunnelServerExternalIPParams ConnectParams = 1;
+  string Domain = 2;
+}
+
+message VerifyTunnelServerDomainResponse {
+  string Domain = 1;
+  bool Ok = 2;
+  string Reason = 3;
+}
+
+message GetTunnelServerExternalIPParams {
+  string Addr = 1;
+  string Secret = 2;
+}
+
+message GetTunnelServerExternalIPResponse {
+  string IP = 1;
+}
+
+message StartFacadesParams {
+  // 端口复用的
+  string LocalFacadeHost = 41;
+  int32 LocalFacadePort = 42;
+  //  bool EnableRMIServer = 1;
+  //  int32 RMILocalPort = 2;
+  //
+  bool EnableDNSLogServer = 3;
+  int32 DNSLogLocalPort = 4;
+  //
+  //  bool EnableHTTPServer = 23;
+  //  int32 HTTPServerPort = 24;
+
+  // 连接远程端口参数
+  GetTunnelServerExternalIPParams ConnectParam = 5;
+
+  // 远端端口开放情况
+  //  int32 RMIRemotePort = 6;
+  int32 FacadeRemotePort = 16;
+  int32 DNSLogRemotePort = 7;
+
+  // 外部域名
+  string ExternalDomain = 8;
+
+  // 验证端口是否转发成功
+  bool Verify = 9;
+}
+message ApplyClassToFacadesParamsWithVerbose {
+  YsoOptionsRequerstWithVerbose GenerateClassParams = 1;
+  string Token = 2;
+}
+//已弃用
+message ApplyClassToFacadesParams {
+  YsoOptionsRequerst GenerateClassParams = 1;
+  string Token = 2;
+}
+message StartFacadesWithYsoParams {
+  // 端口复用的
+  bool IsRemote = 1;
+  int32 ReversePort = 2;
+  string ReverseHost = 4;
+  string Token = 5;
+  GetTunnelServerExternalIPParams BridgeParam = 6;
+
+  YsoOptionsRequerst GenerateClassParams = 7;
+}
+message GetAvailableBruteTypesResponse {
+  repeated string Types = 1;
+}
+
+message StartBruteParams {
+  string Type = 1;
+  string Targets = 2;
+  string TargetFile = 3;
+
+  // 设置如果用户输入了，就代替默认字典
+  bool ReplaceDefaultUsernameDict = 28;
+  bool ReplaceDefaultPasswordDict = 29;
+
+  repeated string Usernames = 4;
+  string UsernameFile = 24;
+
+  repeated string Passwords = 5;
+  string PasswordFile = 25;
+
+  repeated string Prefix = 6;
+  float Timeout = 7;
+
+  // 每个目标之间的并发
+  int64 Concurrent = 8;
+  int64 Retry = 9;
+
+  // 目标任务内并发
+  int64 TargetTaskConcurrent = 10;
+
+  //
+  bool OkToStop = 11;
+  int64 DelayMin = 12;
+  int64 DelayMax = 13;
+
+  string PluginScriptName = 14;
+}
+
+message HTTPRequestMutateParams {
+  bytes Request = 1;
+
+  repeated string FuzzMethods = 2;
+
+  // use chunk encode
+  bool ChunkEncode = 3;
+
+  // multipart boundary
+  bool UploadEncode = 4;
+}
+
+message HTTPResponseMutateParams {
+  bytes Response = 2;
+}
+
+message MutateResult {
+  bytes Result = 1;
+  repeated bytes ExtraResults = 2;
+}
+
+message QueryHostsRequest {
+  Paging Pagination = 1;
+
+  string DomainKeyword = 2;
+  string Network = 3;
+}
+
+message DeleteHostsRequest {
+  bool DeleteAll = 1;
+  string DomainKeyword = 2;
+  string Network = 3;
+  int64 ID = 4;
+}
+
+message QueryHostsResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated Host Data = 3;
+}
+
+message QueryDomainsRequest {
+  Paging Pagination = 1;
+  string Network = 2;
+  string DomainKeyword = 3;
+  string Title = 4;
+  bool   All = 5;
+}
+
+message DeleteDomainsRequest {
+  bool DeleteAll = 1;
+  string DomainKeyword = 2;
+  string Network = 3;
+  int64 ID = 4;
+  QueryDomainsRequest Filter = 5;
+  repeated int64 IDs = 6;
+}
+
+message QueryDomainsResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated Domain Data = 3;
+}
+
+message Domain {
+  int64 ID = 1;
+  string DomainName = 2;
+  string IPAddr = 3;
+  string HTTPTitle = 4;
+}
+
+message Host {
+  int64 Id = 1;
+  string IP = 2;
+  int64 IPInteger = 3;
+  bool IsInPublicNet = 4;
+  repeated string Domains = 5;
+}
+
+message DownloadReportRequest {
+  string FileData = 1;
+  string FileName = 2;
+  string FileDir = 3;
+}
+
+message DeleteYakScriptExecResultRequest {
+  repeated int64 Id = 1;
+  string YakScriptName = 2;
+}
+
+message YakScriptNames {
+  repeated string YakScriptNames = 1;
+}
+
+message QueryYakScriptExecResultRequest {
+  Paging Pagination = 1;
+  string YakScriptName = 2;
+}
+
+message QueryYakScriptExecResultResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated ExecResult Data = 3;
+}
+
+message GenerateWebsiteTreeResponse {
+  bytes TreeDataJson = 1;
+}
+
+message GenerateWebsiteTreeRequest {
+  string Targets = 1;
+}
+
+message StartBasicCrawlerRequest {
+  string Targets = 1;
+  string TargetsFile = 2;
+
+  string MaxDepth = 3;
+  string MaxCountOfLinks = 4;
+  string MaxCountOfRequest = 5;
+  string DisallowSuffix = 6;
+  string StartFromParentPath = 7;
+  string MaxRetryTimes = 8;
+  string AllowMethods = 9;
+  string AllowDomains = 10;
+  string ForbiddenDomain = 11;
+  string AllowUrlRegexp = 12;
+  string ForbiddenUrlRegexp = 13;
+  string UserAgent = 14;
+
+  // 基础认证
+  string BasicAuth = 15;
+  string BasicAuthUsername = 16;
+  string BasicAuthPassword = 17;
+
+  // Transport
+  repeated string Proxies = 18;
+  int64 Concurrent = 19;
+  int64 MaxRedirectTimes = 20;
+  int64 ConnectTimeoutSeconds = 21;
+  int64 ResponseTimeoutSeconds = 22;
+
+  repeated HTTPHeader Headers = 23;
+  repeated HTTPCookie Cookies = 24;
+}
+
+message HTTPCookieSetting {
+  string Key = 1;
+  string Value = 2;
+  string Path = 3;
+  string Domain = 4;
+  int64 Expires = 5;
+  int64 MaxAge = 6;
+  bool Secure = 7;
+  bool HttpOnly = 8;
+
+  // default
+  // lax
+  // strict
+  // none
+  string SameSiteMode = 9;
+}
+
+message HTTPCookie {
+  string Key = 1;
+  string Value = 2;
+  bool AllowOverride = 3;
+}
+
+message ExportYakScriptRequest {
+  int64 YakScriptId = 1;
+  string OutputDir = 2;
+  string OutputPluginDir = 3;
+  repeated int64 YakScriptIds = 4;
+  bool All = 5;
+}
+
+message ExportYakScriptResponse {
+  string OutputDir = 2;
+}
+
+
+message GetMarkdownDocumentResponse {
+  YakScript Script = 1;
+  string Markdown = 2;
+}
+
+message GetMarkdownDocumentRequest {
+  string YakScriptName = 1;
+  int64 YakScriptId = 2;
+}
+
+message SaveMarkdownDocumentRequest {
+  string YakScriptName = 1;
+  int64 YakScriptId = 2;
+  string Markdown = 3;
+}
+
+message GroupNames {
+  repeated string Groups = 1;
+}
+
+message QueryGroupsByYakScriptIdRequest {
+  int64 YakScriptId = 1;
+  string Mode = 2;
+}
+
+message MenuItem {
+  string Group = 1;
+  string Verbose = 2;
+  int64 YakScriptId = 3;
+  BatchExecutionPluginFilter Query = 4;
+  uint64 MenuItemId = 5;
+  int64 GroupSort = 6;
+  string YakScriptName = 7;
+}
+
+// 这里的小写不要改动，兼容前端已有的格式
+message BatchExecutionPluginFilter {
+  string type = 1;
+  string tags = 2;
+  repeated string include = 3;
+  repeated string exclude = 4;
+}
+
+message MenuItemGroup {
+  string Group = 1;
+  repeated MenuItem Items = 2;
+  int64 MenuSort = 3;
+  string Mode = 4;
+}
+
+message GetMenuItemByIdRequest {
+  uint64 ID = 1;
+}
+
+message MenuByGroup {
+  repeated MenuItemGroup Groups = 1;
+}
+
+message YakScriptIsInMenuRequest {
+  string Group = 1 ;
+  int64 YakScriptId = 2;
+}
+
+message RemoveFromMenuRequest {
+  int64 YakScriptId = 1;
+  string Group = 2;
+  string Mode = 3;
+}
+
+message AddToMenuRequest {
+  int64 YakScriptId = 1;
+  string Group = 2;
+  string Verbose = 3;
+  string Mode = 4;
+  int64  MenuSort = 5;
+  int64  GroupSort = 6;
+}
+
+message AddMenuRequest {
+  repeated MenuItemGroup  Data = 1;
+}
+
+message QueryAllMenuItemRequest {
+  string Mode = 1;
+  string Group = 2;
+  string Verbose = 3;
+}
+
+message ImportMenuItemRequest {
+  string RawJson = 1;
+  string JsonFileName = 2;
+}
+
+message ExportMenuItemResult {
+  string RawJson = 1;
+}
+
+message UpdateFromYakitResourceRequest {
+  string Proxy = 1;
+  string BaseSourceUrl = 2;
+}
+
+message UpdateFromGithubRequest {
+  string Proxy = 1;
+  string GithubUrl = 2;
+}
+
+message SimpleScript {
+  string Content = 1;
+}
+
+message LastRecord {
+  int64 LastRecordPtr = 1;
+  double Percent = 2;
+  string YakScriptOnlineGroup = 3;
+}
+
+message RecordPortScanRequest {
+  LastRecord LastRecord = 1;
+  PortScanRequest PortScanRequest = 2;
+}
+
+message PortScanRequest {
+  string Targets = 1;
+  string Ports = 2;
+  string Mode = 3;
+  repeated string Proto = 4;
+  int64 Concurrent = 5;
+  // 主动发包模式
+  bool Active = 6;
+  // service / web / all
+  string FingerprintMode = 7;
+
+  // 保存数据库
+  bool SaveToDB = 8;
+
+  // 保存已经关闭的端口
+  bool SaveClosedPorts = 9;
+
+  // 上传扫描目标为文件
+  string TargetsFile = 10;
+
+  // 设置上传的文件
+  repeated string ScriptNames = 11;
+
+  // TCPProxy
+  repeated string Proxy = 12;
+
+  // 设置单次探测超时时间
+  double ProbeTimeout = 13;
+
+  // ProbeMax 设置指纹探测条数
+  int32 ProbeMax = 14;
+
+  // 启用 C 段扫描
+  bool EnableCClassScan = 15;
+
+  // HostAlive Scan
+  bool SkippedHostAliveScan = 16;
+  double HostAliveTimeout = 17;
+  int32 HostAliveConcurrent = 18;
+  string HostAlivePorts = 19;
+
+  // 排除端口与主机
+  string ExcludeHosts = 20;
+  string ExcludePorts = 21;
+
+  // EnableBasicCrawler
+  // 是否启用基础爬虫，以及基础爬虫最多几个请求？
+  bool EnableBasicCrawler = 22;
+  int64 BasicCrawlerRequestMax = 23;
+
+  // SYN Concurrent
+  // 简易设置 SYN 每秒并发
+  int64 SynConcurrent = 24;
+
+  string TaskName = 25;
+}
+
+message DeletePortsRequest {
+  string Hosts = 1;
+  string Ports = 2;
+  repeated int64 Id = 3;
+  bool All = 4;
+  repeated int64 Ids = 5;
+  bool DeleteAll = 6;
+  QueryPortsRequest Filter = 7;
+}
+
+message QueryPortsRequest {
+  Paging Pagination = 1;
+
+  // 根据 Hosts Ports 查询
+  string Hosts = 2;
+  string Ports = 3;
+  string Service = 4;
+  string State = 5;
+  string Title = 6;
+  bool   All = 7;
+}
+
+message QueryPortsResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated Port Data = 3;
+}
+
+message Port {
+  string Host = 1;
+  int64 IPInteger = 2;
+  int64 Port = 3;
+  string Proto = 4;
+  string ServiceType = 5;
+  string State = 6;
+  string Reason = 7;
+  string Fingerprint = 8;
+  repeated string CPE = 9;
+  string HtmlTitle = 10;
+
+  int64 Id = 11;
+  int64 CreatedAt = 12;
+  int64 UpdatedAt = 13;
+  string TaskName = 14;
+}
+
+message YakitCompletionRawResponse {
+  bytes RawJson = 1;
+}
+
+message GetYakVMBuildInMethodCompletionRequest {
+
+}
+
+// 这个定义我们争取和 monaco editor suggestion 基本一致
+message SuggestionDescription {
+  string Label = 1;
+  string Description = 2;
+  string InsertText = 3;
+  bool JustAppend = 4;
+
+  // 展示定义的内容，如果没有的话，一般展示 InsertText 就行
+  string DefinitionVerbose = 5;
+}
+
+message MethodSuggestion {
+  // 产生这个方法提示的关键词是啥？
+  repeated string ExactKeywords = 1;
+  repeated string FuzzKeywords = 2;
+  repeated string Regexp = 3;
+
+  // 提示的内容是啥？
+  repeated SuggestionDescription Suggestions = 4;
+
+  // 这个代码提示方法组是啥？
+  string Verbose = 5;
+}
+
+message GetYakVMBuildInMethodCompletionResponse {
+  repeated MethodSuggestion Suggestions = 1;
+}
+
+message GetAllPayloadGroupResponse {
+  repeated string Groups = 1;
+}
+
+message SavePayloadRequest {
+  bool IsFile = 1;
+  string Group = 2;
+  string Content = 3;
+  repeated string FileName = 4;
+}
+
+message UpdatePayloadRequest{
+  string Group = 1;
+  string OldGroup = 2;
+}
+
+message DeletePayloadByGroupRequest {
+  string Group = 1;
+}
+
+message DeletePayloadRequest {
+  int64 Id = 1;
+  repeated int64 Ids = 2;
+}
+
+message QueryPayloadRequest {
+  Paging Pagination = 1;
+  string Group = 2;
+  string Keyword = 3;
+}
+
+message QueryPayloadResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated Payload Data = 3;
+}
+
+message Payload {
+  int64 Id = 1;
+  string Group = 2;
+  bytes ContentBytes = 3;
+  string Content = 4;
+}
+
+message GetAllPayloadRequest {
+  string Group = 1;
+}
+
+message GetAllPayloadResponse {
+  repeated Payload Data = 1;
+}
+
+
+message QueryYakScriptRequest {
+  Paging Pagination = 1;
+  string Type = 2;
+  string Keyword = 3;
+  bool IsHistory = 4;
+  bool IsIgnore = 5;
+  bool IsGeneralModule = 6;
+  bool IsBatch = 7;
+  bool ExcludeNucleiWorkflow = 8;
+  repeated string ExcludeScriptNames = 9;
+  repeated string IncludedScriptNames = 10;
+  repeated string Tag = 11;
+  bool NoResultReturn = 12; // 这是一很特殊的选项，如果开启了，total 将会为 0
+  int64 UserId = 13;
+  string UserName = 14;
+
+  bool IgnoreGeneralModuleOrder = 15;
+}
+
+message QueryYakScriptResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated YakScript Data = 3;
+}
+
+message YakScriptParam {
+  string Field = 1;
+  string DefaultValue = 2;
+
+  // int/number/integer/float/str/bool
+  string TypeVerbose = 3;
+
+  string FieldVerbose = 4;
+
+  string Help = 5;
+
+  bool Required = 6;
+  string Group = 7;
+
+  string ExtraSetting = 8;
+}
+
+message YakScript {
+  int64 Id = 1;
+  string Content = 2;
+  string Type = 3;
+  repeated YakScriptParam Params = 4;
+  int64 CreatedAt = 5;
+  string ScriptName = 6;
+  string Help = 7;
+  string Level = 8;
+  string Author = 9;
+  string Tags = 10;
+  bool IsHistory = 11;
+  bool IsIgnore = 12;
+  bool IsGeneralModule = 13;
+  string GeneralModuleVerbose = 14;
+  string GeneralModuleKey = 15;
+  string FromGit = 16;
+  bool EnablePluginSelector = 17;
+  string PluginSelectorTypes = 18;
+  int64 OnlineId = 19;
+  int64 UserId = 20;
+  string OnlineScriptName = 21;
+  string OnlineContributors = 22;
+  string UUID = 23;
+  bool OnlineIsPrivate = 24;
+  string HeadImg = 25;
+  string OnlineBaseUrl = 26;
+  int64  BaseOnlineId = 27;
+  bool OnlineOfficial = 28;
+}
+
+message GetYakScriptTagsAndTypeResponse {
+  repeated TagsAndType Type = 1;
+  repeated TagsAndType Tag = 2;
+}
+
+message TagsAndType {
+  string Value = 1;
+  int32 Total = 2;
+}
+
+message CodecRequest {
+  string Text = 1;
+  string Type = 2;
+  bool Auto = 3;
+  repeated ExecParamItem Params = 4;
+  string ScriptName = 5;
+
+  // 如果 InputBytes 设置了，将会无条件覆盖 Text
+  bytes InputBytes = 6;
+}
+
+message CodecResponse {
+  string Result = 1;
+}
+
+// Yak Invoker
+message ExecHistoryRequest {
+  Paging Pagination = 1;
+  int64 YakScriptId = 3;
+  string YakScriptName = 4;
+}
+
+message ExecHistoryRecordResponse {
+  repeated ExecHistoryRecord Data = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+// 执行的历史记录
+message ExecHistoryRecord {
+  // 脚本内容
+  string Script = 1;
+  // 脚本 ID（如果有的话）
+  string ScriptId = 2;
+  // 执行时间点
+  int64 Timestamp = 3;
+  // 执行间隔
+  int64 DurationMs = 4;
+  // 执行参数（命令行参数部分）
+  string Params = 5;
+
+  // 执行成功还是失败
+  bool Ok = 7;
+  // 失败原因是啥？
+  string Reason = 8;
+  // Uid
+  string Id = 9;
+
+  // 展示界面内容
+  bytes Stdout = 10;
+  bytes Stderr = 11;
+
+  //
+  string RuntimeId = 12;
+  string FromYakModule = 13;
+
+  int64 StdoutLen = 14;
+  int64 StderrLen = 15;
+
+  bytes Messages = 16;
+
+}
+
+// Fuzz 相关模型
+message StringFuzzerRequest {
+  string Template = 1;
+  string HotPatchCode = 2;
+  string HotPatchCodeWithParamGetter = 3;
+  int64 Limit = 4;
+  int64 TimeoutSeconds = 5;
+}
+
+
+message StringFuzzerResponse {
+  repeated bytes Results = 1;
+}
+
+message HTTPRequestAnalysisMaterial {
+  string Request = 1;
+  bool IsHTTPS = 2;
+  string Response = 3;
+}
+
+message HTTPRequestParamItem {
+  string TypePosition = 1;
+  string ParamOriginValue = 2;
+  string ParamName = 3;
+  string TypePositionVerbose = 4;
+}
+
+message HTTPRequestAnalysis {
+  repeated HTTPRequestParamItem Params = 1;
+  repeated string Requests = 2;
+  bool IsHTTPS = 3;
+}
+
+message HTTPResponseMatcher {
+  repeated HTTPResponseMatcher SubMatchers = 1;
+  string SubMatcherCondition = 2;
+
+  string MatcherType = 3;
+  string Scope = 4;
+  string Condition = 5;
+  repeated string Group = 6;
+  string GroupEncoding = 7;
+  bool Negative = 8;
+  string ExprType = 9;
+}
+
+message MatchHTTPResponseParams {
+  repeated HTTPResponseMatcher Matchers = 1;
+  string MatcherCondition = 2;
+
+  bool IsHTTPS = 3;
+  string HTTPResponse = 4;
+  string HTTPRequest = 5;
+}
+
+message MatchHTTPResponseResult {
+  bool Matched = 1;
+}
+
+message HTTPResponseExtractor {
+  string Name = 1; // default for index
+  string Type = 2; // regex / xpath / kval / json / nuclei-dsl
+  string Scope = 3; // body / header / raw
+  repeated string Groups = 4;
+  repeated int64 RegexpMatchGroup = 5;
+  string XPathAttribute = 6;
+}
+
+message ExtractHTTPResponseResult {
+  repeated FuzzerParamItem Values = 1;
+}
+
+message ExtractHTTPResponseParams {
+  repeated HTTPResponseExtractor Extractors = 1;
+  string HTTPResponse = 2;
+}
+
+message PreloadHTTPFuzzerParamsRequest {
+  repeated FuzzerParamItem Params = 1;
+}
+
+message PreloadHTTPFuzzerParamsResponse {
+  repeated FuzzerParamItem Values = 2;
+}
+
+message FuzzerParamItem {
+  string Key = 1;
+  string Value = 2;
+
+  // nuclei-dsl / raw
+  string Type = 3;
+}
+
+message FuzzerRequest {
+  string Request = 1;
+  bytes RequestRaw = 16;  // 这里是因为麻将块儿的问题，还是需要处理一下类型
+  repeated FuzzerParamItem Params = 2;
+  int64 Concurrent = 3;
+  bool IsHTTPS = 4;
+  bool ForceFuzz = 5;
+  string Proxy = 6;
+  double PerRequestTimeoutSeconds = 7;
+
+  // 用于处理 Host 和 Header 中 Host 不一致的情况
+  string ActualAddr = 8;
+
+  // redirect setting
+  bool NoFollowRedirect = 9;
+  // 这个弃用了，Meta 自动归类到 Redirect 里面
+  bool NoFollowMetaRedirect = 10;
+  bool FollowJSRedirect = 11;
+  double RedirectTimes = 27;
+
+  // 如果从历史加载，就用这个！
+  int32 HistoryWebFuzzerId = 12;
+
+  // 如果不想自动修复 Content-Length
+  bool NoFixContentLength = 13;
+
+  // 热加载代码
+  string HotPatchCode = 14;
+
+  // 设置 Fuzzer
+  FuzzerResponseFilter Filter = 15;
+
+  // 随时 delay
+  double DelayMinSeconds = 17;
+  double DelayMaxSeconds = 18;
+
+  // 获取模版数据
+  string HotPatchCodeWithParamGetter = 19;
+
+  // retry
+  int64 MaxRetryTimes = 20; // 最大重试次数
+  string RetryInStatusCode = 21; // 命中这些状态码的时候，重试
+  string RetryNotInStatusCode = 22; // 不是这些状态的时候，重试
+  double RetryWaitSeconds = 25; // 重试等待时间
+  double RetryMaxWaitSeconds = 26; // 最大重试等待时间
+
+  // Response Charset
+  // 默认或者不填为 UTF8
+  // 中国的话，用 gb18030
+  string ResponseCharset = 23;
+
+  // Verbose
+  // 这个字段不需要用户做任何处理，也不需要客户端传递
+  // 这是服务端用来初始化的字段，用以构建快速搜索
+  string Verbose = 24;
+
+  // dns config
+  repeated string DNSServers = 28;
+  repeated KVPair EtcHosts = 29;
+
+  // 不启用系统代理
+  bool NoSystemProxy = 30;
+}
+
+message KVPair {
+  string Key = 1;
+  string Value = 2;
+}
+
+message FuzzerResponseFilter {
+  // 设置 body 大小作为过滤依据
+  int64 MinBodySize = 1;
+  int64 MaxBodySize = 2;
+
+  // 设置正则作为过滤依据，这个正则针对整个数据包生效
+  repeated string Regexps = 3;
+  repeated string Keywords = 4;
+
+  repeated string StatusCode = 6;
+}
+
+message RedirectRequestParams {
+  string Request = 1;
+  string Response = 2;
+  bool IsHttps = 3;
+  double PerRequestTimeoutSeconds = 4;
+  string Proxy = 5;
+}
+
+message ExtractedUrl {
+  string Url = 1;
+}
+
+message FuzzerResponse {
+
+  string Method = 1;
+  int32  StatusCode = 2;
+  string Host = 3;
+  string ContentType = 4;
+  repeated HTTPHeader Headers = 5;
+  bytes ResponseRaw = 6;
+
+  // response body 的长度
+  int64 BodyLength = 7;
+  // 这个请求大约花费了多长时间
+  int64 DurationMs = 8; // FirstByte Duration
+  int64 DNSDurationMs = 40;
+  int64 FirstByteDurationMs = 41;
+  int64 TotalDurationMs = 42;
+
+  // 给一个随机 ID
+  string UUID = 9;
+  // timestamp 请求
+  int64 Timestamp = 10;
+
+  // RequestRaw 原始数据包
+  bytes RequestRaw = 11;
+
+  // 猜测可能的编码
+  string GuessResponseEncoding = 12;
+
+  // 基础状态
+  bool Ok = 31;
+  string Reason = 32;
+
+  // IsHTTPS
+  bool IsHTTPS = 33;
+
+  // payloads
+  repeated string Payloads = 34;
+
+  double BodySimilarity = 35;
+  double HeaderSimilarity = 36;
+
+  // Matched by filter
+  bool MatchedByFilter = 37;
+
+  string Url = 38;
+
+  int64 TaskId = 39;
+
+  // 使用哪个代理
+  string Proxy = 43;
+  string RemoteAddr = 44;
+}
+
+message Paging {
+  int64 Page = 51;
+  int64 Limit = 52;
+  string OrderBy = 53;
+  string Order = 54;
+}
+
+message GetHTTPFlowByHashRequest {
+  string Hash = 1;
+}
+
+message GetHTTPFlowByIdRequest {
+  int64 Id = 1;
+}
+
+message GetHTTPFlowByIdsRequest {
+  repeated int64 Ids = 2;
+}
+
+message QueryHTTPFlowRequest {
+  Paging Pagination = 1;
+  string SourceType = 2;
+  string Methods = 3;
+  string SearchURL = 4;
+  string StatusCode = 5;
+  bool HaveCommonParams = 6;
+  bool HaveBody = 7;
+  string SearchContentType = 9;
+
+  // 一般用于查询增量，查询所有更新前的内容
+  int64 BeforeUpdatedAt = 10;
+  int64 AfterUpdatedAt = 11;
+  int64 AfterId = 12;
+  int64 BeforeId = 13;
+
+  string Keyword = 14;
+
+  bool OnlyWebsocket = 15;
+
+  // 查询包含在这个 URL 中的搜索结果
+  repeated string IncludeInUrl = 16;
+  // 不查询当前 URL 中的结果
+  repeated string ExcludeInUrl = 17;
+  // 仅查看当前 IP 对应的结果或不包含
+  repeated string IncludeInIP = 18;
+  repeated string ExcludeInIP = 19;
+
+  repeated int64 ExcludeId = 20;
+
+  repeated string IncludeInWhere = 21;
+  repeated int64 IncludeId = 22;
+
+  repeated string Tags = 23;
+  string HaveParamsTotal = 24;
+  repeated string Color = 25;
+  int64 OffsetId = 26;
+
+  int64 AfterBodyLength = 27;
+  int64 BeforeBodyLength = 28;
+  string IsWebsocket = 29;
+}
+
+message DeleteHTTPFlowRequest {
+  bool DeleteAll = 1;
+  repeated int64 Id = 4;
+  repeated string ItemHash = 2;
+
+  string URLPrefix = 3;
+  QueryHTTPFlowRequest Filter = 5;
+  repeated string  URLPrefixBatch = 6;
+}
+
+message QueryHTTPFlowsIdsRequest {
+  repeated string IncludeInWhere = 1;
+  string SourceType = 2;
+}
+
+message QueryHTTPFlowsIdsResponse {
+  repeated HTTPFlow Data = 1;
+}
+
+message HTTPHeader {
+  string Header = 1;
+  string Value = 2;
+}
+
+message HTTPFlows {
+  repeated HTTPFlow Data = 1;
+}
+
+message HTTPFlow {
+  bool IsHTTPS = 2;
+  string Url = 3;
+  repeated HTTPHeader RequestHeader = 4;
+  bytes Request = 5;
+  repeated HTTPHeader ResponseHeader = 6;
+  bytes Response = 7;
+  string SourceType = 8;
+  string Path = 9;
+  string Method = 10;
+  int64 BodyLength = 11;
+  string BodySizeVerbose = 19;
+  int64 RequestLength = 31; // 设置 Request Body 长度
+  string RequestSizeVerbose = 32; // 设置 Request
+  string ContentType = 12;
+  int64 StatusCode = 13;
+  int64 GetParamsTotal = 14;
+  int64 PostParamsTotal = 15;
+  int64 CookieParamsTotal = 22;
+  int64 UpdatedAt = 16;
+  int64 CreatedAt = 17;
+  string Hash = 18;
+
+  repeated FuzzableParam GetParams = 20;
+  repeated FuzzableParam PostParams = 21;
+  repeated FuzzableParam CookieParams = 23;
+
+  string HostPort = 24;
+  string IPAddress = 25;
+
+  string HtmlTitle = 26;
+
+  string Tags = 27;
+  bool NoFixContentLength = 28;
+
+  uint64 Id = 29;
+
+  // websocket 相关字段
+  bool IsWebsocket = 30;
+  string WebsocketHash = 33;
+
+  // 标记 UTF8 Invalid
+  /*
+    一般这不是无损的情况，会涉及到用户 Copy Paste 直接 Body 的需求
+  */
+  bool InvalidForUTF8Request = 34;
+  bool InvalidForUTF8Response = 35;
+  string RawRequestBodyBase64 = 36;
+  string RawResponseBodyBase64 = 37;
+
+  // 可以安全的传输到 Fuzzer 的 HTTPRequest
+  string SafeHTTPRequest = 38;
+
+  /*
+  在完全数据下，可加载 Domain 和 RootDomain 还有 Json
+  */
+  repeated string Domains = 40;
+  repeated string RootDomains = 41;
+  repeated string JsonObjects = 42;
+}
+
+message FuzzableParam {
+  string Position = 1;
+  string ParamName = 2;
+  bytes OriginValue = 3;
+  bytes AutoTemplate = 4;
+  bool IsHTTPS = 5;
+}
+
+message QueryHTTPFlowResponse {
+  Paging Pagination = 1;
+  repeated HTTPFlow Data = 2;
+  int64 Total = 3;
+}
+
+message HTTPFlowsFieldGroupRequest {
+  bool RefreshRequest = 1;
+}
+
+message HTTPFlowsFieldGroupResponse {
+  repeated TagsCode Tags = 1;
+  repeated TagsCode StatusCode = 2;
+}
+
+message TagsCode {
+  string Value = 1;
+  int32 Total = 2;
+}
+
+message WebsocketFlows {
+  Paging Pagination = 1;
+  repeated WebsocketFlow Data = 2;
+  int64 Total = 4;
+}
+
+message WebsocketFlow {
+  int64 ID = 1;
+  int64 CreatedAt = 2;
+  string WebsocketRequestHash = 3;
+  int64 FrameIndex = 4;
+  bool FromServer = 5;
+  string MessageType = 6;
+  bytes Data = 7;
+  string DataSizeVerbose = 8;
+  int64 DataLength = 9;
+  string DataVerbose = 10;
+  bool IsJson = 11;
+  bool IsProtobuf = 12;
+}
+
+message SetMITMFilterRequest {
+  repeated string includeHostname = 7;
+  repeated string excludeHostname = 8;
+  repeated string excludeSuffix = 9;
+  repeated string includeSuffix = 10;
+  repeated string excludeMethod = 11;
+  repeated string excludeContentTypes = 40;
+  repeated string excludeUri = 43;
+  repeated string includeUri = 44;
+}
+
+message SetMITMFilterResponse {
+
+}
+
+// 中间人劫持的问题
+message MITMRequest {
+  bytes request = 1;
+  bytes response = 111;
+
+  string host = 2;
+  uint32 port = 3;
+  string downstreamProxy = 4;
+
+  // 用来保证不要串台
+  int64 id = 5;
+  // 这个是响应劫持需要注意的字段。保证不串台
+  int64 responseId = 16;
+  bool recover = 6;
+
+  // 过滤器
+  repeated string includeHostname = 7;
+  repeated string excludeHostname = 8;
+  repeated string excludeSuffix = 9;
+  repeated string includeSuffix = 10;
+  repeated string excludeMethod = 11;
+  repeated string excludeContentTypes = 40;
+  repeated string excludeUri = 43;
+  repeated string includeUri = 44;
+  bool updateFilter = 12;
+
+  // 劫持当前请求的响应信息
+  bool hijackResponse = 13;
+
+  // 手动丢包
+  bool drop = 14;
+
+  // 原封不动放行
+  bool forward = 15;
+
+  // mitm plugin 中间人插件，本质上是一段 Yak 代码
+  bool setYakScript = 21;
+  repeated ExecParamItem yakScriptParams = 22;
+  int64 yakScriptID = 23;
+  string yakScriptContent = 25;
+
+  // 查看当前启用插件
+  bool getCurrentHook = 30;
+
+  // 移除插件
+  bool removeHook = 31;  // 当这个为 true 的时候，将会
+  RemoveHookParams removeHookParams = 32;
+
+  // 设置自动转发
+  bool setAutoForward = 33;
+  bool autoForwardValue = 34;
+
+  // 设置清除上下文
+  bool setClearMITMPluginContext = 35;
+
+  // 设置启用插件模式，自动加载所有主插件。
+  // 如果不设置 initPluginNames 的话，启动所有默认插件
+  bool setPluginMode = 36;
+  repeated string initPluginNames = 37;
+
+  // 设置内容替代器
+  bool setContentReplacers = 38;
+  repeated MITMContentReplacer replacers = 39;
+
+  // 恢复 filter, 防止用户删除了全部的 filter
+  bool setResetFilter = 41;
+
+  // enable h2
+  bool enableHttp2 = 42;
+
+  repeated Certificate certificates = 45;
+
+  // gmtls config
+  bool enableGMTLS = 46;
+  bool onlyEnableGMTLS = 47;
+  bool preferGMTLS = 48;
+
+  // 代理用户名和密码
+  bool enableProxyAuth = 51;
+  string proxyUsername = 49;
+  string proxyPassword = 50;
+}
+
+message Certificate {
+  bytes CrtPem = 1;
+  bytes KeyPem = 2;
+  repeated bytes CaCertificates = 3;
+}
+
+message MITMContentReplacer {
+  // 如果是正则的话，就把匹配到的内容替换成对应结果
+  // 优先 Golang 原生规则
+  // 然后再是 Re2 规则
+  // 然后子字符串
+  string Rule = 1;
+
+  // 这个功能意义在于，不要替代内容，仅标注颜色（敏感内容）
+  bool NoReplace = 2;
+
+  // 这里保存对应结果
+  string Result = 3;
+
+  // 选择替换之后的颜色
+  string Color = 4;
+
+  // 生效内容：默认对 body 生效
+  bool EnableForRequest = 5;
+  bool EnableForResponse = 6;
+  bool EnableForHeader = 9;
+  bool EnableForBody = 10;
+  bool EnableForURI = 15;
+
+  // Index
+  int32 Index = 7;
+
+  // 额外标签，用于标注 flow
+  repeated string ExtraTag = 8;
+
+  // 一键禁用启用全部
+  bool Disabled = 11;
+
+  // 展示名称，一般用于助记，不会有啥额外影响
+  string VerboseName = 12;
+
+  // 为数据包新增 Header
+  repeated HTTPHeader ExtraHeaders = 13;
+  repeated HTTPCookieSetting ExtraCookies = 14;
+
+  // Action
+  // 额外重复一次这个数据包（替换后的数据）
+  // 只有替换数据
+  bool ExtraRepeat = 16;
+  // 匹配掉之后直接丢包
+  bool Drop = 17;
+
+}
+
+message RemoveHookParams {
+  bool ClearAll = 1;
+
+  repeated string HookName = 2;
+  repeated string RemoveHookID = 3;
+}
+
+message MITMResponse {
+  bytes request = 1;
+
+  // 劫持的是 HTTPS 吗？
+  bool isHttps = 3;
+  string url = 4;
+
+  // 和 Request 中的一一对应
+  int64 id = 5;
+
+  // 过滤器
+  bool justFilter = 16;
+  repeated string includeHostname = 17;
+  repeated string excludeHostname = 18;
+  repeated string excludeSuffix = 19;
+  repeated string includeSuffix = 110;
+  repeated string excludeMethod = 111;
+  repeated string excludeContentTypes = 113;
+  repeated string excludeUri = 114;
+  repeated string includeUri = 115;
+
+  // 替代过滤器的内容
+  bool justContentReplacer = 120;
+  repeated MITMContentReplacer replacers = 121;
+
+  // 刷新表格: 如果这个是 True 的话，那么不应该发送回劫持器，应该只发送刷新表格的信息
+  bool refresh = 2;
+  HTTPFlow historyHTTPFlow = 22;
+
+  bool forResponse = 23;
+  bytes response = 24;
+  int64 responseId = 26;
+
+  // exec result
+  bool haveMessage = 27;
+  ExecResult message = 28;
+
+  bool getCurrentHook = 30;
+  repeated YakScriptHooks hooks = 31;
+
+  string RemoteAddr = 32;
+
+  // 这里用来展示一些服务端通知，直接弹框就好
+  bool haveNotification = 34;
+  bytes notificationContent = 33;
+
+  // 这两个标志是用来设置 MITM 加载状态的，用于服务端控制用户端的 "加载中"
+  bool haveLoadingSetter = 35;
+  bool loadingFlag = 36;
+
+  // Websocket 相关配置
+  bool isWebsocket = 37;
+  repeated string websocketEncode = 38;
+}
+
+message YakScriptHooks {
+  string HookName = 1;
+  repeated YakScriptHookItem Hooks = 2;
+}
+
+message YakScriptHookItem {
+  int64 YakScriptId = 1;
+  string YakScriptName = 2;
+  string Verbose = 3;
+}
+
+// 最基础的 ECHO
+message EchoRequest {
+  string text = 1;
+}
+
+message EchoResposne {
+  string result = 1;
+}
+
+// 开启一个端口，对接 GRPC 服务器
+message Input {
+  bytes raw = 1;
+
+  string host = 2;
+  uint32 port = 3;
+}
+
+message Output {
+  bytes raw = 1;
+  string remoteAddr = 11;
+  string localAddr = 12;
+
+  // 如果 control 为 true 说明这是一个控制信息
+  bool control = 2;
+  // 服务端需要关闭
+  bool closed = 3;
+  // 服务端正在等待连接接入
+  bool waiting = 4;
+}
+
+// 执行脚本
+message ExecParamItem {
+  string Key = 1;
+  string Value = 2;
+}
+message ExecRequest {
+  repeated ExecParamItem Params = 1;
+  string Script = 2;
+  string ScriptId = 3;
+  int64 YakScriptId = 5;
+
+  // 这个是为了满足 Runner 的情况，属于特殊情况
+  string RunnerParamRaw = 6;
+}
+
+message ExecResult {
+  string Hash = 1;
+  string OutputJson = 2;
+  bytes Raw = 3;
+  bool IsMessage = 4;
+  bytes Message = 5;
+
+  // 如果是一个保存过的 ExecResult 他应该有数据库记录 ID
+  int64 Id = 6;
+
+  string RuntimeID = 7;
+  float Progress = 8;
+}
+
+message GetLicenseResponse {
+  string License = 1;
+}
+
+message CheckLicenseRequest {
+  string LicenseActivation = 1;
+}

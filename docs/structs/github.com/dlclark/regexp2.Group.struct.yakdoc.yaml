@@ -1,0 +1,49 @@
+is_build_in_struct: true
+libname: servicescan
+struct_name: github.com/dlclark/regexp2.Group
+description: ""
+fields:
+- structname: github.com/dlclark/regexp2.Group
+  name: Capture
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/dlclark/regexp2.Capture
+  type_str: regexp2.Capture
+- structname: github.com/dlclark/regexp2.Group
+  name: Captures
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/dlclark/regexp2.Capture
+  type_str: '[]regexp2.Capture'
+- structname: github.com/dlclark/regexp2.Group
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/dlclark/regexp2.Group
+  name: Runes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int32'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/dlclark/regexp2.Group
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

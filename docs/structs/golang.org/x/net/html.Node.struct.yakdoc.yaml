@@ -1,0 +1,111 @@
+is_build_in_struct: true
+libname: xpath
+struct_name: golang.org/x/net/html.Node
+description: ""
+fields:
+- structname: golang.org/x/net/html.Node
+  name: Attr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Attribute
+  type_str: '[]html.Attribute'
+- structname: golang.org/x/net/html.Node
+  name: Data
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: golang.org/x/net/html.Node
+  name: DataAtom
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: atom.Atom
+- structname: golang.org/x/net/html.Node
+  name: FirstChild
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: golang.org/x/net/html.Node
+  name: LastChild
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: golang.org/x/net/html.Node
+  name: Namespace
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: golang.org/x/net/html.Node
+  name: NextSibling
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: golang.org/x/net/html.Node
+  name: Parent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: golang.org/x/net/html.Node
+  name: PrevSibling
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: golang.org/x/net/html.Node
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: html.NodeType
+methods:
+- ptr: true
+  description: ""
+  structname: golang.org/x/net/html.Node
+  name: AppendChild
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*html.Node'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: golang.org/x/net/html.Node
+  name: InsertBefore
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*html.Node'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*html.Node'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: golang.org/x/net/html.Node
+  name: RemoveChild
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*html.Node'
+  relative_struct_name: []
+ptr_methods: []

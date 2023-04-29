@@ -1,0 +1,43 @@
+is_build_in_struct: false
+libname: dyn
+struct_name: palm/common/yak/yaklang/exec.ReservedInstr
+description: ""
+fields: []
+methods:
+- description: ""
+  structname: palm/common/yak/yaklang/exec.ReservedInstr
+  name: Delta
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: exec.ReservedInstr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklang/exec.ReservedInstr
+  name: Next
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/yak/yaklang/exec.ReservedInstr
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: exec.Instr
+  relative_struct_name: []
+ptr_methods: []

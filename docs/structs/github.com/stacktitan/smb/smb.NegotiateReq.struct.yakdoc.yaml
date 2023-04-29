@@ -1,0 +1,62 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.NegotiateReq
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: Capabilities
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: ClientGuid
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: ClientStartTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: DialectCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: Dialects
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint16'
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/smb.Header
+  type_str: smb.Header
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: Reserved
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: SecurityMode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.NegotiateReq
+  name: StructureSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods: []
+ptr_methods: []

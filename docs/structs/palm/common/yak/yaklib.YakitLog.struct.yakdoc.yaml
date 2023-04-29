@@ -1,0 +1,25 @@
+is_build_in_struct: false
+libname: yakit
+struct_name: palm/common/yak/yaklib.YakitLog
+description: ""
+fields:
+- structname: palm/common/yak/yaklib.YakitLog
+  name: Data
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yak/yaklib.YakitLog
+  name: Level
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yak/yaklib.YakitLog
+  name: Timestamp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+methods: []
+ptr_methods: []

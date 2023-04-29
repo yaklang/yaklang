@@ -1,0 +1,229 @@
+name: spacengine
+functions:
+- name: spacengine.FofaQuery
+  type_str: 'func (v1: string, v2: string, v3: string, v4 ...func _spaceEngineConfigOpt(v1:
+    *yaklib._spaceEngineConfig) ) return(chan *spacengine.NetSpaceEngineResult, error) '
+  long_description: ""
+  description: 查询 Fofa 中的数据
+  params:
+  - name: v1
+    param_alias: email
+    type_alias: ""
+    description: 认证Email
+    type_str: string
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: filter
+    type_alias: ""
+    description: 想要筛选的条件
+    type_str: string
+  - name: v4
+    param_alias: params
+    type_alias: '...opt'
+    description: ""
+    type_str: '[]yaklib._spaceEngineConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    type_str: chan *spacengine.NetSpaceEngineResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    isbuildinstruct: false
+- name: spacengine.HunterQuery
+  type_str: 'func (v1: string, v2: string, v3: string, v4 ...func _spaceEngineConfigOpt(v1:
+    *yaklib._spaceEngineConfig) ) return(chan *spacengine.NetSpaceEngineResult, error) '
+  long_description: ""
+  description: 新增 Hunter 空间引擎接口
+  params:
+  - name: v1
+    param_alias: username
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: apikey
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: query
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: opts
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._spaceEngineConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    type_str: chan *spacengine.NetSpaceEngineResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    isbuildinstruct: false
+- name: spacengine.QuakeQuery
+  type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) return(chan *spacengine.NetSpaceEngineResult, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: apiKey
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: filter
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: params
+    type_alias: '...opt'
+    description: ""
+    type_str: '[]yaklib._spaceEngineConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    type_str: chan *spacengine.NetSpaceEngineResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    isbuildinstruct: false
+- name: spacengine.ShodanQuery
+  type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) return(chan *spacengine.NetSpaceEngineResult, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: apiKey
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: filter
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: params
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._spaceEngineConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultChan
+    type_alias: ""
+    description: ""
+    type_str: chan *spacengine.NetSpaceEngineResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    isbuildinstruct: false
+- name: spacengine.ZoomeyeQuery
+  type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) return(chan *spacengine.NetSpaceEngineResult, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._spaceEngineConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    type_str: chan *spacengine.NetSpaceEngineResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+    isbuildinstruct: false
+- name: spacengine.maxPage
+  type_str: 'func (v1: int) return(func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) '
+  long_description: ""
+  description: 【参数】最多筛选多少页？
+  params:
+  - name: v1
+    param_alias: maxPage
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig) '
+- name: spacengine.maxRecord
+  type_str: 'func (v1: int) return(func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) '
+  long_description: ""
+  description: 【参数】最多获取多少条数据？但是由于 limit 的限制，这个数据往往比 maxRecord 多，直到补满当前页
+  params:
+  - name: v1
+    param_alias: maxRecord
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig) '
+variables: []

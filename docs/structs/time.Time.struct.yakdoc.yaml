@@ -1,0 +1,531 @@
+is_build_in_struct: true
+libname: http
+struct_name: time.Time
+description: ""
+fields: []
+methods:
+- description: ""
+  structname: time.Time
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: AddDate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: After
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: AppendFormat
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Before
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Clock
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Date
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Month
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Day
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Equal
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Format
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: GoString
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: GobEncode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Hour
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: ISOWeek
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: In
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Location
+    type_str: '*time.Location'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name:
+  - structname: time.Location
+    isbuildinstruct: true
+- description: ""
+  structname: time.Time
+  name: IsDST
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: IsZero
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Local
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Location
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*time.Location'
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: MarshalBinary
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: MarshalJSON
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: MarshalText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Minute
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Month
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Month
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Nanosecond
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Round
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Second
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Sub
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Truncate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: UTC
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Unix
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: UnixMicro
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: UnixMilli
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: UnixNano
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Weekday
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Weekday
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Year
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: YearDay
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Zone
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+ptr_methods: []

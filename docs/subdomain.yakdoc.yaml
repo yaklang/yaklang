@@ -1,0 +1,221 @@
+name: subdomain
+functions:
+- name: subdomain.Scan
+  type_str: 'func (v1: interface {}, v2 ...func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) return(chan *subdomain.SubdomainResult, error) '
+  long_description: ""
+  description: 扫描子域名的核心函数，通过和这个函数，输入想要扫描的子域名和相关参数
+  params:
+  - name: v1
+    param_alias: domains
+    type_alias: '[]string|string|bytes'
+    description: 想要扫描的子域名，支持 []string，也支持 string/bytes，可以支持逗号分隔
+    type_str: interface {}
+  - name: v2
+    param_alias: params
+    type_alias: subdomain.param
+    description: 可变参数，扫描时需要增加的参数
+    type_str: '[]subdomain.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: resultsChannel
+    type_alias: ""
+    description: 扫描的结果将会放入返回的这个 channel 中
+    type_str: chan *subdomain.SubdomainResult
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/subdomain.SubdomainResult
+    isbuildinstruct: false
+- name: subdomain.dnsServer
+  type_str: 'func (v1: []string) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 为扫描过程设置自定义 dnsServer
+  params:
+  - name: v1
+    param_alias: servers
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.eachQueryTimeout
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 每一次 DNS 请求发送的超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.eachSearchTimeout
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 每次调用第三方接口进行子域名搜索的时候，HTTP 请求的超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.mainDict
+  type_str: 'func (v1: interface {}) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 子域名爆破使用的主字典（字典名/字典内容[]string/bytes/reader）均支持
+  params:
+  - name: v1
+    param_alias: dict
+    type_alias: string|[]string|fileName|bytes|reader
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.maxDepth
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 设置递归爆破的最大深度
+  params:
+  - name: v1
+    param_alias: depth
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.recursive
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 是否开启递归爆破
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.recursiveDict
+  type_str: 'func (v1: interface {}) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 如果开启了递归，则可以设置递归字典（默认自带一个小字典）
+  params:
+  - name: v1
+    param_alias: dict
+    type_alias: string|fileName|[]string|bytes|reader
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.targetConcurrent
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 针对多个目标进行并发爆破的时候，通过这个选项设置并发
+  params:
+  - name: v1
+    param_alias: concurrent
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.targetTimeout
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 每一个目标应该最多爆破多久？单个目标的超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.wildcardToStop
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 遇到泛解析就停止
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+- name: subdomain.workerConcurrent
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)
+    ) '
+  long_description: ""
+  description: 发送 DNS 请求的最大并发（同时允许多少个 DNS 请求同时发出？）主要用于控制速率
+  params:
+  - name: v1
+    param_alias: concurrent
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: subdomain.param
+    description: ""
+    type_str: 'func ConfigOption(v1: *subdomain.SubdomainScannerConfig) '
+variables: []

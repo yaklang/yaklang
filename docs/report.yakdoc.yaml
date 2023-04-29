@@ -1,0 +1,29 @@
+name: report
+functions:
+- name: report.New
+  type_str: 'func () return(*yakit.Report) '
+  long_description: ""
+  description: 新增 报告 机制
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Report
+    type_str: '*yakit.Report'
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Report
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/yakit.ReportItem
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/yakit.ReportRecord
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Report
+    isbuildinstruct: false
+variables: []

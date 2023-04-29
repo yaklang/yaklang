@@ -1,0 +1,168 @@
+is_build_in_struct: true
+libname: mmdb
+struct_name: github.com/oschwald/maxminddb-golang.Reader
+description: ""
+fields:
+- structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Metadata
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/oschwald/maxminddb-golang.Metadata
+  type_str: maxminddb.Metadata
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Close
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Decode
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uintptr
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Lookup
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: net.IP
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: LookupNetwork
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: net.IP
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net.IPNet
+    type_str: '*net.IPNet'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: net.IPNet
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: LookupOffset
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: net.IP
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uintptr
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Networks
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/oschwald/maxminddb-golang.Networks
+    type_str: '*maxminddb.Networks'
+  relative_struct_name:
+  - structname: github.com/oschwald/maxminddb-golang.Networks
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: NetworksWithin
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*net.IPNet'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*maxminddb.Networks'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/oschwald/maxminddb-golang.Reader
+  name: Verify
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

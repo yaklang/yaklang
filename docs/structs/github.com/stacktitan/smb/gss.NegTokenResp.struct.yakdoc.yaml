@@ -1,0 +1,75 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/gss.NegTokenResp
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: MechListMIC
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: ResponseToken
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: State
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: asn1.Enumerated
+- structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: SupportedMech
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: asn1.ObjectIdentifier
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: MarshalBinary
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*encoder.Metadata'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/gss.NegTokenResp
+  name: UnmarshalBinary
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*encoder.Metadata'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

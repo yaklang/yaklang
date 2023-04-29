@@ -1,0 +1,69 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.SessionSetup1Req
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: Capabilities
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: Channel
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: Flags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/smb.Header
+  type_str: smb.Header
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: PreviousSessionID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: SecurityBlob
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/gss.NegTokenInit
+  type_str: '*gss.NegTokenInit'
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: SecurityBufferLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: SecurityBufferOffset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: SecurityMode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+  name: StructureSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods: []
+ptr_methods: []

@@ -1,0 +1,37 @@
+is_build_in_struct: false
+libname: js
+struct_name: palm/common/javascript.ASTWalkerResult
+description: ""
+fields:
+- structname: palm/common/javascript.ASTWalkerResult
+  name: BadSyntax
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/javascript.ASTWalkerResult
+  name: Float64Literal
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]float64'
+- structname: palm/common/javascript.ASTWalkerResult
+  name: Identifies
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/javascript.ASTWalkerResult
+  name: Int64Literal
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]int64'
+- structname: palm/common/javascript.ASTWalkerResult
+  name: StringLiteral
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods: []
+ptr_methods: []

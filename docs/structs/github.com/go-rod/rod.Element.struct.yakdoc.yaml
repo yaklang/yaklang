@@ -1,0 +1,2178 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.Element
+description: ""
+fields:
+- structname: github.com/go-rod/rod.Element
+  name: Object
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  type_str: '*proto.RuntimeRemoteObject'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Attribute
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*string'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: BackgroundImage
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Blur
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: CancelTimeout
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: CanvasToImage
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Click
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.InputMouseButton
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ContainsElement
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Context
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Describe
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.DOMNode'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.DOMNode
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Element
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ElementByJS
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.EvalOptions'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod.EvalOptions
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+    isbuildinstruct: true
+  - structname: github.com/ysmood/gson.JSON
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimePropertyPreview
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ElementR
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ElementX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Elements
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ElementsByJS
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.EvalOptions'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ElementsX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Equal
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Eval
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.RuntimeRemoteObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Evaluate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.EvalOptions'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.RuntimeRemoteObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Focus
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Frame
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod.Page
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.Mouse
+    isbuildinstruct: true
+  - structname: sync.Mutex
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.Keyboard
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.Touch
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.Browser
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/devices.Device
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/devices.Screen
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/devices.ScreenSize
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PageViewport
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.NetworkSetUserAgentOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.Message
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.NetworkCookie
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.HijackRouter
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.BrowserGetVersionResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.NetworkCookieParam
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/js.Function
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.BrowserBounds
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.KeyActions
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.KeyAction
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDF
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.StreamReader
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.RaceContext
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod.SearchResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.DOMPerformSearchResult
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: GetContext
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: GetSessionID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.TargetSessionID
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: HTML
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Has
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: HasR
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: HasX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Hover
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Input
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: InputTime
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Interactable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.Point
+    type_str: '*proto.Point'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.Point
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: KeyActions
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.KeyActions'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Matches
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MoveMouseOut
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustAttribute
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustBackgroundImage
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustBlur
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustCanvasToImage
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustClick
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustContainsElement
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustDescribe
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.DOMNode'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElement
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElementByJS
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElementR
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElementX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElements
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElementsByJS
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustElementsX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustEqual
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustEval
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gson.JSON
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustFocus
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustFrame
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustHTML
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustHas
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustHasR
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustHasX
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustHover
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustInput
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustInputTime
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustInteractable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustKeyActions
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.KeyActions'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustMatches
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustMoveMouseOut
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustNext
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustParent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustParents
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustPrevious
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustProperty
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gson.JSON
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustRelease
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustRemove
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustResource
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustScreenshot
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustScrollIntoView
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustSelect
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustSelectAllText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustSelectText
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustSetFiles
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustShadowRoot
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustShape
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.DOMGetContentQuadsResult'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.DOMGetContentQuadsResult
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.DOMRect
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustTap
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustType
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustVisible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWait
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitEnabled
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitInteractable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitInvisible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitLoad
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitStable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitVisible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: MustWaitWritable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Next
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Overlay
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Page
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Page'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Parent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Parents
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.Elements
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Previous
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Property
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gson.JSON
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Release
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Remove
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Resource
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Screenshot
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.PageCaptureScreenshotFormat
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ScrollIntoView
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Select
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: rod.SelectorType
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: SelectAllText
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: SelectText
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: SetFiles
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: ShadowRoot
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Shape
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.DOMGetContentQuadsResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Sleeper
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () return(func Sleeper(v1: context.Context) return(error) ) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Tap
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Text
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Timeout
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Type
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Visible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: Wait
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.EvalOptions'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitEnabled
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitInteractable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.Point'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitInvisible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitLoad
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitStable
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitStableRAF
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitVisible
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WaitWritable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WithCancel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Element
+  name: WithPanic
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Element'
+  relative_struct_name: []
+ptr_methods: []

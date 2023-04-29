@@ -1,0 +1,102 @@
+is_build_in_struct: true
+libname: http
+struct_name: net/http.Cookie
+description: ""
+fields:
+- structname: net/http.Cookie
+  name: Domain
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Cookie
+  name: Expires
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: net/http.Cookie
+  name: HttpOnly
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Cookie
+  name: MaxAge
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Cookie
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Cookie
+  name: Path
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Cookie
+  name: Raw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Cookie
+  name: RawExpires
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Cookie
+  name: SameSite
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.SameSite
+- structname: net/http.Cookie
+  name: Secure
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Cookie
+  name: Unparsed
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: net/http.Cookie
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: net/http.Cookie
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Cookie
+  name: Valid
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="./img/favicon.ico">
+
+    <title>Mstsc.js</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="./css/signin.css" rel="stylesheet">
+    <script type="text/javascript" src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+	<script type="text/javascript" src="./js/mstsc.js"></script>
+	<script type="text/javascript" src="./js/keyboard.js"></script>
+	<script type="text/javascript" src="./js/rle.js"></script>
+	<script type="module" src="./js/rfc4648.js"></script>
+  <script type="text/javascript" src="./js/client.js"></script>
+	<script type="text/javascript" src="./js/canvas.js"></script>
+    <script language="javascript">
+    var client = null;
+    
+    function load (canvas) {
+    	client = Mstsc.client.create(Mstsc.$(canvas));
+    } 
+    
+	function connect (ip, port, domain, username, password) {
+		Mstsc.$("main").style.display = 'none';
+		var canvas = Mstsc.$("myCanvas");
+		canvas.style.display = 'inline';
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+		client.connect(ip, port, domain, username, password, function (err) {
+			Mstsc.$("myCanvas").style.display = 'none';
+			Mstsc.$("main").style.display = 'inline';
+		});
+	}
+</script>
+  </head>
+
+  <body onload='load("myCanvas")'>
+
+    <div id="main" class="container">
+		<form class="form-signin"  onSubmit="connect(this.elements['inputIpAddress'].value, this.elements['inputPort'].value, this.elements['inputDomain'].value, this.elements['inputUsername'].value, this.elements['inputPassword'].value);return false;">
+			<img class='logo' src="./img/mstsc.js.svg"></img>
+			<label for="inputIpAddress" class="sr-only">IP Address</label>
+			<input type="text" id="inputIpAddress" class="form-control" placeholder="IP Address required"  autofocus value="192.168.18.107">
+      <label for="inputPort" class="sr-only">Port</label>
+			<input type="text" id="inputPort" class="form-control" placeholder="3389" value="3389">
+			<label for="inputDomain" class="sr-only">Domain</label>
+			<input type="text" id="inputDomain" class="form-control" placeholder="Domain">
+			<label for="inputUsername" class="sr-only">Username</label>
+			<input type="text" id="inputUsername" class="form-control" placeholder="Username" value="wren">
+			<label for="inputPassword" class="sr-only">Password</label>
+			<input type="password" id="inputPassword" class="form-control" placeholder="Password" value="wren">
+			
+			<button class="btn btn-lg btn-primary btn-block" type="submit" style="background-color: #34A6FF; border-color: #34A6FF">Connect</button>
+		</form>
+    </div> <!-- /container -->
+    <canvas id="myCanvas" style="display:inline">
+  </body>
+</html>
