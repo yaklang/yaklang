@@ -1,5 +1,0 @@
-rsp, err = http.get("__PARAM(url)__")
-if err != nil {
-    die(err)
-}
-dump(rsp)

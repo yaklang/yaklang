@@ -1,3 +1,0 @@
-notify.Notify(notify.INFO, "test", "这是一条测试通知", "test")
-notify.Info("测试信息通知级别", "这是一条来源于脚本中的通知信息", "test")
-notify.Danger("这是一条警报级别的信息", "来源于脚本中的严重级别的信息", "test")

@@ -2,14 +2,13 @@ package webfingerprint
 
 import (
 	"github.com/pkg/errors"
+	"path"
 	"yaklang/common/bindata"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"path"
 )
 
 func LoadDefaultDataSource() ([]*WebRule, error) {
-	//content, err := bindata.Asset("data/fingerprint-rules.yml")
 	content, err := bindata.Asset("data/fingerprint-rules.yml.gz")
 	if err != nil {
 		return nil, errors.Errorf("get local web fingerprint rules failed: %s", err)

@@ -1,7 +1,0 @@
-report = graph.NewTimelineReport("")
-report.AddTextBlock("测试标题", "测试文本")
-report.AddActiveAssetRss("CVE-2020,nginx,rce,RCE", "", "")
-
-item = graph.NewTimelinePointItemNow("测试报告系统", report.ToTimelineItemData())
-err = db.CreateOrUpdateTimelineItem(item)
-assertNil(err)
