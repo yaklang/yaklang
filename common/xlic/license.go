@@ -1,10 +1,10 @@
 package xlic
 
 import (
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/license"
-	"sync"
 
 	"github.com/jinzhu/gorm"
 )
@@ -107,7 +107,7 @@ func VerifyAndSaveLicense(db *gorm.DB, license string) error {
 	var lic = &License{
 		License: license,
 	}
-	if db := db.Model(&License{}).Where("true").Delete(&License{}); db.Error != nil {
+	if db := db.Model(&License{}).Where("true").Unscoped().Delete(&License{}); db.Error != nil {
 		log.Error(db.Error)
 		return utils.Errorf("remove old legacy failed: %s", db.Error)
 	}
