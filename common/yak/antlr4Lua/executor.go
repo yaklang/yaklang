@@ -1,6 +1,7 @@
 package antlr4Lua
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"yaklang/common/yak/antlr4Lua/luaast"
@@ -17,7 +18,7 @@ func NewLuaSnippetExecutor(code string) *LuaSnippetExecutor {
 }
 
 func (l *LuaSnippetExecutor) Run() {
-	err := l.engine.Eval(l.sourceCode)
+	err := l.engine.Eval(context.Background(), l.sourceCode)
 	if err != nil {
 		panic(fmt.Sprintf("\n==============\n%s\n==============\n", err.Error()))
 	}
@@ -25,7 +26,7 @@ func (l *LuaSnippetExecutor) Run() {
 
 func (l *LuaSnippetExecutor) Debug() {
 	l.engine.debug = true
-	err := l.engine.Eval(l.sourceCode)
+	err := l.engine.Eval(context.Background(), l.sourceCode)
 	if err != nil {
 		panic(fmt.Sprintf("\n==============\n%s\n==============\n", err.Error()))
 	}

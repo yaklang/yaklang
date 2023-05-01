@@ -166,7 +166,7 @@ func init() {
 		return toStr(x) + toStr(y)
 	})
 
-	yakvm.Import("@getlen", func(x interface{}) int {
+	yakvm.Import("@getlen-=", func(x interface{}) int {
 		if str, ok := x.(string); ok {
 			return len(str)
 		}
