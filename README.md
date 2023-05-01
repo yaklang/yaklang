@@ -1,4 +1,4 @@
-![logo](imgs/yaklang-logo.png){:.image-400 width="400"}
+<img src="imgs/yaklang-logo.png" style="width: 400px"/>
 
 # CDSL-Yaklang: Cybersecurity Domain-Specific Language
 
