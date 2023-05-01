@@ -93,11 +93,9 @@ If you just want to add functionality to the library, or fix some bugs in the li
 
 ### Maintainer
 
-v1ll4n: Yak Project Maintainer. 
+[v1ll4n](https://github.com/VillanCh): Yak Project Maintainer.
 
-1. [V1ll4n Github](https://github.com/VillanCh/) 
-
-### 活跃的 yaklang 核心开发者 / Active yaklang core developers
+### yaklang 核心开发者 / Active yaklang core developers
 
 1. z3
 2. way29
@@ -124,6 +122,12 @@ The code version in this repository uses the AGPL open source license, which is 
 This open source repository should only be used for personal open source and learning.
 
 ## 鸣谢 / Acknowledgments
+
+本项目经由[电子科技大学](https://www.uestc.edu.cn)张小松([网络空间安全学院](https://www.scse.uestc.edu.cn/))教授学术指导。
+
+This project is academically guided by Professor Zhang Xiaosong ([School of Cyber Security](https://www.scse.uestc.edu.cn/)), [University of Electronic Science and Technology of China](https://www.uestc.edu.cn).
+
+<img src="imgs/lab-logo.png" style="width: 180px"/>
 
 ### 基础理论学科 / Basic theoretical disciplines
 
