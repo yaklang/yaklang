@@ -1,5 +1,7 @@
 # CDSL-Yaklang: Cybersecurity Domain-Specific Language
 
+![logo](imgs/yaklang-logo.png)
+
 为了加速安全产品和安全工具的工程化研发，我们研发了一门新的语言（Yaklang）和并且同时实现了一个栈虚拟机（YakVM）。
 
 In order to improve the development process of security products and hacking tools, we have created a new language (
