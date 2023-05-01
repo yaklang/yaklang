@@ -125,7 +125,7 @@ This open source repository should only be used for personal open source and lea
 
 本项目经由[电子科技大学](https://www.uestc.edu.cn)张小松([网络空间安全学院](https://www.scse.uestc.edu.cn/))教授学术指导。
 
-This project is academically guided by Professor Zhang Xiaosong ([School of Cyber Security](https://www.scse.uestc.edu.cn/)), [University of Electronic Science and Technology of China](https://www.uestc.edu.cn).
+This project is academically guided by Professor Zhang Xiaosong ([scse.uestc.edu.cn](https://www.scse.uestc.edu.cn/)), [University of Electronic Science and Technology of China](https://www.uestc.edu.cn).
 
 <img src="imgs/lab-logo.png" style="width: 180px"/>
 
