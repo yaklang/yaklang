@@ -3,10 +3,10 @@ package yak
 import (
 	"bufio"
 	"context"
-	"io"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"io"
 )
 
 type TextHandlingScript struct {
@@ -21,6 +21,7 @@ type TextParser struct {
 	engine yaklang.YaklangEngine
 }
 
+// NewTextParser 创建一个新的文本解析器
 func NewTextParser() *TextParser {
 	parser := &TextParser{
 		Scripts: map[string]*TextHandlingScript{
