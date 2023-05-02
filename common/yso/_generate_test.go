@@ -5,10 +5,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"yaklang.io/yaklang/common/javaclassparser"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yserx"
 	"testing"
 )
 

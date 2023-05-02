@@ -11,8 +11,8 @@ import (
 	"os"
 	"testing"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
-	"yaklang.io/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 func Test_P12Encrypt(t *testing.T) {

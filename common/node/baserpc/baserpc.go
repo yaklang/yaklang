@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	amqp "github.com/streadway/amqp"
-	mq "yaklang.io/yaklang/common/mq"
-	utils "yaklang.io/yaklang/common/utils"
+	mq "github.com/yaklang/yaklang/common/mq"
+	utils "github.com/yaklang/yaklang/common/utils"
 )
 
 type ManagerAPI_ReadDirRequest struct {

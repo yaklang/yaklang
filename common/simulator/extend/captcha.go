@@ -3,9 +3,9 @@ package extend
 import (
 	"encoding/json"
 	"strings"
-	"yaklang.io/yaklang/common/simulator/core"
-	"yaklang.io/yaklang/common/simulator/web"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/simulator/core"
+	"github.com/yaklang/yaklang/common/simulator/web"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type requestStructor interface {

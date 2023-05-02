@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {

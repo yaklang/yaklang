@@ -4,9 +4,9 @@ import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/log"
+	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {

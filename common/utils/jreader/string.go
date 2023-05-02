@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 func MarshalUTFString(str string) []byte {

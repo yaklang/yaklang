@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"context"
 	"io"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 type TextHandlingScript struct {

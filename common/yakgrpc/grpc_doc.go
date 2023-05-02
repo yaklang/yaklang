@@ -2,9 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) SaveMarkdownDocument(ctx context.Context, req *ypb.SaveMarkdownDocumentRequest) (*ypb.Empty, error) {

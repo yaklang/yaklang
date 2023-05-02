@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type httpPacketFilterCondType string

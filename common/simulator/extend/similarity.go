@@ -3,7 +3,7 @@ package extend
 import (
 	"github.com/PuerkitoBio/goquery"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func GetPageSimilarity(pageAHtml, pageBHtml string) float64 {

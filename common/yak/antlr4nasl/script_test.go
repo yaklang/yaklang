@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"yaklang.io/yaklang/common/log"
-	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
-	"yaklang.io/yaklang/common/yak/antlr4nasl/visitors"
+	"github.com/yaklang/yaklang/common/log"
+	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 )
 
 func WalkScript(path string, action func(path, script string)) error {

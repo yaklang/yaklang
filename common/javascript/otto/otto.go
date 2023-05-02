@@ -227,8 +227,8 @@ import (
 	"fmt"
 	"strings"
 
-	"yaklang.io/yaklang/common/javascript/otto/file"
-	"yaklang.io/yaklang/common/javascript/otto/registry"
+	"github.com/yaklang/yaklang/common/javascript/otto/file"
+	"github.com/yaklang/yaklang/common/javascript/otto/registry"
 )
 
 // Otto is the representation of the JavaScript runtime. Each instance of Otto has a self-contained namespace.

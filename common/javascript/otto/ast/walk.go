@@ -2,7 +2,7 @@ package ast
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Visitor Enter method is invoked for each node encountered by Walk.

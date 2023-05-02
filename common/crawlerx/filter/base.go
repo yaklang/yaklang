@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"github.com/valyala/bytebufferpool"
 	"sync"
-	"yaklang.io/yaklang/common/cuckoo"
-	"yaklang.io/yaklang/common/filter"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/cuckoo"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var bufferPool = bytebufferpool.Pool{}

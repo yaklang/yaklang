@@ -5,10 +5,10 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/simulator/core"
-	"yaklang.io/yaklang/common/simulator/examples"
-	"yaklang.io/yaklang/common/simulator/extend"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/simulator/core"
+	"github.com/yaklang/yaklang/common/simulator/examples"
+	"github.com/yaklang/yaklang/common/simulator/extend"
 )
 
 func EvalTest() {

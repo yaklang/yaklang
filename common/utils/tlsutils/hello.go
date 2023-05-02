@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type HandshakeClientHello struct {

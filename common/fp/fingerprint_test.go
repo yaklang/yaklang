@@ -3,7 +3,7 @@ package fp
 import (
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestNewFingerprintMatcher(t *testing.T) {

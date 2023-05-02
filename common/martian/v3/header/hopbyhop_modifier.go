@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strings"
 
-	"yaklang.io/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3"
 )
 
 // Hop-by-hop headers as defined by RFC2616.

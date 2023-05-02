@@ -15,10 +15,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"golang.org/x/net/http2"
 )

@@ -3,7 +3,7 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"sync"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type NaslScript struct {

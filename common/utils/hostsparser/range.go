@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ipRangeBlock struct {

@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestNetConn(t *testing.T) {

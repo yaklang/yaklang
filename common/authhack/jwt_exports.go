@@ -1,7 +1,7 @@
 package authhack
 
 import (
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var JWTExports = map[string]interface{}{

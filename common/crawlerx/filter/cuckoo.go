@@ -1,6 +1,6 @@
 package filter
 
-import "yaklang.io/yaklang/common/cuckoo"
+import "github.com/yaklang/yaklang/common/cuckoo"
 
 // 默认参数的过滤容器, 全局使用一个容易造成碰撞, 因此拆分成四个
 // NewGenericCuckoo 极限容量约 400 万

@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {

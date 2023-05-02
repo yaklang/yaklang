@@ -15,8 +15,8 @@ import (
 	"github.com/google/gxui"
 	"github.com/google/gxui/samples/flags"
 	"github.com/google/gxui/themes/light"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 )
 
 var (

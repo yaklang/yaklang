@@ -2,8 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetExecBatchYakScriptUnfinishedTask(ctx context.Context, req *ypb.Empty) (*ypb.GetExecBatchYakScriptUnfinishedTaskResponse, error) {

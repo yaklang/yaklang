@@ -8,9 +8,9 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"golang.org/x/net/context"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/simulator/config"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/simulator/config"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type GeneralPage struct {

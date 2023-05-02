@@ -3,11 +3,11 @@ package yakit
 import (
 	"context"
 	"github.com/jinzhu/gorm"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/bizhelper"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const INIT_DATABASE_RECORD_NAME = "[default]"

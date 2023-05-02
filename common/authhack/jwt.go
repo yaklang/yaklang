@@ -3,7 +3,7 @@ package authhack
 import (
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
-	"yaklang.io/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func getKey() string {

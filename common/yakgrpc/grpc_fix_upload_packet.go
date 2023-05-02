@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"mime"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) FixUploadPacket(ctx context.Context, req *ypb.FixUploadPacketRequest) (*ypb.FixUploadPacketResponse, error) {

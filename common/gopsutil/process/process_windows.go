@@ -17,8 +17,8 @@ import (
 	"github.com/shirou/w32"
 	"golang.org/x/sys/windows"
 	//cpu "palm/common/gopsutil/cpu"
-	"yaklang.io/yaklang/common/gopsutil/internal/common"
-	net "yaklang.io/yaklang/common/gopsutil/net"
+	"github.com/yaklang/yaklang/common/gopsutil/internal/common"
+	net "github.com/yaklang/yaklang/common/gopsutil/net"
 )
 
 var (

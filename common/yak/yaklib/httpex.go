@@ -2,8 +2,8 @@ package yaklib
 
 import (
 	"io/ioutil"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func requestToMd5(url string) (string, error) {

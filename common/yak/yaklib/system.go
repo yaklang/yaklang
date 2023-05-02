@@ -4,8 +4,8 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/privileged"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/privileged"
 )
 
 func lookupHost(i string) []string {

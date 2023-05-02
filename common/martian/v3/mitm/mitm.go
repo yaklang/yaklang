@@ -31,9 +31,9 @@ import (
 	"net/http"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/martian/v3/h2"
+	"github.com/yaklang/yaklang/common/martian/v3/h2"
 
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // MaxSerialNumber is the upper boundary that is used to create unique serial

@@ -8,9 +8,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/permutil"
 )
 
 func Fix() error {

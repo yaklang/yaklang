@@ -14,8 +14,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"yaklang.io/yaklang/common/gopsutil/internal/common"
-	net "yaklang.io/yaklang/common/gopsutil/net"
+	"github.com/yaklang/yaklang/common/gopsutil/internal/common"
+	net "github.com/yaklang/yaklang/common/gopsutil/net"
 )
 
 // MemoryInfoExStat is different between OSes

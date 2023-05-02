@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"time"
-	"yaklang.io/yaklang/common/filter"
-	"yaklang.io/yaklang/common/fp/webfingerprint"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/hostsparser"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/hostsparser"
 )
 
 type ConfigOption func(config *Config)

@@ -5,7 +5,7 @@ import (
 	"math"
 	"reflect"
 	"runtime"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (v *Value) NativeAsyncCall(vm *Frame, wavy bool, vs ...*Value) interface{} {

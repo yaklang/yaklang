@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type InteractiveDebugger struct {

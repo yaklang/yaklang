@@ -13,8 +13,8 @@ import (
 
 	"golang.org/x/sys/unix"
 	//cpu "palm/common/gopsutil/cpu"
-	"yaklang.io/yaklang/common/gopsutil/internal/common"
-	net "yaklang.io/yaklang/common/gopsutil/net"
+	"github.com/yaklang/yaklang/common/gopsutil/internal/common"
+	net "github.com/yaklang/yaklang/common/gopsutil/net"
 )
 
 // MemoryInfoExStat is different between OSes

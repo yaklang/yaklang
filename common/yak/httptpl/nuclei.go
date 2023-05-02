@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 // vars in http

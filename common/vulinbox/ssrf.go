@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (s *VulinServer) registerSSRF() {

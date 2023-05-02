@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestQuickMutate(t *testing.T) {

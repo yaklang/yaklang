@@ -28,7 +28,7 @@ import (
 	"github.com/golang/snappy"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
-	"yaklang.io/yaklang/common/martian/v3/h2"
+	"github.com/yaklang/yaklang/common/martian/v3/h2"
 )
 
 // Encoding is the grpc-encoding type. See Content-Coding entry at:

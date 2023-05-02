@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 
-	_ "yaklang.io/yaklang/common/yak"
+	_ "github.com/yaklang/yaklang/common/yak"
 )
 
 type YakTestCase struct {

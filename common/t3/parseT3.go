@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 type T3Header struct {

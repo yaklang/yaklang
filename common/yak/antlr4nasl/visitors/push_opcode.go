@@ -2,7 +2,7 @@ package visitors
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (c *Compiler) pushOpcodeFlag(f yakvm.OpcodeFlag) *yakvm.Code {

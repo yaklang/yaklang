@@ -3,7 +3,7 @@ package hybridscan
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"yaklang.io/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/fp"
 )
 
 func mRtoStr(r *fp.MatchResult) string {

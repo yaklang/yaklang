@@ -1,6 +1,6 @@
 package antlr4nasl
 
-import "yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+import "github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 func Exec(code string, init ...bool) {
 	_Exec(false, code, init...)

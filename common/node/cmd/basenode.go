@@ -4,12 +4,12 @@ import (
 	"github.com/urfave/cli"
 	"os"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mq"
-	"yaklang.io/yaklang/common/node"
-	"yaklang.io/yaklang/common/spec"
-	"yaklang.io/yaklang/common/thirdpartyservices"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mq"
+	"github.com/yaklang/yaklang/common/node"
+	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/thirdpartyservices"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type IotDevRule struct {

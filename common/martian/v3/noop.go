@@ -16,7 +16,7 @@ package martian
 
 import (
 	"net/http"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type noopModifier struct {

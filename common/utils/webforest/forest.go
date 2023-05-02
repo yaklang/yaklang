@@ -7,7 +7,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"net/url"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type WebsiteNode struct {

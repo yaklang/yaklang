@@ -33,17 +33,17 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/cybertunnel/ctxio"
-	"yaklang.io/yaklang/common/gmsm/gmtls"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
-	"yaklang.io/yaklang/common/utils/lowhttp/lowhttp2"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
 
-	"yaklang.io/yaklang/common/martian/v3/mitm"
-	"yaklang.io/yaklang/common/martian/v3/nosigpipe"
-	"yaklang.io/yaklang/common/martian/v3/proxyutil"
-	"yaklang.io/yaklang/common/martian/v3/trafficshape"
+	"github.com/yaklang/yaklang/common/martian/v3/mitm"
+	"github.com/yaklang/yaklang/common/martian/v3/nosigpipe"
+	"github.com/yaklang/yaklang/common/martian/v3/proxyutil"
+	"github.com/yaklang/yaklang/common/martian/v3/trafficshape"
 )
 
 var errClose = errors.New("closing connection")

@@ -4,7 +4,7 @@ package newcrawlerx
 
 import (
 	"github.com/go-rod/rod/lib/proto"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func (starter *BrowserStarter) SinglePageCheck(urlStr string) error {

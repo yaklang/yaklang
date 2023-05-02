@@ -4,7 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func generalFix(ProductName string, Products []ProductsTable) string {

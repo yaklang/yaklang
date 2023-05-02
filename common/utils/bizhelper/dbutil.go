@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func QueryBySpecificPorts(db *gorm.DB, field string, ports string) *gorm.DB {

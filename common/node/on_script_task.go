@@ -3,8 +3,8 @@ package node
 import (
 	"encoding/json"
 	"github.com/streadway/amqp"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/spec"
 )
 
 func (n *NodeBase) onScriptTask(msg *amqp.Delivery) {

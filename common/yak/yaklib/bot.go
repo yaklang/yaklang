@@ -1,6 +1,6 @@
 package yaklib
 
-import "yaklang.io/yaklang/common/utils/bot"
+import "github.com/yaklang/yaklang/common/utils/bot"
 
 var BotExports = map[string]interface{}{
 	"New":               bot.New,

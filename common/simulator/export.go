@@ -1,10 +1,10 @@
 package simulator
 
 import (
-	"yaklang.io/yaklang/common/simulator/core"
-	"yaklang.io/yaklang/common/simulator/examples"
-	"yaklang.io/yaklang/common/simulator/extend"
-	"yaklang.io/yaklang/common/simulator/simple"
+	"github.com/yaklang/yaklang/common/simulator/core"
+	"github.com/yaklang/yaklang/common/simulator/examples"
+	"github.com/yaklang/yaklang/common/simulator/extend"
+	"github.com/yaklang/yaklang/common/simulator/simple"
 )
 
 var Exports = map[string]interface{}{

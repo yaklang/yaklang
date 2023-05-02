@@ -1,6 +1,6 @@
 package chaosmaker
 
-import "yaklang.io/yaklang/common/suricata"
+import "github.com/yaklang/yaklang/common/suricata"
 
 type ChaosTraffic struct {
 	ChaosRule             *ChaosMakerRule

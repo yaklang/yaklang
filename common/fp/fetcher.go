@@ -1,7 +1,7 @@
 package fp
 
 import (
-	"yaklang.io/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 )
 
 var FetchBannerFromHostPortEx = webfingerprint.FetchBannerFromHostPortEx

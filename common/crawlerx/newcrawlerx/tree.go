@@ -4,7 +4,7 @@ package newcrawlerx
 
 import (
 	"sync"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type UrlNode struct {

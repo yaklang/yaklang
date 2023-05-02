@@ -6,11 +6,11 @@ import (
 	"io"
 	"os"
 
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 
 	"github.com/lunixbochs/struc"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/t125/per"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/t125/per"
 )
 
 var t124_02_98_oid = []byte{0, 0, 20, 124, 0, 1}

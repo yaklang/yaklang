@@ -4,7 +4,7 @@ package newcrawlerx
 
 import (
 	"strconv"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type OutputResults struct {

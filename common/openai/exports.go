@@ -1,6 +1,6 @@
 package openai
 
-import "yaklang.io/yaklang/common/log"
+import "github.com/yaklang/yaklang/common/log"
 
 func chat(data string, opts ...ConfigOption) string {
 	msg, err := NewOpenAIClient(opts...).Chat(data)

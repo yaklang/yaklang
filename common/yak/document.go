@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/antlr4yak"
-	"yaklang.io/yaklang/common/yak/yakdoc"
-	"yaklang.io/yaklang/common/yak/yaklang"
-	"yaklang.io/yaklang/common/yakdocument"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yakdocument"
 )
 
 func EngineToDocumentHelperWithVerboseInfo(engine yaklang.YaklangEngine) *yakdoc.DocumentHelper {

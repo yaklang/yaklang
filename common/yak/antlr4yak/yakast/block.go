@@ -2,7 +2,7 @@ package yakast
 
 import (
 	"strings"
-	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/google/uuid"
 )

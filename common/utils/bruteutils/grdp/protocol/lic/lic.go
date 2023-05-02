@@ -3,7 +3,7 @@ package lic
 import (
 	"io"
 
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 )
 
 const (

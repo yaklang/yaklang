@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"testing"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestCriticalQueryYakScript(t *testing.T) {

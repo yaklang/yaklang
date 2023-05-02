@@ -3,7 +3,7 @@ package autocomplition
 import (
 	"github.com/k0kubun/pp"
 	"testing"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestGetBashHistoryTreeRawLines(t *testing.T) {

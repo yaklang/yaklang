@@ -4,8 +4,8 @@ import (
 	"golang.org/x/net/html"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/javascript/otto"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/javascript/otto"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func reCheck(data interface{}, ruleInfo *RuleInfo) bool {

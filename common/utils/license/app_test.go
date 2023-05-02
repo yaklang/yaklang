@@ -5,7 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils/tlsutils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 func TestNewMachine(t *testing.T) {

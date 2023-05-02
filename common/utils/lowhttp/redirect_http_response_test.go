@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestWithRedirectTimes(t *testing.T) {

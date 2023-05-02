@@ -3,7 +3,7 @@ package bruteutils
 import (
 	"github.com/mitchellh/go-vnc"
 	"net"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // https://weakpass.com/generate

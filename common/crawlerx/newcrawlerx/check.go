@@ -7,10 +7,10 @@ import (
 	u "net/url"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/crawlerx/filter"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/crawlerx/filter"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func repeatSimpleCheckFunctionGenerator(pageVisitFilter *filter.StringCountFilter) func(string) bool {

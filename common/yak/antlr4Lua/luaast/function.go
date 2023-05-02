@@ -3,8 +3,8 @@ package luaast
 import (
 	uuid "github.com/satori/go.uuid"
 	"strings"
-	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // VisitFuncNameAndBody is used to visit vanilla named function declaration

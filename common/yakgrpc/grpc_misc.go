@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 	"runtime"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/pcapfix"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/pcapfix"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) ResetAndInvalidUserData(ctx context.Context, req *ypb.ResetAndInvalidUserDataRequest) (*ypb.Empty, error) {

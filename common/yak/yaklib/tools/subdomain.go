@@ -2,9 +2,9 @@ package tools
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/subdomain"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/subdomain"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func _subdomainScan(target interface{}, opts ...subdomain.ConfigOption) (chan *subdomain.SubdomainResult, error) {

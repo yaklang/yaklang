@@ -1,8 +1,8 @@
 package luaast
 
 import (
-	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (l *LuaTranslator) VisitExp(raw lua.IExpContext) interface{} {

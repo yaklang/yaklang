@@ -1,7 +1,7 @@
 package t3
 
 import (
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 func writeObject(b []byte) []byte {

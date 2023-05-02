@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strconv"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"google.golang.org/protobuf/encoding/protowire"
 )

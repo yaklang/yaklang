@@ -1,8 +1,8 @@
 package yakast
 
 import (
-	"yaklang.io/yaklang/common/yak/antlr4yak/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (y *YakCompiler) VisitMemberCall(raw parser.IMemberCallContext) interface{} {

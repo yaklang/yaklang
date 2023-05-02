@@ -3,12 +3,12 @@ package cve
 import (
 	"fmt"
 	"strings"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/cve/cvequeryops"
-	"yaklang.io/yaklang/common/cve/cveresources"
-	"yaklang.io/yaklang/common/fp/webfingerprint"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cvequeryops"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func queryEx(i ...interface{}) chan *cveresources.CVE {

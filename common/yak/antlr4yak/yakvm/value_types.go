@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (

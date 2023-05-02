@@ -1,6 +1,6 @@
 package bruteforce
 
-import "yaklang.io/yaklang/common/rpa/captcha"
+import "github.com/yaklang/yaklang/common/rpa/captcha"
 
 func BruteForceStart(url string, opts ...ConfigOpt) (string, string) {
 	config := &Config{

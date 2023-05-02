@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
 	ldap "github.com/lor00x/goldap/message"
 )

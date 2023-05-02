@@ -5,10 +5,10 @@ import (
 	"encoding/gob"
 	"io/ioutil"
 	"os"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak"
-	_ "yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
+	_ "github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func main() {

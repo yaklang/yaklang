@@ -3,9 +3,9 @@ package yaklang
 import (
 	"context"
 	"os"
-	"yaklang.io/yaklang/common/yak/antlr4yak"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang.io/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 var yaklangLibs map[string]interface{}

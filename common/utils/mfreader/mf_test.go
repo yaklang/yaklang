@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 func TestMultiFileLineReader_GetPercent(t *testing.T) {

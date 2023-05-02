@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/jreader"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/jreader"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 var serializationHeader = []byte{0xac, 0xed, 0x00, 0x05}

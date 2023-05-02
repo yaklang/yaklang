@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/fuzztag"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/bizhelper"
-	"yaklang.io/yaklang/common/utils/regen"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yso"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/fuzztag"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/regen"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yso"
 )
 
 var fuzztagfallback = []string{""}

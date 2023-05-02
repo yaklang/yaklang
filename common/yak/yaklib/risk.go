@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils/bot"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/bot"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var riskCounter int

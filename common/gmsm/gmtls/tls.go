@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
-	X "yaklang.io/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	X "github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 // Server returns a new TLS server side connection

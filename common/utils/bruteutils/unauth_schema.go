@@ -3,8 +3,8 @@ package bruteutils
 import (
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 type DefaultServiceAuthInfo struct {

@@ -6,10 +6,10 @@ import (
 	"math/rand"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/cybertunnel"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cybertunnel"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetTunnelServerExternalIP(ctx context.Context, p *ypb.GetTunnelServerExternalIPParams) (*ypb.GetTunnelServerExternalIPResponse, error) {

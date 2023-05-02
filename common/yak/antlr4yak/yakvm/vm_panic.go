@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
 	"github.com/kataras/pio"
 )

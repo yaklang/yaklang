@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type HTTPRspBody struct {

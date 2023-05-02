@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"yaklang.io/yaklang/common/javascript/otto/file"
+	"github.com/yaklang/yaklang/common/javascript/otto/file"
 )
 
 type _exception struct {

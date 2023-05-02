@@ -3,8 +3,8 @@ package core
 import (
 	"github.com/go-rod/rod/lib/proto"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func (crawler *CrawlerX) VisitUrl(urlStr string, depth int) error {

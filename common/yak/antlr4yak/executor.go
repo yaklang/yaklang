@@ -3,8 +3,8 @@ package antlr4yak
 import (
 	"context"
 	"fmt"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakast"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type FakeCompiler struct {

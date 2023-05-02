@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"testing"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yak/yakdoc"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func TestGetnerateDoc(t *testing.T) {

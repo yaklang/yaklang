@@ -11,9 +11,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/fp/webfingerprint"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type FingerprintInfo struct {

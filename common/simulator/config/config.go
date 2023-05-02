@@ -2,7 +2,7 @@ package config
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type PageConfig struct {

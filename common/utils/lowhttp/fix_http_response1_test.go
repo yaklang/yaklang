@@ -3,7 +3,7 @@ package lowhttp
 import (
 	"strings"
 	"testing"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestFixHTTPResponse4(t *testing.T) {

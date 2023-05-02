@@ -12,10 +12,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mutate"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 type BruteItem struct {

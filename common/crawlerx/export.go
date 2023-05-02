@@ -1,8 +1,8 @@
 package crawlerx
 
 import (
-	"yaklang.io/yaklang/common/crawlerx/core"
-	"yaklang.io/yaklang/common/crawlerx/detect"
+	"github.com/yaklang/yaklang/common/crawlerx/core"
+	"github.com/yaklang/yaklang/common/crawlerx/detect"
 )
 
 var CrawlerXExports = map[string]interface{}{

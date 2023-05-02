@@ -27,7 +27,7 @@ import (
 	"io"
 	"math/big"
 
-	"yaklang.io/yaklang/common/gmsm/sm3"
+	"github.com/yaklang/yaklang/common/gmsm/sm3"
 )
 
 var (

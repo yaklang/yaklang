@@ -25,10 +25,10 @@ import (
 	"net/http"
 	"sync"
 
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/martian/v3"
-	"yaklang.io/yaklang/common/martian/v3/parse"
-	"yaklang.io/yaklang/common/martian/v3/verify"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3/parse"
+	"github.com/yaklang/yaklang/common/martian/v3/verify"
 )
 
 // Group is a martian.RequestResponseModifier that maintains lists of

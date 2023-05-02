@@ -5,7 +5,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"net/http"
 	"net/http/httptrace"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type httpTraceTransport struct {

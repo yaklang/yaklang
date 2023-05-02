@@ -2,7 +2,7 @@ package yso
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func BashCmdWrapper(cmd string) string {

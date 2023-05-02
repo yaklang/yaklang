@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"net"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

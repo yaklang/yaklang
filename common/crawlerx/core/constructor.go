@@ -12,12 +12,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/crawlerx/detect"
-	"yaklang.io/yaklang/common/crawlerx/filter"
-	"yaklang.io/yaklang/common/crawlerx/tag"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/crawlerx/detect"
+	"github.com/yaklang/yaklang/common/crawlerx/filter"
+	"github.com/yaklang/yaklang/common/crawlerx/tag"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type CrawlerX struct {

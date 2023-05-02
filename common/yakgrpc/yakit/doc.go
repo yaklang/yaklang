@@ -2,7 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type MarkdownDoc struct {

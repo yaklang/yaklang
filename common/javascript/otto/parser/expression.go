@@ -3,9 +3,9 @@ package parser
 import (
 	"regexp"
 
-	"yaklang.io/yaklang/common/javascript/otto/ast"
-	"yaklang.io/yaklang/common/javascript/otto/file"
-	"yaklang.io/yaklang/common/javascript/otto/token"
+	"github.com/yaklang/yaklang/common/javascript/otto/ast"
+	"github.com/yaklang/yaklang/common/javascript/otto/file"
+	"github.com/yaklang/yaklang/common/javascript/otto/token"
 )
 
 func (self *_parser) parseIdentifier() *ast.Identifier {

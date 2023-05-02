@@ -3,7 +3,7 @@ package mq
 import (
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type BrokerConfigHandler func(b *Broker)

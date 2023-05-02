@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"strings"
-	"yaklang.io/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 func _genXPATHForSimpleNode(origin *html.Node) string {

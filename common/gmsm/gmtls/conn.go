@@ -26,9 +26,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
-	"yaklang.io/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 // A Conn represents a secured connection.

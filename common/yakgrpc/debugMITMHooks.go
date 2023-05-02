@@ -3,11 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"github.com/jinzhu/gorm"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const mitmPluginTestCode = `yakit.AutoInitYakit()

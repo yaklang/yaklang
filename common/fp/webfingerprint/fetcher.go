@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, proxy ...string) (bool, []*HTTPResponseInfo, error) {

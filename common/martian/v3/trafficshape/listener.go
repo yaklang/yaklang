@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // ErrForceClose is an error that communicates the need to close the connection.

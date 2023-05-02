@@ -7,10 +7,10 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
-	"yaklang.io/yaklang/common/yak/yaklib"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var extractHostRegexp = regexp.MustCompile(`[Hh]ost:\s+([^\r\n]+)`)

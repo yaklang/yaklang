@@ -19,7 +19,7 @@ import (
 	"sort"
 	"time"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
 )
 
 // PKCS7 Represents a PKCS7 structure

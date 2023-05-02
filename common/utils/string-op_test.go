@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 	"testing"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestLastLine(t *testing.T) {

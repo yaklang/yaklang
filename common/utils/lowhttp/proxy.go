@@ -1,7 +1,7 @@
 package lowhttp
 
 import (
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var GetProxyConn = utils.GetProxyConn

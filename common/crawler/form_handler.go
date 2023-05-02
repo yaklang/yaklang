@@ -9,8 +9,8 @@ import (
 	"mime/multipart"
 	"net/url"
 	"strings"
-	log "yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	log "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (

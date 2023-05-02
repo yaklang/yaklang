@@ -2,8 +2,8 @@ package yakast
 
 import (
 	"fmt"
-	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	uuid "github.com/satori/go.uuid"
 )

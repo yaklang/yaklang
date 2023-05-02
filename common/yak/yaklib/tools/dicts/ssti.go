@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang.io/yaklang/common/utils"
+import "github.com/yaklang/yaklang/common/utils"
 
 var SSTI = utils.PrettifyListFromStringSplited(`{{4*4}}[[5*5]]
 {{7*7}}

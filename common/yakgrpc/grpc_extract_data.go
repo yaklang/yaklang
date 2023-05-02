@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) ExtractData(server ypb.Yak_ExtractDataServer) error {

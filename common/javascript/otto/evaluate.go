@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"yaklang.io/yaklang/common/javascript/otto/token"
+	"github.com/yaklang/yaklang/common/javascript/otto/token"
 )
 
 func (self *_runtime) evaluateMultiply(left float64, right float64) Value {

@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
-	"yaklang.io/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 type clientHandshakeStateGM struct {

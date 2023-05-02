@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/fp/webfingerprint"
-	log "yaklang.io/yaklang/common/log"
-	utils2 "yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	log "github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type RuleBlock struct {

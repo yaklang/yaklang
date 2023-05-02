@@ -3,7 +3,7 @@ package node
 import (
 	"encoding/json"
 	"time"
-	"yaklang.io/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/spec"
 )
 
 func (n *NodeBase) initScriptEngine() {

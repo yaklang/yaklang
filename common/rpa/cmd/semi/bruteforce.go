@@ -1,8 +1,8 @@
 package semi
 
 import (
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/rpa/implement/bruteforce"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/implement/bruteforce"
 
 	"github.com/urfave/cli"
 )

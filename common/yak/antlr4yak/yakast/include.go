@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
-	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/go-rod/rod/lib/utils"

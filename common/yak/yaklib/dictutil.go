@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 func _dictParams(i ...interface{}) [][]string {

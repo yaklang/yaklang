@@ -9,8 +9,8 @@ import (
 	"os/user"
 	"runtime"
 	"strings"
-	"yaklang.io/yaklang/common/gopsutil/host"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/gopsutil/host"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func GetSystemInfo() (*host.InfoStat, error) {

@@ -7,9 +7,9 @@ import (
 	"gopkg.in/fatih/set.v0"
 	"sort"
 	"strconv"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 func SimHash(raw []byte) uint64 {

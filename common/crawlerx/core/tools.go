@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (crawler *CrawlerX) Visible(element *rod.Element) bool {

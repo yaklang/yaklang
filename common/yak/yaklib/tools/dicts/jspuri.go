@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang.io/yaklang/common/utils"
+import "github.com/yaklang/yaklang/common/utils"
 
 var jspUri = `/FCKeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/jsp/connector.jsp
 /fccmsres/admin/default.jsp

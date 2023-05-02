@@ -1,6 +1,6 @@
 package hidsevent
 
-import "yaklang.io/yaklang/common/gopsutil/net"
+import "github.com/yaklang/yaklang/common/gopsutil/net"
 
 type ReverseShellInfo struct {
 	Process       *ProcessMeta         `json:"process"`

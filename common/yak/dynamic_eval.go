@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/antlr4yak"
-	"yaklang.io/yaklang/common/yak/yaklang"
-	"yaklang.io/yaklang/common/yak/yaklang/spec"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklang/spec"
 )
 
 var GlobalEvalExports = map[string]interface{}{

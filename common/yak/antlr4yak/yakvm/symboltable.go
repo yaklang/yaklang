@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type SymbolTable struct {

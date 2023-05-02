@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/cve/cvequeryops"
+	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 )
 
 func TestQueryCWE(t *testing.T) {

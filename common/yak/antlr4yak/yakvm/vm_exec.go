@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mutate"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"yaklang.io/yaklang/common/yakdocument"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/yakdocument"
 )
 
 type ExitCodeType int

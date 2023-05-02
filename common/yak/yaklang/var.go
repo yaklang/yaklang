@@ -2,7 +2,7 @@ package yaklang
 
 import (
 	"reflect"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func IsYakFunction(i interface{}) bool {

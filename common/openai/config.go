@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type ConfigOption func(client *Client)

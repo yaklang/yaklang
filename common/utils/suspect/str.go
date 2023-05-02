@@ -6,7 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"unicode"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 import (

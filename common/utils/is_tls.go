@@ -11,10 +11,10 @@ import (
 	"os"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/gmsm/gmtls"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils/socksproxy"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/socksproxy"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func IsTLSService(addr string, proxies ...string) bool {

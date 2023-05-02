@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type YakLibDocCompletion struct {

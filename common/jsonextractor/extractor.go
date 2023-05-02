@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 import "github.com/tidwall/gjson"

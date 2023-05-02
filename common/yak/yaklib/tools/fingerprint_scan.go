@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	filter2 "yaklang.io/yaklang/common/filter"
-	"yaklang.io/yaklang/common/fp"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/synscan"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/pingutil"
-	"yaklang.io/yaklang/common/utils/spacengine"
+	filter2 "github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/synscan"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/utils/spacengine"
 )
 
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {

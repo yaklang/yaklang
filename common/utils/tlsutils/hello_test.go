@@ -3,7 +3,7 @@ package tlsutils
 import (
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestClientHello(t *testing.T) {

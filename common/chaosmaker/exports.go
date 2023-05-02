@@ -2,10 +2,10 @@ package chaosmaker
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/suricata"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 func yieldRules() chan *ChaosMakerRule {

@@ -10,8 +10,8 @@ import (
 	"io/ioutil"
 	"regexp"
 	"testing"
-	"yaklang.io/yaklang/common/log"
-	utils2 "yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 func TestRDPRegexp2MatchFailed(t *testing.T) {

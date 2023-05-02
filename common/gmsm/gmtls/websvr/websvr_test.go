@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 
-	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 )
 
 const (

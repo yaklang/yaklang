@@ -17,9 +17,9 @@ package verify
 import (
 	"encoding/json"
 	"net/http"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
-	"yaklang.io/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3"
 )
 
 // Handler is an http.Handler that returns the request and response

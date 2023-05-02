@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func GetLocalIPAddressViaIface() string {

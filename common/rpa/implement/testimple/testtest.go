@@ -2,7 +2,7 @@ package testimple
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/rpa/implement"
+	"github.com/yaklang/yaklang/common/rpa/implement"
 )
 
 type TestSth struct {

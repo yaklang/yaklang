@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"

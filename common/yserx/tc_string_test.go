@@ -2,7 +2,7 @@ package yserx
 
 import (
 	"testing"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestNewJavaString(t *testing.T) {

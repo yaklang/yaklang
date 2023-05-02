@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func LinuxPKExecSudo(cmd string, opt ...SudoOption) error {

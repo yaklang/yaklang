@@ -4,9 +4,9 @@ import (
 	"github.com/google/gopacket/pcap"
 	"runtime"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils/netutil"
-	"yaklang.io/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/permutil"
 )
 
 func IsPrivilegedForNetRaw() bool {

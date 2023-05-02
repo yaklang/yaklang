@@ -2,7 +2,7 @@ package spec
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/fp"
 )
 
 type ScanFingerprintTask struct {

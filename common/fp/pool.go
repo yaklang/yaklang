@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"sync"
-	utils2 "yaklang.io/yaklang/common/utils"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 type Pool struct {

@@ -3,13 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"time"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang.io/yaklang/common/yak/yaklang"
-	"yaklang.io/yaklang/common/yakdocument"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yakdocument"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/davecgh/go-spew/spew"
 )

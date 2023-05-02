@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"testing"
-	"yaklang.io/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
 )
 
 func TestP7BlockDecrypt(t *testing.T) {

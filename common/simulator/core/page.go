@@ -2,8 +2,8 @@ package core
 
 import (
 	"encoding/base64"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (generalPage *GeneralPage) GeneralFindElements(keyword string) (*GeneralElements, error) {

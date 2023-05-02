@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type CpeStruct struct {

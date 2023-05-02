@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"math/rand"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 /* delay with range */

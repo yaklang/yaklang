@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_PortScan(t *testing.T) {

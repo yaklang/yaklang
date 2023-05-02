@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/filter"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mutate"
-	"yaklang.io/yaklang/common/suricata"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func init() {

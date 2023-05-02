@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"testing"
-	"yaklang.io/yaklang/common/filter"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/rpa"
-	"yaklang.io/yaklang/common/rpa/core"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa"
+	"github.com/yaklang/yaklang/common/rpa/core"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestSpiderRun(t *testing.T) {

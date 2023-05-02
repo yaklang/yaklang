@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func _visitNode(node *html.Node, depth int, siblingIndex int, handle func(i *html.Node)) {

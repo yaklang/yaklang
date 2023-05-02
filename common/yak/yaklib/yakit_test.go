@@ -4,7 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestYakitServer_Addr(t *testing.T) {

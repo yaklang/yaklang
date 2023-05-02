@@ -5,9 +5,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/javascript/otto/ast"
-	"yaklang.io/yaklang/common/javascript/otto/parser"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/javascript/otto/ast"
+	"github.com/yaklang/yaklang/common/javascript/otto/parser"
 )
 
 const code = `

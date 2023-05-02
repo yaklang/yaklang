@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/h2non/filetype/matchers"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func IsImage(i []byte) bool {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"yaklang.io/yaklang/common/cybertunnel/tpb"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func FetchExternalIP() (net.IP, error) {

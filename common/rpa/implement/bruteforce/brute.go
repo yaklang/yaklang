@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/rpa/implement"
-	"yaklang.io/yaklang/common/rpa/web"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/implement"
+	"github.com/yaklang/yaklang/common/rpa/web"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 )

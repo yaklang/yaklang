@@ -16,8 +16,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"yaklang.io/yaklang/common/gopsutil/internal/common"
-	"yaklang.io/yaklang/common/gopsutil/process"
+	"github.com/yaklang/yaklang/common/gopsutil/internal/common"
+	"github.com/yaklang/yaklang/common/gopsutil/process"
 )
 
 const (

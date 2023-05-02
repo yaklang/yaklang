@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"sync"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var SyncExport = map[string]interface{}{

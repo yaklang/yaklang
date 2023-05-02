@@ -6,8 +6,8 @@ import (
 	"net"
 	"testing"
 	"time"
-	utils2 "yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestGenPyaload(t *testing.T) {

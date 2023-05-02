@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
-	"yaklang.io/yaklang/common/yak/antlr4Lua/infrastructure"
-	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/yak/antlr4Lua/infrastructure"
+	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 type Position struct {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (s *SubdomainScanner) brute(

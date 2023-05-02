@@ -1,6 +1,6 @@
 package javaclassparser
 
-import "yaklang.io/yaklang/common/utils"
+import "github.com/yaklang/yaklang/common/utils"
 
 type ClassParser struct {
 	reader   *ClassReader

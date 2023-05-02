@@ -1,6 +1,6 @@
 package yakvm
 
-import "yaklang.io/yaklang/common/utils"
+import "github.com/yaklang/yaklang/common/utils"
 
 func (v *Frame) hijackMapMemberCall(caller, callee string, hijacker func(i interface{}) interface{}) {
 	v.hijackMapMemberCallHandlers.Store(utils.CalcSha1(caller, callee), hijacker)

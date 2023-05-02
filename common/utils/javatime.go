@@ -2,7 +2,7 @@ package utils
 
 import (
 	"time"
-	"yaklang.io/yaklang/common/utils/jodatime"
+	"github.com/yaklang/yaklang/common/utils/jodatime"
 )
 
 func JavaTimeFormatter(t time.Time, formatter string) string {

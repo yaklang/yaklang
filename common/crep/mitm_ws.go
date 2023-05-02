@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	logger "yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/martian/v3"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/log"
+	logger "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/pkg/errors"
 )

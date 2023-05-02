@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Bucket is a generic leaky bucket that drains at a configurable interval and

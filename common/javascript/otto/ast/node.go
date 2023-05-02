@@ -9,8 +9,8 @@ node types are concerned) and may change in the future.
 package ast
 
 import (
-	"yaklang.io/yaklang/common/javascript/otto/file"
-	"yaklang.io/yaklang/common/javascript/otto/token"
+	"github.com/yaklang/yaklang/common/javascript/otto/file"
+	"github.com/yaklang/yaklang/common/javascript/otto/token"
 )
 
 // All nodes implement the Node interface.

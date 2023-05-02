@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/streadway/amqp"
-	"yaklang.io/yaklang/common/mq"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/mq"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 

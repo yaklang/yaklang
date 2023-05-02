@@ -3,7 +3,7 @@ package yakvm
 import (
 	"fmt"
 	"reflect"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
 	uuid "github.com/satori/go.uuid"
 )

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Handler configures a trafficshape.Listener.

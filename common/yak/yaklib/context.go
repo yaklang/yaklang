@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var ContextExports = map[string]interface{}{

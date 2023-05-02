@@ -2,7 +2,7 @@ package cve
 
 import (
 	"testing"
-	"yaklang.io/yaklang/common/cve/cvequeryops"
+	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 )
 
 func TestUpdate(t *testing.T) {

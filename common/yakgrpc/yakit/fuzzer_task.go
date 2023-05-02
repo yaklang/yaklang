@@ -6,13 +6,13 @@ import (
 	"github.com/jinzhu/gorm"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/bizhelper"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-import "yaklang.io/yaklang/common/go-funk"
+import "github.com/yaklang/yaklang/common/go-funk"
 
 /*
 这个结构用于保存当前测试的结果

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
-	"yaklang.io/yaklang/common/jsonextractor"
-	"yaklang.io/yaklang/common/jsonpath"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var JsonExports = map[string]interface{}{

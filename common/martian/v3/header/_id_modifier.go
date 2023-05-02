@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"yaklang.io/yaklang/common/martian/v3"
-	"yaklang.io/yaklang/common/martian/v3/parse"
+	"github.com/yaklang/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3/parse"
 )
 
 const idHeaderName string = "X-Martian-ID"

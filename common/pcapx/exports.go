@@ -6,10 +6,10 @@ import (
 	"github.com/google/gopacket/layers"
 	"math/rand"
 	"net"
-	"yaklang.io/yaklang/common/chaosmaker"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func injectWithError(raw []byte, c *Config) error {

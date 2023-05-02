@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	"yaklang.io/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 var HttpPoolExports = mutate.HttpPoolExports

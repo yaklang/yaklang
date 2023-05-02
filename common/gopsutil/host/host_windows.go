@@ -17,8 +17,8 @@ import (
 
 	"github.com/StackExchange/wmi"
 	"golang.org/x/sys/windows"
-	"yaklang.io/yaklang/common/gopsutil/internal/common"
-	process "yaklang.io/yaklang/common/gopsutil/process"
+	"github.com/yaklang/yaklang/common/gopsutil/internal/common"
+	process "github.com/yaklang/yaklang/common/gopsutil/process"
 )
 
 var (

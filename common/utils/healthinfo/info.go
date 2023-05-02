@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/gopsutil/net"
-	"yaklang.io/yaklang/common/spec/health"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/gopsutil/net"
+	"github.com/yaklang/yaklang/common/spec/health"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 var (

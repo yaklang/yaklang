@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 func testScriptWithTimeout(duration time.Duration, t *testing.T, code string, expectErrorInfo string) {

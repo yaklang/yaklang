@@ -2,10 +2,10 @@ package bot
 
 import (
 	"fmt"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils/dingrobot"
-	"yaklang.io/yaklang/common/utils/larkrobot"
-	"yaklang.io/yaklang/common/utils/workwxrobot"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/dingrobot"
+	"github.com/yaklang/yaklang/common/utils/larkrobot"
+	"github.com/yaklang/yaklang/common/utils/workwxrobot"
 )
 
 func (c *Config) SendText(text string, items ...interface{}) {

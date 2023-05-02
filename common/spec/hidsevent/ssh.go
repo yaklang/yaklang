@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 
 	"os"
 )

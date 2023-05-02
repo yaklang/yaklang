@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 var csrfFormTemplate = template.Must(template.New("csrf-form").Parse(strings.TrimSpace(`

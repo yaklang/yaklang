@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	"yaklang.io/yaklang/common/yak/yaklib/yakhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 )
 
 var HttpExports = yakhttp.HttpExports

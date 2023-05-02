@@ -6,8 +6,8 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/cybertunnel/tpb"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func testServer() (tpb.TunnelClient, tpb.TunnelServer) {

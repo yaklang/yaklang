@@ -4,11 +4,11 @@ import (
 	"context"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"os"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/antlr4nasl/lib"
-	"yaklang.io/yaklang/common/yak/antlr4nasl/visitors"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type Engine struct {

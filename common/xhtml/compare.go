@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type OutputPosType string

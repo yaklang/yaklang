@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	utils2 "yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 type Config struct {

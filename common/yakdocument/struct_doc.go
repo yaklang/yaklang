@@ -6,9 +6,9 @@ import (
 	"html/template"
 	"sort"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/yak/yakdoc/doc"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func StructName(libName, pkgPath, name string) string {

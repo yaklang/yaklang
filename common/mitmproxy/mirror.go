@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func mirrorRequest(reqInConn io.Reader, hijacker func(*http.Request, []byte) []byte, reqOut io.Writer, cbs ...func(r *http.Request)) error {

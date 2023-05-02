@@ -3,9 +3,9 @@ package t3
 import (
 	"bytes"
 	"text/template"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 func GenerateWeblogicJNDIPayload(addr string) []byte {

@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"reflect"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func Encrypt(raw []byte, pemBytes []byte) (string, error) {

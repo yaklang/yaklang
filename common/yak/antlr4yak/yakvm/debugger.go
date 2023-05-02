@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
 	"github.com/pkg/errors"
 )

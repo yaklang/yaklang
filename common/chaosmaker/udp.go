@@ -5,9 +5,9 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/suricata"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var udpHandler = &chaosHandler{

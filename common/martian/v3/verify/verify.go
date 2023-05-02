@@ -19,7 +19,7 @@ package verify
 import (
 	"net/http"
 
-	"yaklang.io/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3"
 )
 
 // RequestVerifier is a RequestModifier that maintains a verification state.

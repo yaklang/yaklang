@@ -7,10 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mq"
-	base2 "yaklang.io/yaklang/common/node/baserpc"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mq"
+	base2 "github.com/yaklang/yaklang/common/node/baserpc"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (b *NodeBase) initBasicNodeManagerAPI() {

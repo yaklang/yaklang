@@ -6,8 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func queryDNS(domain string, servers []string, ctx context.Context, timeout time.Duration, client *dns.Client, qType uint16) (_ *dns.Msg, _ time.Duration, server string, _ error) {

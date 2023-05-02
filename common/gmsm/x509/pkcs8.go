@@ -32,7 +32,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
 )
 
 /*

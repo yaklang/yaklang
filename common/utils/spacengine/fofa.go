@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/spacengine/fofa"
-	"yaklang.io/yaklang/common/utils/suspect"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/spacengine/fofa"
+	"github.com/yaklang/yaklang/common/utils/suspect"
 )
 
 func FofaQuery(email string, fofaKey string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {

@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type hostsBlock interface {

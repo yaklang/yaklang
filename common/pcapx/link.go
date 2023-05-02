@@ -4,8 +4,8 @@ import (
 	"github.com/google/gopacket/layers"
 	"net"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 )
 
 var (

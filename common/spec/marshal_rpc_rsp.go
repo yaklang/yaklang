@@ -3,9 +3,9 @@ package spec
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
-	"yaklang.io/yaklang/common/spec/auditlog"
-	"yaklang.io/yaklang/common/spec/hidsevent"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/spec/auditlog"
+	"github.com/yaklang/yaklang/common/spec/hidsevent"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func UnmarshalRPC_APIResponse(apiName string, response []byte) (interface{}, error) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"yaklang.io/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 func TestOpcodeToName(t *testing.T) {

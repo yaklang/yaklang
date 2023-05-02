@@ -3,10 +3,10 @@ package visitors
 import (
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"yaklang.io/yaklang/common/utils"
-	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"github.com/yaklang/yaklang/common/utils"
+	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 type Compiler struct {

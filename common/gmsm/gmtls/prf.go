@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"hash"
 
-	"yaklang.io/yaklang/common/gmsm/sm3"
+	"github.com/yaklang/yaklang/common/gmsm/sm3"
 )
 
 // Split a premaster secret in two as specified in RFC 4346, section 5.

@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Server is an LDAP server.

@@ -4,7 +4,7 @@ import (
 	"github.com/go-rod/rod"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ModifyTarget string

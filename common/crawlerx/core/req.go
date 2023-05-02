@@ -5,7 +5,7 @@ import (
 	"net/http"
 	netUrl "net/url"
 	"strings"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type ReqInfo interface {

@@ -2,7 +2,7 @@ package feedly
 
 import (
 	"github.com/gilliek/go-opml/opml"
-	"yaklang.io/yaklang/common/bindata"
+	"github.com/yaklang/yaklang/common/bindata"
 )
 
 func viewOutlines(ols []opml.Outline, f func(outline opml.Outline)) {

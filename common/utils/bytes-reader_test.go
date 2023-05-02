@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestReadConnWithTimeout(t *testing.T) {

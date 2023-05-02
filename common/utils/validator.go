@@ -4,7 +4,7 @@ import (
 	"github.com/dlclark/regexp2"
 	"net"
 	"strconv"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (

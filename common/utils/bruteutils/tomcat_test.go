@@ -2,7 +2,7 @@ package bruteutils
 
 import (
 	"testing"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestBruteItem_TOMCAT(t *testing.T) {

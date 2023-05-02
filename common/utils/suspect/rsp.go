@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"yaklang.io/yaklang/common/mutate"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 // ref: https://portswigger.net/blog/json-hijacking-for-the-modern-web

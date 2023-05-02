@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"strconv"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // sample:

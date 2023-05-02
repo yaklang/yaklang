@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"yaklang.io/yaklang/common/crep"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mitmproxy"
+	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mitmproxy"
 )
 
 var (

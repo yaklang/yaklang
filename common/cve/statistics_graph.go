@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/cve/cveresources"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type Graph struct {

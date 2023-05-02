@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-	"yaklang.io/yaklang/common/utils/netutil/routewrapper"
+	"github.com/yaklang/yaklang/common/utils/netutil/routewrapper"
 )
 
 func main() {

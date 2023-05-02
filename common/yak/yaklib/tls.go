@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"time"
-	"yaklang.io/yaklang/common/utils/tlsutils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 func rsaWithBitSize(i int) func() ([]byte, []byte, error) {

@@ -3,7 +3,7 @@
 package otto
 
 import (
-	Dbg "yaklang.io/yaklang/common/javascript/otto/dbg"
+	Dbg "github.com/yaklang/yaklang/common/javascript/otto/dbg"
 )
 
 var dbg, dbgf = Dbg.New()

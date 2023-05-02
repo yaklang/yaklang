@@ -9,14 +9,14 @@ import (
 	"runtime"
 	"strconv"
 	"time"
-	"yaklang.io/yaklang/common/consts"
-	"yaklang.io/yaklang/common/go-funk"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/screcorder"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/progresswriter"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/screcorder"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/progresswriter"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenRecorderRequest) (*ypb.QueryScreenRecorderResponse, error) {

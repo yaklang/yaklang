@@ -18,7 +18,7 @@ import (
 	"net"
 	"net/http"
 
-	"yaklang.io/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/martian/v3"
 )
 
 // NewForwardedModifier sets the X-Forwarded-For, X-Forwarded-Proto,

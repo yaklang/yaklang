@@ -5,10 +5,10 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
-	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/utils"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interface{} {

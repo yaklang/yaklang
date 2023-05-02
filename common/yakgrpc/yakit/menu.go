@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"github.com/jinzhu/gorm"
 	"strconv"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type MenuItem struct {

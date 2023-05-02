@@ -1,8 +1,8 @@
 package rpa
 
 import (
-	"yaklang.io/yaklang/common/rpa/core"
-	"yaklang.io/yaklang/common/rpa/implement/bruteforce"
+	"github.com/yaklang/yaklang/common/rpa/core"
+	"github.com/yaklang/yaklang/common/rpa/implement/bruteforce"
 )
 
 var Exports = map[string]interface{}{

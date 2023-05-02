@@ -1,6 +1,6 @@
 package luaast
 
-import lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
+import lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
 
 func (l *LuaTranslator) VisitExpList(raw lua.IExplistContext) interface{} {
 	if l == nil || raw == nil {

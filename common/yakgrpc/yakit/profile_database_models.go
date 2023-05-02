@@ -3,7 +3,7 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"sync"
-	"yaklang.io/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 var initUserDataAndPluginOnce = new(sync.Once)

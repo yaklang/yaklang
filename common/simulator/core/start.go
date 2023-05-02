@@ -2,8 +2,8 @@ package core
 
 import (
 	"golang.org/x/net/context"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/simulator/config"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/simulator/config"
 )
 
 type StartMode struct {

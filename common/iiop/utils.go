@@ -1,6 +1,6 @@
 package iiop
 
-import "yaklang.io/yaklang/common/yserx"
+import "github.com/yaklang/yaklang/common/yserx"
 
 func paddingStr(old []byte) []byte {
 

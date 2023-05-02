@@ -2,7 +2,7 @@ package chaosmaker
 
 import (
 	"sync"
-	"yaklang.io/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/suricata"
 )
 
 /*

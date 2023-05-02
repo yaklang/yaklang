@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"yaklang.io/yaklang/common/crawler"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/crawler"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func reqOnce(target string, onReq func(req *crawler.Req)) {

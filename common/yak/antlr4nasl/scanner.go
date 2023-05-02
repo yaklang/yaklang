@@ -3,8 +3,8 @@ package antlr4nasl
 import (
 	"context"
 	"os"
-	"yaklang.io/yaklang/common/yak"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func SynScan(hosts string, ports string) ([]int, error) {

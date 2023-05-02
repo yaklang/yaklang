@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"unicode/utf8"
 
-	"yaklang.io/yaklang/common/javascript/otto/parser"
+	"github.com/yaklang/yaklang/common/javascript/otto/parser"
 )
 
 type _regExpObject struct {

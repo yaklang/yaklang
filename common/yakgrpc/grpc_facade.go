@@ -6,9 +6,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"net/url"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacadesHTTPRequest) (*ypb.RegisterFacadesHTTPResponse, error) {

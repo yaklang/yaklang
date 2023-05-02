@@ -10,9 +10,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/license"
-	"yaklang.io/yaklang/common/utils/tlsutils"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/license"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 var (

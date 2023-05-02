@@ -7,8 +7,8 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"golang.org/x/net/html"
 	"net/http"
-	"yaklang.io/yaklang/common/crawlerx/core"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/crawlerx/core"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func visit(n *html.Node) bool {

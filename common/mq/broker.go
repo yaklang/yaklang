@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync"
 	"time"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type ChannelHandler func(broker *Broker, a *amqp.Channel) error

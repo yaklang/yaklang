@@ -3,11 +3,11 @@ package yak
 import (
 	"fmt"
 	"regexp"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/antlr4yak"
-	"yaklang.io/yaklang/common/yak/antlr4yak/yakast"
-	"yaklang.io/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 type StaticAnalyzeResult struct {

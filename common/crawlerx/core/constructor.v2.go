@@ -7,10 +7,10 @@ import (
 	"github.com/go-rod/rod/lib/launcher/flags"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/crawlerx/detect"
-	"yaklang.io/yaklang/common/crawlerx/filter"
-	"yaklang.io/yaklang/common/crawlerx/tag"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/crawlerx/detect"
+	"github.com/yaklang/yaklang/common/crawlerx/filter"
+	"github.com/yaklang/yaklang/common/crawlerx/tag"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func NewCrawlerV2(targetUrl string, configOpts ...ConfigOpt) (*CrawlerX, error) {

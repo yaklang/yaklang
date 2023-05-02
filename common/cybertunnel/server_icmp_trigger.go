@@ -2,8 +2,8 @@ package cybertunnel
 
 import (
 	"context"
-	"yaklang.io/yaklang/common/cybertunnel/tpb"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (s *TunnelServer) QuerySpecificICMPLengthTrigger(ctx context.Context, req *tpb.QuerySpecificICMPLengthTriggerParams) (*tpb.QuerySpecificICMPLengthTriggerResponse, error) {

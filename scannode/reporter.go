@@ -7,12 +7,12 @@ import (
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"net"
 	"strings"
-	"yaklang.io/yaklang/common/fp"
-	"yaklang.io/yaklang/common/spec"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/bruteutils"
-	"yaklang.io/yaklang/common/yak/yaklib/tools"
-	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bruteutils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type ScannerAgentReporter struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 	"time"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/hostsparser"
-	"yaklang.io/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/hostsparser"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
 )
 
 type _pingConfig struct {

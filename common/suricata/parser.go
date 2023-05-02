@@ -2,7 +2,7 @@ package suricata
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	rule "yaklang.io/yaklang/common/suricata/parser"
+	rule "github.com/yaklang/yaklang/common/suricata/parser"
 )
 
 func Parse(data string) ([]*Rule, error) {

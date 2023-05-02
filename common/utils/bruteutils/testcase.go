@@ -1,8 +1,8 @@
 package bruteutils
 
 import (
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 func runTest(r *DefaultServiceAuthInfo, target ...string) error {

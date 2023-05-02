@@ -2,8 +2,8 @@ package main
 
 import (
 	"os"
-	"yaklang.io/yaklang/common/cybertunnel"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/cybertunnel"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func main() {

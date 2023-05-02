@@ -11,8 +11,8 @@ import (
 	"time"
 
 	socketio "github.com/googollee/go-socket.io"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
-	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/pdu"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/pdu"
 )
 
 func showPreview(w http.ResponseWriter, r *http.Request) {

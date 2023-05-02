@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"regexp"
 	"sync"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 type TransparentHijackManager struct {

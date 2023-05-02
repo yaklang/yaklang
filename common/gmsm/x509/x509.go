@@ -40,11 +40,11 @@ import (
 	"strconv"
 	"time"
 
-	"yaklang.io/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
 
 	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
-	"yaklang.io/yaklang/common/gmsm/sm3"
+	"github.com/yaklang/yaklang/common/gmsm/sm3"
 )
 
 // pkixPublicKey reflects a PKIX public key structure. See SubjectPublicKeyInfo

@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/urfave/cli"
 	"os"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/simulator/cmd/sub"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/simulator/cmd/sub"
 )
 
 func main() {

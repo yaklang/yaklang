@@ -3,7 +3,7 @@ package tools
 import (
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestHostPortFilter(t *testing.T) {

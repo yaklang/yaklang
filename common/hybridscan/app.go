@@ -5,9 +5,9 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"sync"
-	"yaklang.io/yaklang/common/fp"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/synscan"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/synscan"
 )
 
 type HyperScanCenter struct {

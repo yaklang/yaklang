@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"unicode"
-	"yaklang.io/yaklang/common/log"
-	"yaklang.io/yaklang/common/mutate"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func NewBytesMethodFactory(f func([]byte) interface{}) MethodFactory {

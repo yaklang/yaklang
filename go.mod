@@ -1,4 +1,4 @@
-module yaklang.io/yaklang
+module github.com/yaklang/yaklang
 
 go 1.20
 

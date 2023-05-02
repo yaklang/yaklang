@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
-	utils2 "yaklang.io/yaklang/common/utils"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 func fileInfoToPromptSuggest(file os.FileInfo) prompt.Suggest {

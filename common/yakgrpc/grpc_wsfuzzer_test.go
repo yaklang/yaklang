@@ -8,9 +8,9 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"testing"
 	"time"
-	"yaklang.io/yaklang/common/utils"
-	"yaklang.io/yaklang/common/yak/yaklib/codec"
-	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestWsFuzzer(t *testing.T) {

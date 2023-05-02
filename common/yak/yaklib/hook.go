@@ -3,7 +3,7 @@ package yaklib
 import (
 	"fmt"
 	"sync"
-	"yaklang.io/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type _outputCallback func(taskId string, data string)

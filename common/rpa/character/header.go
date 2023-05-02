@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"yaklang.io/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func AnalysisHeaders(s string) (map[string]string, error) {

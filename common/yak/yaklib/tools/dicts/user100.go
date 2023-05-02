@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang.io/yaklang/common/utils"
+import "github.com/yaklang/yaklang/common/utils"
 
 var UsernameTop10 = utils.PrettifyListFromStringSplited(`root
 admin
