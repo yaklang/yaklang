@@ -6,10 +6,10 @@ import (
 	"io/ioutil"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error {

@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"yaklang/common/martian/v3"
-	"yaklang/common/martian/v3/filter"
-	"yaklang/common/martian/v3/parse"
+	"yaklang.io/yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3/filter"
+	"yaklang.io/yaklang/common/martian/v3/parse"
 )
 
 var noop = martian.Noop("header.Filter")

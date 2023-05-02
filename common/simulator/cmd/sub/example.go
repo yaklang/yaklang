@@ -2,8 +2,8 @@ package sub
 
 import (
 	"github.com/urfave/cli"
-	"yaklang/common/log"
-	"yaklang/common/simulator/examples"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/simulator/examples"
 )
 
 var Example = cli.Command{

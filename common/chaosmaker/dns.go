@@ -4,9 +4,9 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/suricata"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/suricata"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var dnsHandler = &chaosHandler{

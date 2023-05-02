@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"strings"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func qualifyDomain(domain string) string {

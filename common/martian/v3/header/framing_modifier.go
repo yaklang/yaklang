@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3"
 )
 
 // NewBadFramingModifier makes a best effort to fix inconsistencies in the

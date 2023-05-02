@@ -14,7 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/sm2"
 )
 
 type pkcs8 struct { // Duplicated from x509 package

@@ -27,8 +27,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-	"yaklang/common/gmsm/sm3"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/gmsm/sm3"
+	"yaklang.io/yaklang/common/log"
 )
 
 var QueryUnescape = url.QueryUnescape

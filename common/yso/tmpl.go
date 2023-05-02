@@ -1,11 +1,11 @@
 package yso
 
 import (
-	"yaklang/common/javaclassparser"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/javaclassparser"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 func base64MustDecode(r string) []byte {

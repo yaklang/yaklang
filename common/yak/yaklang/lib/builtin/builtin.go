@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklang"
-	yaklangspec "yaklang/common/yak/yaklang/spec"
-	"yaklang/common/yak/yaklang/spec/types"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	yaklangspec "yaklang.io/yaklang/common/yak/yaklang/spec"
+	"yaklang.io/yaklang/common/yak/yaklang/spec/types"
 
 	"github.com/davecgh/go-spew/spew"
 )

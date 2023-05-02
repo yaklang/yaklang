@@ -2,8 +2,8 @@ package suricata
 
 import (
 	"strings"
-	"yaklang/common/suricata/parser"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/suricata/parser"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type PortRule struct {

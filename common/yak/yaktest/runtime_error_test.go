@@ -3,9 +3,9 @@ package yaktest
 import (
 	"os"
 	"testing"
-	"yaklang/common/consts"
+	"yaklang.io/yaklang/common/consts"
 
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 /*

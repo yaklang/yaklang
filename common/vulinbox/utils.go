@@ -3,8 +3,8 @@ package vulinbox
 import (
 	"context"
 	grpcMetadata "google.golang.org/grpc/metadata"
-	"yaklang/common/yakgrpc"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yakgrpc"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func new_EmptyServer() *yakgrpc.Server {

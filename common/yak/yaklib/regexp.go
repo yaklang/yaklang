@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"regexp"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var reMatch = func(pattern string, i interface{}) bool {

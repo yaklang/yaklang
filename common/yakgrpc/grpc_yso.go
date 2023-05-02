@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklang"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yakgrpc/ypb"
-	"yaklang/common/yso"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yso"
 )
 
 //func (s *Server) Version(ctx context.Context, _ *ypb.Empty) (*ypb.VersionResponse, error) {

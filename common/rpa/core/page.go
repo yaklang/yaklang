@@ -3,9 +3,9 @@ package core
 import (
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"

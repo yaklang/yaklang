@@ -2,9 +2,9 @@ package tools
 
 import (
 	"context"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bruteutils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bruteutils"
 )
 
 var BruterExports = map[string]interface{}{

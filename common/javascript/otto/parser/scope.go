@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
 )
 
 type _scope struct {

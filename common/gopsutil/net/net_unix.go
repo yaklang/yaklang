@@ -7,7 +7,7 @@ import (
 	"context"
 	"strings"
 
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 // Return a list of network connections opened.

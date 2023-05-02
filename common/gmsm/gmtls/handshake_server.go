@@ -25,7 +25,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 // serverHandshakeState contains details of a server handshake in progress.

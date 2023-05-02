@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
 )
 
 var (

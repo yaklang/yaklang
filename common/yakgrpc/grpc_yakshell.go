@@ -7,13 +7,13 @@ import (
 	"google.golang.org/grpc"
 	grpcMetadata "google.golang.org/grpc/metadata"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak"
-	"yaklang/common/yak/antlr4yak"
-	"yaklang/common/yak/yaklang"
-	"yaklang/common/yak/yaklib"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak"
+	"yaklang.io/yaklang/common/yak/antlr4yak"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type YakExecServerWrapper struct {

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"io"
 
-	"yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
 
-	"yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
 )
 
 func ReadEnumerates(r io.Reader) (uint8, error) {

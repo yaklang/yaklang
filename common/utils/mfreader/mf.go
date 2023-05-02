@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type MultiFileLineReader struct {

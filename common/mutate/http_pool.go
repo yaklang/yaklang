@@ -10,13 +10,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/crawler"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/crawler"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 var poolingList sync.Map

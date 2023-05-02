@@ -2,11 +2,11 @@ package bot
 
 import (
 	"net/url"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/dingrobot"
-	"yaklang/common/utils/larkrobot"
-	"yaklang/common/utils/workwxrobot"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/dingrobot"
+	"yaklang.io/yaklang/common/utils/larkrobot"
+	"yaklang.io/yaklang/common/utils/workwxrobot"
 )
 
 const (

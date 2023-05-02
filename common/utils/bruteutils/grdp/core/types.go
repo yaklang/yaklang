@@ -1,6 +1,6 @@
 package core
 
-import "yaklang/common/utils/bruteutils/grdp/emission"
+import "yaklang.io/yaklang/common/utils/bruteutils/grdp/emission"
 
 type Transport interface {
 	Read(b []byte) (n int, err error)

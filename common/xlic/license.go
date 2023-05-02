@@ -2,9 +2,9 @@ package xlic
 
 import (
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/license"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/license"
 
 	"github.com/jinzhu/gorm"
 )

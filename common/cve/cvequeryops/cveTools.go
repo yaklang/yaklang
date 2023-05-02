@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/log"
 )
 
 const scriptFormat = `

@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
-	"yaklang/common/domainextractor"
-	"yaklang/common/filter"
-	"yaklang/common/go-funk"
-	"yaklang/common/jsonextractor"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	"yaklang/common/utils/suspect"
+	"yaklang.io/yaklang/common/domainextractor"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/jsonextractor"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/utils/suspect"
 )
 
 func _strJoin(i interface{}, d interface{}) (defaultResult string) {

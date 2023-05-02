@@ -5,7 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestRemoveUnprintableChars(t *testing.T) {

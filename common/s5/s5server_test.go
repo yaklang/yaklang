@@ -5,8 +5,8 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 func TestSocks5(t *testing.T) {

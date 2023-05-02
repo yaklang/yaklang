@@ -2,7 +2,7 @@ package yakast
 
 import (
 	"fmt"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (s *YakCompiler) _pushOpcodeWithCurrentCodeContext(codes ...*yakvm.Code) {

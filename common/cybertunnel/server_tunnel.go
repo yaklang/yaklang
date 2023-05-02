@@ -9,11 +9,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"sync"
 	"time"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var tunnels = new(sync.Map)

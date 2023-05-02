@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 func Info() (*InfoStat, error) {

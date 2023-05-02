@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"yaklang/common/crep"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crep"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var (

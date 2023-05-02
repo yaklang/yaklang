@@ -10,13 +10,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type mitmContentReplaceRulesSortable []*ypb.MITMContentReplacer

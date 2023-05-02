@@ -14,10 +14,10 @@ import (
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 
-	"yaklang/common/cybertunnel/dnslog"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cybertunnel/dnslog"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func GetTunnelServerCommandCli() *cli.App {

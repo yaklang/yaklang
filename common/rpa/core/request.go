@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"net/http"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type RequestIf interface {

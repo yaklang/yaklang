@@ -1,8 +1,8 @@
 package yso
 
 import (
-	"yaklang/common/utils"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 const (

@@ -2,8 +2,8 @@ package fp
 
 import (
 	"sort"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
 )
 
 type byRarity []*RuleBlock

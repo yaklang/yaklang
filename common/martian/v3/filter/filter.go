@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"yaklang/common/log"
-	"yaklang/common/martian/v3"
-	"yaklang/common/martian/v3/verify"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3/verify"
 )
 
 var noop = martian.Noop("Filter")

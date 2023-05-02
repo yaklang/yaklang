@@ -3,7 +3,7 @@ package cvemodels
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 import (

@@ -15,8 +15,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"yaklang/common/gopsutil/internal/common"
-	"yaklang/common/gopsutil/net"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/net"
 )
 
 // copied from sys/sysctl.h

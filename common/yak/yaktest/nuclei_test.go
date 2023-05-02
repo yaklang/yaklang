@@ -3,7 +3,7 @@ package yaktest
 import (
 	"fmt"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestMisc_NUCLEI(t *testing.T) {

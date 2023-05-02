@@ -13,7 +13,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 var (

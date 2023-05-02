@@ -3,7 +3,7 @@ package htmlquery
 import (
 	"golang.org/x/net/html"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var Exports = map[string]interface{}{

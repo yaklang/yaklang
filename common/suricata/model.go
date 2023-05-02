@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/regen"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/regen"
 )
 
 type Rule struct {

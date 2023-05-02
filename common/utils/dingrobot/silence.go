@@ -2,7 +2,7 @@ package dingrobot
 
 import (
 	"sync"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type SilenceDingRobot struct {

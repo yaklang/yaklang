@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"

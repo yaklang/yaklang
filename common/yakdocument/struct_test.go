@@ -2,7 +2,7 @@ package yakdocument
 
 import (
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type DemoStruct struct {

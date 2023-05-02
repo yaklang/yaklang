@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/mq"
-	"yaklang/common/thirdpartyservices"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/thirdpartyservices"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func Test_Conn(t *testing.T) {

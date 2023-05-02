@@ -5,10 +5,10 @@ import (
 	"crypto/x509"
 	"net/http"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/mitmproxy/mitm"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mitmproxy/mitm"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 type Config struct {

@@ -9,10 +9,10 @@ import (
 	"os"
 	"strings"
 	"time"
-	"yaklang/common/crawlerx/config"
-	"yaklang/common/crawlerx/newcrawlerx"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/config"
+	"yaklang.io/yaklang/common/crawlerx/newcrawlerx"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func run(targetURL, proxy, path string) {

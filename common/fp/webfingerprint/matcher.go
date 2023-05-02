@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	log "yaklang/common/log"
-	utils2 "yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	log "yaklang.io/yaklang/common/log"
+	utils2 "yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 type HTTPResponseInfo struct {

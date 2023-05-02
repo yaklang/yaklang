@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestReadWithContextTickCallback(t *testing.T) {

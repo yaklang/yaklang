@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"sync"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 import (

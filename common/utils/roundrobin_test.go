@@ -2,7 +2,7 @@ package utils
 
 import (
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestNewStringRoundRobinSelector(t *testing.T) {

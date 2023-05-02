@@ -3,8 +3,8 @@ package tlsutils
 import (
 	"bufio"
 	"bytes"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func SplitBlock(raw []byte, blockSize int) ([]string, error) {

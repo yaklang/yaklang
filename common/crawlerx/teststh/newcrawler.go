@@ -7,8 +7,8 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"time"
-	"yaklang/common/crawlerx/newcrawlerx"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/crawlerx/newcrawlerx"
+	"yaklang.io/yaklang/common/log"
 )
 
 var targetURL = `http://123.57.216.171/login.php`

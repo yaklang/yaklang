@@ -12,7 +12,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	"yaklang/common/utils/tlsutils/go-pkcs12/rc2"
+	"yaklang.io/yaklang/common/utils/tlsutils/go-pkcs12/rc2"
 )
 
 var (

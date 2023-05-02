@@ -8,9 +8,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/memfile"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/memfile"
 )
 
 // 压缩文件

@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/ziputil"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/ziputil"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func TestDarwinSudo(t *testing.T) {

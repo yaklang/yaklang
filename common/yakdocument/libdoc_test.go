@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"testing"
-	"yaklang/common/yak"
-	"yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak"
+	"yaklang.io/yaklang/common/yak/yaklang"
 
-	_ "yaklang/common/yak"
+	_ "yaklang.io/yaklang/common/yak"
 )
 
 func TestEngineToLibDocuments(t *testing.T) {

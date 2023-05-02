@@ -8,8 +8,8 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestRoute(t *testing.T) {

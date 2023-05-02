@@ -4,7 +4,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestComputeCode(t *testing.T) {

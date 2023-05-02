@@ -1,6 +1,6 @@
 package comparer
 
-import "yaklang/common/utils/bs4"
+import "yaklang.io/yaklang/common/utils/bs4"
 
 func CompareHtml(s1, s2 []byte) (f float64) {
 	f = compareBytes(s1, s2)

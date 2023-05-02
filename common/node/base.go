@@ -8,11 +8,11 @@ import (
 	"github.com/tevino/abool"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/mq"
-	"yaklang/common/spec"
-	"yaklang/common/utils/healthinfo"
-	"yaklang/common/yak"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/spec"
+	"yaklang.io/yaklang/common/utils/healthinfo"
+	"yaklang.io/yaklang/common/yak"
 )
 
 type NodeBase struct {

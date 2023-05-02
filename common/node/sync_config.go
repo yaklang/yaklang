@@ -2,10 +2,10 @@ package node
 
 import (
 	"github.com/streadway/amqp"
-	"yaklang/common/log"
-	"yaklang/common/mq"
-	"yaklang/common/spec"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/spec"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func (c *NodeBase) getSyncConfigMqHandler() []mq.BrokerConfigHandler {

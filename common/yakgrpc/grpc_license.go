@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"github.com/pkg/errors"
-	"yaklang/common/utils"
-	"yaklang/common/xlic"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/xlic"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetLicense(ctx context.Context, _ *ypb.Empty) (_ *ypb.GetLicenseResponse, unexpectedError error) {

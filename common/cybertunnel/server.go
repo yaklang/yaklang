@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 	"time"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var startTunnelServerOnceForRandomPort = new(sync.Once)

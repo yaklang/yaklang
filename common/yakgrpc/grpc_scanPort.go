@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 const scanPort = `yakit.AutoInitYakit()

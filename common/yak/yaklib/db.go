@@ -2,9 +2,9 @@ package yaklib
 
 import (
 	"context"
-	"yaklang/common/consts"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 const (

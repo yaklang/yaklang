@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
-	"yaklang/common/bindata"
-	log "yaklang/common/log"
+	"yaklang.io/yaklang/common/bindata"
+	log "yaklang.io/yaklang/common/log"
 )
 
 func GetYamlWebFingerprintRules(yamlFilePath string) ([]*WebRule, error) {

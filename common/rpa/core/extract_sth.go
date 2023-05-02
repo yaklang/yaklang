@@ -2,7 +2,7 @@ package core
 
 import (
 	"encoding/json"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 )

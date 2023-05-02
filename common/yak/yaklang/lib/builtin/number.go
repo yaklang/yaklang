@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 // -----------------------------------------------------------------------------

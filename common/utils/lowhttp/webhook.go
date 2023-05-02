@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type WebHookServer struct {

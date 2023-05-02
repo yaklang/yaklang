@@ -6,8 +6,8 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"math/rand"
 	"time"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var tokenCache = ttlcache.NewCache()

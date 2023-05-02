@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"yaklang/common/yso"
+	"yaklang.io/yaklang/common/yso"
 )
 
 //	func TestNewFacadeServer(t *testing.T) {

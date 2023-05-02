@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"encoding/json"
 	"github.com/jinzhu/gorm"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 type MITMFilterManager struct {

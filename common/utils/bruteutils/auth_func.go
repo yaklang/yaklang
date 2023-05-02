@@ -2,7 +2,7 @@ package bruteutils
 
 import (
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func fixToTarget(target string, defaultPort int) string {

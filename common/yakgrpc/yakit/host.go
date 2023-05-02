@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/jinzhu/gorm"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bizhelper"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bizhelper"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type Host struct {

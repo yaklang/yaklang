@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func TestMITMTestStripTest(t *testing.T) {

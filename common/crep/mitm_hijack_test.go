@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 func TestMITM_SetTransparentHijackResponse(t *testing.T) {

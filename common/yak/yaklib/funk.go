@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func intersect(x interface{}, y interface{}) interface{} {

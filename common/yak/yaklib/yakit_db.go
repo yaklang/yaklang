@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"yaklang/common/consts"
-	"yaklang/common/fp"
-	"yaklang/common/log"
-	"yaklang/common/synscan"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bizhelper"
-	"yaklang/common/utils/spacengine"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/synscan"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bizhelper"
+	"yaklang.io/yaklang/common/utils/spacengine"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 func queryDomainAssetByNetwork(network string) (chan *yakit.Domain, error) {

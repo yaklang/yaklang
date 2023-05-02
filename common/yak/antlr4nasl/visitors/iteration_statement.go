@@ -1,9 +1,9 @@
 package visitors
 
 import (
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 func (c *Compiler) VisitIterationStatement(i nasl.IIterationStatementContext) {

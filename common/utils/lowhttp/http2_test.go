@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestHpack(t *testing.T) {

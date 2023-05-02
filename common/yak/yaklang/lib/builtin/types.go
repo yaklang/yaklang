@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	yaksepc "yaklang/common/yak/yaklang/spec"
+	yaksepc "yaklang.io/yaklang/common/yak/yaklang/spec"
 )
 
 // -----------------------------------------------------------------------------

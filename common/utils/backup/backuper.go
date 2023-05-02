@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Item struct {

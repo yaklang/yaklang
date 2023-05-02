@@ -17,7 +17,7 @@ import (
 	"strings"
 	"syscall"
 
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 const ( // Conntrack Column numbers

@@ -3,7 +3,7 @@ package yakast
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"testing"
-	yak "yaklang/common/yak/antlr4yak/parser"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
 )
 
 func testYakParsing(i string) {

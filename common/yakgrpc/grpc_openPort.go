@@ -5,9 +5,9 @@ import (
 	"io"
 	"net"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) OpenPort(inputStream ypb.Yak_OpenPortServer) error {

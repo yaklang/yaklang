@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type LabelTable struct {

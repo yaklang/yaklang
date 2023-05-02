@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"yaklang/common/utils/netutil/routewrapper"
+	"yaklang.io/yaklang/common/utils/netutil/routewrapper"
 )
 
 var progname = os.Args[0]

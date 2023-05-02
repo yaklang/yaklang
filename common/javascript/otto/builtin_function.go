@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"yaklang/common/javascript/otto/parser"
+	"yaklang.io/yaklang/common/javascript/otto/parser"
 )
 
 // Function

@@ -5,9 +5,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
-	"yaklang/common/consts"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 func TestStringToUrl(t *testing.T) {

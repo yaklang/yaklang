@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/cybertunnel"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/cybertunnel"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type RiskParamsOpt func(r *Risk)

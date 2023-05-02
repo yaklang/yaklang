@@ -6,8 +6,8 @@ import (
 	"github.com/tevino/abool"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestTask(t *testing.T) {

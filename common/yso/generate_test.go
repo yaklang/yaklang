@@ -2,7 +2,7 @@ package yso
 
 import (
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestGenerateClass(t *testing.T) {

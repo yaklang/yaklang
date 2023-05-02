@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"strings"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) HTTPRequestAnalyzer(ctx context.Context, req *ypb.HTTPRequestAnalysisMaterial) (*ypb.HTTPRequestAnalysis, error) {

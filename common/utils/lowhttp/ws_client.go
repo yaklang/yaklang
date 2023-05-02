@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 
 	"github.com/pkg/errors"
 )

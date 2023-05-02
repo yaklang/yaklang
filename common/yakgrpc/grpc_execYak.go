@@ -14,13 +14,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/antlr4yak"
-	"yaklang/common/yak/yaklib"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/antlr4yak"
+	"yaklang.io/yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func status(verbose string, desc string) string {

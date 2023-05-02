@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // init 暂时用来注入一些函数 lua规定变量名不能@开头，所以此处函数名若@开头表明其作用为替代一些yakvm中不存在的opcode的功能

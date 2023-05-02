@@ -7,9 +7,9 @@ import (
 	"net"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/dnsutil"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/dnsutil"
 )
 
 var queryNs = dnsutil.QueryNSEx

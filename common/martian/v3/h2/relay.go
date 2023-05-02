@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestHostsParser(t *testing.T) {

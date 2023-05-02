@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/rpa/character"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/rpa/character"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func RandomNumberGenerate(start int, end int, count int) ([]int, error) {

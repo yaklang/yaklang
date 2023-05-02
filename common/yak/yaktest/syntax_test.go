@@ -4,7 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"os"
 	"testing"
-	"yaklang/common/yak"
+	"yaklang.io/yaklang/common/yak"
 )
 
 /*

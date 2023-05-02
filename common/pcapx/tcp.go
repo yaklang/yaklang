@@ -6,8 +6,8 @@ import (
 	"github.com/google/gopacket/layers"
 	"math/rand"
 	"time"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type TCPIPFrame struct {

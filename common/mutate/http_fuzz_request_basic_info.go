@@ -3,9 +3,9 @@ package mutate
 import (
 	"mime"
 	"net/url"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 func (f *FuzzHTTPRequest) GetBytes() []byte {

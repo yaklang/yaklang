@@ -9,8 +9,8 @@ import (
 	"net/http/httputil"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils/quakeschema"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/quakeschema"
 )
 
 func newDefaultClient() *http.Client {

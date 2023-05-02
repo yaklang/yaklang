@@ -2,7 +2,7 @@ package iiop
 
 import (
 	"encoding/binary"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type BytesUtils struct {

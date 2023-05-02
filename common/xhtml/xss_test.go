@@ -3,9 +3,9 @@ package xhtml
 import (
 	"fmt"
 	"testing"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 const reqRaw = `GET /xss/example7.php?name=hacker HTTP/1.1

@@ -1,7 +1,7 @@
 package yakast
 
 import (
-	yak "yaklang/common/yak/antlr4yak/parser"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
 )
 
 func (y *YakCompiler) VisitFunctionCall(raw yak.IFunctionCallContext) interface{} {

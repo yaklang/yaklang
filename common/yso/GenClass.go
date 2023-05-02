@@ -2,10 +2,10 @@ package yso
 
 import (
 	"strconv"
-	"yaklang/common/javaclassparser"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/javaclassparser"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type ClassType string

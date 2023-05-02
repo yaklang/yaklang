@@ -3,9 +3,9 @@ package spacengine
 import (
 	"fmt"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/spacengine/go-shodan"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/spacengine/go-shodan"
 )
 
 func interfaceArrayToString(rets []interface{}) string {

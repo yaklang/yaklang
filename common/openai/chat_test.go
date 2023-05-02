@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"yaklang/common/consts"
+	"yaklang.io/yaklang/common/consts"
 )
 
 func getKey() string {

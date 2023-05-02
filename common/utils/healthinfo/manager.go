@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/spec/health"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/spec/health"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Manager struct {

@@ -2,8 +2,8 @@ package yak
 
 import (
 	"testing"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak/yaklang"
 )
 
 func TestScriptEngine_Execute(t *testing.T) {

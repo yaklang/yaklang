@@ -6,8 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"net/http"
-	"yaklang/common/fp"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type ScanPortTask struct {

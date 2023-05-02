@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"strings"
 	"unicode"
-	"yaklang/common/log"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func NewStringMethodFactory(f func(string) interface{}) MethodFactory {

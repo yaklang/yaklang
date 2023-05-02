@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang/common/utils/bruteutils/grdp/emission"
-	"yaklang/common/utils/bruteutils/grdp/glog"
-	"yaklang/common/utils/bruteutils/grdp/protocol/nla"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/emission"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 )
 
 // take idea from https://github.com/Madnikulin50/gordp

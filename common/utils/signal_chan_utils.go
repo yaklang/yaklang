@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func NewSignalChannel(targetSignal ...os.Signal) chan os.Signal {

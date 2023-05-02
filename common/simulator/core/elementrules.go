@@ -2,7 +2,7 @@ package core
 
 import (
 	"strings"
-	"yaklang/common/simulator/config"
+	"yaklang.io/yaklang/common/simulator/config"
 )
 
 var CheckDisplayFunctions = []func(*GeneralElement) bool{

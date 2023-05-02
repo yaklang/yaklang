@@ -2,10 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryMITMRuleExtractedDataRequest) (*ypb.QueryMITMRuleExtractedDataResponse, error) {

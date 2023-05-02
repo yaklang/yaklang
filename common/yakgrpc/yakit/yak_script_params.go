@@ -1,6 +1,6 @@
 package yakit
 
-import "yaklang/common/yakgrpc/ypb"
+import "yaklang.io/yaklang/common/yakgrpc/ypb"
 
 var mitmPluginDefaultPlugins = []*ypb.YakScriptParam{
 	{

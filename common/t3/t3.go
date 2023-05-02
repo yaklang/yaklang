@@ -9,8 +9,8 @@ import (
 	"net"
 	"text/template"
 	"time"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 func aa() ([]byte, []byte) {

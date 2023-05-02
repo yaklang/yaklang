@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Temp struct {

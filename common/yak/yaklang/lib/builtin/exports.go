@@ -2,7 +2,7 @@ package builtin
 
 import (
 	"fmt"
-	yaklangspec "yaklang/common/yak/yaklang/spec"
+	yaklangspec "yaklang.io/yaklang/common/yak/yaklang/spec"
 )
 
 // -----------------------------------------------------------------------------

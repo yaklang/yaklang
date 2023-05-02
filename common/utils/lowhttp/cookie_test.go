@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestCookiesToString(t *testing.T) {

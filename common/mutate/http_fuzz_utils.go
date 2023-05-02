@@ -1,6 +1,6 @@
 package mutate
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 func (s *FuzzHTTPRequest) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {
 	return NewFuzzHTTPRequest(s.originRequest, s.Opts...)

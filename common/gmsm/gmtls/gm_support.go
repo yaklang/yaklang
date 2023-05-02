@@ -15,10 +15,10 @@ import (
 	"strings"
 	"sync"
 
-	"yaklang/common/gmsm/sm2"
-	"yaklang/common/gmsm/sm3"
-	"yaklang/common/gmsm/sm4"
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/sm3"
+	"yaklang.io/yaklang/common/gmsm/sm4"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 const VersionGMSSL = 0x0101 // GM/T 0024-2014

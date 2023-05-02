@@ -7,8 +7,8 @@ import (
 	"context"
 	"syscall"
 
-	"yaklang/common/gopsutil/internal/common"
-	"yaklang/common/gopsutil/net"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/net"
 )
 
 type MemoryMapsStat struct {

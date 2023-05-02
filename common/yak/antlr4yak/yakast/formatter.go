@@ -3,9 +3,9 @@ package yakast
 import (
 	"bytes"
 	"strings"
-	"yaklang/common/go-funk"
-	"yaklang/common/yak/antlr4yak/parser"
-	yak "yaklang/common/yak/antlr4yak/parser"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )

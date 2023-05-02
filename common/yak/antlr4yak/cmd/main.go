@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	yak "yaklang/common/yak/antlr4yak/parser"
-	"yaklang/common/yak/antlr4yak/yakast"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakast"
 )
 
 func main() {

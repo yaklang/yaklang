@@ -1,10 +1,10 @@
 package visitors
 
 import (
-	"yaklang/common/log"
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"yaklang.io/yaklang/common/log"
+	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 func (c *Compiler) VisitStatementList(i nasl.IStatementListContext) {

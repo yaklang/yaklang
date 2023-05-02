@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/antchfx/xmlquery"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type CNNVD struct {

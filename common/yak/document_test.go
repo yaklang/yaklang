@@ -2,7 +2,7 @@ package yak
 
 import (
 	"testing"
-	"yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak/yaklang"
 )
 
 func TestEngineToLibDocuments(t *testing.T) {

@@ -1,7 +1,7 @@
 package codec
 
 import (
-	"yaklang/common/gmsm/sm4"
+	"yaklang.io/yaklang/common/gmsm/sm4"
 )
 
 var PKCS7Padding = sm4.PKCS7Padding

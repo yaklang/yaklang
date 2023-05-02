@@ -10,14 +10,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/cve/cvequeryops"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/filter"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/progresswriter"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/cve/cvequeryops"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/progresswriter"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryCVE(ctx context.Context, req *ypb.QueryCVERequest) (*ypb.QueryCVEResponse, error) {

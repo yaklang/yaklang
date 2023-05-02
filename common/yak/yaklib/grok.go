@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 	"io"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 var (

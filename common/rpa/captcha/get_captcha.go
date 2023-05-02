@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"yaklang/common/rpa/web"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/rpa/web"
+	"yaklang.io/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 )

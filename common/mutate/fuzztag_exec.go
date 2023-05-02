@@ -2,8 +2,8 @@ package mutate
 
 import (
 	"github.com/pkg/errors"
-	"yaklang/common/fuzztag"
-	utils2 "yaklang/common/utils"
+	"yaklang.io/yaklang/common/fuzztag"
+	utils2 "yaklang.io/yaklang/common/utils"
 )
 
 type FuzzTagConfig struct {

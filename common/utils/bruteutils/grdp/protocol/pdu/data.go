@@ -7,8 +7,8 @@ import (
 	"io"
 
 	"github.com/lunixbochs/struc"
-	"yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
 )
 
 const (

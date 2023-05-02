@@ -2,7 +2,7 @@ package lib
 
 import (
 	"reflect"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Iterator struct {

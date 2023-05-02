@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"yaklang/common/go-funk"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {

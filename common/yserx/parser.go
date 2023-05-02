@@ -7,9 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var MAGIC_BANNER = []byte{0xac, 0xed}

@@ -9,8 +9,8 @@ import (
 	"net"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 // Connection Models

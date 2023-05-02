@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) error {

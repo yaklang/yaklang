@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/jsonextractor"
-	"yaklang/common/log"
-	"yaklang/common/openai"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bizhelper"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/jsonextractor"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/openai"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bizhelper"
 )
 
 type CVEDescription struct {

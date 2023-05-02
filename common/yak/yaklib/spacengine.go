@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	spacengine2 "yaklang/common/utils/spacengine"
+	spacengine2 "yaklang.io/yaklang/common/utils/spacengine"
 )
 
 var SpaceEngineExports = map[string]interface{}{

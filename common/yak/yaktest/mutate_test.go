@@ -3,9 +3,9 @@ package yaktest
 import (
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/yak"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak"
 )
 
 func TestMisc_Mutate1(t *testing.T) {

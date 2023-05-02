@@ -3,8 +3,8 @@ package yso
 import (
 	"bytes"
 	"strconv"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 type debugWriter struct {

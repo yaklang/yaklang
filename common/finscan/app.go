@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/netutil"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/netutil"
 )
 
 type Scanner struct {

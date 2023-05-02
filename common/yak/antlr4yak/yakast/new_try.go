@@ -2,8 +2,8 @@ package yakast
 
 import (
 	"github.com/google/uuid"
-	yak "yaklang/common/yak/antlr4yak/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (y *YakCompiler) VisitTryStmt(raw yak.ITryStmtContext) interface{} {

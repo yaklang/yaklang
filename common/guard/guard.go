@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Guard struct {

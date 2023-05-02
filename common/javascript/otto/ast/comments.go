@@ -3,7 +3,7 @@ package ast
 import (
 	"fmt"
 
-	"yaklang/common/javascript/otto/file"
+	"yaklang.io/yaklang/common/javascript/otto/file"
 )
 
 // CommentPosition determines where the comment is in a given context

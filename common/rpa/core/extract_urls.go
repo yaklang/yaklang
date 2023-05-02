@@ -2,10 +2,10 @@ package core
 
 import (
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/rpa/character"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/rpa/character"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 const findHref = `() => {

@@ -3,9 +3,9 @@ package yaktest
 import (
 	"fmt"
 	"testing"
-	"yaklang/common/consts"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 func TestMisc_Hook(t *testing.T) {

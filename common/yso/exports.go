@@ -1,7 +1,7 @@
 package yso
 
 import (
-	"yaklang/common/facades/ldap/ldapserver"
+	"yaklang.io/yaklang/common/facades/ldap/ldapserver"
 )
 
 var Exports = map[string]interface{}{

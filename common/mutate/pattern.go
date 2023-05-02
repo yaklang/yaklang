@@ -7,7 +7,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"strconv"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 /*

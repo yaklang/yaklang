@@ -3,7 +3,7 @@ package sub
 import (
 	"github.com/urfave/cli"
 	"time"
-	"yaklang/common/simulator/simple"
+	"yaklang.io/yaklang/common/simulator/simple"
 )
 
 var Simple = cli.Command{

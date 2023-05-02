@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"regexp"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var (

@@ -25,7 +25,7 @@ import (
 	"io"
 	"net/url"
 	"sync"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 var (

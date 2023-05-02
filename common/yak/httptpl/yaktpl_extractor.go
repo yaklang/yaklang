@@ -14,10 +14,10 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"yaklang/common/jsonextractor"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/jsonextractor"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 type YakExtractor struct {

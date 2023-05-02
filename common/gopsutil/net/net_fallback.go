@@ -6,7 +6,7 @@ package net
 import (
 	"context"
 
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 func IOCounters(pernic bool) ([]IOCountersStat, error) {

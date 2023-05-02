@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 
 	"github.com/asaskevich/govalidator"
 )

@@ -3,8 +3,8 @@ package codec
 import (
 	"bytes"
 	"github.com/pkg/errors"
-	"yaklang/common/gmsm/sm2"
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 import (

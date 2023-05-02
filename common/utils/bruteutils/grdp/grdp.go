@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"yaklang/common/utils/bruteutils/grdp/protocol/rfb"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/rfb"
 
-	"yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang/common/utils/bruteutils/grdp/glog"
-	"yaklang/common/utils/bruteutils/grdp/protocol/nla"
-	"yaklang/common/utils/bruteutils/grdp/protocol/pdu"
-	"yaklang/common/utils/bruteutils/grdp/protocol/sec"
-	"yaklang/common/utils/bruteutils/grdp/protocol/t125"
-	"yaklang/common/utils/bruteutils/grdp/protocol/tpkt"
-	"yaklang/common/utils/bruteutils/grdp/protocol/x224"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/nla"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/pdu"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/sec"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/t125"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/tpkt"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/x224"
 )
 
 type Client struct {

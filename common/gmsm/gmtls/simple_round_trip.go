@@ -29,8 +29,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils/socksproxy"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/socksproxy"
 )
 
 // SimpleRoundTripper 简单的单次HTTP/HTTPS（国密） 连接往返器

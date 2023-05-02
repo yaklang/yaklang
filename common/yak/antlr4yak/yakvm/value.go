@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Value struct {

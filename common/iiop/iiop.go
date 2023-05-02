@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"net"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 const (

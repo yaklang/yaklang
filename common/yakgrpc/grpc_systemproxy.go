@@ -2,8 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang/common/utils/systemproxy"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils/systemproxy"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetSystemProxy(ctx context.Context, req *ypb.Empty) (*ypb.GetSystemProxyResult, error) {

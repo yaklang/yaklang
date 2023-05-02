@@ -3,9 +3,9 @@ package sub
 import (
 	"fmt"
 	"github.com/urfave/cli"
-	"yaklang/common/crawlerx"
-	"yaklang/common/crawlerx/tag"
-	"yaklang/common/crawlerx/teststh"
+	"yaklang.io/yaklang/common/crawlerx"
+	"yaklang.io/yaklang/common/crawlerx/tag"
+	"yaklang.io/yaklang/common/crawlerx/teststh"
 )
 
 var TestModule = cli.Command{

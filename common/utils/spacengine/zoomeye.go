@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/spacengine/zoomeye"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/spacengine/zoomeye"
 )
 
 func zoomeyeResultToSpacengineList(filter string, z *zoomeye.ZoomeyeResult) []*NetSpaceEngineResult {

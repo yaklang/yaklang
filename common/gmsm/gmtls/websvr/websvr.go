@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	x "crypto/x509"
 	"io/ioutil"
-	"yaklang/common/gmsm/gmtls"
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 const (

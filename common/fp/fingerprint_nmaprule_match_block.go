@@ -7,8 +7,8 @@ import (
 	"net"
 	"strconv"
 	"time"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	utils2 "yaklang.io/yaklang/common/utils"
 )
 
 func getDeadlineFromContext(ctx context.Context, timeout time.Duration) time.Time {

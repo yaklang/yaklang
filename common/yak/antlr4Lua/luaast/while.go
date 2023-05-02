@@ -1,6 +1,6 @@
 package luaast
 
-import "yaklang/common/yak/antlr4yak/yakvm"
+import "yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 
 func (l *LuaTranslator) enterWhileContext(start int) {
 	l.whileDepthStack.Push(&whileContext{

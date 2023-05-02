@@ -17,10 +17,10 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	utils "yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	utils "yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var _contentLengthRE = regexp.MustCompile(`(?i)Content-Length:(\s+)?(\d+)?\r?\n?`)

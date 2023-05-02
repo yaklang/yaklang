@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib"
 )
 
 type MySQLServerDetail struct {

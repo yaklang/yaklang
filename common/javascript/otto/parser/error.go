@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"yaklang/common/javascript/otto/file"
-	"yaklang/common/javascript/otto/token"
+	"yaklang.io/yaklang/common/javascript/otto/file"
+	"yaklang.io/yaklang/common/javascript/otto/token"
 )
 
 const (

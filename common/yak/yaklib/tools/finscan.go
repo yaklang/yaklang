@@ -7,11 +7,11 @@ import (
 	"net"
 	"sync"
 	"time"
-	"yaklang/common/filter"
-	"yaklang/common/finscan"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/hostsparser"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/finscan"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/hostsparser"
 )
 
 type _yakFinPortScanConfig struct {

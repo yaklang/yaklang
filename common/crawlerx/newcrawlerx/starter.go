@@ -13,9 +13,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"yaklang/common/crawlerx/filter"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/filter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type BrowserStarter struct {

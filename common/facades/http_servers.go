@@ -5,9 +5,9 @@ import (
 	"github.com/h2non/filetype"
 	"net"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 const defaultHTTPFallback = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n\r\n\r\n"

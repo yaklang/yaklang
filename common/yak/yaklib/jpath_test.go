@@ -6,7 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"testing"
-	"yaklang/common/jsonpath"
+	"yaklang.io/yaklang/common/jsonpath"
 )
 
 const data = `{

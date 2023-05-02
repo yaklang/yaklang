@@ -2,9 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang/common/go-funk"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryWebsocketFlowByHTTPFlowWebsocketHash(ctx context.Context, req *ypb.QueryWebsocketFlowByHTTPFlowWebsocketHashRequest) (*ypb.WebsocketFlows, error) {

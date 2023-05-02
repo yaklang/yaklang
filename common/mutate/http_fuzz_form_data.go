@@ -9,10 +9,10 @@ import (
 	"net/textproto"
 	"regexp"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/mixer"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/mixer"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type multipartData struct {

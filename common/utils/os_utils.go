@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/user"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func init() {

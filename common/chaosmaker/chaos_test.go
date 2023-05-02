@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/openai"
-	"yaklang/common/suricata"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/openai"
+	"yaklang.io/yaklang/common/suricata"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type ruleTest struct {

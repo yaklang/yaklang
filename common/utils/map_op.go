@@ -3,7 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"reflect"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func MapGetStringOr(m map[string]interface{}, key string, value string) string {

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/gob"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yakdoc"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yakdoc"
 )
 
 //go:embed doc.gob.gzip

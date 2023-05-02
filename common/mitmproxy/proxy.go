@@ -14,11 +14,11 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/crep"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/crep"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 type MITMProxy struct {

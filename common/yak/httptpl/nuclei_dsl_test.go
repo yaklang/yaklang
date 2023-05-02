@@ -3,7 +3,7 @@ package httptpl
 import (
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 func TestNewNucleiDSLSandbox(t *testing.T) {

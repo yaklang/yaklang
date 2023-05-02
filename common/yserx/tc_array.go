@@ -2,7 +2,7 @@ package yserx
 
 import (
 	"bytes"
-	"yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/go-funk"
 )
 
 type JavaArray struct {

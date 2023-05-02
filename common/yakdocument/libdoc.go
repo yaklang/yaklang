@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func ReflectFuncToFunctionDoc(libName string, ret reflect.Type) (ExportsFunctionDoc, error) {

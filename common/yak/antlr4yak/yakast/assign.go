@@ -2,8 +2,8 @@ package yakast
 
 import (
 	"strings"
-	yak "yaklang/common/yak/antlr4yak/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (y *YakCompiler) VisitAssignExpressionStmt(raw yak.IAssignExpressionStmtContext) interface{} {

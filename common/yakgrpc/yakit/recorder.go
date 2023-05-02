@@ -2,9 +2,9 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bizhelper"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bizhelper"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type ScreenRecorder struct {

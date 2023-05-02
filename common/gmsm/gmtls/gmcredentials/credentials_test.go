@@ -10,9 +10,9 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"yaklang/common/gmsm/gmtls"
-	"yaklang/common/gmsm/gmtls/gmcredentials/echo"
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"yaklang.io/yaklang/common/gmsm/gmtls/gmcredentials/echo"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 const (

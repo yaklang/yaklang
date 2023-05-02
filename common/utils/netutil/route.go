@@ -10,10 +10,10 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/netutil/netroute"
-	"yaklang/common/utils/netutil/routewrapper"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/netutil/netroute"
+	"yaklang.io/yaklang/common/utils/netutil/routewrapper"
 )
 
 func FindInterfaceByIP(ip string) (net.Interface, error) {

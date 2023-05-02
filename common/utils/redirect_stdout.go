@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 var (

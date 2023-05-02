@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_CreateYaklangShell(t *testing.T) {

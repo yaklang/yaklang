@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang/common/utils/bruteutils/grdp/emission"
-	"yaklang/common/utils/bruteutils/grdp/glog"
-	"yaklang/common/utils/bruteutils/grdp/protocol/t125/gcc"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/emission"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/t125/gcc"
 )
 
 type PDULayer struct {

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 //func TestHttp2ClientManual(t *testing.T) {

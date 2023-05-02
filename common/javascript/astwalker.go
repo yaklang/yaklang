@@ -1,10 +1,10 @@
 package javascript
 
 import (
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/parser"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/parser"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type ASTWalkerResult struct {

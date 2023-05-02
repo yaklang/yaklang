@@ -12,11 +12,11 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yak/yaklib/yakhttp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yak/yaklib/yakhttp"
 )
 
 type FuzzHTTPRequest struct {

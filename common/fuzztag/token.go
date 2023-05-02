@@ -1,7 +1,7 @@
 package fuzztag
 
 import (
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type token struct {

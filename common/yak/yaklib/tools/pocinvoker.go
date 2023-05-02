@@ -13,11 +13,11 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 
 	"github.com/hpcloud/tail"
 )

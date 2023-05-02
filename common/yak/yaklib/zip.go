@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	"yaklang/common/utils/ziputil"
+	"yaklang.io/yaklang/common/utils/ziputil"
 )
 
 var ZipExports = map[string]interface{}{

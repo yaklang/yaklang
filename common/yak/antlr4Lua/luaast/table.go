@@ -2,7 +2,7 @@ package luaast
 
 import (
 	"fmt"
-	lua "yaklang/common/yak/antlr4Lua/parser"
+	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
 )
 
 func (l *LuaTranslator) VisitTableConstructor(raw lua.ITableconstructorContext) interface{} {

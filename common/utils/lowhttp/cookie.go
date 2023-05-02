@@ -9,8 +9,8 @@ import (
 	"net/http/cookiejar"
 	"strings"
 	"sync"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var CookiejarPool sync.Map

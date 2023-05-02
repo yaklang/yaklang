@@ -2,9 +2,9 @@ package yaklib
 
 // otto
 import (
-	"yaklang/common/javascript"
-	"yaklang/common/javascript/otto"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/javascript"
+	"yaklang.io/yaklang/common/javascript/otto"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var (

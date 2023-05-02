@@ -5,9 +5,9 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 func TestNewDNSServer(t *testing.T) {

@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"yaklang/common/gopsutil/internal/common"
-	"yaklang/common/gopsutil/net"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/net"
 )
 
 var PageSize = uint64(os.Getpagesize())

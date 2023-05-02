@@ -7,8 +7,8 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"net/http"
 	"net/url"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type VBrowser struct {

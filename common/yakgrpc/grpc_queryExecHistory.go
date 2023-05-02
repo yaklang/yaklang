@@ -2,8 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryExecHistory(ctx context.Context, req *ypb.ExecHistoryRequest) (*ypb.ExecHistoryRecordResponse, error) {

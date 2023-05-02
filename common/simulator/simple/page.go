@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type VPage struct {

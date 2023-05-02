@@ -2,7 +2,7 @@ package yaktest
 
 import (
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 const code = `yakit.AutoInitYakit()

@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/token"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/token"
 )
 
 func (self *_parser) parseBlockStatement() *ast.BlockStatement {

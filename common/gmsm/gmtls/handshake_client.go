@@ -29,7 +29,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 type clientHandshakeState struct {

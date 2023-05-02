@@ -3,9 +3,9 @@ package node
 import (
 	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/log"
-	"yaklang/common/spec"
-	"yaklang/common/spec/health"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/spec"
+	"yaklang.io/yaklang/common/spec/health"
 )
 
 func (n *NodeBase) heartbeat() {

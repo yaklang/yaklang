@@ -3,12 +3,12 @@ package scannode
 import (
 	"context"
 	"encoding/json"
-	"yaklang/common/log"
-	"yaklang/common/mq"
-	"yaklang/common/node"
-	"yaklang/common/spec"
-	"yaklang/common/utils"
-	"yaklang/scannode/scanrpc"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/node"
+	"yaklang.io/yaklang/common/spec"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/scannode/scanrpc"
 )
 
 type ScanNode struct {

@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"yaklang/common/utils/bruteutils/grdp/glog"
-	"yaklang/common/utils/bruteutils/grdp/protocol/rfb"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/rfb"
 )
 
 type VncClient struct {

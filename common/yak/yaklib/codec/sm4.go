@@ -2,7 +2,7 @@ package codec
 
 import (
 	"github.com/pkg/errors"
-	"yaklang/common/gmsm/sm4"
+	"yaklang.io/yaklang/common/gmsm/sm4"
 )
 
 func sm4encBase(data interface{}, key []byte, iv []byte, sm4ordinary func(key, in []byte, encode bool, iv []byte) ([]byte, error)) ([]byte, error) {

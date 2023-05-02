@@ -7,9 +7,9 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"net/http"
 	"strings"
-	"yaklang/common/crawlerx/filter"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/filter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type SimpleTestCrawler struct {

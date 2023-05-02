@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 const (

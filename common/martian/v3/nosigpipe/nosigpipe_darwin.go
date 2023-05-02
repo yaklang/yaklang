@@ -7,7 +7,7 @@ import (
 	"net"
 	"syscall"
 
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 // IgnoreSIGPIPE prevents SIGPIPE from being raised on TCP sockets when remote hangs up

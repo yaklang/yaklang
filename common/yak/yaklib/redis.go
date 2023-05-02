@@ -5,8 +5,8 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type redisConfig struct {

@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 var PasswordTop25 = utils.PrettifyListFromStringSplited(`123456
 12345679

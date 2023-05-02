@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 // Roboter is the interface implemented by Robot that can send multiple types of messages.

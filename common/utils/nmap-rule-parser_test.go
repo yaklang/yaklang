@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 var (

@@ -12,11 +12,11 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang/common/gmsm/gmtls"
-	"yaklang/common/gmsm/sm2"
-	x509gm "yaklang/common/gmsm/x509"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"yaklang.io/yaklang/common/gmsm/sm2"
+	x509gm "yaklang.io/yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 import (

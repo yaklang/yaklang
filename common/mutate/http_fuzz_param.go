@@ -3,7 +3,7 @@ package mutate
 import (
 	"fmt"
 	"strings"
-	"yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/go-funk"
 )
 
 type httpParamPositionType string

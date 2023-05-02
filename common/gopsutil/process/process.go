@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 var (

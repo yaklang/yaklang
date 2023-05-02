@@ -8,14 +8,14 @@ import (
 	"os"
 	"sync"
 	"time"
-	"yaklang/common/filter"
-	"yaklang/common/hybridscan"
-	"yaklang/common/log"
-	"yaklang/common/synscan"
-	"yaklang/common/utils"
-	"yaklang/common/utils/hostsparser"
-	"yaklang/common/utils/pcapfix"
-	"yaklang/common/utils/pingutil"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/hybridscan"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/synscan"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/hostsparser"
+	"yaklang.io/yaklang/common/utils/pcapfix"
+	"yaklang.io/yaklang/common/utils/pingutil"
 )
 
 type _yakPortScanConfig struct {

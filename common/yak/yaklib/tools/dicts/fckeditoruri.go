@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 var fckEditorUri = `/admin/FCKeditor/editor/filemanager/browser/default/connectors/test.html
 /admin/FCKeditor/editor/filemanager/upload/test.html

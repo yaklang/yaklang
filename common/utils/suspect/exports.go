@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 var GuessExports = map[string]interface{}{

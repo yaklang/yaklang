@@ -4,8 +4,8 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4nasl/visitors"
+	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
+	"yaklang.io/yaklang/common/yak/antlr4nasl/visitors"
 )
 
 func TestCode(t *testing.T) {

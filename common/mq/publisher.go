@@ -6,7 +6,7 @@ import (
 	"github.com/streadway/amqp"
 	"sync"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type Publisher struct {

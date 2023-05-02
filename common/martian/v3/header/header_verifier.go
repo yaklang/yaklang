@@ -22,10 +22,10 @@ import (
 	"net/http"
 	"strings"
 
-	"yaklang/common/martian/v3"
-	"yaklang/common/martian/v3/parse"
-	"yaklang/common/martian/v3/proxyutil"
-	"yaklang/common/martian/v3/verify"
+	"yaklang.io/yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3/parse"
+	"yaklang.io/yaklang/common/martian/v3/proxyutil"
+	"yaklang.io/yaklang/common/martian/v3/verify"
 )
 
 const (

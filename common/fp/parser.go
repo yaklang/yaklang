@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"strings"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func ParseNmapServiceProbeToRuleMap(raw []byte) (result map[*NmapProbe][]*NmapMatch, err error) {

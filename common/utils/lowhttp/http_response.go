@@ -14,9 +14,9 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
-	"yaklang/common/log"
-	utils "yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	utils "yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var charsetRegexp = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)

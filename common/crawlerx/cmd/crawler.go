@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"os"
-	"yaklang/common/crawlerx"
-	"yaklang/common/crawlerx/cmd/sub"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/crawlerx"
+	"yaklang.io/yaklang/common/crawlerx/cmd/sub"
+	"yaklang.io/yaklang/common/log"
 )
 
 func main() {

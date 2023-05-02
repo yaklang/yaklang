@@ -2,7 +2,7 @@ package host
 
 import (
 	"encoding/json"
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 var invoke common.Invoker = common.Invoke{}

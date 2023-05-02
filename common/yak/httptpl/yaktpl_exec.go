@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 )
 
 type requestRaw struct {

@@ -1,7 +1,7 @@
 package luaast
 
 import (
-	lua "yaklang/common/yak/antlr4Lua/parser"
+	lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
 )
 
 func (l *LuaTranslator) VisitFunctionCall(raw lua.IFunctioncallContext) interface{} {

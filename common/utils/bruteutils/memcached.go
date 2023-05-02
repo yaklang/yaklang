@@ -3,8 +3,8 @@ package bruteutils
 import (
 	"bytes"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var memcachedAuth = &DefaultServiceAuthInfo{

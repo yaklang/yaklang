@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"yaklang/common/utils/bruteutils/grdp/protocol/nla"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 )
 
 func TestNTOWFv2(t *testing.T) {

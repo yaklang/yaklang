@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 var ca = []byte(`-----BEGIN CERTIFICATE-----

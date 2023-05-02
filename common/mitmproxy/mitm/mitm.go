@@ -31,7 +31,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 // MaxSerialNumber is the upper boundary that is used to create unique serial

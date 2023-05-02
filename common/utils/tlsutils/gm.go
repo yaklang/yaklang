@@ -8,13 +8,13 @@ import (
 	"github.com/pkg/errors"
 	"math/big"
 	"time"
-	"yaklang/common/gmsm/gmtls"
-	"yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"yaklang.io/yaklang/common/gmsm/sm2"
 
 	cryptorand "crypto/rand"
 )
 
-import "yaklang/common/gmsm/x509"
+import "yaklang.io/yaklang/common/gmsm/x509"
 
 func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (*gmtls.Config, error) {
 	p := x509.NewCertPool()

@@ -1,7 +1,7 @@
 package core
 
 import (
-	"yaklang/common/rpa/character"
+	"yaklang.io/yaklang/common/rpa/character"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/gobwas/glob"

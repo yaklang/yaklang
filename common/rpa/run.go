@@ -1,8 +1,8 @@
 package rpa
 
 import (
-	"yaklang/common/log"
-	"yaklang/common/rpa/core"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/rpa/core"
 )
 
 func Start(url string, opt ...core.ConfigOpt) (chan core.RequestIf, error) {

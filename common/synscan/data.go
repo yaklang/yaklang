@@ -2,7 +2,7 @@ package synscan
 
 import (
 	"fmt"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type SynScanResult struct {

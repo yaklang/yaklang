@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
-	"yaklang/common/yso"
+	"yaklang.io/yaklang/common/log"
+	utils2 "yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
+	"yaklang.io/yaklang/common/yso"
 )
 
 type T3Paylaod struct {

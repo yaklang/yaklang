@@ -6,14 +6,14 @@ import (
 	"github.com/lor00x/goldap/message"
 	"net"
 	"sync"
-	"yaklang/common/facades/ldap/ldapserver"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/facades/ldap/ldapserver"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 
 	//"palm/common/yak/yaklib"
 	"time"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type FacadeServer struct {

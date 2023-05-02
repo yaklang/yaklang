@@ -6,10 +6,10 @@ import (
 	"net"
 	"os"
 	"time"
-	"yaklang/common/fp"
-	"yaklang/common/hybridscan"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/hybridscan"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func main() {

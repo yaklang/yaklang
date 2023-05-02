@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/streadway/amqp"
-	"yaklang/common/log"
-	"yaklang/common/spec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/spec"
 )
 
 func (n *NodeBase) Notify(key string, msg *spec.Message) {

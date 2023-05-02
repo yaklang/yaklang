@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func fqdn(r string) string {

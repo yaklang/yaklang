@@ -2,8 +2,8 @@ package yaklib
 
 import (
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/dnsutil"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/dnsutil"
 )
 
 type _dnsConfig struct {

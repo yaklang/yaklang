@@ -10,10 +10,10 @@ import (
 	"path"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/subdomain"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/subdomain"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func contentToTmpFile(raw []byte) (string, error) {

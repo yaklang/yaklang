@@ -5,7 +5,7 @@ import (
 	"github.com/kataras/golog"
 	"os"
 	"path/filepath"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 
 	"strings"
 	"sync"

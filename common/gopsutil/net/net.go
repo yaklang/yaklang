@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 var invoke common.Invoker = common.Invoke{}

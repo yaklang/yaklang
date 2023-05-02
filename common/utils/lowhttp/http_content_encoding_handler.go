@@ -8,8 +8,8 @@ import (
 	"github.com/andybalholm/brotli"
 	"io"
 	"io/ioutil"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func ContentEncodingDecode(contentEncoding string, bodyRaw []byte) (finalResult []byte, fixed bool) {

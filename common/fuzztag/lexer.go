@@ -2,7 +2,7 @@ package fuzztag
 
 import (
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type FuzzTagLexer struct {

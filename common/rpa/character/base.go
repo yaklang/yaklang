@@ -3,7 +3,7 @@ package character
 import (
 	"regexp"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func String2Vec(str string) []interface{} {

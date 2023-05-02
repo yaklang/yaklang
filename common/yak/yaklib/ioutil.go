@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var IoExports = map[string]interface{}{

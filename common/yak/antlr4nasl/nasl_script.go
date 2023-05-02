@@ -2,8 +2,8 @@ package antlr4nasl
 
 import (
 	"encoding/json"
-	"yaklang/common/consts"
-	"yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
 )
 
 type NaslScriptInfo struct {

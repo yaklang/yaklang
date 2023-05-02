@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/parser"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/parser"
 )
 
 type _global struct {

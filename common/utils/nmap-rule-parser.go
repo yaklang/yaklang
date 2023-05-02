@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"regexp"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type ProtoType string

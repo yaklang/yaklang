@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/spacengine/hunter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/spacengine/hunter"
 )
 
 func resultToSpacengineList(filter string, h *hunter.HunterResult) []*NetSpaceEngineResult {

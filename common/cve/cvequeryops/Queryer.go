@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/log"
 )
 
 type CVEOption func(info *CVEQueryInfo)

@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak/yaklang"
 )
 
 type PalmScriptEngineHelper struct {

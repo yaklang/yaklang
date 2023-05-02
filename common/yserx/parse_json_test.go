@@ -5,8 +5,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseJavaSerialized_1(t *testing.T) {

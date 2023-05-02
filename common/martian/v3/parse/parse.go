@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3"
 )
 
 // ModifierType is the HTTP message type.

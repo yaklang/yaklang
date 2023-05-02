@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/sm2"
 )
 
 // pickSignatureAlgorithm selects a signature algorithm that is compatible with

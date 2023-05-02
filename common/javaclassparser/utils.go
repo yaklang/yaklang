@@ -5,8 +5,8 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"strings"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var ValueTypeError = utils.Error("error value type")

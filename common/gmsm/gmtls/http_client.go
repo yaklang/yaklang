@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 // NewHTTPSClient 创建国密HTTPS客户端，只对服务端进行身份认证（验证服务端证书）。

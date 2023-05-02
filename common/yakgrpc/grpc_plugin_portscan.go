@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"fmt"
 	"strings"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type portScanParam struct {

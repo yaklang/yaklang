@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"time"
-	gopsnet "yaklang/common/gopsutil/net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	gopsnet "yaklang.io/yaklang/common/gopsutil/net"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type NetConn struct {

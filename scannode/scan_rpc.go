@@ -11,14 +11,14 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	"yaklang/common/crep"
-	"yaklang/common/fp"
-	"yaklang/common/log"
-	"yaklang/common/mq"
-	"yaklang/common/spec"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklang"
-	"yaklang/scannode/scanrpc"
+	"yaklang.io/yaklang/common/crep"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/spec"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/scannode/scanrpc"
 )
 
 type TaskManager struct {

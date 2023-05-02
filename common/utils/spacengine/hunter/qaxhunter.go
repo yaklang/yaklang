@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type HunterResult struct {

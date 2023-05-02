@@ -8,7 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type cliExtraParams struct {

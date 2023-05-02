@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"yaklang/common/log"
-	"yaklang/common/mutate"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mutate"
 )
 
 var (

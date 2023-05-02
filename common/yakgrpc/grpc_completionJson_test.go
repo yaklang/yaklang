@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
-	_ "yaklang/common/yak"
-	"yaklang/common/yakgrpc/ypb"
+	_ "yaklang.io/yaklang/common/yak"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_GetYakitCompletionRaw(t *testing.T) {

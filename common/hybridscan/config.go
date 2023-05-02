@@ -4,8 +4,8 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/pkg/errors"
 	"time"
-	"yaklang/common/fp"
-	"yaklang/common/synscan"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/synscan"
 )
 
 type Config struct {

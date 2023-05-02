@@ -11,11 +11,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"yaklang/common/consts"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/ziputil"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/cve/cveresources"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/ziputil"
 )
 
 func DownloadCWE() (string, error) {

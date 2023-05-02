@@ -1,7 +1,7 @@
 package suricata
 
 import (
-	"yaklang/common/suricata/parser"
+	"yaklang.io/yaklang/common/suricata/parser"
 )
 
 type AddressRule struct {

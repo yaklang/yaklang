@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"yaklang/common/log"
-	"yaklang/common/martian/v3"
-	"yaklang/common/martian/v3/parse"
-	"yaklang/common/martian/v3/proxyutil"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3/parse"
+	"yaklang.io/yaklang/common/martian/v3/proxyutil"
 )
 
 func init() {

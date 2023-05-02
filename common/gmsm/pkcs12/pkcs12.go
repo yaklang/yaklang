@@ -21,8 +21,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
-	"yaklang/common/gmsm/sm2"
-	x "yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/sm2"
+	x "yaklang.io/yaklang/common/gmsm/x509"
 )
 
 var (

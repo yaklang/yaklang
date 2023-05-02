@@ -2,7 +2,7 @@ package yaktest
 
 import (
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestMisc_JS(t *testing.T) {

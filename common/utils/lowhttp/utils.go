@@ -18,9 +18,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/filter"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 
 	"golang.org/x/net/http/httpguts"
 )

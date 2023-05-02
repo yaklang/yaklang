@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"yaklang/common/javascript/otto/token"
+	"yaklang.io/yaklang/common/javascript/otto/token"
 )
 
 func (self *_runtime) cmpl_evaluate_nodeStatement(node _nodeStatement) Value {

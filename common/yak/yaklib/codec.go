@@ -1,9 +1,9 @@
 package yaklib
 
 import (
-	"yaklang/common/gmsm/sm4"
-	"yaklang/common/utils/tlsutils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/gmsm/sm4"
+	"yaklang.io/yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var CodecExports = map[string]interface{}{

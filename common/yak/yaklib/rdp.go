@@ -1,8 +1,8 @@
 package yaklib
 
 import (
-	"yaklang/common/utils/bruteutils"
-	"yaklang/common/utils/extrafp"
+	"yaklang.io/yaklang/common/utils/bruteutils"
+	"yaklang.io/yaklang/common/utils/extrafp"
 )
 
 var RdpExports = map[string]interface{}{

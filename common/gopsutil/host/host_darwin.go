@@ -17,8 +17,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"yaklang/common/gopsutil/internal/common"
-	"yaklang/common/gopsutil/process"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/process"
 )
 
 // from utmpx.h

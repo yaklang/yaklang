@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Config struct {

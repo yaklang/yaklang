@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	nasl "yaklang.io/yaklang/common/yak/antlr4nasl/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (c *Compiler) VisitExpressionSequence(i nasl.IExpressionSequenceContext) {

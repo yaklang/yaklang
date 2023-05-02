@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"yaklang/common/filter"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 var singleWordDomainSuffix = filter.NewFilter()

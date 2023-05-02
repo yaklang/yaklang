@@ -6,7 +6,7 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/types"
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func Snapshot(s string, timeout time.Duration) ([]byte, *types.Type, error) {

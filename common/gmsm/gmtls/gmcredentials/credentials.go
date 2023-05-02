@@ -24,8 +24,8 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/credentials"
-	"yaklang/common/gmsm/gmtls"
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/gmtls"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 var (

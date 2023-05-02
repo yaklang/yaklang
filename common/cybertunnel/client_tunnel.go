@@ -7,10 +7,10 @@ import (
 	"io"
 	"net"
 	"sync"
-	"yaklang/common/cybertunnel/ctxio"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cybertunnel/ctxio"
+	"yaklang.io/yaklang/common/cybertunnel/tpb"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var tunnelContexts = new(sync.Map)

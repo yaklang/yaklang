@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/mixer"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/mixer"
 )
 
 func TestBruteUtils(t *testing.T) {

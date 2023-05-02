@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"github.com/urfave/cli"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 func main() {

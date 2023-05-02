@@ -16,13 +16,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"yaklang/common/fp"
-	"yaklang/common/fp/cmd/scanfpcmd"
-	"yaklang/common/fp/webfingerprint"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/netutil"
-	"yaklang/common/yak/yaklib/tools"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/fp/cmd/scanfpcmd"
+	"yaklang.io/yaklang/common/fp/webfingerprint"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/netutil"
+	"yaklang.io/yaklang/common/yak/yaklib/tools"
 )
 
 var (

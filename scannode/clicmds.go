@@ -4,10 +4,10 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"path/filepath"
-	"yaklang/common/utils"
-	"yaklang/common/yak"
-	"yaklang/common/yak/antlr4yak"
-	"yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak"
+	"yaklang.io/yaklang/common/yak/antlr4yak"
+	"yaklang.io/yaklang/common/yak/yaklang"
 )
 
 var DistYakCommand = cli.Command{

@@ -4,7 +4,7 @@ import (
 	"golang.org/x/net/html"
 	"strings"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestHtml(t *testing.T) {

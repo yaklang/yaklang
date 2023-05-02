@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"strings"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	utils2 "yaklang.io/yaklang/common/utils"
 )
 
 func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result *MatchResult, err error) {

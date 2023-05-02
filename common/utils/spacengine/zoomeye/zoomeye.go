@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type ZoomeyeResult struct {

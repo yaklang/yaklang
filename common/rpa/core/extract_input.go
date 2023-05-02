@@ -2,9 +2,9 @@ package core
 
 import (
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/rpa/captcha"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/rpa/captcha"
+	"yaklang.io/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/lunixbochs/struc"
-	"yaklang/common/utils/bruteutils/grdp/protocol/nla"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 )
 
 func TestNewNegotiateMessage(t *testing.T) {

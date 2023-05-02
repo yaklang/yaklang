@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/go-funk"
 )
 
 var buildMethodsArray = map[string]interface{}{}

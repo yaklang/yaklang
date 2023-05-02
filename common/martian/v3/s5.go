@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"yaklang/common/cybertunnel/ctxio"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/cybertunnel/ctxio"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type S5Config struct {

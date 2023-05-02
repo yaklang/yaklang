@@ -11,12 +11,12 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/crep"
-	"yaklang/common/cybertunnel/ctxio"
-	"yaklang/common/log"
-	"yaklang/common/martian/v3/mitm"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/crep"
+	"yaklang.io/yaklang/common/cybertunnel/ctxio"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/martian/v3/mitm"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 type S5Config struct {

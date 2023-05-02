@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils/mixer"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/mixer"
 )
 
 type ExecutableNode interface {

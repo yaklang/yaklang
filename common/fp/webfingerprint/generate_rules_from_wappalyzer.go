@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	log "yaklang/common/log"
+	log "yaklang.io/yaklang/common/log"
 )
 
 func check(e error) {

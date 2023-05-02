@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	amqp "github.com/streadway/amqp"
-	mq "yaklang/common/mq"
-	utils "yaklang/common/utils"
+	mq "yaklang.io/yaklang/common/mq"
+	utils "yaklang.io/yaklang/common/utils"
 )
 
 type SCAN_StartScriptRequest struct {

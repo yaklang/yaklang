@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"sync"
-	"yaklang/common/consts"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 var (

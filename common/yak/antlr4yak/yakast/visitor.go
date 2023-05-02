@@ -3,11 +3,11 @@ package yakast
 import (
 	"bytes"
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	yak "yaklang/common/yak/antlr4yak/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
-	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	yak "yaklang.io/yaklang/common/yak/antlr4yak/parser"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )

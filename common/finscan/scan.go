@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func (s *Scanner) OnSubmitTask(i func(addr string, port int)) {

@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/netutil"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/netutil"
 )
 
 type Config struct {

@@ -1,6 +1,6 @@
 package luaast
 
-import lua "yaklang/common/yak/antlr4Lua/parser"
+import lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
 
 // VisitLabel save label to a dedicated label table just like symbolTable with no op
 func (l *LuaTranslator) VisitLabel(raw lua.ILabelContext) interface{} {

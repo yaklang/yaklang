@@ -8,12 +8,12 @@ import (
 	"os"
 	"sync"
 	"time"
-	"yaklang/common/fp"
-	"yaklang/common/fp/webfingerprint"
-	"yaklang/common/hybridscan"
-	"yaklang/common/log"
-	"yaklang/common/synscan"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/fp/webfingerprint"
+	"yaklang.io/yaklang/common/hybridscan"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/synscan"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var SynScanCmd = cli.Command{

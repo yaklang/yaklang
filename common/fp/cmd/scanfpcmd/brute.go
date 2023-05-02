@@ -5,9 +5,9 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bruteutils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bruteutils"
 )
 
 var BruteUtil = cli.Command{

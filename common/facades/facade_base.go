@@ -3,7 +3,7 @@ package facades
 import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type FacadeConnectionHandler func(conn *utils.BufferedPeekableConn) error

@@ -3,11 +3,11 @@ package yakgrpc
 import (
 	"io/ioutil"
 	"os"
-	"yaklang/common/consts"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 const __CODE_EXEC_YAKIT_PLUGINS_BY_YAK_SCRIPT_FILTER = `loglevel("error")

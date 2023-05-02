@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yserx"
 )
 
 var verTest = `[

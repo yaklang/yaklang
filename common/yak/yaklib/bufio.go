@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"io"
 	"reflect"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func _newReader(i interface{}) (*bufio.Reader, error) {

@@ -2,8 +2,8 @@ package javaclassparser
 
 import (
 	"io/ioutil"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type ClassObject struct {

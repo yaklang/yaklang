@@ -3,7 +3,7 @@ package detect
 import (
 	"regexp"
 	"strings"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 const AllDomain = 1

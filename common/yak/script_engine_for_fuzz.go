@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklang"
-	yaklangspec "yaklang/common/yak/yaklang/spec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	yaklangspec "yaklang.io/yaklang/common/yak/yaklang/spec"
 )
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)

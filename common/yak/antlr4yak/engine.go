@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/antlr4yak/yakast"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakast"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/davecgh/go-spew/spew"
 )

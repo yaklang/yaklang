@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestExecuteWithRam(t *testing.T) {

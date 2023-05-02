@@ -12,11 +12,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
-	utils2 "yaklang/common/yak/antlr4nasl/lib"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
+	utils2 "yaklang.io/yaklang/common/yak/antlr4nasl/lib"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 var empty = yakvm.NewValue("empty", nil, "empty")

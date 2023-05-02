@@ -1,8 +1,8 @@
 package otto
 
 import (
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/file"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/file"
 )
 
 type _compiler struct {

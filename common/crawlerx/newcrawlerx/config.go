@@ -8,9 +8,9 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"net/url"
 	"regexp"
-	"yaklang/common/crawlerx/filter"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/filter"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type NewBrowserInfo struct {

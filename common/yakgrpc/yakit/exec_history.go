@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bizhelper"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bizhelper"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type ExecHistory struct {

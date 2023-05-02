@@ -1,8 +1,8 @@
 package crawlerx
 
 import (
-	"yaklang/common/crawlerx/core"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/core"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type Crawler struct {

@@ -5,7 +5,7 @@ package newcrawlerx
 import (
 	"github.com/go-rod/rod"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func (starter *BrowserStarter) vueClick(doGetUrl func(string, string) error) func(*rod.Page, string, string) error {

@@ -2,9 +2,9 @@ package antlr4Lua
 
 import (
 	"context"
-	"yaklang/common/yak/antlr4Lua/infrastructure"
-	"yaklang/common/yak/antlr4Lua/luaast"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4Lua/infrastructure"
+	"yaklang.io/yaklang/common/yak/antlr4Lua/luaast"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type Engine struct {

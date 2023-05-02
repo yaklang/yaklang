@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type RssFeed struct {

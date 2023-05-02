@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 // https://docs.oracle.com/javase/7/docs/platform/serialization/spec/protocol.html

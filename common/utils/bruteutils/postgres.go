@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func postgresqlUnAuthCheck(Host string, Port int) (bool, error) {

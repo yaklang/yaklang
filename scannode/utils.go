@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"yaklang/common/cybertunnel"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/cybertunnel"
+	"yaklang.io/yaklang/common/log"
 )
 
 type IpEcho struct {

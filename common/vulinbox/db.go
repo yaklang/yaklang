@@ -3,7 +3,7 @@ package vulinbox
 import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
-	"yaklang/common/consts"
+	"yaklang.io/yaklang/common/consts"
 )
 
 type dbm struct {

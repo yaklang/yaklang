@@ -5,9 +5,9 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/tlsutils"
 )
 
 var HttpServeExports = map[string]interface{}{

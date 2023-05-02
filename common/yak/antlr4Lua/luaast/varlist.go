@@ -1,6 +1,6 @@
 package luaast
 
-import lua "yaklang/common/yak/antlr4Lua/parser"
+import lua "yaklang.io/yaklang/common/yak/antlr4Lua/parser"
 
 func (l *LuaTranslator) VisitVarList(isAssign bool, raw lua.IVarlistContext) interface{} {
 	if l == nil || raw == nil {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 type ExecFlag int

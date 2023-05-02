@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"yaklang/common/utils"
-	"yaklang/common/utils/bruteutils"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/bruteutils"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 const startBruteScript = `yakit.AutoInitYakit()

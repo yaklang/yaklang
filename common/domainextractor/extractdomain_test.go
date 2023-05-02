@@ -5,7 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestTryDecode(t *testing.T) {

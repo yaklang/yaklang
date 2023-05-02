@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"testing"
-	"yaklang/common/yak/antlr4Lua"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4Lua"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func init() {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/sm2"
 )
 
 func TestPKCS7SM2(t *testing.T) {

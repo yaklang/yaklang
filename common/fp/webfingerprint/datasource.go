@@ -3,9 +3,9 @@ package webfingerprint
 import (
 	"github.com/pkg/errors"
 	"path"
-	"yaklang/common/bindata"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/bindata"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func LoadDefaultDataSource() ([]*WebRule, error) {

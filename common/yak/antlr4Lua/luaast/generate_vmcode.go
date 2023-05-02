@@ -2,7 +2,7 @@ package luaast
 
 import (
 	"fmt"
-	"yaklang/common/yak/antlr4yak/yakvm"
+	"yaklang.io/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 const GLOBAL_ASSIGN_UNARY = 0

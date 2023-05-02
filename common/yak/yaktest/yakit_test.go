@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestMisc_YAKIT(t *testing.T) {

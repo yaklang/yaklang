@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils/arptable"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils/arptable"
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/google/gopacket"
@@ -19,7 +19,7 @@ import (
 	"github.com/mdlayher/arp"
 	"github.com/pkg/errors"
 
-	_ "yaklang/common/utils/arptable"
+	_ "yaklang.io/yaklang/common/utils/arptable"
 )
 
 func Arp(ifaceName string, target string) (net.HardwareAddr, error) {

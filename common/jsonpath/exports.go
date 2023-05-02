@@ -3,8 +3,8 @@ package jsonpath
 import (
 	"encoding/json"
 	"reflect"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func ReplaceAll(j interface{}, jpath string, replaceValue interface{}) map[string]interface{} {

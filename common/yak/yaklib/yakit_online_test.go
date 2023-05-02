@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
-	"yaklang/common/consts"
+	"yaklang.io/yaklang/common/consts"
 )
 
 func TestNewOnlineClient(t *testing.T) {

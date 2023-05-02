@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 
-	"yaklang/common/utils/bruteutils/grdp/glog"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/glog"
 
 	"github.com/lunixbochs/struc"
-	"yaklang/common/utils/bruteutils/grdp/core"
-	"yaklang/common/utils/bruteutils/grdp/protocol/t125/gcc"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/protocol/t125/gcc"
 )
 
 type CapsType uint16

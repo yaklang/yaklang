@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-	"yaklang/common/go-funk"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/go-funk"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {

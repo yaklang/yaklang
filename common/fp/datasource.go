@@ -4,10 +4,10 @@ import (
 	"github.com/pkg/errors"
 	"path"
 	"sync"
-	"yaklang/common/bindata"
-	"yaklang/common/fp/webfingerprint"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/bindata"
+	"yaklang.io/yaklang/common/fp/webfingerprint"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var (

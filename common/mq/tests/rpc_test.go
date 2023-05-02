@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
-	"yaklang/common/mq"
-	"yaklang/common/thirdpartyservices"
+	"yaklang.io/yaklang/common/mq"
+	"yaklang.io/yaklang/common/thirdpartyservices"
 )
 
 type HealthInfo struct {

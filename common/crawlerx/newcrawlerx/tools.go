@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func getAttribute(element *rod.Element, attribute string) (string, error) {

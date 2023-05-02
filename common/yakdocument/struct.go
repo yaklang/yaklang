@@ -6,8 +6,8 @@ import (
 	"github.com/dave/jennifer/jen"
 	"reflect"
 	"sync"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type StructHelper struct {

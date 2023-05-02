@@ -7,14 +7,14 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"strings"
 	"testing"
-	"yaklang/common/bindata"
-	"yaklang/common/crawler"
-	"yaklang/common/log"
-	"yaklang/common/yak"
-	"yaklang/common/yak/yaklang"
-	"yaklang/common/yak/yaklib"
-	"yaklang/common/yakgrpc/yakit"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/bindata"
+	"yaklang.io/yaklang/common/crawler"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	"yaklang.io/yaklang/common/yak/yaklib"
+	"yaklang.io/yaklang/common/yakgrpc/yakit"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 type vulBoxTester struct {

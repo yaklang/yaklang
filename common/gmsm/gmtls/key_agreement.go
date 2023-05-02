@@ -25,7 +25,7 @@ import (
 	"io"
 	"math/big"
 
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/x509"
 
 	"golang.org/x/crypto/curve25519"
 )

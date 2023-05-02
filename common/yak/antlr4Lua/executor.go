@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"yaklang/common/yak/antlr4Lua/luaast"
+	"yaklang.io/yaklang/common/yak/antlr4Lua/luaast"
 )
 
 type LuaSnippetExecutor struct {

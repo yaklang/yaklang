@@ -40,9 +40,9 @@ import (
 	"io/ioutil"
 
 	"gopkg.in/sourcemap.v1"
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/file"
-	"yaklang/common/javascript/otto/token"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/file"
+	"yaklang.io/yaklang/common/javascript/otto/token"
 )
 
 // A Mode value is a set of flags (or 0). They control optional parser functionality.

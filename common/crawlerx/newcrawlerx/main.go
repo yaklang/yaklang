@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"yaklang/common/crawlerx/filter"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/crawlerx/filter"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type CrawlerCore struct {

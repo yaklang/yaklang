@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
-	"yaklang/common/yakgrpc/ypb"
+	"yaklang.io/yaklang/common/yakgrpc/ypb"
 )
 
 //func TestServer_Pipe(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"yaklang/common/consts"
-	"yaklang/common/geo"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/ziputil"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/geo"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/ziputil"
 )
 
 /*

@@ -8,8 +8,8 @@ import (
 	"net"
 	"reflect"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func _floatSeconds(f float64) time.Duration {

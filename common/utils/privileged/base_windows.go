@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func isPrivileged() bool {

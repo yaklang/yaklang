@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"time"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var TimeExports = map[string]interface{}{

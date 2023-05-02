@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"yaklang/common/martian/v3"
-	"yaklang/common/martian/v3/parse"
+	"yaklang.io/yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3/parse"
 )
 
 // ValueRegexFilter executes resmod and reqmod when the header

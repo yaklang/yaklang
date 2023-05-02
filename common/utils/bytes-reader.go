@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"yaklang/common/cybertunnel/ctxio"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/cybertunnel/ctxio"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func CopyReader(r io.ReadCloser) (io.ReadCloser, io.ReadCloser, error) {

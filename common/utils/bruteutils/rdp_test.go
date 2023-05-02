@@ -2,7 +2,7 @@ package bruteutils
 
 import (
 	"testing"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 
 	"github.com/icodeface/grdp"
 	"github.com/icodeface/grdp/glog"

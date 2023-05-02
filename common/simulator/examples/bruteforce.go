@@ -3,10 +3,10 @@ package examples
 import (
 	"fmt"
 	"github.com/go-rod/rod/lib/proto"
-	"yaklang/common/log"
-	"yaklang/common/simulator/core"
-	"yaklang/common/simulator/extend"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/simulator/core"
+	"yaklang.io/yaklang/common/simulator/extend"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func BruteForce(urlStr string) {

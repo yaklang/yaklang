@@ -5,7 +5,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"strings"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 type SqliteManager struct {

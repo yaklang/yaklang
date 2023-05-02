@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"yaklang/common/gmsm/x509"
+	"yaklang.io/yaklang/common/gmsm/x509"
 )
 
 var _ExpectRawContent = []byte("Hello World!")

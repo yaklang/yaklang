@@ -2,7 +2,7 @@ package lowhttp
 
 import (
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestCurlToHTTPRequest(t *testing.T) {

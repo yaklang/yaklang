@@ -1,6 +1,6 @@
 package dicts
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 var phpUri = `/syssite/install/ini_setup.php
 /admin888/admin.php

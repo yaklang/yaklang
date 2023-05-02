@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"yaklang/common/utils/bruteutils/grdp/core"
+	"yaklang.io/yaklang/common/utils/bruteutils/grdp/core"
 )
 
 func TestWriteUInt16LE(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"net"
 	"testing"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestNewScanner(t *testing.T) {

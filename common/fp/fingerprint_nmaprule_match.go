@@ -7,8 +7,8 @@ import (
 	"net"
 	"sync"
 	"time"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	utils2 "yaklang.io/yaklang/common/utils"
 )
 
 func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout time.Duration) (net.Conn, error) {

@@ -7,7 +7,7 @@ import (
 	"net/http/httputil"
 	"reflect"
 	"strings"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 
 	"github.com/pkg/errors"
 )

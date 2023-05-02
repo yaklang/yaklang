@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"yaklang/common/fp"
-	"yaklang/common/log"
-	"yaklang/common/synscan"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/synscan"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type YakitMessageHandleFunc func(i interface{}) error

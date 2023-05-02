@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	utils2 "yaklang/common/utils"
+	utils2 "yaklang.io/yaklang/common/utils"
 )
 
 func TestStatusText_Read(t *testing.T) {

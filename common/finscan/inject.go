@@ -4,8 +4,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/pkg/errors"
 	"time"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func (s *Scanner) sleepRateLimit() {

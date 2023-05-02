@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"yaklang/common/gmsm/sm2"
+	"yaklang.io/yaklang/common/gmsm/sm2"
 )
 
 func TestX509(t *testing.T) {

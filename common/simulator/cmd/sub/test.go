@@ -2,7 +2,7 @@ package sub
 
 import (
 	"github.com/urfave/cli"
-	test2 "yaklang/common/simulator/test"
+	test2 "yaklang.io/yaklang/common/simulator/test"
 )
 
 var TestModule = cli.Command{

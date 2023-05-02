@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"yaklang/common/martian/v3"
+	"yaklang.io/yaklang/common/martian/v3"
 )
 
 const viaLoopKey = "via.LoopDetection"

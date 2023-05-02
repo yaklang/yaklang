@@ -2,8 +2,8 @@ package yak
 
 import (
 	"testing"
-	"yaklang/common/yak/yaklang"
-	yaklangspec "yaklang/common/yak/yaklang/spec"
+	"yaklang.io/yaklang/common/yak/yaklang"
+	yaklangspec "yaklang.io/yaklang/common/yak/yaklang/spec"
 )
 
 func TestCounter(t *testing.T) {

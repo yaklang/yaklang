@@ -4,7 +4,7 @@ import (
 	"context"
 	uuid "github.com/satori/go.uuid"
 	"sync"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var (

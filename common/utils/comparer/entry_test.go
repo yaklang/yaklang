@@ -2,7 +2,7 @@ package comparer
 
 import (
 	"testing"
-	"yaklang/common/mutate"
+	"yaklang.io/yaklang/common/mutate"
 )
 
 func TestCompareHTTPResponseRaw(t *testing.T) {

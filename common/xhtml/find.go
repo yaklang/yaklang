@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"golang.org/x/net/html"
 	"strings"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 type MatchType string

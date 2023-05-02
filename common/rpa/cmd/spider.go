@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"yaklang/common/rpa"
-	"yaklang/common/rpa/cmd/semi"
-	"yaklang/common/rpa/core"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/rpa"
+	"yaklang.io/yaklang/common/rpa/cmd/semi"
+	"yaklang.io/yaklang/common/rpa/core"
+	"yaklang.io/yaklang/common/utils"
 
 	"github.com/urfave/cli"
 )

@@ -3,7 +3,7 @@ package permutil
 import (
 	"os"
 	"testing"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func TestIsFileUnreadAndUnWritable(t *testing.T) {

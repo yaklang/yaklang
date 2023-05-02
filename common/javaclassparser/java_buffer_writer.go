@@ -2,7 +2,7 @@ package javaclassparser
 
 import (
 	"bytes"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 type JavaBufferWriter struct {

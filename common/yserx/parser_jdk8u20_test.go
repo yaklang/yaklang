@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
-	"yaklang/common/yak/yaklib/codec"
+	"yaklang.io/yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseJavaSerializedEx(t *testing.T) {

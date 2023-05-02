@@ -5,9 +5,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"testing"
-	"yaklang/common/chaosmaker"
-	"yaklang/common/consts"
-	"yaklang/common/suricata"
+	"yaklang.io/yaklang/common/chaosmaker"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/suricata"
 )
 
 func init() {

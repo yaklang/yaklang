@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 func DumpReturnTypes(types []reflect.Type) string {

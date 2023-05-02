@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"yaklang/common/javascript/otto/ast"
-	"yaklang/common/javascript/otto/file"
-	"yaklang/common/javascript/otto/token"
+	"yaklang.io/yaklang/common/javascript/otto/ast"
+	"yaklang.io/yaklang/common/javascript/otto/file"
+	"yaklang.io/yaklang/common/javascript/otto/token"
 )
 
 var trueLiteral = &_nodeLiteral{value: toValue_bool(true)}

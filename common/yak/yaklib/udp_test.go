@@ -4,7 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
-	"yaklang/common/log"
+	"yaklang.io/yaklang/common/log"
 )
 
 func TestUdpConn_Send(t *testing.T) {

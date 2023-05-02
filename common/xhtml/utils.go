@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 	"unsafe"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils"
 )
 
 var fillings = []string{"%09", "%0a", "%0d", "/+/"}

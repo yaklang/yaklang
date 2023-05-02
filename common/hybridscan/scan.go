@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"net"
-	"yaklang/common/filter"
-	"yaklang/common/fp"
-	"yaklang/common/log"
-	"yaklang/common/utils"
+	"yaklang.io/yaklang/common/filter"
+	"yaklang.io/yaklang/common/fp"
+	"yaklang.io/yaklang/common/log"
+	"yaklang.io/yaklang/common/utils"
 )
 
 //func (h *HyperScanCenter) SyncScan(ctx context.Context, target, port string, shuffle bool) {

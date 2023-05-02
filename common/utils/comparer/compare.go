@@ -1,6 +1,6 @@
 package comparer
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 /*
 

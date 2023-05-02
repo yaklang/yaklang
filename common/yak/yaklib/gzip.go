@@ -1,6 +1,6 @@
 package yaklib
 
-import "yaklang/common/utils"
+import "yaklang.io/yaklang/common/utils"
 
 var GzipExports = map[string]interface{}{
 	"Compress":   utils.GzipCompress,

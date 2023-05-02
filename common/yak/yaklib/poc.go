@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	"yaklang/common/consts"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
+	"yaklang.io/yaklang/common/consts"
+	"yaklang.io/yaklang/common/mutate"
+	"yaklang.io/yaklang/common/utils"
+	"yaklang.io/yaklang/common/utils/lowhttp"
 
 	"github.com/pkg/errors"
 

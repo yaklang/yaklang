@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-	"yaklang/common/gopsutil/internal/common"
+	"yaklang.io/yaklang/common/gopsutil/internal/common"
 )
 
 type LSB struct {
