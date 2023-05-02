@@ -13,7 +13,7 @@ jobs:
         os:
           - windows-latest
           - macos-latest
-          - ubuntu-latest
+          - ubuntu-20.04
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.19
+          go-version: 1.20.3
       #      - name: Download Npcap SDK (Windows)
       #        run: |
       #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
@@ -62,17 +62,12 @@ jobs:
           go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
         if: runner.os == 'Windows'
 
-      - name: Build For Windows(i386)
-        run: |
-          GOARCH=386 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_386.exe -v common/yak/cmd/yak.go
-        if: runner.os == 'Windows'
-
       - name: Upload Artifacts Windows(x86)
         uses: actions/upload-artifact@v2
         if: runner.os == 'Windows'
         with:
-          name: yak_windows_386.exe
-          path: ./yak_windows_386.exe
+          name: yak_windows_amd64.exe
+          path: ./yak_windows_amd64.exe
 
       - name: Upload Artifacts Windows
         uses: actions/upload-artifact@v2
