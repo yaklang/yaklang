@@ -1,18 +1,21 @@
 package xlic
 
 import (
+	"embed"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/license"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"sync"
 
 	"github.com/jinzhu/gorm"
 )
 
-var EncPub = `
-`
+//go:embed pub.gzip
+var encPub embed.FS
 
-var DecPri = ``
+//go:embed pri.gzip
+var decPri embed.FS
 
 var (
 	initOnce sync.Once
@@ -21,7 +24,28 @@ var (
 
 func initMachine() {
 	initOnce.Do(func() {
-		Machine = license.NewMachine([]byte(EncPub), []byte(DecPri))
+		var (
+			encBytes, decBytes []byte
+		)
+		raw, _ := encPub.ReadFile("pub.gzip")
+		if len(raw) > 0 {
+			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
+				encBytes = raw
+			}
+		}
+
+		raw, _ = decPri.ReadFile("pri.gzip")
+		if len(raw) > 0 {
+			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
+				decBytes = raw
+			}
+		}
+
+		if len(encBytes) <= 0 || len(decBytes) <= 0 {
+			decBytes, encBytes, _ = tlsutils.GeneratePrivateAndPublicKeyPEM()
+		}
+
+		Machine = license.NewMachine(encBytes, decBytes)
 	})
 }
 
@@ -78,7 +102,7 @@ func GetLicenseRequest() (string, error) {
 
 func RemoveLicense(db *gorm.DB) {
 	if db := db.Model(&License{}).Delete(&License{}); db.Error != nil {
-		log.Error("remove license error: %s", db.Error)
+		log.Errorf("remove license error: %s", db.Error)
 		return
 	}
 }
