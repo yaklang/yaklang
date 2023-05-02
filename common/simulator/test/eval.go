@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/simulator/core"
 	"yaklang/common/simulator/examples"
 	"yaklang/common/simulator/extend"
-	"time"
 )
 
 func EvalTest() {

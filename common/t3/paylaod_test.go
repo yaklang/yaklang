@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	utils2 "yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
 	"testing"
 	"time"
+	utils2 "yaklang/common/utils"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func TestGenPyaload(t *testing.T) {

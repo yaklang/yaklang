@@ -3,12 +3,12 @@ package systemproxy
 import (
 	"fmt"
 	"os/exec"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 /*

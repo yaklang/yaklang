@@ -1,8 +1,8 @@
 package cvemodels
 
 import (
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 func TestVersionTree(t *testing.T) {

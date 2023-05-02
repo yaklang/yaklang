@@ -1,8 +1,8 @@
 package bruteutils
 
 import (
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 
 	"github.com/icodeface/grdp"
 	"github.com/icodeface/grdp/glog"

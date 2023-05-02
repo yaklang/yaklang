@@ -6,9 +6,9 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/assert"
 	"net"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestNewScanner(t *testing.T) {

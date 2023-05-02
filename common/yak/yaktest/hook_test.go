@@ -2,10 +2,10 @@ package yaktest
 
 import (
 	"fmt"
+	"testing"
 	"yaklang/common/consts"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/yakit"
-	"testing"
 )
 
 func TestMisc_Hook(t *testing.T) {

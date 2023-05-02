@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"runtime"
 	"strconv"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func LinuxPKExecSudo(cmd string, opt ...SudoOption) error {

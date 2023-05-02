@@ -54,13 +54,14 @@ func NewFilter(name, value string) *Filter {
 // filterFromJSON builds a header.Filter from JSON.
 //
 // Example JSON:
-// {
-//   "scope": ["request", "result"],
-//   "name": "Martian-Testing",
-//   "value": "true",
-//   "modifier": { ... },
-//   "else": { ... }
-// }
+//
+//	{
+//	  "scope": ["request", "result"],
+//	  "name": "Martian-Testing",
+//	  "value": "true",
+//	  "modifier": { ... },
+//	  "else": { ... }
+//	}
 func filterFromJSON(b []byte) (*parse.Result, error) {
 	msg := &filterJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

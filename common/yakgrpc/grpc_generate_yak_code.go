@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
+	"text/template"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
 var extractHostRegexp = regexp.MustCompile(`[Hh]ost:\s+([^\r\n]+)`)

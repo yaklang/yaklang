@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
 	"yaklang/common/filter"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"strings"
 )
 
 var singleWordDomainSuffix = filter.NewFilter()

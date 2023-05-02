@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
-	"time"
 )
 
 func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error {

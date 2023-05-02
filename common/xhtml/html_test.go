@@ -2,9 +2,9 @@ package xhtml
 
 import (
 	"golang.org/x/net/html"
-	"yaklang/common/utils"
 	"strings"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestHtml(t *testing.T) {

@@ -12,6 +12,10 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 	"yaklang/common/fp"
 	"yaklang/common/fp/cmd/scanfpcmd"
 	"yaklang/common/fp/webfingerprint"
@@ -19,10 +23,6 @@ import (
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil"
 	"yaklang/common/yak/yaklib/tools"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
 )
 
 var (

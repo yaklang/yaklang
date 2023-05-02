@@ -3,8 +3,8 @@ package codec
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 func TestRC4EncAndDec(t *testing.T) {

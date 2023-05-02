@@ -9,9 +9,9 @@ import (
 	"github.com/streadway/amqp"
 	"os"
 	"os/exec"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 )
 
 var (

@@ -2,11 +2,11 @@ package xhtml
 
 import (
 	"math/rand"
-	"yaklang/common/utils"
 	"regexp"
 	"strings"
 	"time"
 	"unsafe"
+	"yaklang/common/utils"
 )
 
 var fillings = []string{"%09", "%0a", "%0d", "/+/"}

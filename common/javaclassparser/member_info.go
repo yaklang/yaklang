@@ -1,6 +1,7 @@
 package javaclassparser
 
-/**
+/*
+*
 字段/方法
 */
 type MemberInfo struct {

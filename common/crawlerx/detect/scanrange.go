@@ -1,9 +1,9 @@
 package detect
 
 import (
-	"yaklang/common/log"
 	"regexp"
 	"strings"
+	"yaklang/common/log"
 )
 
 const AllDomain = 1

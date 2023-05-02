@@ -3,9 +3,9 @@ package ldapserver
 import (
 	"bufio"
 	"net"
-	"yaklang/common/log"
 	"sync"
 	"time"
+	"yaklang/common/log"
 
 	ldap "github.com/lor00x/goldap/message"
 )

@@ -2,11 +2,11 @@ package suricata
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"yaklang/common/suricata/parser"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strconv"
-	"strings"
 )
 
 func atoi(i string) int {

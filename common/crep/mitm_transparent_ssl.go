@@ -10,11 +10,11 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"sync"
-	"time"
 )
 
 var (

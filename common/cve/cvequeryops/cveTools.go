@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+	"yaklang/common/cve/cveresources"
+	"yaklang/common/log"
 )
 
 const scriptFormat = `

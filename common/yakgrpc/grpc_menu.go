@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"strconv"
+	"strings"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AddToMenu(ctx context.Context, req *ypb.AddToMenuRequest) (*ypb.Empty, error) {
@@ -221,9 +221,9 @@ func (s *Server) QueryAllMenuItem(ctx context.Context, req *ypb.QueryAllMenuItem
 		}
 
 	}
-	for _, v := range groupItems{
+	for _, v := range groupItems {
 		for _, i := range AllMenuItem {
-			if i.Group == v.Group  {
+			if i.Group == v.Group {
 				item, err := s._queryAllYakitMenuItemToGRPCMenuItem(i)
 				if err != nil {
 					log.Error(err)
@@ -259,12 +259,12 @@ func (s *Server) _queryAllYakitMenuItemToGRPCMenuItem(i *yakit.MenuItem) (*ypb.M
 	_ = json.Unmarshal([]byte(rawJson), &query)
 
 	item := &ypb.MenuItem{
-		Group:       i.Group,
-		Verbose:     i.Verbose,
-		YakScriptId: YakScriptId,
-		Query:       &query,
-		MenuItemId:  uint64(i.ID),
-		GroupSort:   i.GroupSort,
+		Group:         i.Group,
+		Verbose:       i.Verbose,
+		YakScriptId:   YakScriptId,
+		Query:         &query,
+		MenuItemId:    uint64(i.ID),
+		GroupSort:     i.GroupSort,
 		YakScriptName: i.YakScriptName,
 	}
 	if item.Verbose == "" {
@@ -279,10 +279,10 @@ func (s *Server) AddMenus(ctx context.Context, req *ypb.AddMenuRequest) (*ypb.Em
 	}
 	var errVerbose []string
 	for _, v := range req.Data {
-		for _, k := range v.Items{
+		for _, k := range v.Items {
 			r, err := yakit.GetYakScript(s.GetProfileDatabase(), k.YakScriptId)
 			ScriptName := k.YakScriptName
-			if  r != nil {
+			if r != nil {
 				ScriptName = r.ScriptName
 			}
 			item := &yakit.MenuItem{

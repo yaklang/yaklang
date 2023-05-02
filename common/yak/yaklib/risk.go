@@ -3,11 +3,11 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils/bot"
 	"yaklang/common/yakgrpc/yakit"
-	"sync"
 )
 
 var riskCounter int

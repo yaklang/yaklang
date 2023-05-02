@@ -10,6 +10,11 @@ import (
 	"github.com/hashicorp/go-version"
 	"math"
 	"math/rand"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
@@ -21,11 +26,6 @@ import (
 	"yaklang/common/yak/yaklang"
 	"yaklang/common/yak/yaklang/lib/builtin"
 	"yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // ns_sort: sort a list of numbers or strings

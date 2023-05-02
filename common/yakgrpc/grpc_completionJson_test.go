@@ -5,9 +5,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"testing"
 	_ "yaklang/common/yak"
 	"yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestServer_GetYakitCompletionRaw(t *testing.T) {

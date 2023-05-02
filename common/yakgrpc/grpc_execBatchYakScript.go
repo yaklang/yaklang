@@ -7,6 +7,10 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
@@ -15,10 +19,6 @@ import (
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream ypb.Yak_ExecBatchYakScriptServer) error {

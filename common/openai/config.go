@@ -2,10 +2,10 @@ package openai
 
 import (
 	"os"
-	"yaklang/common/consts"
-	"yaklang/common/log"
 	"path/filepath"
 	"strings"
+	"yaklang/common/consts"
+	"yaklang/common/log"
 )
 
 type ConfigOption func(client *Client)

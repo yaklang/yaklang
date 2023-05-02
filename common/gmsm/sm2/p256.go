@@ -789,8 +789,9 @@ func sm2P256Square(b, a *sm2P256FieldElement) {
 }
 
 // nonZeroToAllOnes returns:
-//   0xffffffff for 0 < x <= 2**31
-//   0 for x == 0 or x > 2**31.
+//
+//	0xffffffff for 0 < x <= 2**31
+//	0 for x == 0 or x > 2**31.
 func nonZeroToAllOnes(x uint32) uint32 {
 	return ((x - 1) >> 31) - 1
 }

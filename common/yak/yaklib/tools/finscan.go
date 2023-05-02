@@ -5,13 +5,13 @@ import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"net"
+	"sync"
+	"time"
 	"yaklang/common/filter"
 	"yaklang/common/finscan"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/hostsparser"
-	"sync"
-	"time"
 )
 
 type _yakFinPortScanConfig struct {

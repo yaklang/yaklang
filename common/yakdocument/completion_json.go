@@ -3,8 +3,8 @@ package yakdocument
 import (
 	"encoding/json"
 	"fmt"
-	"yaklang/common/utils"
 	"sort"
+	"yaklang/common/utils"
 )
 
 type YakLibDocCompletion struct {

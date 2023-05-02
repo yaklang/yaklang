@@ -2,9 +2,9 @@ package yaklib
 
 import (
 	"io"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"sync"
 )
 
 type portForward struct {

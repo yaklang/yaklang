@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 import "github.com/tatsushid/go-fastping"

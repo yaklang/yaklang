@@ -3,8 +3,8 @@ package yaktest
 import (
 	"github.com/davecgh/go-spew/spew"
 	"os"
-	"yaklang/common/yak"
 	"testing"
+	"yaklang/common/yak"
 )
 
 /*

@@ -2,10 +2,10 @@ package partition
 
 import (
 	"fmt"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 const RegexRaw = `(?i)\{\{%s:(.*?)\}\}`

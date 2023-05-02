@@ -3,8 +3,8 @@ package utils
 import (
 	"os"
 	"os/signal"
-	"yaklang/common/log"
 	"syscall"
+	"yaklang/common/log"
 )
 
 func NewSignalChannel(targetSignal ...os.Signal) chan os.Signal {

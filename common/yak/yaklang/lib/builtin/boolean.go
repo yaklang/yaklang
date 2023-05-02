@@ -5,7 +5,6 @@ import "reflect"
 // -----------------------------------------------------------------------------
 
 // Not returns !a
-//
 func Not(a interface{}) interface{} {
 
 	if a1, ok := a.(bool); ok {
@@ -15,7 +14,6 @@ func Not(a interface{}) interface{} {
 }
 
 // LT returns a < b
-//
 func LT(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -42,7 +40,6 @@ func LT(a, b interface{}) interface{} {
 }
 
 // GT returns a > b
-//
 func GT(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -69,7 +66,6 @@ func GT(a, b interface{}) interface{} {
 }
 
 // LE returns a <= b
-//
 func LE(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -96,7 +92,6 @@ func LE(a, b interface{}) interface{} {
 }
 
 // GE returns a >= b
-//
 func GE(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -123,7 +118,6 @@ func GE(a, b interface{}) interface{} {
 }
 
 // EQ returns a == b
-//
 func isEmpty(a interface{}) (ret bool) {
 	if a == nil {
 		return true
@@ -148,7 +142,6 @@ func EQ(a, b interface{}) interface{} {
 }
 
 // NE returns a != b
-//
 func NE(a, b interface{}) interface{} {
 	return !EQ(a, b).(bool)
 }

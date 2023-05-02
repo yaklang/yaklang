@@ -6,10 +6,10 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"net/http"
-	"yaklang/common/utils"
-	"yaklang/common/utils/tlsutils"
 	"testing"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/utils/tlsutils"
 )
 
 //func TestHttp2ClientManual(t *testing.T) {
@@ -285,15 +285,15 @@ func TestMisc_PocHTTP2_POC(t *testing.T) {
 	go TestHttp2TLS(t)
 	time.Sleep(1 * time.Second)
 
-		cases := []YakTestCase{
-			{
-				Name: "测试数据库",
-				Src: fmt.Sprintf(`
+	cases := []YakTestCase{
+		{
+			Name: "测试数据库",
+			Src: fmt.Sprintf(`
 env.Set("HTTP_PROXY", "")
 rsp, req, err = poc.HTTP("GET / HTTP/2.0\r\nHost: 127.0.0.1:8882\r\nUser-Agent: testAgent\r\n", poc.https(true)); println(string(rsp))
 	`),
-			},
-		}
+		},
+	}
 
 	Run("测试数据库链接", t, cases...)
 }

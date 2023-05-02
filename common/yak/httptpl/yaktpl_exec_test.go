@@ -2,11 +2,11 @@ package httptpl
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"testing"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"testing"
-	"time"
 )
 
 func TestMockTest_SmokingTest(t *testing.T) {

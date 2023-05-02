@@ -2,8 +2,8 @@ package bruteutils
 
 import (
 	"github.com/jlaffaye/ftp"
-	"yaklang/common/log"
 	"time"
+	"yaklang/common/log"
 )
 
 var ftpUser = []string{

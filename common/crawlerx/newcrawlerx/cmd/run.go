@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"os"
+	"strings"
+	"time"
 	"yaklang/common/crawlerx/config"
 	"yaklang/common/crawlerx/newcrawlerx"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func run(targetURL, proxy, path string) {

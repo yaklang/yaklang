@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"yaklang/common/log"
 	"strings"
+	"yaklang/common/log"
 )
 
 type SqliteManager struct {

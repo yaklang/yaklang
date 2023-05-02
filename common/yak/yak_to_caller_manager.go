@@ -3,6 +3,9 @@ package yak
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
@@ -14,9 +17,6 @@ import (
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"runtime/debug"
-	"sync"
-	"time"
 
 	"github.com/jinzhu/gorm"
 )

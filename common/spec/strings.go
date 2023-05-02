@@ -72,7 +72,7 @@ const (
 	BackendKey_BootSoftware                       = "boot_software"
 	BackendKey_Crontab                            = "crontab"
 	BackendKey_ReverseShell                       = "reverse_shell"
-	BackendKey_NodeLog                       = "node_log"
+	BackendKey_NodeLog                            = "node_log"
 
 	HIDS_API_Sleep = "hids-rpc-sleep"
 )

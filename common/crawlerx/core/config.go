@@ -2,9 +2,9 @@ package core
 
 import (
 	"github.com/go-rod/rod/lib/proto"
+	"regexp"
 	"yaklang/common/crawlerx/detect"
 	"yaklang/common/log"
-	"regexp"
 )
 
 type Header struct {

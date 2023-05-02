@@ -1,8 +1,8 @@
 package yaklib
 
 import (
-	"yaklang/common/utils"
 	"regexp"
+	"yaklang/common/utils"
 )
 
 var (

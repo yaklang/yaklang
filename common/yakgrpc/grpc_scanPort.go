@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 const scanPort = `yakit.AutoInitYakit()

@@ -1,11 +1,13 @@
 package javaclassparser
 
-/**
-CONSTANT_UTF8_INFO {
-	u1 tag;
-	u2 Length;
-	u1 bytes[Length];
-}
+/*
+*
+
+	CONSTANT_UTF8_INFO {
+		u1 tag;
+		u2 Length;
+		u1 bytes[Length];
+	}
 */
 type ConstantUtf8Info struct {
 	Type  string

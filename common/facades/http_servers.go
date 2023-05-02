@@ -4,15 +4,15 @@ import (
 	"bufio"
 	"github.com/h2non/filetype"
 	"net"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"time"
 )
 
 const defaultHTTPFallback = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n\r\n\r\n"
 
-//var HttpRoutes sync.Map
+// var HttpRoutes sync.Map
 type HttpResourceType string
 
 const (
@@ -47,7 +47,7 @@ type HttpResource struct {
 	disableNotify bool
 }
 
-//如果路由已存在，则跳过
+// 如果路由已存在，则跳过
 func (f *FacadeServer) AddHttpRoute(pattern string, rsc *HttpResource) {
 	f.httpMux.Lock()
 	_, ok := f.httpResource[pattern]
@@ -79,7 +79,7 @@ func (f *FacadeServer) OverwriteFileResource(pattern string, resource []byte) {
 	f.SaveHttpRoute(pattern, &HttpResource{resource: resource, responseType: HttpResourceType_File, times: -1})
 }
 
-//如果路由已经存在，则覆盖原有的路由
+// 如果路由已经存在，则覆盖原有的路由
 func (f *FacadeServer) SaveHttpRoute(pattern string, resource *HttpResource) {
 	f.httpMux.Lock()
 	f.httpResource[pattern] = resource

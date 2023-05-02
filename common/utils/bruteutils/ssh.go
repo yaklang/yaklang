@@ -3,11 +3,11 @@ package bruteutils
 import (
 	"golang.org/x/crypto/ssh"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strconv"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 var DefaultDailer = &net.Dialer{Timeout: 5 * time.Second}

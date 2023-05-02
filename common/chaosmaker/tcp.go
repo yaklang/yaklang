@@ -7,11 +7,11 @@ import (
 	"github.com/google/gopacket/layers"
 	"math/rand"
 	"net"
+	"strconv"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/suricata"
 	"yaklang/common/utils"
-	"strconv"
-	"strings"
 )
 
 var tcpHandler = &chaosHandler{

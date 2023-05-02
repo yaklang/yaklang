@@ -6,9 +6,9 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"net"
+	"strings"
 	"yaklang/common/log"
 	utils2 "yaklang/common/utils"
-	"strings"
 )
 
 func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result *MatchResult, err error) {

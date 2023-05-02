@@ -2,8 +2,8 @@ package yaktest
 
 import (
 	"os"
-	"yaklang/common/consts"
 	"testing"
+	"yaklang/common/consts"
 
 	"yaklang/common/yakgrpc/yakit"
 )

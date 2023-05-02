@@ -163,7 +163,7 @@ type Authentication struct {
 	ForwardIp     string `json:"forward_ip"`      // 转发服务的IP
 }
 
-//钉钉报告消息，用
+// 钉钉报告消息，用
 type DingReportMsg struct {
 	Date          string `json:"date"`
 	Name          string `json:"name"`

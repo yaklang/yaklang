@@ -3,8 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/yakgrpc/ypb"
 	"testing"
+	"yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_PortScan(t *testing.T) {

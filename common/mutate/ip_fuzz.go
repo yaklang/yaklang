@@ -20,7 +20,6 @@ func CircledEnclosedConvertor(i interface{}) {
 	return
 }
 
-//
 func ObfuscateIP(ipAddr string, originDomain ...string) []string {
 	ip := net.ParseIP(ipAddr)
 	if ip == nil {

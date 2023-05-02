@@ -4,8 +4,8 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
-	"yaklang/common/log"
 	"strings"
+	"yaklang/common/log"
 )
 
 func (crawler *CrawlerX) DoInput(element *rod.Element) error {

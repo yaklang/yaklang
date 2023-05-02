@@ -20,7 +20,7 @@ type LdapServer struct {
 	classRes func(name string) []byte
 }
 
-//exports func
+// exports func
 func NewLdapServer() *LdapServer {
 	host := "127.0.0.1"
 	ldapport := utils.GetRandomAvailableTCPPort()
@@ -33,7 +33,7 @@ func NewLdapServerWithPort(ldapport int, weboprt int) LdapServer {
 	return LdapServer{host: host, ldapport: ldapport, webport: weboprt}
 }
 
-//LdapServer func
+// LdapServer func
 func (l *LdapServer) SetResource(resource []byte) {
 	l.resource = resource
 }

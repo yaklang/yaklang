@@ -61,11 +61,12 @@ func NewModifier(name, value string) martian.RequestResponseModifier {
 // a headerModifier and an error.
 //
 // Example JSON configuration message:
-// {
-//  "scope": ["request", "result"],
-//  "name": "X-Martian",
-//  "value": "true"
-// }
+//
+//	{
+//	 "scope": ["request", "result"],
+//	 "name": "X-Martian",
+//	 "value": "true"
+//	}
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

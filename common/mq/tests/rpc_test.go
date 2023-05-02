@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
-	"yaklang/common/mq"
-	"yaklang/common/thirdpartyservices"
 	"testing"
 	"time"
+	"yaklang/common/mq"
+	"yaklang/common/thirdpartyservices"
 )
 
 type HealthInfo struct {

@@ -696,11 +696,13 @@ const AssetDebug = false
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -736,8 +738,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"data": {nil, map[string]*bintree{
 		"base-yak-plugin": {nil, map[string]*bintree{
 			"SSRF HTTP Public.yak": {dataBaseYakPluginSsrfHttpPublicYak, map[string]*bintree{}},
-			"启发式SQL注入检测.yak": {dataBaseYakPluginSqlYak, map[string]*bintree{}},
-			"基础 XSS 检测.yak": {dataBaseYakPluginXssYak, map[string]*bintree{}},
+			"启发式SQL注入检测.yak":       {dataBaseYakPluginSqlYak, map[string]*bintree{}},
+			"基础 XSS 检测.yak":        {dataBaseYakPluginXssYak, map[string]*bintree{}},
 		}},
 		"fingerprint-rules.yml.gz": {dataFingerprintRulesYmlGz, map[string]*bintree{}},
 		"geo": {nil, map[string]*bintree{
@@ -746,27 +748,27 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"nfp.gz": {dataNfpGz, map[string]*bintree{}},
 		"rss": {nil, map[string]*bintree{
 			"cyber_security_rss.opml": {dataRssCyber_security_rssOpml, map[string]*bintree{}},
-			"feedly.opml": {dataRssFeedlyOpml, map[string]*bintree{}},
-			"feedly_bak.opml": {dataRssFeedly_bakOpml, map[string]*bintree{}},
+			"feedly.opml":             {dataRssFeedlyOpml, map[string]*bintree{}},
+			"feedly_bak.opml":         {dataRssFeedly_bakOpml, map[string]*bintree{}},
 		}},
 		"user-fp-rules": {nil, map[string]*bintree{
-			"amqp.txt": {dataUserFpRulesAmqpTxt, map[string]*bintree{}},
-			"elastic-search.txt": {dataUserFpRulesElasticSearchTxt, map[string]*bintree{}},
-			"oracle-tns.txt": {dataUserFpRulesOracleTnsTxt, map[string]*bintree{}},
-			"rdp-ntlm.txt": {dataUserFpRulesRdpNtlmTxt, map[string]*bintree{}},
-			"rdp.txt": {dataUserFpRulesRdpTxt, map[string]*bintree{}},
-			"redis.txt": {dataUserFpRulesRedisTxt, map[string]*bintree{}},
-			"s5.txt": {dataUserFpRulesS5Txt, map[string]*bintree{}},
+			"amqp.txt":                 {dataUserFpRulesAmqpTxt, map[string]*bintree{}},
+			"elastic-search.txt":       {dataUserFpRulesElasticSearchTxt, map[string]*bintree{}},
+			"oracle-tns.txt":           {dataUserFpRulesOracleTnsTxt, map[string]*bintree{}},
+			"rdp-ntlm.txt":             {dataUserFpRulesRdpNtlmTxt, map[string]*bintree{}},
+			"rdp.txt":                  {dataUserFpRulesRdpTxt, map[string]*bintree{}},
+			"redis.txt":                {dataUserFpRulesRedisTxt, map[string]*bintree{}},
+			"s5.txt":                   {dataUserFpRulesS5Txt, map[string]*bintree{}},
 			"tcp-http-get-payload.txt": {dataUserFpRulesTcpHttpGetPayloadTxt, map[string]*bintree{}},
-			"tcp-null-payload.txt": {dataUserFpRulesTcpNullPayloadTxt, map[string]*bintree{}},
-			"zookeeper.txt": {dataUserFpRulesZookeeperTxt, map[string]*bintree{}},
+			"tcp-null-payload.txt":     {dataUserFpRulesTcpNullPayloadTxt, map[string]*bintree{}},
+			"zookeeper.txt":            {dataUserFpRulesZookeeperTxt, map[string]*bintree{}},
 		}},
 		"user-wfp-rules": {nil, map[string]*bintree{
-			"elasticsearch.yml": {dataUserWfpRulesElasticsearchYml, map[string]*bintree{}},
+			"elasticsearch.yml":      {dataUserWfpRulesElasticsearchYml, map[string]*bintree{}},
 			"jenkins-error-page.yml": {dataUserWfpRulesJenkinsErrorPageYml, map[string]*bintree{}},
-			"mongo-web.yml": {dataUserWfpRulesMongoWebYml, map[string]*bintree{}},
-			"mongodb-27017.yml": {dataUserWfpRulesMongodb27017Yml, map[string]*bintree{}},
-			"rabbitmq-15672.yml": {dataUserWfpRulesRabbitmq15672Yml, map[string]*bintree{}},
+			"mongo-web.yml":          {dataUserWfpRulesMongoWebYml, map[string]*bintree{}},
+			"mongodb-27017.yml":      {dataUserWfpRulesMongodb27017Yml, map[string]*bintree{}},
+			"rabbitmq-15672.yml":     {dataUserWfpRulesRabbitmq15672Yml, map[string]*bintree{}},
 		}},
 	}},
 }}

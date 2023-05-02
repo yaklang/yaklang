@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"math/rand"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func TestAXFR(t *testing.T) {

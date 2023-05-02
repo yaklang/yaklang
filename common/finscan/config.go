@@ -4,9 +4,9 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
 	"net"
+	"time"
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil"
-	"time"
 )
 
 type Config struct {

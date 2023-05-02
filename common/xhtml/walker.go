@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"golang.org/x/net/html"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
 )
 
 func _visitNode(node *html.Node, depth int, siblingIndex int, handle func(i *html.Node)) {

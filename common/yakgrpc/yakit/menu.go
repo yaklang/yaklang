@@ -3,10 +3,10 @@ package yakit
 import (
 	"encoding/json"
 	"github.com/jinzhu/gorm"
+	"strconv"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
 )
 
 type MenuItem struct {
@@ -19,13 +19,13 @@ type MenuItem struct {
 
 	// quoted json
 	BatchPluginFilterJson string `json:"batch_plugin_filter_json"`
-	Mode          string  `json:"mode"`
-	MenuSort	  int64   `json:"menu_sort"`
-	GroupSort     int64   `json:"group_sort"`
+	Mode                  string `json:"mode"`
+	MenuSort              int64  `json:"menu_sort"`
+	GroupSort             int64  `json:"group_sort"`
 }
 
 /*
-	{"group":"12312","name":"aaa","query":{"type":"mitm,port-scan,nuclei","tags":"","include":["ElasticSearch 未授权访问","[wptouch-open-redirect]: WPTouch Switch Desktop 3.x Open Redirection","[wpmudev-pub-keys]: Wpmudev Dashboard Pub Key","[wpdm-cache-session]: Wpdm-Cache Session"],"exclude":[]}}
+{"group":"12312","name":"aaa","query":{"type":"mitm,port-scan,nuclei","tags":"","include":["ElasticSearch 未授权访问","[wptouch-open-redirect]: WPTouch Switch Desktop 3.x Open Redirection","[wpmudev-pub-keys]: Wpmudev Dashboard Pub Key","[wpdm-cache-session]: Wpdm-Cache Session"],"exclude":[]}}
 */
 type batchExecutionSchema struct {
 	Group string                     `json:"group"`
@@ -121,7 +121,7 @@ func DeleteMenuItem(db *gorm.DB, group string, name string, mode string) error {
 	if mode != "" {
 		db = db.Where("mode = ?", mode)
 	}
-	db = db.Unscoped().Delete(&MenuItem{});
+	db = db.Unscoped().Delete(&MenuItem{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -151,7 +151,7 @@ func GetAllMenuItem(db *gorm.DB) []*MenuItem {
 
 func GetMenuItem(db *gorm.DB, group string, name string) (*MenuItem, error) {
 	db = UserDataAndPluginDatabaseScope(db)
-	
+
 	var req MenuItem
 	if db := db.Model(&MenuItem{}).Where("`group` = ? AND yak_script_string = ?", group, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get MenuItem failed: %s", db.Error)

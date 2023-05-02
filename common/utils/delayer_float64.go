@@ -3,8 +3,8 @@ package utils
 import (
 	"github.com/pkg/errors"
 	"math/rand"
-	"yaklang/common/log"
 	"time"
+	"yaklang/common/log"
 )
 
 /* delay with range */

@@ -2,9 +2,9 @@ package yaklib
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestYakitServer_Addr(t *testing.T) {

@@ -3,10 +3,10 @@ package suspect
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"reflect"
 )
 
 var GuessExports = map[string]interface{}{

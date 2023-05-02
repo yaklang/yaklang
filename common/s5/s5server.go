@@ -7,18 +7,17 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/crep"
 	"yaklang/common/cybertunnel/ctxio"
 	"yaklang/common/log"
 	"yaklang/common/martian/v3/mitm"
 	"yaklang/common/utils"
 	"yaklang/common/utils/tlsutils"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
-
 
 type S5Config struct {
 	HandshakeTimeout    time.Duration
@@ -57,7 +56,6 @@ func (h *S5Config) IsHijackMode() bool {
 	}
 	return h.HijackMode
 }
-
 
 const (
 	socks5Version = 0x05

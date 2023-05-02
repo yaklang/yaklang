@@ -7,6 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/fp"
 	"yaklang/common/go-funk"
@@ -18,10 +22,6 @@ import (
 	"yaklang/common/yak/yaklib/yakhttp"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
 )
 
 var emptyVirtualClient = NewVirtualYakitClient(func(i interface{}) error {

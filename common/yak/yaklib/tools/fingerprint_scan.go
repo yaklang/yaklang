@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 	filter2 "yaklang/common/filter"
 	"yaklang/common/fp"
 	"yaklang/common/log"
@@ -10,8 +12,6 @@ import (
 	"yaklang/common/utils"
 	"yaklang/common/utils/pingutil"
 	"yaklang/common/utils/spacengine"
-	"reflect"
-	"strings"
 )
 
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {

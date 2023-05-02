@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"sort"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/yak/yakdoc/doc"
 	"yaklang/common/yak/yaklib/codec"
-	"sort"
-	"strings"
 )
 
 func StructName(libName, pkgPath, name string) string {

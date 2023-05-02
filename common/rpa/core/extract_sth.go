@@ -19,7 +19,7 @@ const GETREADYSTATE = `
 }
 `
 
-//get current page url by js
+// get current page url by js
 func (m *Manager) GetCurrentUrl(page *rod.Page) (url string, err error) {
 	result, err := page.Eval(GETURL)
 	if err != nil {
@@ -37,7 +37,7 @@ func (m *Manager) GetCurrentUrl(page *rod.Page) (url string, err error) {
 	return str, nil
 }
 
-//get page state by js
+// get page state by js
 func (m *Manager) GetReadyState(page *rod.Page) (state string, err error) {
 	result, err := page.Eval(GETREADYSTATE)
 	if err != nil {

@@ -3,8 +3,8 @@ package lowhttp
 import (
 	"net/http"
 	"net/url"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {

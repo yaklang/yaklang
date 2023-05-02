@@ -3,10 +3,10 @@ package healthinfo
 import (
 	"context"
 	"github.com/pkg/errors"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/spec/health"
 	"yaklang/common/utils"
-	"time"
 )
 
 type Manager struct {

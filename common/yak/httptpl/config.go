@@ -3,6 +3,7 @@ package httptpl
 import (
 	"context"
 	"fmt"
+	"strings"
 	"yaklang/common/consts"
 	"yaklang/common/filter"
 	"yaklang/common/go-funk"
@@ -11,7 +12,6 @@ import (
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
 type ResultCallback func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{})

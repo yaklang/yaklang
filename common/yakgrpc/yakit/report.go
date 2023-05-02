@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"strconv"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"time"
 )
 
 type ReportRecord struct {

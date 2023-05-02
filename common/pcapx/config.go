@@ -4,9 +4,9 @@ import (
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"sync"
 )
 
 var (

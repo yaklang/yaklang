@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"time"
 	"yaklang/common/filter"
 	"yaklang/common/fp/webfingerprint"
 	"yaklang/common/utils"
 	"yaklang/common/utils/hostsparser"
-	"time"
 )
 
 type ConfigOption func(config *Config)

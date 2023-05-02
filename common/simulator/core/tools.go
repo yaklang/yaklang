@@ -2,9 +2,9 @@ package core
 
 import (
 	"github.com/go-rod/rod"
+	"strings"
 	"yaklang/common/simulator/config"
 	"yaklang/common/utils"
-	"strings"
 )
 
 func calculateGroupRelevance(target string, originGroup []string) float32 {

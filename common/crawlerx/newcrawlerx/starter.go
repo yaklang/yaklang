@@ -11,11 +11,11 @@ import (
 	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"net/http"
+	"strings"
+	"time"
 	"yaklang/common/crawlerx/filter"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 type BrowserStarter struct {

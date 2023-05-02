@@ -29,16 +29,16 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/cybertunnel/ctxio"
 	"yaklang/common/gmsm/gmtls"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/utils/lowhttp/lowhttp2"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
 
 	"yaklang/common/martian/v3/mitm"
 	"yaklang/common/martian/v3/nosigpipe"
@@ -569,7 +569,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			}
 		}
 	}
-
 
 	if req.Method == "CONNECT" {
 		// req auth enable

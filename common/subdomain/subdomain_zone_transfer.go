@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/dnsutil"
-	"strings"
-	"time"
 )
 
 var queryNs = dnsutil.QueryNSEx

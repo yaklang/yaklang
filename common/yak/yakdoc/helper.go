@@ -3,10 +3,10 @@ package yakdoc
 import (
 	"bytes"
 	"fmt"
-	"yaklang/common/log"
 	"reflect"
 	"sort"
 	"strings"
+	"yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"

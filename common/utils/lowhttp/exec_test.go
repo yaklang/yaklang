@@ -6,11 +6,11 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func TestLowhttpResponse2(t *testing.T) {

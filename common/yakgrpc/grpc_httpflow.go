@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+	"time"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
@@ -9,8 +11,6 @@ import (
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
-	"time"
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {

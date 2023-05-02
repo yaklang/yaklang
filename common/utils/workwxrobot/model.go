@@ -6,7 +6,7 @@ import (
 
 // BotMessage 机器人消息
 type BotMessage struct {
-	MsgType       string `json:"msgtype"`  // text / textcard / markdown / link(<a href="">...<a/>)
+	MsgType       string `json:"msgtype"` // text / textcard / markdown / link(<a href="">...<a/>)
 	ProgramType   string `json:"program"`
 	IsSendNow     bool   `json:"issendimmediately"`
 	ConfigID      string `json:"configid"`
@@ -44,7 +44,7 @@ type Err struct {
 	ErrMsg  string `json:"errmsg"`
 }
 
-//AccessToken 微信企业号请求Token
+// AccessToken 微信企业号请求Token
 type AccessToken struct {
 	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
@@ -52,7 +52,7 @@ type AccessToken struct {
 	ExpiresInTime time.Time
 }
 
-//Client 微信企业号应用配置信息
+// Client 微信企业号应用配置信息
 type Client struct {
 	CropID      string
 	AgentID     int64
@@ -60,7 +60,7 @@ type Client struct {
 	Token       AccessToken
 }
 
-//Result 发送消息返回结果
+// Result 发送消息返回结果
 type Result struct {
 	Err
 	InvalidUser  string `json:"invaliduser"`
@@ -68,19 +68,19 @@ type Result struct {
 	InvalidTag   string `json:"invalidtag"`
 }
 
-//Content 文本消息内容
+// Content 文本消息内容
 type Content struct {
 	Content string `json:"content"`
 }
 
-//Media 媒体内容
+// Media 媒体内容
 type Media struct {
 	MediaID     string `json:"media_id"`
 	Title       string `json:"title,omitempty"`       // 视频参数
 	Description string `json:"description,omitempty"` // 视频参数
 }
 
-//Card 卡片
+// Card 卡片
 type TextCard struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -88,7 +88,7 @@ type TextCard struct {
 	Btntxt      string `json:"btntxt"`
 }
 
-//news 图文
+// news 图文
 type News struct {
 	Articles []Article `json:"articles"`
 }
@@ -100,7 +100,7 @@ type Article struct {
 	Picurl      string `json:"picurl"`
 }
 
-//mpnews 图文
+// mpnews 图文
 type MpNews struct {
 	Articles []MpArticle `json:"articles"`
 }
@@ -131,7 +131,7 @@ type TaskBtn struct {
 	IsBold      bool   `json:"is_bold"`
 }
 
-//Message 消息主体参数 https://work.weixin.qq.com/api/doc/90000/90135/90236
+// Message 消息主体参数 https://work.weixin.qq.com/api/doc/90000/90135/90236
 type Message struct {
 	ToUser  string `json:"touser"`
 	ToParty string `json:"toparty"`

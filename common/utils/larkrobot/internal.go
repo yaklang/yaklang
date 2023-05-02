@@ -1136,7 +1136,7 @@ func (element *CardLinkElement) ToMessage() map[string]interface{} {
 
 // ConfirmElement  用于交互元素的二次确认
 //
-//  弹框默认提供确定和取消的按钮，无需开发者手动配置
+//	弹框默认提供确定和取消的按钮，无需开发者手动配置
 type ConfirmElement struct {
 	// Title 弹框标题 仅支持"plain_text"
 	Title *CardText
@@ -1161,9 +1161,9 @@ func (element *ConfirmElement) ToMessage() map[string]interface{} {
 
 // OptionElement
 //
-//作为selectMenu的选项对象
+// 作为selectMenu的选项对象
 //
-//作为overflow的选项对象
+// 作为overflow的选项对象
 type OptionElement struct {
 	// Text 选项显示内容，非待选人员时必填
 	Text *CardText

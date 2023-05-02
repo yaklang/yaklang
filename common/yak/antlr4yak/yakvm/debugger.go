@@ -2,11 +2,11 @@ package yakvm
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"yaklang/common/go-funk"
 	"yaklang/common/utils"
 	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"strings"
-	"sync"
 
 	"github.com/pkg/errors"
 )

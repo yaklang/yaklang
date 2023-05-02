@@ -3,8 +3,8 @@ package yaktest
 import (
 	"fmt"
 	"os"
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestMisc_YAKIT(t *testing.T) {

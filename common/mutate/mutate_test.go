@@ -2,12 +2,12 @@ package mutate
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/consts"
+	"yaklang/common/log"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func TestQuickMutate(t *testing.T) {

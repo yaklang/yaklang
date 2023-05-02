@@ -15,8 +15,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"yaklang/common/log"
 	"sync/atomic"
+	"yaklang/common/log"
 
 	"yaklang/common/gmsm/sm2"
 	"yaklang/common/gmsm/x509"

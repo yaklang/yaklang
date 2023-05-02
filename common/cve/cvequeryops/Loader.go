@@ -9,14 +9,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+	"yaklang/common/cve/cveresources"
+	"yaklang/common/go-funk"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 const (

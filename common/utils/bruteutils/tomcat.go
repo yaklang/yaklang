@@ -3,11 +3,11 @@ package bruteutils
 import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	"regexp"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"regexp"
-	"time"
 )
 
 var defaultPassTomcat = utils.ParseStringToLines(`tomcat

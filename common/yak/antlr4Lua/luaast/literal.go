@@ -2,9 +2,9 @@ package luaast
 
 import (
 	"math"
-	lua "yaklang/common/yak/antlr4Lua/parser"
 	"strconv"
 	"strings"
+	lua "yaklang/common/yak/antlr4Lua/parser"
 )
 
 func (l *LuaTranslator) VisitNumber(raw lua.INumberContext) interface{} {

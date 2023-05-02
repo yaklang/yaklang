@@ -2,9 +2,9 @@ package yakgrpc
 
 import (
 	"crypto/tls"
-	"yaklang/common/utils"
 	"testing"
 	"time"
+	"yaklang/common/utils"
 )
 
 func TestNetConn(t *testing.T) {

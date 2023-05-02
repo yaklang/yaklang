@@ -3,10 +3,10 @@ package yserx
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
-	"yaklang/common/log"
-	"yaklang/common/yak/yaklib/codec"
 	"strconv"
 	"testing"
+	"yaklang/common/log"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseJavaSerialized_1(t *testing.T) {

@@ -5,12 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/permutil"
 	"runtime"
 	"strconv"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/permutil"
 )
 
 func Fix() error {

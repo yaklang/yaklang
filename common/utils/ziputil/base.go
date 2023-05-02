@@ -5,17 +5,17 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/memfile"
 	"path"
 	"path/filepath"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/memfile"
 )
 
-//压缩文件
-//files 文件数组，可以是不同dir下的文件或者文件夹
-//dest 压缩文件存放地址
+// 压缩文件
+// files 文件数组，可以是不同dir下的文件或者文件夹
+// dest 压缩文件存放地址
 func Compress(files []*os.File, dest string) error {
 	d, _ := os.Create(dest)
 	defer d.Close()
@@ -227,7 +227,7 @@ func DeCompressFromRaw(raw []byte, dest string) error {
 	return nil
 }
 
-//解压
+// 解压
 func DeCompress(zipFile, dest string) error {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {

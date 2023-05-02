@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"golang.org/x/net/html"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type OutputPosType string

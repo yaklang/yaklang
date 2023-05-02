@@ -3,8 +3,8 @@ package yaklib
 import (
 	"bufio"
 	"io"
-	"yaklang/common/utils"
 	"reflect"
+	"yaklang/common/utils"
 )
 
 func _newReader(i interface{}) (*bufio.Reader, error) {

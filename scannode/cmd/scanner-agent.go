@@ -10,6 +10,11 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 	"yaklang/common/fp"
 	"yaklang/common/log"
 	"yaklang/common/spec"
@@ -22,11 +27,6 @@ import (
 	"yaklang/scannode/scanrpc"
 	"yaklang/server/dbm/falcons"
 	"yaklang/server/dbm/visualization"
-	"path/filepath"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
 )
 
 var (

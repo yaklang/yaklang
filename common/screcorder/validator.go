@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"runtime"
 	"strings"
 	"time"
+	"yaklang/common/consts"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func GetDarwinAvailableAVFoundationScreenDevices() []*ScreenDevice {

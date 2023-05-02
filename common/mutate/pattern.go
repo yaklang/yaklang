@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
-	"yaklang/common/utils"
 	"strconv"
 	"strings"
+	"yaklang/common/utils"
 )
 
 /*
- 设置 CODEC 回调函数
+设置 CODEC 回调函数
 */
 var codecCaller func(name string, s interface{}) (string, error)
 

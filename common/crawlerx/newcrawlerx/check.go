@@ -5,12 +5,12 @@ package newcrawlerx
 import (
 	"github.com/go-rod/rod"
 	u "net/url"
+	"regexp"
+	"strings"
 	"yaklang/common/crawlerx/filter"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"strings"
 )
 
 func repeatSimpleCheckFunctionGenerator(pageVisitFilter *filter.StringCountFilter) func(string) bool {

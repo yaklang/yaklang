@@ -59,7 +59,7 @@ func GetH(key []byte) (H []byte) {
 	return H
 }
 
-//ut = a + b
+// ut = a + b
 func addition(a, b []byte) (out []byte) {
 	Len := len(a)
 	if Len != len(b) {

@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"os"
-	"yaklang/common/yak/yaklib/codec"
 	"testing"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseJavaSerializedEx(t *testing.T) {

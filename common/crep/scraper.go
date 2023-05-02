@@ -5,8 +5,8 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/types"
-	"yaklang/common/utils"
 	"time"
+	"yaklang/common/utils"
 )
 
 func Snapshot(s string, timeout time.Duration) ([]byte, *types.Type, error) {

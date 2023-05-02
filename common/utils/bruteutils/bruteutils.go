@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"io/ioutil"
-	"yaklang/common/log"
-	"yaklang/common/mutate"
-	"yaklang/common/utils"
-	"yaklang/common/utils/mixer"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/mutate"
+	"yaklang/common/utils"
+	"yaklang/common/utils/mixer"
 )
 
 type BruteItem struct {

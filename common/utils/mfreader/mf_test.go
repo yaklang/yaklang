@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"testing"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
-	"testing"
-	"time"
 )
 
 func TestMultiFileLineReader_GetPercent(t *testing.T) {

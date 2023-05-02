@@ -4,9 +4,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
-	"yaklang/common/log"
 	"sync"
 	"time"
+	"yaklang/common/log"
 )
 
 type Publisher struct {

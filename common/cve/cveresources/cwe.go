@@ -3,12 +3,12 @@ package cveresources
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"strconv"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type CWE struct {

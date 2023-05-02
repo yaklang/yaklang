@@ -7,13 +7,13 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/pkg/errors"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/netutil"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/netutil"
 )
 
 type Scanner struct {

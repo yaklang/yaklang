@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dave/jennifer/jen"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"reflect"
 	"sync"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type StructHelper struct {

@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/antlr4yak"
 	"yaklang/common/yak/yaklang"
 	"yaklang/common/yak/yaklang/spec"
-	"path/filepath"
-	"strings"
 )
 
 var GlobalEvalExports = map[string]interface{}{

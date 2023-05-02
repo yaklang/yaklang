@@ -8,10 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 	"github.com/tevino/abool"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 const (

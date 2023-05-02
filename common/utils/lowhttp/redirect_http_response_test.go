@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
-	"yaklang/common/utils"
 	"testing"
 	"time"
+	"yaklang/common/utils"
 )
 
 func TestWithRedirectTimes(t *testing.T) {

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func fqdn(r string) string {

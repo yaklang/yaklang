@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"yaklang/common/gmsm/x509"
 	"testing"
 	"time"
+	"yaklang/common/gmsm/x509"
 
 	"yaklang/common/gmsm/gmtls"
 )

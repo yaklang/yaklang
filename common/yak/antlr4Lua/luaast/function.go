@@ -2,9 +2,9 @@ package luaast
 
 import (
 	uuid "github.com/satori/go.uuid"
+	"strings"
 	lua "yaklang/common/yak/antlr4Lua/parser"
 	"yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 )
 
 // VisitFuncNameAndBody is used to visit vanilla named function declaration

@@ -2,10 +2,10 @@ package tag
 
 import (
 	"golang.org/x/net/html"
-	"yaklang/common/javascript/otto"
-	"yaklang/common/log"
 	"regexp"
 	"strings"
+	"yaklang/common/javascript/otto"
+	"yaklang/common/log"
 )
 
 func reCheck(data interface{}, ruleInfo *RuleInfo) bool {

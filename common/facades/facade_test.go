@@ -3,11 +3,11 @@ package facades
 import (
 	"bytes"
 	"net"
+	"testing"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/tlsutils"
-	"testing"
-	"time"
 )
 
 func TestNewDNSServer(t *testing.T) {

@@ -9,15 +9,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type QueryOnlinePluginRequest struct {
@@ -59,22 +59,21 @@ func NewOnlineClient(baseUrl string) *OnlineClient {
 	}
 }
 
-func DownloadOnlineAuthProxy(baseUrl string)  error {
+func DownloadOnlineAuthProxy(baseUrl string) error {
 	host, port, err := utils.ParseStringToHostPort(baseUrl)
 	if err != nil {
-		return  utils.Errorf("parse url[%s] failed: %s", baseUrl, err)
+		return utils.Errorf("parse url[%s] failed: %s", baseUrl, err)
 	}
 	proxy := strings.TrimSpace(consts.GetOnlineBaseUrlProxy())
 	if proxy != "" {
 		conn, err := utils.GetProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
 		if err != nil {
-			return utils.Errorf("connect to [%s] via proxy[%v] failed: %s", consts.GetOnlineBaseUrl(), proxy,  err.Error())
+			return utils.Errorf("connect to [%s] via proxy[%v] failed: %s", consts.GetOnlineBaseUrl(), proxy, err.Error())
 		}
 		conn.Close()
 	}
 	return nil
 }
-
 
 type OnlinePluginParam struct {
 	Field        string `json:"field"`

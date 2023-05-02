@@ -2,12 +2,12 @@ package fp
 
 import (
 	"github.com/pkg/errors"
+	"path"
+	"sync"
 	"yaklang/common/bindata"
 	"yaklang/common/fp/webfingerprint"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"path"
-	"sync"
 )
 
 var (

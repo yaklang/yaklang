@@ -69,7 +69,7 @@ func IsGBK(data []byte) bool {
 	return true
 }
 
-//UTF-8编码格式的判断
+// UTF-8编码格式的判断
 func preNUm(data byte) int {
 	var mask byte = 0x80
 	var num int = 0

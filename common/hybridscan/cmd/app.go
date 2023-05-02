@@ -5,11 +5,11 @@ import (
 	"github.com/urfave/cli"
 	"net"
 	"os"
+	"time"
 	"yaklang/common/fp"
 	"yaklang/common/hybridscan"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 )
 
 func main() {

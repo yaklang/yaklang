@@ -2,13 +2,15 @@ package javaclassparser
 
 import "math"
 
-/**
+/*
+*
 常量池中integer
 四字节存储整数常量
-CONSTANT_INTEGER_INFO {
-	u1 tag;
-	u4 bytes;
-}
+
+	CONSTANT_INTEGER_INFO {
+		u1 tag;
+		u4 bytes;
+	}
 */
 type ConstantIntegerInfo struct {
 	Type string
@@ -21,13 +23,15 @@ func (self *ConstantIntegerInfo) readInfo(cp *ClassParser) {
 	self.Value = int32(bytes)
 }
 
-/**
+/*
+*
 常量池中float
 四字节
-CONSTANT_FLOAT_INFO {
-	u1 tag;
-	u4 bytes;
-}
+
+	CONSTANT_FLOAT_INFO {
+		u1 tag;
+		u4 bytes;
+	}
 */
 type ConstantFloatInfo struct {
 	Type  string
@@ -39,14 +43,16 @@ func (self *ConstantFloatInfo) readInfo(cp *ClassParser) {
 	self.Value = math.Float32frombits(bytes)
 }
 
-/**
+/*
+*
 常量池中long
 特殊一些 八字节，分成高8字节和低8字节
-CONSTANT_LONG_INFO {
-	u1 tag;
-	u4 high_bytes;
-	u4 low_bytes;
-}
+
+	CONSTANT_LONG_INFO {
+		u1 tag;
+		u4 high_bytes;
+		u4 low_bytes;
+	}
 */
 type ConstantLongInfo struct {
 	Type  string
@@ -58,14 +64,16 @@ func (self *ConstantLongInfo) readInfo(cp *ClassParser) {
 	self.Value = int64(bytes)
 }
 
-/**
+/*
+*
 常量池中double
 同样特殊 八字节
-CONSTANT_DOUBLE_INFO {
-	u1 tag;
-	u4 high_bytes;
-	u4 low_bytes;
-}
+
+	CONSTANT_DOUBLE_INFO {
+		u1 tag;
+		u4 high_bytes;
+		u4 low_bytes;
+	}
 */
 type ConstantDoubleInfo struct {
 	Type  string

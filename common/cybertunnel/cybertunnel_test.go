@@ -4,10 +4,10 @@ import (
 	"context"
 	"google.golang.org/grpc"
 	"net"
-	"yaklang/common/cybertunnel/tpb"
-	"yaklang/common/utils"
 	"testing"
 	"time"
+	"yaklang/common/cybertunnel/tpb"
+	"yaklang/common/utils"
 )
 
 func testServer() (tpb.TunnelClient, tpb.TunnelServer) {

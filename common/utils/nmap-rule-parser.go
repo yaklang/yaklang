@@ -3,8 +3,8 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"yaklang/common/log"
 	"regexp"
+	"yaklang/common/log"
 )
 
 type ProtoType string

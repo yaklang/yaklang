@@ -7,6 +7,9 @@ import (
 	"github.com/jinzhu/gorm"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
@@ -16,9 +19,6 @@ import (
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 var saveYakitLogLock = new(sync.Mutex)

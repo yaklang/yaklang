@@ -3,10 +3,10 @@ package core
 import (
 	"github.com/go-rod/rod"
 	"net/url"
-	"yaklang/common/utils"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"yaklang/common/utils"
 )
 
 func (crawler *CrawlerX) Visible(element *rod.Element) bool {

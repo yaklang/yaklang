@@ -26,7 +26,7 @@ const (
 
 // BucketEntries ...
 //
-// Number of entries per bucket denoted as b
+// # Number of entries per bucket denoted as b
 //
 // Example:
 //
@@ -39,7 +39,7 @@ func BucketEntries(entries uint) ConfigOption {
 
 // BucketTotal ...
 //
-// Number of buckets in the Filter denoted as m
+// # Number of buckets in the Filter denoted as m
 //
 // Example:
 //
@@ -52,7 +52,7 @@ func BucketTotal(total uint) ConfigOption {
 
 // FingerprintLength ...
 //
-// Length of the item fingerprint denoted as f
+// # Length of the item fingerprint denoted as f
 //
 // Example:
 //
@@ -68,7 +68,7 @@ func FingerprintLength(length uint) ConfigOption {
 
 // Kicks ...
 //
-// Maximum number of kicks to attempt when bucket collisions occur
+// # Maximum number of kicks to attempt when bucket collisions occur
 //
 // Example:
 //

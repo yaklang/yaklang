@@ -3,8 +3,8 @@ package fp
 import (
 	"context"
 	"github.com/pkg/errors"
-	utils2 "yaklang/common/utils"
 	"sync"
+	utils2 "yaklang/common/utils"
 )
 
 type Pool struct {
@@ -17,7 +17,6 @@ type Pool struct {
 	callbacks []PoolCallback
 }
 
-//
 type PoolTask struct {
 	Host    string
 	Port    int

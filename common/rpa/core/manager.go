@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"yaklang/common/filter"
 	"yaklang/common/log"
 	"yaklang/common/rpa/captcha"
@@ -13,7 +14,6 @@ import (
 	"yaklang/common/rpa/web"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"

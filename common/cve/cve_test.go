@@ -2,10 +2,10 @@ package cve
 
 import (
 	"fmt"
-	"yaklang/common/cve/cvequeryops"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/cve/cvequeryops"
 )
 
 func TestQueryCWE(t *testing.T) {

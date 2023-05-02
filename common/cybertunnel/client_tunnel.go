@@ -6,11 +6,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"io"
 	"net"
+	"sync"
 	"yaklang/common/cybertunnel/ctxio"
 	"yaklang/common/cybertunnel/tpb"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"sync"
 )
 
 var tunnelContexts = new(sync.Map)
@@ -20,7 +20,7 @@ func outputToVerbose(o *tpb.TunnelOutput) string {
 }
 
 /*
-	channel context¬
+channel context¬
 */
 type channelContext struct {
 	feedback io.Writer

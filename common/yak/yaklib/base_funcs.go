@@ -2,8 +2,8 @@ package yaklib
 
 import (
 	"fmt"
-	"yaklang/common/log"
 	"strconv"
+	"yaklang/common/log"
 )
 
 func parseInt(s string) int {

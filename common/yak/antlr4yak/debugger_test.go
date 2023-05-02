@@ -2,8 +2,8 @@ package antlr4yak
 
 import (
 	"context"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.Debugger)) {

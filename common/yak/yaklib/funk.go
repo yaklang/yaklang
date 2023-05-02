@@ -2,10 +2,10 @@ package yaklib
 
 import (
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
 	"reflect"
 	"sort"
+	"yaklang/common/go-funk"
+	"yaklang/common/utils"
 )
 
 func intersect(x interface{}, y interface{}) interface{} {

@@ -40,13 +40,11 @@ func IsUndefinedType(val interface{}) bool {
 // -----------------------------------------------------------------------------
 
 // A Chan represents chan class in yak.
-//
 type Chan struct {
 	Data reflect.Value
 }
 
 // A DataIndex represents a compound data and its index. such as map[index], slice[index], object.member.
-//
 type DataIndex struct {
 	Data        interface{}
 	Index       interface{}
@@ -56,7 +54,6 @@ type DataIndex struct {
 // -----------------------------------------------------------------------------
 
 // GoTyper is required by `yak type` spec.
-//
 type GoTyper interface {
 	GoType() reflect.Type
 }
@@ -74,34 +71,29 @@ func GoTypeFunc(r reflect.Type) GoTyper {
 }
 
 // A Type represents a yak builtin type.
-//
 type Type struct {
 	t reflect.Type
 }
 
 // NewType returns a yak builtin type object.
-//
 func NewType(t reflect.Type) *Type {
 
 	return &Type{t: t}
 }
 
 // StructOf returns a yak builtin type object.
-//
 func StructOf(ptr interface{}) *Type {
 
 	return &Type{t: reflect.TypeOf(ptr).Elem()}
 }
 
 // GoType returns the underlying go type. required by `yak type` spec.
-//
 func (p *Type) GoType() reflect.Type {
 
 	return p.t
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p *Type) NewInstance(args ...interface{}) interface{} {
 
 	ret := reflect.New(p.t)
@@ -113,7 +105,6 @@ func (p *Type) NewInstance(args ...interface{}) interface{} {
 }
 
 // Call returns `T(a)`.
-//
 func (p *Type) Call(a interface{}) interface{} {
 
 	if a == nil {
@@ -128,21 +119,18 @@ func (p *Type) String() string {
 }
 
 // TySliceOf represents the `[]T` type.
-//
 func TySliceOf(elem reflect.Type) *Type {
 
 	return &Type{t: reflect.SliceOf(elem)}
 }
 
 // TyMapOf represents the `map[key]elem` type.
-//
 func TyMapOf(key, elem reflect.Type) *Type {
 
 	return &Type{t: reflect.MapOf(key, elem)}
 }
 
 // TyPtrTo represents the `*T` type.
-//
 func TyPtrTo(elem reflect.Type) *Type {
 
 	return &Type{t: reflect.PtrTo(elem)}
@@ -151,35 +139,30 @@ func TyPtrTo(elem reflect.Type) *Type {
 // -----------------------------------------------------------------------------
 
 // A TypeEx represents a yak builtin type with a cast function.
-//
 type TypeEx struct {
 	t    reflect.Type
 	Call interface{}
 }
 
 // NewTypeEx returns a yak builtin type object with a cast function.
-//
 func NewTypeEx(t reflect.Type, cast interface{}) *TypeEx {
 
 	return &TypeEx{t: t, Call: cast}
 }
 
 // StructOfEx returns a yak builtin type object with a cast function.
-//
 func StructOfEx(ptr interface{}, cast interface{}) *TypeEx {
 
 	return &TypeEx{t: reflect.TypeOf(ptr).Elem(), Call: cast}
 }
 
 // GoType returns the underlying go type. required by `yak type` spec.
-//
 func (p *TypeEx) GoType() reflect.Type {
 
 	return p.t
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p *TypeEx) NewInstance(args ...interface{}) interface{} {
 
 	ret := reflect.New(p.t)
@@ -197,7 +180,6 @@ func (p *TypeEx) String() string {
 // -----------------------------------------------------------------------------
 
 // AutoConvert converts a value to specified type automatically.
-//
 func AutoConvert(v reflect.Value, t reflect.Type) reflect.Value {
 
 	tkind := t.Kind()
@@ -226,13 +208,11 @@ func convertible(kind, tkind reflect.Kind) bool {
 // -----------------------------------------------------------------------------
 
 // A Module represents a yak module to be imported.
-//
 type Module struct {
 	Exports map[string]interface{}
 }
 
 // Disable disables some export names.
-//
 func (p Module) Disable(fnNames ...string) {
 
 	for _, fnName := range fnNames {
@@ -241,7 +221,6 @@ func (p Module) Disable(fnNames ...string) {
 }
 
 // GoModuleName returns name of a yak module.
-//
 func GoModuleName(table map[string]interface{}) (name string, ok bool) {
 
 	name, ok = table["_name"].(string)
@@ -376,7 +355,6 @@ var (
 // -----------------------------------------------------------------------------
 
 // Fntable is function table required by tpl.Interpreter engine.
-//
 var Fntable = map[string]interface{}{
 	"$neg":  dummy1,
 	"$elem": dummy1,
@@ -408,19 +386,16 @@ var Fntable = map[string]interface{}{
 // -----------------------------------------------------------------------------
 
 // SafeMode is the init mode of yak.
-//
 var SafeMode bool
 
 var goMods []string
 
 // GoModuleList returns yak modules implemented by Go.
-//
 func GoModuleList() []string {
 	return goMods
 }
 
 // Import imports a yak module implemented by Go.
-//
 func Import(mod string, table map[string]interface{}) {
 
 	if SafeMode {
@@ -470,19 +445,16 @@ var (
 )
 
 // SetAutoCall is reserved for internal use.
-//
 func SetAutoCall(t reflect.Type) {
 	AutoCall[t] = true
 }
 
 // SetDontTyNormalize is reserved for internal use.
-//
 func SetDontTyNormalize(t reflect.Type) {
 	DontTyNormalize[t] = true
 }
 
 // SetDumpStack set to dump stack or not.
-//
 func SetDumpStack(dump bool) {
 	DumpStack = dump
 }

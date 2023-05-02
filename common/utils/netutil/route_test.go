@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/tatsushid/go-fastping"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"testing"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func TestRoute(t *testing.T) {

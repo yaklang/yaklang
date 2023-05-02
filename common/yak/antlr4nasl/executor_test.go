@@ -3,9 +3,9 @@ package antlr4nasl
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
+	"testing"
 	nasl "yaklang/common/yak/antlr4nasl/parser"
 	"yaklang/common/yak/antlr4nasl/visitors"
-	"testing"
 )
 
 func TestCode(t *testing.T) {

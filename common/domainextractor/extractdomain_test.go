@@ -3,9 +3,9 @@ package domainextractor
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/utils"
 	"strings"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestTryDecode(t *testing.T) {

@@ -6,13 +6,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 	"github.com/tevino/abool"
+	"sync"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/mq"
 	"yaklang/common/spec"
 	"yaklang/common/utils/healthinfo"
 	"yaklang/common/yak"
-	"sync"
-	"time"
 )
 
 type NodeBase struct {

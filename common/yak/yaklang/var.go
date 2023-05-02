@@ -1,8 +1,8 @@
 package yaklang
 
 import (
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"reflect"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func IsYakFunction(i interface{}) bool {

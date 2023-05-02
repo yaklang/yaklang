@@ -3,11 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"testing"
 	"yaklang/common/utils"
 	"yaklang/common/yak"
 	"yaklang/common/yak/yakdoc"
 	"yaklang/common/yak/yaklang"
-	"testing"
 )
 
 func TestGetnerateDoc(t *testing.T) {

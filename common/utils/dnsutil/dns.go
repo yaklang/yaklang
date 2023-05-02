@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func qualifyDomain(domain string) string {

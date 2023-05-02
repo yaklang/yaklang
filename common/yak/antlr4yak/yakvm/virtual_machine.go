@@ -3,10 +3,10 @@ package yakvm
 import (
 	"context"
 	"fmt"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"sync"
 )
 
 type ExecFlag int

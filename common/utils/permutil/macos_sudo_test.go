@@ -8,16 +8,16 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"yaklang/common/consts"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/ziputil"
-	"yaklang/common/yak/yaklib/codec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+	"yaklang/common/consts"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/ziputil"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func TestDarwinSudo(t *testing.T) {

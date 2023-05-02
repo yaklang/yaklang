@@ -1,10 +1,10 @@
 package cui
 
 import (
-	utils2 "yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+	utils2 "yaklang/common/utils"
 )
 
 func TestStatusText_Read(t *testing.T) {

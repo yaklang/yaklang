@@ -2,10 +2,10 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"strings"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type ExtractedData struct {

@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"net/url"
+	"strings"
 	log "yaklang/common/log"
 	utils2 "yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
 )
 
 type HTTPResponseInfo struct {

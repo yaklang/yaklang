@@ -3,9 +3,9 @@ package license
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"yaklang/common/utils/tlsutils"
 	"testing"
 	"time"
+	"yaklang/common/utils/tlsutils"
 )
 
 func TestNewMachine(t *testing.T) {

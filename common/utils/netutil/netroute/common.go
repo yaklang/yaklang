@@ -6,8 +6,8 @@
 
 // Originally found in
 // https://github.com/google/gopacket/blob/master/routing/routing.go
-// * Route selection modified to choose most selective route
-//   to break ties when route priority is insufficient.
+//   - Route selection modified to choose most selective route
+//     to break ties when route priority is insufficient.
 package netroute
 
 import (

@@ -3,10 +3,10 @@ package license
 import (
 	"encoding/json"
 	"io/ioutil"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/tlsutils"
-	"time"
 )
 
 type Request struct {

@@ -2,12 +2,12 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"reflect"
 	"strconv"
 	"sync"
+	"yaklang/common/go-funk"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type Value struct {

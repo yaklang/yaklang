@@ -4,10 +4,10 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/simulator/config"
 	"yaklang/common/utils"
-	"strings"
 )
 
 const maxScanLevel = 3

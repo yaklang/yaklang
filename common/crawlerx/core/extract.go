@@ -3,10 +3,10 @@ package core
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 func (crawler *CrawlerX) ExtractUrl(page *GeneralPage) error {

@@ -5,11 +5,11 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/rpa/character"
 	"yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func RandomNumberGenerate(start int, end int, count int) ([]int, error) {

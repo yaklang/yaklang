@@ -15,7 +15,6 @@ var (
 )
 
 // Reflect returns reflect.Type of typ.
-//
 func Reflect(typ interface{}) reflect.Type {
 
 	if t, ok := typ.(yaklangspec.GoTyper); ok {

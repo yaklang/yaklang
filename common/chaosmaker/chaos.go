@@ -1,8 +1,8 @@
 package chaosmaker
 
 import (
-	"yaklang/common/suricata"
 	"sync"
+	"yaklang/common/suricata"
 )
 
 /*
@@ -19,5 +19,6 @@ type chaosHandler struct {
 }
 
 // chaosMap means registered map for rule
-//    act: map[string]chaosHandler
+//
+//	act: map[string]chaosHandler
 var chaosMap = new(sync.Map)

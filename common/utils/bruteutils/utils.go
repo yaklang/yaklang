@@ -2,10 +2,10 @@ package bruteutils
 
 import (
 	"fmt"
+	"regexp"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"regexp"
 )
 
 func keywordToRegexp(k string) *regexp.Regexp {

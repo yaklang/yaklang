@@ -3,8 +3,8 @@ package synscan
 import (
 	"math/rand"
 	"net"
-	"yaklang/common/utils"
 	"time"
+	"yaklang/common/utils"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

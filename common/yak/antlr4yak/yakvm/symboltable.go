@@ -2,9 +2,9 @@ package yakvm
 
 import (
 	"errors"
-	"yaklang/common/log"
 	"strings"
 	"sync"
+	"yaklang/common/log"
 )
 
 type SymbolTable struct {

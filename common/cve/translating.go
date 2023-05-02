@@ -6,12 +6,12 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/cve/cveresources"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) error {

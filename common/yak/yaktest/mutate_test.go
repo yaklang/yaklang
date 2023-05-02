@@ -2,10 +2,10 @@ package yaktest
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"testing"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
 	"yaklang/common/yak"
-	"testing"
 )
 
 func TestMisc_Mutate1(t *testing.T) {

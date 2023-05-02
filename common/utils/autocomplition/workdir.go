@@ -5,9 +5,9 @@ import (
 	"github.com/c-bata/go-prompt"
 	"io/ioutil"
 	"os"
-	utils2 "yaklang/common/utils"
 	"path"
 	"strings"
+	utils2 "yaklang/common/utils"
 )
 
 func fileInfoToPromptSuggest(file os.FileInfo) prompt.Suggest {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func queryDNS(domain string, servers []string, ctx context.Context, timeout time.Duration, client *dns.Client, qType uint16) (_ *dns.Msg, _ time.Duration, server string, _ error) {

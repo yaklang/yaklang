@@ -2,10 +2,10 @@ package httptpl
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"testing"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"testing"
 )
 
 func TestCreateYakTemplateFromNucleiTemplateRaw(t *testing.T) {

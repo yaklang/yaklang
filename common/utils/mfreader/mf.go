@@ -3,9 +3,9 @@ package mfreader
 import (
 	"io"
 	"os"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"sync"
 )
 
 type MultiFileLineReader struct {

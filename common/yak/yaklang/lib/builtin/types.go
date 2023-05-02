@@ -28,11 +28,9 @@ var (
 )
 
 // TyByte represents the `byte` type.
-//
 var TyByte = TyUint8
 
 // TyFloat represents the `float` type.
-//
 var TyFloat = TyFloat64
 
 // -----------------------------------------------------------------------------
@@ -45,7 +43,6 @@ func (p tyVar) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyVar) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(interface{})
@@ -66,7 +63,6 @@ func (p tyVar) String() string {
 }
 
 // TyVar represents the `var` type.
-//
 var TyVar = tyVar(0)
 
 // -----------------------------------------------------------------------------
@@ -97,7 +93,6 @@ func init() {
 // -----------------------------------------------------------------------------
 
 // Elem returns *a
-//
 func Elem(a interface{}) interface{} {
 
 	if t, ok := a.(yaksepc.GoTyper); ok {
@@ -107,7 +102,6 @@ func Elem(a interface{}) interface{} {
 }
 
 // Slice returns []T
-//
 func Slice(elem interface{}) interface{} {
 
 	if t, ok := elem.(yaksepc.GoTyper); ok {
@@ -117,7 +111,6 @@ func Slice(elem interface{}) interface{} {
 }
 
 // Map returns map[key]elem
-//
 func Map(key, elem interface{}) interface{} {
 
 	tkey, ok := key.(yaksepc.GoTyper)
@@ -134,7 +127,6 @@ func Map(key, elem interface{}) interface{} {
 // -----------------------------------------------------------------------------
 
 // Make creates a instance of yaksepc builtin type (slice, map and chan)
-//
 func Make(typ yaksepc.GoTyper, args ...int) interface{} {
 
 	t := typ.GoType()

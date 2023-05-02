@@ -3,8 +3,8 @@ package cveresources
 import (
 	"fmt"
 	"github.com/antchfx/xmlquery"
-	"yaklang/common/log"
 	"time"
+	"yaklang/common/log"
 )
 
 type CNNVD struct {

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/antlr4yak/yakast"
 	"yaklang/common/yak/antlr4yak/yakvm"
-	"sort"
 
 	"github.com/davecgh/go-spew/spew"
 )

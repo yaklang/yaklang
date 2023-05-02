@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	utils2 "yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yserx"
 	"yaklang/common/yso"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type T3Paylaod struct {
@@ -274,18 +274,19 @@ func (t *T3Paylaod) Read(conn net.Conn) ([]byte, error) {
 	return byt, nil
 }
 
-//func (t *T3Paylaod) ShowBytes(timeout time.Duration) {
-//	byt, err := utils2.ReadConnWithTimeout(t.conn, timeout)
-//	if err != nil {
+//	func (t *T3Paylaod) ShowBytes(timeout time.Duration) {
+//		byt, err := utils2.ReadConnWithTimeout(t.conn, timeout)
+//		if err != nil {
+//		}
+//		println(codec.EncodeToHex(byt))
 //	}
-//	println(codec.EncodeToHex(byt))
-//}
-//func (t *T3Paylaod) ShowStr(timeout time.Duration) {
-//	byt, err := utils2.ReadConnWithTimeout(t.conn, timeout)
-//	if err != nil {
+//
+//	func (t *T3Paylaod) ShowStr(timeout time.Duration) {
+//		byt, err := utils2.ReadConnWithTimeout(t.conn, timeout)
+//		if err != nil {
+//		}
+//		println(string(byt))
 //	}
-//	println(string(byt))
-//}
 func (t *T3Paylaod) genLookup(name string) []byte {
 	var payload []byte
 	space := "supeream"

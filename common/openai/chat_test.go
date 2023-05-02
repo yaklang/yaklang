@@ -3,10 +3,10 @@ package openai
 import (
 	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
-	"yaklang/common/consts"
 	"path/filepath"
 	"strings"
 	"testing"
+	"yaklang/common/consts"
 )
 
 func getKey() string {

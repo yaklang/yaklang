@@ -2,8 +2,8 @@ package iotdevfp
 
 import (
 	"context"
-	"yaklang/common/utils/lowhttp"
 	"testing"
+	"yaklang/common/utils/lowhttp"
 )
 
 func TestFetchBannerFromHostPort(t *testing.T) {

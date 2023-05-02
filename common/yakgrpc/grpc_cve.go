@@ -7,6 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/cve/cvequeryops"
 	"yaklang/common/cve/cveresources"
@@ -15,9 +18,6 @@ import (
 	"yaklang/common/utils"
 	"yaklang/common/utils/progresswriter"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (s *Server) QueryCVE(ctx context.Context, req *ypb.QueryCVERequest) (*ypb.QueryCVEResponse, error) {

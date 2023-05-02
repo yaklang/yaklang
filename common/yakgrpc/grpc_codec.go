@@ -8,6 +8,8 @@ import (
 	"moul.io/http2curl"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"yaklang/common/authhack"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
@@ -19,8 +21,6 @@ import (
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
 	"yaklang/common/yserx"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*ypb.AutoDecodeResponse, error) {

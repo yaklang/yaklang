@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"yaklang/common/gopsutil/internal/common"
 	"regexp"
 	"strconv"
 	"strings"
+	"yaklang/common/gopsutil/internal/common"
 )
 
 var (

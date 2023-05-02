@@ -3,7 +3,6 @@ package builtin
 // -----------------------------------------------------------------------------
 
 // Lshr returns a << b
-//
 func Lshr(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -17,7 +16,6 @@ func Lshr(a, b interface{}) interface{} {
 }
 
 // Rshr returns a >> b
-//
 func Rshr(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -31,7 +29,6 @@ func Rshr(a, b interface{}) interface{} {
 }
 
 // Xor returns a ^ b
-//
 func Xor(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -45,7 +42,6 @@ func Xor(a, b interface{}) interface{} {
 }
 
 // BitAnd returns a & b
-//
 func BitAnd(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -59,7 +55,6 @@ func BitAnd(a, b interface{}) interface{} {
 }
 
 // BitOr returns a | b
-//
 func BitOr(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -73,7 +68,6 @@ func BitOr(a, b interface{}) interface{} {
 }
 
 // BitNot returns ^a
-//
 func BitNot(a interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -84,7 +78,6 @@ func BitNot(a interface{}) interface{} {
 }
 
 // AndNot returns a &^ b
-//
 func AndNot(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {

@@ -7,10 +7,10 @@ import (
 	"net"
 	"os/exec"
 	"os/user"
-	"yaklang/common/gopsutil/host"
-	"yaklang/common/log"
 	"runtime"
 	"strings"
+	"yaklang/common/gopsutil/host"
+	"yaklang/common/log"
 )
 
 func GetSystemInfo() (*host.InfoStat, error) {

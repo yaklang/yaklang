@@ -8,12 +8,12 @@ import (
 	tablewriter "github.com/olekukonko/tablewriter"
 	"io/ioutil"
 	"os"
-	"yaklang/common/fp/webfingerprint"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"strconv"
 	"strings"
+	"yaklang/common/fp/webfingerprint"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type FingerprintInfo struct {

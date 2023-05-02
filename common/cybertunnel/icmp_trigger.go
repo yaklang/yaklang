@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil"
-	"sync"
-	"time"
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/google/gopacket"

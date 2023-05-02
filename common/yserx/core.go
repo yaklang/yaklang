@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
 	"reflect"
 	"strconv"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 // https://docs.oracle.com/javase/7/docs/platform/serialization/spec/protocol.html
@@ -1236,12 +1236,12 @@ func (p *JavaSerializationParser) readNewClass(r *bufio.Reader) (*JavaClass, err
 	return cl, nil
 }
 
-/*******************
- * Read a blockdatashort element from the stream.
- *
- * TC_BLOCKDATA		(unsigned byte)size		contents
-
- */
+/*
+******************
+  - Read a blockdatashort element from the stream.
+    *
+  - TC_BLOCKDATA		(unsigned byte)size		contents
+*/
 func (p *JavaSerializationParser) readBlockData(r *bufio.Reader) (*JavaBlockData, error) {
 	_, err := r.ReadByte()
 	if err != nil {

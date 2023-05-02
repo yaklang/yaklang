@@ -70,10 +70,11 @@ func NewBlacklistModifier(names ...string) martian.RequestResponseModifier {
 // a blacklistModifier and an error.
 //
 // Example JSON configuration message:
-// {
-//   "names": ["X-Header", "Y-Header"],
-//   "scope": ["request", "result"]
-// }
+//
+//	{
+//	  "names": ["X-Header", "Y-Header"],
+//	  "scope": ["request", "result"]
+//	}
 func blacklistModifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &blacklistModifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

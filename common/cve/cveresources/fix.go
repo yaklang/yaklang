@@ -2,9 +2,9 @@ package cveresources
 
 import (
 	"github.com/jinzhu/gorm"
-	"yaklang/common/log"
 	"regexp"
 	"strings"
+	"yaklang/common/log"
 )
 
 func generalFix(ProductName string, Products []ProductsTable) string {

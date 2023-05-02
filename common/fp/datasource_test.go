@@ -1,8 +1,8 @@
 package fp
 
 import (
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestGetDefaultNmapServiceProbeRules(t *testing.T) {

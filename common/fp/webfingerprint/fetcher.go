@@ -9,10 +9,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
 	"strconv"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/utils/lowhttp"
 )
 
 func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, proxy ...string) (bool, []*HTTPResponseInfo, error) {

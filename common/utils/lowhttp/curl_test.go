@@ -1,8 +1,8 @@
 package lowhttp
 
 import (
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestCurlToHTTPRequest(t *testing.T) {

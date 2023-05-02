@@ -3,9 +3,9 @@ package finscan
 import (
 	"github.com/google/gopacket"
 	"github.com/pkg/errors"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 )
 
 func (s *Scanner) sleepRateLimit() {

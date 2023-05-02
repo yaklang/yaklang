@@ -3,11 +3,11 @@ package yakvm
 import (
 	"fmt"
 	"math/rand"
+	"strings"
+	"unicode"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
-	"strings"
-	"unicode"
 )
 
 func NewStringMethodFactory(f func(string) interface{}) MethodFactory {

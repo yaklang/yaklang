@@ -3,10 +3,10 @@ package bruteutils
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 var redisAuth = &DefaultServiceAuthInfo{

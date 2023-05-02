@@ -3,9 +3,9 @@ package finscan
 import (
 	"math/rand"
 	"net"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

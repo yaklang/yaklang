@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"yaklang/common/yserx"
 	"reflect"
+	"yaklang/common/yserx"
 )
 
 type T3Header struct {

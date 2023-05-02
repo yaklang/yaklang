@@ -14,7 +14,6 @@ func (p tyFloat32) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyFloat32) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(float32)
@@ -35,7 +34,6 @@ func (p tyFloat32) String() string {
 }
 
 // TyFloat32 represents the `float32` type.
-//
 var TyFloat32 = tyFloat32(0)
 
 // -----------------------------------------------------------------------------
@@ -48,7 +46,6 @@ func (p tyFloat64) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyFloat64) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(float64)
@@ -69,7 +66,6 @@ func (p tyFloat64) String() string {
 }
 
 // TyFloat64 represents the `float64` type.
-//
 var TyFloat64 = tyFloat64(0)
 
 // -----------------------------------------------------------------------------
@@ -82,7 +78,6 @@ func (p tyInt) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyInt) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(int)
@@ -103,7 +98,6 @@ func (p tyInt) String() string {
 }
 
 // TyInt represents the `int` type.
-//
 var TyInt = tyInt(0)
 
 // -----------------------------------------------------------------------------
@@ -116,7 +110,6 @@ func (p tyInt8) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyInt8) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(int8)
@@ -137,7 +130,6 @@ func (p tyInt8) String() string {
 }
 
 // TyInt8 represents the `int8` type.
-//
 var TyInt8 = tyInt8(0)
 
 // -----------------------------------------------------------------------------
@@ -150,7 +142,6 @@ func (p tyInt16) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyInt16) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(int16)
@@ -171,7 +162,6 @@ func (p tyInt16) String() string {
 }
 
 // TyInt16 represents the `int16` type.
-//
 var TyInt16 = tyInt16(0)
 
 // -----------------------------------------------------------------------------
@@ -184,7 +174,6 @@ func (p tyInt32) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyInt32) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(int32)
@@ -205,7 +194,6 @@ func (p tyInt32) String() string {
 }
 
 // TyInt32 represents the `int32` type.
-//
 var TyInt32 = tyInt32(0)
 
 // -----------------------------------------------------------------------------
@@ -218,7 +206,6 @@ func (p tyInt64) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyInt64) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(int64)
@@ -239,7 +226,6 @@ func (p tyInt64) String() string {
 }
 
 // TyInt64 represents the `int64` type.
-//
 var TyInt64 = tyInt64(0)
 
 // -----------------------------------------------------------------------------
@@ -252,7 +238,6 @@ func (p tyUint) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyUint) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(uint)
@@ -273,7 +258,6 @@ func (p tyUint) String() string {
 }
 
 // TyUint represents the `uint` type.
-//
 var TyUint = tyUint(0)
 
 // -----------------------------------------------------------------------------
@@ -286,7 +270,6 @@ func (p tyUint8) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyUint8) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(uint8)
@@ -307,7 +290,6 @@ func (p tyUint8) String() string {
 }
 
 // TyUint8 represents the `uint8` type.
-//
 var TyUint8 = tyUint8(0)
 
 // -----------------------------------------------------------------------------
@@ -320,7 +302,6 @@ func (p tyUint16) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyUint16) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(uint16)
@@ -341,7 +322,6 @@ func (p tyUint16) String() string {
 }
 
 // TyUint16 represents the `uint16` type.
-//
 var TyUint16 = tyUint16(0)
 
 // -----------------------------------------------------------------------------
@@ -354,7 +334,6 @@ func (p tyUint32) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyUint32) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(uint32)
@@ -375,7 +354,6 @@ func (p tyUint32) String() string {
 }
 
 // TyUint32 represents the `uint32` type.
-//
 var TyUint32 = tyUint32(0)
 
 // -----------------------------------------------------------------------------
@@ -388,7 +366,6 @@ func (p tyUint64) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyUint64) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(uint64)
@@ -409,7 +386,6 @@ func (p tyUint64) String() string {
 }
 
 // TyUint64 represents the `uint64` type.
-//
 var TyUint64 = tyUint64(0)
 
 // -----------------------------------------------------------------------------
@@ -422,7 +398,6 @@ func (p tyString) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyString) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(string)
@@ -442,7 +417,6 @@ func (p tyString) String() string {
 }
 
 // TyString represents the `string` type.
-//
 var TyString = tyString(0)
 
 // -----------------------------------------------------------------------------
@@ -455,7 +429,6 @@ func (p tyBool) GoType() reflect.Type {
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
-//
 func (p tyBool) NewInstance(args ...interface{}) interface{} {
 
 	ret := new(bool)
@@ -476,7 +449,6 @@ func (p tyBool) String() string {
 }
 
 // TyBool represents the `bool` type.
-//
 var TyBool = tyBool(0)
 
 // -----------------------------------------------------------------------------

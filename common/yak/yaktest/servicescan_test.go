@@ -2,9 +2,9 @@ package yaktest
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"testing"
 	"yaklang/common/utils"
 	"yaklang/common/utils/tlsutils"
-	"testing"
 )
 
 func TestServiceScanOne(t *testing.T) {

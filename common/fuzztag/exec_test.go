@@ -3,11 +3,11 @@ package fuzztag
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
 	"strconv"
 	"strings"
 	"testing"
+	"yaklang/common/go-funk"
+	"yaklang/common/utils"
 )
 
 func TestExecuteWithRam(t *testing.T) {

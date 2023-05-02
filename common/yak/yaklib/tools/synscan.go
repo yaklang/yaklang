@@ -6,6 +6,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"net"
 	"os"
+	"sync"
+	"time"
 	"yaklang/common/filter"
 	"yaklang/common/hybridscan"
 	"yaklang/common/log"
@@ -14,8 +16,6 @@ import (
 	"yaklang/common/utils/hostsparser"
 	"yaklang/common/utils/pcapfix"
 	"yaklang/common/utils/pingutil"
-	"sync"
-	"time"
 )
 
 type _yakPortScanConfig struct {

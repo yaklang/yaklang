@@ -7,10 +7,10 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"golang.org/x/net/context"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/simulator/config"
 	"yaklang/common/utils"
-	"time"
 )
 
 type GeneralPage struct {

@@ -25,12 +25,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/utils/socksproxy"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils/socksproxy"
 )
 
 // SimpleRoundTripper 简单的单次HTTP/HTTPS（国密） 连接往返器

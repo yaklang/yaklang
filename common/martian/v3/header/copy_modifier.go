@@ -66,13 +66,14 @@ func NewCopyModifier(from, to string) martian.RequestResponseModifier {
 // copyModifierFromJSON builds a copy modifier from JSON.
 //
 // Example JSON:
-// {
-//   "header.Copy": {
-//     "scope": ["request", "response"],
-//     "from": "Original-Header",
-//     "to": "Copy-Header"
-//   }
-// }
+//
+//	{
+//	  "header.Copy": {
+//	    "scope": ["request", "response"],
+//	    "from": "Original-Header",
+//	    "to": "Copy-Header"
+//	  }
+//	}
 func copyModifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &copyModifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

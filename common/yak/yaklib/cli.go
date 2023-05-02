@@ -5,10 +5,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"yaklang/common/utils"
 	"path"
 	"path/filepath"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type cliExtraParams struct {

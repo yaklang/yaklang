@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"yaklang/common/consts"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"sort"
 	"strconv"
 	"strings"
+	"yaklang/common/consts"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type InteractiveDebugger struct {

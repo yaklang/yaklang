@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/url"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
 	"testing"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/utils/lowhttp"
 )
 
 func TestMITM_SetTransparentHijackResponse(t *testing.T) {

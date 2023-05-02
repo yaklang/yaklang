@@ -8,10 +8,10 @@ import (
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 	"io/ioutil"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
 	"regexp"
 	"testing"
+	"yaklang/common/log"
+	utils2 "yaklang/common/utils"
 )
 
 func TestRDPRegexp2MatchFailed(t *testing.T) {

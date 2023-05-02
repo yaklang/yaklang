@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"net"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type hostsBlock interface {

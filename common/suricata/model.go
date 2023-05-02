@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/regen"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/regen"
 )
 
 type Rule struct {

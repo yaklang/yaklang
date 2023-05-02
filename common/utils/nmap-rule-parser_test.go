@@ -2,8 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 var (

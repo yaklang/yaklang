@@ -9,14 +9,14 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"reflect"
+	"sort"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yak/yaklib/yakhttp"
-	"reflect"
-	"sort"
-	"strings"
 )
 
 type FuzzHTTPRequest struct {

@@ -2,11 +2,11 @@ package suricata
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"strings"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/suricata/parser"
 	"yaklang/common/utils"
-	"strings"
 )
 
 func (r *RuleSyntaxVisitor) Errorf(msg string, items ...interface{}) {

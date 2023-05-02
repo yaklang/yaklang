@@ -3,11 +3,11 @@ package spacengine
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/spacengine/fofa"
 	"yaklang/common/utils/suspect"
-	"strings"
 )
 
 func FofaQuery(email string, fofaKey string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {

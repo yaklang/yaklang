@@ -3,10 +3,10 @@ package lowhttp
 import (
 	"fmt"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"runtime"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func GetHostsFilePath() string {

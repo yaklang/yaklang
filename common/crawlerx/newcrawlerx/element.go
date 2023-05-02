@@ -4,8 +4,8 @@ package newcrawlerx
 
 import (
 	"github.com/go-rod/rod"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 func getInputSubmitElementSelectors(page *rod.Page) []string {

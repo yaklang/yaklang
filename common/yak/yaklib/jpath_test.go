@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"github.com/bcicen/jstream"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/jsonpath"
 	"reflect"
 	"testing"
+	"yaklang/common/jsonpath"
 )
 
 const data = `{

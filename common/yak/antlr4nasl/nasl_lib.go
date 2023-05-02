@@ -8,15 +8,15 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"net"
 	"os"
+	"path"
+	"regexp"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	utils2 "yaklang/common/yak/antlr4nasl/lib"
 	"yaklang/common/yak/antlr4yak/yakvm"
-	"path"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var empty = yakvm.NewValue("empty", nil, "empty")

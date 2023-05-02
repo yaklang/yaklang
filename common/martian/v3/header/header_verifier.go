@@ -144,14 +144,15 @@ func (v *verifier) ResetResponseVerifications() {
 // verifierFromJSON builds a header.Verifier from JSON.
 //
 // Example JSON:
-// {
-//   "name": "header.Verifier",
-//   "scope": ["request", "result"],
-//   "modifier": {
-//     "name": "Martian-Testing",
-//     "value": "true"
-//   }
-// }
+//
+//	{
+//	  "name": "header.Verifier",
+//	  "scope": ["request", "result"],
+//	  "modifier": {
+//	    "name": "Martian-Testing",
+//	    "value": "true"
+//	  }
+//	}
 func verifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &verifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

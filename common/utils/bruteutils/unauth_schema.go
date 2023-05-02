@@ -1,10 +1,10 @@
 package bruteutils
 
 import (
-	"yaklang/common/consts"
-	"yaklang/common/mutate"
 	"strings"
 	"sync"
+	"yaklang/common/consts"
+	"yaklang/common/mutate"
 )
 
 type DefaultServiceAuthInfo struct {

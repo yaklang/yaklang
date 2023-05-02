@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 	_ "net/http/pprof"
+	"testing"
 	"yaklang/common/chaosmaker"
 	"yaklang/common/consts"
 	"yaklang/common/suricata"
-	"testing"
 )
 
 func init() {

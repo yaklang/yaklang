@@ -2,11 +2,11 @@ package vulinbox
 
 import (
 	"context"
-	"yaklang/common/crawler"
-	"yaklang/common/log"
 	"strings"
 	"sync"
 	"testing"
+	"yaklang/common/crawler"
+	"yaklang/common/log"
 )
 
 func reqOnce(target string, onReq func(req *crawler.Req)) {

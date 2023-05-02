@@ -2,9 +2,9 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/utils"
 	"reflect"
 	"strings"
+	"yaklang/common/utils"
 )
 
 var (
@@ -228,7 +228,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 	if reflectType == reflectValue.Type() {
 		return nil
 	}
-	
+
 	targetKind := reflectType.Kind()
 	if targetKind == reflect.Interface {
 		//if targetReflectType != nil && yaklangspec.DontTyNormalize[targetReflectType] { // don't normalize input type

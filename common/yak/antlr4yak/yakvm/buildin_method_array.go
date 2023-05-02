@@ -2,9 +2,9 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/go-funk"
 	"reflect"
 	"sort"
+	"yaklang/common/go-funk"
 )
 
 var buildMethodsArray = map[string]interface{}{}

@@ -3,10 +3,10 @@ package tlsutils
 import (
 	"crypto/tls"
 	"fmt"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type TLSInspectResult struct {

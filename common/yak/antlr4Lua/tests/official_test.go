@@ -3,12 +3,12 @@ package tests
 import (
 	"fmt"
 	"math"
-	"yaklang/common/yak/antlr4Lua"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"reflect"
 	"sort"
 	"strconv"
 	"testing"
+	"yaklang/common/yak/antlr4Lua"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func init() {

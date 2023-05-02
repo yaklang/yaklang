@@ -3,9 +3,9 @@ package yakvm
 import (
 	"fmt"
 	"math"
-	"yaklang/common/utils"
 	"reflect"
 	"runtime"
+	"yaklang/common/utils"
 )
 
 func (v *Value) NativeAsyncCall(vm *Frame, wavy bool, vs ...*Value) interface{} {

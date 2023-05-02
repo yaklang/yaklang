@@ -3,10 +3,10 @@ package comparer
 import (
 	"encoding/json"
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
 	"reflect"
 	"sort"
+	"yaklang/common/go-funk"
+	"yaklang/common/utils"
 )
 
 func getSlice(v reflect.Value, index int) (_ reflect.Value, err error) {

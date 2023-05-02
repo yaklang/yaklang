@@ -2,12 +2,12 @@ package chaosmaker
 
 import (
 	"context"
+	"strings"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/suricata"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 type ChaosMaker struct {

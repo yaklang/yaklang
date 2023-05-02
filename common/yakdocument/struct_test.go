@@ -1,8 +1,8 @@
 package yakdocument
 
 import (
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 type DemoStruct struct {

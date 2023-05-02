@@ -126,7 +126,7 @@ const CommentMatch = `() => {
 }
 `
 
-//const hrefReg = "(src|href)\\s*=\\s*(?:\"(?<1>[^\"]*)\"|(?<1>\\S+))"
+// const hrefReg = "(src|href)\\s*=\\s*(?:\"(?<1>[^\"]*)\"|(?<1>\\S+))"
 const hrefReg2 = `(?:src|href)\s*?\=\s*?(?:\"|\')(.+?)(?:\"|\')`
 
 //const reg = "\\w\\.get\\([\\\"\\'](.*?)[\\\"\\']\\,"

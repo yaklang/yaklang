@@ -2,8 +2,8 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/log"
 	"reflect"
+	"yaklang/common/log"
 
 	uuid "github.com/satori/go.uuid"
 )

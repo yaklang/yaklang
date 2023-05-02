@@ -2,12 +2,12 @@ package yaklib
 
 import (
 	"context"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/hostsparser"
 	"yaklang/common/utils/pingutil"
-	"strings"
-	"time"
 )
 
 type _pingConfig struct {

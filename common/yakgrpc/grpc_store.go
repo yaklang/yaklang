@@ -2,11 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 func (s *Server) UpdateFromYakitResource(ctx context.Context, req *ypb.UpdateFromYakitResourceRequest) (*ypb.Empty, error) {

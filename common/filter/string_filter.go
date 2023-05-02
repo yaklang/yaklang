@@ -3,9 +3,9 @@ package filter
 import (
 	"encoding/binary"
 	"github.com/valyala/bytebufferpool"
+	"sync"
 	"yaklang/common/cuckoo"
 	"yaklang/common/utils"
-	"sync"
 )
 
 var bufferPool = bytebufferpool.Pool{}

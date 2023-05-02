@@ -3,8 +3,8 @@ package yakgrpc
 import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/yakgrpc/ypb"
 	"testing"
+	"yaklang/common/yakgrpc/ypb"
 )
 
 func TestMITMTestStripTest(t *testing.T) {

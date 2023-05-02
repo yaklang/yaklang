@@ -4,26 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jinzhu/gorm"
+	"strconv"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 import "yaklang/common/go-funk"
 
 /*
-	这个结构用于保存当前测试的结果
+这个结构用于保存当前测试的结果
 
-	包含：基本参数+请求数据
+包含：基本参数+请求数据
 
-	耗时+执行结果
+耗时+执行结果
 
-	执行结果包含，失败原因与执行成功的原因。
+执行结果包含，失败原因与执行成功的原因。
 
-	总共有多少个请求
+总共有多少个请求
 */
 type WebFuzzerTask struct {
 	gorm.Model

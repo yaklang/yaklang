@@ -3,12 +3,12 @@ package synscan
 import (
 	"context"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

@@ -6,9 +6,9 @@ import (
 	uuid2 "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"net"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestNewScanner(t *testing.T) {

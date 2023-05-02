@@ -2,9 +2,9 @@ package yakdocument
 
 import (
 	"fmt"
-	"yaklang/common/utils"
 	"reflect"
 	"sort"
+	"yaklang/common/utils"
 )
 
 func ReflectFuncToFunctionDoc(libName string, ret reflect.Type) (ExportsFunctionDoc, error) {

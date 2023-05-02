@@ -6,10 +6,10 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"net/url"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func (starter *BrowserStarter) PageScan(page *rod.Page) error {

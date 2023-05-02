@@ -2,9 +2,9 @@ package jsonpath
 
 import (
 	"encoding/json"
+	"reflect"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"reflect"
 )
 
 func ReplaceAll(j interface{}, jpath string, replaceValue interface{}) map[string]interface{} {

@@ -5,14 +5,14 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
 	"os"
+	"strconv"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"sync"
-	"time"
 )
 
 func MigrateLegacyDatabase() error {

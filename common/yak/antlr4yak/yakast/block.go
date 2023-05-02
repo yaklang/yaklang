@@ -1,8 +1,8 @@
 package yakast
 
 import (
-	yak "yaklang/common/yak/antlr4yak/parser"
 	"strings"
+	yak "yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/google/uuid"
 )

@@ -6,10 +6,10 @@ import (
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 	"net/http"
+	"strings"
 	"yaklang/common/crawlerx/filter"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
 )
 
 type SimpleTestCrawler struct {

@@ -7,10 +7,10 @@ import (
 	"github.com/apex/log"
 	"os"
 	"os/signal"
-	"yaklang/common/crawlerx/filter"
-	"yaklang/common/utils"
 	"syscall"
 	"time"
+	"yaklang/common/crawlerx/filter"
+	"yaklang/common/utils"
 )
 
 type CrawlerCore struct {

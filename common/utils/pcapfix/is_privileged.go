@@ -2,11 +2,11 @@ package pcapfix
 
 import (
 	"github.com/google/gopacket/pcap"
+	"runtime"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils/netutil"
 	"yaklang/common/utils/permutil"
-	"runtime"
-	"time"
 )
 
 func IsPrivilegedForNetRaw() bool {

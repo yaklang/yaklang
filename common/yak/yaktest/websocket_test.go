@@ -2,8 +2,8 @@ package yaktest
 
 import (
 	"fmt"
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestMisc_WS(t *testing.T) {

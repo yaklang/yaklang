@@ -2,10 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 var (

@@ -6,9 +6,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 )
 
 // https://github.com/bradleyfalzon/tlsx

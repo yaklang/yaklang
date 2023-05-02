@@ -3,11 +3,11 @@ package synscan
 import (
 	"math/rand"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"sync/atomic"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func (s *Scanner) OnSubmitTask(i func(addr string, port int)) {

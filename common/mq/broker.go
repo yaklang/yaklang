@@ -6,9 +6,9 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/tevino/abool"
 	"io"
-	"yaklang/common/log"
 	"sync"
 	"time"
+	"yaklang/common/log"
 )
 
 type ChannelHandler func(broker *Broker, a *amqp.Channel) error

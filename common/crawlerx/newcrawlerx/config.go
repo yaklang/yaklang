@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"github.com/go-rod/rod/lib/proto"
 	"net/url"
+	"regexp"
 	"yaklang/common/crawlerx/filter"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"regexp"
 )
 
 type NewBrowserInfo struct {

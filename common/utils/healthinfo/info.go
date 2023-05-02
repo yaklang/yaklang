@@ -6,14 +6,14 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"yaklang/common/gopsutil/net"
-	"yaklang/common/spec/health"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+	"yaklang/common/gopsutil/net"
+	"yaklang/common/spec/health"
+	"yaklang/common/utils"
+	"yaklang/common/yak/yaklib"
 )
 
 var (

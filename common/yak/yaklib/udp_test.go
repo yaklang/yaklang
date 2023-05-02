@@ -2,9 +2,9 @@ package yaklib
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestUdpConn_Send(t *testing.T) {

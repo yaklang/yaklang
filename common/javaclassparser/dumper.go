@@ -2,9 +2,9 @@ package javaclassparser
 
 import (
 	"fmt"
-	"yaklang/common/utils"
 	"regexp"
 	"strings"
+	"yaklang/common/utils"
 )
 
 const classTemplate = "\n//Class Declaration\n%s class %s{%s}"

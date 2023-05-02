@@ -3,9 +3,9 @@ package cvemodels
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"yaklang/common/log"
 	"regexp"
 	"strings"
+	"yaklang/common/log"
 )
 
 type CpeStruct struct {

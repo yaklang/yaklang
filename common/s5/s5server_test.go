@@ -3,10 +3,10 @@ package s5
 import (
 	"io"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils/lowhttp"
 	"testing"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils/lowhttp"
 )
 
 func TestSocks5(t *testing.T) {

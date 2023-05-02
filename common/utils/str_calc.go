@@ -5,11 +5,11 @@ import (
 	"github.com/glaslos/ssdeep"
 	"github.com/mfonda/simhash"
 	"gopkg.in/fatih/set.v0"
+	"sort"
+	"strconv"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils/mixer"
-	"sort"
-	"strconv"
 )
 
 func SimHash(raw []byte) uint64 {

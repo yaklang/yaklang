@@ -6,14 +6,14 @@ import (
 	"github.com/urfave/cli"
 	"net"
 	"os"
+	"sync"
+	"time"
 	"yaklang/common/fp"
 	"yaklang/common/fp/webfingerprint"
 	"yaklang/common/hybridscan"
 	"yaklang/common/log"
 	"yaklang/common/synscan"
 	"yaklang/common/utils"
-	"sync"
-	"time"
 )
 
 var SynScanCmd = cli.Command{

@@ -227,15 +227,16 @@ func (g *Group) ResetResponseVerifications() {
 // groupFromJSON builds a fifo.Group from JSON.
 //
 // Example JSON:
-// {
-//   "fifo.Group" : {
-//     "scope": ["request", "result"],
-//     "modifiers": [
-//       { ... },
-//       { ... },
-//     ]
-//   }
-// }
+//
+//	{
+//	  "fifo.Group" : {
+//	    "scope": ["request", "result"],
+//	    "modifiers": [
+//	      { ... },
+//	      { ... },
+//	    ]
+//	  }
+//	}
 func groupFromJSON(b []byte) (*parse.Result, error) {
 	msg := &groupJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {

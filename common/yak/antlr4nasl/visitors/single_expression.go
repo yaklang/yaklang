@@ -3,10 +3,10 @@ package visitors
 import "C"
 import (
 	"fmt"
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"strconv"
 	"strings"
+	nasl "yaklang/common/yak/antlr4nasl/parser"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (c *Compiler) VisitExpressionSequence(i nasl.IExpressionSequenceContext) {

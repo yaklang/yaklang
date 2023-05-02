@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"net"
-	"yaklang/common/log"
-	utils2 "yaklang/common/utils"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	utils2 "yaklang/common/utils"
 )
 
 func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout time.Duration) (net.Conn, error) {

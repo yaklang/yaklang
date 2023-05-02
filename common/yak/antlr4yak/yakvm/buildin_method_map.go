@@ -2,8 +2,8 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/go-funk"
 	"reflect"
+	"yaklang/common/go-funk"
 )
 
 func aliasMapBuildinMethod(origin string, target string) {

@@ -76,8 +76,9 @@ func (c *Conn) serverHandshakeAutoSwitch() error {
 // hs: GMSSL服务端握手状态
 //
 // return:
-// 			是否重用会话，true/false 重用/不重用
-//			错误信息
+//
+//	是否重用会话，true/false 重用/不重用
+//	错误信息
 func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, err error) {
 	if c.config.GetConfigForClient != nil {
 		if newConfig, err := c.config.GetConfigForClient(hs.clientHelloInfo()); err != nil {
@@ -221,7 +222,8 @@ func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, e
 // isResume: 是否重新启用会话
 //
 // return:
-//			错误信息
+//
+//	错误信息
 func runServerHandshakeGM(c *Conn, hs *serverHandshakeStateGM, isResume bool) error {
 	// For an overview of TLS handshaking, see https://tools.ietf.org/html/rfc5246#section-7.3
 	c.buffering = true
@@ -290,8 +292,9 @@ func runServerHandshakeGM(c *Conn, hs *serverHandshakeStateGM, isResume bool) er
 // hs: TLS服务端握手状态
 //
 // return:
-// 			是否重用会话，true/false 重用/不重用
-//			错误信息
+//
+//	是否重用会话，true/false 重用/不重用
+//	错误信息
 func processClientHello(c *Conn, hs *serverHandshakeState) (bool, error) {
 	if c.config.GetConfigForClient != nil {
 		if newConfig, err := c.config.GetConfigForClient(hs.clientHelloInfo()); err != nil {
@@ -460,7 +463,8 @@ Curves:
 // isResume: 是否重新启用会话
 //
 // return:
-//			错误信息
+//
+//	错误信息
 func runServerHandshake(c *Conn, hs *serverHandshakeState, isResume bool) error {
 	// For an overview of TLS handshaking, see https://tools.ietf.org/html/rfc5246#section-7.3
 	c.buffering = true

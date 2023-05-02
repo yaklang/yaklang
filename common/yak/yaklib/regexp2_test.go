@@ -3,9 +3,9 @@ package yaklib
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dlclark/regexp2"
+	"testing"
 	"yaklang/common/log"
 	"yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 var jsonExtractRe2 = regexp2.MustCompile(`(\{(?:(?>[^{}"'\/]+)|(?>"(?:(?>[^\\"]+)|\\.)*")|(?>'(?:(?>[^\\']+)|\\.)*')|(?>\/\/.*\n)|(?>\/\*.*?\*\/))*\})`, regexp2.ECMAScript|regexp2.Multiline)

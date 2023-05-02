@@ -2,12 +2,12 @@ package yak
 
 import (
 	"fmt"
+	"regexp"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/antlr4yak"
 	"yaklang/common/yak/antlr4yak/yakast"
 	"yaklang/common/yak/yaklang"
-	"regexp"
 )
 
 type StaticAnalyzeResult struct {

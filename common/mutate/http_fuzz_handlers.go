@@ -7,15 +7,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/utils/mixer"
-	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/davecgh/go-spew/spew"
 )

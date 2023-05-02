@@ -2,9 +2,9 @@ package cve
 
 import (
 	"io/ioutil"
-	"yaklang/common/consts"
 	"path/filepath"
 	"strings"
+	"yaklang/common/consts"
 )
 
 func getKey() string {

@@ -133,7 +133,7 @@ func (c *SSHClient) ScriptFile(fname string) *SSHRemoteScript {
 	}
 }
 
-//Copy local file to remote
+// Copy local file to remote
 func (c *SSHClient) CopyLocalFileToRemote(srcFilePath string, dstFilePath string) error {
 	sftpClient, err := sftp.NewClient(c.client)
 	if err != nil {
@@ -163,7 +163,7 @@ func (c *SSHClient) CopyLocalFileToRemote(srcFilePath string, dstFilePath string
 	return err
 }
 
-//Copy remote file to local
+// Copy remote file to local
 func (c *SSHClient) CopyRemoteFileToLocal(dstFilePath string, srcFilePath string) error {
 	sftpClient, err := sftp.NewClient(c.client)
 	if err != nil {

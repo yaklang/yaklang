@@ -3,8 +3,8 @@ package xhtml
 import (
 	"fmt"
 	"golang.org/x/net/html"
-	"yaklang/common/go-funk"
 	"strings"
+	"yaklang/common/go-funk"
 )
 
 func _genXPATHForSimpleNode(origin *html.Node) string {

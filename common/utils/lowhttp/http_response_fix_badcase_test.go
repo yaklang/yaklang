@@ -4,11 +4,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/h2non/filetype"
 	"net"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func _mockHTTP(rsp []byte) (string, int) {

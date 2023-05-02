@@ -3,10 +3,10 @@ package yaklib
 import (
 	"fmt"
 	"github.com/dlclark/regexp2"
+	"strings"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
 )
 
 func re2Find(data interface{}, text string) string {

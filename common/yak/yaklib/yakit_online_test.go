@@ -3,8 +3,8 @@ package yaklib
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/consts"
 	"testing"
+	"yaklang/common/consts"
 )
 
 func TestNewOnlineClient(t *testing.T) {

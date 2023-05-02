@@ -12,12 +12,12 @@ import (
 	"github.com/itchyny/gojq"
 	"mime"
 	"net/url"
+	"regexp"
+	"strings"
 	"yaklang/common/jsonextractor"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"regexp"
-	"strings"
 )
 
 type YakExtractor struct {

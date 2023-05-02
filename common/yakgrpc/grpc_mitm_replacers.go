@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"github.com/dlclark/regexp2"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
@@ -12,11 +17,6 @@ import (
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type mitmContentReplaceRulesSortable []*ypb.MITMContentReplacer

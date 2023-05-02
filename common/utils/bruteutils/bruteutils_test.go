@@ -2,11 +2,11 @@ package bruteutils
 
 import (
 	"context"
+	"testing"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/mixer"
-	"testing"
-	"time"
 )
 
 func TestBruteUtils(t *testing.T) {

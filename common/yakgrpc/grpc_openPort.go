@@ -4,10 +4,10 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 func (s *Server) OpenPort(inputStream ypb.Yak_OpenPortServer) error {

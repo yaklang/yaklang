@@ -12,39 +12,37 @@ import (
 )
 
 type QueryUploadRiskOnlineRequest struct {
-	Token string            `json:"token"`
-	RiskHash string         `json:"risk_hash"`
-	IP string               `json:"ip"`
-	IPInteger int64  `json:"ip_integer"`
-	Url  string             `json:"url"`
-	Port int                `json:"port"`
-	Host string             `json:"host"`
-	Title string            `json:"title"`
-	TitleVerbose string     `json:"title_verbose"`
-	RiskType string         `json:"risk_type"`
-	RiskTypeVerbose string  `json:"risk_type_verbose"`
-	Parameter string        `json:"parameter"`
-	Payload string          `json:"payload"`
-	Details string          `json:"details"`
-	FromYakScript string    `json:"from_yak_script"`
-	WaitingVerified bool    `json:"waiting_verified"`
-	ReverseToken string     `json:"reverse_token"`
-	Severity string         `json:"severity"`
-	Request string          `json:"request"`
-	Response string         `json:"response"`
-	RuntimeId string        `json:"runtime_id"`
-	CVE string              `json:"cve"`
-	Description string      `json:"description"`
-	Solution string         `json:"solution"`
-	RiskCreatedAt int64	    `json:"risk_created_at"`
+	Token           string `json:"token"`
+	RiskHash        string `json:"risk_hash"`
+	IP              string `json:"ip"`
+	IPInteger       int64  `json:"ip_integer"`
+	Url             string `json:"url"`
+	Port            int    `json:"port"`
+	Host            string `json:"host"`
+	Title           string `json:"title"`
+	TitleVerbose    string `json:"title_verbose"`
+	RiskType        string `json:"risk_type"`
+	RiskTypeVerbose string `json:"risk_type_verbose"`
+	Parameter       string `json:"parameter"`
+	Payload         string `json:"payload"`
+	Details         string `json:"details"`
+	FromYakScript   string `json:"from_yak_script"`
+	WaitingVerified bool   `json:"waiting_verified"`
+	ReverseToken    string `json:"reverse_token"`
+	Severity        string `json:"severity"`
+	Request         string `json:"request"`
+	Response        string `json:"response"`
+	RuntimeId       string `json:"runtime_id"`
+	CVE             string `json:"cve"`
+	Description     string `json:"description"`
+	Solution        string `json:"solution"`
+	RiskCreatedAt   int64  `json:"risk_created_at"`
 }
 
-
-
-func (s *OnlineClient) UploadRiskToOnlineWithToken(ctx context.Context, token string,  risk *yakit.Risk) error {
+func (s *OnlineClient) UploadRiskToOnlineWithToken(ctx context.Context, token string, risk *yakit.Risk) error {
 	err := s.UploadRiskToOnline(ctx,
 		token,
-		risk.Hash ,
+		risk.Hash,
 		risk.IP,
 		risk.IPInteger,
 		risk.Url,
@@ -87,10 +85,10 @@ func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
 	raw, err := json.Marshal(QueryUploadRiskOnlineRequest{
-		Token: token,
+		Token:           token,
 		RiskHash:        hash,
 		IP:              ip,
-		IPInteger: ipInteger,
+		IPInteger:       ipInteger,
 		Url:             Url,
 		Port:            port,
 		Host:            host,
@@ -111,27 +109,27 @@ func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
 		CVE:             cve,
 		Description:     description,
 		Solution:        solution,
-		RiskCreatedAt: 	 riskCreatedAt,
+		RiskCreatedAt:   riskCreatedAt,
 	})
 	if err != nil {
-		return  utils.Errorf("marshal params failed: %s", err)
+		return utils.Errorf("marshal params failed: %s", err)
 	}
 
 	rsp, err := s.client.Post(urlIns.String(), "application/json", bytes.NewBuffer(raw))
 	if err != nil {
-		return  utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+		return utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
 	}
 	rawResponse, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		return  utils.Errorf("read body failed: %s", err)
+		return utils.Errorf("read body failed: %s", err)
 	}
 	var responseData map[string]interface{}
 	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
-		return  utils.Errorf("unmarshal upload risk to online response failed: %s", err)
+		return utils.Errorf("unmarshal upload risk to online response failed: %s", err)
 	}
 	if !utils.MapGetBool(responseData, "ok") {
-		return  utils.Errorf("upload risk to online failed: %s", utils.MapGetString(responseData, "reason"))
+		return utils.Errorf("upload risk to online failed: %s", utils.MapGetString(responseData, "reason"))
 	}
-	return  nil
+	return nil
 }

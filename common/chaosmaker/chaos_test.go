@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"testing"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/openai"
 	"yaklang/common/suricata"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 type ruleTest struct {

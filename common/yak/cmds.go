@@ -7,6 +7,10 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/fp"
 	"yaklang/common/fp/webfingerprint"
@@ -17,10 +21,6 @@ import (
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yak/yaklib/tools"
-	"path/filepath"
-	"runtime"
-	"sync"
-	"time"
 
 	"github.com/urfave/cli"
 )

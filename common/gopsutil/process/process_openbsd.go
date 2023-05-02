@@ -293,29 +293,30 @@ func (p *Process) NumThreadsWithContext(ctx context.Context) (int32, error) {
 	return 1, nil
 }
 
-//func (p *Process) Threads() (map[int32]*cpu.TimesStat, error) {
-//	return p.ThreadsWithContext(context.Background())
-//}
-//
-//func (p *Process) ThreadsWithContext(ctx context.Context) (map[int32]*cpu.TimesStat, error) {
-//	ret := make(map[int32]*cpu.TimesStat)
-//	return ret, common.ErrNotImplementedError
-//}
-//func (p *Process) Times() (*cpu.TimesStat, error) {
-//	return p.TimesWithContext(context.Background())
-//}
-//
-//func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
-//	k, err := p.getKProc()
-//	if err != nil {
-//		return nil, err
+//	func (p *Process) Threads() (map[int32]*cpu.TimesStat, error) {
+//		return p.ThreadsWithContext(context.Background())
 //	}
-//	return &cpu.TimesStat{
-//		CPU:    "cpu",
-//		User:   float64(k.Uutime_sec) + float64(k.Uutime_usec)/1000000,
-//		System: float64(k.Ustime_sec) + float64(k.Ustime_usec)/1000000,
-//	}, nil
-//}
+//
+//	func (p *Process) ThreadsWithContext(ctx context.Context) (map[int32]*cpu.TimesStat, error) {
+//		ret := make(map[int32]*cpu.TimesStat)
+//		return ret, common.ErrNotImplementedError
+//	}
+//
+//	func (p *Process) Times() (*cpu.TimesStat, error) {
+//		return p.TimesWithContext(context.Background())
+//	}
+//
+//	func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
+//		k, err := p.getKProc()
+//		if err != nil {
+//			return nil, err
+//		}
+//		return &cpu.TimesStat{
+//			CPU:    "cpu",
+//			User:   float64(k.Uutime_sec) + float64(k.Uutime_usec)/1000000,
+//			System: float64(k.Ustime_sec) + float64(k.Ustime_usec)/1000000,
+//		}, nil
+//	}
 func (p *Process) CPUAffinity() ([]int32, error) {
 	return p.CPUAffinityWithContext(context.Background())
 }
@@ -324,26 +325,26 @@ func (p *Process) CPUAffinityWithContext(ctx context.Context) ([]int32, error) {
 	return nil, common.ErrNotImplementedError
 }
 
-//func (p *Process) MemoryInfo() (*MemoryInfoStat, error) {
-//	return p.MemoryInfoWithContext(context.Background())
-//}
-//
-//func (p *Process) MemoryInfoWithContext(ctx context.Context) (*MemoryInfoStat, error) {
-//	k, err := p.getKProc()
-//	if err != nil {
-//		return nil, err
-//	}
-//	pageSize, err := mem.GetPageSize()
-//	if err != nil {
-//		return nil, err
+//	func (p *Process) MemoryInfo() (*MemoryInfoStat, error) {
+//		return p.MemoryInfoWithContext(context.Background())
 //	}
 //
-//	return &MemoryInfoStat{
-//		RSS: uint64(k.Vm_rssize) * pageSize,
-//		VMS: uint64(k.Vm_tsize) + uint64(k.Vm_dsize) +
-//			uint64(k.Vm_ssize),
-//	}, nil
-//}
+//	func (p *Process) MemoryInfoWithContext(ctx context.Context) (*MemoryInfoStat, error) {
+//		k, err := p.getKProc()
+//		if err != nil {
+//			return nil, err
+//		}
+//		pageSize, err := mem.GetPageSize()
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		return &MemoryInfoStat{
+//			RSS: uint64(k.Vm_rssize) * pageSize,
+//			VMS: uint64(k.Vm_tsize) + uint64(k.Vm_dsize) +
+//				uint64(k.Vm_ssize),
+//		}, nil
+//	}
 func (p *Process) MemoryInfoEx() (*MemoryInfoExStat, error) {
 	return p.MemoryInfoExWithContext(context.Background())
 }

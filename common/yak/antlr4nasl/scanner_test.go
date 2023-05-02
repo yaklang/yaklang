@@ -1,10 +1,10 @@
 package antlr4nasl
 
 import (
-	"yaklang/common/log"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"strings"
 	"testing"
+	"yaklang/common/log"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func TestPocScanner(t *testing.T) {

@@ -392,40 +392,41 @@ func convertCPUTimes(s string) (ret float64, err error) {
 	return float64(t) / ClockTicks, nil
 }
 
-//func (p *Process) Times() (*cpu.TimesStat, error) {
-//	return p.TimesWithContext(context.Background())
-//}
-//
-//func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
-//	r, err := callPsWithContext(ctx, "utime,stime", p.Pid, false)
-//
-//	if err != nil {
-//		return nil, err
+//	func (p *Process) Times() (*cpu.TimesStat, error) {
+//		return p.TimesWithContext(context.Background())
 //	}
 //
-//	utime, err := convertCPUTimes(r[0][0])
-//	if err != nil {
-//		return nil, err
-//	}
-//	stime, err := convertCPUTimes(r[0][1])
-//	if err != nil {
-//		return nil, err
+//	func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
+//		r, err := callPsWithContext(ctx, "utime,stime", p.Pid, false)
+//
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		utime, err := convertCPUTimes(r[0][0])
+//		if err != nil {
+//			return nil, err
+//		}
+//		stime, err := convertCPUTimes(r[0][1])
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		ret := &cpu.TimesStat{
+//			CPU:    "cpu",
+//			User:   utime,
+//			System: stime,
+//		}
+//		return ret, nil
 //	}
 //
-//	ret := &cpu.TimesStat{
-//		CPU:    "cpu",
-//		User:   utime,
-//		System: stime,
+//	func (p *Process) CPUAffinity() ([]int32, error) {
+//		return p.CPUAffinityWithContext(context.Background())
 //	}
-//	return ret, nil
-//}
-//func (p *Process) CPUAffinity() ([]int32, error) {
-//	return p.CPUAffinityWithContext(context.Background())
-//}
 //
-//func (p *Process) CPUAffinityWithContext(ctx context.Context) ([]int32, error) {
-//	return nil, common.ErrNotImplementedError
-//}
+//	func (p *Process) CPUAffinityWithContext(ctx context.Context) ([]int32, error) {
+//		return nil, common.ErrNotImplementedError
+//	}
 func (p *Process) MemoryInfo() (*MemoryInfoStat, error) {
 	return p.MemoryInfoWithContext(context.Background())
 }

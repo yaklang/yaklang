@@ -3,10 +3,10 @@ package iiop
 import (
 	"bytes"
 	"net"
+	"time"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yserx"
-	"time"
 )
 
 const (
@@ -215,9 +215,9 @@ func GetKeyFromBytes(locateReply []byte) ([]byte, error) {
 
 }
 
-//func Bytes2Int(data []byte) int {
-//	return int(binary.BigEndian.Uint32(data))
-//}
+//	func Bytes2Int(data []byte) int {
+//		return int(binary.BigEndian.Uint32(data))
+//	}
 func ParseHeader(data []byte) (*MessageHeader, error) {
 	if len(data) < 12 {
 		return nil, utils.Error(" header format error")

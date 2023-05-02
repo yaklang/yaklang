@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/go-pg/pg/v10"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func postgresqlUnAuthCheck(Host string, Port int) (bool, error) {

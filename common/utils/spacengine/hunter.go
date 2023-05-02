@@ -2,11 +2,11 @@ package spacengine
 
 import (
 	"fmt"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/spacengine/hunter"
-	"strings"
-	"time"
 )
 
 func resultToSpacengineList(filter string, h *hunter.HunterResult) []*NetSpaceEngineResult {

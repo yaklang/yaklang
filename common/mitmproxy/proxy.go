@@ -11,14 +11,14 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/crep"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
-	"sync"
-	"time"
 )
 
 type MITMProxy struct {

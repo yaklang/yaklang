@@ -3,12 +3,12 @@ package yakast
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"yaklang/common/utils"
 	yak "yaklang/common/yak/antlr4yak/parser"
 	"yaklang/common/yak/antlr4yak/yakvm"
 	"yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"strings"
 )
 
 func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interface{} {

@@ -7,10 +7,10 @@ import (
 	"github.com/google/gopacket/pcap"
 	"math/rand"
 	"net"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
 	"sync"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/utils/lowhttp"
 )
 
 var (

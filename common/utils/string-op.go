@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+	"yaklang/common/go-funk"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {

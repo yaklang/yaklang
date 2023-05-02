@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"yaklang/common/cve/cveresources"
+	"yaklang/common/log"
 )
 
 type CVEOption func(info *CVEQueryInfo)

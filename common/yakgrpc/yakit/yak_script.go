@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"strconv"
+	"strings"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 var yakScriptOpLock = new(sync.Mutex)
@@ -550,7 +550,8 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 
 /*
 YieldYakScripts no use spec, checking
- calling
+
+	calling
 */
 func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *YakScript {
 

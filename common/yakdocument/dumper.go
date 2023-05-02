@@ -3,11 +3,11 @@ package yakdocument
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/utils"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"yaklang/common/utils"
 )
 
 func DumpReturnTypes(types []reflect.Type) string {

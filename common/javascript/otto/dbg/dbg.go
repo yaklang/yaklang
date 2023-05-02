@@ -3,56 +3,55 @@
 /*
 Package dbg is a println/printf/log-debugging utility library.
 
-    import (
-        Dbg "github.com/robertkrimen/dbg"
-    )
+	import (
+	    Dbg "github.com/robertkrimen/dbg"
+	)
 
-    dbg, dbgf := Dbg.New()
+	dbg, dbgf := Dbg.New()
 
-    dbg("Emit some debug stuff", []byte{120, 121, 122, 122, 121}, math.Pi)
-    # "2013/01/28 16:50:03 Emit some debug stuff [120 121 122 122 121] 3.141592653589793"
+	dbg("Emit some debug stuff", []byte{120, 121, 122, 122, 121}, math.Pi)
+	# "2013/01/28 16:50:03 Emit some debug stuff [120 121 122 122 121] 3.141592653589793"
 
-    dbgf("With a %s formatting %.2f", "little", math.Pi)
-    # "2013/01/28 16:51:55 With a little formatting (3.14)"
+	dbgf("With a %s formatting %.2f", "little", math.Pi)
+	# "2013/01/28 16:51:55 With a little formatting (3.14)"
 
-    dbgf("%/fatal//A fatal debug statement: should not be here")
-    # "A fatal debug statement: should not be here"
-    # ...and then, os.Exit(1)
+	dbgf("%/fatal//A fatal debug statement: should not be here")
+	# "A fatal debug statement: should not be here"
+	# ...and then, os.Exit(1)
 
-    dbgf("%/panic//Can also panic %s", "this")
-    # "Can also panic this"
-    # ...as a panic, equivalent to: panic("Can also panic this")
+	dbgf("%/panic//Can also panic %s", "this")
+	# "Can also panic this"
+	# ...as a panic, equivalent to: panic("Can also panic this")
 
-    dbgf("Any %s arguments without a corresponding %%", "extra", "are treated like arguments to dbg()")
-    # "2013/01/28 17:14:40 Any extra arguments (without a corresponding %) are treated like arguments to dbg()"
+	dbgf("Any %s arguments without a corresponding %%", "extra", "are treated like arguments to dbg()")
+	# "2013/01/28 17:14:40 Any extra arguments (without a corresponding %) are treated like arguments to dbg()"
 
-    dbgf("%d %d", 1, 2, 3, 4, 5)
-    # "2013/01/28 17:16:32 Another example: 1 2 3 4 5"
+	dbgf("%d %d", 1, 2, 3, 4, 5)
+	# "2013/01/28 17:16:32 Another example: 1 2 3 4 5"
 
-    dbgf("%@: Include the function name for a little context (via %s)", "%@")
-    # "2013... github.com/robertkrimen/dbg.TestSynopsis: Include the function name for a little context (via %@)"
+	dbgf("%@: Include the function name for a little context (via %s)", "%@")
+	# "2013... github.com/robertkrimen/dbg.TestSynopsis: Include the function name for a little context (via %@)"
 
 By default, dbg uses log (log.Println, log.Printf, log.Panic, etc.) for output.
 However, you can also provide your own output destination by invoking dbg.New with
 a customization function:
 
-    import (
-        "bytes"
-        Dbg "github.com/robertkrimen/dbg"
-        "os"
-    )
+	import (
+	    "bytes"
+	    Dbg "github.com/robertkrimen/dbg"
+	    "os"
+	)
 
-    # dbg to os.Stderr
-    dbg, dbgf := Dbg.New(func(dbgr *Dbgr) {
-        dbgr.SetOutput(os.Stderr)
-    })
+	# dbg to os.Stderr
+	dbg, dbgf := Dbg.New(func(dbgr *Dbgr) {
+	    dbgr.SetOutput(os.Stderr)
+	})
 
-    # A slightly contrived example:
-    var buffer bytes.Buffer
-    dbg, dbgf := New(func(dbgr *Dbgr) {
-        dbgr.SetOutput(&buffer)
-    })
-
+	# A slightly contrived example:
+	var buffer bytes.Buffer
+	dbg, dbgf := New(func(dbgr *Dbgr) {
+	    dbgr.SetOutput(&buffer)
+	})
 */
 package dbg
 
@@ -144,16 +143,15 @@ func NewDbgr() *Dbgr {
 New will create and return a pair of debugging functions. You can customize where
 they output to by passing in an (optional) customization function:
 
-    import (
-        Dbg "github.com/robertkrimen/dbg"
-        "os"
-    )
+	import (
+	    Dbg "github.com/robertkrimen/dbg"
+	    "os"
+	)
 
-    # dbg to os.Stderr
-    dbg, dbgf := Dbg.New(func(dbgr *Dbgr) {
-        dbgr.SetOutput(os.Stderr)
-    })
-
+	# dbg to os.Stderr
+	dbg, dbgf := Dbg.New(func(dbgr *Dbgr) {
+	    dbgr.SetOutput(os.Stderr)
+	})
 */
 func New(options ...interface{}) (dbg DbgFunction, dbgf DbgFunction) {
 	dbgr := NewDbgr()
@@ -281,11 +279,10 @@ func (self *Dbgr) getEmit() _emit {
 
 // SetOutput will accept the following as a destination for output:
 //
-//      *log.Logger         Print*/Panic*/Fatal* of the logger
-//      io.Writer           -
-//      nil                 Reset to the default output (os.Stderr)
-//      "log"               Print*/Panic*/Fatal* via the "log" package
-//
+//	*log.Logger         Print*/Panic*/Fatal* of the logger
+//	io.Writer           -
+//	nil                 Reset to the default output (os.Stderr)
+//	"log"               Print*/Panic*/Fatal* via the "log" package
 func (self *Dbgr) SetOutput(output interface{}) {
 	if output == nil {
 		self.emit = standardEmit()

@@ -1,11 +1,13 @@
 package javaclassparser
 
-/**
+/*
+*
 常量数据结构如下
-cp_info {
-	u1 tag; -> 用来区分常量类型
-	u2 Info[];
-}
+
+	cp_info {
+		u1 tag; -> 用来区分常量类型
+		u2 Info[];
+	}
 */
 const (
 	CONSTANT_Class              = 7
@@ -24,7 +26,8 @@ const (
 	CONSTANT_InvokeDynamic      = 18
 )
 
-/**
+/*
+*
 constant info类型的接口
 */
 type ConstantInfo interface {
@@ -42,7 +45,8 @@ type ConstantInfo interface {
 //	return c
 //}
 
-/**
+/*
+*
 根据tag创建不同的constant Info
 */
 func newConstantInfo(tag uint8) ConstantInfo {

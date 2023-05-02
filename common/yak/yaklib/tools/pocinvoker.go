@@ -9,15 +9,15 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
-	"runtime"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/hpcloud/tail"
 )
@@ -284,7 +284,7 @@ func (p *PocInvoker) xrayExec(ctx context.Context, urlFile string) ([]*PocVul, e
 }
 
 /*
-  解析 nuclei 和 xray 的输出结果 （JSON）
+解析 nuclei 和 xray 的输出结果 （JSON）
 */
 func HandleXrayResult(raw []byte) []*PocVul {
 	var vuls []*PocVul

@@ -3,8 +3,8 @@
 package newcrawlerx
 
 import (
-	"yaklang/common/log"
 	"sync"
+	"yaklang/common/log"
 )
 
 type UrlNode struct {

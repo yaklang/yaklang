@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"net"
+	"sync"
 	"yaklang/common/fp"
 	"yaklang/common/log"
 	"yaklang/common/synscan"
-	"sync"
 )
 
 type HyperScanCenter struct {

@@ -6,12 +6,12 @@ import (
 	"io"
 	"net"
 	"os"
-	"yaklang/common/cybertunnel/ctxio"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"strconv"
 	"sync"
 	"time"
+	"yaklang/common/cybertunnel/ctxio"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type S5Config struct {

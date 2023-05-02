@@ -3,8 +3,8 @@ package twofa
 import (
 	"encoding/base32"
 	"fmt"
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 func TestComputeCode(t *testing.T) {

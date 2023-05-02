@@ -5,11 +5,11 @@ import (
 	"html"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"regexp"
-	"strings"
 )
 
 // ref: https://portswigger.net/blog/json-hijacking-for-the-modern-web

@@ -4,13 +4,13 @@ import (
 	"context"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
+	"strconv"
+	"strings"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type Risk struct {

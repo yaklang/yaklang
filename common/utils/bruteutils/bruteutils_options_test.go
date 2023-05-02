@@ -1,12 +1,12 @@
 package bruteutils
 
 import (
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/mixer"
 	"sync/atomic"
 	"testing"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/mixer"
 )
 
 func TestNewMultiTargetBruteUtilEx_WithTargetsConcurrentOption(t *testing.T) {

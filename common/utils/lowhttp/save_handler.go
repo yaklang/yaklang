@@ -1,8 +1,8 @@
 package lowhttp
 
 import (
-	"yaklang/common/log"
 	"sync"
+	"yaklang/common/log"
 )
 
 type saveHTTPFlowHandler func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string)

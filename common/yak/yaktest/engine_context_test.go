@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"yaklang/common/utils"
-	"yaklang/common/yak"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+	"yaklang/common/utils"
+	"yaklang/common/yak"
 )
 
 func testScriptWithTimeout(duration time.Duration, t *testing.T, code string, expectErrorInfo string) {

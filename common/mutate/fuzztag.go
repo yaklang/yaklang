@@ -6,6 +6,9 @@ import (
 	"github.com/google/uuid"
 	"io/ioutil"
 	"math/rand"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/fuzztag"
 	"yaklang/common/log"
@@ -14,9 +17,6 @@ import (
 	"yaklang/common/utils/regen"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yso"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var fuzztagfallback = []string{""}

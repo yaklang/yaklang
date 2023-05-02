@@ -3,9 +3,9 @@ package synscan
 import (
 	"github.com/pkg/errors"
 	"net"
+	"time"
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil"
-	"time"
 )
 
 type Config struct {

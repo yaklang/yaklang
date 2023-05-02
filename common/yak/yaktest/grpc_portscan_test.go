@@ -1,8 +1,8 @@
 package yaktest
 
 import (
-	"yaklang/common/utils"
 	"testing"
+	"yaklang/common/utils"
 )
 
 const code = `yakit.AutoInitYakit()

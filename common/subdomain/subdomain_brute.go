@@ -3,9 +3,9 @@ package subdomain
 import (
 	"context"
 	"fmt"
-	"yaklang/common/utils"
 	"strings"
 	"sync"
+	"yaklang/common/utils"
 )
 
 func (s *SubdomainScanner) brute(

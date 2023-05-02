@@ -7,14 +7,14 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func WindowsSudo(cmd string, opts ...SudoOption) error {

@@ -2,13 +2,13 @@ package httptpl
 
 import (
 	"fmt"
+	"path"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/utils/mixer"
-	"path"
-	"strings"
-	"time"
 )
 
 type YakTemplate struct {

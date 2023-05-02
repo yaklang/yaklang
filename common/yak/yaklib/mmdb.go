@@ -7,34 +7,33 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
+	"path/filepath"
 	"yaklang/common/consts"
 	"yaklang/common/geo"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/ziputil"
-	"path"
-	"path/filepath"
 )
 
 /*
-(map[string]interface {}) (len=4) {
- (string) (len=9) "GeoNameID": (float64) 1.814991e+06,
- (string) (len=17) "IsInEuropeanUnion": (bool) false,
- (string) (len=7) "IsoCode": (string) (len=2) "CN",
- (string) (len=5) "Names": (map[string]interface {}) (len=8) {
-  (string) (len=5) "pt-BR": (string) (len=5) "China",
-  (string) (len=2) "ru": (string) (len=10) "Китай",
-  (string) (len=5) "zh-CN": (string) (len=6) "中国",
-  (string) (len=2) "de": (string) (len=5) "China",
-  (string) (len=2) "en": (string) (len=5) "China",
-  (string) (len=2) "es": (string) (len=5) "China",
-  (string) (len=2) "fr": (string) (len=5) "Chine",
-  (string) (len=2) "ja": (string) (len=6) "中国"
- }
-}
+	(map[string]interface {}) (len=4) {
+	 (string) (len=9) "GeoNameID": (float64) 1.814991e+06,
+	 (string) (len=17) "IsInEuropeanUnion": (bool) false,
+	 (string) (len=7) "IsoCode": (string) (len=2) "CN",
+	 (string) (len=5) "Names": (map[string]interface {}) (len=8) {
+	  (string) (len=5) "pt-BR": (string) (len=5) "China",
+	  (string) (len=2) "ru": (string) (len=10) "Китай",
+	  (string) (len=5) "zh-CN": (string) (len=6) "中国",
+	  (string) (len=2) "de": (string) (len=5) "China",
+	  (string) (len=2) "en": (string) (len=5) "China",
+	  (string) (len=2) "es": (string) (len=5) "China",
+	  (string) (len=2) "fr": (string) (len=5) "Chine",
+	  (string) (len=2) "ja": (string) (len=6) "中国"
+	 }
+	}
 
 var CNCountry =
-
 */
 var CNCountry = struct {
 	GeoNameID         uint              `maxminddb:"geoname_id"`

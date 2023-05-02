@@ -9,13 +9,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/mfreader"
-	"path/filepath"
-	"reflect"
-	"strings"
 )
 
 type _yakFile struct {

@@ -5,16 +5,16 @@ import (
 	"github.com/antchfx/xmlquery"
 	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
-	"yaklang/common/consts"
-	"yaklang/common/cve/cveresources"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/ziputil"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"yaklang/common/consts"
+	"yaklang/common/cve/cveresources"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/ziputil"
 )
 
 func TestCWE_Download2(t *testing.T) {

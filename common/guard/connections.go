@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	"time"
 	gopsnet "yaklang/common/gopsutil/net"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"time"
 )
 
 type NetConn struct {

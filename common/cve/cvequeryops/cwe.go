@@ -7,15 +7,15 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"yaklang/common/consts"
 	"yaklang/common/cve/cveresources"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/ziputil"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 func DownloadCWE() (string, error) {

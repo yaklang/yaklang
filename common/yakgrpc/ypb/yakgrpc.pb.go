@@ -9743,7 +9743,7 @@ func (x *Fields) GetValues() []*FieldName {
 	return nil
 }
 
-//获取Gadget的Options
+// 获取Gadget的Options
 type YsoOption struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -9854,7 +9854,7 @@ func (x *YsoOptionsWithVerbose) GetOptions() []*YsoOption {
 	return nil
 }
 
-//已弃用
+// 已弃用
 type YsoOptions struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -9902,7 +9902,7 @@ func (x *YsoOptions) GetNames() []string {
 	return nil
 }
 
-//类生成器的参数
+// 类生成器的参数
 type YsoClassGeneraterOptionsWithVerbose struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -10037,7 +10037,7 @@ func (x *YsoClassOptionsResponseWithVerbose) GetOptions() []*YsoClassGeneraterOp
 	return nil
 }
 
-//已弃用
+// 已弃用
 type YsoClassGeneraterOptions struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -10101,7 +10101,7 @@ func (x *YsoClassGeneraterOptions) GetType() string {
 	return ""
 }
 
-//已弃用
+// 已弃用
 type YsoClassOptionsResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -10149,7 +10149,7 @@ func (x *YsoClassOptionsResponse) GetOptions() []*YsoClassGeneraterOptions {
 	return nil
 }
 
-//生成代码和字节码
+// 生成代码和字节码
 type YsoOptionsRequerstWithVerbose struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -10213,7 +10213,7 @@ func (x *YsoOptionsRequerstWithVerbose) GetOptions() []*YsoClassGeneraterOptions
 	return nil
 }
 
-//已弃用
+// 已弃用
 type YsoOptionsRequerst struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -13112,7 +13112,7 @@ func (x *ApplyClassToFacadesParamsWithVerbose) GetToken() string {
 	return ""
 }
 
-//已弃用
+// 已弃用
 type ApplyClassToFacadesParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

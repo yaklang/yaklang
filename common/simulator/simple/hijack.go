@@ -2,9 +2,9 @@ package simple
 
 import (
 	"github.com/go-rod/rod"
-	"yaklang/common/utils"
 	"regexp"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type ModifyTarget string

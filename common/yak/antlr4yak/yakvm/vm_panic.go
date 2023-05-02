@@ -3,10 +3,10 @@ package yakvm
 import (
 	"bufio"
 	"fmt"
+	"strings"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"strings"
 
 	"github.com/kataras/pio"
 )

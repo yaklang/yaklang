@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"net/http"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
 )
 
 type RequestIf interface {

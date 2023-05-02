@@ -2,10 +2,10 @@ package spacengine
 
 import (
 	"fmt"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/spacengine/go-shodan"
-	"strings"
 )
 
 func interfaceArrayToString(rets []interface{}) string {

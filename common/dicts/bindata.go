@@ -674,11 +674,13 @@ const AssetDebug = false
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -713,29 +715,29 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"dataex": {nil, map[string]*bintree{
 		"dicts": {nil, map[string]*bintree{
-			"3389.txt": {dataexDicts3389Txt, map[string]*bintree{}},
-			"cmd_inj.txt": {dataexDictsCmd_injTxt, map[string]*bintree{}},
-			"cmd_inj_unix.txt": {dataexDictsCmd_inj_unixTxt, map[string]*bintree{}},
-			"crlf.txt": {dataexDictsCrlfTxt, map[string]*bintree{}},
-			"csv_inj.txt": {dataexDictsCsv_injTxt, map[string]*bintree{}},
-			"fckeditor_uri.txt": {dataexDictsFckeditor_uriTxt, map[string]*bintree{}},
-			"jsp_uri.txt": {dataexDictsJsp_uriTxt, map[string]*bintree{}},
-			"php_uri.txt": {dataexDictsPhp_uriTxt, map[string]*bintree{}},
-			"sql_fuzz_auth.txt": {dataexDictsSql_fuzz_authTxt, map[string]*bintree{}},
+			"3389.txt":               {dataexDicts3389Txt, map[string]*bintree{}},
+			"cmd_inj.txt":            {dataexDictsCmd_injTxt, map[string]*bintree{}},
+			"cmd_inj_unix.txt":       {dataexDictsCmd_inj_unixTxt, map[string]*bintree{}},
+			"crlf.txt":               {dataexDictsCrlfTxt, map[string]*bintree{}},
+			"csv_inj.txt":            {dataexDictsCsv_injTxt, map[string]*bintree{}},
+			"fckeditor_uri.txt":      {dataexDictsFckeditor_uriTxt, map[string]*bintree{}},
+			"jsp_uri.txt":            {dataexDictsJsp_uriTxt, map[string]*bintree{}},
+			"php_uri.txt":            {dataexDictsPhp_uriTxt, map[string]*bintree{}},
+			"sql_fuzz_auth.txt":      {dataexDictsSql_fuzz_authTxt, map[string]*bintree{}},
 			"sql_fuzz_errorbase.txt": {dataexDictsSql_fuzz_errorbaseTxt, map[string]*bintree{}},
-			"sql_fuzz_sleep.txt": {dataexDictsSql_fuzz_sleepTxt, map[string]*bintree{}},
-			"sql_fuzz_small.txt": {dataexDictsSql_fuzz_smallTxt, map[string]*bintree{}},
-			"sql_fuzz_union.txt": {dataexDictsSql_fuzz_unionTxt, map[string]*bintree{}},
-			"ssti.txt": {dataexDictsSstiTxt, map[string]*bintree{}},
-			"user.txt": {dataexDictsUserTxt, map[string]*bintree{}},
-			"user_cn.txt": {dataexDictsUser_cnTxt, map[string]*bintree{}},
-			"weakpass100_cn.txt": {dataexDictsWeakpass100_cnTxt, map[string]*bintree{}},
-			"weakpass100_vn.txt": {dataexDictsWeakpass100_vnTxt, map[string]*bintree{}},
-			"weakpass100_vps.txt": {dataexDictsWeakpass100_vpsTxt, map[string]*bintree{}},
-			"weakpass25.txt": {dataexDictsWeakpass25Txt, map[string]*bintree{}},
-			"xpath.txt": {dataexDictsXpathTxt, map[string]*bintree{}},
-			"xxe_attack.txt": {dataexDictsXxe_attackTxt, map[string]*bintree{}},
-			"xxe_fuzz.txt": {dataexDictsXxe_fuzzTxt, map[string]*bintree{}},
+			"sql_fuzz_sleep.txt":     {dataexDictsSql_fuzz_sleepTxt, map[string]*bintree{}},
+			"sql_fuzz_small.txt":     {dataexDictsSql_fuzz_smallTxt, map[string]*bintree{}},
+			"sql_fuzz_union.txt":     {dataexDictsSql_fuzz_unionTxt, map[string]*bintree{}},
+			"ssti.txt":               {dataexDictsSstiTxt, map[string]*bintree{}},
+			"user.txt":               {dataexDictsUserTxt, map[string]*bintree{}},
+			"user_cn.txt":            {dataexDictsUser_cnTxt, map[string]*bintree{}},
+			"weakpass100_cn.txt":     {dataexDictsWeakpass100_cnTxt, map[string]*bintree{}},
+			"weakpass100_vn.txt":     {dataexDictsWeakpass100_vnTxt, map[string]*bintree{}},
+			"weakpass100_vps.txt":    {dataexDictsWeakpass100_vpsTxt, map[string]*bintree{}},
+			"weakpass25.txt":         {dataexDictsWeakpass25Txt, map[string]*bintree{}},
+			"xpath.txt":              {dataexDictsXpathTxt, map[string]*bintree{}},
+			"xxe_attack.txt":         {dataexDictsXxe_attackTxt, map[string]*bintree{}},
+			"xxe_fuzz.txt":           {dataexDictsXxe_fuzzTxt, map[string]*bintree{}},
 		}},
 	}},
 }}

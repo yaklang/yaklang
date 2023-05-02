@@ -12,10 +12,9 @@ type T interface{}
 
 var ErrIsEmpty = errors.New("ring buffer is empty")
 
-//
 // cell
-//  @Description: https://github.com/zngw/zchan
 //
+//	@Description: https://github.com/zngw/zchan
 type cell struct {
 	Data     []T
 	fullFlag bool
@@ -26,10 +25,9 @@ type cell struct {
 	w int
 }
 
-//
 // RingBuffer
-//  @Description: https://github.com/zngw/zchan
 //
+//	@Description: https://github.com/zngw/zchan
 type RingBuffer struct {
 	cellSize  int
 	cellCount int

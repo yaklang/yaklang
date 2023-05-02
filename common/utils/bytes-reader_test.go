@@ -3,9 +3,9 @@ package utils
 import (
 	"github.com/akutz/memconn"
 	"github.com/google/uuid"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestReadConnWithTimeout(t *testing.T) {

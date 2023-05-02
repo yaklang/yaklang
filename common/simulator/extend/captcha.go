@@ -2,10 +2,10 @@ package extend
 
 import (
 	"encoding/json"
+	"strings"
 	"yaklang/common/simulator/core"
 	"yaklang/common/simulator/web"
 	"yaklang/common/utils"
-	"strings"
 )
 
 type requestStructor interface {

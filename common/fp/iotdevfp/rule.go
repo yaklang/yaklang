@@ -3,10 +3,10 @@ package iotdevfp
 import (
 	"encoding/json"
 	"fmt"
-	"yaklang/common/utils"
 	"regexp"
 	"sort"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type IotDevRule struct {

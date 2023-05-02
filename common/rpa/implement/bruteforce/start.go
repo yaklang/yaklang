@@ -34,7 +34,7 @@ func BruteForceStart(url string, opts ...ConfigOpt) (string, string) {
 	}
 
 	bf.CaptchaUrl = config.captchaUrl
-	
+
 	if config.usernamePath != "" && config.passwordPath != "" {
 		bf.ReadUserPassList(config.usernamePath, config.passwordPath)
 	}

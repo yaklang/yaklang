@@ -3,10 +3,10 @@ package guard
 import (
 	"io/ioutil"
 	"os"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"sync"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type GuardFileInfo struct {

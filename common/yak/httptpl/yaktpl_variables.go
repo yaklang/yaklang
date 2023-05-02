@@ -2,9 +2,9 @@ package httptpl
 
 import (
 	"bytes"
+	"sync"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"sync"
 )
 
 type Var struct {

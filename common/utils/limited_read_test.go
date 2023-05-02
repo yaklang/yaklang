@@ -3,9 +3,9 @@ package utils
 import (
 	"context"
 	"io"
-	"yaklang/common/log"
 	"testing"
 	"time"
+	"yaklang/common/log"
 )
 
 func TestReadWithContextTickCallback(t *testing.T) {

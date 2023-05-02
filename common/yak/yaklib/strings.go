@@ -2,6 +2,8 @@ package yaklib
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"strings"
 	"yaklang/common/domainextractor"
 	"yaklang/common/filter"
 	"yaklang/common/go-funk"
@@ -9,8 +11,6 @@ import (
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/utils/suspect"
-	"path/filepath"
-	"strings"
 )
 
 func _strJoin(i interface{}, d interface{}) (defaultResult string) {

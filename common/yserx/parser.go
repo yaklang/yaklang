@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 var MAGIC_BANNER = []byte{0xac, 0xed}

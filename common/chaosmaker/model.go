@@ -7,6 +7,11 @@ import (
 	"github.com/jinzhu/gorm"
 	"io/ioutil"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/jsonextractor"
 	"yaklang/common/log"
@@ -17,11 +22,6 @@ import (
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type ChaosMakerRule struct {

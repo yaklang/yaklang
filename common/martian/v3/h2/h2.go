@@ -24,8 +24,8 @@ import (
 	"golang.org/x/net/http2"
 	"io"
 	"net/url"
-	"yaklang/common/log"
 	"sync"
+	"yaklang/common/log"
 )
 
 var (

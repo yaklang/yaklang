@@ -2,8 +2,8 @@ package httptpl
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 func TestYakExtractor_Execute(t *testing.T) {

@@ -11,6 +11,8 @@ import (
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	//"github.com/shadow1ng/fscan/common"
+	"sync"
+	"time"
 	"yaklang/common/utils/bruteutils/grdp/core"
 	"yaklang/common/utils/bruteutils/grdp/glog"
 	"yaklang/common/utils/bruteutils/grdp/protocol/nla"
@@ -20,8 +22,6 @@ import (
 	"yaklang/common/utils/bruteutils/grdp/protocol/t125"
 	"yaklang/common/utils/bruteutils/grdp/protocol/tpkt"
 	"yaklang/common/utils/bruteutils/grdp/protocol/x224"
-	"sync"
-	"time"
 )
 
 var (

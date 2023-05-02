@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bruteutils"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 const startBruteScript = `yakit.AutoInitYakit()

@@ -1,13 +1,13 @@
 package implement
 
 import (
+	"regexp"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/rpa/captcha"
 	"yaklang/common/rpa/core"
 	"yaklang/common/utils"
-	"regexp"
-	"strings"
-	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"

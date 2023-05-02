@@ -2,9 +2,9 @@ package spacengine
 
 import (
 	fmt "fmt"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
 )
 
 func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {

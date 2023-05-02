@@ -2,7 +2,8 @@ package javaclassparser
 
 import "encoding/binary"
 
-/**
+/*
+*
 jvm中定义了u1，u2，u4来表示1，2，4字节的 无 符号整数
 相同类型的多条数据一般按表的形式存储在class文件中，由表头和表项构成，表头是u2或者u4整数。
 假设表头为10，后面就紧跟着10个表项数据
@@ -16,7 +17,8 @@ func NewClassReader(data []byte) *ClassReader {
 	return &ClassReader{data: data}
 }
 
-/**
+/*
+*
 相当于java的 byte 8位无符号整数
 */
 func (this *ClassReader) readUint8() uint8 {
@@ -25,7 +27,8 @@ func (this *ClassReader) readUint8() uint8 {
 	return val
 }
 
-/**
+/*
+*
 相当于java的 short 16位无符号整数
 这里class文件在文件系统中以大端法存储
 */
@@ -36,7 +39,8 @@ func (this *ClassReader) readUint16() uint16 {
 	return val
 }
 
-/**
+/*
+*
 相当于java的 int 32位无符号整数
 */
 func (this *ClassReader) readUint32() uint32 {
@@ -45,7 +49,8 @@ func (this *ClassReader) readUint32() uint32 {
 	return val
 }
 
-/**
+/*
+*
 相当于java的 long 64位无符号整数
 */
 func (this *ClassReader) readUint64() uint64 {
@@ -54,7 +59,8 @@ func (this *ClassReader) readUint64() uint64 {
 	return val
 }
 
-/**
+/*
+*
 读取uint16表，表的大小由开头的uint16数据指出
 */
 func (this *ClassReader) readUint16s() []uint16 {
@@ -66,7 +72,8 @@ func (this *ClassReader) readUint16s() []uint16 {
 	return s
 }
 
-/**
+/*
+*
 读取制定length数量的字节
 */
 func (this *ClassReader) readBytes(length uint32) []byte {

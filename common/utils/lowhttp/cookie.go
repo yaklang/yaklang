@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
 	"strings"
 	"sync"
+	"yaklang/common/go-funk"
+	"yaklang/common/utils"
 )
 
 var CookiejarPool sync.Map

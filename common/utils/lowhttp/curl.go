@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"yaklang/common/utils"
-	"yaklang/common/yak/yaklib/codec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"yaklang/common/utils"
+	"yaklang/common/yak/yaklib/codec"
 )
 
 func CurlToHTTPRequest(i string) ([]byte, error) {

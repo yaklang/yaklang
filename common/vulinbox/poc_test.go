@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
+	"strings"
+	"testing"
 	"yaklang/common/bindata"
 	"yaklang/common/crawler"
 	"yaklang/common/log"
@@ -13,8 +15,6 @@ import (
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
 type vulBoxTester struct {

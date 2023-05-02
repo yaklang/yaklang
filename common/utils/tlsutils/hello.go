@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 type HandshakeClientHello struct {

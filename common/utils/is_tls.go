@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
+	"time"
 	"yaklang/common/gmsm/gmtls"
 	"yaklang/common/log"
 	"yaklang/common/utils/socksproxy"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
-	"time"
 )
 
 func IsTLSService(addr string, proxies ...string) bool {

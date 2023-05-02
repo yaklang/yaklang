@@ -3,17 +3,16 @@ package builtin
 import (
 	"bytes"
 	"fmt"
-	"yaklang/common/go-funk"
-	"yaklang/common/utils"
 	"reflect"
 	"strings"
 	"unicode"
+	"yaklang/common/go-funk"
+	"yaklang/common/utils"
 )
 
 // -----------------------------------------------------------------------------
 
 // Inc returns a+1
-//
 func Inc(a interface{}) interface{} {
 
 	switch v := a.(type) {
@@ -42,7 +41,6 @@ func Inc(a interface{}) interface{} {
 }
 
 // Dec returns a-1
-//
 func Dec(a interface{}) interface{} {
 
 	switch v := a.(type) {
@@ -71,7 +69,6 @@ func Dec(a interface{}) interface{} {
 }
 
 // Neg returns -a
-//
 func Neg(a interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -84,7 +81,6 @@ func Neg(a interface{}) interface{} {
 }
 
 // Float64 returns float64(a)
-//
 func Float64(a interface{}) float64 {
 
 	switch a1 := a.(type) {
@@ -98,7 +94,6 @@ func Float64(a interface{}) float64 {
 }
 
 // Float32 returns float32(a)
-//
 func Float32(a interface{}) float32 {
 
 	switch a1 := a.(type) {
@@ -112,7 +107,6 @@ func Float32(a interface{}) float32 {
 }
 
 // Int returns int(a)
-//
 func Int(a interface{}) int {
 
 	switch a1 := a.(type) {
@@ -126,7 +120,6 @@ func Int(a interface{}) int {
 }
 
 // Int8 returns int8(a)
-//
 func Int8(a interface{}) int8 {
 
 	switch a1 := a.(type) {
@@ -140,7 +133,6 @@ func Int8(a interface{}) int8 {
 }
 
 // Int16 returns int16(a)
-//
 func Int16(a interface{}) int16 {
 
 	switch a1 := a.(type) {
@@ -154,7 +146,6 @@ func Int16(a interface{}) int16 {
 }
 
 // Int32 returns int32(a)
-//
 func Int32(a interface{}) int32 {
 
 	switch a1 := a.(type) {
@@ -168,7 +159,6 @@ func Int32(a interface{}) int32 {
 }
 
 // Int64 returns int64(a)
-//
 func Int64(a interface{}) int64 {
 
 	switch a1 := a.(type) {
@@ -182,7 +172,6 @@ func Int64(a interface{}) int64 {
 }
 
 // Uint16 returns uint16(a)
-//
 func Uint16(a interface{}) uint16 {
 
 	switch a1 := a.(type) {
@@ -196,7 +185,6 @@ func Uint16(a interface{}) uint16 {
 }
 
 // Uint32 returns uint32(a)
-//
 func Uint32(a interface{}) uint32 {
 
 	switch a1 := a.(type) {
@@ -210,7 +198,6 @@ func Uint32(a interface{}) uint32 {
 }
 
 // Uint64 returns uint64(a)
-//
 func Uint64(a interface{}) uint64 {
 
 	switch a1 := a.(type) {
@@ -224,7 +211,6 @@ func Uint64(a interface{}) uint64 {
 }
 
 // Uint returns uint(a)
-//
 func Uint(a interface{}) uint {
 
 	switch a1 := a.(type) {
@@ -238,7 +224,6 @@ func Uint(a interface{}) uint {
 }
 
 // Uint8 returns uint8(a)
-//
 func Uint8(a interface{}) byte {
 
 	switch a1 := a.(type) {
@@ -252,7 +237,6 @@ func Uint8(a interface{}) byte {
 }
 
 // String returns string(a)
-//
 func String(a interface{}) string {
 
 	switch a1 := a.(type) {
@@ -286,7 +270,6 @@ func StringEx(a interface{}, verbose string) string {
 }
 
 // Bool returns bool(a)
-//
 func Bool(a interface{}) bool {
 
 	switch a1 := a.(type) {
@@ -298,7 +281,6 @@ func Bool(a interface{}) bool {
 }
 
 // Mul returns a*b
-//
 func Mul(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -336,7 +318,6 @@ func Mul(a, b interface{}) interface{} {
 }
 
 // Quo returns a/b
-//
 func Quo(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -359,7 +340,6 @@ func Quo(a, b interface{}) interface{} {
 }
 
 // Mod returns a%b or return fmt.Sprintf(a,b...)
-//
 func Mod(a, b interface{}) interface{} {
 
 	if a1, ok := a.(int); ok {
@@ -510,7 +490,6 @@ func Ternary(condation, a, b interface{}) interface{} {
 }
 
 // Add returns a+b
-//
 func Add(a, b interface{}) interface{} {
 	switch a1 := a.(type) {
 	case int:
@@ -591,7 +570,6 @@ func Add(a, b interface{}) interface{} {
 }
 
 // Sub returns a-b
-//
 func Sub(a, b interface{}) interface{} {
 
 	switch a1 := a.(type) {
@@ -659,7 +637,6 @@ func Sub(a, b interface{}) interface{} {
 }
 
 // Max returns max(a1, a2, ...)
-//
 func Max(args ...interface{}) (max interface{}) {
 
 	if len(args) == 0 {
@@ -676,7 +653,6 @@ func Max(args ...interface{}) (max interface{}) {
 }
 
 // Min returns min(a1, a2, ...)
-//
 func Min(args ...interface{}) (min interface{}) {
 
 	if len(args) == 0 {

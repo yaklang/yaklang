@@ -3,11 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"os"
+	"runtime"
 	"yaklang/common/consts"
 	"yaklang/common/utils"
 	"yaklang/common/utils/pcapfix"
 	"yaklang/common/yakgrpc/ypb"
-	"runtime"
 )
 
 func (s *Server) ResetAndInvalidUserData(ctx context.Context, req *ypb.ResetAndInvalidUserDataRequest) (*ypb.Empty, error) {

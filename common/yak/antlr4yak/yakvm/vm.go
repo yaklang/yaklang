@@ -2,8 +2,8 @@ package yakvm
 
 import (
 	"context"
-	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"sync"
+	"yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 var buildinBinaryOperatorHandler = make(map[OpcodeFlag]func(*Value, *Value) *Value)

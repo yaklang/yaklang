@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"yaklang/common/utils"
 	"strings"
+	"yaklang/common/utils"
 )
 
 func AnalysisHeaders(s string) (map[string]string, error) {

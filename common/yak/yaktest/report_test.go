@@ -58,7 +58,6 @@ r.Table(
 r.Save()
 `),
 		},
-
 	}
 
 	Run("x.ConvertToMap 可用性测试", t, cases...)

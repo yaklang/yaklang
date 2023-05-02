@@ -3,9 +3,9 @@ package ldapserver
 import (
 	"bufio"
 	"net"
-	"yaklang/common/log"
 	"sync"
 	"time"
+	"yaklang/common/log"
 )
 
 // Server is an LDAP server.

@@ -3,9 +3,9 @@ package yaklib
 import (
 	"net"
 	"os"
+	"runtime"
 	"yaklang/common/utils"
 	"yaklang/common/utils/privileged"
-	"runtime"
 )
 
 func lookupHost(i string) []string {

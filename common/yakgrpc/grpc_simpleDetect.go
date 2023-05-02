@@ -6,10 +6,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"io/ioutil"
 	"os"
-	"yaklang/common/utils"
-	"yaklang/common/yakgrpc/ypb"
 	"strconv"
 	"strings"
+	"yaklang/common/utils"
+	"yaklang/common/yakgrpc/ypb"
 )
 
 const simpleDetect = `

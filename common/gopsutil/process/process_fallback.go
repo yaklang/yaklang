@@ -203,27 +203,29 @@ func (p *Process) NumThreadsWithContext(ctx context.Context) (int32, error) {
 	return 0, common.ErrNotImplementedError
 }
 
-//func (p *Process) Threads() (map[int32]*cpu.TimesStat, error) {
-//	return p.ThreadsWithContext(context.Background())
-//}
+//	func (p *Process) Threads() (map[int32]*cpu.TimesStat, error) {
+//		return p.ThreadsWithContext(context.Background())
+//	}
 //
-//func (p *Process) ThreadsWithContext(ctx context.Context) (map[int32]*cpu.TimesStat, error) {
-//	return nil, common.ErrNotImplementedError
-//}
-//func (p *Process) Times() (*cpu.TimesStat, error) {
-//	return p.TimesWithContext(context.Background())
-//}
+//	func (p *Process) ThreadsWithContext(ctx context.Context) (map[int32]*cpu.TimesStat, error) {
+//		return nil, common.ErrNotImplementedError
+//	}
 //
-//func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
-//	return nil, common.ErrNotImplementedError
-//}
-//func (p *Process) CPUAffinity() ([]int32, error) {
-//	return p.CPUAffinityWithContext(context.Background())
-//}
+//	func (p *Process) Times() (*cpu.TimesStat, error) {
+//		return p.TimesWithContext(context.Background())
+//	}
 //
-//func (p *Process) CPUAffinityWithContext(ctx context.Context) ([]int32, error) {
-//	return nil, common.ErrNotImplementedError
-//}
+//	func (p *Process) TimesWithContext(ctx context.Context) (*cpu.TimesStat, error) {
+//		return nil, common.ErrNotImplementedError
+//	}
+//
+//	func (p *Process) CPUAffinity() ([]int32, error) {
+//		return p.CPUAffinityWithContext(context.Background())
+//	}
+//
+//	func (p *Process) CPUAffinityWithContext(ctx context.Context) ([]int32, error) {
+//		return nil, common.ErrNotImplementedError
+//	}
 func (p *Process) MemoryInfo() (*MemoryInfoStat, error) {
 	return p.MemoryInfoWithContext(context.Background())
 }

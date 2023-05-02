@@ -9,6 +9,10 @@ import (
 	"github.com/jinzhu/gorm"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
 	"yaklang/common/consts"
 	"yaklang/common/domainextractor"
 	"yaklang/common/go-funk"
@@ -20,10 +24,6 @@ import (
 	"yaklang/common/utils/lowhttp"
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"

@@ -5,13 +5,13 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"os"
-	"yaklang/common/log"
-	nasl "yaklang/common/yak/antlr4nasl/parser"
-	"yaklang/common/yak/antlr4nasl/visitors"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"yaklang/common/log"
+	nasl "yaklang/common/yak/antlr4nasl/parser"
+	"yaklang/common/yak/antlr4nasl/visitors"
 )
 
 func WalkScript(path string, action func(path, script string)) error {

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"yaklang/common/yak/antlr4yak/yakvm"
 	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
+	"yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {

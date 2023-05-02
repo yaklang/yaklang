@@ -3,9 +3,9 @@ package tag
 import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
-	"strings"
 )
 
 const rulePath string = "/Users/chenyangbao/Project/yak/common/crawlerx/tag/rules/rule.yml"

@@ -4,6 +4,9 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"net/http"
+	"reflect"
+	"strings"
+	"sync"
 	"yaklang/common/consts"
 	"yaklang/common/fp"
 	"yaklang/common/log"
@@ -12,9 +15,6 @@ import (
 	"yaklang/common/utils/bizhelper"
 	"yaklang/common/utils/spacengine"
 	"yaklang/common/yakgrpc/yakit"
-	"reflect"
-	"strings"
-	"sync"
 )
 
 func queryDomainAssetByNetwork(network string) (chan *yakit.Domain, error) {

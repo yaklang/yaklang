@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"yaklang/common/log"
 	"sync"
 	"time"
+	"yaklang/common/log"
 )
 
 import (

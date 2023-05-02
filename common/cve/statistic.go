@@ -2,9 +2,9 @@ package cve
 
 import (
 	"fmt"
+	"strings"
 	"yaklang/common/cve/cveresources"
 	"yaklang/common/utils"
-	"strings"
 )
 
 type KVPair struct {

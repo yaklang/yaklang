@@ -4,11 +4,11 @@ package newcrawlerx
 
 import (
 	"github.com/go-rod/rod"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"strings"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 func getAttribute(element *rod.Element, attribute string) (string, error) {

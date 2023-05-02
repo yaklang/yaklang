@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	uuid "github.com/satori/go.uuid"
 	"io"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
@@ -10,7 +11,6 @@ import (
 	"yaklang/common/yak/yaklib/codec"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 const EXECUTEPACKET_CODE = `yakit.AutoInitYakit()

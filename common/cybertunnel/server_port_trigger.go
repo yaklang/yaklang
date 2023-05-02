@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"math/rand"
+	"time"
 	"yaklang/common/cybertunnel/tpb"
 	"yaklang/common/utils"
-	"time"
 )
 
 var tokenCache = ttlcache.NewCache()

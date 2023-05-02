@@ -3,9 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"yaklang/common/yakgrpc/ypb"
 	"testing"
 	"time"
+	"yaklang/common/yakgrpc/ypb"
 )
 
 //func TestServer_Pipe(t *testing.T) {

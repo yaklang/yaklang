@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"unicode"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
-	"unicode"
 )
 
 func NewBytesMethodFactory(f func([]byte) interface{}) MethodFactory {

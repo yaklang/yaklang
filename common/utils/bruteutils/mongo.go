@@ -3,11 +3,11 @@ package bruteutils
 import (
 	"fmt"
 	"net"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
-	"time"
 
 	"gopkg.in/mgo.v2"
 )

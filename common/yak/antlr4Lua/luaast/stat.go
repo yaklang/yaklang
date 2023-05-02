@@ -3,10 +3,10 @@ package luaast
 import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	"strings"
 	"yaklang/common/log"
 	lua "yaklang/common/yak/antlr4Lua/parser"
 	"yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 )
 
 func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {

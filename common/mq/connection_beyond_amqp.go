@@ -7,10 +7,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/streadway/amqp"
 	"net"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"sync"
 	"time"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 // Connection Models

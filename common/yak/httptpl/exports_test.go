@@ -3,11 +3,11 @@ package httptpl
 import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
+	"strings"
+	"testing"
 	"yaklang/common/consts"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
-	"testing"
 )
 
 func TestStringToUrl(t *testing.T) {

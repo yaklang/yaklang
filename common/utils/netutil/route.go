@@ -7,13 +7,13 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"os/exec"
+	"runtime"
+	"strings"
+	"time"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil/netroute"
 	"yaklang/common/utils/netutil/routewrapper"
-	"runtime"
-	"strings"
-	"time"
 )
 
 func FindInterfaceByIP(ip string) (net.Interface, error) {

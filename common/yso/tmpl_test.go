@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"yaklang/common/yak/yaklib/codec"
-	"yaklang/common/yserx"
 	"strconv"
 	"testing"
+	"yaklang/common/yak/yaklib/codec"
+	"yaklang/common/yserx"
 )
 
 var verTest = `[

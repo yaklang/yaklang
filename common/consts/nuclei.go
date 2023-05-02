@@ -1,8 +1,8 @@
 package consts
 
 import (
-	"yaklang/common/utils"
 	"path/filepath"
+	"yaklang/common/utils"
 )
 
 func GetNucleiTemplatesDir() string {

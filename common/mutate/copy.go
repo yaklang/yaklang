@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"yaklang/common/utils"
 	"sync"
+	"yaklang/common/utils"
 )
 
 func deepCopyHeader(h http.Header) (http.Header, error) {

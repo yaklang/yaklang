@@ -5,27 +5,27 @@ import (
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"gopkg.in/yaml.v3"
-	"yaklang/common/go-funk"
-	"yaklang/common/log"
-	"yaklang/common/utils"
-	"yaklang/common/utils/lowhttp"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"yaklang/common/go-funk"
+	"yaklang/common/log"
+	"yaklang/common/utils"
+	"yaklang/common/utils/lowhttp"
 )
 
 // vars in http
 // https://nuclei.projectdiscovery.io/templating-guide/protocols/http/
 // {{BaseURL}} - This will replace on runtime in the request by the input URL as specified in the target file.
-//{{RootURL}} - This will replace on runtime in the request by the root URL as specified in the target file.
-//{{Hostname}} - Hostname variable is replaced by the hostname including port of the target on runtime.
-//{{Host}} - This will replace on runtime in the request by the input host as specified in the target file.
-//{{Port}} - This will replace on runtime in the request by the input port as specified in the target file.
-//{{Path}} - This will replace on runtime in the request by the input path as specified in the target file.
-//{{File}} - This will replace on runtime in the request by the input filename as specified in the target file.
-//{{Scheme}} - This will replace on runtime in the request by protocol scheme as specified in the target file.
+// {{RootURL}} - This will replace on runtime in the request by the root URL as specified in the target file.
+// {{Hostname}} - Hostname variable is replaced by the hostname including port of the target on runtime.
+// {{Host}} - This will replace on runtime in the request by the input host as specified in the target file.
+// {{Port}} - This will replace on runtime in the request by the input port as specified in the target file.
+// {{Path}} - This will replace on runtime in the request by the input path as specified in the target file.
+// {{File}} - This will replace on runtime in the request by the input filename as specified in the target file.
+// {{Scheme}} - This will replace on runtime in the request by protocol scheme as specified in the target file.
 var preprocessorRegex = regexp.MustCompile(`{{([a-z0-9_]+)}}`)
 
 // expandPreprocessors expands the pre-processors if any for a template data.

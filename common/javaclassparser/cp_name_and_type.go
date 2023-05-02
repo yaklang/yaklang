@@ -1,12 +1,14 @@
 package javaclassparser
 
-/**
+/*
+*
 给出字段或方法的名称和描述符
-CONSTANT_NAMEANDTYPE_INFO {
-	u1 tag;
-	u2 name_index;
-	u2 descriptor_index
-}
+
+	CONSTANT_NAMEANDTYPE_INFO {
+		u1 tag;
+		u2 name_index;
+		u2 descriptor_index
+	}
 */
 type ConstantNameAndTypeInfo struct {
 	Type string

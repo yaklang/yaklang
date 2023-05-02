@@ -3,12 +3,12 @@ package cveresources
 import (
 	"errors"
 	"fmt"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 type CPE struct {

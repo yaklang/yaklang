@@ -2,10 +2,10 @@ package core
 
 import (
 	"encoding/binary"
+	"sync"
 	"yaklang/common/cuckoo"
 	"yaklang/common/filter"
 	"yaklang/common/utils"
-	"sync"
 
 	"github.com/valyala/bytebufferpool"
 )

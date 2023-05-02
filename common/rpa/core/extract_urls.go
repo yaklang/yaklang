@@ -1,11 +1,11 @@
 package core
 
 import (
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/rpa/character"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 const findHref = `() => {

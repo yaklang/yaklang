@@ -3,8 +3,8 @@ package fp
 import (
 	"bufio"
 	"bytes"
-	"yaklang/common/log"
 	"strings"
+	"yaklang/common/log"
 )
 
 func ParseNmapServiceProbeToRuleMap(raw []byte) (result map[*NmapProbe][]*NmapMatch, err error) {

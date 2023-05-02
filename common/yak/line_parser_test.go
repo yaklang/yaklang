@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"yaklang/common/yak/yaklib"
 	"testing"
+	"yaklang/common/yak/yaklib"
 )
 
 func TestLineLogParser(t *testing.T) {

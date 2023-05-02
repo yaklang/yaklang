@@ -10,11 +10,11 @@ import (
 	"os/exec"
 	"time"
 
+	"strconv"
+	"strings"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib"
-	"strconv"
-	"strings"
 )
 
 type NginxDetail struct {

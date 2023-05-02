@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
+	"testing"
 	"yaklang/common/filter"
 	"yaklang/common/log"
 	"yaklang/common/rpa"
 	"yaklang/common/rpa/core"
 	"yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestSpiderRun(t *testing.T) {

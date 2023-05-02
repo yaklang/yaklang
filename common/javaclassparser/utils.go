@@ -4,24 +4,24 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io/ioutil"
+	"strings"
 	"yaklang/common/utils"
 	"yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 var ValueTypeError = utils.Error("error value type")
 
-//func FindFromPool(v string, pool ConstantPool) int {
-//	for i := 1; i < len(pool); i++ {
-//		s, ok := pool[i].(*ConstantUtf8Info)
-//		if ok {
-//			if s.Value == v {
-//				return i
+//	func FindFromPool(v string, pool ConstantPool) int {
+//		for i := 1; i < len(pool); i++ {
+//			s, ok := pool[i].(*ConstantUtf8Info)
+//			if ok {
+//				if s.Value == v {
+//					return i
+//				}
 //			}
 //		}
+//		return -1
 //	}
-//	return -1
-//}
 func deleteStringKeysFromMap(data map[string]interface{}, keys ...string) {
 	for _, key := range keys {
 		delete(data, key)

@@ -2,13 +2,13 @@ package httptpl
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/mutate"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"sync"
-	"sync/atomic"
 )
 
 type requestRaw struct {

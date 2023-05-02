@@ -11,6 +11,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/utils"
@@ -18,9 +21,6 @@ import (
 	"yaklang/common/yak/yaklib"
 	"yaklang/common/yakgrpc/yakit"
 	"yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func status(verbose string, desc string) string {

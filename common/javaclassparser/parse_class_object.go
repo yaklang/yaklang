@@ -39,12 +39,12 @@ type ClassObject struct {
 //	Attributes     []AttributeInfo
 //}
 
-//func (this *ClassObject) MarshalJSON() ([]byte, error) {
-//	js := CLassObjectJson{
-//		Version: fmt.Sprintf("%d.%d", this.MajorVersion, this.MinorVersion),
+//	func (this *ClassObject) MarshalJSON() ([]byte, error) {
+//		js := CLassObjectJson{
+//			Version: fmt.Sprintf("%d.%d", this.MajorVersion, this.MinorVersion),
+//		}
+//		return json.MarshalIndent(js, "", " ")
 //	}
-//	return json.MarshalIndent(js, "", " ")
-//}
 func (this *ClassObject) Bytes() []byte {
 	return _MarshalJavaClass(this)
 }
@@ -62,7 +62,7 @@ func (this *ClassObject) Bcel() (string, error) {
 	return bytes2bcel(bytes)
 }
 
-//获取
+// 获取
 func (this *ClassObject) GetClassName() string {
 	name, err := this.getUtf8(this.ThisClass)
 	if err != nil {
@@ -88,7 +88,7 @@ func (this *ClassObject) GetInterfacesName() []string {
 	return names
 }
 
-//查找
+// 查找
 func (this *ClassObject) FindConstStringFromPool(v string) *ConstantUtf8Info {
 	n := this.findUtf8IndexFromPool(v)
 	if n == -1 {
@@ -104,7 +104,7 @@ func (this *ClassObject) FindMethods(v string) *MemberInfo {
 	return nil
 }
 
-//修改
+// 修改
 func (this *ClassObject) SetClassName(name string) error {
 	constantInfo, err := this.getConstantInfo(this.ThisClass)
 	if err != nil {

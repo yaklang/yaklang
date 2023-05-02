@@ -3,14 +3,18 @@ package healthinfo
 import (
 	"bytes"
 	"io/ioutil"
-	"yaklang/common/log"
 	"strconv"
+	"yaklang/common/log"
 )
 
 // sample:
-//     0       1 2    3       4    5        6      7        8      9         10      11 12      13
+//
+//	0       1 2    3       4    5        6      7        8      9         10      11 12      13
+//
 // "   8       1 sda1 3774108 2444 30194552 637303 11746691 283841 529382982 90114806 0 1657750 90747516"
-//   %4d     %7d %s   %lu     %lu  %lu      %u     %lu      %lu    %lu       %u      %u %u      %u\n
+//
+//	%4d     %7d %s   %lu     %lu  %lu      %u     %lu      %lu    %lu       %u      %u %u      %u\n
+//
 // ^ from linux/block/genhd.c ~ line 1139
 type Diskstat struct {
 	Major         uint   //  0: major dev no

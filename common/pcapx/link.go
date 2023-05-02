@@ -3,9 +3,9 @@ package pcapx
 import (
 	"github.com/google/gopacket/layers"
 	"net"
+	"time"
 	"yaklang/common/utils"
 	"yaklang/common/utils/netutil"
-	"time"
 )
 
 var (

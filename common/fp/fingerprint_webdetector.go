@@ -3,14 +3,14 @@ package fp
 import (
 	"context"
 	"net"
+	"strconv"
+	"strings"
+	"sync"
 	"yaklang/common/fp/iotdevfp"
 	"yaklang/common/fp/webfingerprint"
 	"yaklang/common/log"
 	utils2 "yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *Config, host string, ip net.IP, port int) (*MatchResult, error) {

@@ -3,11 +3,11 @@ package core
 import (
 	"net"
 	"net/url"
-	"yaklang/common/log"
-	"yaklang/common/utils"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"yaklang/common/log"
+	"yaklang/common/utils"
 )
 
 var defaultExcludedSuffix = []string{

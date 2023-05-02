@@ -3,11 +3,11 @@ package javascript
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"strings"
+	"testing"
 	"yaklang/common/go-funk"
 	"yaklang/common/javascript/otto/ast"
 	"yaklang/common/javascript/otto/parser"
-	"strings"
-	"testing"
 )
 
 const code = `

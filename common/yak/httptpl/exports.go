@@ -2,11 +2,11 @@ package httptpl
 
 import (
 	"context"
+	"strings"
 	"yaklang/common/go-funk"
 	"yaklang/common/log"
 	"yaklang/common/utils"
 	"yaklang/common/utils/lowhttp"
-	"strings"
 )
 
 func ScanPacket(req []byte, opts ...interface{}) {

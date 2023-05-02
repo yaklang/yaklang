@@ -3,9 +3,9 @@ package hybridscan
 import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/pkg/errors"
+	"time"
 	"yaklang/common/fp"
 	"yaklang/common/synscan"
-	"time"
 )
 
 type Config struct {

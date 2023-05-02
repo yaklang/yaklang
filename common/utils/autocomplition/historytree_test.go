@@ -2,8 +2,8 @@ package autocomplition
 
 import (
 	"github.com/k0kubun/pp"
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 func TestGetBashHistoryTreeRawLines(t *testing.T) {

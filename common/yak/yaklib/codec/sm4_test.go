@@ -2,8 +2,8 @@ package codec
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"yaklang/common/log"
 	"testing"
+	"yaklang/common/log"
 )
 
 type encType func(key []byte, i interface{}, iv []byte) ([]byte, error)

@@ -2,9 +2,9 @@ package yakvm
 
 import (
 	"fmt"
-	"yaklang/common/utils"
 	"reflect"
 	"sort"
+	"yaklang/common/utils"
 )
 
 type IteratorType int

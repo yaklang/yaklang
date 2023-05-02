@@ -7,13 +7,13 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
+	"strings"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/log"
 	"yaklang/common/subdomain"
 	"yaklang/common/utils"
-	"path"
-	"strings"
-	"time"
 )
 
 func contentToTmpFile(raw []byte) (string, error) {

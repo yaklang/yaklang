@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"strconv"
+	"sync"
+	"time"
 	"yaklang/common/consts"
 	"yaklang/common/cve/cveresources"
 	"yaklang/common/jsonextractor"
@@ -12,9 +15,6 @@ import (
 	"yaklang/common/openai"
 	"yaklang/common/utils"
 	"yaklang/common/utils/bizhelper"
-	"strconv"
-	"sync"
-	"time"
 )
 
 type CVEDescription struct {
