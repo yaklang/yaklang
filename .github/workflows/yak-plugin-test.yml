@@ -27,4 +27,4 @@ jobs:
           go mod vendor
 
       - name: Test Yak Plugin
-        run: go test -timeout 5m common/vulinbox -v
+        run: go test -timeout 5m ./common/vulinbox -v
