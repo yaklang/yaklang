@@ -2,6 +2,10 @@ module github.com/yaklang/yaklang
 
 go 1.20
 
+replace (
+	github.com/yaklang/yaklang v0.0.0 => ./
+)
+
 require (
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/PuerkitoBio/goquery v1.6.0
