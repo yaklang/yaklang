@@ -2,7 +2,7 @@ name: Yak Plugin Testcases
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     paths:
       - 'common/**'
 jobs:

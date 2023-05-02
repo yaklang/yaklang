@@ -2,7 +2,7 @@ name: lowhttp-testcases
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     paths:
       - 'common/utils/lowhttp/**'
       - 'common/jsonextractor/**'
