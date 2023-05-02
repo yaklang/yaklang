@@ -52,6 +52,9 @@ jobs:
       - name: Generate Document
         run: go run common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
 
+      - name: Initialize License Machine
+        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+
       - name: Build For Linux
         run: |
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
