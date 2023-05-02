@@ -29,4 +29,4 @@ jobs:
        go mod tidy
 
     - name: Test
-      run: go test -timeout 30m -tags common/yak/antlr4yak yaklang/common/yak/antlr4yak -v -count=1
+      run: go test -timeout 30m -tags common/yak/antlr4yak common/yak/antlr4yak -v -count=1
