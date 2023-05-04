@@ -137,7 +137,7 @@ jobs:
         uses: actions/create-release@v1
         continue-on-error: true
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTIONS_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
