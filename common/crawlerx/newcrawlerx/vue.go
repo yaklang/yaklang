@@ -4,16 +4,18 @@ package newcrawlerx
 
 import (
 	"github.com/go-rod/rod"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"time"
 )
 
 func (starter *BrowserStarter) vueClick(doGetUrl func(string, string) error) func(*rod.Page, string, string) error {
 	return func(page *rod.Page, originUrl string, selector string) error {
-		page.Navigate(originUrl)
-		page.WaitLoad()
+		err := page.Navigate(originUrl)
+		if err != nil {
+			return utils.Errorf("page navigate %s error: %s", originUrl, err)
+		}
+		page.MustWaitLoad()
 		time.Sleep(time.Second)
-		log.Infof("click %s: ", selector)
 		clickElementOnPageBySelector(page, selector)
 		currentUrl, _ := getCurrentUrl(page)
 		if currentUrl != "" && currentUrl != originUrl {
