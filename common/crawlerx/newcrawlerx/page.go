@@ -114,7 +114,6 @@ func (starter *BrowserStarter) EventClickFunctionGenerator(doClick func(*rod.Pag
 		for _, clickableElementSelectorRaw := range clickableElementArr {
 			clickableElementSelector := clickableElementSelectorRaw.Str()
 			doClick(page, currentUrl, clickableElementSelector)
-			page.WaitLoad()
 		}
 		return nil
 	}
@@ -229,7 +228,6 @@ func (starter *BrowserStarter) HttpPostFile(element *rod.Element) error {
 		postUrlParse, _ := baseUrlParse.Parse(action)
 		postUrl = postUrlParse.String()
 	}
-	log.Info(postUrl)
 	// get post params
 	inputElements, err := formElement.Elements("input")
 	formValues := make(map[string]string)

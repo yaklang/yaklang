@@ -24,7 +24,8 @@ var TestModule = cli.Command{
 		//teststh.PopUpTest()
 		//teststh.GetHrefSelector()
 		//teststh.VisitIco()
-		teststh.ErrorUrlTest()
+		//teststh.ErrorUrlTest()
+		teststh.VueTest()
 		//testFunction := detect.GetURLRepeatCheck(detect.UnLimit)
 		//fmt.Println(testFunction("https://go-rod.github.io/#/network?id=proxy", "get"))
 		return nil

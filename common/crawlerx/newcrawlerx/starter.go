@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/crawlerx/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -61,6 +62,11 @@ type BrowserStarter struct {
 	inputFunction  func(*rod.Page) error
 	pageActions    []func(*rod.Page) error
 	actionMap      map[string]func(*rod.Page) error
+
+	client    http.Client
+	transport http.Transport
+
+	extraWaitLoad int
 }
 
 func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -96,6 +102,8 @@ func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) 
 
 		pageActions: make([]func(*rod.Page) error, 0),
 		actionMap:   make(map[string]func(*rod.Page) error),
+
+		extraWaitLoad: baseConfig.extraWaitLoadTime,
 	}
 	ctx, cancel := context.WithCancel(baseConfig.ctx)
 	starter.ctx = ctx
@@ -111,6 +119,27 @@ func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) 
 	}
 	starter.requestAfterRepeat = repeatCheckGenerator(starter.repeatLevel, starter.noParams...)
 	starter.urlAfterRepeat = urlRepeatCheckGenerator(starter.repeatLevel, starter.noParams...)
+	starter.transport = http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	if starter.browserConfig.proxyAddress != nil {
+		starter.transport.Proxy = http.ProxyURL(starter.browserConfig.proxyAddress)
+	}
+	starter.client = http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: &starter.transport,
+	}
 	return &starter
 }
 
@@ -237,12 +266,15 @@ func (starter *BrowserStarter) newPageDetectEvent() {
 					PromptText: "",
 				}.Call(page)
 			})()
-			page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
 			err = page.WaitLoad()
 			if err != nil {
 				log.Errorf("targetID %s wait load error: %s", targetID, err)
 				return
 			}
+			if starter.extraWaitLoad != 0 {
+				time.Sleep(time.Duration(starter.extraWaitLoad) * time.Millisecond)
+			}
+			page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
 			err = starter.PageScan(page)
 			if err != nil {
 				log.Errorf("targetID %s do page scan error: %s", targetID, err)
@@ -275,19 +307,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
 		}
-		client := http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		}
-		transport := http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		if starter.browserConfig.proxyAddress != nil {
-			transport.Proxy = http.ProxyURL(starter.browserConfig.proxyAddress)
-		}
-		client.Transport = &transport
-		err := hijack.LoadResponse(&client, true)
+		err := hijack.LoadResponse(&starter.client, true)
 		if err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				log.Errorf("load response error: %s", err)
@@ -418,13 +438,11 @@ func (starter *BrowserStarter) MultiRun() {
 				if starter.subWaitGroup.WaitingEventCount > 0 {
 					starter.subWaitGroup.Wait()
 				} else {
-					log.Info(starter.subWaitGroup.WaitingEventCount)
 					starter.mainWaitGroup.Done()
 					break next
 				}
 			}
 		}
-		log.Info("break next.")
 	}
 	log.Info("done!")
 }

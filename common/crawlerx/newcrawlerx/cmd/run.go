@@ -185,6 +185,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 		newcrawlerx.WithBlackList(getSliceFromString(blackList)...),
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
 		newcrawlerx.WithVueWeb(true),
+		newcrawlerx.WithExtraWaitLoadTime(1000),
 	)
 	return opts
 }
