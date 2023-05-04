@@ -1,0 +1,57 @@
+name: tools
+functions:
+- name: tools.NewBruteUtil
+  type_str: 'func (v1: string) return(*bruteutils.BruteUtil, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/bruteutils.BruteUtil
+    type_str: '*bruteutils.BruteUtil'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/utils/bruteutils.BruteUtil
+    isbuildinstruct: false
+  - structname: palm/common/utils/bruteutils.BruteItem
+    isbuildinstruct: false
+  - structname: palm/common/utils/bruteutils.BruteItemResult
+    isbuildinstruct: false
+  - structname: palm/common/utils/bruteutils.targetProcessing
+    isbuildinstruct: false
+  - structname: palm/common/utils.SizedWaitGroup
+    isbuildinstruct: false
+- name: tools.NewPocInvoker
+  type_str: 'func () return(*tools.PocInvoker, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib/tools.PocInvoker
+    type_str: '*tools.PocInvoker'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib/tools.PocInvoker
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib/tools.PocVul
+    isbuildinstruct: false
+variables: []

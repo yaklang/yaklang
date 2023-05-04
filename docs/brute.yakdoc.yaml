@@ -1,0 +1,242 @@
+name: brute
+functions:
+- name: brute.GetAvailableBruteTypes
+  type_str: 'func () return([]string) '
+  long_description: ""
+  description: 获取当前模块支持的所有的爆破类型
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: brute.GetPasswordListFromBruteType
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: 根据服务获取服务对应的密码列表
+  params:
+  - name: v1
+    param_alias: bruteType
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: list
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: brute.GetUsernameListFromBruteType
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: 根据服务获取服务对应的用户列表
+  params:
+  - name: v1
+    param_alias: bruteType
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: list
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: brute.New
+  type_str: 'func (v1: string, v2 ...func yakBruteOpt(v1: *tools.yakBruter) ) return(*tools.yakBruter,
+    error) '
+  long_description: ""
+  description: 新建一个爆破执行期
+  params:
+  - name: v1
+    param_alias: bruteType
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: bruteParams
+    type_alias: '...yakBruteOpt'
+    description: ""
+    type_str: '[]tools.yakBruteOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib/tools.yakBruter
+    type_str: '*tools.yakBruter'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib/tools.yakBruter
+    isbuildinstruct: false
+  - structname: palm/common/utils/bruteutils.BruteItemResult
+    isbuildinstruct: false
+- name: brute.bruteHandler
+  type_str: 'func (v1: func (v1: *bruteutils.BruteItem) return(*bruteutils.BruteItemResult)
+    ) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *bruteutils.BruteItem) return(*bruteutils.BruteItemResult) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.concurrent
+  type_str: 'func (v1: int) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.concurrentTarget
+  type_str: 'func (v1: int) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.debug
+  type_str: 'func (v1: bool) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.finishingThreshold
+  type_str: 'func (v1: int) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: 停止爆破的阈值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.maxDelay
+  type_str: 'func (v1: int) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.minDelay
+  type_str: 'func (v1: int) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.okToStop
+  type_str: 'func (v1: bool) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: 如果爆破出结果就停止
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.passList
+  type_str: 'func (v1 ...string) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: 设置密码列表
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+- name: brute.userList
+  type_str: 'func (v1 ...string) return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
+variables: []

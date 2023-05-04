@@ -1,0 +1,71 @@
+is_build_in_struct: false
+libname: brute
+struct_name: palm/common/utils/bruteutils.BruteItemResult
+description: ""
+fields:
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Finished
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Ok
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: OnlyNeedPassword
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Password
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Target
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: UserEliminated
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Username
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/utils/bruteutils.BruteItemResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/bruteutils.BruteItemResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

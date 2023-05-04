@@ -1,0 +1,1076 @@
+name: yakit
+functions:
+- name: yakit.AutoInitYakit
+  type_str: 'func () '
+  long_description: '`yakit.AutoInitYakit()` 可以自动建立与 Yakit 的连接（yakit-webhook）'
+  description: 自动初始化与 Yakit 的链接
+- name: yakit.DeletePayloadByGroup
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.EnableTable
+  type_str: 'func (v1: string, v2: []string) '
+  long_description: ""
+  description: 启动一个实时刷新的表格，一般用这个表格来收集结果
+  params:
+  - name: v1
+    param_alias: tableName
+    type_alias: ""
+    description: 表名，实时刷新表格的名称
+    type_str: string
+  - name: v2
+    param_alias: columns
+    type_alias: ""
+    description: 表列
+    type_str: '[]string'
+- name: yakit.EnableWebsiteTrees
+  type_str: 'func (v1: string) '
+  long_description: ""
+  description: 启动在结果中启动网站树视图（案例：基础爬虫）
+  params:
+  - name: v1
+    param_alias: websiteKeyword
+    type_alias: ""
+    description: 生成网站树的关键字
+    type_str: string
+- name: yakit.Error
+  type_str: 'func (v1: string, v2 ...interface {}) '
+  long_description: ""
+  description: 在 Yakit 的 UI 中输出输出 Error 级别的信息
+  params:
+  - name: v1
+    param_alias: fmt
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: items
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+- name: yakit.File
+  type_str: 'func (v1: string, v2 ...interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+- name: yakit.GenerateYakitMITMHooksParams
+  type_str: 'func (v1: string, v2: string, v3 ...func HttpOption(v1: *yakhttp.YakHttpRequest)
+    ) return([]interface {}, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakhttp.HttpOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.GetHomeDir
+  type_str: 'func () return(string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: yakit.GetHomeTempDir
+  type_str: 'func () return(string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: yakit.GetOnlineBaseUrl
+  type_str: 'func () return(string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: yakit.Info
+  type_str: 'func (v1: string, v2 ...interface {}) '
+  long_description: ""
+  description: 在 Yakit UI 中输出 Info 级别的信息
+  params:
+  - name: v1
+    param_alias: fmt
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: items
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+- name: yakit.InitYakit
+  type_str: 'func (v1: *yaklib.YakitClient) '
+  long_description: ""
+  description: 手动初始化 Yakit 客户端，用于自定义
+  params:
+  - name: v1
+    param_alias: yakitClient
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitClient
+    type_str: '*yaklib.YakitClient'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitClient
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.YakitLog
+    isbuildinstruct: false
+- name: yakit.Markdown
+  type_str: 'func (v1: interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: yakit.NewBarGraph
+  type_str: 'func () return(*yaklib.YakitGraph) '
+  long_description: ""
+  description: 创建一个柱形图
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitGraph
+    type_str: '*yaklib.YakitGraph'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitGraph
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.yakitGraphValue
+    isbuildinstruct: false
+- name: yakit.NewClient
+  type_str: 'func (v1: string) return(*yaklib.YakitClient) '
+  long_description: ""
+  description: 创建一个与 yakit 通信的通道（webhook）
+  params:
+  - name: v1
+    param_alias: yakitWebhook
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitClient
+    type_str: '*yaklib.YakitClient'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitClient
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.YakitLog
+    isbuildinstruct: false
+- name: yakit.NewHTTPFlowRisk
+  type_str: 'func (v1: string, v2: bool, v3: string, v4: []uint8, v5: []uint8) return(*yaklib.YakitHTTPFlowRisk) '
+  long_description: ""
+  description: 生成一个 HTTPFlow 的风险项
+  params:
+  - name: v1
+    param_alias: riskName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: v3
+    param_alias: url
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: req
+    type_alias: bytes
+    description: ""
+    type_str: '[]uint8'
+  - name: v5
+    param_alias: rsp
+    type_alias: bytes
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitHTTPFlowRisk
+    type_str: '*yaklib.YakitHTTPFlowRisk'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitHTTPFlowRisk
+    isbuildinstruct: false
+- name: yakit.NewLineGraph
+  type_str: 'func () return(*yaklib.YakitGraph) '
+  long_description: ""
+  description: 生成线形图数据
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitGraph
+    type_str: '*yaklib.YakitGraph'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitGraph
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.yakitGraphValue
+    isbuildinstruct: false
+- name: yakit.NewPieGraph
+  type_str: 'func () return(*yaklib.YakitGraph) '
+  long_description: ""
+  description: 生成饼图数据
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitGraph
+    type_str: '*yaklib.YakitGraph'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitGraph
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.yakitGraphValue
+    isbuildinstruct: false
+- name: yakit.NewTable
+  type_str: 'func (v1 ...string) return(*yaklib.YakitTable) '
+  long_description: ""
+  description: 生成表格（无法实时刷新，对比 EnableTable）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitTable
+    type_str: '*yaklib.YakitTable'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitTable
+    isbuildinstruct: false
+- name: yakit.NewWordCloud
+  type_str: 'func () return(*yaklib.YakitGraph) '
+  long_description: ""
+  description: 生成词云
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitGraph
+    type_str: '*yaklib.YakitGraph'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitGraph
+    isbuildinstruct: false
+  - structname: palm/common/yak/yaklib.yakitGraphValue
+    isbuildinstruct: false
+- name: yakit.Output
+  type_str: 'func (v1: interface {}) '
+  long_description: ""
+  description: 输出任意的对象到 Yakit UI 中，如果对象是图，将会自动创建一个图，如果对象是一个其他东西，将会自动 JSON 序列化
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: yakit.QueryDomainsByDomainKeyword
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 从数据库中根据域名关键字查询域名
+  params:
+  - name: v1
+    param_alias: keyword
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryDomainsByNetwork
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 通过域名关联的 IP 查询域名
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: IP网段或IP
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryDomainsByTitle
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 根据域名关联网站的标题查询域名
+  params:
+  - name: v1
+    param_alias: title
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryHTTPFlowsAll
+  type_str: 'func () return(chan *yakit.HTTPFlow) '
+  long_description: ""
+  description: 查询所有的 HTTPFlow，包含请求和结果的所有信息
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
+    type_str: chan *yakit.HTTPFlow
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: yakit.QueryHTTPFlowsByKeyword
+  type_str: 'func (v1: string) return(chan *yakit.HTTPFlow) '
+  long_description: ""
+  description: 根据关键字搜索查询符合条件的 HTTPFlow
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
+    type_str: chan *yakit.HTTPFlow
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: yakit.QueryHostPortAll
+  type_str: 'func () return(chan string) '
+  long_description: ""
+  description: 查询数据库中所有的 [host]:[port] 的形式，例如（192.168.100.1:80）
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.QueryHostPortByKeyword
+  type_str: 'func (v1: string) return(chan string) '
+  long_description: ""
+  description: 根据指纹信息搜索所有符合条件的 host:port
+  params:
+  - name: v1
+    param_alias: keyword
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.QueryHostPortByNetwork
+  type_str: 'func (v1: string) return(chan string) '
+  long_description: ""
+  description: 根据目标网段搜索本机的 host:port
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.QueryHostPortByNetworkAndPort
+  type_str: 'func (v1: string, v2: string) return(chan string) '
+  long_description: ""
+  description: 根据 network 和 port 查询端口 host:port 格式
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ports
+    type_alias: ""
+    description: 端口是支持范围搜索的！所以使用字符串吧！
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.QueryHostsByDomain
+  type_str: 'func (v1: string) return(chan *yakit.Host, error) '
+  long_description: ""
+  description: 根据 Domain 查询 Host 资产
+  params:
+  - name: v1
+    param_alias: domain
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Host
+    type_str: chan *yakit.Host
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Host
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryHostsByNetwork
+  type_str: 'func (v1: string) return(chan *yakit.Host, error) '
+  long_description: ""
+  description: 根据网段查询 host 资产
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Host
+    type_str: chan *yakit.Host
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Host
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryPortAssetByNetwork
+  type_str: 'func (v1: string) return(chan *yakit.Port, error) '
+  long_description: ""
+  description: 查询端口资产
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: channel
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Port
+    type_str: chan *yakit.Port
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Port
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: yakit.QueryUrlsAll
+  type_str: 'func () return(chan string) '
+  long_description: ""
+  description: 搜索数据库中所有可用的 URL (httpflows 表)
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.QueryUrlsByKeyword
+  type_str: 'func (v1: string) return(chan string) '
+  long_description: ""
+  description: 查询所有带一定关键字的 URL
+  params:
+  - name: v1
+    param_alias: keyword
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: yakit.Report
+  type_str: 'func (v1: int) '
+  long_description: ""
+  description: 返回报告的内容给 Yakit
+  params:
+  - name: v1
+    param_alias: 生成的报告的 ID
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: yakit.SaveDomain
+  type_str: 'func (v1: string, v2 ...string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.SaveHTTPFlow
+  type_str: 'func (v1: string, v2: *http.Request, v3: *http.Response) return(error) '
+  long_description: ""
+  description: 保存 HTTP Flow 到数据库
+  params:
+  - name: v1
+    param_alias: isHttps
+    type_alias: ""
+    description: 该 HTTP 流对象是不是 HTTPS 加密的。
+    type_str: string
+  - name: v2
+    param_alias: request
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: v3
+    param_alias: response
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: yakit.SavePayload
+  type_str: 'func (v1: string, v2: []string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.SavePayloadByFile
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.SavePortFromResult
+  type_str: 'func (v1: interface {}) return(error) '
+  long_description: ""
+  description: 把端口信息保存到数据库中，支持 synscan 和 servicescan 的扫描结果直接保存。
+  params:
+  - name: v1
+    param_alias: result
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.SetOnlineBaseUrl
+  type_str: 'func (v1: string) '
+  long_description: ""
+  description: 设置 Yakit Online 的基础 URL
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: yakit.SetProgress
+  type_str: 'func (v1: float64) '
+  long_description: 设置默认进度条的进度信息
+  description: ""
+  params:
+  - name: v1
+    param_alias: progress
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: yakit.SetProgressEx
+  type_str: 'func (v1: string, v2: float64) '
+  long_description: ""
+  description: 设置额外进度条的进度信息（默认进度条id为 `main`）
+  params:
+  - name: v1
+    param_alias: progressName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: percent
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: yakit.StatusCard
+  type_str: 'func (v1: string, v2: interface {}, v3 ...string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: statusName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: statusValue
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: tags
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+- name: yakit.TableData
+  type_str: 'func (v1: string, v2: map[string]interface {}) return(*yaklib.YakitFixedTableData) '
+  long_description: ""
+  description: 为启动的 table 生成数据
+  params:
+  - name: v1
+    param_alias: tableName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: map[string]interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.YakitFixedTableData
+    type_str: '*yaklib.YakitFixedTableData'
+  relative_structs:
+  - structname: palm/common/yak/yaklib.YakitFixedTableData
+    isbuildinstruct: false
+- name: yakit.Text
+  type_str: 'func (v1: interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: yakit.UpdateOnlineYakitStore
+  type_str: 'func () return(error) '
+  long_description: ""
+  description: 更新所有线上商店的内容
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.UpdateYakitStore
+  type_str: 'func () return(error) '
+  long_description: ""
+  description: 使用 yakit 来直接更新 yakit-store 中的插件
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.UpdateYakitStoreFromGit
+  type_str: 'func (v1: context.Context, v2: string, v3 ...string) return(error) '
+  long_description: ""
+  description: 从 Git 中更新 Yakit 商店内容
+  params:
+  - name: v1
+    param_alias: ctx
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v2
+    param_alias: url
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: proxy
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.UpdateYakitStoreLocal
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: yakit.Warn
+  type_str: 'func (v1: string, v2 ...interface {}) '
+  long_description: ""
+  description: 让 Yakit UI 输出告警信息
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+variables: []

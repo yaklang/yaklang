@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.DelRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.DelRequest
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.DelRequest
+  name: DN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

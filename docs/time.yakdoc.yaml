@@ -1,0 +1,319 @@
+name: time
+functions:
+- name: time.After
+  type_str: 'func (v1: float64) return(<-chan time.Time) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: <-chan time.Time
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.AfterFunc
+  type_str: 'func (v1: time.Duration, v2: func () ) return(*time.Timer) '
+  long_description: ""
+  description: 一段时间之后执行一个函数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Timer
+    type_str: '*time.Timer'
+  relative_structs:
+  - structname: time.Timer
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.GetCurrentDate
+  type_str: 'func () return(time.Time, error) '
+  long_description: ""
+  description: 获得当前今天的日期
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.GetCurrentMonday
+  type_str: 'func () return(time.Time, error) '
+  long_description: ""
+  description: 或者当前周的周一日期
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.NewTicker
+  type_str: 'func (v1: float64) return(*time.Ticker) '
+  long_description: ""
+  description: 获取一个 seconds 的 ticker，每隔 seconds 秒触发一次
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Ticker
+    type_str: '*time.Ticker'
+  relative_structs:
+  - structname: time.Ticker
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.NewTimer
+  type_str: 'func (v1: float64) return(*time.Timer) '
+  long_description: ""
+  description: 设置一个新的定时器，seconds 秒之后触发
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Timer
+    type_str: '*time.Timer'
+  relative_structs:
+  - structname: time.Timer
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.Now
+  type_str: 'func () return(time.Time) '
+  long_description: ""
+  description: 获取当前时间
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.Parse
+  type_str: 'func (v1: string, v2: string) return(time.Time, error) '
+  long_description: ""
+  description: 把时间按照一定规则进行解析（遵循 Golang 的规则）
+  params:
+  - name: v1
+    param_alias: timeStr
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: format
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.ParseDuration
+  type_str: 'func (v1: string) return(time.Duration, error) '
+  long_description: ""
+  description: 把一个字符串时间解析成 `time.Duration`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: time.Since
+  type_str: 'func (v1: time.Time) return(time.Duration) '
+  long_description: ""
+  description: 计算一个时间到现在的时间差
+  params:
+  - name: v1
+    param_alias: start
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.Sleep
+  type_str: 'func (v1: float64) '
+  long_description: ""
+  description: sleep 一段时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: time.Unix
+  type_str: 'func (v1: int64, v2: int64) return(time.Time) '
+  long_description: ""
+  description: 使用 Unix 时间戳构建一个时间
+  params:
+  - name: v1
+    param_alias: timestampSeconds
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: v2
+    param_alias: nano
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.Until
+  type_str: 'func (v1: time.Time) return(time.Duration) '
+  long_description: ""
+  description: 计算当前时间到目标时间的时间间隔
+  params:
+  - name: v1
+    param_alias: end
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Duration
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.now
+  type_str: 'func () return(time.Time) '
+  long_description: ""
+  description: 当前时间
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: time.Time
+    type_str: time.Time
+  relative_structs:
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: time.sleep
+  type_str: 'func (v1: float64) '
+  long_description: ""
+  description: sleep 一段时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+variables: []

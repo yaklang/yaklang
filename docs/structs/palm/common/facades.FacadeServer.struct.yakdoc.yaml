@@ -1,0 +1,200 @@
+is_build_in_struct: false
+libname: facades
+struct_name: palm/common/facades.FacadeServer
+description: ""
+fields:
+- structname: palm/common/facades.FacadeServer
+  name: ExternalHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/facades.FacadeServer
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/facades.FacadeServer
+  name: Port
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: palm/common/facades.FacadeServer
+  name: RemoteAddrConvertorHandler
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: string) return(string) '
+- structname: palm/common/facades.FacadeServer
+  name: ReverseAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: AddFileResource
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: AddHttpRoute
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/facades.HttpResource
+    type_str: facades.HttpResource
+  relative_struct_name:
+  - structname: palm/common/facades.HttpResource
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: Config
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]facades.FacadeServerConfig'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: ConvertRemoteAddr
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: GetAddr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: GetHTTPHandler
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func FacadeConnectionHandler(v1: *utils.PeekableNetConn) return(error) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: OnHandle
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *facades.Notification) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: OverwriteFileResource
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: SaveHttpRoute
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: facades.HttpResource
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: Serve
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/facades.FacadeServer
+  name: ServeWithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

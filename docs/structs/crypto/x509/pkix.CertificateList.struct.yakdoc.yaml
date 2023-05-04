@@ -1,0 +1,45 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.CertificateList
+description: ""
+fields:
+- structname: crypto/x509/pkix.CertificateList
+  name: SignatureAlgorithm
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.AlgorithmIdentifier
+  type_str: pkix.AlgorithmIdentifier
+- structname: crypto/x509/pkix.CertificateList
+  name: SignatureValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: encoding/asn1.BitString
+  type_str: asn1.BitString
+- structname: crypto/x509/pkix.CertificateList
+  name: TBSCertList
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.TBSCertificateList
+  type_str: pkix.TBSCertificateList
+methods:
+- ptr: true
+  description: ""
+  structname: crypto/x509/pkix.CertificateList
+  name: HasExpired
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

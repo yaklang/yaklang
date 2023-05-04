@@ -1,0 +1,56 @@
+is_build_in_struct: false
+libname: tools
+struct_name: palm/common/utils/bruteutils.BruteItem
+description: ""
+fields:
+- structname: palm/common/utils/bruteutils.BruteItem
+  name: Password
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItem
+  name: Target
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItem
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/bruteutils.BruteItem
+  name: Username
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/utils/bruteutils.BruteItem
+  name: Result
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/bruteutils.BruteItemResult
+    type_str: '*bruteutils.BruteItemResult'
+  relative_struct_name:
+  - structname: palm/common/utils/bruteutils.BruteItemResult
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/utils/bruteutils.BruteItem
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

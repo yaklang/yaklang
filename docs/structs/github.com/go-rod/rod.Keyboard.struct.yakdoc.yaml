@@ -1,0 +1,105 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.Keyboard
+description: ""
+fields:
+- structname: github.com/go-rod/rod.Keyboard
+  name: Mutex
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: sync.Mutex
+  type_str: sync.Mutex
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: Lock
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: MustType
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.Keyboard'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: Press
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: input.Key
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: Release
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: input.Key
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: TryLock
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: Type
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Keyboard
+  name: Unlock
+  relative_struct_name: []
+ptr_methods: []

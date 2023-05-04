@@ -1,0 +1,695 @@
+name: risk
+functions:
+- name: risk.CheckDNSLogByToken
+  type_str: 'func (v1: string) return([]*tpb.DNSLogEvent, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/cybertunnel/tpb.DNSLogEvent
+    type_str: '[]*tpb.DNSLogEvent'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/cybertunnel/tpb.DNSLogEvent
+    isbuildinstruct: false
+- name: risk.CheckICMPTriggerByLength
+  type_str: 'func (v1: int) return(*tpb.ICMPTriggerNotification, error) '
+  long_description: ""
+  description: 检查 ICMP 触发器
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+    type_str: '*tpb.ICMPTriggerNotification'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+    isbuildinstruct: false
+- name: risk.CheckRandomTriggerByToken
+  type_str: 'func (v1: string) return(*tpb.RandomPortTriggerEvent, error) '
+  long_description: ""
+  description: 通过 Token 来查询随机触发器
+  params:
+  - name: v1
+    param_alias: token
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: event
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/cybertunnel/tpb.RandomPortTriggerEvent
+    type_str: '*tpb.RandomPortTriggerEvent'
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/cybertunnel/tpb.RandomPortTriggerEvent
+    isbuildinstruct: false
+- name: risk.CreateRisk
+  type_str: 'func (v1: string, v2 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(*yakit.Risk) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Risk
+    type_str: '*yakit.Risk'
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.ExtractTokenFromUrl
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 从 URL 中提取 token
+  params:
+  - name: v1
+    param_alias: url
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.HaveReverseRisk
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个 Token 的反连是否触发
+  params:
+  - name: v1
+    param_alias: token
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: boolvendor/github.com/projectdiscovery/fileutil/file.go
+- name: risk.NewDNSLogDomain
+  type_str: 'func () return(string, string, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: risk.NewLocalReverseHTTPSUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewLocalReverseHTTPUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewLocalReverseRMIUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewPublicReverseHTTPSUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewPublicReverseHTTPUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewPublicReverseRMIUrl
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: risk.NewRandomPortTrigger
+  type_str: 'func (v1 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(string, string,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: risk.NewRisk
+  type_str: 'func (v1: string, v2 ...func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+- name: risk.NewUnverifiedRisk
+  type_str: 'func (v1: string, v2: string, v3 ...func RiskParamsOpt(v1: *yakit.Risk)
+    ) return(*yakit.Risk, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yakit.RiskParamsOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Risk
+    type_str: '*yakit.Risk'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.Save
+  type_str: 'func (v1: *yakit.Risk) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Risk
+    type_str: '*yakit.Risk'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.YieldRiskByRuntimeId
+  type_str: 'func (v1: string) return(chan *yakit.Risk) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Risk
+    type_str: chan *yakit.Risk
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.YieldRiskByTarget
+  type_str: 'func (v1: string) return(chan *yakit.Risk) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Risk
+    type_str: chan *yakit.Risk
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.cve
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.details
+  type_str: 'func (v1: interface {}) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.fromYakScript
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.level
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.parameter
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.payload
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.potential
+  type_str: 'func (v1: bool) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.request
+  type_str: 'func (v1: interface {}) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.response
+  type_str: 'func (v1: interface {}) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.runtimeId
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.severity
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.title
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.titleVerbose
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.token
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.type
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.typeVerbose
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+variables: []

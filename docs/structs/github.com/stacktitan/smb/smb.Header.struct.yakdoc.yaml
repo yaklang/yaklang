@@ -1,0 +1,85 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.Header
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Command
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.Header
+  name: CreditCharge
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Credits
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Flags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.Header
+  name: MessageID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/stacktitan/smb/smb.Header
+  name: NextCommand
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.Header
+  name: ProtocolID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Reserved
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.Header
+  name: SessionID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Signature
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/smb.Header
+  name: Status
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: github.com/stacktitan/smb/smb.Header
+  name: StructureSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.Header
+  name: TreeID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+methods: []
+ptr_methods: []

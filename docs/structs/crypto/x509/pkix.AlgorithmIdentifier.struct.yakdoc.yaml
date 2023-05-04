@@ -1,0 +1,20 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.AlgorithmIdentifier
+description: ""
+fields:
+- structname: crypto/x509/pkix.AlgorithmIdentifier
+  name: Algorithm
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: asn1.ObjectIdentifier
+- structname: crypto/x509/pkix.AlgorithmIdentifier
+  name: Parameters
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: encoding/asn1.RawValue
+  type_str: asn1.RawValue
+methods: []
+ptr_methods: []

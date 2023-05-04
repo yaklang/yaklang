@@ -1,0 +1,105 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: CaptureBeyondViewport
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: Clip
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.PageViewport
+  type_str: '*proto.PageViewport'
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: Format
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.PageCaptureScreenshotFormat
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: FromSurface
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: Quality
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+methods:
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Client
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
+    type_str: '*proto.PageCaptureScreenshotResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Client
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.PageCaptureScreenshotResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: ProtoReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
+  name: ProtoReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

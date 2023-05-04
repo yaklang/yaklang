@@ -1,0 +1,74 @@
+name: updateCve
+
+on:
+  push:
+    branches:
+      - "cve/*"
+  schedule:
+    # 定时任务，在每周一0点更新
+    - cron: '0 0 * * 1'
+
+jobs:
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.18
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Dependence
+        run: |
+          sudo apt-get update
+          sudo apt-get install libpcap-dev wget
+          go mod tidy
+          go mod vendor
+          go build -o ./yak common/yak/cmd/yak.go
+
+      - name: LoadCVE-Description
+        run: mkdir -p ~/yakit-projects && wget -O ~/yakit-projects/default-cve-description.db.gzip https://cve-db.oss-cn-beijing.aliyuncs.com/default-cve-description.db.gzip
+
+      - name: Check file size(Pre Checking!)
+        run: |
+          FILE_PATH=~/yakit-projects/default-cve-description.db.gzip
+          FILE_SIZE=$(stat -c%s "$FILE_PATH")
+          echo "File size: $FILE_SIZE bytes"
+
+          SIZE_LIMIT=$((10 * 1024 * 1024)) # 10MB size limit
+          if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
+            echo "File size is less than 10MB. Aborting GitHub Actions."
+            exit 1
+          fi
+
+      - name: Loadcve
+        run: ./yak build-cve-database --no-gzip && ./yak build-cve-database --cwe # go test -timeout 30m common/cve/cve_update_test.go
+
+      - name: Setup Ossutil
+        uses: manyuanrong/setup-ossutil@v3.0
+        with:
+          endpoint: "oss-cn-beijing.aliyuncs.com"
+          # 使用我们之前配置在secrets里面的accesskeys来配置ossutil
+          access-key-id: ${{ secrets.OSS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_KEY_SECRET }}
+
+      - name: Check file size
+        run: |
+          FILE_PATH=~/yakit-projects/default-cve.db.gzip
+          FILE_SIZE=$(stat -c%s "$FILE_PATH")
+          echo "File size: $FILE_SIZE bytes"
+          
+          SIZE_LIMIT=$((10 * 1024 * 1024)) # 10MB size limit
+          if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
+            echo "File size is less than 10MB. Aborting GitHub Actions."
+            exit 1
+          fi
+
+      - name: Deply To OSS
+        run: ossutil cp ~/yakit-projects/default-cve.db.gzip oss://cve-db/ -rf

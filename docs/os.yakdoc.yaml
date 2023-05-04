@@ -1,0 +1,393 @@
+name: os
+functions:
+- name: os.Chdir
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Clearenv
+  type_str: 'func () '
+  long_description: ""
+  description: 清除环境变量，与原生 Golang `go.Clearenv` 相同
+- name: os.Environ
+  type_str: 'func () return([]string) '
+  long_description: ""
+  description: 获取当前所有的环境变量内容
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: os.Executable
+  type_str: 'func () return(string, error) '
+  long_description: ""
+  description: 获取当前正在执行的二进制程序的路径
+  returns:
+  - name: r0
+    param_alias: path
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Exit
+  type_str: 'func (v1: int) '
+  long_description: ""
+  description: 退出主程序，手动结束当前进程
+  params:
+  - name: v1
+    param_alias: exitCode
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.ExpandEnv
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 同 Golang 的 `os.ExpandEnv`：根据当前环境变量的值来替换字符串中的${var}或者$var
+  params:
+  - name: v1
+    param_alias: targetWithEnv
+    type_alias: ""
+    description: 替换前的字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 替换后的字符串
+    type_str: string
+- name: os.GetMachineID
+  type_str: 'func () return(string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: os.GetRandomAvailableTCPPort
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: 随机获得一个可用的 TCP 端口
+  returns:
+  - name: r0
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.GetRandomAvailableUDPPort
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: 随机获得一个可用的 UDP 端口
+  returns:
+  - name: r0
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getenv
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 获得一个环境变量的值
+  params:
+  - name: v1
+    param_alias: envName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: value
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: os.IsRemoteTCPPortOpen
+  type_str: 'func (v1: string, v2: int) return(bool) '
+  long_description: ""
+  description: 判断一个远程 TCP 端口是否开放
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.IsTCPPortAvailable
+  type_str: 'func (v1: int) return(bool) '
+  long_description: ""
+  description: 判断一个本地 TCP 端口是否可用（监听可用）
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.IsTCPPortOpen
+  type_str: 'func (v1: int) return(bool) '
+  long_description: ""
+  description: 判断一个本地端口是否开放
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.IsUDPPortAvailable
+  type_str: 'func (v1: int) return(bool) '
+  long_description: ""
+  description: 判断一个本地 UDP 端口是否可用
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.IsUDPPortOpen
+  type_str: 'func (v1: int) return(bool) '
+  long_description: ""
+  description: 判断一个本地 UDP 端口是否开放
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.LookupEnv
+  type_str: 'func (v1: string) return(string, bool) '
+  long_description: ""
+  description: 判断这个环境变量是否存在，如果存在，返回环境变量的值，不存在设置 ok 为 false
+  params:
+  - name: v1
+    param_alias: envName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: value
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ok
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: os.Pipe
+  type_str: 'func () return(*os.File, *os.File, error) '
+  long_description: ""
+  description: 返回文件管道，两个结果互通，均可互相读写
+  returns:
+  - name: r0
+    param_alias: file1
+    type_alias: ""
+    description: ""
+    relative_structname: os.File
+    type_str: '*os.File'
+  - name: r1
+    param_alias: file2
+    type_alias: ""
+    description: ""
+    relative_structname: os.File
+    type_str: '*os.File'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: os.Remove
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 移除一个文件
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.RemoveAll
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 移除一个文件（强制）
+  params:
+  - name: v1
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Rename
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 重命名一个文件：同 Golang `os.Rename`
+  params:
+  - name: v1
+    param_alias: oldFile
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: newFile
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Setenv
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 设置环境变量
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: value
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Unsetenv
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 清除环境变量
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables:
+- name: os.ARCH
+  typestr: string
+  description: //
+- name: os.Args
+  typestr: '[]string'
+  description: 获取当前命令行参数
+- name: os.IsPrivileged
+  typestr: bool
+  description: //
+- name: os.OS
+  typestr: string
+  description: //
+- name: os.Stderr
+  typestr: '*os.File'
+  description: 标准错误流
+  relative_struct:
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: os.Stdin
+  typestr: '*os.File'
+  description: 标准输入流
+  relative_struct:
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: os.Stdout
+  typestr: '*os.File'
+  description: 标准输出流
+  relative_struct:
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true

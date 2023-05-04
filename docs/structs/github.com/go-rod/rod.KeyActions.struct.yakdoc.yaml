@@ -1,0 +1,84 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.KeyActions
+description: ""
+fields:
+- structname: github.com/go-rod/rod.KeyActions
+  name: Actions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod.KeyAction
+  type_str: '[]rod.KeyAction'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.KeyActions
+  name: Do
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.KeyActions
+  name: MustDo
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.KeyActions
+  name: Press
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.KeyActions'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.KeyActions
+  name: Release
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.KeyActions'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.KeyActions
+  name: Type
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]input.Key'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*rod.KeyActions'
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,60 @@
+is_build_in_struct: true
+libname: sync
+struct_name: sync.RWMutex
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: Lock
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: RLock
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: RLocker
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: sync.Locker
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: RUnlock
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: TryLock
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: TryRLock
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.RWMutex
+  name: Unlock
+  relative_struct_name: []
+ptr_methods: []

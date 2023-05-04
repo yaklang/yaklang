@@ -1,0 +1,2878 @@
+name: str
+functions:
+- name: str.CalcSSDeep
+  type_str: 'func (v1: []uint8) return(string) '
+  long_description: ""
+  description: 计算 SSDeep 的 Hash 值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.CalcSSDeepStability
+  type_str: 'func (v1 ...[]uint8) return(float64, error) '
+  long_description: ""
+  description: 计算多个文本的 SSDeep 平均相似度，0-1.0，越大越稳定（相似）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.CalcSimHash
+  type_str: 'func (v1: []uint8) return(uint64) '
+  long_description: ""
+  description: 计算 SimHash 的值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+- name: str.CalcSimHashStability
+  type_str: 'func (v1 ...[]uint8) return(float64, error) '
+  long_description: ""
+  description: 计算多个值 SimHash 的相似度
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.CalcSimilarity
+  type_str: 'func (v1 ...[]uint8) return(float64) '
+  long_description: ""
+  description: 计算多个文本的相似度（综合）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: str.CalcTextMaxSubStrStability
+  type_str: 'func (v1 ...[]uint8) return(float64, error) '
+  long_description: ""
+  description: 计算文本相似度（SQLMap 文本相似度算法）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.Compare
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 比较字符串
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.Contains
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 字符串中是否包含一个子串
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.ContainsAny
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 字符串中包含字串的任何一个字符
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: chars
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.Count
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 字符串中包含多少个字串？
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.EndsWith
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 判断字符串是否以子串为结尾
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.EqualFold
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 判断忽略大小写字符串是否相等？
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.ExtractBodyFromHTTPResponseRaw
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 从 response bytes 中提取 body
+  params:
+  - name: v1
+    param_alias: rsp
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: body
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.ExtractChineseIDCards
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 提取内容中的身份证号
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ExtractDomain
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ExtractHost
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ExtractStrContext
+  type_str: 'func (v1: []uint8, v2: []string) return([]string) '
+  long_description: ""
+  description: 提取 str 的上下文，（前后字符串）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: keywords
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ExtractTitle
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 从 HTML 中提取标题
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ExtractURLFromHTTPRequest
+  type_str: 'func (v1: *http.Request, v2: bool) return(*url.URL, error) '
+  long_description: ""
+  description: 从一个请求对象提取 URL
+  params:
+  - name: v1
+    param_alias: req
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: v2
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/url.URL
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: str.ExtractURLFromHTTPRequestRaw
+  type_str: 'func (v1: []uint8, v2: bool) return(*url.URL, error) '
+  long_description: ""
+  description: 从一个原始数据包中提取 URL
+  params:
+  - name: v1
+    param_alias: reqRaw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/url.URL
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: str.Fields
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: 按空格把字符串分割开
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.FixHTTPRequest
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: str.FixHTTPResponse
+  type_str: 'func (v1: []uint8) return([]uint8, []uint8, error) '
+  long_description: ""
+  description: 修复 HTTPResponse 的 bytes
+  params:
+  - name: v1
+    param_alias: response
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: rsp
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: body
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.Grok
+  type_str: 'func (v1: string, v2: string) return(yaklib.GrokResult) '
+  long_description: ""
+  description: 同 `re.Grok`
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: grokRule
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: yaklib.GrokResult
+- name: str.HasPrefix
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 判断字符串是不是以子串为前缀
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.HasSuffix
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 判断字符串是否以子字符串为后缀
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.HostPort
+  type_str: 'func (v1: string, v2: interface {}) return(string) '
+  long_description: ""
+  description: 把字符串Host和Port拼接起来
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.IPv4ToCClassNetwork
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 把一个 IPv4 变成对应的 C段网络
+  params:
+  - name: v1
+    param_alias: ip
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.Index
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 判断子字符串在字符串中的位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.IndexAny
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 判断子字符串中任意一个字符在主串中的位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.IndexByte
+  type_str: 'func (v1: string, v2: uint8) return(int) '
+  long_description: ""
+  description: 判断一个 byte 的位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: byte
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.IntersectString
+  type_str: 'func (v1: []string, v2: []string) return([]string) '
+  long_description: ""
+  description: 取两个集合的交集
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.IsAlNum
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsAlpha
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsAlphaNum
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsBase64Value
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个值是不是 base64
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsCaptchaField
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个参数是不是验证码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsDigit
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsHtmlResponse
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个 Response 是不是 HTML
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsHttpURL
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: '判断 URL 是不是 http(s):// '
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsIPv4
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个字符串是不是 IPv4
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsIPv6
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个字符串是不是 IPv6
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsJSONPParam
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断 JSONP 参数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsJsonResponse
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断请求是不是 JSON 请求
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsMD5Value
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断有没有参数是 MD5 值的
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsPasswordField
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断是否是密码字段
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsPlainBase64Value
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断Base64的结果是不是都是可见字符
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsRedirectParam
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断参数是不是可能是 Redirect 参数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsSQLColumnField
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断字段名是不是 SQL 列名
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsSensitiveJson
+  type_str: 'func (v1: []uint8) return(bool) '
+  long_description: ""
+  description: 判断是否是敏感 JSON（Key:Value）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsSensitiveTokenField
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断是不是敏感 Token/AC/SecretKey
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsServerError
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断是否有服务器常见错误
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsSha256Value
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断是否是一个可能的 SHA256 值
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsStrongPassword
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个密码是不是强密码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsTLSServer
+  type_str: 'func (v1: string, v2 ...string) return(bool) '
+  long_description: ""
+  description: 判断地址对应是不是 TLS
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsUrlParam
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个参数是不是 URL
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsUrlPath
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个参数是不是路径？
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsUsernameField
+  type_str: 'func (v1: string) return(bool) '
+  long_description: ""
+  description: 判断一个字段名是不是可能是用户名？
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsXmlParam
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个参数是否是 XML 参数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsXmlRequest
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个请求是不是 XML 请求
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.IsXmlValue
+  type_str: 'func (v1: interface {}) return(bool) '
+  long_description: ""
+  description: 判断一个值是不是 XML
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.Join
+  type_str: 'func (v1: interface {}, v2: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.JsonStreamToMapList
+  type_str: 'func (v1: io.Reader) return([]map[string]interface {}) '
+  long_description: ""
+  description: 把 json 流解析成多个 `map[string]interface{}`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Reader
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]map[string]interface {}'
+- name: str.JsonToMap
+  type_str: 'func (v1: string) return(map[string]string) '
+  long_description: ""
+  description: 把 Json 解析成 `map[string]string`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+- name: str.JsonToMapList
+  type_str: 'func (v1: string) return([]map[string]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]map[string]string'
+- name: str.LastIndex
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 从后往前匹配最后一个子字符串位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.LastIndexAny
+  type_str: 'func (v1: string, v2: string) return(int) '
+  long_description: ""
+  description: 子字符串中任何一个字符在主字符串中最后出现的位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.LastIndexByte
+  type_str: 'func (v1: string, v2: uint8) return(int) '
+  long_description: ""
+  description: 最后一个目标 byte 的位置
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: byte
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: str.LowerAndTrimSpace
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把字符串前后空白移除，并变成小写
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.MatchAllOfGlob
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 所有的 glob 规则都被匹配到
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: globRules
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MatchAllOfRegexp
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 所有的正则都被匹配到
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexps
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MatchAllOfSubString
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 所有的子字符串都被匹配到
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: subStrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MatchAnyOfGlob
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 只要有一条规则被匹配到规则即可
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: globRules
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MatchAnyOfRegexp
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 匹配任何一条正则语句
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexps
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MatchAnyOfSubString
+  type_str: 'func (v1: interface {}, v2 ...string) return(bool) '
+  long_description: ""
+  description: 包含任何一个子字符串
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: subStrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.MergeUrlFromHTTPRequest
+  type_str: 'func (v1: []uint8, v2: string, v3: bool) return(string) '
+  long_description: ""
+  description: 根据原始数据包拼接一个新的 URL
+  params:
+  - name: v1
+    param_alias: reqRaw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: newUrl
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.NewFilter
+  type_str: 'func () return(*filter.StringFilter) '
+  long_description: ""
+  description: 创建一个字符串过滤器
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/filter.StringFilter
+    type_str: '*filter.StringFilter'
+  relative_structs:
+  - structname: palm/common/filter.StringFilter
+    isbuildinstruct: false
+  - structname: sync.Mutex
+    isbuildinstruct: true
+- name: str.NewReader
+  type_str: 'func (v1: string) return(*strings.Reader) '
+  long_description: ""
+  description: 创建一个 Reader
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: strings.Reader
+    type_str: '*strings.Reader'
+  relative_structs:
+  - structname: strings.Reader
+    isbuildinstruct: true
+- name: str.ParamsGetOr
+  type_str: 'func (v1: map[string]string, v2: string, v3: string) return(string) '
+  long_description: ""
+  description: 从 `map[string]string` 中获取参数
+  params:
+  - name: v1
+    param_alias: params
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: defaulValue
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ParseBytesToHTTPRequest
+  type_str: 'func (v1: []uint8) return(*http.Request, error) '
+  long_description: ""
+  description: 把 bytes 解析成 *http.Request
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: str.ParseBytesToHTTPResponse
+  type_str: 'func (v1: []uint8) return(*http.Response, error) '
+  long_description: ""
+  description: 把 bytes 解析成 *http.Response
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: str.ParseStringToCClassHosts
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把网络段的字符串变为整理后的 C 段主机
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ParseStringToHTTPRequest
+  type_str: 'func (v1: string) return(*http.Request, error) '
+  long_description: ""
+  description: 把字符串解析为 *http.Request
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: str.ParseStringToHTTPResponse
+  type_str: 'func (v1: string) return(*http.Response, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: str.ParseStringToHostPort
+  type_str: 'func (v1: string) return(string, int, error) '
+  long_description: ""
+  description: 把字符串解析成 host 和 port
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: host
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.ParseStringToHosts
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: 把字符串解析成 hosts，字符串可以是逗号分割的网段/域名/ip地址
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ParseStringToLines
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: 把一个字符串按行解析
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ParseStringToPorts
+  type_str: 'func (v1: string) return([]int) '
+  long_description: ""
+  description: 把字符串解析成多个端口，逗号分隔
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+- name: str.ParseStringToUrls
+  type_str: 'func (v1 ...string) return([]string) '
+  long_description: ""
+  description: 把字符串（域名/IP/URL）解析成可能的 URL（如果是域名，不自动补充 WWW 前缀）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ParseStringToUrlsWith3W
+  type_str: 'func (v1 ...string) return([]string) '
+  long_description: ""
+  description: 把字符串（域名/IP/URL）解析成可能的 URL（如果是域名，自动补充 WWW 前缀）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ParseStringUrlToUrlInstance
+  type_str: 'func (v1: string) return(*url.URL, error) '
+  long_description: ""
+  description: 把 URL 解析成 *url.URL
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/url.URL
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: str.ParseStringUrlToWebsiteRootPath
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.PathJoin
+  type_str: 'func (v1 ...string) return(string) '
+  long_description: ""
+  description: 把 path 进行拼接
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.RandSecret
+  type_str: 'func (v1: int) return(string) '
+  long_description: ""
+  description: 生成一个随机密码
+  params:
+  - name: v1
+    param_alias: length
+    type_alias: ""
+    description: 随机密码长度
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.RandStr
+  type_str: 'func (v1: int) return(string) '
+  long_description: ""
+  description: 生成一个随机字符串
+  params:
+  - name: v1
+    param_alias: length
+    type_alias: ""
+    description: 随机字符串长度
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.RegexpMatch
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: 使用正则匹配
+  params:
+  - name: v1
+    param_alias: regexpPattern
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: content
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.RemoveRepeat
+  type_str: 'func (v1: []string) return([]string) '
+  long_description: ""
+  description: 移除 slice 中重复元素
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.Repeat
+  type_str: 'func (v1: string, v2: int) return(string) '
+  long_description: ""
+  description: 重复字符串
+  params:
+  - name: v1
+    param_alias: strContent
+    type_alias: ""
+    description: 想要重复的字符串
+    type_str: string
+  - name: v2
+    param_alias: count
+    type_alias: ""
+    description: 重复次数
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.Replace
+  type_str: 'func (v1: string, v2: string, v3: string, v4: int) return(string) '
+  long_description: ""
+  description: 字符串替换（次数）
+  params:
+  - name: v1
+    param_alias: raw
+    type_alias: ""
+    description: 原始字符串
+    type_str: string
+  - name: v2
+    param_alias: old
+    type_alias: ""
+    description: 想要匹配的旧字符串
+    type_str: string
+  - name: v3
+    param_alias: new
+    type_alias: ""
+    description: 想要替换的新字符串
+    type_str: string
+  - name: v4
+    param_alias: matchTimes
+    type_alias: ""
+    description: 匹配次数
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ReplaceAll
+  type_str: 'func (v1: string, v2: string, v3: string) return(string) '
+  long_description: ""
+  description: 字符串替换，全部
+  params:
+  - name: v1
+    param_alias: raw
+    type_alias: ""
+    description: 全部字符串
+    type_str: string
+  - name: v2
+    param_alias: old
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: new
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ReplaceHTTPPacketBody
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: bool) return([]uint8) '
+  long_description: ""
+  description: 整体替代一个数据包的 body
+  params:
+  - name: v1
+    param_alias: packetRaw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: newBody
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: str.Split
+  type_str: 'func (v1: string, v2: string) return([]string) '
+  long_description: ""
+  description: 分割字符串
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sep
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.SplitAfter
+  type_str: 'func (v1: string, v2: string) return([]string) '
+  long_description: ""
+  description: 分割字符串，不移除分隔符
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sep
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.SplitAfterN
+  type_str: 'func (v1: string, v2: string, v3: int) return([]string) '
+  long_description: ""
+  description: 分割字符串，不移除分隔符，最多分割成N个块
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sep
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: "n"
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.SplitAndTrim
+  type_str: 'func (v1: string, v2: string) return([]string) '
+  long_description: ""
+  description: 分割，并清除每一个部分的前后空白
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sep
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.SplitHTTPHeadersAndBodyFromPacket
+  type_str: 'func (v1: []uint8, v2 ...func (v1: string) ) return(string, []uint8) '
+  long_description: ""
+  description: 把数据包的 headers 和 body 进行分离
+  params:
+  - name: v1
+    param_alias: packet
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func(string)'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: str.SplitHostsToPrivateAndPublic
+  type_str: 'func (v1 ...string) return([]string, []string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.SplitN
+  type_str: 'func (v1: string, v2: string, v3: int) return([]string) '
+  long_description: ""
+  description: 分割字符串，分割成N块
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sep
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: "n"
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.StartsWith
+  type_str: 'func (v1: string, v2: string) return(bool) '
+  long_description: ""
+  description: 判断主字符串是否是子串开头？
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: sub
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.StringContainsAnyOfSubString
+  type_str: 'func (v1: string, v2: []string) return(bool) '
+  long_description: ""
+  description: 判断字符串是否包含任意一个后续 Slice 中的元素？
+  params:
+  - name: v1
+    param_alias: all
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: subStrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.StringSliceContains
+  type_str: 'func (v1: interface {}, v2: string) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.StringSliceContainsAll
+  type_str: 'func (v1: []string, v2 ...string) return(bool) '
+  long_description: ""
+  description: 判断一个 Slice 中是否包含后续所有子串？
+  params:
+  - name: v1
+    param_alias: slice
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v2
+    param_alias: subStrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: str.Subtract
+  type_str: 'func (v1: []string, v2: []string) return([]string) '
+  long_description: ""
+  description: 列表相减
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.Title
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把字符串每个单词首字母大写，变成 Title
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ToJsonIndentStr
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个对象解析成 Json，并保证 indent 合理
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ToLower
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把字符串变成小写
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ToLowerSpecial
+  type_str: 'func (v1: unicode.SpecialCase, v2: string) return(string) '
+  long_description: ""
+  description: 同 Golang `strings.ToLowerSpecial`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: unicode.SpecialCase
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: unicode.CaseRange
+    isbuildinstruct: true
+- name: str.ToStringSlice
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 把任意一个数据结构转换成数组
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: str.ToTitle
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 同 Golang `strings.ToTitle`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ToTitleSpecial
+  type_str: 'func (v1: unicode.SpecialCase, v2: string) return(string) '
+  long_description: ""
+  description: 同 Golang `strings.ToTitleSpecial`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: unicode.SpecialCase
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: unicode.CaseRange
+    isbuildinstruct: true
+- name: str.ToUpper
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把字符串变成全大写
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.ToUpperSpecial
+  type_str: 'func (v1: unicode.SpecialCase, v2: string) return(string) '
+  long_description: ""
+  description: 同 Golang `strings.ToUpperSpecial`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: unicode.SpecialCase
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: unicode.CaseRange
+    isbuildinstruct: true
+- name: str.ToValidUTF8
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 把字符串中不安全的UTF8字符替换掉，避免 panic
+  params:
+  - name: v1
+    param_alias: originStr
+    type_alias: ""
+    description: 原字符串
+    type_str: string
+  - name: v2
+    param_alias: replaced
+    type_alias: ""
+    description: 想要替换成的字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.Trim
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 把字符串前后任何包含子字符串中字符移除
+  params:
+  - name: v1
+    param_alias: origin
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: subs
+    type_alias: ""
+    description: 想要移除的子字符集合
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.TrimLeft
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 移除左边的某些字符
+  params:
+  - name: v1
+    param_alias: origin
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: subs
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.TrimPrefix
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 移除某个前缀
+  params:
+  - name: v1
+    param_alias: origin
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: prefix
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.TrimRight
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 移除右边的某些字符
+  params:
+  - name: v1
+    param_alias: origin
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: subs
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.TrimSpace
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 移除前后空白字符
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.TrimSuffix
+  type_str: 'func (v1: string, v2: string) return(string) '
+  long_description: ""
+  description: 移除后缀
+  params:
+  - name: v1
+    param_alias: origin
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: suffix
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: str.UrlJoin
+  type_str: 'func (v1: string, v2 ...string) return(string, error) '
+  long_description: ""
+  description: URL Join，可以拼接 URL Path
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: str.f
+  type_str: 'func (v1: string, v2 ...interface {}) return(string) '
+  long_description: ""
+  description: 相当于 `fmt.Sprintf`
+  params:
+  - name: v1
+    param_alias: strFmt
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: items
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+variables: []

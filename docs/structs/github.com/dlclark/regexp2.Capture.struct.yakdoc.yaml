@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: servicescan
+struct_name: github.com/dlclark/regexp2.Capture
+description: ""
+fields:
+- structname: github.com/dlclark/regexp2.Capture
+  name: Index
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/dlclark/regexp2.Capture
+  name: Length
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

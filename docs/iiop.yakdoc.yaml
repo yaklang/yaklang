@@ -1,0 +1,81 @@
+name: iiop
+functions:
+- name: iiop.BindPayload
+  type_str: 'func (v1: string) return(func PayloadGeneraterFun(v1: net.Conn, v2: []uint8)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PayloadGeneraterFun(v1: net.Conn, v2: []uint8) return(error) '
+- name: iiop.InvokePayload
+  type_str: 'func (v1: string, v2: string) return(func PayloadGeneraterFun(v1: net.Conn,
+    v2: []uint8) return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PayloadGeneraterFun(v1: net.Conn, v2: []uint8) return(error) '
+- name: iiop.RebindPayload
+  type_str: 'func (v1: string) return(func PayloadGeneraterFun(v1: net.Conn, v2: []uint8)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PayloadGeneraterFun(v1: net.Conn, v2: []uint8) return(error) '
+- name: iiop.SendPayload
+  type_str: 'func (v1: string, v2: func PayloadGeneraterFun(v1: net.Conn, v2: []uint8)
+    return(error) ) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PayloadGeneraterFun(v1: net.Conn, v2: []uint8) return(error) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables: []

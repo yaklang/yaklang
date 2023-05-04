@@ -1,0 +1,502 @@
+- NAME: PhoneLeak
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: '(\\D|\\+86(-|\\s))(1\\d{10})\\D'
+- NAME: file_include_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: '\\?[\\S]+=\\S+\\.(html|php)$'
+- NAME: code_inject_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: '(undefined\\?[\\w]|eval\\(\\))'
+- NAME: sql_inj_pre_test
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: '[\w\d]+=\S+'
+    - ORIGIN: response.path
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".js")+3 !== ORIGIN.length
+    - ORIGIN: response.path
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".axd")+4 !== ORIGIN.length
+    - ORIGIN: response.path
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".css")+4 !== ORIGIN.length
+    - ORIGIN: response.url_param
+      RULE_TYPE: SCRIPT
+      RULE: '!(ORIGIN.split("&").length==1 && ORIGIN.startsWith("token="))'
+- NAME: sql_inj_pre_test
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: '[\w\d]+=\S+'
+- NAME: sql_inj_pre_test
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.startsWith("{") && ORIGIN.endsWith("}") && ORIGIN != "{}"
+
+- NAME: xpath_inject
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: '[\w\d]+=[\w\d]+'
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: xpath
+- NAME: file_download_pre_test
+  RULES:
+    - ORIGIN: response.responseHeader
+      RULE_TYPE: JSON
+      KEY: content-disposition
+      RULE: attachment
+- NAME: mysql_conf_download_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: RE
+      RULE: ini_file_download
+- NAME: file_download_pre_test
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: (path|file|url|Data|src|temp)=
+    - ORIGIN: response.url_param
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".")>-1
+- NAME: editor
+  RULES:
+    - ORIGIN: response.path
+      RULE_TYPE: re
+      RULE: southid/|ueditor/|eweb/|fck/|ckeditor|kindeditor/|editor/
+- NAME: http_file_upload_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: xpath
+      RULE: 'input[type=file]'
+
+#- NAME: test_submit
+#  RULES:
+#    - ORIGIN: response.html
+#      RULE_TYPE: xpath
+#      RULE: 'input[type=submit]'
+
+- NAME: price_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: xpath
+      RULE: 'input[name=price]'
+
+- NAME: file_upload_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: xpath
+      RULE: 'input[type=file]'
+- NAME: http_struts2_url
+  RULES:
+    - ORIGIN: response.path
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.endsWith(".do")
+- NAME: http_struts2_url
+  RULES:
+    - ORIGIN: response.path
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.endsWith(".action")
+- NAME: backend_http_login
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: lk383
+- NAME: backend_http_login
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: QK@lk383
+- NAME: backend_http_login
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.toLocaleLowerCase().search('=frankxz1$')>-1 || ORIGIN.toLocaleLowerCase().search("=frankxz1&")>-1
+    - ORIGIN: response.requestData
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.toLocaleLowerCase().search('password|pwd|pass|密码')>-1
+
+- NAME: xxe_pre_test
+  METHOD: POST
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.startsWith('<') && ORIGIN.endsWith('>')
+#- NAME: emailLeak
+#  RULES:
+#    - ORIGIN: response.html
+#      RULE_TYPE: SCRIPT
+#      RULE: |-
+#        (function (){
+#          try{
+#            var pattern = /[\s\S\W]([A-Za-z0-9_-|.]+@[A-Za-z0-9_-|.]+\.\w+)[\s\S\W]/gi;
+#            var _ = ORIGIN.matchAll(pattern)
+#            var t1 = [..._]
+#            if(!t1.length){
+#              return false
+#            }
+#            for (let i of t1){
+#                if (i[1]){
+#                    if (!email.includes(i[1])) email.push(i[1]);
+#                }
+#            }
+#          }catch(err){
+#            return false
+#          }
+#          return true
+#         }
+#        )()
+- NAME: xxe_pre_test
+  METHOD: POST
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: '=(%3C%3Fxml|%3C%3F%78%6D%6C)'
+- NAME: xxe_pre_test
+  METHOD: POST
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: '\[&quot;xmlStandalone&quot;\]'
+- NAME: xxe_pre_test
+  METHOD: POST
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: '\[\"xmlStandalone\"\]'
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <sCript>alert\(/xss/\)</sCript>
+- NAME: cmd_inject_ip_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: 27997522
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: filter_xss.php
+- NAME: link_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: link_xss.php
+# - NAME: http_xss_pre_test
+#   RULES:
+#     - ORIGIN: response.html
+#       RULE_TYPE: SCRIPT
+#       RULE: |-
+#         (function (){
+#                 let m_url = require('url');
+#                 let query = m_url.parse(url,true).query;
+#                 for (let key in query){
+#                   if(query[key].length<4) continue
+#                   let nums = query[key].match(/\d/gi)
+#                   if(nums && nums.length===query[key].length) continue
+#                   if (ORIGIN.replace(/<[^>]+>/g,"").includes(query[key])){
+#                     return true} }
+#                 return false })()
+#     - ORIGIN: response.path
+#       RULE_TYPE: SCRIPT
+#       RULE: ORIGIN.lastIndexOf(".js")+3 !== ORIGIN.length
+#     - ORIGIN: response.path
+#       RULE_TYPE: SCRIPT
+#       RULE: ORIGIN.lastIndexOf(".axd")+4 !== ORIGIN.length
+#     - ORIGIN: response.path
+#       RULE_TYPE: SCRIPT
+#       RULE: ORIGIN.lastIndexOf(".css")+4 !== ORIGIN.length
+- NAME: unauthorized_access_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: cross_find.php
+- NAME: url_redirect_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: SCRIPT
+      RULE: 'ORIGIN.match(/:\/\//gi) && ORIGIN.match(/:\/\//gi).length>= 2'
+    - ORIGIN: response.res_status
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.toString().startsWith('30')
+- NAME: file_include_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: \?[\S]+=\S+\.(html|php|jsp)$
+- NAME: webshell_brute_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: webshell.php
+- NAME: cmd_inject_ip_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: tp5/public/index.php
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: xss_1.php
+- NAME: ssrf
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: >-
+        (share|wap|url|link|src|source|target|u|3g|display|sourceURl|imageURL|domain)=
+- NAME: ssrf
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: ssrf.php
+
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: listproducts.php
+
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: guestbook.php
+
+- NAME: http_xss_pre_test
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: showxml.php
+
+- NAME: xml_pre_test
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: <xml.*?/xml>
+
+- NAME: error_message_pre_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: mysql_fetch_array
+
+- NAME: apache_shiro
+  RULES:
+    - ORIGIN: response.responseHeader
+      RULE_TYPE: JSON
+      KEY: set-cookie
+      RULE: remember
+
+- NAME: UserNameLeak
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: .username.:..*?.
+- NAME: file_download_pre_test
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: file|path|url|lang|src|menu|meta-inf|web-inf|filename|topic
+    - ORIGIN: response.url_param
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".")>-1
+
+- NAME: file_download_pre_test
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: file|path|url|lang|src|menu|meta-inf|web-inf|filename|topic
+
+- NAME: file_include_pre_test
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: file|path|url|lang|src|menu|meta-inf|web-inf|filename|topic
+    - ORIGIN: response.url_param
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN.lastIndexOf(".")>-1
+
+- NAME: file_include_pre_test
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: file|path|url|lang|src|menu|meta-inf|web-inf|filename|topic
+
+
+- NAME: plaintext_pretest
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: lk3831
+- NAME: plaintext_pretest
+  RULES:
+    - ORIGIN: response.url_param
+      RULE_TYPE: re
+      RULE: lk3831
+
+- NAME: app_err_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: Error report
+- NAME: app_err_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: in your SQL syntax
+- NAME: app_err_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: mysql_fetch_array
+- NAME: app_err_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: mysql_connect()
+- NAME: app_err_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: org.apache.catalina
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <title>Directory Listing For
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: Directory Listing for
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: Last modified<\/a>
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <TITLE>Folder Listing
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: "<TITLE>Directory: "
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: "<i>Directory Listing --"
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <table summary="Directory Listing"
+
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <A\sHREF="[^"]*">\[To\sParent\sDirectory]<\/A>
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <body><h1>Directory\sListing\sFor\s.*<\/h1>
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <HTML><HEAD><TITLE>Directory:.*?<\/TITLE><\/HEAD><BODY>
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <a href="\?C=[NMSD];O=[AD]">Name<\/a>
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <font\ssize="[^"]+"\sface="[^"]+"><b>Index\sof\s\/
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <title>Index\sof\s.*?<\/title>
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <table\s+summary="Directory Listing"
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <h2>Index of (?:.*)<\/h2>
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <body bgcolor="white">\s+<h1>Index of
+
+- NAME: dir_list_pro_test
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: <h1>Index of .+<\/h1><pre><img
+- NAME: node_sourcemap_disclose
+  RULES:
+    - ORIGIN: response.html
+      RULE_TYPE: re
+      RULE: //.+sourceMappingURL.+?\.map
+- NAME: jwt_in_headers
+  RULES:
+    - ORIGIN: response.responseHeader
+      RULE_TYPE: SCRIPT
+      RULE: JSON.stringify(ORIGIN).search("-jwt-")>-1
+
+- NAME: not_content_type
+  RULES:
+    - ORIGIN: response.responseHeader
+      RULE_TYPE: SCRIPT
+      RULE: ORIGIN["Content-Type"] == undefined
+
+- NAME: session_token_in_url
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: token=
+
+- NAME: test_tag
+  RULES:
+    - ORIGIN: response.url
+      RULE_TYPE: re
+      RULE: query
+
+- NAME: test_postdata
+  RULES:
+    - ORIGIN: response.requestData
+      RULE_TYPE: re
+      RULE: '\w+=\w'

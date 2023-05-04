@@ -1,0 +1,159 @@
+is_build_in_struct: true
+libname: fuzz
+struct_name: gopkg.in/yaml.v3.Node
+description: ""
+fields:
+- structname: gopkg.in/yaml.v3.Node
+  name: Alias
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: gopkg.in/yaml.v3.Node
+  type_str: '*yaml.Node'
+- structname: gopkg.in/yaml.v3.Node
+  name: Anchor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: gopkg.in/yaml.v3.Node
+  name: Column
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: gopkg.in/yaml.v3.Node
+  name: Content
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: gopkg.in/yaml.v3.Node
+  type_str: '[]*yaml.Node'
+- structname: gopkg.in/yaml.v3.Node
+  name: FootComment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: gopkg.in/yaml.v3.Node
+  name: HeadComment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: gopkg.in/yaml.v3.Node
+  name: Kind
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yaml.Kind
+- structname: gopkg.in/yaml.v3.Node
+  name: Line
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: gopkg.in/yaml.v3.Node
+  name: LineComment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: gopkg.in/yaml.v3.Node
+  name: Style
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yaml.Style
+- structname: gopkg.in/yaml.v3.Node
+  name: Tag
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: gopkg.in/yaml.v3.Node
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: Decode
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: Encode
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: IsZero
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: LongTag
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: SetString
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/yaml.v3.Node
+  name: ShortTag
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

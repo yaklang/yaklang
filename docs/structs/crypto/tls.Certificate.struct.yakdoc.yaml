@@ -1,0 +1,44 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: crypto/tls.Certificate
+description: ""
+fields:
+- structname: crypto/tls.Certificate
+  name: Certificate
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[][]uint8'
+- structname: crypto/tls.Certificate
+  name: Leaf
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509.Certificate
+  type_str: '*x509.Certificate'
+- structname: crypto/tls.Certificate
+  name: OCSPStaple
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: crypto/tls.Certificate
+  name: PrivateKey
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: crypto.PrivateKey
+- structname: crypto/tls.Certificate
+  name: SignedCertificateTimestamps
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[][]uint8'
+- structname: crypto/tls.Certificate
+  name: SupportedSignatureAlgorithms
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]tls.SignatureScheme'
+methods: []
+ptr_methods: []

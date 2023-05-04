@@ -1,0 +1,226 @@
+name: ping
+functions:
+- name: ping.Ping
+  type_str: 'func (v1: string, v2 ...func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) return(*pingutil.PingResult) '
+  long_description: ""
+  description: 原生 ICMP ping
+  params:
+  - name: v1
+    param_alias: target
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: opts
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._pingConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/pingutil.PingResult
+    type_str: '*pingutil.PingResult'
+  relative_structs:
+  - structname: palm/common/utils/pingutil.PingResult
+    isbuildinstruct: false
+- name: ping.Scan
+  type_str: 'func (v1: string, v2 ...func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) return(chan *pingutil.PingResult) '
+  long_description: ""
+  description: ping 扫描
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._pingConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/pingutil.PingResult
+    type_str: chan *pingutil.PingResult
+  relative_structs:
+  - structname: palm/common/utils/pingutil.PingResult
+    isbuildinstruct: false
+- name: ping.concurrent
+  type_str: 'func (v1: int) return(func _pingConfigOpt(v1: *yaklib._pingConfig) ) '
+  long_description: ""
+  description: 设置 Ping 扫的并发
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.dnsServers
+  type_str: 'func (v1 ...string) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: 设置 DNS 服务器
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.dnsTimeout
+  type_str: 'func (v1: float64) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: 设置 DNS 超时时间
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.excludeHosts
+  type_str: 'func (v1: string) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.onResult
+  type_str: 'func (v1: func (v1: *pingutil.PingResult) ) return(func _pingConfigOpt(v1:
+    *yaklib._pingConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *pingutil.PingResult) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.proxy
+  type_str: 'func (v1 ...string) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: 为 TCP Ping 增加代理
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.scanCClass
+  type_str: 'func (v1: bool) return(func _pingConfigOpt(v1: *yaklib._pingConfig) ) '
+  long_description: ""
+  description: 直接 ping 整个 C 段
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.skip
+  type_str: 'func (v1: bool) return(func _pingConfigOpt(v1: *yaklib._pingConfig) ) '
+  long_description: ""
+  description: 跳过存活检查，默认均为存活
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.tcpPingPorts
+  type_str: 'func (v1: string) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+- name: ping.timeout
+  type_str: 'func (v1: float64) return(func _pingConfigOpt(v1: *yaklib._pingConfig)
+    ) '
+  long_description: ""
+  description: 设置 ping 超时
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func _pingConfigOpt(v1: *yaklib._pingConfig) '
+variables: []

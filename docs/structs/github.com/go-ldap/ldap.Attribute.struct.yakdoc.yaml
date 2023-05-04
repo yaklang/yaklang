@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.Attribute
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.Attribute
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.Attribute
+  name: Vals
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods: []
+ptr_methods: []

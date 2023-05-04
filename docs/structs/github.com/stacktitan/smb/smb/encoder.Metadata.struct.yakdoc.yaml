@@ -1,0 +1,50 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb/encoder.Metadata
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: CurrField
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: CurrOffset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: Lens
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]uint64
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: Offsets
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]uint64
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: Parent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: ParentBuf
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/smb/encoder.Metadata
+  name: Tags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/smb/encoder.TagMap
+  type_str: '*encoder.TagMap'
+methods: []
+ptr_methods: []

@@ -1,0 +1,44 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.TreeConnectReq
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/smb.Header
+  type_str: smb.Header
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: Path
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: PathLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: PathOffset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: Reserved
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.TreeConnectReq
+  name: StructureSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods: []
+ptr_methods: []

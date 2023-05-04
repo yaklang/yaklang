@@ -1,0 +1,13 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.SimpleBindResult
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.SimpleBindResult
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+methods: []
+ptr_methods: []

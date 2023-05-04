@@ -1,0 +1,41 @@
+is_build_in_struct: true
+libname: http
+struct_name: mime/multipart.FileHeader
+description: ""
+fields:
+- structname: mime/multipart.FileHeader
+  name: Filename
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: mime/multipart.FileHeader
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: textproto.MIMEHeader
+- structname: mime/multipart.FileHeader
+  name: Size
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+methods:
+- ptr: true
+  description: ""
+  structname: mime/multipart.FileHeader
+  name: Open
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: multipart.File
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

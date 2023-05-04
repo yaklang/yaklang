@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+  name: Angle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.EmulationScreenOrientationType
+methods: []
+ptr_methods: []

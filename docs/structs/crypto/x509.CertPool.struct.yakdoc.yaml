@@ -1,0 +1,46 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509.CertPool
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: crypto/x509.CertPool
+  name: AddCert
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*x509.Certificate'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: crypto/x509.CertPool
+  name: AppendCertsFromPEM
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: crypto/x509.CertPool
+  name: Subjects
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+  relative_struct_name: []
+ptr_methods: []

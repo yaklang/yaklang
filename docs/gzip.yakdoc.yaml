@@ -1,0 +1,61 @@
+name: gzip
+functions:
+- name: gzip.Compress
+  type_str: 'func (v1: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: 把一个数据进行 gzip 压缩
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: gzip.Decompress
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 解压缩
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: gzip.IsGzip
+  type_str: 'func (v1: []uint8) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+variables: []

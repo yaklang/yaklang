@@ -1,0 +1,44 @@
+is_build_in_struct: false
+libname: xhtml
+struct_name: palm/common/xhtml.DiffInfo
+description: ""
+fields:
+- structname: palm/common/xhtml.DiffInfo
+  name: FuzzRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.DiffInfo
+  name: Node
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: golang.org/x/net/html.Node
+  type_str: '*html.Node'
+- structname: palm/common/xhtml.DiffInfo
+  name: OriginRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.DiffInfo
+  name: Reason
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/xhtml.DiffInfo
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: xhtml.OutputPosType
+- structname: palm/common/xhtml.DiffInfo
+  name: XpathPos
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

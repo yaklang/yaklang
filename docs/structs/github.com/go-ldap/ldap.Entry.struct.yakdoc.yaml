@@ -1,0 +1,104 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.Entry
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.Entry
+  name: Attributes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-ldap/ldap.EntryAttribute
+  type_str: '[]*ldap.EntryAttribute'
+- structname: github.com/go-ldap/ldap.Entry
+  name: DN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: GetAttributeValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: GetAttributeValues
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: GetRawAttributeValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: GetRawAttributeValues
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: PrettyPrint
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.Entry
+  name: Print
+  relative_struct_name: []
+ptr_methods: []

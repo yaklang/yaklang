@@ -1,0 +1,27 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/devices.Screen
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/devices.Screen
+  name: DevicePixelRatio
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/devices.Screen
+  name: Horizontal
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/devices.ScreenSize
+  type_str: devices.ScreenSize
+- structname: github.com/go-rod/rod/lib/devices.Screen
+  name: Vertical
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/devices.ScreenSize
+  type_str: devices.ScreenSize
+methods: []
+ptr_methods: []

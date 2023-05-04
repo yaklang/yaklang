@@ -1,0 +1,26 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/js.Function
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/js.Function
+  name: Definition
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/js.Function
+  name: Dependencies
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/js.Function
+  type_str: '[]*js.Function'
+- structname: github.com/go-rod/rod/lib/js.Function
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

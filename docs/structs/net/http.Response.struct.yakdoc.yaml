@@ -1,0 +1,159 @@
+is_build_in_struct: true
+libname: http
+struct_name: net/http.Response
+description: ""
+fields:
+- structname: net/http.Response
+  name: Body
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: io.ReadCloser
+- structname: net/http.Response
+  name: Close
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Response
+  name: ContentLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: net/http.Response
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.Header
+- structname: net/http.Response
+  name: Proto
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Response
+  name: ProtoMajor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Response
+  name: ProtoMinor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Response
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Request
+  type_str: '*http.Request'
+- structname: net/http.Response
+  name: Status
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/http.Response
+  name: StatusCode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Response
+  name: TLS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/tls.ConnectionState
+  type_str: '*tls.ConnectionState'
+- structname: net/http.Response
+  name: Trailer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.Header
+- structname: net/http.Response
+  name: TransferEncoding
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: net/http.Response
+  name: Uncompressed
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: net/http.Response
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Response
+  name: Location
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Response
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Response
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

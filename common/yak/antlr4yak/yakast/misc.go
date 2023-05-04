@@ -1,0 +1,145 @@
+package yakast
+
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+)
+
+func (y *YakCompiler) SwitchSymbolTableInNewScope(name ...string) func() {
+	origin := y.currentSymtbl
+	y.currentSymtbl = origin.CreateSubSymbolTable(name...)
+	y.pushScope(y.rootSymtbl.MustRoot().GetTableIndex())
+	y.addContinueScopeCounter(1)
+	y.addNearliestBreakScopeCounter(1)
+
+	return func() {
+		defer y.pushOperator(yakvm.OpScopeEnd)
+		y.currentSymtbl = origin
+		y.addContinueScopeCounter(-1)
+		y.addNearliestBreakScopeCounter(-1)
+	}
+}
+
+func (y *YakCompiler) addContinueScopeCounter(delta int) {
+	if y.peekForStartIndex() >= 0 {
+		y.peekForContext().continueScopeCounter += delta
+	}
+}
+
+func (y *YakCompiler) getContinueScopeCounter() int {
+	if y.peekForStartIndex() >= 0 {
+		return y.peekForContext().continueScopeCounter
+	}
+	return 0
+}
+
+func (y *YakCompiler) addNearliestBreakScopeCounter(delta int) {
+	if y.peekForStartIndex() >= 0 && y.peekSwitchStartIndex() >= 0 {
+		if y.GetNextCodeIndex()-y.peekForStartIndex() > y.GetNextCodeIndex()-y.peekSwitchStartIndex() {
+			// switch 离得近
+			y.peekSwitchContext().switchBreakScopeCounter += delta
+		} else {
+			// for 离得近
+			y.peekForContext().breakScopeCounter += delta
+		}
+		return
+	}
+
+	if y.peekForStartIndex() >= 0 {
+		y.peekForContext().breakScopeCounter += delta
+		return
+	}
+
+	if y.peekSwitchStartIndex() >= 0 {
+		y.peekSwitchContext().switchBreakScopeCounter += delta
+		return
+	}
+}
+
+func (y *YakCompiler) getNearliestBreakScopeCounter() int {
+	if y.peekForStartIndex() >= 0 && y.peekSwitchStartIndex() >= 0 {
+		if y.GetNextCodeIndex()-y.peekForStartIndex() > y.GetNextCodeIndex()-y.peekSwitchStartIndex() {
+			// switch 离得近
+			return y.peekSwitchContext().switchBreakScopeCounter
+		} else {
+			// for 离得近
+			return y.peekForContext().breakScopeCounter
+		}
+	}
+
+	if y.peekForStartIndex() >= 0 {
+		return y.peekForContext().breakScopeCounter
+	}
+
+	if y.peekSwitchStartIndex() >= 0 {
+		return y.peekSwitchContext().switchBreakScopeCounter
+	}
+	return 0
+}
+
+func (y *YakCompiler) SwitchSymbolTable(name ...string) func() {
+	origin := y.currentSymtbl
+	y.currentSymtbl = origin.CreateSubSymbolTable(name...)
+	return func() {
+		y.currentSymtbl = origin
+	}
+}
+
+func (y *YakCompiler) SwitchCodes() func() {
+	origin := y.codes
+	y.codes = []*yakvm.Code{}
+	return func() {
+		y.codes = origin
+	}
+}
+
+type canStartStopToken interface {
+	GetStop() antlr.Token
+	GetStart() antlr.Token
+}
+
+func (y *YakCompiler) GetRangeVerbose() string {
+	var prefix string
+	if y.currentStartPosition != nil && y.currentEndPosition != nil {
+		prefix = fmt.Sprintf(`[%v:%v -> %v:%v]`,
+			y.currentStartPosition.LineNumber,
+			y.currentStartPosition.ColumnNumber,
+			y.currentEndPosition.LineNumber,
+			y.currentEndPosition.ColumnNumber,
+		)
+	}
+	return prefix
+}
+
+// SetRange 设置当前解析到的范围，用来自动关联 Opcode 的 Range
+func (y *YakCompiler) SetRange(b canStartStopToken) func() {
+	originEndPosition := y._setCurrentEndPosition(b.GetStop())
+	originStartPosition := y._setCurrentStartPosition(b.GetStart())
+	return func() {
+		y.currentStartPosition = originStartPosition
+		y.currentEndPosition = originEndPosition
+	}
+}
+
+func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) *Position {
+	origin := y.currentStartPosition
+	y.currentStartPosition = &Position{
+		LineNumber:   t.GetLine(),
+		ColumnNumber: t.GetColumn(),
+	}
+	return origin
+}
+
+func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) *Position {
+	origin := y.currentEndPosition
+	y.currentEndPosition = &Position{
+		LineNumber:   t.GetLine(),
+		ColumnNumber: t.GetColumn() + len(t.GetText()),
+	}
+	if y.currentEndPosition.ColumnNumber > 0 {
+		y.currentEndPosition.ColumnNumber--
+	}
+	return origin
+}

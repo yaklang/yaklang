@@ -1,0 +1,402 @@
+package antlr4yak
+
+import (
+	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"os"
+	"sort"
+
+	"github.com/davecgh/go-spew/spew"
+)
+
+const YAKC_CACHE_MAX_LENGTH = 300
+
+type Engine struct {
+	rootSymbol            *yakvm.SymbolTable
+	vm                    *yakvm.VirtualMachine
+	strictMode            bool
+	sourceFilePathPointer *string
+	// debug
+	debug         bool // 内部debug
+	debugMode     bool // 外部debugger
+	debugCallBack func(*yakvm.Debugger)
+	debugInit     func(*yakvm.Debugger)
+}
+
+func New() *Engine {
+	table := yakvm.NewSymbolTable()
+	vm := yakvm.NewWithSymbolTable(table)
+	engine := &Engine{
+		rootSymbol: table,
+		vm:         vm,
+	}
+	evalFunc := func(ctx context.Context, code string) {
+		codes, err := engine.Compile(code)
+		if err != nil {
+			panic(err)
+		}
+		if err = vm.ExecYakCode(ctx, code, codes, yakvm.Inline); err != nil {
+			panic(err)
+		}
+	}
+	engine.ImportLibs(map[string]interface{}{
+		"eval": evalFunc,
+		"yakfmt": func(code string) string {
+			newCode, err := New().FormattedAndSyntaxChecking(code)
+			if err != nil {
+				log.Errorf("format and syntax checking met error: %s", err)
+				return code
+			}
+			return newCode
+		},
+		"yakfmtWithError": func(code string) (string, error) {
+			return New().FormattedAndSyntaxChecking(code)
+		},
+		"getScopeInspects": func() ([]*ScopeValue, error) {
+			return engine.GetScopeInspects()
+		},
+	})
+	return engine
+}
+func (n *Engine) SetSourceFilePath(path string) {
+	n.sourceFilePathPointer = &path
+}
+func (n *Engine) SetDebugInit(callback func(*yakvm.Debugger)) {
+	n.debugInit = callback
+}
+func (n *Engine) SetDebugCallback(callback func(*yakvm.Debugger)) {
+	n.debugCallBack = callback
+}
+func (n *Engine) SetDebugMode(debug bool) {
+	n.debugMode = debug
+}
+func (n *Engine) EnableStrictMode() {
+	n.strictMode = true
+}
+func (n *Engine) GetSymNames() []string {
+	return nil
+}
+func (n *Engine) CopyVars() map[string]interface{} {
+	return nil
+}
+
+func (n *Engine) GetVM() *yakvm.VirtualMachine {
+	return n.vm
+}
+
+func (n *Engine) CallYakFunctionNative(ctx context.Context, function *yakvm.Function, params ...interface{}) (interface{}, error) {
+	if function == nil {
+		return nil, utils.Error("no function")
+	}
+	var paramsValue = make([]*yakvm.Value, len(params))
+	for i, v := range params {
+		paramsValue[i] = yakvm.NewAutoValue(v)
+	}
+	return n.vm.ExecYakFunction(ctx, function, yakvm.YakVMValuesToFunctionMap(function, paramsValue, n.vm.GetConfig().GetFunctionNumberCheck()), yakvm.None)
+}
+
+// 函数调用时如果不加锁，并发会有问题
+func (n *Engine) CallYakFunction(ctx context.Context, funcName string, params []interface{}) (interface{}, error) {
+	i, ok := n.GetVar(funcName)
+	if !ok {
+		return nil, utils.Errorf("function %s not found", funcName)
+	}
+	if f, ok := i.(*yakvm.Function); ok {
+		return n.CallYakFunctionNative(ctx, f, params...)
+	}
+	return nil, utils.Errorf("cannot found yakvm.Function: %v", funcName)
+	//
+	//returnValueReciver := "__global_return__"
+	//paramStrList := []string{}
+	//for index, param := range params {
+	//	paramName := fmt.Sprintf("__global_param_%d__", index)
+	//	n.vm.SetVar(paramName, param)
+	//	paramStrList = append(paramStrList, paramName)
+	//}
+	//
+	//code := fmt.Sprintf("%s = %s(%s)", returnValueReciver, funcName, strings.Join(paramStrList, ","))
+	//err := n.SafeEval(code)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//returnValue := n.Var(returnValueReciver)
+	//return returnValue, nil
+}
+
+// RunFile 手动执行Yak脚本一般都是从文件开始执行，这种情况建议使用RunFile执行代码，便于报错时提供文件路径信息
+func (n *Engine) RunFile(ctx context.Context, path string) error {
+	n.sourceFilePathPointer = &path
+	defer func() {
+		n.sourceFilePathPointer = nil
+	}()
+	codeB, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return n.Eval(ctx, string(codeB))
+}
+
+// LoadCode 暂时使用Eval的方式加载代码，后面可以进行优化，只编译声明语句和assign语句
+func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]interface{}) error {
+	codes, err := n.Compile(code)
+	if err != nil {
+		return err
+	}
+	n.vm.ImportLibs(table)
+	return n.vm.ExecYakCode(ctx, code, codes, yakvm.Trace)
+}
+func (n *Engine) GetFntable() map[string]interface{} {
+	return n.vm.GetGlobalVar()
+}
+
+func (n *Engine) GetCurrentScope() (*yakvm.Scope, error) {
+	frame := n.vm.CurrentFM()
+	if frame == nil {
+		return nil, utils.Error("current frame empty")
+	}
+	return frame.CurrentScope(), nil
+}
+
+func (n *Engine) GetLastStackValue() (*yakvm.Value, error) {
+	frame := n.vm.CurrentFM()
+	if frame == nil {
+		return nil, utils.Error("current frame empty")
+	}
+	val := frame.GetLastStackValue()
+	if val == nil {
+		return nil, utils.Errorf("last Stack Value is nil/undefined")
+	}
+	return val, nil
+}
+
+type ScopeValue struct {
+	Name         string
+	Id           int
+	Value        interface{}
+	ValueVerbose string
+}
+
+func (n *Engine) GetScopeInspects() ([]*ScopeValue, error) {
+	scope, err := n.GetCurrentScope()
+	if err != nil {
+		return nil, err
+	}
+	ids := scope.GetAllIdInScopes()
+	var vals []*ScopeValue
+	for _, id := range ids {
+		name := scope.GetNameById(id)
+		if name == "" {
+			continue
+		}
+		val, ok := scope.GetValueByID(id)
+		if !ok {
+			continue
+		}
+		vals = append(vals, &ScopeValue{
+			Name:         name,
+			Id:           id,
+			Value:        val.Value,
+			ValueVerbose: spew.Sdump(val.Value),
+		})
+	}
+	val, _ := n.GetLastStackValue()
+	if val != nil {
+		vals = append(vals, &ScopeValue{
+			Name:         "_",
+			Id:           0,
+			Value:        val.Value,
+			ValueVerbose: spew.Sdump(val.Value),
+		})
+	}
+	sort.SliceStable(vals, func(i, j int) bool {
+		return vals[i].Id < vals[j].Id
+	})
+	return vals, nil
+}
+func (n *Engine) ImportSubLibs(parent string, libs map[string]interface{}) {
+	var parentLib map[string]interface{}
+	if v, ok := n.vm.GetGlobalVar()[parent]; ok {
+		if v1, ok := v.(map[string]interface{}); ok {
+			parentLib = v1
+		}
+	} else {
+		parentLib = make(map[string]interface{})
+		n.vm.GetGlobalVar()[parent] = parentLib
+	}
+	for k, v2 := range libs {
+		parentLib[k] = v2
+	}
+}
+
+func (n *Engine) ImportLibs(libs map[string]interface{}) {
+	n.vm.ImportLibs(libs)
+}
+
+func (n *Engine) Var(name string) interface{} {
+	v, _ := n.vm.GetVar(name)
+	return v
+}
+func (n *Engine) GetVar(name string) (interface{}, bool) {
+	return n.vm.GetVar(name)
+}
+func (n *Engine) SetVar(k string, v interface{}) {
+	n.vm.SetVar(k, v)
+}
+
+func (n *Engine) Compile(code string) ([]*yakvm.Code, error) {
+	compiler, err := n._compile(code)
+	if err != nil {
+		return nil, err
+	}
+	return compiler.GetOpcodes(), err
+}
+func (n *Engine) MustCompile(code string) []*yakvm.Code {
+	compiler, err := n._compile(code)
+	if err != nil {
+		panic(err)
+	}
+	return compiler.GetOpcodes()
+}
+func (n *Engine) _compile(code string) (*yakast.YakCompiler, error) {
+	compiler := yakast.NewYakCompilerWithSymbolTable(n.rootSymbol)
+	compiler.SetStrictMode(n.strictMode)
+	if n.strictMode {
+		compiler.SetExternalVariableNames(n.vm.GetExternalVariableNames())
+	}
+	if n.sourceFilePathPointer != nil {
+		compiler.CompileSourceCodeWithPath(code, n.sourceFilePathPointer)
+	} else {
+		compiler.Compiler(code)
+	}
+	if len(compiler.GetErrors()) > 0 {
+		return nil, compiler.GetErrors()
+	}
+	return compiler, nil
+}
+func (n *Engine) EnableDebug() {
+	n.debug = true
+}
+
+func (n *Engine) HaveEvaluatedCode() bool {
+	return !n.rootSymbol.IsNew()
+}
+
+func (n *Engine) Eval(ctx context.Context, code string) error {
+	return n.EvalWithInline(ctx, code, false)
+}
+
+func (n *Engine) EvalInline(ctx context.Context, code string) error {
+	return n.EvalWithInline(ctx, code, true)
+}
+
+func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) error {
+	flag := yakvm.None
+	if inline {
+		flag = yakvm.Inline
+	}
+
+	compiler, err := n._compile(code)
+	if err != nil {
+		panic(err)
+	}
+	n.vm.SetDebug(n.debug)
+	n.vm.SetDebugMode(n.debugMode, code, compiler.GetOpcodes(), n.debugInit, n.debugCallBack)
+
+	// yakc缓存
+	codes, symtbl := compiler.GetOpcodes(), compiler.GetRootSymbolTable()
+	defer func() {
+		if len(code) <= YAKC_CACHE_MAX_LENGTH {
+			return
+		}
+		yc, err := n._marshal(symtbl, codes, nil)
+		if err != nil {
+			return
+		}
+		SaveYakcCache(code, yc)
+	}()
+
+	err = n.vm.ExecYakCode(ctx, code, codes, flag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (n *Engine) SafeEval(ctx context.Context, code string) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(fmt.Sprint(e))
+			//log.Error(err)
+		}
+	}()
+	err = n.Eval(ctx, code)
+	return
+}
+
+func (n *Engine) SafeEvalInline(ctx context.Context, code string) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(fmt.Sprint(e))
+		}
+	}()
+	err = n.EvalInline(ctx, code)
+	return
+}
+
+func (n *Engine) FormattedAndSyntaxChecking(code string) (string, error) {
+	compiler, err := n._compile(code)
+	if err != nil {
+		return "", err
+	}
+	return compiler.GetFormattedCode(), err
+}
+
+func (n *Engine) ExecuteAsBooleanExpression(expr string, dependencies map[string]interface{}) (bool, error) {
+	if dependencies != nil {
+		n.ImportLibs(dependencies)
+	}
+
+	err := n.SafeEvalInline(context.Background(), expr)
+	if err != nil {
+		return false, err
+	}
+
+	val, err := n.GetLastStackValue()
+	if err != nil {
+		return false, err
+	}
+	if val == nil {
+		return false, nil
+	}
+	if val.IsBool() {
+		return val.Bool(), nil
+	}
+	if funk.IsEmpty(val.Value) || funk.IsZero(val.Value) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interface{}) (interface{}, error) {
+	if dependencies != nil {
+		n.ImportLibs(dependencies)
+	}
+
+	err := n.SafeEvalInline(context.Background(), expr)
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := n.GetLastStackValue()
+	if err != nil {
+		return nil, err
+	}
+	if val == nil {
+		return nil, nil
+	}
+	return val.Value, nil
+}

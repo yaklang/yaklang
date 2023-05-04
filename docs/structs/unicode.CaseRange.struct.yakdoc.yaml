@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: str
+struct_name: unicode.CaseRange
+description: ""
+fields:
+- structname: unicode.CaseRange
+  name: Delta
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: unicode.d
+- structname: unicode.CaseRange
+  name: Hi
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+- structname: unicode.CaseRange
+  name: Lo
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint32
+methods: []
+ptr_methods: []

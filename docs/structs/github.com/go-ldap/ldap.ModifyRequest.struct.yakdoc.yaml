@@ -1,0 +1,74 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.ModifyRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.ModifyRequest
+  name: Changes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-ldap/ldap.Change
+  type_str: '[]ldap.Change'
+- structname: github.com/go-ldap/ldap.ModifyRequest
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.ModifyRequest
+  name: DN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.ModifyRequest
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.ModifyRequest
+  name: Delete
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-ldap/ldap.ModifyRequest
+  name: Replace
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,164 @@
+name: udp
+functions:
+- name: udp.Connect
+  type_str: 'func (v1: string, v2 ...func udpClientOption(v1: *yaklib.udpClientConfig)
+    ) return(*yaklib.udpConn, error) '
+  long_description: ""
+  description: 创建一个 UDP 连接
+  params:
+  - name: v1
+    param_alias: target
+    type_alias: ""
+    description: 连接目标：IP:Port 的格式即可
+    type_str: string
+  - name: v2
+    param_alias: extraParams
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib.udpClientOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: conn
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.udpConn
+    type_str: '*yaklib.udpConn'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib.udpConn
+    isbuildinstruct: false
+  - structname: net.UDPConn
+    isbuildinstruct: true
+  - structname: os.File
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net.UDPAddr
+    isbuildinstruct: true
+  - structname: net/netip.AddrPort
+    isbuildinstruct: true
+  - structname: net/netip.Addr
+    isbuildinstruct: true
+  - structname: net/netip.Prefix
+    isbuildinstruct: true
+- name: udp.Serve
+  type_str: 'func (v1: string, v2: interface {}, v3 ...func udpServerOpt(v1: *yaklib.udpServerConfig)
+    ) return(error) '
+  long_description: ""
+  description: 启动一个 UDP 服务器
+  params:
+  - name: v1
+    param_alias: host
+    type_alias: ""
+    description: IP地址
+    type_str: string
+  - name: v2
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: params
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib.udpServerOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: udp.clientLocalAddr
+  type_str: 'func (v1: string) return(func udpClientOption(v1: *yaklib.udpClientConfig)
+    ) '
+  long_description: ""
+  description: 【可选】设置客户端的本地监听地址
+  params:
+  - name: v1
+    param_alias: localaddr
+    type_alias: ""
+    description: IP:Port, 例如 127.0.0.0:53
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func udpClientOption(v1: *yaklib.udpClientConfig) '
+- name: udp.clientTimeout
+  type_str: 'func (v1: float64) return(func udpClientOption(v1: *yaklib.udpClientConfig)
+    ) '
+  long_description: ""
+  description: 【可选】设置默认的客户端超时时间
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func udpClientOption(v1: *yaklib.udpClientConfig) '
+- name: udp.serverCallback
+  type_str: 'func (v1: func (v1: *yaklib.udpConn, v2: []uint8, v3: net.Addr) ) return(func
+    udpServerOpt(v1: *yaklib.udpServerConfig) ) '
+  long_description: ""
+  description: 【重要参数】设置服务器的处理函数
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yaklib.udpConn, v2: []uint8, v3: net.Addr) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func udpServerOpt(v1: *yaklib.udpServerConfig) '
+- name: udp.serverContext
+  type_str: 'func (v1: context.Context) return(func udpServerOpt(v1: *yaklib.udpServerConfig)
+    ) '
+  long_description: ""
+  description: 【可选】设置服务器上下文
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func udpServerOpt(v1: *yaklib.udpServerConfig) '
+- name: udp.serverTimeout
+  type_str: 'func (v1: float64) return(func udpServerOpt(v1: *yaklib.udpServerConfig)
+    ) '
+  long_description: ""
+  description: 【可选】设置服务器默认超时时间
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func udpServerOpt(v1: *yaklib.udpServerConfig) '
+variables: []

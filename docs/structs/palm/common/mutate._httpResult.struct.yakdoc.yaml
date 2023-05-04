@@ -1,0 +1,63 @@
+is_build_in_struct: false
+libname: httpool
+struct_name: palm/common/mutate._httpResult
+description: ""
+fields:
+- structname: palm/common/mutate._httpResult
+  name: DurationMs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: palm/common/mutate._httpResult
+  name: Error
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: error
+- structname: palm/common/mutate._httpResult
+  name: Payloads
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/mutate._httpResult
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Request
+  type_str: '*http.Request'
+- structname: palm/common/mutate._httpResult
+  name: RequestRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: palm/common/mutate._httpResult
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Response
+  type_str: '*http.Response'
+- structname: palm/common/mutate._httpResult
+  name: ResponseRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: palm/common/mutate._httpResult
+  name: Timestamp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: palm/common/mutate._httpResult
+  name: Url
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

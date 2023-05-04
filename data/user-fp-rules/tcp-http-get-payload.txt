@@ -1,0 +1,6 @@
+# 这个文件中的指纹会合并在 Nmap 指纹中
+# 同名: "GetRequest" 且 同payload: "q|GET / HTTP/1.0\r\n\r\n|"的规则会进行合并，否则新增规则
+Probe TCP GetRequest q|GET / HTTP/1.0\r\n\r\n|
+rarity 1
+
+softmatch http m|^HTTP/[^ ]{1,3} \d{3}|i

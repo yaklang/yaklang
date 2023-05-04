@@ -1,0 +1,46 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509.VerifyOptions
+description: ""
+fields:
+- structname: crypto/x509.VerifyOptions
+  name: CurrentTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: crypto/x509.VerifyOptions
+  name: DNSName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: crypto/x509.VerifyOptions
+  name: Intermediates
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509.CertPool
+  type_str: '*x509.CertPool'
+- structname: crypto/x509.VerifyOptions
+  name: KeyUsages
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]x509.ExtKeyUsage'
+- structname: crypto/x509.VerifyOptions
+  name: MaxConstraintComparisions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: crypto/x509.VerifyOptions
+  name: Roots
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509.CertPool
+  type_str: '*x509.CertPool'
+methods: []
+ptr_methods: []

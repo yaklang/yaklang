@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: mmdb
+struct_name: github.com/oschwald/maxminddb-golang.Metadata
+description: ""
+fields:
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: BinaryFormatMajorVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: BinaryFormatMinorVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: BuildEpoch
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: DatabaseType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]string
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: IPVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: Languages
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: NodeCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/oschwald/maxminddb-golang.Metadata
+  name: RecordSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+methods: []
+ptr_methods: []

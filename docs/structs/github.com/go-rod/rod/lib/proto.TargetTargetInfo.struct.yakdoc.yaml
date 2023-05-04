@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: Attached
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: BrowserContextID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.BrowserBrowserContextID
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: CanAccessOpener
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: OpenerFrameID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.PageFrameID
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: OpenerID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.TargetTargetID
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: TargetID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.TargetTargetID
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: Title
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.TargetTargetInfoType
+- structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
+  name: URL
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

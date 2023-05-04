@@ -1,0 +1,83 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: Background
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: BrowserContextID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.BrowserBrowserContextID
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: EnableBeginFrameControl
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: Height
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: NewWindow
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: URL
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: Width
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+methods:
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Client
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+    type_str: '*proto.TargetCreateTargetResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+    isbuildinstruct: true
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
+  name: ProtoReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

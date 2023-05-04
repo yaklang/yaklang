@@ -1,0 +1,929 @@
+name: db
+functions:
+- name: db.DelKey
+  type_str: 'func (v1: interface {}) '
+  long_description: ""
+  description: 删除 Key 对应的值(数据库中)
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: db.DeletePayloadByGroup
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: 删除 Payload
+  params:
+  - name: v1
+    param_alias: group
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.DeleteYakScriptByName
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.DeleteYakitMenuItemAll
+  type_str: 'func () return(error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.DownloadGeoIP
+  type_str: 'func () return(error) '
+  long_description: ""
+  description: 下载并自动解压 GeoIP
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.GetKey
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 获取持久化 Key
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: db.GetYakitPluginByName
+  type_str: 'func (v1: string) return(*yakit.YakScript, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.YakScript
+    type_str: '*yakit.YakScript'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.YakScript
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.YakScript
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptParam
+    isbuildinstruct: false
+- name: db.QueryDomainsByDomainKeyword
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 根据关键字查询域名资产
+  params:
+  - name: v1
+    param_alias: keyword
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryDomainsByNetwork
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 根据解析到的网段查询域名资产
+  params:
+  - name: v1
+    param_alias: cidrNetwork
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryDomainsByTitle
+  type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
+  long_description: ""
+  description: 根据网站名查询域名
+  params:
+  - name: v1
+    param_alias: title
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Domain
+    type_str: chan *yakit.Domain
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Domain
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryHTTPFlowsAll
+  type_str: 'func () return(chan *yakit.HTTPFlow) '
+  long_description: ""
+  description: 查询所有的 HTTP 流
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
+    type_str: chan *yakit.HTTPFlow
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: db.QueryHTTPFlowsByID
+  type_str: 'func (v1 ...int64) return(chan *yakit.HTTPFlow) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int64'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: '[db]:palm/common/yakgrpc/yakit.HTTPFlow'
+    type_str: chan *yakit.HTTPFlow
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: db.QueryHTTPFlowsByKeyword
+  type_str: 'func (v1: string) return(chan *yakit.HTTPFlow) '
+  long_description: ""
+  description: 根据关键字插件 HTTP 流对象
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
+    type_str: chan *yakit.HTTPFlow
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+    isbuildinstruct: false
+- name: db.QueryHostPortByKeyword
+  type_str: 'func (v1: string) return(chan *yakit.Host, error) '
+  long_description: ""
+  description: 通过关键字查询 HostPort
+  params:
+  - name: v1
+    param_alias: keyword
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Host
+    type_str: chan *yakit.Host
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Host
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryHostPortByNetwork
+  type_str: 'func (v1: string) return(chan string) '
+  long_description: ""
+  description: 根据网络查询 Host:Port
+  params:
+  - name: v1
+    param_alias: network
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: db.QueryHostsByDomain
+  type_str: 'func (v1: string) return(chan *yakit.Host, error) '
+  long_description: ""
+  description: 根据域名查询 Hosts 资产
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.Host
+    type_str: chan *yakit.Host
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.Host
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryIPCity
+  type_str: 'func (v1: string) return(*geo.City, error) '
+  long_description: ""
+  description: 查询 IP 对应的城市位置
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/geo.City
+    type_str: '*geo.City'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/geo.City
+    isbuildinstruct: false
+  - structname: .
+    isbuildinstruct: true
+- name: db.QueryIPForIPS
+  type_str: 'func (v1: string) return(*geo.ISP, error) '
+  long_description: ""
+  description: 根据 IP 查询运营商
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/geo.ISP
+    type_str: '*geo.ISP'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/geo.ISP
+    isbuildinstruct: false
+- name: db.QueryUrlsAll
+  type_str: 'func () return(chan string) '
+  long_description: ""
+  description: 查询所有可用 URL
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: db.QueryUrlsByKeyword
+  type_str: 'func (v1: string) return(chan string) '
+  long_description: ""
+  description: 根据关键字查询 URL
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan string
+- name: db.SaveDomain
+  type_str: 'func (v1: string, v2 ...string) return(error) '
+  long_description: ""
+  description: 保存域名
+  params:
+  - name: v1
+    param_alias: domain
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ipaddress
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SaveHTTPFlowFromNative
+  type_str: 'func (v1: string, v2: *http.Request, v3: *http.Response) return(error) '
+  long_description: ""
+  description: 从原始对象中保存 HTTP 资产
+  params:
+  - name: v1
+    param_alias: url
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: req
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: v3
+    param_alias: rsp
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: db.SaveHTTPFlowFromNativeWithType
+  type_str: 'func (v1: string, v2: *http.Request, v3: *http.Response, v4: string)
+    return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Request
+    type_str: '*http.Request'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Response
+    type_str: '*http.Response'
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- name: db.SavePayload
+  type_str: 'func (v1: string, v2: []string) return(error) '
+  long_description: ""
+  description: 保存 Payload 到一个组
+  params:
+  - name: v1
+    param_alias: group
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: payload
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SavePayloadByFile
+  type_str: 'func (v1: string, v2: string) return(error) '
+  long_description: ""
+  description: 保存 Payload 到文件
+  params:
+  - name: v1
+    param_alias: group
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: fileName
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SavePortFromResult
+  type_str: 'func (v1: interface {}) return(error) '
+  long_description: ""
+  description: 从某个结果中保存端口
+  params:
+  - name: v1
+    param_alias: result
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SaveYakitMenuItemByBatchExecuteConfig
+  type_str: 'func (v1: interface {}) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SaveYakitPlugin
+  type_str: 'func (v1: string, v2: string, v3: interface {}) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.SetKey
+  type_str: 'func (v1: interface {}, v2: interface {}) return(error) '
+  long_description: ""
+  description: 设置持久化 Key
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: value
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: db.YieldYakScriptAll
+  type_str: 'func () return(chan *yakit.YakScript) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yakgrpc/yakit.YakScript
+    type_str: chan *yakit.YakScript
+  relative_structs:
+  - structname: palm/common/yakgrpc/yakit.YakScript
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: palm/common/yakgrpc/ypb.YakScript
+    isbuildinstruct: false
+  - structname: palm/common/yakgrpc/ypb.YakScriptParam
+    isbuildinstruct: false
+variables:
+- name: db.YAKIT_PLUGIN_TYPE_CODEC
+  typestr: string
+  description: //
+- name: db.YAKIT_PLUGIN_TYPE_MITM
+  typestr: string
+  description: //
+- name: db.YAKIT_PLUGIN_TYPE_NUCLEI
+  typestr: string
+  description: //
+- name: db.YAKIT_PLUGIN_TYPE_PACKET_HACK
+  typestr: string
+  description: //
+- name: db.YAKIT_PLUGIN_TYPE_PORTSCAN
+  typestr: string
+  description: //
+- name: db.YAKIT_PLUGIN_TYPE_YAK
+  typestr: string
+  description: //

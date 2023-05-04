@@ -1,0 +1,51 @@
+is_build_in_struct: true
+libname: dyn
+struct_name: reflect.MapIter
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: reflect.MapIter
+  name: Key
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: reflect.MapIter
+  name: Next
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: reflect.MapIter
+  name: Reset
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: reflect.MapIter
+  name: Value
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+ptr_methods: []

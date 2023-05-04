@@ -1,0 +1,100 @@
+package_name: scanrpc
+name: SCAN
+
+models:
+  - name: Task
+    fields:
+      - name: TaskID
+        type: string
+      - name: TaskType
+        type: string
+      - name: StartTimestamp
+        type: int64
+      - name: DeadlineTimestamp
+        type: int64
+
+rpcs:
+  - method: StartScript
+    request:
+      - name: Content
+        type: string
+    response:
+  - method: GetRunningTasks
+    request: [ ]
+    response:
+      - name: Tasks
+        type: '[]*Task'
+  - method: StopTask
+    request:
+      - name: TaskId
+        type: string
+
+  - method: RadCrawler
+    request:
+      - name: Targets
+        type: '[]string'
+      - name: Proxy
+        type: string
+      - name: EnableXray
+        type: bool
+      - name: Cookie
+        type: string
+    response:
+
+  - method: DownloadXrayAndRad
+    request:
+      - name: Proxy
+        type: string
+      - name: ForceUpdate
+        type: bool
+    response:
+
+  - method: IsXrayAndRadAvailable
+    request:
+    response:
+      - name: Ok
+        type: bool
+      - name: Reason
+        type: string
+
+  - method: ScanFingerprint
+    request:
+      - name: Hosts
+        type: string
+      - name: Ports
+        type: string
+      - name: IsUDP
+        type: bool
+      - name: TimeoutSeconds
+        type: int
+      - name: Concurrent
+        type: int
+    response:
+
+  - method: BasicCrawler
+    request:
+      - name: Targets
+        type: '[]string'
+      - name: EnableXray
+        type: bool
+      - name: Proxy
+        type: string
+    response:
+  - method: ProxyCollector
+    request:
+      - name: Port
+        type: int
+
+  - method: InvokeScript
+    request:
+      - name: TaskId
+        type: string
+      - name: RuntimeId
+        type: string
+      - name: SubTaskId
+        type: string
+      - name: ScriptContent
+        type: string
+      - name: ScriptJsonParam
+        type: string
+    response:

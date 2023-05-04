@@ -1,0 +1,18 @@
+is_build_in_struct: true
+libname: sync
+struct_name: sync.Once
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: sync.Once
+  name: Do
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func () '
+  relative_struct_name: []
+ptr_methods: []

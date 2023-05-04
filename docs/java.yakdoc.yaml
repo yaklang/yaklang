@@ -1,0 +1,788 @@
+name: java
+functions:
+- name: java.FromJson
+  type_str: 'func (v1: []uint8) return([]yserx.JavaSerializable, error) '
+  long_description: ""
+  description: 把 JSON 转变为 Java 对象
+  params:
+  - name: v1
+    param_alias: bytes
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: tcObjects
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: java.MarshalJavaObjects
+  type_str: 'func (v1 ...yserx.JavaSerializable) return([]uint8) '
+  long_description: ""
+  description: 序列化 Java 对象
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: java.NewJavaArray
+  type_str: 'func (v1: *yserx.JavaClassDesc, v2 ...*yserx.JavaFieldValue) return(*yserx.JavaArray) '
+  long_description: ""
+  description: 创建一个 JAVA TC_ARRAY
+  params:
+  - name: v1
+    param_alias: classDesc
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDesc
+    type_str: '*yserx.JavaClassDesc'
+  - name: v2
+    param_alias: fields
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '[]*yserx.JavaFieldValue'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: TC_ARRAY
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaArray
+    type_str: '*yserx.JavaArray'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassDesc
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaArray
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaBlockDataBytes
+  type_str: 'func (v1: []uint8) return(*yserx.JavaBlockData) '
+  long_description: ""
+  description: 创建一个 Java TC_BLOCKDATA (bytes)
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: TC_BLOCKDATA
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaBlockData
+    type_str: '*yserx.JavaBlockData'
+  relative_structs:
+  - structname: palm/common/yserx.JavaBlockData
+    isbuildinstruct: false
+- name: java.NewJavaClass
+  type_str: 'func (v1: *yserx.JavaClassDesc) return(*yserx.JavaClass) '
+  long_description: ""
+  description: 创建一个 JavaClass TC_CLASS
+  params:
+  - name: v1
+    param_alias: tcClassDesc
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDesc
+    type_str: '*yserx.JavaClassDesc'
+  returns:
+  - name: r0
+    param_alias: TC_CLASS
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClass
+    type_str: '*yserx.JavaClass'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassDesc
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClass
+    isbuildinstruct: false
+- name: java.NewJavaClassData
+  type_str: 'func (v1: []yserx.JavaSerializable, v2: []yserx.JavaSerializable) return(*yserx.JavaClassData) '
+  long_description: ""
+  description: 创建一个 CLASSDATA 块
+  params:
+  - name: v1
+    param_alias: fields
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: v2
+    param_alias: blockdatas
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  returns:
+  - name: r0
+    param_alias: X_CLASSDATA
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassData
+    type_str: '*yserx.JavaClassData'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassData
+    isbuildinstruct: false
+- name: java.NewJavaClassDesc
+  type_str: 'func (v1: string, v2: []uint8, v3: uint8, v4: *yserx.JavaClassFields,
+    v5: []yserx.JavaSerializable, v6: *yserx.JavaClassDetails) return(*yserx.JavaClassDesc) '
+  long_description: ""
+  description: 创建一个 TC_CLASSDESC
+  params:
+  - name: v1
+    param_alias: className
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: serialId
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: flag
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  - name: v4
+    param_alias: X_FIELDS
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassFields
+    type_str: '*yserx.JavaClassFields'
+  - name: v5
+    param_alias: annotations
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: v6
+    param_alias: superClass
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDetails
+    type_str: '*yserx.JavaClassDetails'
+  returns:
+  - name: r0
+    param_alias: TC_CLASSDESC
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDesc
+    type_str: '*yserx.JavaClassDesc'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDesc
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+- name: java.NewJavaClassDetails
+  type_str: 'func (v1: string, v2: []uint8, v3: uint8, v4: *yserx.JavaClassFields,
+    v5: []yserx.JavaSerializable, v6: *yserx.JavaClassDetails) return(*yserx.JavaClassDetails) '
+  long_description: ""
+  description: 创建一个 X_CLASSDETAILS
+  params:
+  - name: v1
+    param_alias: className
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: serialId
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: flag
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  - name: v4
+    param_alias: fields
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassFields
+    type_str: '*yserx.JavaClassFields'
+  - name: v5
+    param_alias: annotations
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: v6
+    param_alias: superClass
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDetails
+    type_str: '*yserx.JavaClassDetails'
+  returns:
+  - name: r0
+    param_alias: X_CLASSDETAILS
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDetails
+    type_str: '*yserx.JavaClassDetails'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+- name: java.NewJavaClassField
+  type_str: 'func (v1: string, v2: uint8, v3: yserx.JavaSerializable) return(*yserx.JavaClassField) '
+  long_description: ""
+  description: 创建一个类参数结构 X_CLASSFIELD
+  params:
+  - name: v1
+    param_alias: fieldName
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: fieldType
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  - name: v3
+    param_alias: fieldObject
+    type_alias: ""
+    description: ""
+    type_str: yserx.JavaSerializable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassField
+    type_str: '*yserx.JavaClassField'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+- name: java.NewJavaClassFields
+  type_str: 'func (v1 ...*yserx.JavaClassField) return(*yserx.JavaClassFields) '
+  long_description: ""
+  description: 创建参数组 X_CLASSFIELDS
+  params:
+  - name: v1
+    param_alias: fields
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassField
+    type_str: '[]*yserx.JavaClassField'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassFields
+    type_str: '*yserx.JavaClassFields'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+- name: java.NewJavaEndBlockData
+  type_str: 'func () return(*yserx.JavaEndBlockData) '
+  long_description: ""
+  description: 创建一个块数据结束符（TC_ENDBLOCKDATA）
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaEndBlockData
+    type_str: '*yserx.JavaEndBlockData'
+  relative_structs:
+  - structname: palm/common/yserx.JavaEndBlockData
+    isbuildinstruct: false
+- name: java.NewJavaEnum
+  type_str: 'func (v1: *yserx.JavaClassDesc, v2: *yserx.JavaString) return(*yserx.JavaEnumDesc) '
+  long_description: ""
+  description: 创建一个 TC_ENUM
+  params:
+  - name: v1
+    param_alias: desc
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDesc
+    type_str: '*yserx.JavaClassDesc'
+  - name: v2
+    param_alias: constantName
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaString
+    type_str: '*yserx.JavaString'
+  returns:
+  - name: r0
+    param_alias: TC_ENUM
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaEnumDesc
+    type_str: '*yserx.JavaEnumDesc'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassDesc
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaString
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaEnumDesc
+    isbuildinstruct: false
+- name: java.NewJavaFieldArrayValue
+  type_str: 'func (v1: yserx.JavaSerializable) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 X_FIELDVALUE
+  params:
+  - name: v1
+    param_alias: element
+    type_alias: ""
+    description: ""
+    type_str: yserx.JavaSerializable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldBoolValue
+  type_str: 'func (v1: bool) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个布尔值作为 Java 字段值
+  params:
+  - name: v1
+    param_alias: result
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldByteValue
+  type_str: 'func (v1: uint8) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 Byte 的字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldCharValue
+  type_str: 'func (v1: int) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 Char 作为字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldDoubleValue
+  type_str: 'func (v1: float64) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 float64 作为字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldFloatValue
+  type_str: 'func (v1: float32) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 float32 作为字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: float32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldIntValue
+  type_str: 'func (v1: uint64) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个整数作为字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldLongValue
+  type_str: 'func (v1: uint64) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 Long 作为字段值(uint64)
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldObjectValue
+  type_str: 'func (v1: yserx.JavaSerializable) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 TC_OBJECT 作为字段值
+  params:
+  - name: v1
+    param_alias: obj
+    type_alias: ""
+    description: ""
+    type_str: yserx.JavaSerializable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldShortValue
+  type_str: 'func (v1: int) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 创建一个 short 作为字段值
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaFieldValue
+  type_str: 'func (v1: uint8, v2: []uint8) return(*yserx.JavaFieldValue) '
+  long_description: ""
+  description: 根据类型，和 bytes 创建一个字段值
+  params:
+  - name: v1
+    param_alias: typeFlag
+    type_alias: ""
+    description: ""
+    type_str: uint8
+  - name: v2
+    param_alias: raw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaFieldValue
+    type_str: '*yserx.JavaFieldValue'
+  relative_structs:
+  - structname: palm/common/yserx.JavaFieldValue
+    isbuildinstruct: false
+- name: java.NewJavaLongString
+  type_str: 'func (v1: string) return(*yserx.JavaString) '
+  long_description: ""
+  description: 创建一个 Long String(8byte length)
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaString
+    type_str: '*yserx.JavaString'
+  relative_structs:
+  - structname: palm/common/yserx.JavaString
+    isbuildinstruct: false
+- name: java.NewJavaNull
+  type_str: 'func () return(*yserx.JavaNull) '
+  long_description: ""
+  description: 创建一个 TC_NULL
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaNull
+    type_str: '*yserx.JavaNull'
+  relative_structs:
+  - structname: palm/common/yserx.JavaNull
+    isbuildinstruct: false
+- name: java.NewJavaObject
+  type_str: 'func (v1: *yserx.JavaClassDesc, v2 ...*yserx.JavaClassData) return(*yserx.JavaObject) '
+  long_description: ""
+  description: 创建一个 Java TC_OBJECT
+  params:
+  - name: v1
+    param_alias: desc
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassDesc
+    type_str: '*yserx.JavaClassDesc'
+  - name: v2
+    param_alias: classDataArr
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaClassData
+    type_str: '[]*yserx.JavaClassData'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: TC_OBJECT
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaObject
+    type_str: '*yserx.JavaObject'
+  relative_structs:
+  - structname: palm/common/yserx.JavaClassDesc
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassField
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaClassData
+    isbuildinstruct: false
+  - structname: palm/common/yserx.JavaObject
+    isbuildinstruct: false
+- name: java.NewJavaReference
+  type_str: 'func (v1: uint64) return(*yserx.JavaReference) '
+  long_description: ""
+  description: 根据 Handle 创建一个 TC_REFERENCE
+  params:
+  - name: v1
+    param_alias: handle
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaReference
+    type_str: '*yserx.JavaReference'
+  relative_structs:
+  - structname: palm/common/yserx.JavaReference
+    isbuildinstruct: false
+- name: java.NewJavaString
+  type_str: 'func (v1: string) return(*yserx.JavaString) '
+  long_description: ""
+  description: 创建一个 TC_STRING (4byte length)
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yserx.JavaString
+    type_str: '*yserx.JavaString'
+  relative_structs:
+  - structname: palm/common/yserx.JavaString
+    isbuildinstruct: false
+- name: java.ParseHexJavaObjectStream
+  type_str: 'func (v1: string) return([]yserx.JavaSerializable, error) '
+  long_description: ""
+  description: 把 HEX 流(aced0005...)转变为对象
+  params:
+  - name: v1
+    param_alias: hexStream
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: objs
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: java.ParseJavaObjectStream
+  type_str: 'func (v1: []uint8) return([]yserx.JavaSerializable, error) '
+  long_description: ""
+  description: 把 bytes 转变为 Java 对象
+  params:
+  - name: v1
+    param_alias: raw
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: obj
+    type_alias: ""
+    description: ""
+    type_str: '[]yserx.JavaSerializable'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: java.ToJson
+  type_str: 'func (v1: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: 把 Java 对象转变为 JSON
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+variables: []

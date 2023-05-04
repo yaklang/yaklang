@@ -1,0 +1,36 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod.Message
+description: ""
+fields:
+- structname: github.com/go-rod/rod.Message
+  name: Method
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod.Message
+  name: SessionID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.TargetSessionID
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod.Message
+  name: Load
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Event
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

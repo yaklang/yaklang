@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package tpb;
+
+option go_package = "/;tpb";
+
+message Empty{}
+
+service Tunnel {
+  rpc RemoteIP(Empty) returns (RemoteIPResponse);
+
+  rpc CreateTunnel(stream TunnelInput) returns(stream TunnelOutput);
+
+  // 注册一个隧道
+  rpc RegisterTunnel(RegisterTunnelRequest) returns (RegisterTunnelResponse);
+  // 获取所有隧道的简要描述信息
+  rpc GetAllRegisteredTunnel(GetAllRegisteredTunnelRequest) returns (GetAllRegisteredTunnelResponse);
+  rpc GetRegisteredTunnelDescriptionByID(GetRegisteredTunnelDescriptionByIDRequest) returns (RegisteredTunnel);
+
+  // 随机端口触发器
+  rpc RequireRandomPortTrigger(RequireRandomPortTriggerParams) returns (RequireRandomPortTriggerResponse);
+  rpc QueryExistedRandomPortTrigger(QueryExistedRandomPortTriggerRequest) returns (QueryExistedRandomPortTriggerResponse);
+
+  // 随机 ICMP 长度触发器
+  rpc QuerySpecificICMPLengthTrigger(QuerySpecificICMPLengthTriggerParams) returns (QuerySpecificICMPLengthTriggerResponse);
+}
+
+message RegisterTunnelRequest {
+  bytes PublicKeyPEM = 1;
+  string Secret = 2;
+
+  // 用来描述 Tunnel 携带信息的，比如想要测试的机器名或者测试的内容之类的
+  string Verbose = 3;
+}
+
+message RegisterTunnelResponse {
+  string Id = 1;
+}
+
+message GetAllRegisteredTunnelRequest {
+  // 二级密码
+  string SecondaryPassword = 5;
+}
+
+message RegisterTunnelMeta {
+  string ConnectHost = 1;
+  int64 ConnectPort = 2;
+  string Id = 3;
+  string Verbose = 4;
+}
+
+message GetAllRegisteredTunnelResponse {
+  repeated RegisterTunnelMeta Tunnels = 1;
+}
+
+message GetRegisteredTunnelDescriptionByIDRequest {
+  string Id = 1;
+
+  // 二级密码
+  string SecondaryPassword = 2;
+}
+
+message RegisteredTunnel {
+  RegisterTunnelMeta Info = 1;
+  bytes Auth = 2;
+}
+
+message QuerySpecificICMPLengthTriggerParams {
+  int32 Length = 1;
+}
+
+
+message ICMPTriggerNotification {
+  int32 Size = 1;
+  string CurrentRemoteAddr = 2;
+  repeated string Histories = 3;
+  int32 CurrentRemoteCachedConnectionCount = 4;
+  int32 SizeCachedHistoryConnectionCount = 5;
+  int64 TriggerTimestamp = 6;
+  int64 Timestamp = 7;
+}
+
+message QuerySpecificICMPLengthTriggerResponse {
+  repeated ICMPTriggerNotification Notifications = 1;
+}
+
+service DNSLog {
+  rpc RequireDomain(RequireDomainParams) returns (RequireDomainResponse);
+  rpc QueryExistedDNSLog(QueryExistedDNSLogParams) returns (QueryExistedDNSLogResponse);
+}
+
+message QueryExistedDNSLogParams {
+  string Token = 1;
+}
+
+message DNSLogEvent {
+  string Type = 1;
+  string Token = 2;
+  string Domain = 3;
+  string RemoteAddr = 4;
+  string RemoteIP = 5;
+  int32 RemotePort = 6;
+  bytes Raw = 7;
+  int64 Timestamp = 8;
+}
+
+message QueryExistedDNSLogResponse {
+  repeated DNSLogEvent Events = 1;
+}
+
+message RequireDomainParams {
+
+}
+
+message RequireDomainResponse {
+  string Domain = 1;
+  string Token = 2;
+}
+
+message QueryExistedRandomPortTriggerRequest {
+  string Token = 1;
+}
+
+message RandomPortTriggerEvent {
+  string RemoteAddr = 1;
+  string RemoteIP = 2;
+  int32  RemotePort = 3;
+
+  int32 LocalPort = 4;
+  repeated string History = 5;
+  int32 CurrentRemoteCachedConnectionCount = 6;
+  int32 LocalPortCachedHistoryConnectionCount = 7;
+  int64 TriggerTimestamp = 8;
+  int64 Timestamp = 9;
+}
+
+message QueryExistedRandomPortTriggerResponse {
+  repeated RandomPortTriggerEvent Events = 1;
+}
+
+message RequireRandomPortTriggerParams {
+  string Token = 1;
+  int32 TTLSeconds = 2;
+}
+
+message RequireRandomPortTriggerResponse {
+  int32 Port = 1;
+  string Token = 2;
+  string ExternalIP = 3;
+}
+
+message Mirror {
+  string Id = 1;
+  int32 Port = 2;
+  string Network = 3;
+}
+
+message TunnelInput {
+  repeated Mirror Mirrors = 1;
+
+  // 发送给哪个端口镜像的？
+  string ToId = 2;
+  // 数据
+  bytes Data = 3;
+  // 对应的远端地址是啥？用来区分 conn
+  string ToRemoteAddr = 4;
+
+  // Close
+  bool Close = 5;
+}
+
+message TunnelOutput {
+  string FromId = 1;
+  string RemoteAddr = 2;
+  bytes Data = 3;
+  bool  Close = 4;
+}
+
+message RemoteIPResponse {
+  string IPAddress = 1;
+}

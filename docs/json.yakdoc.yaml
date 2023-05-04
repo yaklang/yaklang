@@ -1,0 +1,123 @@
+name: json
+functions:
+- name: json.Find
+  type_str: 'func (v1: interface {}, v2: string) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: json.FindPath
+  type_str: 'func (v1: interface {}, v2: string) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: json.Marshal
+  type_str: 'func (v1: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: json.New
+  type_str: 'func (v1: interface {}) return(*yaklib.yakJson, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib.yakJson
+    type_str: '*yaklib.yakJson'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/yak/yaklib.yakJson
+    isbuildinstruct: false
+- name: json.dumps
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个任何Yak/Golang对象解析为 string
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: json.loads
+  type_str: 'func (v1: interface {}) return(interface {}) '
+  long_description: ""
+  description: 把一个JSON字符串解析成Yak对象，要注意参数支持 string 或 bytes
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: string|[]byte
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+variables: []

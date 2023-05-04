@@ -1,0 +1,71 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: ClassName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: CustomPreview
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
+  type_str: '*proto.RuntimeCustomPreview'
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: ObjectID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeRemoteObjectID
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: Preview
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  type_str: '*proto.RuntimeObjectPreview'
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: Subtype
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeRemoteObjectSubtype
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeRemoteObjectType
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: UnserializableValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeUnserializableValue
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/ysmood/gson.JSON
+  type_str: gson.JSON
+- structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
+  name: WebDriverValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+  type_str: '*proto.RuntimeWebDriverValue'
+methods: []
+ptr_methods: []

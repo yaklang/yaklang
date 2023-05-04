@@ -1,0 +1,21 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
+  name: Key
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  type_str: '*proto.RuntimeObjectPreview'
+- structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
+  type_str: '*proto.RuntimeObjectPreview'
+methods: []
+ptr_methods: []

@@ -1,0 +1,32 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/gss.NegTokenInitData
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/gss.NegTokenInitData
+  name: MechToken
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/gss.NegTokenInitData
+  name: MechTokenMIC
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/stacktitan/smb/gss.NegTokenInitData
+  name: MechTypes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]asn1.ObjectIdentifier'
+- structname: github.com/stacktitan/smb/gss.NegTokenInitData
+  name: ReqFlags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: encoding/asn1.BitString
+  type_str: asn1.BitString
+methods: []
+ptr_methods: []

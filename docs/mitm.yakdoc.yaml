@@ -1,0 +1,206 @@
+name: mitm
+functions:
+- name: mitm.Bridge
+  type_str: 'func (v1: interface {}, v2: string, v3 ...func mitmConfigOpt(v1: *yaklib.mitmConfig)
+    ) return(error) '
+  long_description: ""
+  description: 桥接模式中间人
+  params:
+  - name: v1
+    param_alias: listenedPort
+    type_alias: ""
+    description: 想要监听的本地端口
+    type_str: interface {}
+  - name: v2
+    param_alias: nextProxy
+    type_alias: ""
+    description: 想要中转的下游代理
+    type_str: string
+  - name: v3
+    param_alias: params
+    type_alias: '...opt'
+    description: 额外参数，用于设置证书/上下文等
+    type_str: '[]yaklib.mitmConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: mitm.Start
+  type_str: 'func (v1: int, v2 ...func mitmConfigOpt(v1: *yaklib.mitmConfig) ) return(error) '
+  long_description: ""
+  description: 启动一个中间人代理
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: 中间人想要监听的代理
+    type_str: int
+  - name: v2
+    param_alias: params
+    type_alias: '...opt'
+    description: ""
+    type_str: '[]yaklib.mitmConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: mitm.callback
+  type_str: 'func (v1: func (v1: bool, v2: string, v3: *http.Request, v4: *http.Response)
+    ) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: 'func(isHttps, url, req: *http.Request, rsp: *http.Resposne)'
+    description: ""
+    type_str: 'func (v1: bool, v2: string, v3: *http.Request, v4: *http.Response) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.context
+  type_str: 'func (v1: context.Context) return(func mitmConfigOpt(v1: *yaklib.mitmConfig)
+    ) '
+  long_description: ""
+  description: 【参数】设置中间人的 context，用来控制生命周期
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.host
+  type_str: 'func (v1: string) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: 【参数】设置中间人代理/服务器的监听主机端口
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.isTransparent
+  type_str: 'func (v1: bool) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: 设置启动一个透明 mitm 劫持接口！
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.maxContentLength
+  type_str: 'func (v1: int) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.rootCA
+  type_str: 'func (v1: []uint8, v2: []uint8) return(func mitmConfigOpt(v1: *yaklib.mitmConfig)
+    ) '
+  long_description: ""
+  description: 设置中间人根 CA 证书（可以用 `tls` 工具包生成）
+  params:
+  - name: v1
+    param_alias: caCert
+    type_alias: ""
+    description: 设置 CA 根证书
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: key
+    type_alias: ""
+    description: 设置 CA 对应的私钥
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.useDefaultCA
+  type_str: 'func (v1: bool) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: 设置是否使用默认CA，如果使用了默认CA会在当前目录自动生成一套CA证书和Key
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.wscallback
+  type_str: 'func (v1: func (v1: []uint8, v2: bool) return(interface {}) ) return(func
+    mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: []uint8, v2: bool) return(interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.wsforcetext
+  type_str: 'func (v1: bool) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+variables: []

@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/devices.ScreenSize
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/devices.ScreenSize
+  name: Height
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/devices.ScreenSize
+  name: Width
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

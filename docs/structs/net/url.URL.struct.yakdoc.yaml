@@ -1,0 +1,239 @@
+is_build_in_struct: true
+libname: http
+struct_name: net/url.URL
+description: ""
+fields:
+- structname: net/url.URL
+  name: ForceQuery
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/url.URL
+  name: Fragment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: Opaque
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: Path
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: RawFragment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: RawPath
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: RawQuery
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: Scheme
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: net/url.URL
+  name: User
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/url.Userinfo
+  type_str: '*url.Userinfo'
+methods:
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: EscapedFragment
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: EscapedPath
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: Hostname
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: IsAbs
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: MarshalBinary
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: Parse
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: Port
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: Query
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: url.Values
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: Redacted
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: RequestURI
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: ResolveReference
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: UnmarshalBinary
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

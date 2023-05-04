@@ -1,0 +1,223 @@
+is_build_in_struct: true
+libname: http
+struct_name: math/rand.Rand
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: ExpFloat64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Float32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Int31
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Int31n
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Int63
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Int63n
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Intn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: NormFloat64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Perm
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Read
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Seed
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Shuffle
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: int, v2: int) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Uint32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: math/rand.Rand
+  name: Uint64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint64
+  relative_struct_name: []
+ptr_methods: []

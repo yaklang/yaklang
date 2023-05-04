@@ -1,0 +1,198 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.Session
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.Session
+  name: IsAuthenticated
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/stacktitan/smb/smb.Session
+  name: IsSigningRequired
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: Close
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: Debug
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NegotiateProtocol
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NewNegotiateReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: smb.NegotiateReq
+  relative_struct_name:
+  - structname: github.com/stacktitan/smb/smb.NegotiateReq
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb.Header
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NewSessionSetup1Req
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: smb.SessionSetup1Req
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/stacktitan/smb/smb.SessionSetup1Req
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenInit
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenInitData
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb/encoder.Metadata
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/smb/encoder.TagMap
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NewSessionSetup2Req
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: smb.SessionSetup2Req
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/stacktitan/smb/smb.SessionSetup2Req
+    isbuildinstruct: true
+  - structname: github.com/stacktitan/smb/gss.NegTokenResp
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NewTreeConnectReq
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/stacktitan/smb/smb.TreeConnectReq
+    type_str: smb.TreeConnectReq
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/stacktitan/smb/smb.TreeConnectReq
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: NewTreeDisconnectReq
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint32
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+    type_str: smb.TreeDisconnectReq
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: TreeConnect
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/stacktitan/smb/smb.Session
+  name: TreeDisconnect
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

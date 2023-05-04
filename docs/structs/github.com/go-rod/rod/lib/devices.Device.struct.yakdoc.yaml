@@ -1,0 +1,105 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/devices.Device
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/devices.Device
+  name: AcceptLanguage
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/devices.Device
+  name: Capabilities
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/go-rod/rod/lib/devices.Device
+  name: Screen
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/devices.Screen
+  type_str: devices.Screen
+- structname: github.com/go-rod/rod/lib/devices.Device
+  name: Title
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/devices.Device
+  name: UserAgent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- description: ""
+  structname: github.com/go-rod/rod/lib/devices.Device
+  name: IsClear
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: github.com/go-rod/rod/lib/devices.Device
+  name: Landescape
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: devices.Device
+  relative_struct_name: []
+- description: ""
+  structname: github.com/go-rod/rod/lib/devices.Device
+  name: MetricsEmulation
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.EmulationSetDeviceMetricsOverride'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.PageViewport
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+    isbuildinstruct: true
+- description: ""
+  structname: github.com/go-rod/rod/lib/devices.Device
+  name: TouchEmulation
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
+    type_str: '*proto.EmulationSetTouchEmulationEnabled'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
+    isbuildinstruct: true
+- description: ""
+  structname: github.com/go-rod/rod/lib/devices.Device
+  name: UserAgentEmulation
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*proto.NetworkSetUserAgentOverride'
+  relative_struct_name:
+  - structname: github.com/go-rod/rod/lib/proto.NetworkSetUserAgentOverride
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
+    isbuildinstruct: true
+  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
+    isbuildinstruct: true
+ptr_methods: []

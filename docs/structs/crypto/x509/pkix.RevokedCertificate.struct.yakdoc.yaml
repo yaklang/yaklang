@@ -1,0 +1,28 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.RevokedCertificate
+description: ""
+fields:
+- structname: crypto/x509/pkix.RevokedCertificate
+  name: Extensions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.Extension
+  type_str: '[]pkix.Extension'
+- structname: crypto/x509/pkix.RevokedCertificate
+  name: RevocationTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: crypto/x509/pkix.RevokedCertificate
+  name: SerialNumber
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: math/big.Int
+  type_str: '*big.Int'
+methods: []
+ptr_methods: []

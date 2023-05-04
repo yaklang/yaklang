@@ -1,0 +1,25 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.DOMBackendNode
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
+  name: BackendNodeID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.DOMBackendNodeID
+- structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
+  name: NodeName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
+  name: NodeType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

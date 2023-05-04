@@ -1,0 +1,78 @@
+is_build_in_struct: true
+libname: bufio
+struct_name: bufio.Scanner
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Buffer
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Bytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Err
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Scan
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Split
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func SplitFunc(v1: []uint8, v2: bool) return(int, []uint8, error) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: bufio.Scanner
+  name: Text
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

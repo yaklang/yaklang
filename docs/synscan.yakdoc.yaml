@@ -1,0 +1,271 @@
+name: synscan
+functions:
+- name: synscan.Scan
+  type_str: 'func (v1: string, v2: string, v3 ...func scanOpt(v1: *tools._yakPortScanConfig)
+    ) return(chan *synscan.SynScanResult, error) '
+  long_description: ""
+  description: 扫描核心函数
+  params:
+  - name: v1
+    param_alias: hosts
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ports
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]tools.scanOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/synscan.SynScanResult
+    type_str: chan *synscan.SynScanResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/synscan.SynScanResult
+    isbuildinstruct: false
+- name: synscan.ScanFromPing
+  type_str: 'func (v1: chan *pingutil.PingResult, v2: string, v3 ...func scanOpt(v1:
+    *tools._yakPortScanConfig) ) return(chan *synscan.SynScanResult, error) '
+  long_description: ""
+  description: 新增从 Ping 中的扫描
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/pingutil.PingResult
+    type_str: chan *pingutil.PingResult
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]tools.scanOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/synscan.SynScanResult
+    type_str: chan *synscan.SynScanResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/utils/pingutil.PingResult
+    isbuildinstruct: false
+  - structname: palm/common/synscan.SynScanResult
+    isbuildinstruct: false
+- name: synscan.callback
+  type_str: 'func (v1: func (v1: *synscan.SynScanResult) ) return(func scanOpt(v1:
+    *tools._yakPortScanConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *synscan.SynScanResult) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.concurrent
+  type_str: 'func (v1: int) return(func scanOpt(v1: *tools._yakPortScanConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.excludeHosts
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: 可设置排除的 Host
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.excludePorts
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: 设置排除端口
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.initHostFilter
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.initPortFilter
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.outputFile
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: 【参数】synscan 对外输出的文件
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.outputPrefix
+  type_str: 'func (v1: string) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: 【参数】输出的文件每一行的前缀（用于增加 `https://` 这样的协议名等）
+  params:
+  - name: v1
+    param_alias: prefix
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.rateLimit
+  type_str: 'func (v1: int, v2: int) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.submitTaskCallback
+  type_str: 'func (v1: func (v1: string) ) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+- name: synscan.wait
+  type_str: 'func (v1: float64) return(func scanOpt(v1: *tools._yakPortScanConfig)
+    ) '
+  long_description: ""
+  description: 【参数】当所有数据包发出之后，等待多少秒？
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func scanOpt(v1: *tools._yakPortScanConfig) '
+variables: []

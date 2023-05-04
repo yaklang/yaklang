@@ -1,0 +1,58 @@
+is_build_in_struct: true
+libname: http
+struct_name: net.IPNet
+description: ""
+fields:
+- structname: net.IPNet
+  name: IP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: net.IP
+- structname: net.IPNet
+  name: Mask
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: net.IPMask
+methods:
+- ptr: true
+  description: ""
+  structname: net.IPNet
+  name: Contains
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: net.IP
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net.IPNet
+  name: Network
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net.IPNet
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

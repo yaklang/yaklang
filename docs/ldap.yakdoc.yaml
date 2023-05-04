@@ -1,0 +1,109 @@
+name: ldap
+functions:
+- name: ldap.Login
+  type_str: 'func (v1: string, v2 ...func (v1: *yaklib.ldapClientConfig) ) return(*ldap.Conn,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func(*yaklib.ldapClientConfig)'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/go-ldap/ldap.Conn
+    type_str: '*ldap.Conn'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/go-ldap/ldap.Conn
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.AddRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.Attribute
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.DelRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.ModifyRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.Change
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.PartialAttribute
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.ModifyDNRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.PasswordModifyRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.PasswordModifyResult
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.SearchRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.SearchResult
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.Entry
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.EntryAttribute
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.SimpleBindRequest
+    isbuildinstruct: true
+  - structname: github.com/go-ldap/ldap.SimpleBindResult
+    isbuildinstruct: true
+  - structname: crypto/tls.Config
+    isbuildinstruct: true
+  - structname: crypto/tls.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+variables: []

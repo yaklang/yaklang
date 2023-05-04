@@ -1,0 +1,174 @@
+is_build_in_struct: false
+libname: risk
+struct_name: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+description: ""
+fields:
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: CurrentRemoteAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: CurrentRemoteCachedConnectionCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int32
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: Histories
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: Size
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int32
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: SizeCachedHistoryConnectionCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int32
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: Timestamp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: TriggerTimestamp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: Descriptor
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetCurrentRemoteAddr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetCurrentRemoteCachedConnectionCount
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetHistories
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetSize
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetSizeCachedHistoryConnectionCount
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetTimestamp
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: GetTriggerTimestamp
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: ProtoMessage
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: ProtoReflect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: protoreflect.Message
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: Reset
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

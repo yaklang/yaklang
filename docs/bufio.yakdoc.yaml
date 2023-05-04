@@ -1,0 +1,172 @@
+name: bufio
+functions:
+- name: bufio.NewReadWriter
+  type_str: 'func (v1: interface {}, v2: interface {}) return(*bufio.ReadWriter, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.ReadWriter
+    type_str: '*bufio.ReadWriter'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.ReadWriter
+    isbuildinstruct: true
+  - structname: bufio.Reader
+    isbuildinstruct: true
+  - structname: bufio.Writer
+    isbuildinstruct: true
+- name: bufio.NewReader
+  type_str: 'func (v1: interface {}) return(*bufio.Reader, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.Reader
+    type_str: '*bufio.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.Reader
+    isbuildinstruct: true
+- name: bufio.NewReaderSize
+  type_str: 'func (v1: interface {}, v2: int) return(*bufio.Reader, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.Reader
+    type_str: '*bufio.Reader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.Reader
+    isbuildinstruct: true
+- name: bufio.NewScanner
+  type_str: 'func (v1: interface {}) return(*bufio.Scanner, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.Scanner
+    type_str: '*bufio.Scanner'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.Scanner
+    isbuildinstruct: true
+- name: bufio.NewWriter
+  type_str: 'func (v1: interface {}) return(*bufio.Writer, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.Writer
+    type_str: '*bufio.Writer'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.Writer
+    isbuildinstruct: true
+- name: bufio.NewWriterSize
+  type_str: 'func (v1: interface {}, v2: int) return(*bufio.Writer, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: bufio.Writer
+    type_str: '*bufio.Writer'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: bufio.Writer
+    isbuildinstruct: true
+variables: []

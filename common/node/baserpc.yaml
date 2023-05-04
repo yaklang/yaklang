@@ -1,0 +1,71 @@
+package_name: baserpc
+name: ManagerAPI
+rpcs:
+  - method: ReadDir
+    request:
+      - name: Target
+        type: str
+    response:
+      - type: "[]*FileInfo"
+        name: Infos
+  - method: ReadDirRecursive
+    request:
+      - name: Target
+        type: str
+    response:
+      - type: "[]*FileInfo"
+        name: Infos
+  - method: ReadFile
+    request:
+      - name: FileName
+        type: str
+    response:
+      - type: bytes
+        name: Raw
+  - method: Shutdown
+    request: [ ]
+    response:
+      - name: Ok
+        type: bool
+      - name: Reason
+        type: string
+  - method: Restart
+    request: [ ]
+    response:
+      - name: Ok
+        type: bool
+      - name: Reason
+        type: string
+  - method: Echo
+    request:
+      - name: Data
+        type: string
+    response:
+      - name: Data
+        type: string
+  - method: Exec
+    request:
+      - name: TimeoutStr
+        type: string
+      - name: Binary
+        type: string
+      - name: Args
+        type: strings
+    response:
+      - name: CombinedOutput
+        type: bytes
+models:
+  - name: FileInfo
+    fields:
+      - name: Name
+        type: str
+      - name: Path
+        type: str
+      - name: IsDir
+        type: bool
+      - name: ModifyTimestamp
+        type: int64
+      - name: BytesSize
+        type: int64
+      - name: Mode
+        type: uint32

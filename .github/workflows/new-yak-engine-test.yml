@@ -1,0 +1,32 @@
+name: new-yak-engine-test
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'common/yak/antlr4yak/**'
+
+jobs:
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.18
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Dependence
+      run: |
+       sudo apt-get update
+       sudo apt-get install libpcap-dev
+       go mod tidy
+
+    - name: Test
+      run: go test -timeout 30m -tags ./common/yak/antlr4yak ./common/yak/antlr4yak -v -count=1

@@ -1,0 +1,67 @@
+is_build_in_struct: false
+libname: tls
+struct_name: palm/common/utils/tlsutils.TLSInspectResult
+description: ""
+fields:
+- structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: RelativeAccount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: RelativeDomains
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: RelativeEmail
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: RelativeURIs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- description: ""
+  structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: Show
+  relative_struct_name: []
+- description: ""
+  structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/utils/tlsutils.TLSInspectResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

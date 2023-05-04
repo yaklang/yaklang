@@ -1,0 +1,212 @@
+is_build_in_struct: false
+libname: dyn
+struct_name: palm/common/yak/yaklang/exec.Stack
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: BaseFrame
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: Clone
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*exec.Stack'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: Pop
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklang/exec.StackValue
+    type_str: '*exec.StackValue'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name:
+  - structname: palm/common/yak/yaklang/exec.StackValue
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PopArgs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name:
+  - structname: reflect.Value
+    isbuildinstruct: true
+  - structname: reflect.MapIter
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PopArgsWithStackValue
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*exec.StackValue'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PopFnArgs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PopNArgs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*exec.StackValue'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: Push
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PushRet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: PushRetWithVerbose
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]reflect.Value'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: SetFrame
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yak/yaklang/exec.Stack
+  name: Top
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*exec.StackValue'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.SearchRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: Attributes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: BaseDN
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: DerefAliases
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: Filter
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: Scope
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: SizeLimit
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: TimeLimit
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-ldap/ldap.SearchRequest
+  name: TypesOnly
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods: []
+ptr_methods: []

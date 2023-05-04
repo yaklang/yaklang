@@ -1,0 +1,2166 @@
+name: codec
+functions:
+- name: codec.AESCBCDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes cbc 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESCBCEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes cbc 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESECBDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESECBEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes cbc 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESGCMDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes gcm 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESGCMEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: aes gcm 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AutoDecode
+  type_str: 'func (v1: interface {}) return([]*codec.AutoDecodeResult) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/yak/yaklib/codec.AutoDecodeResult
+    type_str: '[]*codec.AutoDecodeResult'
+  relative_structs:
+  - structname: palm/common/yak/yaklib/codec.AutoDecodeResult
+    isbuildinstruct: false
+- name: codec.DESCBCDecrypt
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DESCBCEncrypt
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DESDecrypt
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: DES 解密（默认CBC）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: encryptedData
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: 初始化块，可以为空(nil)
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DESECBDecrypt
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DESECBEncrypt
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DESEncrypt
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: DES 加密，默认 CBC 模式
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: originData
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeASCII
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 等价于 `strconv.Unquote`，把一个被 `"` 包裹的字符串解析成字符串内容，同时解析 `"\x0a"` 解析成对应的字符串。
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeBase64
+  type_str: 'func (v1: string) return([]uint8, error) '
+  long_description: ""
+  description: 把 base64 解析成 bytes
+  params:
+  - name: v1
+    param_alias: base64Str
+    type_alias: str
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: result
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: err
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeBase64Url
+  type_str: 'func (v1: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeChunked
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: http chunked 解码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeHex
+  type_str: 'func (v1: string) return([]uint8, error) '
+  long_description: ""
+  description: 把 Hex 字符串解析成 bytes
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要解析的 HEX 字符串，例如 `0a0a` 会解析成 `\n\n`
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解析出的 bytes
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DecodeHtml
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把 HTML 实体编码后的文字进行解析，例如 `&#x0a;` 或 `&#amp;` 等，如果包含正常字符串，则会保留原字符串
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.DecodeUrl
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 把 `%21%63%57asdf` 这类的字符串中的 URL 编码解析成正常字符
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 需要解析的字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解析后的字符串
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DoubleDecodeUrl
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 双重 URL 解码，例如 `%2564%2567` 会解析成 `dg`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要解析的包含双重 URL 编码的字符串，其他字符串将不会被解析
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解析结果
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.DoubleEncodeUrl
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.EncodeASCII
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 通常用于把不可见字符串变成可见字符串，把一个字符串变成双引号`"`包裹的字符串，字符串中的不可见字符会变成 `\xAA\x0A` 这类被转义的内容
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的字符串
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码结果
+    type_str: string
+- name: codec.EncodeBase64
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个对象编码成 base64 字符串
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的对象，如果是 string 或者 []byte 会正常编码，如果是一个其他对象，会尝试把 `json.Marshal`
+      之后的 bytes 进行编码
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码后的 base64 字符串
+    type_str: string
+- name: codec.EncodeBase64Url
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.EncodeChunked
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: 增加 chunked 编码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.EncodeHtml
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个字符串编码成 HTML 实体编码，如果输入了一个对象，会 json 序列化后再编码，注意这个函数会把所有内容都进行编码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的对象
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码结果
+    type_str: string
+- name: codec.EncodeHtmlHex
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个字符串编码成 HTML 实体编码，如果输入了一个对象，会序列化后再对 bytes 进行编码，注意这个函数会把参数所有内容都进行编码，编码成
+    `&#xNN;` 这种形式
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的对象
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码结果
+    type_str: string
+- name: codec.EncodeToHex
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个对象编码成 hex 字符串，注意：不以 `0x` 开头
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的内容
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码的结果
+    type_str: string
+- name: codec.EncodeToPrintable
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 等价于 `codec.EncodeASCII`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 等价于 `codec.EncodeASCII`
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 等价于 `codec.EncodeASCII`
+    type_str: string
+- name: codec.EncodeUrl
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 把一个对象进行 URL 编码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的参数
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码后的结果
+    type_str: string
+- name: codec.EscapeHtml
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 同 `codec.DecodeHtml`
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要解码的内容
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解码结果
+    type_str: string
+- name: codec.EscapePathUrl
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: URL 编码：（作为 url.Path 进行编码）
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的内容
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码结果
+    type_str: string
+- name: codec.EscapeQueryUrl
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: URL 编码：作为 url.Query 进行编码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要编码的内容
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 编码结果
+    type_str: string
+- name: codec.FixUTF8
+  type_str: 'func (v1: []uint8) return(string) '
+  long_description: ""
+  description: 修复 Bytes 到 UTF8，会把不合理的 UTF8 字符转义
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.GB18030ToUTF8
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.GBKSafe
+  type_str: 'func (v1: []uint8) return(string, error) '
+  long_description: ""
+  description: 尝试修复 GBK
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.GBKToUTF8
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.HTMLChardet
+  type_str: 'func (v1: interface {}) return([]chardet.Result, error) '
+  long_description: ""
+  description: 检测 HTML 的字符集
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/saintfish/chardet.Result
+    type_str: '[]chardet.Result'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/saintfish/chardet.Result
+    isbuildinstruct: true
+- name: codec.HTMLChardetBest
+  type_str: 'func (v1: interface {}) return(*chardet.Result, error) '
+  long_description: ""
+  description: 检测 HTML 的字符集，只展示最有可能的结果
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/saintfish/chardet.Result
+    type_str: '*chardet.Result'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/saintfish/chardet.Result
+    isbuildinstruct: true
+- name: codec.HZGB2312ToUTF8
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.HmacMD5
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.HmacSM3
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.HmacSha1
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.HmacSha256
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.HmacSha512
+  type_str: 'func (v1: interface {}, v2: interface {}) return([]uint8) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.MMH3Hash128
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 计算一个对象的 mmh3 hash128
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.MMH3Hash128x64
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 计算一个对象的 mmh3 hash128x64
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.MMH3Hash32
+  type_str: 'func (v1: interface {}) return(uint32) '
+  long_description: ""
+  description: 计算 mmh3 的 hash32
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint32
+- name: codec.Md5
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 计算 md5 hash
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要计算 md5 的值，如果是一个对象，会先尝试序列化 json
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 计算结果为一串十六进制字符串
+    type_str: string
+- name: codec.PKCS5Padding
+  type_str: 'func (v1: []uint8, v2: int) return([]uint8) '
+  long_description: ""
+  description: pkcs5 填充
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: blockSize
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.PKCS5UnPadding
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: pkcs5 解码
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.PKCS7Padding
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: pkcs7 编码
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.PKCS7UnPadding
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: pkcs7 解码
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.RSADecryptWithPKCS1v15
+  type_str: 'func (v1: []uint8, v2: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.RSAEncryptWithPKCS1v15
+  type_str: 'func (v1: []uint8, v2: interface {}) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sha1
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: 计算 sha1 hash
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要计算 sha1 的参数
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 计算结果，十六进制字符串
+    type_str: string
+- name: codec.Sha224
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.Sha256
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.Sha384
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.Sha512
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.Sm2DecryptAsn1
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2DecryptAsn1WithPassword
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2DecryptC1C2C3
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2DecryptC1C2C3WithPassword
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2DecryptC1C3C2
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2DecryptC1C3C2WithPassword
+  type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2EncryptAsn1
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2EncryptC1C2C3
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2EncryptC1C3C2
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2GenerateHexKeyPair
+  type_str: 'func () return([]uint8, []uint8, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm2GeneratePemKeyPair
+  type_str: 'func () return([]uint8, []uint8, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm3
+  type_str: 'func (v1: interface {}) return([]uint8) '
+  long_description: ""
+  description: SM3 计算 Hash
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.Sm4CBCDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 CBC 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CBCEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 cbc 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 CFB 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 cfb 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4EBCDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 EBC 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4EBCEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 EBC 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4GCMDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: 国密4 gcm 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4GCMEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 GCM 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OFB 解密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OBF 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.StrconvQuote
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.StrconvUnquote
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UTF8ToGB18030
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UTF8ToGBK
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UTF8ToHZGB2312
+  type_str: 'func (v1: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UnescapePathUrl
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 作为 url.Path 进行 URL 解码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要解码的内容
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解码结果
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UnescapeQueryUrl
+  type_str: 'func (v1: string) return(string, error) '
+  long_description: ""
+  description: 作为 url.Query 进行 URL 解码
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 想要解码的内容
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: 解码结果
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.UnicodeDecode
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.UnicodeEncode
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: codec.ZeroPadding
+  type_str: 'func (v1: []uint8, v2: int) return([]uint8) '
+  long_description: ""
+  description: 零填充
+  params:
+  - name: v1
+    param_alias: originData
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: blockSize
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+- name: codec.ZeroUnPadding
+  type_str: 'func (v1: []uint8) return([]uint8) '
+  long_description: ""
+  description: 移除 0 填充的末尾
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+variables: []

@@ -1,0 +1,516 @@
+name: re
+functions:
+- name: re.Compile
+  type_str: 'func (v1: string) return(*regexp.Regexp, error) '
+  long_description: ""
+  description: 编译正则
+  params:
+  - name: v1
+    param_alias: regexpStr
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: regexp.Regexp
+    type_str: '*regexp.Regexp'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: regexp.Regexp
+    isbuildinstruct: true
+- name: re.CompilePOSIX
+  type_str: 'func (v1: string) return(*regexp.Regexp, error) '
+  long_description: 编译正则（同 Golang `regexp.CompilePOSIX`）
+  description: ""
+  params:
+  - name: v1
+    param_alias: regexpStr
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: regexp.Regexp
+    type_str: '*regexp.Regexp'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: regexp.Regexp
+    isbuildinstruct: true
+- name: re.ExtractEmail
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从字符串中提取 email
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: emails
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractHostPort
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从结果中提取 `host:port`
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: hostPorts
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractIP
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取 IP 地址
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ipAddrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractIPv4
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取 IPv4 地址
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ipAddrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractIPv6
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取 IPv6 地址
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ipAddrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractMac
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从字符串中提取可用的 Mac 地址
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: macAddrs
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractPath
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取路径
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: paths
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractTTY
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取 TTY 内容
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ttys
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.ExtractURL
+  type_str: 'func (v1: interface {}) return([]string) '
+  long_description: ""
+  description: 从内容中提取 URL
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: '[]byte|string|io.Reader|any'
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: urls
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.Find
+  type_str: 'func (v1: interface {}, v2: string) return(string) '
+  long_description: ""
+  description: 匹配并提取数据中符合正则的数据
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: result
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: re.FindAll
+  type_str: 'func (v1: interface {}, v2: string) return([]string) '
+  long_description: ""
+  description: 提取所有正则匹配到的数据
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: results
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.FindAllIndex
+  type_str: 'func (v1: interface {}, v2: string) return([][]int) '
+  long_description: ""
+  description: 提取匹配到的数据的索引（起止位置）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: indexes
+    type_alias: '[][start: int, end: int]'
+    description: ""
+    type_str: '[][]int'
+- name: re.FindIndex
+  type_str: 'func (v1: interface {}, v2: string) return([]int) '
+  long_description: ""
+  description: 提取匹配到的数据索引位置（起止位置）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: index
+    type_alias: '[start:int, end:int]'
+    description: ""
+    type_str: '[]int'
+- name: re.FindSubmatch
+  type_str: 'func (v1: interface {}, v2: string) return([]string) '
+  long_description: ""
+  description: 正则匹配提取带分组的数据（只匹配一个）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: results
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: re.FindSubmatchAll
+  type_str: 'func (v1: interface {}, v2: string) return([][]string) '
+  long_description: ""
+  description: 正则匹配提取带分组的数据（匹配全部）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[][]string'
+- name: re.FindSubmatchAllIndex
+  type_str: 'func (v1: interface {}, v2: string) return([][]int) '
+  long_description: ""
+  description: 匹配并提取分组带索引（起止位置）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: indexes
+    type_alias: '[][matchStart, matchEnd, group1Start, group1End, ...]'
+    description: ""
+    type_str: '[][]int'
+- name: re.FindSubmatchIndex
+  type_str: 'func (v1: interface {}, v2: string) return([]int) '
+  long_description: ""
+  description: 只匹配并提取第一组的分组带索引（起止位置）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+- name: re.Grok
+  type_str: 'func (v1: string, v2: string) return(yaklib.GrokResult) '
+  long_description: ""
+  description: 从内容中按照 Grok 规则提取数据
+  params:
+  - name: v1
+    param_alias: content
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: grokRule
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: yaklib.GrokResult
+- name: re.Match
+  type_str: 'func (v1: string, v2: interface {}) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: regexpPattern
+    type_alias: ""
+    description: 想要匹配的规则
+    type_str: string
+  - name: v2
+    param_alias: content
+    type_alias: ""
+    description: 想要通过正则匹配的数据
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+- name: re.MustCompile
+  type_str: 'func (v1: string) return(*regexp.Regexp) '
+  long_description: ""
+  description: 编译正则，如果编译失败则 Panic
+  params:
+  - name: v1
+    param_alias: regexpStr
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: regexp.Regexp
+    type_str: '*regexp.Regexp'
+  relative_structs:
+  - structname: regexp.Regexp
+    isbuildinstruct: true
+- name: re.MustCompilePOSIX
+  type_str: 'func (v1: string) return(*regexp.Regexp) '
+  long_description: ""
+  description: 编译正则 POSIX 模式，编译失败则 Panic
+  params:
+  - name: v1
+    param_alias: regexpStr
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: regexp.Regexp
+    type_str: '*regexp.Regexp'
+  relative_structs:
+  - structname: regexp.Regexp
+    isbuildinstruct: true
+- name: re.QuoteMeta
+  type_str: 'func (v1: string) return(string) '
+  long_description: ""
+  description: 把正则保留字符进行转义
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: re.ReplaceAll
+  type_str: 'func (v1: interface {}, v2: string, v3: interface {}) return(string) '
+  long_description: ""
+  description: 整体批量替换
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: newStr
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: re.ReplaceAllWithFunc
+  type_str: 'func (v1: interface {}, v2: string, v3: func (v1: string) return(string)
+    ) return(string) '
+  long_description: ""
+  description: 正则批量替换数据（使用函数处理匹配结果）
+  params:
+  - name: v1
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: regexp
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: replaceFunc
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: string) return(string) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+variables: []

@@ -1,0 +1,53 @@
+name: lowhttp-testcases
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'common/utils/lowhttp/**'
+      - 'common/jsonextractor/**'
+      - 'common/domainextractor/**'
+      - 'common/yak/**'
+
+jobs:
+
+  test:
+    name: Test
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.18
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Dependence
+        run: |
+          sudo apt-get update
+          sudo apt-get install libpcap-dev=1.9.1-3
+
+      - name: Test Start
+        run: go test -timeout 1m ./common/jsonextractor -v
+
+      - name: Run tests lowhttp with retry
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 3
+          timeout_minutes: 1
+          command: go test -timeout 1m ./common/utils/lowhttp -v
+
+      - name: Test Codec
+        run: go test -timeout 1m ./common/yak/yaklib/codec -v
+
+      - name: Test CartesianProduct
+        run: go test -timeout 1m ./common/yak/cartesian -v
+
+      - name: TestDomainExtract
+        run: go test -timeout 1m ./common/domainextractor -v
+
+      - name: Test HttpTpl(YakTemplate)
+        run: go test -timeout 1m ./common/yak/httptpl -v

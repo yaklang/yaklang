@@ -1,0 +1,26 @@
+is_build_in_struct: true
+libname: smb
+struct_name: github.com/stacktitan/smb/smb.TreeDisconnectReq
+description: ""
+fields:
+- structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+  name: Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/stacktitan/smb/smb.Header
+  type_str: smb.Header
+- structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+  name: Reserved
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/stacktitan/smb/smb.TreeDisconnectReq
+  name: StructureSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods: []
+ptr_methods: []

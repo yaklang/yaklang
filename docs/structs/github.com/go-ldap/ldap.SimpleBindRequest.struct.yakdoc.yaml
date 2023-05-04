@@ -1,0 +1,31 @@
+is_build_in_struct: true
+libname: ldap
+struct_name: github.com/go-ldap/ldap.SimpleBindRequest
+description: ""
+fields:
+- structname: github.com/go-ldap/ldap.SimpleBindRequest
+  name: AllowEmptyPassword
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-ldap/ldap.SimpleBindRequest
+  name: Controls
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ldap.Control'
+- structname: github.com/go-ldap/ldap.SimpleBindRequest
+  name: Password
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-ldap/ldap.SimpleBindRequest
+  name: Username
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

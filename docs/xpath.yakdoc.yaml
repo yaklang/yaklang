@@ -1,0 +1,317 @@
+name: xpath
+functions:
+- name: xpath.CreateXPathNavigator
+  type_str: 'func (v1: *html.Node) return(*htmlquery.NodeNavigator) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: palm/common/utils/htmlquery.NodeNavigator
+    type_str: '*htmlquery.NodeNavigator'
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+  - structname: palm/common/utils/htmlquery.NodeNavigator
+    isbuildinstruct: false
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.ExistedAttr
+  type_str: 'func (v1: *html.Node, v2: string) return(bool) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.Find
+  type_str: 'func (v1: *html.Node, v2: string) return([]*html.Node) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '[]*html.Node'
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.FindOne
+  type_str: 'func (v1: *html.Node, v2: string) return(*html.Node) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.InnerText
+  type_str: 'func (v1: *html.Node) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.LoadHTMLDocument
+  type_str: 'func (v1: interface {}) return(*html.Node, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.OutputHTML
+  type_str: 'func (v1: *html.Node) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.OutputHTMLSelf
+  type_str: 'func (v1: *html.Node) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.Query
+  type_str: 'func (v1: *html.Node, v2: string) return(*html.Node, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.QueryAll
+  type_str: 'func (v1: *html.Node, v2: string) return([]*html.Node, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '[]*html.Node'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+- name: xpath.SelectAttr
+  type_str: 'func (v1: *html.Node, v2: string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: golang.org/x/net/html.Node
+    type_str: '*html.Node'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_structs:
+  - structname: golang.org/x/net/html.Node
+    isbuildinstruct: true
+  - structname: golang.org/x/net/html.Attribute
+    isbuildinstruct: true
+variables: []

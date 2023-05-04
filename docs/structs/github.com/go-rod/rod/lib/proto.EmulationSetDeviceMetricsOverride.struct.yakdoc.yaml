@@ -1,0 +1,142 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: DeviceScaleFactor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: DisplayFeature
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
+  type_str: '*proto.EmulationDisplayFeature'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: DontSetVisibleSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Height
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Mobile
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: PositionX
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: PositionY
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Scale
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*float64'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: ScreenHeight
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: ScreenOrientation
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
+  type_str: '*proto.EmulationScreenOrientation'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: ScreenWidth
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Viewport
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/go-rod/rod/lib/proto.PageViewport
+  type_str: '*proto.PageViewport'
+- structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Width
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Client
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: Call
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: proto.Client
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: ProtoReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
+  name: ProtoReq
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

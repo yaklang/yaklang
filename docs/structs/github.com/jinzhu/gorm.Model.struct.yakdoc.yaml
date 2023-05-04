@@ -1,0 +1,34 @@
+is_build_in_struct: true
+libname: risk
+struct_name: github.com/jinzhu/gorm.Model
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.Model
+  name: CreatedAt
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+- structname: github.com/jinzhu/gorm.Model
+  name: DeletedAt
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: '*time.Time'
+- structname: github.com/jinzhu/gorm.Model
+  name: ID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint
+- structname: github.com/jinzhu/gorm.Model
+  name: UpdatedAt
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: time.Time
+  type_str: time.Time
+methods: []
+ptr_methods: []

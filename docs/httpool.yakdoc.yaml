@@ -1,0 +1,300 @@
+name: httpool
+functions:
+- name: httpool.Pool
+  type_str: 'func (v1: interface {}, v2 ...func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) return(chan *mutate._httpResult, error) '
+  long_description: ""
+  description: 批量执行 http 请求
+  params:
+  - name: v1
+    param_alias: requests
+    type_alias: '[]*http.Request|FuzzHTTPRequest|FuzzHTTPRequestBatch|FuzzHTTPRequestIf|*http.Request'
+    description: 想要批量执行的请求
+    type_str: interface {}
+  - name: v2
+    param_alias: params
+    type_alias: '...opt'
+    description: 额外选项
+    type_str: '[]mutate.httpPoolConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan *mutate._httpResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: palm/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: httpool.context
+  type_str: 'func (v1: context.Context) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 为 pool 增加上下文
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.fuzz
+  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.fuzzParams
+  type_str: 'func (v1: interface {}) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.host
+  type_str: 'func (v1: string, v2: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.https
+  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 为请求设置 HTTPS
+  params:
+  - name: v1
+    param_alias: isHttps
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.noFixContentLength
+  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 新增不修复 Content-Length 的可能性
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.perRequestTimeout
+  type_str: 'func (v1: float64) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 【参数】为每个请求设置超时时间
+  params:
+  - name: v1
+    param_alias: seconds
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.port
+  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 【参数】设置请求发送到的真正 Port
+  params:
+  - name: v1
+    param_alias: port
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.proxy
+  type_str: 'func (v1 ...string) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 【参数】设置整个请求池的代理
+  params:
+  - name: v1
+    param_alias: proxyUrls
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.rawMode
+  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: rawMode 模式意味着直接发送包，尽量少的去改动数据包内容
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.redirectTimes
+  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 限制重定向次数
+  params:
+  - name: v1
+    param_alias: count
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: httpool.size
+  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: 【参数】设置每个请求的 body 的最大大小
+  params:
+  - name: v1
+    param_alias: bodySize
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: opt
+    description: ""
+    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+variables: []

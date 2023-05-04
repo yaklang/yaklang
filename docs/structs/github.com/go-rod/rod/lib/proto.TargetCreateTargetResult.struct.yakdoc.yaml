@@ -1,0 +1,13 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
+  name: TargetID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.TargetTargetID
+methods: []
+ptr_methods: []

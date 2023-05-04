@@ -1,0 +1,95 @@
+is_build_in_struct: true
+libname: http
+struct_name: crypto/x509/pkix.Name
+description: ""
+fields:
+- structname: crypto/x509/pkix.Name
+  name: CommonName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: crypto/x509/pkix.Name
+  name: Country
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: ExtraNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.AttributeTypeAndValue
+  type_str: '[]pkix.AttributeTypeAndValue'
+- structname: crypto/x509/pkix.Name
+  name: Locality
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: Names
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/x509/pkix.AttributeTypeAndValue
+  type_str: '[]pkix.AttributeTypeAndValue'
+- structname: crypto/x509/pkix.Name
+  name: Organization
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: OrganizationalUnit
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: PostalCode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: Province
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: crypto/x509/pkix.Name
+  name: SerialNumber
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: crypto/x509/pkix.Name
+  name: StreetAddress
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- description: ""
+  structname: crypto/x509/pkix.Name
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: crypto/x509/pkix.Name
+  name: ToRDNSequence
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: pkix.RDNSequence
+  relative_struct_name: []
+ptr_methods: []

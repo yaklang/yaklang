@@ -1,0 +1,158 @@
+is_build_in_struct: false
+libname: java
+struct_name: palm/common/yserx.JavaClassDetails
+description: ""
+fields:
+- structname: palm/common/yserx.JavaClassDetails
+  name: Annotations
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]yserx.JavaSerializable'
+- structname: palm/common/yserx.JavaClassDetails
+  name: ClassName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: palm/common/yserx.JavaClassDetails
+  name: DescFlag
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: palm/common/yserx.JavaClassDetails
+  name: DynamicProxyAnnotation
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]yserx.JavaSerializable'
+- structname: palm/common/yserx.JavaClassDetails
+  name: DynamicProxyClass
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/yserx.JavaClassDetails
+  name: DynamicProxyClassInterfaceCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: palm/common/yserx.JavaClassDetails
+  name: DynamicProxyClassInterfaceNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: palm/common/yserx.JavaClassDetails
+  name: Fields
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: palm/common/yserx.JavaClassFields
+  type_str: '*yserx.JavaClassFields'
+- structname: palm/common/yserx.JavaClassDetails
+  name: Handle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: palm/common/yserx.JavaClassDetails
+  name: IsNull
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/yserx.JavaClassDetails
+  name: SerialVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: palm/common/yserx.JavaClassDetails
+  name: SuperClass
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yserx.JavaSerializable
+- structname: palm/common/yserx.JavaClassDetails
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: palm/common/yserx.JavaClassDetails
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: IsJavaNull
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: Is_SC_BLOCKDATA
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: Is_SC_EXTERNALIZABLE
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: Is_SC_SERIALIZABLE
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: Is_SC_WRITE_METHOD
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaClassDetails
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,201 @@
+is_build_in_struct: true
+libname: exec
+struct_name: os/exec.Cmd
+description: ""
+fields:
+- structname: os/exec.Cmd
+  name: Args
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: os/exec.Cmd
+  name: Dir
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: os/exec.Cmd
+  name: Env
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: os/exec.Cmd
+  name: ExtraFiles
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: os.File
+  type_str: '[]*os.File'
+- structname: os/exec.Cmd
+  name: Path
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: os/exec.Cmd
+  name: Process
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: os.Process
+  type_str: '*os.Process'
+- structname: os/exec.Cmd
+  name: ProcessState
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: os.ProcessState
+  type_str: '*os.ProcessState'
+- structname: os/exec.Cmd
+  name: Stderr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: io.Writer
+- structname: os/exec.Cmd
+  name: Stdin
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: io.Reader
+- structname: os/exec.Cmd
+  name: Stdout
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: io.Writer
+- structname: os/exec.Cmd
+  name: SysProcAttr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: syscall.SysProcAttr
+  type_str: '*syscall.SysProcAttr'
+methods:
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: CombinedOutput
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: Output
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: Run
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: Start
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: StderrPipe
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.ReadCloser
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: StdinPipe
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.WriteCloser
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: StdoutPipe
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.ReadCloser
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: Wait
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

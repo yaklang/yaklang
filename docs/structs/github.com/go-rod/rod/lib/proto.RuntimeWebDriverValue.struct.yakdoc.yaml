@@ -1,0 +1,26 @@
+is_build_in_struct: true
+libname: simulator
+struct_name: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+description: ""
+fields:
+- structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+  name: ObjectID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: proto.RuntimeWebDriverValueType
+- structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/ysmood/gson.JSON
+  type_str: gson.JSON
+methods: []
+ptr_methods: []

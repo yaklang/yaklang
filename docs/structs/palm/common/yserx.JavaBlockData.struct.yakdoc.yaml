@@ -1,0 +1,48 @@
+is_build_in_struct: false
+libname: java
+struct_name: palm/common/yserx.JavaBlockData
+description: ""
+fields:
+- structname: palm/common/yserx.JavaBlockData
+  name: Contents
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: palm/common/yserx.JavaBlockData
+  name: IsLong
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: palm/common/yserx.JavaBlockData
+  name: Size
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: palm/common/yserx.JavaBlockData
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: palm/common/yserx.JavaBlockData
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: palm/common/yserx.JavaBlockData
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []
