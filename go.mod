@@ -13,7 +13,7 @@ require (
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.4
 	github.com/antchfx/htmlquery v1.2.5
-	github.com/antchfx/xmlquery v1.2.3
+	github.com/antchfx/xmlquery v1.3.1
 	github.com/antchfx/xpath v1.2.1
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/apex/log v1.9.0
