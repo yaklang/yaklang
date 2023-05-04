@@ -1,37 +1,33 @@
 # Antlr4 Yak
 
-Generate Code
-
-`antlr -Dlanguage=Go ./YaklangLexer.g4 ./YaklangParser.g4 -o parser -no-listener -visitor`
-
-# TODO
+Generate Code, use `re-generate-antlr-schema.sh`
 
 statement
-- [ ] go
-- [ ] include
-- [ ] defer
+- [x] go
+- [x] include
+- [x] defer
 - [x] assert
 - [x] return
-- [ ] importmod
-- [ ] range
-- [ ] func
-- [ ] recover
+- [x] importmod
+- [x] range
+- [x] func
+- [x] recover
 变量
-- [ ] new/make/chan
-- [ ] const
-- [ ] type
-- [ ] struct
-- [ ] interface
+- [x] new/make/chan
+- [x] const
+- [x] type
+- [x] struct
+- [x] interface
 操作符
-- [ ] in
+- [x] in
 - [x] .获取成员
-- [x] []获取元素
+- [x] \[\]获取元素
 流程控制
-- [ ] if/elif/else
-- [ ] for
-- [ ] switch
+- [x] if/elif/else
+- [x] for
+- [x] switch
 其它
-- [ ] 语法警告提示
-- [ ] 语法错误提示
-- [x] 支持char类型
+- [x] 语法警告提示
+- [x] 语法错误提示
+- [x] 支持char类型(Rune / Byte 本质都为 Int)
 
