@@ -50,8 +50,9 @@ type BaseConfig struct {
 	blackList []*regexp.Regexp
 	whiteList []*regexp.Regexp
 
-	pageTimeout int
-	timeout     int
+	pageTimeout       int
+	timeout           int
+	extraWaitLoadTime int
 
 	formFill  map[string]string
 	fileInput map[string]string
@@ -95,14 +96,15 @@ func NewConfig() *Config {
 			cookies:        make([]*proto.NetworkCookieParam, 0),
 			requestHeaders: defaultChromeHeaders,
 
-			pageTimeout: 30,
-			timeout:     1800,
+			pageTimeout: 60,
+			timeout:     3600,
 
 			scanRepeat:   lowLevel,
 			scanRange:    mainDomain,
 			ignoreParams: make([]string, 0),
 
-			concurrent: 2,
+			concurrent:        2,
+			extraWaitLoadTime: 0,
 		},
 	}
 }
@@ -331,5 +333,11 @@ func WithIgnoreQueryName(names ...string) ConfigOpt {
 func WithVueWeb(vue bool) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.vue = vue
+	}
+}
+
+func WithExtraWaitLoadTime(time int) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.extraWaitLoadTime = time
 	}
 }
