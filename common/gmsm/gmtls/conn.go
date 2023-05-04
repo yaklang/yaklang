@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"sync"
@@ -1286,7 +1285,7 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warnf("handshake context panic: %v", err)
-			ret = utils.Errorf("handshake context panic: %v", err)
+			ret = fmt.Errorf("handshake context panic: %v", err)
 		}
 	}()
 
