@@ -249,6 +249,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 				}
 				var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
 				rawPacket += utils.MapGetString(req, "body")
+				rawPacket = nucleiFormatRequestTemplate(rawPacket)
 				reqIns.HTTPRequests = append(reqIns.HTTPRequests, &YakHTTPRequestPacket{Request: rawPacket})
 			}
 		}
