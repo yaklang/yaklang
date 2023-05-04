@@ -31,5 +31,6 @@ var NewCrawlerXExports = map[string]interface{}{
 	"AllDomainScan": mainDomain,
 	"SubMenuScan":   subDomain,
 
-	"vueWebsite": WithVueWeb,
+	"vueWebsite":    WithVueWeb,
+	"extraWaitLoad": WithExtraWaitLoadTime,
 }
