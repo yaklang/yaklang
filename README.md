@@ -98,7 +98,7 @@ If you just want to add functionality to the library, or fix some bugs in the li
 ### yaklang 核心开发者 / Active yaklang core developers
 
 1. z3
-2. way29
+2. Longlone
 3. Go0p
 4. zwh-china
 5. bcy2007
