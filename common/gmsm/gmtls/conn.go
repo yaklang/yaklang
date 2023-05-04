@@ -1282,6 +1282,13 @@ func (c *Conn) HandshakeContext(ctx context.Context) error {
 }
 
 func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warnf("handshake context panic: %v", err)
+			ret = fmt.Errorf("handshake context panic: %v", err)
+		}
+	}()
+
 	// Fast sync/atomic-based exit if there is no handshake in flight and the
 	// last one succeeded without an error. Avoids the expensive context setup
 	// and mutex for most Read and Write calls.
@@ -1355,7 +1362,9 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 		// If an error occurred during the hadshake try to flush the
 		// alert that might be left in the buffer.
 		c.flush()
-		log.Error("gmtls: handshake error :", c.handshakeErr)
+		if c.handshakeErr != io.EOF {
+			log.Warnf("gmtls-handshake error:", c.handshakeErr)
+		}
 	}
 
 	if c.handshakeErr == nil && !c.handshakeComplete() {

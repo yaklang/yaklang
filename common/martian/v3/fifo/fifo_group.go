@@ -22,6 +22,7 @@ package fifo
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"sync"
 
@@ -118,6 +119,9 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 // aggregateErrors is set to true, the errors returned by each modifier in the group are
 // aggregated.
 func (g *Group) ModifyResponse(res *http.Response) error {
+	if res == nil {
+		return utils.Error("no response should be modified")
+	}
 	requ := ""
 	if res.Request != nil {
 		requ = res.Request.URL.String()
