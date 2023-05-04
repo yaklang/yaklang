@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -214,4 +215,24 @@ requests:
 	if !checked {
 		panic(1)
 	}
+}
+
+func TestNewVars(t *testing.T) {
+	vars := NewVars()
+	vars.AutoSet("year", "{{rand_int(2000,2020)}}")
+	vars.AutoSet("month", "0{{rand_int(1,7)}}")
+	vars.AutoSet("day", "{{rand_int(1,28)}}")
+	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
+	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
+	var a = vars.ToMap()
+
+	actResult := utils.Atoi(fmt.Sprint(a["year"])) - utils.Atoi(fmt.Sprint(a["month"])) - utils.Atoi(fmt.Sprint(a["day"]))
+	if actResult == 0 {
+		panic("empty result vars")
+	}
+
+	if actResult != utils.Atoi(fmt.Sprint(a["result"])) {
+		panic("result vars not equal")
+	}
+	spew.Dump(a)
 }
