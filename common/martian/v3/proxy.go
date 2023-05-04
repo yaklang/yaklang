@@ -354,26 +354,6 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 		conn, err := l.Accept()
 		nosigpipe.IgnoreSIGPIPE(conn)
-		var ok bool
-		conn, ok, _ = s5config.IsSocks5HandleShake(conn)
-		if ok {
-			conn := conn
-			log.Infof("recv s5 proxy request from: %v", conn.RemoteAddr())
-			go func() {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Errorf("socks5 handle failed: %s", err)
-					}
-				}()
-				err := s5config.ServeConn(conn)
-				if err != nil {
-					log.Errorf("socks5 handle failed: %s", err)
-					return
-				}
-			}()
-			continue
-		}
-
 		if conn != nil {
 			cacheConns(conn)
 			select {
@@ -422,8 +402,28 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
+			var ok bool
+			conn, ok, _ = s5config.IsSocks5HandleShake(conn)
+			if ok {
+				conn := conn
+				log.Infof("recv s5 proxy request from: %v", conn.RemoteAddr())
+				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("socks5 handle failed: %s", err)
+						}
+					}()
+					err := s5config.ServeConn(conn)
+					if err != nil {
+						log.Errorf("socks5 handle failed: %s", err)
+						return
+					}
+				}()
+				return
+			}
 			p.handleLoop(conn, ctx)
 		}()
 	}
@@ -434,7 +434,11 @@ func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
 	p.conns.Add(1)
 	p.connsMu.Unlock()
 	defer p.conns.Done()
-	defer conn.Close()
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 	if p.Closing() {
 		return
 	}
@@ -475,6 +479,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("handle proxy request panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
@@ -606,10 +611,13 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
+			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			b := make([]byte, 1)
 			if _, err := brw.Read(b); err != nil {
 				log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
+				return err
 			}
+			conn.SetReadDeadline(time.Time{})
 
 			// Drain all of the rest of the buffered data.
 			buf := make([]byte, brw.Reader.Buffered())
@@ -768,7 +776,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	res, err := p.roundTrip(ctx, req)
-	if err != nil && err != io.EOF {
+	if (err != nil && err != io.EOF) || res == nil {
 		log.Debugf("martian: failed to round trip: %v", err)
 		res = proxyutil.NewResponse(502, nil, req)
 		proxyutil.Warning(res.Header, err)
