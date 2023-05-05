@@ -81,13 +81,10 @@ func (generalPage *GeneralPage) StopListen() (string, error) {
 
 func (generalPage *GeneralPage) StopListenWithBytes() ([]byte, error) {
 	//generalPage.Wait()
-	//log.Info("stop!")
 	result, err := generalPage.currentPage.Eval(OBSERVERRESULT)
-	//log.Info(result)
 	if err != nil {
 		return nil, utils.Errorf("get observer result error: %s", err)
 	}
-	//return result.Value.String(), nil
 	resultStr := result.Value.Str()
 	return []byte(resultStr), nil
 }
