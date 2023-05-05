@@ -40,7 +40,6 @@ func (crawler *CrawlerX) DoTextInput(element *rod.Element) error {
 }
 
 func (crawler *CrawlerX) DoFileInput(element *rod.Element) error {
-	//element.MustSetFiles("")
 	log.Info("pretend upload file.")
 	return nil
 }
