@@ -75,6 +75,11 @@ powershell (new-object System.Net.WebClient).DownloadFile('https://yaklang.oss-c
 2. 国内用户可以使用 WeChat 加入群组
 3. 国际用户可以使用 Discord 加入社区
 
+### Translation
+1. You can add the topics you want to discuss or express in Yaklang or Yakit's issues, in either English or Chinese, and we will reply as soon as possible.
+2. Chinese users can join the group through WeChat.
+3. International users can join the community through Discord.
+
 ## 贡献你的代码 / Contribute your code
 
 这是一个高级话题，在贡献你的代码之前，确保你对 Yaklang 整个项目结构有所了解。
@@ -97,12 +102,13 @@ If you just want to add functionality to the library, or fix some bugs in the li
 
 ### yaklang 核心开发者 / Active yaklang core developers
 
-1. z3
-2. Longlone
-3. Go0p
-4. zwh-china
-5. bcy2007
-6. naiquan
+1. [z3](https://github.com/OrangeWatermelon)
+2. [Longlone](https://github.com/way29)
+3. [Go0p](https://github.com/Go0p)
+4. [zwh-china](https://github.com/Matrix-Cain)
+5. [bcy2007](https://github.com/bcy2007)
+6. [naiquan](https://github.com/naiquann)
+7. [Rookie-is](https://github.com/Rookie-is)
 
 ## 开源许可证 / Open Source LICENSE
 
