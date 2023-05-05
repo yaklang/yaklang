@@ -13,25 +13,7 @@ import (
 )
 
 func (crawler *CrawlerX) Start() {
-	//crawler.pageSizedWaitGroup.AddWithContext(crawler.rootContext)
 	crawler.PageSizedGroup().AddWithContext(crawler.RootContext())
-	//go crawler.browser.EachEvent(
-	//	func(e *proto.TargetTargetCreated) {
-	//		targetID := e.TargetInfo.TargetID
-	//		page, err := crawler.browser.PageFromTarget(targetID)
-	//		defer page.Close()
-	//		if err != nil {
-	//			return
-	//		}
-	//		page.WaitLoad()
-	//		//go crawler.VisitPage(&generalPage)
-	//		go func() {
-	//			generalPage := GeneralPage{page, 0}
-	//			defer crawler.pageSizedWaitGroup.Done()
-	//			crawler.VisitPage(&generalPage)
-	//		}()
-	//	},
-	//)()
 	go func() {
 		crawler.VisitUrl(crawler.targetUrl, 0)
 	}()
@@ -44,18 +26,6 @@ func (crawler *CrawlerX) Start() {
 }
 
 func (crawler *CrawlerX) StartRemote() {
-	//go crawler.browser.EachEvent(
-	//	func(e *proto.TargetTargetCreated) {
-	//		targetID := e.TargetInfo.TargetID
-	//		page, err := crawler.browser.PageFromTarget(targetID)
-	//		defer page.Close()
-	//		if err != nil {
-	//			return
-	//		}
-	//		generalPage := GeneralPage{page, 0}
-	//		go crawler.VisitPage(&generalPage)
-	//	},
-	//)()
 	go func() {
 		crawler.VisitUrl(crawler.targetUrl, 0)
 	}()
@@ -68,7 +38,6 @@ func (crawler *CrawlerX) Monitor() {
 	}()
 	defer close(crawler.sendInfoChannel)
 	crawler.pageSizedWaitGroup.Wait()
-	//time.Sleep(60 * time.Second)
 	log.Info("end")
 }
 
@@ -79,17 +48,6 @@ func (crawler *CrawlerX) monitor() {
 		proto.TargetCreateTarget{URL: crawler.targetUrl},
 		0,
 	)
-	//page.MustWaitLoad()
-	//time.Sleep(time.Second)
-	//page.MustWaitLoad()
-	//page.MustElement(`input[name="upload"]`).MustSetFiles("/Users/chenyangbao/1.txt")
-	//time.Sleep(time.Second)
-	//page.MustWaitLoad()
-	//time.Sleep(time.Second)
-	//page.MustWaitLoad()
-	//page.MustElement(`input[name="submit"]`).Click(proto.InputMouseButtonLeft)
-	//page.MustWaitLoad()
-	//log.Info("qqqq", page.MustHTML())
 
 	page.Navigate("http://192.168.0.3/login.php")
 	page.MustWaitLoad()

@@ -7,7 +7,6 @@ import (
 )
 
 func (crawler *CrawlerX) JsInfoMatch(baseUrl, jsHtml string) {
-	//log.Info(jsHtml)
 	urlIns, _ := url.Parse(baseUrl)
 	for _, regStr := range jsUrlRegExps {
 		reg, _ := regexp.Compile(regStr)
@@ -26,17 +25,6 @@ func (crawler *CrawlerX) JsInfoMatch(baseUrl, jsHtml string) {
 				urlStr = tempIns.String()
 			}
 			urlStrList = append(urlStrList, urlStr)
-			//log.Info(urlStr)
-			//repeatStr := crawler.checkRepeat(urlStr, "get")
-			//hashStr := codec.Sha256(repeatStr)
-			//if crawler.visited.Exist(hashStr) {
-			//	continue
-			//}
-			//crawler.visited.Insert(hashStr)
-			//go func() {
-			//	crawler.pageSizedWaitGroup.AddWithContext(crawler.rootContext)
-			//	crawler.VisitUrl(urlStr, 0)
-			//}()
 		}
 		crawler.SimpleCheckSend(urlStrList...)
 	}
