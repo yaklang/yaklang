@@ -24,6 +24,7 @@ import (
 )
 
 func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
+	//return GenerateSelfSignedCertKeyWithCommonName("Yakit MITM Root CA", host, alternateIPs, alternateDNS)
 	return GenerateSelfSignedCertKeyWithCommonName("Yakit MITM Root CA", host, alternateIPs, alternateDNS)
 }
 
@@ -169,72 +170,21 @@ func GenerateSelfSignedCertKeyWithCommonNameWithPrivateKey(commonName, host stri
 }
 
 func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey, auth bool) ([]byte, []byte, error) {
-	var err error
-	if priv == nil {
-		priv, err = rsa.GenerateKey(cryptorand.Reader, 2048)
-		if err != nil {
-			return nil, nil, err
+	var hosts []string
+	if host != "" {
+		hosts = append(hosts, host)
+	}
+	for _, i := range alternateDNS {
+		if i != "" {
+			hosts = append(hosts, i)
 		}
 	}
-
-	if commonName == "" {
-		return nil, nil, utils.Errorf("empty common name")
+	for _, i := range alternateIPs {
+		if i != nil {
+			hosts = append(hosts, i.String())
+		}
 	}
-
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	sid, err := cryptorand.Int(cryptorand.Reader, serialNumberLimit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	template := x509.Certificate{
-		SerialNumber: sid,
-		Subject: pkix.Name{
-			CommonName: commonName,
-		},
-		NotBefore: time.Unix(946656000, 0),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 99),
-
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-			x509.ExtKeyUsageServerAuth,
-		},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-
-	if !auth {
-		template.ExtKeyUsage = nil
-	}
-
-	if ip := net.ParseIP(host); ip != nil {
-		template.IPAddresses = append(template.IPAddresses, ip)
-	} else {
-		//template.DNSNames = append(template.DNSNames, host)
-	}
-
-	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
-	template.DNSNames = append(template.DNSNames, alternateDNS...)
-
-	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Generate cert
-	certBuffer := bytes.Buffer{}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		return nil, nil, err
-	}
-
-	// Generate key
-	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, err
-	}
-
-	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+	return SelfSignCACertificateAndPrivateKey(commonName, WithSelfSign_SignTo(hosts...), WithSelfSign_EnableAuth(auth), WithSelfSign_PrivateKey(priv))
 }
 
 func SignServerCrtNKey(ca []byte, key []byte) (cert []byte, sKey []byte, _ error) {
