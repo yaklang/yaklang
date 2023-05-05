@@ -48,8 +48,7 @@ func (mode *StartMode) setContext(ctx context.Context) {
 }
 
 func (mode *StartMode) Test() {
-	//fmt.Println(mode.config
-	//mode.Listen()
+
 }
 
 func (startMode *StartMode) Cancel() {

