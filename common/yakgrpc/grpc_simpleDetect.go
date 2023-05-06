@@ -723,7 +723,7 @@ func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPort
 
 func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverSimpleDetectUnfinishedTaskServer) error {
 	manager := NewProgressManager(s.GetProjectDatabase())
-	reqTask, err := manager.GetSimpleProgressByUid(req.GetUid(), true)
+	reqTask, err := manager.GetSimpleProgressByUid(req.GetUid(), true, false)
 	if err != nil {
 		return utils.Errorf("recover request by uid[%s] failed: %s", req.GetUid(), err)
 	}
