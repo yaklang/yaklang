@@ -20,9 +20,6 @@ func (crawler *CrawlerX) ExtractUrl(page *GeneralPage) error {
 		if urlStr == "" {
 			continue
 		}
-		//if !crawler.checkRangeValid(urlStr) || !crawler.CheckValidSuffix(urlStr) || !crawler.CheckValidHost(urlStr) {
-		//	continue
-		//}
 		if !crawler.checkRangeValid(urlStr) {
 			continue
 		}
@@ -32,7 +29,6 @@ func (crawler *CrawlerX) ExtractUrl(page *GeneralPage) error {
 		if !crawler.CheckValidHost(urlStr) {
 			continue
 		}
-		//fmt.Println(crawler.checkDanger)
 		if crawler.checkDanger != nil && crawler.checkDanger(urlStr) {
 			fmt.Printf("%s checked!\n", urlStr)
 			continue

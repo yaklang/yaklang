@@ -8,7 +8,6 @@ import (
 )
 
 func (crawler *CrawlerX) VisitUrl(urlStr string, depth int) error {
-	//log.Infof("visit url: %s", urlStr)
 	defer crawler.pageSizedWaitGroup.Done()
 
 	page := crawler.GetPage(
@@ -32,7 +31,6 @@ func (crawler *CrawlerX) VisitUrl(urlStr string, depth int) error {
 	}
 	wait := page.MustWaitRequestIdle()
 	wait()
-	//page.WaitRequestIdle()
 
 	html, _ := page.HTML()
 	hashHtml := codec.Sha256(html)
@@ -67,7 +65,6 @@ func (crawler *CrawlerX) VisitUrl(urlStr string, depth int) error {
 }
 
 func (crawler *CrawlerX) VisitPage(page *GeneralPage) error {
-	//log.Infof("visit page url: %s", page.GetCurrentUrl())
 	html, _ := page.HTML()
 	hashHtml := codec.Sha256(html)
 	if crawler.htmlRecord.Exist(hashHtml) {

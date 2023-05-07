@@ -5,7 +5,6 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/crawlerx/tag"
-	"github.com/yaklang/yaklang/common/crawlerx/teststh"
 )
 
 var TestModule = cli.Command{
@@ -19,15 +18,6 @@ var TestModule = cli.Command{
 
 	Flags: []cli.Flag{},
 	Action: func(c *cli.Context) error {
-		//teststh.Test()
-		//teststh.Test2()
-		//teststh.PopUpTest()
-		//teststh.GetHrefSelector()
-		//teststh.VisitIco()
-		//teststh.ErrorUrlTest()
-		teststh.VueTest()
-		//testFunction := detect.GetURLRepeatCheck(detect.UnLimit)
-		//fmt.Println(testFunction("https://go-rod.github.io/#/network?id=proxy", "get"))
 		return nil
 	},
 }
