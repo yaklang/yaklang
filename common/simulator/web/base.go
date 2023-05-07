@@ -35,7 +35,6 @@ func Do_Post(url string, v interface{}) (string, error) {
 	if err != nil {
 		return "", utils.Errorf("marshal data error:%s", err)
 	}
-	//log.Info(string(reqParam))
 	reqBody := strings.NewReader(string(reqParam))
 	httpReq, err := http.NewRequest("POST", url, reqBody)
 	if err != nil {

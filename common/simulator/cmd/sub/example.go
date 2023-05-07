@@ -38,8 +38,8 @@ var Example = cli.Command{
 			userOpt := examples.WithUserNameList(usernameList)
 			passOpt := examples.WithPassWordList(passwordList)
 			scanMode := examples.WithCaptchaMode("common_arithmetic")
-			remoteWs := examples.WithWsAddress("http://192.168.0.115:7317/")
-			result, err := examples.BruteForceModuleV2(url, userOpt, passOpt, scanMode, remoteWs)
+			//remoteWs := examples.WithWsAddress("http://192.168.0.115:7317/")
+			result, err := examples.BruteForceModuleV2(url, userOpt, passOpt, scanMode)
 			log.Info(err)
 			log.Info(result.Username(), result.Password(), result.Log(), result.Cookie())
 		}
