@@ -108,7 +108,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 
 		mc.SkipTLSVerify(true)
 		mc.SetOrganization("MITMServer")
-		mc.SetValidity(time.Hour * 24 * 365)
+		mc.SetValidity(time.Hour * 24 * 90)
 
 		// add default config for H2 support
 		defaultH2Config := new(h2.Config)
