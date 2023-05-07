@@ -165,10 +165,6 @@ func NewCrawler(targetUrl string, configOpts ...ConfigOpt) (*CrawlerX, error) {
 func (crawler *CrawlerX) init() error {
 	// browser
 	if crawler.proxy != "" {
-		//l := launcher.MustNewManaged("ws://192.168.0.115:7317")
-		//l.Proxy(crawler.proxy).Headless(true).NoSandbox(true)
-		//crawler.browser = rod.New().Client(l.MustClient())
-		log.Info("proxy!")
 		launch := launcher.New().Set(flags.ProxyServer, crawler.proxy)
 		controlUrl, err := launch.Launch()
 		if err != nil {
@@ -176,7 +172,6 @@ func (crawler *CrawlerX) init() error {
 		}
 		crawler.browser = crawler.browser.ControlURL(controlUrl)
 	} else if crawler.chromeWS != "" {
-		log.Info("ws start!")
 		crawler.browser = crawler.browser.ControlURL(crawler.chromeWS)
 	}
 	crawler.browser = crawler.browser.Context(crawler.rootContext)

@@ -15,22 +15,6 @@ const findOnlyHref = `()=>{
     return hrefs
 }`
 
-const FindHref = `()=>{
-	let nodes = document.createNodeIterator(document.getRootNode())
-    let hrefs = [];
-    let node;
-    while ((node = nodes.nextNode())) {
-        let {href, src} = node;
-        if (href) {
-            hrefs.push(href)
-        }
-        if (src) {
-            hrefs.push(src)
-        }
-    }
-    return hrefs
-}`
-
 const getSelector = `
 ()=>{
     let e = this;
@@ -58,8 +42,6 @@ const getSelector = `
     return domPath
 }
 `
-
-const FindListener = findListener
 
 const findListener = `() => {
 	function getSelector(e){
@@ -185,5 +167,3 @@ const GetHrefSelector = `
 	}
 	hrefs
 `
-
-var TestJs = testJs

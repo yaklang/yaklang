@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -208,6 +209,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	defer func() {
 		if err := recover(); err != nil {
 			finalError = utils.Errorf("panic from httpfuzzer: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
@@ -290,6 +292,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	var inStatusCode = utils.ParseStringToPorts(req.GetRetryInStatusCode())
 	var notInStatusCode = utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
+	if req.GetRepeatTimes() > 0 {
+		var buf bytes.Buffer
+		buf.WriteString("{{repeat(" + fmt.Sprint(req.GetRepeatTimes()) + ")}}")
+		buf.Write(rawRequest)
+		rawRequest = buf.Bytes()
+	}
 	res, err := mutate.ExecPool(
 		rawRequest,
 		mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),

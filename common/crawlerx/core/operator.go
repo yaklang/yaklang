@@ -90,7 +90,6 @@ func clickButton(page *rod.Page, buttonSelector string) {
 		return
 	}
 	buttonElement := buttonElements[0]
-	//buttonElement, _ := page.Element(buttonSelector)
 	if visible, _ := buttonElement.Visible(); !visible {
 		return
 	}

@@ -140,15 +140,13 @@ func generatorFormOpt(form string) newcrawlerx.ConfigOpt {
 }
 
 func main() {
-	//fmt.Println(lineA)
-	//fmt.Println(lineB)
-	//fmt.Println(lineC)
-	//fmt.Println(lineD)
-	//fmt.Println(lineE)
-	//fmt.Println(lineF)
+	fmt.Println(lineA)
+	fmt.Println(lineB)
+	fmt.Println(lineC)
+	fmt.Println(lineD)
+	fmt.Println(lineE)
+	fmt.Println(lineF)
 	do()
-	//opts := loadFromFile("/Users/chenyangbao/Project/crawlerx/cmd/param.ini")
-	//log.Info(opts)
 }
 
 func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {

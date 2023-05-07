@@ -22,19 +22,6 @@ var GeneralElementRulesFromPage = map[string][]func(*GeneralPage) GeneralElement
 }
 
 func normalDisplayCheck(generalElement *GeneralElement) bool {
-	//elementType, _ := generalElement.GetAttribute("type")
-	//if elementType == "hidden" {
-	//	return false
-	//}
-	//style, _ := generalElement.GetAttribute("style")
-	//if style == "" {
-	//	return true
-	//}
-	//reg := regexp.MustCompile("\\s+")
-	//if strings.Contains(reg.ReplaceAllString(style, ""), "display:none") {
-	//	return false
-	//}
-	//return true
 	visible, err := generalElement.element.Visible()
 	if err != nil {
 		return false

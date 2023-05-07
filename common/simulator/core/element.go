@@ -198,7 +198,6 @@ func (generalElement *GeneralElement) HasTypeKeyword(typeStr string) (bool, erro
 		return false, utils.Errorf("get error type str: %s", typeStr)
 	}
 	tempStr := generalElement.GetWholeAttributesStr()
-	//log.Info(tempStr)
 	if tempStr == "" {
 		return false, nil
 	}
