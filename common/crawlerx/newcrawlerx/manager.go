@@ -19,8 +19,6 @@ func (manager *BrowserManager) CreateBrowserStarters() {
 	if len(manager.config.browsers) == 0 {
 		starter := NewBrowserStarter(&NewBrowserConfig{}, manager.config.baseConfig)
 		manager.browsers = append(manager.browsers, starter)
-		//nextStarter := NewBrowserStarter(&NewBrowserConfig{}, manager.config.baseConfig)
-		//manager.browsers = append(manager.browsers, starter, nextStarter)
 		return
 	}
 	for _, browserConfig := range manager.config.browsers {

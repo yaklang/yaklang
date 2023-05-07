@@ -57,7 +57,6 @@ func (tree *UrlTree) Find(url string) *UrlNode {
 			return node
 		}
 	}
-	//log.Infof("url %s not found.", url)
 	return nil
 }
 
