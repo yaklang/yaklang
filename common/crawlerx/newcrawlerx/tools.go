@@ -54,13 +54,11 @@ func getElementSelector(element *rod.Element) string {
 	if visible, _ := element.Visible(); !visible {
 		return ""
 	}
-	//selectorObj, err := element.Eval(getUniqueSelector)
 	selectorObj, err := element.Eval(getSelector)
 	if err != nil {
 		log.Errorf("element %s get selector error: %s", element, err)
 		return ""
 	}
-	//log.Info(selectorObj.Value)
 	return selectorObj.Value.Str()
 }
 
@@ -93,14 +91,10 @@ func clickElementOnPageBySelector(page *rod.Page, selector string) {
 	if visible, _ := element.Visible(); !visible {
 		return
 	}
-	//wait := page.WaitRequestIdle(time.Second, nil, nil)
 	//element.Click(proto.InputMouseButtonLeft)
 	element.Eval(`this.click()`)
 	page.MustWaitLoad()
 	time.Sleep(500 * time.Millisecond)
-	//page.MustWaitLoad()
-	//log.Infof("click %s", selector)
-	//wait()
 }
 
 func StringArrayContains(array []string, element string) bool {

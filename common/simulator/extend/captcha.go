@@ -20,7 +20,6 @@ type CaptchaRequest struct {
 }
 
 func (req *CaptchaRequest) InputBase64(b64 string) {
-	//req.Project_name = "common_alphanumeric"
 	req.Image = b64
 }
 
@@ -84,7 +83,6 @@ func (identifier *CaptchaIdentifier) Detect(generalElement *core.GeneralElement)
 		return "", utils.Errorf("identifier url not exist")
 	}
 	if identifier.requestStruct == nil || identifier.responseStruct == nil {
-		//return "", utils.Errorf("identifier data struct not found")
 		identifier.requestStruct = &CaptchaRequest{}
 		identifier.responseStruct = &CaptchaResult{}
 	}
@@ -109,21 +107,8 @@ func (identifier *CaptchaIdentifier) Detect(generalElement *core.GeneralElement)
 	if strings.HasPrefix(imgSrc, "data:image") {
 		imgBase64 = imgSrc
 	} else {
-		//if strings.HasPrefix(imgSrc, "/") {
-		//	mainDomain := web.GetMainDomain(generalElement.Url())
-		//	if mainDomain == "" {
-		//		return "", utils.Errorf("imgsrc not complete and main domain not found")
-		//	}
-		//	imgSrc = mainDomain + imgSrc
-		//}
-		//tempB64, err := web.GetBase64fromWebImage(imgSrc)
-		//if err != nil {
-		//	return "", utils.Errorf("get img %s base64 error: %s", imgSrc, err)
-		//}
-		//imgBase64 = tempB64
 		imgBase64 = generalElement.Eval(GETIMGB64STR)
 	}
-	//log.Info(imgSrc)
 	req := identifier.requestStruct
 	req.InputBase64(imgBase64)
 	if identifier.identifierMode != "" {
@@ -147,7 +132,6 @@ func (identifier *CaptchaIdentifier) Detect(generalElement *core.GeneralElement)
 }
 
 func CreateCaptcha() *CaptchaIdentifier {
-	//return CaptchaIdentifier{}
 	identify := &CaptchaIdentifier{}
 	return identify
 }

@@ -50,13 +50,6 @@ func (starter *BrowserStarter) DefaultDoGetUrl() func(string, string) error {
 		if starter.stopSignal {
 			return nil
 		}
-		//for _, f := range starter.extraFunctions {
-		//	if f(targetUrl) {
-		//		log.Infof("extra rules: %s", targetUrl)
-		//		starter.uChan.In <- targetUrl
-		//		return nil
-		//	}
-		//}
 		for k, f := range starter.checkFunctionMap {
 			if !f(targetUrl) {
 				log.Errorf("%s banned url: %s", k, targetUrl)
@@ -70,9 +63,7 @@ func (starter *BrowserStarter) DefaultDoGetUrl() func(string, string) error {
 			}
 		}
 		//starter.urlTree.Add(originUrl, targetUrl)
-		//log.Info(originUrl, " -> ", targetUrl)
 		starter.uChan.In <- targetUrl
-		//log.Info(starter.uChan.Len(), " ", starter.uChan.BufLen())
 		return nil
 	}
 }
@@ -89,7 +80,6 @@ func (starter *BrowserStarter) DefaultClickFunctionGenerator(doClick func(*rod.P
 		}
 		selectors := GetDefaultClickElementSelectors(page)
 		for _, selector := range selectors {
-			//log.Info("click selectors: ", selector)
 			doClick(page, currentUrl, selector)
 		}
 		return nil
@@ -176,7 +166,6 @@ func (starter *BrowserStarter) DefaultDoInput() func(*rod.Element) error {
 			}
 			return element.Input("test")
 		case "file":
-			//log.Info("pretend do upload.")
 			starter.defaultUploadFile(element)
 			return nil
 		case "radio", "checkbox":

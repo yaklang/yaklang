@@ -10,7 +10,13 @@
 #  --go_out=common/yakgrpc/ypb \
 #  --proto_path=common/yakgrpc/ yakgrpc.proto
 
-cp common/yakgrpc/yakgrpc.proto ./../yakit/app/protos/grpc.proto
+if [ -f "./../yakit/app/protos/grpc.proto" ]; then
+  echo "YAKIT GRPC PROTO EXISTED, start to replace"
+  cp common/yakgrpc/yakgrpc.proto ./../yakit/app/protos/grpc.proto
+else
+  echo "YAKIT REPOS NOT FOUND"
+fi
+
 protoc \
   --go-grpc_out=common/yakgrpc/ypb \
   --go_out=common/yakgrpc/ypb \

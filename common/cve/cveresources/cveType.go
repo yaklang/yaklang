@@ -77,6 +77,7 @@ func (c *CVE) ToGPRCModel() *ypb.CVEDetail {
 		Title:                   utils.EscapeInvalidUTF8Byte([]byte(c.TitleZh)),
 		Solution:                utils.EscapeInvalidUTF8Byte([]byte(c.Solution)),
 		AccessVector:            utils.EscapeInvalidUTF8Byte([]byte(c.AccessVector)),
+		References:              utils.EscapeInvalidUTF8Byte(c.References),
 		AccessComplexity:        AccessComplexityVerbose(utils.EscapeInvalidUTF8Byte([]byte(c.AccessComplexity))),
 		Authentication:          utils.EscapeInvalidUTF8Byte([]byte(c.Authentication)),
 		ConfidentialityImpact:   utils.EscapeInvalidUTF8Byte([]byte(c.ConfidentialityImpact)),

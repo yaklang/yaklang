@@ -374,7 +374,7 @@ BruteForceResult包括如下输出：
     replaceModify = simulator.simple.responseModify("uapws/login.ajax", simulator.simple.bodyReplaceTarget, replaceStr)
     headless = simulator.simple.headless(false)
     browser = simulator.simple.createBrowser(headless, replaceModify)
-    page = browser.Navigate("http://121.5.162.122:8099/uapws/")
+    page = browser.Navigate("http://192.168.0.111:8099/uapws/")
     page.Input("#password", "123321")
     page.Click("#dijit_form_Button_0_label")
     time.Sleep(2)

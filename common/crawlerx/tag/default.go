@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-const rulePath string = "/Users/chenyangbao/Project/yak/common/crawlerx/tag/rules/rule.yml"
-
 type TDetect struct {
 	//resHeader *http.Header
 	//resBody   string
@@ -90,13 +88,7 @@ func (tDetect *TDetect) Init() {
 }
 
 func ReadRules(path string) Rules {
-	var rPath string
-	if path == "" {
-		rPath = rulePath
-	} else {
-		rPath = path
-	}
-	yamlFile, err := ioutil.ReadFile(rPath)
+	yamlFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Errorf("read error: %s", err)
 		return nil
