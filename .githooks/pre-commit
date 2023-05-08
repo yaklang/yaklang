@@ -1,0 +1,3 @@
+#!/bin/sh
+
+git restore --staged common/xlic/*.gzip
