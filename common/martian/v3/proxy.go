@@ -399,7 +399,10 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 		go func() {
 			defer func() {
-				removeConns(conn)
+				if conn != nil {
+					log.Infof("start to recycle conn[%p]: %v", conn, conn.RemoteAddr())
+					removeConns(conn)
+				}
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
 					utils.PrintCurrentGoroutineRuntimeStack()
@@ -413,18 +416,11 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			if ok {
 				conn := conn
 				log.Infof("recv s5 proxy request from: %v", conn.RemoteAddr())
-				go func() {
-					defer func() {
-						if err := recover(); err != nil {
-							log.Errorf("socks5 handle failed: %s", err)
-						}
-					}()
-					err := s5config.ServeConn(conn)
-					if err != nil {
-						log.Errorf("socks5 handle failed: %s", err)
-						return
-					}
-				}()
+				err := s5config.ServeConn(conn)
+				if err != nil {
+					log.Errorf("socks5 handle failed: %s", err)
+					return
+				}
 				return
 			}
 			if conn != nil {
