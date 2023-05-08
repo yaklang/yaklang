@@ -398,15 +398,18 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 		}
 
 		go func() {
-			defer removeConns(conn)
 			defer func() {
+				removeConns(conn)
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
 			var ok bool
-			conn, ok, _ = s5config.IsSocks5HandleShake(conn)
+			conn, ok, err = s5config.IsSocks5HandleShake(conn)
+			if err != nil {
+				log.Errorf("check socks5 handle shake failed: %s", err)
+			}
 			if ok {
 				conn := conn
 				log.Infof("recv s5 proxy request from: %v", conn.RemoteAddr())
@@ -424,12 +427,18 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				}()
 				return
 			}
-			p.handleLoop(conn, ctx)
+			if conn != nil {
+				p.handleLoop(conn, ctx)
+			}
 		}()
 	}
 }
 
 func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
+	if conn == nil {
+		return
+	}
+
 	p.connsMu.Lock()
 	p.conns.Add(1)
 	p.connsMu.Unlock()
@@ -446,6 +455,7 @@ func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("handle proxy loop failed: %s", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
