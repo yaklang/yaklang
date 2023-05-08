@@ -25,8 +25,25 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var varsOperatorMutex sync.Mutex
+
+func appendMap(m map[string]interface{}, key string, value interface{}) {
+	varsOperatorMutex.Lock()
+	defer varsOperatorMutex.Unlock()
+	m[key] = value
+}
+
+func getMap(m map[string]interface{}, key string) (interface{}, bool) {
+	varsOperatorMutex.Lock()
+	defer varsOperatorMutex.Unlock()
+
+	data, ok := m[key]
+	return data, ok
+}
 
 // ns_sort: sort a list of numbers or strings
 func nc_sort(origin ...interface{}) (ret []interface{}) {
@@ -689,9 +706,11 @@ func (d *NucleiDSL) _execute(expr string, items ...map[string]interface{}) (*ant
 		if v == nil {
 			continue
 		}
+		varsOperatorMutex.Lock()
 		for k, v := range v {
 			merged[k] = v
 		}
+		varsOperatorMutex.Unlock()
 	}
 	return box, merged, nil
 }
@@ -726,7 +745,7 @@ func (d *NucleiDSL) GetUndefinedVarNames(expr string, extra map[string]interface
 				continue
 			}
 			if extra != nil {
-				_, ok = extra[varName]
+				_, ok = getMap(extra, varName) // extra[varName]
 				if ok {
 					continue
 				}
