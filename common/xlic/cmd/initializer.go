@@ -101,8 +101,8 @@ func main() {
 		}
 		defer os.RemoveAll(pubKey)
 
-		priGzip := `common/xlic/pri.gzip`
-		pubGzip := `common/xlic/pub.gzip`
+		priGzip := `common/xlic/certs/pri.gzip`
+		pubGzip := `common/xlic/certs/pub.gzip`
 
 		os.RemoveAll(priGzip)
 		os.RemoveAll(pubGzip)

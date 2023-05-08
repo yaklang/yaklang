@@ -11,11 +11,8 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-//go:embed pub.gzip
-var encPub embed.FS
-
-//go:embed pri.gzip
-var decPri embed.FS
+//go:embed certs
+var certs embed.FS
 
 var (
 	initOnce sync.Once
@@ -27,14 +24,22 @@ func initMachine() {
 		var (
 			encBytes, decBytes []byte
 		)
-		raw, _ := encPub.ReadFile("pub.gzip")
+
+		raw, err := certs.ReadFile("certs/pub.gzip")
+		if err != nil {
+			log.Errorf("read enc.gzip error: %v", err)
+		}
 		if len(raw) > 0 {
 			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
 				encBytes = raw
 			}
 		}
 
-		raw, _ = decPri.ReadFile("pri.gzip")
+		raw, err = certs.ReadFile("certs/pri.gzip")
+		if err != nil {
+			log.Errorf("read pri.gzip error: %v", err)
+		}
+
 		if len(raw) > 0 {
 			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
 				decBytes = raw
