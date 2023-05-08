@@ -345,12 +345,15 @@ func (e *ScriptEngine) HookOsExit() {
 
 func (e *ScriptEngine) Compile(code string) ([]byte, error) {
 	engine := yaklang.New()
+	code = utils.RemoveBOMForString(code)
 	return engine.Marshal(code, e.cryptoKey)
 }
 
 func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params map[string]interface{}, cache bool) (yaklang.YaklangEngine, error) {
 	e.swg.Add()
 	defer e.swg.Done()
+
+	code = utils.RemoveBOMForString(code)
 
 	t := &Task{
 		TaskID:     id,
