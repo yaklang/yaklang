@@ -592,16 +592,27 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			id := c.Unary
+			//尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if !ok {
 				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 				if ok1 {
-					if v, ok1 := v.GlobalVariables[name]; ok1 {
-						val = NewValue("function", v, name)
+					//使用名字在全局变量中查找
+					if v1, ok1 := v.GlobalVariables[name]; ok1 {
+						val = NewValue("function", v1, name)
+						ok = true
+					} else if v1, ok2 := v.CurrentScope().GetValueByName(name + "s"); ok2 && v1.IsYakFunction() {
+						v1.AddExtraInfo("getOne", true)
+						val = v1
 						ok = true
 					} else {
-						panic("BUG: cannot found value by name:[" + name + "]")
+						//val = GetUndefined()
+						//ok = true
+						//panic("BUG: cannot found value by name:[" + name + "]")
 					}
+				}
+				if !ok {
+					panic("cannot found value by variable name:[" + name + "]")
 				}
 			}
 			if !ok {
@@ -1095,25 +1106,40 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if v1, ok := v.GlobalVariables["__OpCallCallBack__"]; ok {
 					if v2, ok := v1.(func(string)); ok {
 						if v3, ok := idValue.Value.(*Function); ok {
-							v2(v3.name)
+							if idValue.GetExtraInfo("getOne") != nil {
+								v2(v3.name[:len(v3.name)-1])
+							} else {
+								v2(v3.name)
+							}
 						}
 					}
 				}
 				val := idValue.Call(v, false, args...)
+				if idValue.GetExtraInfo("getOne") != nil {
+					refVal := reflect.ValueOf(val)
+					if refVal.Kind() == reflect.Slice || refVal.Kind() == reflect.Array {
+						if refVal.Len() > 0 {
+							val = refVal.Index(0).Interface()
+						} else {
+							val = -1
+						}
+					} else {
+						panic("getOne call must return a slice or array")
+					}
+				}
 				typeVerbose := "undefined"
 				if val != nil {
 					typeVerbose = reflect.TypeOf(val).String()
 				}
+
 				v.push(&Value{
 					TypeVerbose: typeVerbose,
 					Value:       val,
 				})
 			}
-			return
 			//外置函数手动调用
 			//symbolTable := v.CurrentScope().GetSymTable()
 			//funName, ok := symbolTable.GetNameByVariableId(idValue.Int())
-
 			return
 		case LUA:
 			args := v.popArgN(c.Unary)
@@ -1826,7 +1852,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpExit:
 		val := v.pop()
-		panic(NewVMPanic(&VMPanicSignal{Info: val}))
+		panic(NewVMPanic(&VMPanicSignal{Info: val, AdditionalInfo: c.Op1.Value}))
 	}
 }
 

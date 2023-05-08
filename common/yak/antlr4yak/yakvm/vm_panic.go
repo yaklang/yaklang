@@ -12,7 +12,8 @@ import (
 )
 
 type VMPanicSignal struct {
-	Info interface{}
+	Info           interface{}
+	AdditionalInfo interface{}
 }
 type PanicInfo struct {
 	code           *Code

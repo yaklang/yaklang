@@ -12,11 +12,6 @@ import (
 	"time"
 )
 
-// 这里是与上下文无关的函数
-var preferences = map[string]interface{}{
-	"optimize_test": false,
-}
-
 //	libs := map[string][]*yakvm.Code{
 //		""
 //	}
@@ -25,7 +20,6 @@ type ExitSignal struct {
 }
 
 var oid = codec.Md5("code")
-var kbs = map[string]interface{}{}
 var NaslBuildInNativeMethod = map[string]interface{}{
 	"sleep": func(n int) {
 		time.Sleep(time.Duration(n) * time.Second)
@@ -42,16 +36,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	},
 	"get_host_ip": func() string {
 		return ""
-	},
-
-	"get_kb_list": func(s string) map[string]interface{} {
-		res := map[string]interface{}{}
-		for k, v := range kbs {
-			if utils.MatchAllOfGlob(k, s) {
-				res[k] = v
-			}
-		}
-		return res
 	},
 	"string": func(i interface{}) string {
 		return utils.InterfaceToString(i)
@@ -80,14 +64,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 		}
 		return -1
 	},
-	"__set_kb_item": Set_kb_item,
-	"__get_kb_item": func(k string) interface{} {
-		if v, ok := kbs[k]; ok {
-			return v
-		}
-		return nil
-	},
-
 	"reEqual": func(s1, s2 string) bool { // 内置=~运算符号
 		return utils.MatchAllOfRegexp(s1, s2)
 	},
@@ -106,10 +82,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	},
 	"chomp": func(s string) string {
 		return strings.TrimRight(s, "\n")
-	},
-
-	"replace_kb_item": func(name string, v interface{}) {
-		kbs[name] = v
 	},
 	"close": func(conn net.Conn) {
 		if err := conn.Close(); err != nil {

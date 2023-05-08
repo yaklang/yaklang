@@ -71,7 +71,7 @@ func TestCompileScripts(t *testing.T) {
 		}
 	}
 	_ = includeHook
-	engine.GetCompiler().AddVisitHook(includeHook)
+	engine.GetCompiler().RegisterVisitHook("a", includeHook)
 	total := 0
 	paths := []string{}
 	_ = paths
@@ -152,7 +152,7 @@ func TestScript(t *testing.T) {
 	}
 }
 func TestScript1(t *testing.T) {
-	path := "/Users/z3/Downloads/mageni-master/src/backend/scanner/plugins/http_func.inc"
+	path := "/Users/z3/nasl/nasl-plugins/gb_print_ciphers.inc"
 	err := ExecFile(path)
 	if err != nil {
 		t.Fatal("exec failed")

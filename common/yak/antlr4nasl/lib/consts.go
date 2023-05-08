@@ -28,4 +28,10 @@ var BuildInVars = map[string]interface{}{
 	"ENCAPS_TLSv12":    OPENVAS_ENCAPS_TLSv12,
 	"ENCAPS_TLScustom": OPENVAS_ENCAPS_TLScustom,
 	"ENCAPS_MAX":       OPENVAS_ENCAPS_MAX,
+	"ACT_UNKNOWN":      nil,
+	"description":      nil,
+	"NULL":             nil,
+	"SCRIPT_NAME":      nil,
+	"COMMAND_LINE":     nil,
+	"_FCT_ANON_ARGS":   []interface{}{},
 }

@@ -3,11 +3,49 @@ package antlr4nasl
 import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"sync"
 )
 
+type NaslKBs struct {
+	data map[string]interface{}
+	mux  *sync.RWMutex
+}
+
+func NewNaslKBs() *NaslKBs {
+	return &NaslKBs{
+		data: make(map[string]interface{}),
+		mux:  &sync.RWMutex{},
+	}
+}
+func (n *NaslKBs) AddKB(name string, value interface{}) error {
+	n.mux.Lock()
+	if v, ok := n.data[name]; ok {
+		if v1, ok := v.([]interface{}); ok {
+			v1 = append(v1, value)
+		} else {
+			return utils.Errorf("KB %s is not array", name)
+		}
+	}
+	n.mux.Unlock()
+	return n.SetKB(name, []interface{}{value})
+}
+func (n *NaslKBs) SetKB(name string, value interface{}) error {
+	n.mux.Lock()
+	defer n.mux.Unlock()
+	n.data[name] = value
+	return nil
+}
+func (n *NaslKBs) GetKB(name string) interface{} {
+	if v, ok := n.data[name]; ok {
+		return v
+	}
+	return nil
+}
+
 type NaslScriptInfo struct {
-	Kbs        map[string]interface{}
+	Kbs        *NaslKBs
 	naslScript *yakit.NaslScript
 	Hash       string
 	OID        string
@@ -38,7 +76,7 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Tags:        make(map[string]interface{}),
 		Xrefs:       make(map[string]string),
 		Preferences: make(map[string]interface{}),
-		Kbs:         make(map[string]interface{}),
+		Kbs:         NewNaslKBs(),
 	}
 }
 func GetNaslScriptObjectBy() *NaslScriptInfo {
