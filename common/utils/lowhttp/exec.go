@@ -587,7 +587,31 @@ func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse
 	// 获取url
 	url, err := ExtractURLFromHTTPRequestRaw(r, https)
 	if err != nil {
-		return response, err
+		if host != "" && port > 0 {
+			var fallbackUrlMaterial []string
+			var handledHost bool
+			SplitHTTPHeadersAndBodyFromPacketEx(r, func(method string, requestUri string, proto string) error {
+				fallbackUrlMaterial = append(fallbackUrlMaterial, method+" "+requestUri+" "+proto)
+				return nil
+			}, func(line string) {
+				if strings.HasPrefix(strings.ToLower(line), "host:") {
+					handledHost = true
+					fallbackUrlMaterial = append(fallbackUrlMaterial, "Host: "+utils.HostPort(host, port))
+				} else {
+					fallbackUrlMaterial = append(fallbackUrlMaterial, line)
+				}
+			})
+			if !handledHost {
+				fallbackUrlMaterial = append(fallbackUrlMaterial, "Host: "+utils.HostPort(host, port))
+			}
+			var data = strings.Join(fallbackUrlMaterial, "\r\n") + "\r\n\r\n"
+			url, err = ExtractURLFromHTTPRequestRaw([]byte(data), https)
+			if err != nil {
+				return nil, utils.Errorf("extract(fallback) url from request raw failed! reason: %v", err)
+			}
+		} else {
+			return response, err
+		}
 	}
 
 	// 逐个记录 response 中的内容
