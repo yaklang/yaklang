@@ -842,7 +842,7 @@ func (s *Server) MatchHTTPResponse(ctx context.Context, req *ypb.MatchHTTPRespon
 func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRequest) (*ypb.RenderVariablesResponse, error) {
 	vars := httptpl.NewVars()
 	for _, kv := range req.GetParams() {
-		vars.Set(kv.GetKey(), kv.GetValue())
+		vars.AutoSet(kv.GetKey(), kv.GetValue())
 	}
 	var results = vars.ToMap()
 	var finalResults []*ypb.KVPair

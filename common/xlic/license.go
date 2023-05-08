@@ -45,6 +45,7 @@ func initMachine() {
 			decBytes, encBytes, _ = tlsutils.GeneratePrivateAndPublicKeyPEM()
 		}
 
+		// spew.Dump(codec.Md5(string(encBytes)), codec.Md5(string(decBytes)))
 		Machine = license.NewMachine(encBytes, decBytes)
 	})
 }
