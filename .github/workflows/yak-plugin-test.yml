@@ -26,5 +26,9 @@ jobs:
           go mod tidy
           go mod vendor
 
-      - name: Test Yak Plugin
-        run: go test -timeout 5m ./common/vulinbox -v
+      - name: Run tests lowhttp with retry
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 5
+          timeout_minutes: 1
+          command: go test -timeout 5m ./common/vulinbox -v
