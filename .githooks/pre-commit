@@ -1,4 +1,0 @@
-#!/bin/sh
-echo "Ignore xlic/*.gzip files in git commit"
-git restore --staged common/xlic/*.gzip
-git restore --staged common/xlic/certs/*.gzip
