@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -836,4 +837,36 @@ func (s *Server) MatchHTTPResponse(ctx context.Context, req *ypb.MatchHTTPRespon
 		return nil, err
 	}
 	return &ypb.MatchHTTPResponseResult{Matched: result}, nil
+}
+
+func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRequest) (*ypb.RenderVariablesResponse, error) {
+	vars := httptpl.NewVars()
+	for _, kv := range req.GetParams() {
+		vars.AutoSet(kv.GetKey(), kv.GetValue())
+	}
+	var results = vars.ToMap()
+	var finalResults []*ypb.KVPair
+	for _, kv := range req.GetParams() {
+		value, ok := results[kv.GetKey()]
+		if !ok {
+			continue
+		}
+		finalResults = append(finalResults, &ypb.KVPair{
+			Key:   kv.GetKey(),
+			Value: utils.EscapeInvalidUTF8Byte(utils.InterfaceToBytes(value)),
+		})
+	}
+
+	var responseVars []*ypb.KVPair
+	for k, v := range httptpl.LoadVarFromRawResponse(req.GetHTTPResponse(), 0) {
+		responseVars = append(responseVars, &ypb.KVPair{
+			Key:   k,
+			Value: utils.EscapeInvalidUTF8Byte(utils.InterfaceToBytes(v)),
+		})
+	}
+	sort.SliceStable(responseVars, func(i, j int) bool {
+		return responseVars[i].Key < responseVars[j].Key
+	})
+	finalResults = append(finalResults, responseVars...)
+	return &ypb.RenderVariablesResponse{Results: finalResults}, nil
 }

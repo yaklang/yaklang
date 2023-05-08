@@ -46,3 +46,4 @@ tmp_build/
 .vscode/*
 gen
 .antlr/
+common/xlic/*.gzip

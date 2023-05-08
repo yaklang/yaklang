@@ -76,6 +76,7 @@ type YakClient interface {
 	DeleteHistoryHTTPFuzzerTask(ctx context.Context, in *DeleteHistoryHTTPFuzzerTaskRequest, opts ...grpc.CallOption) (*Empty, error)
 	HTTPFuzzer(ctx context.Context, in *FuzzerRequest, opts ...grpc.CallOption) (Yak_HTTPFuzzerClient, error)
 	PreloadHTTPFuzzerParams(ctx context.Context, in *PreloadHTTPFuzzerParamsRequest, opts ...grpc.CallOption) (*PreloadHTTPFuzzerParamsResponse, error)
+	RenderVariables(ctx context.Context, in *RenderVariablesRequest, opts ...grpc.CallOption) (*RenderVariablesResponse, error)
 	MatchHTTPResponse(ctx context.Context, in *MatchHTTPResponseParams, opts ...grpc.CallOption) (*MatchHTTPResponseResult, error)
 	ExtractHTTPResponse(ctx context.Context, in *ExtractHTTPResponseParams, opts ...grpc.CallOption) (*ExtractHTTPResponseResult, error)
 	RedirectRequest(ctx context.Context, in *RedirectRequestParams, opts ...grpc.CallOption) (*FuzzerResponse, error)
@@ -191,7 +192,7 @@ type YakClient interface {
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -289,7 +290,8 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -1004,6 +1006,15 @@ func (x *yakHTTPFuzzerClient) Recv() (*FuzzerResponse, error) {
 func (c *yakClient) PreloadHTTPFuzzerParams(ctx context.Context, in *PreloadHTTPFuzzerParamsRequest, opts ...grpc.CallOption) (*PreloadHTTPFuzzerParamsResponse, error) {
 	out := new(PreloadHTTPFuzzerParamsResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/PreloadHTTPFuzzerParams", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RenderVariables(ctx context.Context, in *RenderVariablesRequest, opts ...grpc.CallOption) (*RenderVariablesResponse, error) {
+	out := new(RenderVariablesResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/RenderVariables", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3249,6 +3260,7 @@ type YakServer interface {
 	DeleteHistoryHTTPFuzzerTask(context.Context, *DeleteHistoryHTTPFuzzerTaskRequest) (*Empty, error)
 	HTTPFuzzer(*FuzzerRequest, Yak_HTTPFuzzerServer) error
 	PreloadHTTPFuzzerParams(context.Context, *PreloadHTTPFuzzerParamsRequest) (*PreloadHTTPFuzzerParamsResponse, error)
+	RenderVariables(context.Context, *RenderVariablesRequest) (*RenderVariablesResponse, error)
 	MatchHTTPResponse(context.Context, *MatchHTTPResponseParams) (*MatchHTTPResponseResult, error)
 	ExtractHTTPResponse(context.Context, *ExtractHTTPResponseParams) (*ExtractHTTPResponseResult, error)
 	RedirectRequest(context.Context, *RedirectRequestParams) (*FuzzerResponse, error)
@@ -3364,7 +3376,7 @@ type YakServer interface {
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -3462,7 +3474,8 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
@@ -3634,6 +3647,9 @@ func (UnimplementedYakServer) HTTPFuzzer(*FuzzerRequest, Yak_HTTPFuzzerServer) e
 }
 func (UnimplementedYakServer) PreloadHTTPFuzzerParams(context.Context, *PreloadHTTPFuzzerParamsRequest) (*PreloadHTTPFuzzerParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PreloadHTTPFuzzerParams not implemented")
+}
+func (UnimplementedYakServer) RenderVariables(context.Context, *RenderVariablesRequest) (*RenderVariablesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenderVariables not implemented")
 }
 func (UnimplementedYakServer) MatchHTTPResponse(context.Context, *MatchHTTPResponseParams) (*MatchHTTPResponseResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MatchHTTPResponse not implemented")
@@ -5112,6 +5128,24 @@ func _Yak_PreloadHTTPFuzzerParams_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).PreloadHTTPFuzzerParams(ctx, req.(*PreloadHTTPFuzzerParamsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RenderVariables_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenderVariablesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RenderVariables(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/RenderVariables",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RenderVariables(ctx, req.(*RenderVariablesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -8624,6 +8658,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PreloadHTTPFuzzerParams",
 			Handler:    _Yak_PreloadHTTPFuzzerParams_Handler,
+		},
+		{
+			MethodName: "RenderVariables",
+			Handler:    _Yak_RenderVariables_Handler,
 		},
 		{
 			MethodName: "MatchHTTPResponse",
