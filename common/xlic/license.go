@@ -27,7 +27,7 @@ func initMachine() {
 
 		raw, err := certs.ReadFile("certs/pub.gzip")
 		if err != nil {
-			log.Errorf("read enc.gzip error: %v", err)
+			log.Debugf("read enc.gzip error: %v", err)
 		}
 		if len(raw) > 0 {
 			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
@@ -37,7 +37,7 @@ func initMachine() {
 
 		raw, err = certs.ReadFile("certs/pri.gzip")
 		if err != nil {
-			log.Errorf("read pri.gzip error: %v", err)
+			log.Debugf("read pri.gzip error: %v", err)
 		}
 
 		if len(raw) > 0 {
