@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
 	"reflect"
@@ -396,6 +397,13 @@ func init() {
 				}
 			} else if op1.IsString() && op2.Value == nil {
 				return op1
+			} else if op1.IsString() {
+				v := op1.AsString() + utils.InterfaceToString(op2.Value)
+				return &yakvm.Value{
+					TypeVerbose: "string",
+					Value:       v,
+					Literal:     fmt.Sprint(v),
+				}
 			}
 			panic(fmt.Sprintf("cannot support op1[%v] + op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 		},

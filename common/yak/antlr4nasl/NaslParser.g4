@@ -92,7 +92,7 @@ singleExpression
     | singleExpression '[' singleExpression ']'                              # MemberIndexExpression
     | singleExpression ( '**' | '*' | '/' | '%') singleExpression                    # MultiplicativeExpression
     | singleExpression ('+' | '-') singleExpression                          # AdditiveExpression
-    | singleExpression ('<<' | '>>' | '>>>' ) singleExpression                # BitShiftExpression
+    | singleExpression ('<<' | '>>' | '>>>' | '>>=' | '>>>=' ) singleExpression                # BitShiftExpression
     | singleExpression ('<' | '>' | '<=' | '>=') singleExpression            # RelationalExpression
     | singleExpression ('==' | '>!<' | '><' | '!=' | '!~' | '=~') singleExpression        # EqualityExpression
     | singleExpression '&' singleExpression                                  # BitAndExpression

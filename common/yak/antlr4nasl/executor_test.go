@@ -19,6 +19,16 @@ a = 0;
 
 dump(a);
 assert(a == 6,"a != 6");
+
+res = [];
+if( ! isnull( res ) ) {
+      res = make_list( res );
+      foreach entry( res ) {
+        # both CPE and free-form entries can be registered under the "OS" banner
+        if( "cpe:/" >< entry )
+          return entry;
+      }
+    }
 `)
 }
 
@@ -171,7 +181,7 @@ func TestAssigment(t *testing.T) {
 			}
 		},
 	})
-	engine.GetCompiler().AddVisitHook(func(compiler *visitors.Compiler, ctx antlr.ParserRuleContext) {
+	engine.GetCompiler().RegisterVisitHook("a", func(compiler *visitors.Compiler, ctx antlr.ParserRuleContext) {
 		if id, ok := ctx.(*nasl.IdentifierExpressionContext); ok {
 			if id.GetText() == "__this__" {
 				print()
