@@ -29,6 +29,8 @@ type Progress struct {
 	// 记录指针
 	LastRecordPtr int64
 	TaskName      string
+	// 额外信息
+	ExtraInfo string
 }
 
 func NewProgressManager(db *gorm.DB) *ProgressManager {
@@ -76,6 +78,7 @@ func (p *ProgressManager) AddSimpleDetectTaskToPool(uid string, req *ypb.RecordP
 		YakScriptOnlineGroup: req.LastRecord.GetYakScriptOnlineGroup(),
 		TaskName:             req.PortScanRequest.GetTaskName(),
 		LastRecordPtr:        req.LastRecord.GetLastRecordPtr(),
+		ExtraInfo:            req.LastRecord.GetExtraInfo(),
 	})
 	p.SaveProgressToDatabase(KEY_SimpleDetectManager, progress)
 	paramJson, err := json.Marshal(req)
@@ -125,12 +128,14 @@ func (p *ProgressManager) GetProgressByUid(uid string, removeOld bool) (*ypb.Exe
 
 	if removeOld {
 		p.SaveProgressToDatabase(KEY_ProgressManager, progress)
+		// 同时也删除 uid 对应的任务
+		yakit.DelKey(p.db, uid)
 	}
 
 	return &req, nil
 }
 
-func (p *ProgressManager) GetSimpleProgressByUid(uid string, removeOld bool) (*ypb.RecordPortScanRequest, error) {
+func (p *ProgressManager) GetSimpleProgressByUid(uid string, removeOld, isPop bool) (*ypb.RecordPortScanRequest, error) {
 	var progress = p.GetProgressFromDatabase(KEY_SimpleDetectManager)
 	progress = funk.Filter(progress, func(i *Progress) bool {
 		return i.Uid != uid
@@ -149,6 +154,10 @@ func (p *ProgressManager) GetSimpleProgressByUid(uid string, removeOld bool) (*y
 
 	if removeOld {
 		p.SaveProgressToDatabase(KEY_SimpleDetectManager, progress)
+		if isPop {
+			// 同时也删除 uid 对应的任务
+			yakit.DelKey(p.db, uid)
+		}
 	}
 
 	return &req, nil
