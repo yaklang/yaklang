@@ -80,7 +80,7 @@ func (m *Machine) SignLicense(reqRaw string, org string, duration time.Duration,
 func (m *Machine) GenerateRequest() (string, error) {
 	code := utils.GetMachineCode()
 
-	log.Infof("generate with machine code: %", code)
+	log.Infof("generate with machine code: %v", code)
 	req := &Request{
 		Timestamp:   time.Now().Unix(),
 		MachineCode: code,

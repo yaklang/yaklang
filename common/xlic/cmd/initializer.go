@@ -5,6 +5,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/xlic"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -37,6 +38,20 @@ func init() {
 
 func main() {
 	app := cli.NewApp()
+
+	app.Commands = []cli.Command{
+		{
+			Name: "gen-request",
+			Action: func(c *cli.Context) error {
+				req, err := xlic.Machine.GenerateRequest()
+				if err != nil {
+					return err
+				}
+				fmt.Println(req)
+				return nil
+			},
+		},
+	}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -86,8 +101,8 @@ func main() {
 		}
 		defer os.RemoveAll(pubKey)
 
-		priGzip := `common/xlic/pri.gzip`
-		pubGzip := `common/xlic/pub.gzip`
+		priGzip := `common/xlic/certs/pri.gzip`
+		pubGzip := `common/xlic/certs/pub.gzip`
 
 		os.RemoveAll(priGzip)
 		os.RemoveAll(pubGzip)

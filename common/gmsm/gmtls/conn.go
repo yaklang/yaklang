@@ -1363,7 +1363,7 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 		// alert that might be left in the buffer.
 		c.flush()
 		if c.handshakeErr != io.EOF {
-			log.Warnf("gmtls-handshake error:", c.handshakeErr)
+			log.Warnf("gmtls-handshake error: %v", c.handshakeErr)
 		}
 	}
 
