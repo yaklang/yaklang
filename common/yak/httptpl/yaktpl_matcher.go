@@ -225,7 +225,11 @@ func (y *YakMatcher) execute(rspIns *lowhttp.LowhttpResponse, vars map[string]in
 				if vars == nil {
 					vars = LoadVarFromRawResponse(rsp, duration, sufs...)
 				}
+
+				varsOperatorMutex.Lock()
 				vars = utils.CopyMapInterface(vars)
+				varsOperatorMutex.Unlock()
+
 				result, err := dslEngine.ExecuteAsBool(sub, vars)
 				if err != nil {
 					log.Errorf("dsl engine execute as bool failed: %s", err)
