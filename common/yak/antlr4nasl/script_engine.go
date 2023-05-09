@@ -2,10 +2,11 @@ package antlr4nasl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"path/filepath"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
 	"sync"
 )
@@ -13,8 +14,8 @@ import (
 type ScriptEngine struct {
 	Kbs                *NaslKBs
 	naslLibsPath       string
-	scripts            map[string]struct{}
-	excludeScripts     map[string]struct{}
+	scripts            map[*NaslScriptInfo]struct{}
+	excludeScripts     map[string]struct{} // 基于OID排除一些脚本
 	scriptGroupDefines map[ScriptGroup][]string
 	goroutineNum       int
 	debug              bool
@@ -23,7 +24,7 @@ type ScriptEngine struct {
 
 func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
-		scripts:            make(map[string]struct{}),
+		scripts:            make(map[*NaslScriptInfo]struct{}),
 		excludeScripts:     make(map[string]struct{}),
 		scriptGroupDefines: make(map[ScriptGroup][]string),
 		goroutineNum:       10,
@@ -57,30 +58,50 @@ func (engine *ScriptEngine) AddExcludeScripts(paths ...string) {
 		engine.excludeScripts[p] = struct{}{}
 	}
 }
-func (engine *ScriptEngine) LoadScript(path string) {
+func (engine *ScriptEngine) LoadScript(script *NaslScriptInfo) {
+	engine.scripts[script] = struct{}{}
+}
+func (engine *ScriptEngine) LoadScriptFromFile(path string) {
 	if utils.IsDir(path) {
 		raw, err := utils.ReadFilesRecursively(path)
 		if err == nil {
 			for _, r := range raw {
-				engine.LoadScript(r.Path)
+				engine.LoadScriptFromFile(r.Path)
 			}
 		}
 	} else if utils.IsFile(path) {
-		engine.scripts[path] = struct{}{}
+		script, err := NewNaslScriptObjectFromFile(path)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		engine.LoadScript(script)
 	}
 }
-func (engine *ScriptEngine) RunWithDescription() {
 
-}
 func (engine *ScriptEngine) AddScriptIntoGroup(group ScriptGroup, paths ...string) {
 	engine.scriptGroupDefines[group] = append(engine.scriptGroupDefines[group], paths...)
 }
 func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
+	db := consts.GetGormProfileDatabase()
 	for _, group := range groups {
 		if v, ok := e.scriptGroupDefines[group]; ok {
 			for _, p := range v {
-				e.LoadScript(p)
+				e.LoadScriptFromFile(p)
 			}
+		}
+		if db == nil {
+			continue
+		}
+		var scripts []*yakit.NaslScript
+		if db := db.Find(&scripts).Where("group = ?", group); db.Error != nil {
+			continue
+		}
+		for _, script := range scripts {
+			if _, ok := e.excludeScripts[script.OID]; ok {
+				continue
+			}
+			e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
 		}
 	}
 }
@@ -116,12 +137,11 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	errorsMux := sync.Mutex{}
 	for script, _ := range e.scripts {
-		scriptName := filepath.Base(script)
-		if _, ok := e.excludeScripts[scriptName]; ok {
+		if _, ok := e.excludeScripts[script.OID]; ok {
 			continue
 		}
 		swg.Add()
-		go func(script string) {
+		go func(script *NaslScriptInfo) {
 			defer swg.Done()
 			engine := New()
 			engine.host = host
@@ -131,9 +151,9 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			for _, hook := range e.engineHooks {
 				hook(engine)
 			}
-			err := engine.RunFile(script)
+			err := engine.RunScript(script)
 			if err != nil {
-				log.Errorf("run script %s met error: %s", script, err)
+				log.Errorf("run script %s met error: %s", script.ScriptName, err)
 				errorsMux.Lock()
 				allErrors = append(allErrors, err)
 				errorsMux.Unlock()

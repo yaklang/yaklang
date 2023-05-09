@@ -20,7 +20,7 @@ func NewNaslScriptConfig() *NaslScriptConfig {
 type NaslScriptConfigOptFunc func(c *NaslScriptConfig)
 
 var Exports = map[string]interface{}{
-	"UpdateDatabase": func(p string) {
+	"UpdateDatabase": func(p string, group ...string) {
 		saveScript := func(path string) {
 			engine := New()
 			engine.SetDescription(true)
@@ -30,7 +30,11 @@ var Exports = map[string]interface{}{
 				log.Errorf("Error load script %s: %s", path, err.Error())
 				return
 			}
-			err = engine.GetScriptObject().Save()
+			scriptIns := engine.GetScriptObject()
+			if len(group) > 0 {
+				scriptIns.Group = group[0]
+			}
+			err = scriptIns.Save()
 			if err != nil {
 				log.Errorf("Error save script %s: %s", path, err.Error())
 			}
@@ -63,7 +67,8 @@ var Exports = map[string]interface{}{
 		for _, scriptName := range scriptNames {
 			scriptIns, err := yakit.QueryNaslScriptByName(db, scriptName)
 			if err != nil {
-				return err
+				log.Errorf("cannot find script %s: %s", scriptName, err.Error())
+				continue
 			}
 			if scriptIns == nil {
 				return utils.Errorf("cannot find script %s", scriptName)
@@ -85,8 +90,35 @@ var Exports = map[string]interface{}{
 		}
 		return nil
 	},
-	"KBToRisk": func() {
-
+	"QueryAllScript": func() []*NaslScriptInfo {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		var scripts []*yakit.NaslScript
+		if db := db.Find(&scripts); db.Error != nil {
+			return nil
+		}
+		var ret []*NaslScriptInfo
+		for _, s := range scripts {
+			ret = append(ret, NewNaslScriptObjectFromNaslScript(s))
+		}
+		return ret
+	},
+	"QueryAllGroupNames": func() []string {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		var ret []string
+		if db := db.Model(&yakit.NaslScript{}).Group(`"group"`).Pluck(`"group"`, &ret); db.Error != nil {
+			log.Error(db.Error)
+			return nil
+		}
+		return ret
+	},
+	"KBToRisk": func(kbs *NaslKBs) *yakit.Risk {
+		return nil
 	},
 	"ScanTarget": func(target string, opts ...NaslScriptConfigOptFunc) (map[string]interface{}, error) {
 		config := NewNaslScriptConfig()
@@ -94,7 +126,6 @@ var Exports = map[string]interface{}{
 			opt(config)
 		}
 		engine := NewScriptEngine()
-		InitPluginGroup(engine)
 		for _, g := range config.group {
 			engine.LoadGroups(ScriptGroup(g))
 		}

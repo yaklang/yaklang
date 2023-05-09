@@ -191,7 +191,7 @@ func TestPocScanner(t *testing.T) {
 	//})
 	engine.SetGoroutineNum(1)
 	engine.SetIncludePath("/Users/z3/nasl/nasl-plugins") // 设置nasl依赖库位置
-	//engine.LoadScript("/Users/z3/nasl/nasl-plugins/gb_apache_struts_detect.nasl")
+	//engine.LoadScriptFromFile("/Users/z3/nasl/nasl-plugins/gb_apache_struts_detect.nasl")
 	//engine.LoadGroup(PluginGroupApache)
 	engine.LoadGroups(PluginGroupApache)
 
