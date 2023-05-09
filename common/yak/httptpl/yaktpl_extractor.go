@@ -14,11 +14,23 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"mime"
 	"net/url"
 	"regexp"
 	"strings"
 )
+
+func NewExtractorFromGRPCModel(m *ypb.HTTPResponseExtractor) *YakExtractor {
+	return &YakExtractor{
+		Name:             m.GetName(),
+		Type:             m.GetType(),
+		Scope:            m.GetScope(),
+		Groups:           m.GetGroups(),
+		RegexpMatchGroup: utils.Int64SliceToIntSlice(m.GetRegexpMatchGroup()),
+		XPathAttribute:   m.GetXPathAttribute(),
+	}
+}
 
 type YakExtractor struct {
 	Name string // name or index

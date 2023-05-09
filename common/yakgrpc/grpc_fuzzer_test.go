@@ -1,27 +1,24 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
 	"testing"
-	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func TestServer_HTTPFuzzerBIG(t *testing.T) {
-	rPort := utils.GetRandomAvailableTCPPort()
-	go yaklib.HTTPServer_Serve("127.0.0.1", rPort, yaklib.HTTPServer_ServeOpt_Callback(func(rsp http.ResponseWriter, req *http.Request) {
-		rsp.Write(bytes.Repeat([]byte("abcdefghijklmnopqrstuvwxyz\n"), 4000000))
-	}))
+	consts.GetGormProfileDatabase()
+	consts.GetGormProjectDatabase()
 
-	time.Sleep(2 * time.Second)
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Length: 12
+
+{"abc": "111111", "qqq": "12"}`))
 
 	c, err := NewLocalClient()
 	if err != nil {
@@ -29,14 +26,35 @@ func TestServer_HTTPFuzzerBIG(t *testing.T) {
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: fmt.Sprintf(`GET /{{rs(10,10,10)}} HTTP/1.1
+		Request: fmt.Sprintf(`GET /{{rs}} HTTP/1.1
 Host: %v 
 
-`, utils.HostPort("127.0.0.1", rPort)),
+{{params(abc)}}
+{{params(a1)}}
+`, utils.HostPort(host, port)),
 		Concurrent:               10,
 		IsHTTPS:                  false,
 		ForceFuzz:                true,
 		PerRequestTimeoutSeconds: 5,
+		Params: []*ypb.FuzzerParamItem{
+			{Key: "abc", Value: "123"},
+			{Key: "a1", Value: "{{rand_int(1000,9999)}}"},
+		},
+		Extractors: []*ypb.HTTPResponseExtractor{
+			{
+				Name:   "test",
+				Type:   "json",
+				Scope:  "body",
+				Groups: []string{".qqq"},
+			},
+		},
+		Matchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "expr",
+				Group:       []string{"test == '12'"},
+				ExprType:    "nuclei-dsl",
+			},
+		},
 	})
 	if err != nil {
 		panic(err)
@@ -49,6 +67,9 @@ Host: %v
 			break
 		}
 		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		fmt.Println(string(rsp.GetRequestRaw()))
+		spew.Dump(rsp.GetExtractedResults())
+		spew.Dump(rsp.GetMatchedByMatcher())
 	}
 }
 
