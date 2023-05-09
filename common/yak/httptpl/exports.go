@@ -6,9 +6,15 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"strings"
 )
 
+func init() {
+	for k, v := range tools.NucleiOperationsExports {
+		Exports[k] = v
+	}
+}
 func ScanPacket(req []byte, opts ...interface{}) {
 	config, lowhttpConfig, lowhttpOpts := toConfig(opts...)
 	baseContext, cancel := context.WithCancel(context.Background())
