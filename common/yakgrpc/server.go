@@ -18,6 +18,7 @@ import (
 
 type Server struct {
 	ypb.YakServer
+	ypb.WebShellManagerServer
 	homeDir            string
 	cacheDir           string
 	_abandonedDatabase *gorm.DB

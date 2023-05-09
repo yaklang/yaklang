@@ -438,7 +438,7 @@ var startGRPCServerCommand = cli.Command{
 			return err
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
-
+		ypb.RegisterWebShellManagerServer(grpcTrans, s)
 		log.Infof("start to listen on: %v", utils.HostPort(c.String("host"), c.Int("port")))
 		var lis net.Listener
 
