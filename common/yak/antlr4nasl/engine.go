@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"os"
+	"path/filepath"
 )
 
 type ScriptGroup string
@@ -146,7 +147,13 @@ func (e *Engine) SafeRunFile(path string) (err error) {
 	}()
 	return e.RunFile(path)
 }
+func (e *Engine) RunScript(script *NaslScriptInfo) error {
+	e.scriptObj = script
+	e.compiler.SetSourceCodeFilePath("script name: " + script.ScriptName)
+	return e.SafeEval(script.Script)
+}
 func (e *Engine) RunFile(path string) error {
+	e.scriptObj.OriginFileName = filepath.Base(path)
 	code, err := os.ReadFile(path)
 	if err != nil {
 		return err

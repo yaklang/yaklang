@@ -50,6 +50,7 @@ func (n *NaslKBs) GetKB(name string) interface{} {
 type NaslScriptInfo struct {
 	Kbs             *NaslKBs
 	naslScript      *yakit.NaslScript
+	OriginFileName  string
 	Hash            string
 	OID             string
 	Group           string
@@ -82,7 +83,68 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Kbs:         NewNaslKBs(),
 	}
 }
-
+func NewNaslScriptObjectFromFile(path string) (*NaslScriptInfo, error) {
+	e := New()
+	e.InitBuildInLib()
+	e.SetDescription(true)
+	err := e.RunFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return e.GetScriptObject(), nil
+}
+func NewNaslScriptObjectFromNaslScript(s *yakit.NaslScript) *NaslScriptInfo {
+	info := NewNaslScriptObject()
+	n := func() error {
+		if err := json.Unmarshal([]byte(s.Tags), &info.Tags); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.Dependencies), &info.Dependencies); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.RequirePorts), &info.RequirePorts); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.RequireKeys), &info.RequireKeys); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.ExcludeKeys), &info.ExcludeKeys); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.Xref), &info.Xrefs); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.Preferences), &info.Preferences); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.RequireUdpPorts), &info.RequireUdpPorts); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.MandatoryKeys), &info.MandatoryKeys); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.BugtraqId), &info.BugtraqId); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(s.CVE), &info.CVE); err != nil {
+			return err
+		}
+		return nil
+	}
+	n()
+	info.Group = s.Group
+	info.Hash = s.Hash
+	info.OID = s.OID
+	info.ScriptName = s.ScriptName
+	info.Script = s.Script
+	info.Version = s.Version
+	info.Category = s.Category
+	info.Family = s.Family
+	info.Copyright = s.Copyright
+	info.Timeout = s.Timeout
+	info.naslScript = s
+	return info
+}
 func (n *NaslScriptInfo) Save() error {
 	tagMarshal, err := json.Marshal(n.Tags)
 	if err != nil {
@@ -149,5 +211,6 @@ func (n *NaslScriptInfo) Save() error {
 	n.naslScript.Timeout = n.Timeout
 	n.naslScript.RequireKeys = string(RequireKeys)
 	n.naslScript.Group = n.Group
+	n.naslScript.OriginFileName = n.OriginFileName
 	return n.naslScript.CreateOrUpdateNaslScript(consts.GetGormProfileDatabase())
 }
