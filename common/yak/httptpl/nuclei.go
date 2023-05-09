@@ -28,8 +28,8 @@ import (
 // {{Scheme}} - This will replace on runtime in the request by protocol scheme as specified in the target file.
 var preprocessorRegex = regexp.MustCompile(`{{([a-z0-9_]+)}}`)
 
-// expandPreprocessors expands the pre-processors if any for a template data.
-func expandPreprocessors(data string) string {
+// ExpandPreprocessor expands the pre-processors if any for a template data.
+func ExpandPreprocessor(data string) string {
 	foundMap := make(map[string]struct{})
 	for _, expression := range preprocessorRegex.FindAllStringSubmatch(string(data), -1) {
 		if len(expression) != 2 {
@@ -124,7 +124,7 @@ func ParseNucleiTag(raw string) []*NucleiTagData {
 
 func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 	if strings.Contains(raw, "{{") {
-		raw = expandPreprocessors(raw)
+		raw = ExpandPreprocessor(raw)
 	}
 
 	yakTemp := &YakTemplate{}
