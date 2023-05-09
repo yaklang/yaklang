@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStringToUrl(t *testing.T) {
@@ -235,4 +239,41 @@ func TestNewVars(t *testing.T) {
 		panic("result vars not equal")
 	}
 	spew.Dump(a)
+}
+
+func TestScanAuto(t *testing.T) {
+	consts.GetGormProjectDatabase()
+	Scan := func(target string, opt ...interface{}) (chan *tools.PocVul, error) {
+		var vCh = make(chan *tools.PocVul)
+		opt = append(opt, _callback(func(i map[string]interface{}) {
+			if i["match"].(bool) {
+				tpl := i["template"].(*YakTemplate)
+				log.Infof("Scan callback: %#v", tpl)
+				vCh <- &tools.PocVul{
+					Source:    "nuclei",
+					Target:    target,
+					PocName:   tpl.Name,
+					MatchedAt: utils.DatetimePretty(),
+					Tags:      strings.Join(tpl.Tags, ","),
+					Timestamp: time.Now().Unix(),
+					Severity:  tpl.Severity,
+					//TitleName: ,
+					//Payload: ,
+				}
+
+			}
+		}))
+		go func() {
+			defer close(vCh)
+			ScanAuto(target, opt...)
+		}()
+		return vCh, nil
+	}
+	res, _ := Scan(
+		"http://192.168.124.14:8080/S2-032/index.action",
+		WithTemplateName("[CVE-2016-3081]: Apache S2-032 Struts - Remote Code Execution"),
+	)
+	for r := range res {
+		yakit.SaveRisk(tools.PocVulToRisk(r))
+	}
 }
