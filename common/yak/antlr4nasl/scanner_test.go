@@ -3,8 +3,8 @@ package antlr4nasl
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	_ "github.com/yaklang/yaklang/common/yak"
 	"regexp"
-	"strings"
 	"testing"
 )
 
@@ -39,39 +39,6 @@ function smtp_get_port( default_list, ignore_broken, ignore_unscanned ) {
 `
 		return s
 	})
-}
-func InitPluginGroup(engine *ScriptEngine) {
-	apachePath := `/Users/z3/nasl/nasl-plugins/2013/apache
-/Users/z3/nasl/nasl-plugins/2014/apache
-/Users/z3/nasl/nasl-plugins/2022/apache
-/Users/z3/nasl/nasl-plugins/2023/apache
-/Users/z3/nasl/nasl-plugins/2012/apache
-/Users/z3/nasl/nasl-plugins/2009/apache
-/Users/z3/nasl/nasl-plugins/2017/apache
-/Users/z3/nasl/nasl-plugins/2010/apache
-/Users/z3/nasl/nasl-plugins/2019/apache
-/Users/z3/nasl/nasl-plugins/2021/apache
-/Users/z3/nasl/nasl-plugins/2020/apache
-/Users/z3/nasl/nasl-plugins/2018/apache
-/Users/z3/nasl/nasl-plugins/2011/apache
-/Users/z3/nasl/nasl-plugins/2016/apache`
-	oraclePath := `/Users/z3/nasl/nasl-plugins/2013/oracle
-/Users/z3/nasl/nasl-plugins/2014/oracle
-/Users/z3/nasl/nasl-plugins/2022/oracle
-/Users/z3/nasl/nasl-plugins/2023/oracle
-/Users/z3/nasl/nasl-plugins/2015/oracle
-/Users/z3/nasl/nasl-plugins/2017/oracle
-/Users/z3/nasl/nasl-plugins/2019/oracle
-/Users/z3/nasl/nasl-plugins/2021/oracle
-/Users/z3/nasl/nasl-plugins/2020/oracle
-/Users/z3/nasl/nasl-plugins/2018/oracle
-/Users/z3/nasl/nasl-plugins/2016/oracle`
-	for _, path := range strings.Split(apachePath, "\n") {
-		engine.AddPluginIntoGroup(PluginGroupApache, path)
-	}
-	for _, path := range strings.Split(oraclePath, "\n") {
-		engine.AddPluginIntoGroup(PluginGroupOracle, path)
-	}
 }
 
 //func BuildInMethodCheck(engine *ScriptEngine) {
@@ -219,17 +186,30 @@ func TestPocScanner(t *testing.T) {
 	//engine.vm.GetConfig().SetStopRecover(true)
 	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
 	InitPluginGroup(engine) // 初始化插件组
-	engine.AddEngineHooks(func(engine *Engine) {
-		PatchEngine(engine) // 一些库缺少函数
-	})
+	//engine.AddEngineHooks(func(engine *Engine) {
+	//	PatchEngine(engine) // 一些库缺少函数
+	//})
+	engine.SetGoroutineNum(1)
 	engine.SetIncludePath("/Users/z3/nasl/nasl-plugins") // 设置nasl依赖库位置
 	//engine.LoadScript("/Users/z3/nasl/nasl-plugins/gb_apache_struts_detect.nasl")
-	engine.LoadGroup(PluginGroupApache)
-	engine.AddExcludeScript("gb_log4j_CVE-2021-44228_http_active.nasl") // 找不到http_cgi_dirs
-	engine.LoadScript("/Users/z3/nasl/nasl-plugins/2022/apache/gb_log4j_CVE-2021-44228_pop3_active.nasl")
-	//BuildInMethodCheck(engine) // 检测当前已经加载的脚本内置函数是否存在
-	err := engine.Scan("34.241.215.249", "8080")
-	var knownErrors multiError
+	//engine.LoadGroup(PluginGroupApache)
+	engine.LoadGroups(PluginGroupApache)
+
+	engine.AddExcludeScripts(
+		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
+		"gb_apache_couchdb_priv_esc_vuln_apr22_active.nasl", // service_get_port
+		"gb_log4j_CVE-2021-44228_sip_active.nasl",           // sip.inc.open_priv_sock_udp
+		"gb_struts_log4j_rce_vuln_dec21_active.nasl",        //pcap_src_ip_filter_from_hostnames
+		"gb_struts_s2-048.nasl",                             // found
+		"gb_log4j_CVE-2021-44228_http_web_dirs_active.nasl", //pcap_src_ip_filter_from_hostnames
+		"gb_struts_config_browser_plugin_exposed_http.nasl", //http_cgi_dirs
+		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
+		//get_app_port_from_list，get_app_version_and_location_from_list
+	)
+
+	err := engine.Scan("182.54.177.31", "3306")
+	// 排查未定义的函数
+	var unknownErrors multiError
 	undefinedVars := []string{}
 	if err != nil {
 		if errors, ok := err.(multiError); ok {
@@ -251,16 +231,23 @@ func TestPocScanner(t *testing.T) {
 					if len(res) > 0 {
 						undefinedVars = append(undefinedVars, res[1])
 					} else {
-						knownErrors = append(knownErrors, err2)
+						unknownErrors = append(unknownErrors, err2)
 					}
 				}
 			}
 		} else {
-			knownErrors = append(knownErrors, err)
+			unknownErrors = append(unknownErrors, err)
 		}
 	}
-	if len(knownErrors) > 0 {
-		log.Error(knownErrors)
+	println("errors")
+	log.Error(err)
+
+	println("unknownErrors:")
+	if len(unknownErrors) > 0 {
+		log.Error(unknownErrors)
 	}
+	println("undefinedVars:")
 	spew.Dump(undefinedVars)
+	println("engine.GetKBData():")
+	spew.Dump(engine.GetKBData())
 }

@@ -8,7 +8,7 @@ import (
 
 type NaslScript struct {
 	gorm.Model
-
+	Group           string `json:"group"`
 	Hash            string `json:"hash" gorm:"unique_index"`
 	OID             string `json:"oid"`
 	CVE             string `json:"cve"`
@@ -43,14 +43,21 @@ func NewNaslScript(name, content string) *NaslScript {
 	obj.Hash = obj.CalcHash()
 	return obj
 }
-func QueryScriptByOID(db *gorm.DB, oid string) (*NaslScript, error) {
+func QueryAllNaslScripts(db *gorm.DB) (*NaslScript, error) {
+	req := &NaslScript{}
+	if db := db.Model(&NaslScript{}); db.Error != nil {
+		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)
+	}
+	return req, nil
+}
+func QueryNaslScriptByOID(db *gorm.DB, oid string) (*NaslScript, error) {
 	req := &NaslScript{}
 	if db := db.Model(&NaslScript{}).Where("o_id = ?", oid).First(req); db.Error != nil {
 		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)
 	}
 	return req, nil
 }
-func QueryScriptByName(db *gorm.DB, name string) (*NaslScript, error) {
+func QueryNaslScriptByName(db *gorm.DB, name string) (*NaslScript, error) {
 	req := &NaslScript{}
 	if db := db.Model(&NaslScript{}).Where("script_name = ?", name).First(req); db.Error != nil {
 		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)

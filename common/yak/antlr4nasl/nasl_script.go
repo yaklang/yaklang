@@ -19,6 +19,9 @@ func NewNaslKBs() *NaslKBs {
 		mux:  &sync.RWMutex{},
 	}
 }
+func (n *NaslKBs) GetData() map[string]interface{} {
+	return n.data
+}
 func (n *NaslKBs) AddKB(name string, value interface{}) error {
 	n.mux.Lock()
 	if v, ok := n.data[name]; ok {
@@ -45,11 +48,11 @@ func (n *NaslKBs) GetKB(name string) interface{} {
 }
 
 type NaslScriptInfo struct {
-	Kbs        *NaslKBs
-	naslScript *yakit.NaslScript
-	Hash       string
-	OID        string
-
+	Kbs             *NaslKBs
+	naslScript      *yakit.NaslScript
+	Hash            string
+	OID             string
+	Group           string
 	CVE             []string
 	ScriptName      string
 	Script          string
@@ -79,9 +82,7 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Kbs:         NewNaslKBs(),
 	}
 }
-func GetNaslScriptObjectBy() *NaslScriptInfo {
-	return nil
-}
+
 func (n *NaslScriptInfo) Save() error {
 	tagMarshal, err := json.Marshal(n.Tags)
 	if err != nil {
@@ -147,5 +148,6 @@ func (n *NaslScriptInfo) Save() error {
 	n.naslScript.MandatoryKeys = string(MandatoryKeys)
 	n.naslScript.Timeout = n.Timeout
 	n.naslScript.RequireKeys = string(RequireKeys)
+	n.naslScript.Group = n.Group
 	return n.naslScript.CreateOrUpdateNaslScript(consts.GetGormProfileDatabase())
 }

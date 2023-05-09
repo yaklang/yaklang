@@ -13,7 +13,7 @@ func DebugExec(code string, init ...bool) {
 func _Exec(debug bool, code string, init ...bool) {
 	engine := New()
 	if len(init) == 0 {
-		engine.Init()
+		engine.InitBuildInLib()
 	}
 	err := engine.SafeEval(code)
 	if debug {
@@ -30,6 +30,6 @@ func _Exec(debug bool, code string, init ...bool) {
 }
 func ExecFile(path string) error {
 	engine := New()
-	engine.Init()
+	engine.InitBuildInLib()
 	return engine.RunFile(path)
 }

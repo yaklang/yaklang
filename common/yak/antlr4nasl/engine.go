@@ -12,13 +12,12 @@ import (
 	"os"
 )
 
-type PluginGroup string
+type ScriptGroup string
 
 const (
-	PluginGroupApache PluginGroup = "PluginGroupApache"
-	PluginGroupOracle PluginGroup = "PluginGroupOracle"
+	PluginGroupApache ScriptGroup = "apache"
+	PluginGroupOracle ScriptGroup = "oracle"
 )
-
 
 type Engine struct {
 	debug        bool
@@ -87,6 +86,12 @@ func New() *Engine {
 	return engine
 }
 
+func (engine *Engine) GetScriptObject() *NaslScriptInfo {
+	return engine.scriptObj
+}
+func (engine *Engine) GetKBData() map[string]interface{} {
+	return engine.scriptObj.Kbs.GetData()
+}
 func (engine *Engine) SetIncludePath(path string) {
 	engine.naslLibsPath = path
 }
@@ -120,7 +125,7 @@ func (engine *Engine) SetKBs(kbs *NaslKBs) {
 func (engine *Engine) ServiceScan(target string, ports string) ([]*fp.MatchResult, error) {
 	return ServiceScan(target, ports)
 }
-func (engine *Engine) Init() {
+func (engine *Engine) InitBuildInLib() {
 	engine.vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	engine.vm.ImportLibs(lib.BuildInVars)
 }

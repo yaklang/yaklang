@@ -115,8 +115,8 @@ func (v *Frame) panic(i *VMPanic) {
 
 func (v *VMPanic) Error() string {
 	var source []string
-	iinfo := v.contextInfos.Pop()
-	for {
+	for i := 0; i < v.contextInfos.Len(); i++ {
+		iinfo := v.contextInfos.PeekN(i)
 		if iinfo == nil {
 			break
 		}
@@ -146,8 +146,6 @@ func (v *VMPanic) Error() string {
 				codeReview),
 			)
 		}
-
-		iinfo = v.contextInfos.Pop()
 	}
 	source = funk.Reverse(source).([]string)
 	sources := strings.Join(source, "\n")

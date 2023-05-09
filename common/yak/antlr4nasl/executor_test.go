@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
+	_ "github.com/yaklang/yaklang/common/yak"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"testing"
@@ -163,7 +164,7 @@ dump(1) x 3;
 }
 func TestAssigment(t *testing.T) {
 	engine := New()
-	engine.Init()
+	engine.InitBuildInLib()
 	engine.GetVirtualMachine().ImportLibs(map[string]interface{}{
 		"dump": func(i interface{}) {
 			spew.Dump(i)

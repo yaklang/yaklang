@@ -6,14 +6,16 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"path/filepath"
+	"strconv"
 	"sync"
 )
 
 type ScriptEngine struct {
+	Kbs                *NaslKBs
 	naslLibsPath       string
 	scripts            map[string]struct{}
 	excludeScripts     map[string]struct{}
-	pluginGroupDefines map[PluginGroup][]string
+	scriptGroupDefines map[ScriptGroup][]string
 	goroutineNum       int
 	debug              bool
 	engineHooks        []func(engine *Engine)
@@ -23,9 +25,16 @@ func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
 		scripts:            make(map[string]struct{}),
 		excludeScripts:     make(map[string]struct{}),
-		pluginGroupDefines: make(map[PluginGroup][]string),
+		scriptGroupDefines: make(map[ScriptGroup][]string),
 		goroutineNum:       10,
+		Kbs:                NewNaslKBs(),
 	}
+}
+func (engine *ScriptEngine) GetAllScriptGroups() map[ScriptGroup][]string {
+	return engine.scriptGroupDefines
+}
+func (engine *ScriptEngine) GetKBData() map[string]interface{} {
+	return engine.Kbs.GetData()
 }
 func (engine *ScriptEngine) SetNaslLibsPath(path string) {
 	engine.naslLibsPath = path
@@ -43,8 +52,10 @@ func (engine *ScriptEngine) Debug(debug ...bool) {
 		engine.debug = true
 	}
 }
-func (engine *ScriptEngine) AddExcludeScript(path string) {
-	engine.excludeScripts[path] = struct{}{}
+func (engine *ScriptEngine) AddExcludeScripts(paths ...string) {
+	for _, p := range paths {
+		engine.excludeScripts[p] = struct{}{}
+	}
 }
 func (engine *ScriptEngine) LoadScript(path string) {
 	if utils.IsDir(path) {
@@ -58,36 +69,47 @@ func (engine *ScriptEngine) LoadScript(path string) {
 		engine.scripts[path] = struct{}{}
 	}
 }
-func (engine *ScriptEngine) AddPluginIntoGroup(group PluginGroup, paths ...string) {
-	engine.pluginGroupDefines[group] = append(engine.pluginGroupDefines[group], paths...)
+func (engine *ScriptEngine) RunWithDescription() {
+
 }
-func (e *ScriptEngine) LoadGroup(group PluginGroup) {
-	if v, ok := e.pluginGroupDefines[group]; ok {
-		for _, p := range v {
-			e.LoadScript(p)
+func (engine *ScriptEngine) AddScriptIntoGroup(group ScriptGroup, paths ...string) {
+	engine.scriptGroupDefines[group] = append(engine.scriptGroupDefines[group], paths...)
+}
+func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
+	for _, group := range groups {
+		if v, ok := e.scriptGroupDefines[group]; ok {
+			for _, p := range v {
+				e.LoadScript(p)
+			}
 		}
 	}
 }
-func (e *ScriptEngine) Scan(target string, ports string) error {
+func (e *ScriptEngine) ScanTarget(target string) error {
+	host, port, err := utils.ParseStringToHostPort(target)
+	if err != nil {
+		return err
+	}
+	return e.Scan(host, strconv.Itoa(port))
+}
+func (e *ScriptEngine) Scan(host string, ports string) error {
 	var allErrors multiError
-	log.Infof("start syn scan target: %s, ports: %s", target, ports)
-	servicesInfo, err := ServiceScan(target, ports)
+	log.Infof("start syn scan host: %s, ports: %s", host, ports)
+	servicesInfo, err := ServiceScan(host, ports)
 	if err != nil {
 		return err
 	}
 	openPorts := []int{}
-	kbs := NewNaslKBs()
 	for _, result := range servicesInfo {
 		if result.State == fp.OPEN {
 			openPorts = append(openPorts, result.Port)
-			kbs.AddKB("Host/scanned", result.Port)
+			e.Kbs.AddKB("Host/scanned", result.Port)
 			var ServiceName string
 			switch result.Fingerprint.ServiceName {
 			case "http", "https":
 				ServiceName = "www"
 			}
 			if ServiceName != "" {
-				kbs.SetKB(fmt.Sprintf("Services/%s", ServiceName), result.Port)
+				e.Kbs.SetKB(fmt.Sprintf("Services/%s", ServiceName), result.Port)
 			}
 		}
 	}
@@ -102,10 +124,10 @@ func (e *ScriptEngine) Scan(target string, ports string) error {
 		go func(script string) {
 			defer swg.Done()
 			engine := New()
-			engine.host = target
+			engine.host = host
 			engine.SetIncludePath(e.naslLibsPath)
-			engine.SetKBs(kbs)
-			engine.Init()
+			engine.SetKBs(e.Kbs)
+			engine.InitBuildInLib()
 			for _, hook := range e.engineHooks {
 				hook(engine)
 			}
