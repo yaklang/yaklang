@@ -161,7 +161,6 @@ func initYaklangLib() {
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
-	yaklang.Import("nuclei", tools.NucleiOperationsExports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)
