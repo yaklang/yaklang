@@ -498,6 +498,22 @@ func InterfaceToQuotedString(i interface{}) string {
 	return strconv.Quote(packetRawStr)
 }
 
+func Int64SliceToIntSlice(i []int64) []int {
+	var result = make([]int, len(i))
+	for _, v := range i {
+		result = append(result, int(v))
+	}
+	return result
+}
+
+func IntSliceToInt64Slice(i []int) []int64 {
+	var result = make([]int64, len(i))
+	for _, v := range i {
+		result = append(result, int64(v))
+	}
+	return result
+}
+
 func InterfaceToStringSlice(i interface{}) []string {
 	var result []string
 	defer func() {
