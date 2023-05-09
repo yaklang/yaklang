@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"sync"
 	"sync/atomic"
 )
 
@@ -58,10 +57,9 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 	if err != nil {
 		return 0, utils.Errorf("cannot create vars from http request: %v", err)
 	}
-	varsMutex := new(sync.Mutex)
 	addToVars := func(k string, v any) {
-		varsMutex.Lock()
-		defer varsMutex.Unlock()
+		varsOperatorMutex.Lock()
+		defer varsOperatorMutex.Unlock()
 		vars[k] = v
 	}
 
@@ -214,9 +212,9 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 
 	for reqSeqs := range y.generateRequests() {
 		swg.Add()
-		varsMutex.Lock()
+		varsOperatorMutex.Lock()
 		p := utils.CopyMapInterface(vars)
-		varsMutex.Unlock()
+		varsOperatorMutex.Unlock()
 		go func(ret *RequestBulk, params map[string]interface{}) {
 			defer swg.Done()
 
