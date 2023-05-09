@@ -49,7 +49,7 @@ func FetchCurrentNucleiTemplates(defaultDirs ...string) ([]*templateDesc, error)
 		}
 	}
 	if prefixDir == "" {
-		prefixDir := filepath.Join(homeDir, "nuclei-templates")
+		prefixDir = filepath.Join(homeDir, "nuclei-templates")
 		if !strings.HasSuffix(prefixDir, string(filepath.Separator)) {
 			prefixDir += string(filepath.Separator)
 		}

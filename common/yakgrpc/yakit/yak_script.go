@@ -270,13 +270,13 @@ func GetYakScriptByName(db *gorm.DB, name string) (*YakScript, error) {
 func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*YakScript, error) {
 	var req YakScript
 	db = UserDataAndPluginDatabaseScope(db)
-
 	if db := db.Model(&YakScript{}).Where(
 		"`type` = 'nuclei'",
 	).Where(
-		"(script_name LIKE ?) OR (script_name LIKE ?)",
+		"(script_name LIKE ?) OR (script_name LIKE ?) OR (script_name = ?)",
 		"[%]:%"+scriptName,
 		`[`+scriptName+`]:%`,
+		scriptName,
 	).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
