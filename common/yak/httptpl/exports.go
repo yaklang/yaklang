@@ -214,7 +214,21 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 }
 
 var Exports = map[string]interface{}{
-	"Scan": ScanAuto,
+	"Scan": func(target string, opt ...interface{}) (chan *tools.PocVul, error) {
+		var vCh = make(chan *tools.PocVul)
+		opt = append(opt, _callback(func(i map[string]interface{}) {
+			vCh <- &tools.PocVul{
+				Target: target,
+			}
+			log.Infof("Scan callback: %v", i)
+		}))
+		go func() {
+
+		}()
+		ScanAuto(target, opt...)
+		return vCh, nil
+	},
+	"ScanAuto": ScanAuto,
 
 	// params
 	"tags":                    WithTags,
