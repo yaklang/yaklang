@@ -5,6 +5,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	_ "github.com/yaklang/yaklang/common/yak"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"os"
@@ -162,7 +163,7 @@ func TestScript1(t *testing.T) {
 func TestSaveNaslScript(t *testing.T) {
 	path := "/Users/z3/Downloads/mageni-master/src/backend/scanner/plugins/DDI_FTP_Any_User_Login.antlr4nasl"
 	engine := New()
-	engine.Init()
+	engine.InitBuildInLib()
 	//engine.SetDescription(true)
 	engine.SetIncludePath("/Users/z3/Downloads/mageni-master/src/backend/scanner/incs")
 	err := engine.RunFile(path)
@@ -174,7 +175,7 @@ func TestSaveNaslScript(t *testing.T) {
 
 func TestLoadScriptInfo(t *testing.T) {
 	engine := New()
-	engine.Init()
+	engine.InitBuildInLib()
 	engine.SetDescription(true)
 	engine.SetIncludePath("/Users/z3/Downloads/mageni-master/src/backend/scanner/incs")
 	WalkScript("/Users/z3/Downloads/mageni-master/src/backend/scanner/plugins", func(path, script string) {

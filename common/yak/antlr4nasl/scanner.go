@@ -3,7 +3,6 @@ package antlr4nasl
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"os"
 )
@@ -11,7 +10,6 @@ import (
 func ServiceScan(hosts string, ports string) ([]*fp.MatchResult, error) {
 	result := []*fp.MatchResult{}
 	os.Setenv("YAKMODE", "vm")
-	yak.Init()
 	yakEngine := yaklang.New()
 
 	yakEngine.SetVar("addRes", func(res *fp.MatchResult) {
