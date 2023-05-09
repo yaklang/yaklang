@@ -2,12 +2,14 @@ package httptpl
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"strings"
+	"time"
 )
 
 func init() {
@@ -217,15 +219,27 @@ var Exports = map[string]interface{}{
 	"Scan": func(target string, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
 		opt = append(opt, _callback(func(i map[string]interface{}) {
-			vCh <- &tools.PocVul{
-				Target: target,
+			if i["match"].(bool) {
+				tpl := i["template"].(*YakTemplate)
+				log.Infof("Scan callback: %#v", tpl)
+				vCh <- &tools.PocVul{
+					Source:    "nuclei",
+					Target:    target,
+					PocName:   tpl.Name,
+					MatchedAt: utils.DatetimePretty(),
+					Tags:      strings.Join(tpl.Tags, ","),
+					Timestamp: time.Now().Unix(),
+					Severity:  tpl.Severity,
+					//TitleName: ,
+					//Payload: ,
+				}
+
 			}
-			log.Infof("Scan callback: %v", i)
 		}))
 		go func() {
-
+			defer close(vCh)
+			ScanAuto(target, opt...)
 		}()
-		ScanAuto(target, opt...)
 		return vCh, nil
 	},
 	"ScanAuto": ScanAuto,
@@ -282,6 +296,7 @@ var Exports = map[string]interface{}{
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {
 	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		spew.Dump(reqBulk)
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
