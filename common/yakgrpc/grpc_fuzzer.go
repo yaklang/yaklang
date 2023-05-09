@@ -184,16 +184,11 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 func (s *Server) PreloadHTTPFuzzerParams(ctx context.Context, req *ypb.PreloadHTTPFuzzerParamsRequest) (*ypb.PreloadHTTPFuzzerParamsResponse, error) {
 	vars := httptpl.NewVars()
 	for _, k := range req.GetParams() {
-		switch k.Type {
-		case "nuclei-dsl":
-			if ret := httptpl.ParseNucleiTag(k.Value); len(ret) > 1 {
-				vars.SetNucleiDSL(k.Key, ret)
-			} else {
-				vars.Set(k.Key, k.Value)
-			}
-		case "raw":
-			vars.Set(k.Key, k.Value)
+		if k.GetType() == "raw" {
+			vars.Set(k.GetKey(), k.GetValue())
+			continue
 		}
+		vars.AutoSet(k.GetKey(), k.GetValue())
 	}
 	var results []*ypb.FuzzerParamItem
 	for k, v := range vars.ToMap() {
@@ -213,6 +208,20 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+
+	var mergedParams = make(map[string]interface{})
+	renderedParams, err := s.RenderVariables(stream.Context(), &ypb.RenderVariablesRequest{
+		Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
+			return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
+		}).([]*ypb.KVPair),
+		IsHTTPS: req.GetIsHTTPS(),
+	})
+	if err != nil {
+		return utils.Errorf("render variables failed: %v", err)
+	}
+	for _, kv := range renderedParams.GetResults() {
+		mergedParams[kv.GetKey()] = kv.GetValue()
+	}
 
 	if req.GetHistoryWebFuzzerId() > 0 {
 		for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(req.GetHistoryWebFuzzerId())) {
@@ -293,6 +302,22 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	var inStatusCode = utils.ParseStringToPorts(req.GetRetryInStatusCode())
 	var notInStatusCode = utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
+	var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+	var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+	var haveHTTPTplMatcher = len(httpTplMatcher) > 0
+	var haveHTTPTplExtractor = len(httpTplExtractor) > 0
+	if haveHTTPTplExtractor {
+		for i, e := range req.GetExtractors() {
+			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
+		}
+	}
+
+	if haveHTTPTplMatcher {
+		for i, m := range req.GetMatchers() {
+			httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
+		}
+	}
+
 	if req.GetRepeatTimes() > 0 {
 		var buf bytes.Buffer
 		buf.WriteString("{{repeat(" + fmt.Sprint(req.GetRepeatTimes()) + ")}}")
@@ -329,6 +354,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
 		mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 		mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
+		mutate.WithPoolOpt_FuzzParams(mergedParams),
 	)
 	if err != nil {
 		task.Ok = false
@@ -340,12 +366,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	var firstHeader, firstBody []byte
 	for result := range res {
 		task.HTTPFlowTotal++
-		payloads := funk.Map(result.Payloads, func(i string) string {
-			if len(i) > 100 {
-				i = i[:100] + "..."
+		var payloads = make([]string, len(result.Payloads))
+		for i, payload := range result.Payloads {
+			if len(payload) > 100 {
+				payload = payload[:100] + "..."
 			}
-			return utils.ParseStringToVisible(i)
-		}).([]string)
+			payloads[i] = utils.ParseStringToVisible(payload)
+		}
 
 		if result.Error != nil {
 			rsp := &ypb.FuzzerResponse{}
@@ -368,6 +395,42 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
 			_ = stream.Send(rsp)
 			continue
+		}
+
+		var extractorResults []*ypb.KVPair
+		if haveHTTPTplExtractor {
+			for _, extractor := range httpTplExtractor {
+				vars, err := extractor.Execute(result.ResponseRaw)
+				if err != nil {
+					log.Errorf("extractor execute failed: %s", err)
+					continue
+				}
+				for k, v := range vars {
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: utils.InterfaceToString(v)})
+				}
+			}
+		}
+
+		var httpTPLmatchersResult bool
+		if haveHTTPTplMatcher && result.LowhttpResponse != nil {
+			cond := "and"
+			switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
+			case "or", "and":
+				cond = ret
+			default:
+			}
+			ins := &httptpl.YakMatcher{
+				SubMatcherCondition: cond,
+				SubMatchers:         httpTplMatcher,
+			}
+			matcherParams := utils.CopyMapInterface(mergedParams)
+			for _, kv := range extractorResults {
+				matcherParams[kv.GetKey()] = kv.GetValue()
+			}
+			httpTPLmatchersResult, err = ins.Execute(result.LowhttpResponse, matcherParams)
+			if finalError != nil {
+				log.Errorf("httptpl.YakMatcher execute failed: %s", err)
+			}
 		}
 
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
@@ -395,6 +458,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			RequestRaw:            result.RequestRaw,
 			Payloads:              payloads,
 			IsHTTPS:               strings.HasPrefix(strings.ToLower(result.Url), "https://"),
+			ExtractedResults:      extractorResults,
+			MatchedByMatcher:      httpTPLmatchersResult,
 		}
 		// 处理额外时间
 		if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {

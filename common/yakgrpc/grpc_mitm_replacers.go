@@ -123,7 +123,7 @@ func (m *mitmReplacer) LoadRules(rules []*ypb.MITMContentReplacer) {
 		// 缓存
 		raw := m.getRule(i)
 		if raw == nil {
-			log.Infof("rule: %v is disabled(cannot compiled): %v", i.VerboseName)
+			log.Infof("rule: %v is disabled(cannot compiled): %v", i.VerboseName, i.Rule)
 			return false
 		}
 		log.Infof("rule: %v is enabled", raw.String())

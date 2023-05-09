@@ -2,14 +2,30 @@ package httptpl
 
 import (
 	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
 	"strings"
 	"time"
 )
+
+func NewMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakMatcher {
+	return &YakMatcher{
+		MatcherType:         m.GetMatcherType(),
+		ExprType:            m.GetExprType(),
+		Scope:               m.GetScope(),
+		Condition:           m.GetCondition(),
+		Group:               m.GetGroup(),
+		GroupEncoding:       m.GetGroupEncoding(),
+		Negative:            m.GetNegative(),
+		SubMatcherCondition: m.GetSubMatcherCondition(),
+		SubMatchers:         funk.Map(m.GetSubMatchers(), NewMatcherFromGRPCModel).([]*YakMatcher),
+	}
+}
 
 type YakMatcher struct {
 	// status

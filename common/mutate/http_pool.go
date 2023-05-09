@@ -135,8 +135,9 @@ func _httpPool_Source(i string) HttpPoolConfigOption {
 
 func _httpPool_SetFuzzParams(i interface{}) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
-		config.FuzzParams = utils.InterfaceToMap(i)
-		config.ForceFuzz = true
+		if i != nil {
+			config.FuzzParams = utils.InterfaceToMap(i)
+		}
 	}
 }
 
