@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"context"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"os"
+	"path"
 	"path/filepath"
 )
 
@@ -30,6 +32,7 @@ type Engine struct {
 	sourceCode   string
 	scriptObj    *NaslScriptInfo
 	host         string
+	proxy        string
 }
 
 func New() *Engine {
@@ -86,7 +89,9 @@ func New() *Engine {
 	engine.scriptObj = NewNaslScriptObject()
 	return engine
 }
-
+func (engine *Engine) SetProxy(proxy string) {
+	engine.proxy = proxy
+}
 func (engine *Engine) GetScriptObject() *NaslScriptInfo {
 	return engine.scriptObj
 }
@@ -152,13 +157,41 @@ func (e *Engine) RunScript(script *NaslScriptInfo) error {
 	e.compiler.SetSourceCodeFilePath("script name: " + script.ScriptName)
 	return e.SafeEval(script.Script)
 }
+
+func (e *Engine) EvalInclude(name string) error {
+	// 优先从内置库中查找
+	var sourceBytes []byte
+	data, err := bindata.Asset("data/nasl-incs/" + name)
+	if err != nil {
+		libPath := path.Join(e.naslLibsPath, name)
+		codes, err := os.ReadFile(libPath)
+		if err != nil {
+			err = utils.Errorf("not found include file: %s", name)
+			log.Error(err)
+			return err
+		}
+		sourceBytes = codes
+		recoverPath := e.compiler.SetSourceCodeFilePath(libPath)
+		defer recoverPath()
+	} else {
+		sourceBytes = data
+		recoverPath := e.compiler.SetSourceCodeFilePath(name)
+		defer recoverPath()
+	}
+
+	if v, ok := e.naslLibPatch[name]; ok {
+		sourceBytes = []byte(v(string(sourceBytes)))
+	}
+	return e.SafeEval(string(sourceBytes))
+}
 func (e *Engine) RunFile(path string) error {
 	e.scriptObj.OriginFileName = filepath.Base(path)
 	code, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	e.compiler.SetSourceCodeFilePath(path)
+	recoverSource := e.compiler.SetSourceCodeFilePath(path)
+	defer recoverSource()
 	return e.SafeEval(string(code))
 }
 

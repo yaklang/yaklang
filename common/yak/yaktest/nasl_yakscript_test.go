@@ -23,7 +23,7 @@ func TestScanTarget(t *testing.T) {
 		{
 			Name: "测试扫描目标",
 			Src: `
-kbs = nasl.ScanTarget("182.54.177.31:3306",nasl.group("apache"))
+kbs,err = nasl.ScanTarget("182.54.177.31:3306",nasl.group("oracle"))
 dump(kbs)
 `,
 		},
@@ -59,50 +59,12 @@ func TestInitNaslDatabase(t *testing.T) {
 		{
 			Name: "测试初始化NaslScript",
 			Src: `
-oracleGroupScriptPath=` + "`" + `
-/Users/z3/nasl/nasl-plugins/2013/oracle
-/Users/z3/nasl/nasl-plugins/2014/oracle
-/Users/z3/nasl/nasl-plugins/2022/oracle
-/Users/z3/nasl/nasl-plugins/2023/oracle
-/Users/z3/nasl/nasl-plugins/2015/oracle
-/Users/z3/nasl/nasl-plugins/2017/oracle
-/Users/z3/nasl/nasl-plugins/2019/oracle
-/Users/z3/nasl/nasl-plugins/2021/oracle
-/Users/z3/nasl/nasl-plugins/2020/oracle
-/Users/z3/nasl/nasl-plugins/2018/oracle
-/Users/z3/nasl/nasl-plugins/2016/oracle
-` + "`" + `
-apacheGroupScriptPath=` + "`" + `
-/Users/z3/nasl/nasl-plugins/2013/apache
-/Users/z3/nasl/nasl-plugins/2014/apache
-/Users/z3/nasl/nasl-plugins/2022/apache
-/Users/z3/nasl/nasl-plugins/2023/apache
-/Users/z3/nasl/nasl-plugins/2012/apache
-/Users/z3/nasl/nasl-plugins/2009/apache
-/Users/z3/nasl/nasl-plugins/2017/apache
-/Users/z3/nasl/nasl-plugins/2010/apache
-/Users/z3/nasl/nasl-plugins/2019/apache
-/Users/z3/nasl/nasl-plugins/2021/apache
-/Users/z3/nasl/nasl-plugins/2020/apache
-/Users/z3/nasl/nasl-plugins/2018/apache
-/Users/z3/nasl/nasl-plugins/2011/apache
-/Users/z3/nasl/nasl-plugins/2016/apache
-` + "`" + `
-nasl.RemoveDatabase()
-oracleGroupScriptPath.Split("\n").Map(func(path) {
-	err = nasl.UpdateDatabase(path,"oracle")
-	if err{
-		log.Error(err)
-		return
-	}
-})
-apacheGroupScriptPath.Split("\n").Map(func(path) {
-	err = nasl.UpdateDatabase(path,"apache")
-	if err{
-		log.Error(err)
-		return
-	}
-})
+
+libraryPath = "/Users/z3/Downloads/nasllib"
+err = nasl.UpdateDatabase(libraryPath)
+if err{
+	log.Error(err)
+}
 `,
 		},
 	}
