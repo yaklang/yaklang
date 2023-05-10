@@ -1,16 +1,17 @@
 package antlr4nasl
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 )
 
 type NaslScriptConfig struct {
 	group []string
+	proxy string
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -22,6 +23,10 @@ type NaslScriptConfigOptFunc func(c *NaslScriptConfig)
 var Exports = map[string]interface{}{
 	"UpdateDatabase": func(p string, group ...string) {
 		saveScript := func(path string) {
+			if !strings.HasSuffix(path, ".nasl") {
+				log.Error("Error load script %s: not a nasl file", path)
+				return
+			}
 			engine := New()
 			engine.SetDescription(true)
 			engine.InitBuildInLib()
@@ -34,6 +39,7 @@ var Exports = map[string]interface{}{
 			if len(group) > 0 {
 				scriptIns.Group = group[0]
 			}
+			scriptIns.OID = uuid.NewString()
 			err = scriptIns.Save()
 			if err != nil {
 				log.Errorf("Error save script %s: %s", path, err.Error())
@@ -129,16 +135,23 @@ var Exports = map[string]interface{}{
 		for _, g := range config.group {
 			engine.LoadGroups(ScriptGroup(g))
 		}
+		engine.AddEngineHooks(func(engine *Engine) {
+			engine.SetProxy(config.proxy)
+		})
 		err := engine.ScanTarget(target)
-		if err != nil {
-			return nil, err
-		}
-		return engine.GetKBData(), nil
+		//if err != nil {
+		//	return nil, err
+		//}
+		return engine.GetKBData(), err
 	},
 	"group": func(groupName string) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
 			c.group = append(c.group, groupName)
 		}
 	},
-	"proxy": lowhttp.WithProxy,
+	"proxy": func(proxy string) NaslScriptConfigOptFunc {
+		return func(c *NaslScriptConfig) {
+			c.proxy = proxy
+		}
+	},
 }

@@ -15,7 +15,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"path"
 	"reflect"
 	"regexp"
 	"strings"
@@ -329,7 +328,7 @@ func init() {
 			return nil, nil
 		},
 		"open_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
+			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
 			transport := params.getParamByName("transport", -1).Int()
 			if !params.getParamByName("priority").IsUndefined() {
 				return nil, utils.Errorf("priority is not support")
@@ -341,13 +340,16 @@ func init() {
 			if port == 0 {
 				return nil, utils.Errorf("port is empty")
 			}
+			var conn net.Conn
 
-			tcpAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%d", engine.host, port))
+			proxys := []string{}
+			if engine.proxy != "" {
+				proxys = append(proxys, engine.proxy)
+			}
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, proxys...)
 			if err != nil {
 				return nil, err
 			}
-			var conn net.Conn
-			conn, err = net.DialTCP("tcp", nil, tcpAddr)
 			if transport >= 0 {
 				conn = utils.NewDefaultTLSClient(conn)
 			}
@@ -477,6 +479,7 @@ func init() {
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByName("port", 0).Int()
+			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
 			var n int
 
@@ -485,7 +488,11 @@ func init() {
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			conn, err := net.DialTimeout("tcp", adderss, time.Second*5)
+			proxys := []string{}
+			if engine.proxy != "" {
+				proxys = append(proxys, engine.proxy)
+			}
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, proxys...)
 			if err != nil {
 				return nil, err
 			}
@@ -1286,8 +1293,11 @@ func init() {
 				return nil, fmt.Errorf("port is invalid")
 			}
 
-			host := engine.host
-			conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+			proxys := []string{}
+			if engine.proxy != "" {
+				proxys = append(proxys, engine.proxy)
+			}
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, proxys...)
 			if err != nil {
 				return nil, fmt.Errorf("connect pop3 server error：%s", err)
 			}
@@ -1311,28 +1321,10 @@ func init() {
 			//if lib, ok := libs[name]; ok {
 			//	vm.ExecYakCode("", lib)
 			//}
-			libName := ""
-			if strings.HasSuffix(name, ".inc") {
-				libName = name[:len(name)-4]
-			} else {
+			if !strings.HasSuffix(name, ".inc") {
 				panic(fmt.Sprintf("include file name must end with .inc"))
 			}
-			var libPath string
-			libPath = path.Join(engine.naslLibsPath, name)
-			recoverPath := engine.compiler.SetSourceCodeFilePath(libPath)
-			defer func() { recoverPath() }()
-			codes, err := os.ReadFile(libPath)
-			if v, ok := engine.naslLibPatch[libName]; ok {
-				codes = []byte(v(string(codes)))
-			}
-			if err != nil {
-				return nil, err
-			}
-			err = engine.Eval(string(codes))
-			if err != nil {
-				return nil, err
-			}
-			return nil, nil
+			return nil, engine.EvalInclude(name)
 		},
 
 		"new_preference": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
