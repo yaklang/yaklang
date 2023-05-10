@@ -321,7 +321,12 @@ func HandleXrayResultChan(r io.Reader) chan *PocVul {
 }
 
 func PocVulToRisk(p *PocVul) *yakit.Risk {
-	var title = fmt.Sprintf("POC[%v] %v", p.Severity, p.PocName)
+	var title string
+	if p.CVE != "" {
+		title = fmt.Sprintf("[%v] %v", p.CVE, p.PocName)
+	} else {
+		title = p.PocName
+	}
 	var name = p.TitleName
 	if name != "" {
 		title = fmt.Sprintf("%v %v", name, title)
@@ -330,10 +335,17 @@ func PocVulToRisk(p *PocVul) *yakit.Risk {
 	if matchedAt != "" {
 		title = fmt.Sprintf("%v at %v", title, matchedAt)
 	}
-
+	var desc string
+	if p.DescriptionZh != "" {
+		desc = p.DescriptionZh
+	} else {
+		desc = p.Description
+	}
 	return yakit.CreateRisk(
 		p.Target,
 		yakit.WithRiskParam_Title(title),
+		yakit.WithRiskParam_CVE(p.CVE),
+		yakit.WithRiskParam_Description(desc),
 		yakit.WithRiskParam_Payload(p.Payload),
 		yakit.WithRiskParam_RiskType(fmt.Sprintf("nuclei-%v", p.Tags)),
 		yakit.WithRiskParam_Severity(p.Severity),
@@ -494,17 +506,20 @@ func HandleNucleiResult(raw []byte) []*PocVul {
 }
 
 type PocVul struct {
-	Source    string
-	PocName   string
-	MatchedAt string
-	Target    string
-	IP        string
-	Port      int
-	Timestamp int64
-	Payload   string
-	Severity  string
-	RawJson   string
-	Tags      string
-	TitleName string
-	Details   map[string]interface{}
+	Source        string
+	PocName       string
+	CVE           string
+	Description   string
+	DescriptionZh string
+	MatchedAt     string
+	Target        string
+	IP            string
+	Port          int
+	Timestamp     int64
+	Payload       string
+	Severity      string
+	RawJson       string
+	Tags          string
+	TitleName     string
+	Details       map[string]interface{}
 }

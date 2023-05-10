@@ -2,12 +2,16 @@ package httptpl
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"time"
 )
@@ -215,31 +219,85 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 	}
 }
 
+func payloadsToString(payloads *YakPayloads) (string, error) {
+	result := make(map[string]string)
+	for key, value := range payloads.raw {
+
+		if value.FromFile == "" {
+			result[key] = fmt.Sprintf("%+v", value.Data)
+		}
+	}
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonBytes), nil
+}
+
 var Exports = map[string]interface{}{
-	"Scan": func(target string, opt ...interface{}) (chan *tools.PocVul, error) {
+	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
+		//var targetVul *tools.PocVul
+		filterVul := filter.NewFilter()
+		calcSha1 := utils.CalcSha1(target)
+		filterVul.Insert(calcSha1)
+
 		opt = append(opt, _callback(func(i map[string]interface{}) {
 			if i["match"].(bool) {
-				tpl := i["template"].(*YakTemplate)
-				log.Infof("Scan callback: %#v", tpl)
-				vCh <- &tools.PocVul{
-					Source:    "nuclei",
-					Target:    target,
-					PocName:   tpl.Name,
-					MatchedAt: utils.DatetimePretty(),
-					Tags:      strings.Join(tpl.Tags, ","),
-					Timestamp: time.Now().Unix(),
-					Severity:  tpl.Severity,
-					//TitleName: ,
-					//Payload: ,
+				if filterVul.Exist(calcSha1) {
+					return
 				}
+				tpl := i["template"].(*YakTemplate)
+				resp := i["responses"].([]*lowhttp.LowhttpResponse)
+				reqBulk := i["requests"].(*YakRequestBulkConfig)
+				_ = reqBulk
+				log.Infof("Scan callback: %#v", tpl)
+				details := make(map[string]interface{})
+				if len(resp) == 1 {
+					details["request"] = string(resp[0].RawRequest)
+					details["response"] = string(resp[0].RawPacket)
+				} else {
+					for idx, r := range resp {
+						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
+						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+					}
+				}
+				payloads, err := payloadsToString(reqBulk.Payloads)
+				if err != nil {
+					log.Errorf("payloadsToString failed: %v", err)
+				}
+				pv := &tools.PocVul{
+					Source:        "nuclei",
+					Target:        resp[0].RemoteAddr,
+					PocName:       tpl.Name,
+					MatchedAt:     utils.DatetimePretty(),
+					Tags:          strings.Join(tpl.Tags, ","),
+					Timestamp:     time.Now().Unix(),
+					Severity:      tpl.Severity,
+					RawJson:       "1",
+					Details:       details,
+					CVE:           tpl.CVE,
+					DescriptionZh: tpl.DescriptionZh,
+					Description:   tpl.Description,
+					Payload:       payloads,
+				}
+				//calcSha1 := func(tempNmae, addr string) string {
+				//	return utils.CalcSha1(tempNmae, addr)
+				//}
 
+				risk := tools.PocVulToRisk(pv)
+				err = yakit.SaveRisk(risk)
+				if err != nil {
+					log.Errorf("save risk failed: %s", err)
+				}
+				vCh <- pv
 			}
 		}))
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)
 		}()
+
 		return vCh, nil
 	},
 	"ScanAuto": ScanAuto,
@@ -296,7 +354,14 @@ var Exports = map[string]interface{}{
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {
 	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		log.Info("reqBulk ")
 		spew.Dump(reqBulk)
+		log.Info("y: ")
+		spew.Dump(y)
+		log.Info("rsp: ")
+		spew.Dump(rsp)
+		log.Info("extractor: ")
+		spew.Dump(extractor)
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
