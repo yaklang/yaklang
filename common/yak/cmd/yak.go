@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/consts"
@@ -1158,6 +1159,14 @@ func main() {
 			Name:  "code,c",
 			Usage: "yak代码",
 		},
+		cli.BoolFlag{
+			Name:  "hex",
+			Usage: "yak代码(被HEX编码)",
+		},
+		cli.BoolFlag{
+			Name:  "base64",
+			Usage: "yak代码(被Base64编码)",
+		},
 		cli.StringFlag{
 			Name:  "key,k",
 			Usage: "执行yakc时所需要的密钥文件，是可选的，长度为128 bit(16 字节)",
@@ -1224,6 +1233,24 @@ func main() {
 		}
 
 		code := c.String("code")
+		if c.Bool("hex") {
+			var codeRaw, err = codec.DecodeHex(code)
+			if err != nil {
+				spew.Dump(code)
+				return err
+			}
+			code = string(codeRaw)
+		}
+
+		if c.Bool("base64") {
+			var codeRaw, err = codec.DecodeBase64(code)
+			if err != nil {
+				spew.Dump(code)
+				return err
+			}
+			code = string(codeRaw)
+		}
+
 		engine := yak.NewScriptEngine(100)
 		err = engine.Execute(code)
 		if err != nil {
