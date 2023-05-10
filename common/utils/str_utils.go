@@ -759,6 +759,11 @@ func Atoi(i string) int {
 	return raw
 }
 
+func Atof(i string) float64 {
+	raw, _ := strconv.ParseFloat(i, 64)
+	return raw
+}
+
 func CopyBytes(rsp []byte) []byte {
 	b := make([]byte, len(rsp))
 	copy(b, rsp)

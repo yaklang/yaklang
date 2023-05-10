@@ -5,7 +5,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/gopsutil/net"
+	"github.com/shirou/gopsutil/v3/cpu"
+	_ "github.com/shirou/gopsutil/v3/disk"
+	_ "github.com/shirou/gopsutil/v3/docker"
+	_ "github.com/shirou/gopsutil/v3/host"
+	_ "github.com/shirou/gopsutil/v3/load"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec/health"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -36,6 +43,8 @@ func toRound2(f float64) float64 {
 func runTop(ctx context.Context) (*health.HealthInfo, error) {
 	detail := &health.HealthInfo{
 		Timestamp:       time.Now().Unix(),
+		CPUPercent:      0,
+		MemoryPercent:   0,
 		NetworkUpload:   0,
 		NetworkDownload: 0,
 		DiskWrite:       0,
@@ -211,10 +220,47 @@ func runTop(ctx context.Context) (*health.HealthInfo, error) {
 	}
 }
 
-func NewHealthInfo(ctx context.Context) (*health.HealthInfo, error) {
-	info, err := runTop(ctx)
+func healthInfoFromGopsutil() (*health.HealthInfo, error) {
+	detail := &health.HealthInfo{
+		Timestamp: time.Now().Unix(),
+	}
+	cpuProfiles, err := cpu.Percent(0, false)
 	if err != nil {
-		return nil, utils.Errorf("no top running: reason: %s", err)
+		return nil, utils.Errorf("gopsutil cannot fetch cpu percent: %s", err)
+	}
+	if len(cpuProfiles) > 0 {
+		var avg float64 = cpuProfiles[0]
+		for _, p := range cpuProfiles[1:] {
+			if p > 0 {
+				avg = (avg + p) / 2.0
+			}
+		}
+		detail.CPUPercent = toRound2(avg)
+	}
+
+	stat, err := mem.VirtualMemory()
+	if err != nil {
+		return nil, utils.Errorf("gopsutil cannot fetch mem percent: %s", err)
+	}
+	detail.MemoryPercent = stat.UsedPercent
+	return detail, nil
+}
+
+// NewHealthInfo 获取系统健康信息
+//    2023.5.10: TODO: disk rate is waiting for fixing;
+func NewHealthInfo(ctx context.Context) (*health.HealthInfo, error) {
+	// 硬盘读写暂时有点问题
+	info, err := healthInfoFromGopsutil()
+	if err != nil {
+		log.Infof("gopsutil(v3) native cannot fetch info: %v, try by top...", err)
+		info, err = runTop(ctx)
+		if err != nil {
+			return nil, utils.Errorf("no top running: reason: %s", err)
+		}
+	}
+
+	if info == nil {
+		return nil, utils.Errorf("fetch system health info failed: %s", err)
 	}
 
 	// 计算网络 IO
