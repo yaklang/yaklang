@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -239,19 +238,14 @@ var Exports = map[string]interface{}{
 		var vCh = make(chan *tools.PocVul)
 		//var targetVul *tools.PocVul
 		filterVul := filter.NewFilter()
-		calcSha1 := utils.CalcSha1(target)
-		filterVul.Insert(calcSha1)
 
 		opt = append(opt, _callback(func(i map[string]interface{}) {
 			if i["match"].(bool) {
-				if filterVul.Exist(calcSha1) {
-					return
-				}
 				tpl := i["template"].(*YakTemplate)
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				_ = reqBulk
-				log.Infof("Scan callback: %#v", tpl)
+				//log.Infof("Scan callback: %#v", tpl)
 				details := make(map[string]interface{})
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
@@ -281,16 +275,19 @@ var Exports = map[string]interface{}{
 					Description:   tpl.Description,
 					Payload:       payloads,
 				}
-				//calcSha1 := func(tempNmae, addr string) string {
-				//	return utils.CalcSha1(tempNmae, addr)
-				//}
+				calcSha1 := utils.CalcSha1(tpl.Name)
+				log.Infof("calcSha1: %s", calcSha1)
+				if !filterVul.Exist(calcSha1) {
+					risk := tools.PocVulToRisk(pv)
+					err = yakit.SaveRisk(risk)
+					if err != nil {
+						log.Errorf("save risk failed: %s", err)
+					}
 
-				risk := tools.PocVulToRisk(pv)
-				err = yakit.SaveRisk(risk)
-				if err != nil {
-					log.Errorf("save risk failed: %s", err)
+					vCh <- pv
 				}
-				vCh <- pv
+				filterVul.Insert(calcSha1)
+
 			}
 		}))
 		go func() {
@@ -354,14 +351,14 @@ var Exports = map[string]interface{}{
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {
 	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-		log.Info("reqBulk ")
-		spew.Dump(reqBulk)
-		log.Info("y: ")
-		spew.Dump(y)
-		log.Info("rsp: ")
-		spew.Dump(rsp)
-		log.Info("extractor: ")
-		spew.Dump(extractor)
+		//log.Info("reqBulk ")
+		//spew.Dump(reqBulk)
+		//log.Info("y: ")
+		//spew.Dump(y)
+		//log.Info("rsp: ")
+		//spew.Dump(rsp)
+		//log.Info("extractor: ")
+		//spew.Dump(extractor)
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
