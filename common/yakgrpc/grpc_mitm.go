@@ -728,6 +728,28 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var handled = utils.NewBool(false)
 		var dropped = utils.NewBool(false)
 		var modifiedResponse []byte
+
+		var requestRaw []byte
+		requestRaw, _ = utils.HttpDumpWithBody(req, true)
+		// 响应，带请求
+		mitmPluginCaller.CallHijackResponseEx(isHttps, urlStr, func() interface{} {
+			return requestRaw
+		}, func() interface{} {
+			var fixedResponse, _, _ = lowhttp.FixHTTPResponse(originRspRaw[:])
+			if len(fixedResponse) > 0 {
+				return fixedResponse
+			} else {
+				return originRspRaw[:]
+			}
+		}, constClujore(func(i interface{}) {
+			handled.Set()
+			modifiedResponse = utils.InterfaceToBytes(i)
+		}), constClujore(func() {
+			handled.Set()
+			dropped.Set()
+		}))
+
+		// 响应
 		mitmPluginCaller.CallHijackResponse(isHttps, urlStr, func() interface{} {
 			var fixedResponse, _, _ = lowhttp.FixHTTPResponse(originRspRaw[:])
 			if len(fixedResponse) > 0 {
