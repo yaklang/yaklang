@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/simulator"
+	"github.com/yaklang/yaklang/common/systemd"
 	"github.com/yaklang/yaklang/common/t3"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/comparer"
@@ -96,6 +97,7 @@ func initYaklangLib() {
 	yaklang.Import("log", yaklib.LogExports)
 	//yaklang.Import("net", yaklib.Ne)
 	yaklang.Import("hids", hids.Exports)
+	yaklang.Import("systemd", systemd.Exports)
 
 	//yaklang.Import("geojson", yaklib.GeoJsonExports)
 	yaklang.Import("mmdb", yaklib.MmdbExports)

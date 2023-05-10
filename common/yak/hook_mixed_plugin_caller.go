@@ -43,6 +43,8 @@ const (
 
 	// func hijackHTTPRequest(isHttps, url, response, forward/*func(modified []byte)*/, drop /*func()*/)
 	HOOK_HijackHTTPResponse = "hijackHTTPResponse"
+	// func hijackHTTPRequest(isHttps, url, request, response, forward/*func(modified []byte)*/, drop /*func()*/)
+	HOOK_HijackHTTPResponseEx = "hijackHTTPResponseEx"
 
 	// func hijackSaveHTTPFlow(record *httpFlow, forward func(*httpFlow), drop func()) return (*httpFlow)
 	HOOK_hijackSaveHTTPFlow = "hijackSaveHTTPFlow"
@@ -72,6 +74,7 @@ var MITMAndPortScanHooks = []string{
 
 	HOOK_HijackHTTPRequest,
 	HOOK_HijackHTTPResponse,
+	HOOK_HijackHTTPResponseEx,
 	HOOK_hijackSaveHTTPFlow,
 
 	// port-scan
@@ -371,6 +374,17 @@ func (m *MixPluginCaller) CallHijackResponse(
 		HOOK_HijackHTTPResponse,
 		func() interface{} { return isHttps },
 		func() interface{} { return u }, getResponse, reject, drop,
+	)
+}
+
+func (m *MixPluginCaller) CallHijackResponseEx(
+	isHttps bool, u string, getRequest, getResponse,
+	reject, drop func() interface{},
+) {
+	m.callers.CallByNameExSync(
+		HOOK_HijackHTTPResponseEx,
+		func() interface{} { return isHttps },
+		func() interface{} { return u }, getRequest, getResponse, reject, drop,
 	)
 }
 
