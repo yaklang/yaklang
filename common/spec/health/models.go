@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/gopsutil/host"
+	"github.com/shirou/gopsutil/v3/host"
 	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"os/exec"
