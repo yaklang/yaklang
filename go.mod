@@ -8,7 +8,6 @@ require (
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/ReneKroon/ttlcache v1.6.0
-	github.com/StackExchange/wmi v1.2.1
 	github.com/akutz/memconn v0.1.0
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.4
@@ -91,11 +90,10 @@ require (
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/ksuid v1.0.4
-	github.com/shirou/gopsutil/v3 v3.22.6
-	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4
+	github.com/shirou/gopsutil/v3 v3.23.4
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.2
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
@@ -106,7 +104,7 @@ require (
 	github.com/xiecat/wsm v0.1.3
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/net v0.2.0
-	golang.org/x/sys v0.6.0
+	golang.org/x/sys v0.7.0
 	golang.org/x/text v0.4.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.0
@@ -190,13 +188,14 @@ require (
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
+	github.com/shoenig/go-m1cpu v0.1.5 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/tebeka/strftime v0.1.3 // indirect
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.4.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.11 // indirect
+	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/vmihailenco/bufpool v0.1.11 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.0 // indirect
