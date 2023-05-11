@@ -220,6 +220,7 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 
 func payloadsToString(payloads *YakPayloads) (string, error) {
 	result := make(map[string]string)
+	log.Info(payloads.raw)
 	for key, value := range payloads.raw {
 
 		if value.FromFile == "" {
@@ -236,7 +237,6 @@ func payloadsToString(payloads *YakPayloads) (string, error) {
 var Exports = map[string]interface{}{
 	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
-		//var targetVul *tools.PocVul
 		filterVul := filter.NewFilter()
 
 		opt = append(opt, _callback(func(i map[string]interface{}) {
@@ -244,8 +244,7 @@ var Exports = map[string]interface{}{
 				tpl := i["template"].(*YakTemplate)
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
-				_ = reqBulk
-				//log.Infof("Scan callback: %#v", tpl)
+				calcSha1 := utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 				details := make(map[string]interface{})
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
@@ -268,16 +267,15 @@ var Exports = map[string]interface{}{
 					Tags:          strings.Join(tpl.Tags, ","),
 					Timestamp:     time.Now().Unix(),
 					Severity:      tpl.Severity,
-					RawJson:       "1",
 					Details:       details,
 					CVE:           tpl.CVE,
 					DescriptionZh: tpl.DescriptionZh,
 					Description:   tpl.Description,
 					Payload:       payloads,
 				}
-				calcSha1 := utils.CalcSha1(tpl.Name)
 				log.Infof("calcSha1: %s", calcSha1)
 				if !filterVul.Exist(calcSha1) {
+					filterVul.Insert(calcSha1)
 					risk := tools.PocVulToRisk(pv)
 					err = yakit.SaveRisk(risk)
 					if err != nil {
@@ -286,7 +284,6 @@ var Exports = map[string]interface{}{
 
 					vCh <- pv
 				}
-				filterVul.Insert(calcSha1)
 
 			}
 		}))
