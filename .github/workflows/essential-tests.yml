@@ -46,6 +46,9 @@ jobs:
       - name: Test CartesianProduct
         run: go test -timeout 1m ./common/yak/cartesian -v
 
+      - name: Test JsonPath
+        run: go test -timeout 1m ./common/jsonpath -v
+
       - name: TestDomainExtract
         run: go test -timeout 1m ./common/domainextractor -v
 

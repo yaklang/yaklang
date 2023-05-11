@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -49,6 +50,9 @@ type FuzzHTTPRequestIf interface {
 	// 模糊测试 Query 中的字段
 	FuzzGetParams(interface{}, interface{}) FuzzHTTPRequestIf
 
+	// FuzzGetParamJson
+	FuzzGetJsonPathParams(any, string, any) FuzzHTTPRequestIf
+
 	// 模糊测试 Post
 	FuzzPostRaw(...string) FuzzHTTPRequestIf
 
@@ -57,6 +61,9 @@ type FuzzHTTPRequestIf interface {
 
 	// 测试 PostJson 中的数据
 	FuzzPostJsonParams(k, v interface{}) FuzzHTTPRequestIf
+
+	// 测试 PostJsonPath 中的数据
+	FuzzPostJsonPathParams(k any, jp string, v any) FuzzHTTPRequestIf
 
 	// 测试 Cookie 中的数据
 	FuzzCookieRaw(value interface{}) FuzzHTTPRequestIf
@@ -386,6 +393,19 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 		if !strVisible(key) {
 			continue
 		}
+
+		if val, ok := utils.IsJSON(param[0]); ok {
+			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+				params = append(params, &FuzzHTTPRequestParam{
+					typePosition:     posGetQueryJson,
+					param:            key,
+					paramOriginValue: param,
+					jsonPath:         j,
+					origin:           f,
+				})
+			}
+		}
+
 		param := &FuzzHTTPRequestParam{
 			typePosition:     posGetQuery,
 			param:            key,
@@ -445,6 +465,23 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 		if !strVisible(key) {
 			continue
 		}
+
+		if len(param) <= 0 {
+			continue
+		}
+
+		if val, ok := utils.IsJSON(param[0]); ok {
+			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+				params = append(params, &FuzzHTTPRequestParam{
+					typePosition:     posPostQueryJson,
+					param:            key,
+					paramOriginValue: param,
+					jsonPath:         j,
+					origin:           f,
+				})
+			}
+		}
+
 		param := &FuzzHTTPRequestParam{
 			typePosition:     posPostQuery,
 			param:            key,
