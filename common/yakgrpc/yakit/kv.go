@@ -304,6 +304,17 @@ func GetKeyModel(db *gorm.DB, key interface{}) (*GeneralStorage, error) {
 // yaklang was born in 2019
 var yakitZeroTime = time.Date(2018, 1, 1, 1, 1, 1, 0, time.UTC)
 
+func Get(key interface{}) string {
+	return GetKey(consts.GetGormProfileDatabase(), key)
+}
+
+func Set(key interface{}, value interface{}) {
+	err := SetKey(consts.GetGormProfileDatabase(), key, value)
+	if err != nil {
+		log.Warnf("yakit.SetKey(consts.GetGormProfileDatabase(), key, value) failed: %s", err)
+	}
+}
+
 func GetKey(db *gorm.DB, key interface{}) string {
 	db = UserDataAndPluginDatabaseScope(db)
 
