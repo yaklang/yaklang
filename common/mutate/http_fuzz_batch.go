@@ -159,6 +159,48 @@ func (f *FuzzHTTPRequestBatch) FuzzHTTPHeader(k, v interface{}) FuzzHTTPRequestI
 	}
 }
 
+func (f *FuzzHTTPRequestBatch) FuzzPostJsonPathParams(key any, jp string, value any) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzPostJsonPathParams(key, jp, value)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzPostJsonPathParams(key, jp, value))
+	}
+
+	if len(reqs) <= 0 {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f.fallback,
+			originRequest: f.GetOriginRequest(),
+		}
+	}
+	return &FuzzHTTPRequestBatch{
+		nextFuzzRequests: reqs,
+		originRequest:    f.GetOriginRequest(),
+	}
+}
+
+func (f *FuzzHTTPRequestBatch) FuzzGetJsonPathParams(key any, jp string, value any) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzGetJsonPathParams(key, jp, value)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzGetJsonPathParams(key, jp, value))
+	}
+
+	if len(reqs) <= 0 {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f.fallback,
+			originRequest: f.GetOriginRequest(),
+		}
+	}
+	return &FuzzHTTPRequestBatch{
+		nextFuzzRequests: reqs,
+		originRequest:    f.GetOriginRequest(),
+	}
+}
+
 func (f *FuzzHTTPRequestBatch) FuzzGetParamsRaw(raw ...string) FuzzHTTPRequestIf {
 	if len(f.nextFuzzRequests) <= 0 {
 		return f.fallback.FuzzGetParamsRaw(raw...)

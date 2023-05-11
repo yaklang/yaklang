@@ -29,11 +29,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strconv"
 	"strings"
 	"text/scanner"
 )
+
+func ToMapInterface(origin any) (map[string]interface{}, error) {
+	var originMap = make(map[string]interface{})
+	switch origin.(type) {
+	case string, []byte, []rune:
+		err := json.Unmarshal([]byte(fmt.Sprintf("%v", origin)), &originMap)
+		if err != nil {
+			return nil, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
+		}
+	default:
+		originMap = utils.InterfaceToMapInterface(origin)
+	}
+	return originMap, nil
+}
 
 func deepCopyMapRaw(h map[string]interface{}) (map[string]interface{}, error) {
 	var newValues = make(map[string]interface{})
@@ -61,13 +77,20 @@ func Read(value interface{}, path string) (interface{}, error) {
 }
 
 // Replace
-func Replace(originMap map[string]interface{}, path string, replaceValue interface{}) (map[string]interface{}, error) {
+func Replace(origin any, path string, replaceValue interface{}) (map[string]interface{}, error) {
+	var originMap, err = ToMapInterface(origin)
+	if err != nil {
+		return make(map[string]any), utils.Errorf("cannot parse[%v] to map[str]any: %v", spew.Sdump(err), err)
+	}
+
 	var (
 		newMap map[string]interface{}
-		err    error
 	)
 
-	newMap, err = deepCopyMapRaw(originMap)
+	newMap, _ = deepCopyMapRaw(originMap)
+	if newMap == nil {
+		newMap = make(map[string]any)
+	}
 
 	p := newScannerWithReplaceValue(path, replaceValue)
 	if err := p.parse(); err != nil {

@@ -24,10 +24,16 @@ func (s *VulinServer) init() {
   <li><a  target="_blank" href='/ssrf-json-in-post-param'>SSRF POST 中有个 JSON 参数，其中 REF 为 URL 的情况</a></li>
   <li><a  target="_blank" href='/ping/cmd/shlex?ip=127.0.0.1'>Shlex 解析的命令注入</a></li>
   <li><a target="_blank"  href='/ping/cmd/bash?ip=127.0.0.1'>Bash 解析的命令注入</a></li>
+
+  <li> ---------------------表达式注入------------------------- </li>
+  <li><a target="_blank"  href='/expr/injection?a=1'>表达式注入1</a></li>
+  <li><a target="_blank"  href='/expr/injection?b={"a": 1}'>表达式注入2</a></li>
+  <li><a target="_blank"  href='/expr/injection?c=abc'>表达式注入3</a></li>
 </ol>
 `))
 	})
 	s.registerSQLinj()
 	s.registerSSRF()
 	s.registerPingCMDI()
+	s.registerExprInj()
 }

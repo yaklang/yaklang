@@ -616,3 +616,27 @@ c=1&d=1`, OptHTTPS(true), OptSource("abc"))
 		spew.Dump(r.Source)
 	}
 }
+
+func TestNewMustFuzzHTTPRequestJP(t *testing.T) {
+	freq, err := NewFuzzHTTPRequest(`GET /abc?a={"a":1} HTTP/1.1
+Host: www.baidu.com
+
+`)
+	if err != nil {
+		panic(1)
+	}
+	for _, r := range freq.GetCommonParams() {
+		r.Fuzz("ccc").Show()
+	}
+
+	freq, err = NewFuzzHTTPRequest(`POST /abc?a=1 HTTP/1.1
+Host: www.baidu.com
+
+b={"c":123}`)
+	if err != nil {
+		panic(1)
+	}
+	for _, r := range freq.GetCommonParams() {
+		r.Fuzz("ccc").Show()
+	}
+}

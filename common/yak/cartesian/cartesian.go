@@ -16,7 +16,7 @@ func Product[T any](origin [][]T) ([][]T, error) {
 	return result, nil
 }
 
-func ProductEx[T any](origin [][]T, handler func(raw []T) error) error {
+func ProductEx[T any](origin [][]T, handler func(result []T) error) error {
 	return ProductExContext[T](context.Background(), origin, handler)
 }
 

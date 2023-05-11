@@ -3,13 +3,17 @@ package mutate
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -314,6 +318,132 @@ func (f *FuzzHTTPRequest) FuzzGetParamsRaw(queryRaws ...string) FuzzHTTPRequestI
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
 
+func (f *FuzzHTTPRequest) FuzzGetJsonPathParams(key any, jsonPath string, val any) FuzzHTTPRequestIf {
+	reqs, err := f.fuzzGetParamsJsonPath(key, jsonPath, val)
+	if err != nil {
+		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+	}
+	return NewFuzzHTTPRequestBatch(f, reqs...)
+}
+
+func (f *FuzzHTTPRequest) FuzzPostJsonPathParams(key any, jsonPath string, val any) FuzzHTTPRequestIf {
+	reqs, err := f.fuzzPostParamsJsonPath(key, jsonPath, val)
+	if err != nil {
+		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+	}
+	return NewFuzzHTTPRequestBatch(f, reqs...)
+}
+
+func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
+	req, err := f.GetOriginHTTPRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(f.originRequest)
+	if body == nil {
+		return nil, errors.New("empty body")
+	}
+
+	vals, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil, errors.New("parse body failed")
+	}
+
+	var reqs []*http.Request
+	var keyStr = utils.InterfaceToString(key)
+	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
+	var valueOrigin = vals.Get(keyStr)
+	if valueOrigin == "" {
+		return nil, utils.Errorf("empty HTTP Get Params[%v] Values", key)
+	}
+	rawJson, isJsonOk := utils.IsJSON(valueOrigin)
+	if !isJsonOk {
+		return nil, utils.Errorf("HTTP Get Params[%v] Values is not json", key)
+	}
+
+	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
+		key, value := result[0], result[1]
+		var replacedValue = []string{
+			jsonpath.ReplaceString(rawJson, jsonPath, value),
+		}
+		if govalidator.IsIn(value) {
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atoi(value)))
+		}
+		for _, i := range replacedValue {
+			newReq := lowhttp.CopyRequest(req)
+			if newReq == nil {
+				continue
+			}
+
+			newVals, err := deepCopyUrlValues(vals)
+			if err != nil {
+				continue
+			}
+			newVals.Set(key, i)
+			newReq.Body = ioutil.NopCloser(bytes.NewBufferString(newVals.Encode()))
+			reqs = append(reqs, newReq)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return reqs, nil
+}
+
+func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
+	req, err := f.GetOriginHTTPRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	vals := req.URL.Query()
+	if vals == nil {
+		vals = make(url.Values)
+	}
+	keyStr := utils.InterfaceToString(key)
+	valueOrigin := vals.Get(keyStr)
+	if valueOrigin == "" {
+		return nil, utils.Errorf("empty HTTP Get Params[%v] Values", key)
+	}
+	rawJson, isJsonOk := utils.IsJSON(valueOrigin)
+	if !isJsonOk {
+		return nil, utils.Errorf("HTTP Get Params[%v] Values is not json", key)
+	}
+
+	var reqs []*http.Request
+	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
+	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
+		key, value := result[0], result[1]
+		var replacedValue = []string{
+			jsonpath.ReplaceString(rawJson, jsonPath, value),
+		}
+		if govalidator.IsInt(value) {
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atoi(value)))
+		}
+		//if govalidator.IsFloat(value) {
+		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atof(value)))
+		//}
+		for _, i := range replacedValue {
+			newReq := lowhttp.CopyRequest(req)
+			if newReq == nil {
+				continue
+			}
+			newVals := newReq.URL.Query()
+			newVals.Set(key, i)
+			newReq.URL.RawQuery = newVals.Encode()
+			newReq.RequestURI = newReq.URL.RequestURI()
+			reqs = append(reqs, newReq)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return reqs, nil
+}
+
 func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
@@ -498,10 +628,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 		return nil, utils.Errorf("key or value is empty...")
 	}
 
-	m, err := mixer.NewMixer(keys, values)
-	if err != nil {
-		return nil, err
-	}
+	var reqs []*http.Request
 
 	// find last map
 	tempParam := originParam
@@ -519,11 +646,10 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 		}
 	}
 
-	var reqs []*http.Request
-	for {
-		pair := m.Value()
-		key, value := pair[0], pair[1]
-
+	err = cartesian.ProductEx([][]string{
+		keys, values,
+	}, func(result []string) error {
+		key, value := result[0], result[1]
 		tempParam[key] = value
 		raw, _ := json.Marshal(originParam)
 		_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
@@ -532,10 +658,10 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 			reqs = append(reqs, _req)
 		}
 		tempParam[key] = originValue
-
-		if err = m.Next(); err != nil {
-			break
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return reqs, nil
