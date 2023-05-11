@@ -220,12 +220,8 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 
 func payloadsToString(payloads *YakPayloads) (string, error) {
 	result := make(map[string]string)
-	log.Info(payloads.raw)
 	for key, value := range payloads.raw {
-
-		if value.FromFile == "" {
-			result[key] = fmt.Sprintf("%+v", value.Data)
-		}
+		result[key] = fmt.Sprintf("%+v - %+v", value.FromFile, value.Data)
 	}
 	jsonBytes, err := json.Marshal(result)
 	if err != nil {
@@ -244,6 +240,7 @@ var Exports = map[string]interface{}{
 				tpl := i["template"].(*YakTemplate)
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
+				// 根据 payload , tpl 名称 , target 条件过滤
 				calcSha1 := utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 				details := make(map[string]interface{})
 				if len(resp) == 1 {
@@ -273,7 +270,6 @@ var Exports = map[string]interface{}{
 					Description:   tpl.Description,
 					Payload:       payloads,
 				}
-				log.Infof("calcSha1: %s", calcSha1)
 				if !filterVul.Exist(calcSha1) {
 					filterVul.Insert(calcSha1)
 					risk := tools.PocVulToRisk(pv)
@@ -281,7 +277,6 @@ var Exports = map[string]interface{}{
 					if err != nil {
 						log.Errorf("save risk failed: %s", err)
 					}
-
 					vCh <- pv
 				}
 
