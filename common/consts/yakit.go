@@ -422,6 +422,24 @@ func InitializeCVEDatabase() (*gorm.DB, error) {
 	return gormCVEDatabase, nil
 }
 
+func doDBPatch() {
+	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source"
+ON "http_flows" (
+  "source_type" ASC
+);`).Error
+	if err != nil {
+		log.Warn("failed to add index on http_flows.source_type")
+	}
+
+	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_tags"
+ON "http_flows" (
+  "tags" ASC
+);`).Error
+	if err != nil {
+		log.Warn("failed to add index on http_flows.tags")
+	}
+}
+
 func GetGormProjectDatabase() *gorm.DB {
 	initOnce.Do(func() {
 		log.Debug("start to loading gorm project/profile database")
@@ -498,6 +516,8 @@ func GetGormProjectDatabase() *gorm.DB {
 				log.Errorf("chmod +rw failed: %s", err)
 			}
 		}
+
+		doDBPatch()
 
 	})
 	return gormDatabase
