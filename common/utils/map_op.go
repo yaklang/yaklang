@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 )
@@ -87,35 +88,40 @@ func MapGetString(m map[string]interface{}, key string) string {
 }
 
 func InterfaceToMapInterface(i interface{}) map[string]interface{} {
+	raw, _ := InterfaceToMapInterfaceE(i)
+	return raw
+}
+
+func InterfaceToMapInterfaceE(i interface{}) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	if i == nil {
-		return result
+		return result, Error("empty")
 	}
 	switch ret := i.(type) {
 	case map[string]interface{}:
-		return ret
+		return ret, nil
 	case map[string]string:
 		for k, v := range ret {
 			result[k] = v
 		}
-		return result
+		return result, nil
 	case map[interface{}]interface{}:
 		result := make(map[string]interface{})
 		for k, v := range ret {
 			result[InterfaceToString(k)] = v
 		}
-		return result
+		return result, nil
 	default:
 		if reflect.TypeOf(i).Kind() == reflect.Map {
 			v := reflect.ValueOf(i)
 			for _, k := range v.MapKeys() {
 				result[InterfaceToString(k.Interface())] = v.MapIndex(k).Interface()
 			}
-			return result
+			return result, nil
 		} else {
-			result["raw"] = i
-			log.Warnf("InterfaceToRawMap error: %v", i)
-			return result
+			result["__[yaklang-raw]__"] = i
+			log.Debugf("InterfaceToRawMap error: %v", i)
+			return result, Errorf("interfaceToRawMap error, got: %v", spew.Sdump(i))
 		}
 	}
 }
