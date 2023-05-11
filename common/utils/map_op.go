@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 )
@@ -61,10 +62,18 @@ func MapGetFirstRaw(m map[string]interface{}, key ...string) interface{} {
 
 	for _, i := range key {
 		result := MapGetRawOr(m, i, nil)
-		if result == nil {
-			continue
+		if result != nil {
+			return result
 		}
-		return result
+
+		// If not, try to find the key with "request_%d" format
+		for j := 1; j <= 20; j++ {
+			reqKey := fmt.Sprintf("%s_%d", i, j)
+			result := MapGetRawOr(m, reqKey, nil)
+			if result != nil {
+				return result
+			}
+		}
 	}
 	return nil
 }
