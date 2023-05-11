@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
-	gopsnet "github.com/yaklang/yaklang/common/gopsutil/net"
+	gopsnet "github.com/shirou/gopsutil/v3/net"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"time"

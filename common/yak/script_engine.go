@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/crawlerx/newcrawlerx"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
+	"github.com/yaklang/yaklang/common/hids"
 	"github.com/yaklang/yaklang/common/iiop"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -19,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/simulator"
+	"github.com/yaklang/yaklang/common/systemd"
 	"github.com/yaklang/yaklang/common/t3"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/comparer"
@@ -94,6 +96,8 @@ func initYaklangLib() {
 	yaklang.Import("codec", yaklib.CodecExports) //编码解码
 	yaklang.Import("log", yaklib.LogExports)
 	//yaklang.Import("net", yaklib.Ne)
+	yaklang.Import("hids", hids.Exports)
+	yaklang.Import("systemd", systemd.Exports)
 
 	//yaklang.Import("geojson", yaklib.GeoJsonExports)
 	yaklang.Import("mmdb", yaklib.MmdbExports)
