@@ -292,6 +292,24 @@ func ParseUrlToHttpRequestRaw(method string, i interface{}) (bool, []byte, error
 	return strings.HasPrefix(strings.ToLower(urlStr), "https://"), bytes, err
 }
 
+func CopyRequest(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+	raw, err := utils.HttpDumpWithBody(r, true)
+	if err != nil {
+		log.Warnf("copy request && Dump failed: %s", err)
+	}
+	if raw == nil {
+		return nil
+	}
+	result, err := ParseBytesToHttpRequest(raw)
+	if err != nil {
+		log.Warnf("copy request && ParseBytesToHttpRequest failed: %s", err)
+	}
+	return result
+}
+
 func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	raw = FixHTTPPacketCRLF(raw, false)
 

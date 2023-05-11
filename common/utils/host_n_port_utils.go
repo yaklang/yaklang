@@ -5,8 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	"github.com/asaskevich/govalidator"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"google.golang.org/protobuf/encoding/protowire"
 	"math/big"
 	"math/rand"
@@ -347,6 +350,31 @@ func IsIPv4(raw string) bool {
 
 func IsHttp(raw string) bool {
 	return strings.HasPrefix(strings.TrimSpace(raw), "http://") || strings.HasPrefix(strings.TrimSpace(raw), "https://")
+}
+
+func IsJSON(raw string) (string, bool) {
+	if govalidator.IsJSON(raw) {
+		return raw, true
+	}
+
+	fixRaw := jsonextractor.FixJson([]byte(raw))
+	if fixRaw != nil {
+		raw = string(fixRaw)
+		if govalidator.IsJSON(raw) {
+			return raw, true
+		}
+	}
+
+	unescapeJson, err := codec.QueryUnescape(raw)
+	if err != nil {
+		return raw, false
+	}
+
+	if govalidator.IsJSON(unescapeJson) {
+		return string(unescapeJson), true
+	}
+
+	return raw, false
 }
 
 func IsGzip(raw []byte) bool {

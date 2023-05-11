@@ -7,8 +7,10 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
@@ -19,7 +21,22 @@ func init() {
 	for k, v := range tools.NucleiOperationsExports {
 		Exports[k] = v
 	}
+
+	yaklib.FuzzExports["FuzzCalcExpr"] = FuzzCalcExpr
 }
+
+func FuzzCalcExpr() map[string]interface{} {
+	vars := NewVars()
+	day := mutate.MutateQuick("{{ri(1-28|2)}}")[0]
+	vars.AutoSet("year", "{{rand_int(2000,2020)}}")
+	vars.AutoSet("month", "0{{rand_int(1,7)}}")
+	vars.AutoSet("day", day)
+	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
+	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
+	var a = vars.ToMap()
+	return a
+}
+
 func ScanPacket(req []byte, opts ...interface{}) {
 	config, lowhttpConfig, lowhttpOpts := toConfig(opts...)
 	baseContext, cancel := context.WithCancel(context.Background())
