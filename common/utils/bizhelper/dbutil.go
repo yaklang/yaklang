@@ -592,6 +592,7 @@ func Paging(db *gorm.DB, page int, limit int, data interface{}) (*Paginator, *go
 		DB:    db,
 		Page:  page,
 		Limit: limit,
+		//ShowSQL: true,
 	}, data)
 	return p, db
 }
