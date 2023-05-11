@@ -107,24 +107,24 @@ const nucleiCodeExecTemplate = `
 // 这个脚本需要进行操作，设置 CURRENT_NUCLEI_PLUGIN_NAME 作为变量名
 nucleiPoCName = MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
 // nucleiPoCName = "[thinkphp-5023-rce]: ThinkPHP 5.0.23 RCE" // MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
-script, err := db.GetYakitPluginByName(nucleiPoCName)
-if err != nil {
-	yakit.Error("load yakit-plugin(nuclei) failed: %s", err)
-	return
-}
-
-script.LocalPath = str.TrimLeft(script.LocalPath, "/")
-pocName = file.Join(nuclei.GetPoCDir(), script.LocalPath)
-if pocName == "" || (!file.IsExisted(pocName)) {
-	f, err := file.TempFile()
-	if err != nil {
-		yakit.Error("load tempfile to save nuclei poc failed: %s", err)
-		return
-	}
-	pocName = f.Name()
-    f.WriteString(script.Content)
-    f.Close()	
-}
+//script, err := db.GetYakitPluginByName(nucleiPoCName)
+//if err != nil {
+//	yakit.Error("load yakit-plugin(nuclei) failed: %s", err)
+//	return
+//}
+//
+//script.LocalPath = str.TrimLeft(script.LocalPath, "/")
+//pocName = file.Join(nuclei.GetPoCDir(), script.LocalPath)
+//if pocName == "" || (!file.IsExisted(pocName)) {
+//	f, err := file.TempFile()
+//	if err != nil {
+//		yakit.Error("load tempfile to save nuclei poc failed: %s", err)
+//		return
+//	}
+//	pocName = f.Name()
+//    f.WriteString(script.Content)
+//    f.Close()	
+//}
 
 proxy = cli.StringSlice("proxy")
 
@@ -135,7 +135,7 @@ execNuclei = func(target) {
 	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
     
 	res, err = nuclei.Scan(
-        target, nuclei.templates(pocName),
+        target, nuclei.templates(nucleiPoCName),
         nuclei.retry(0), nuclei.stopAtFirstMatch(true), nuclei.timeout(10), 
         nuclei.proxy(proxy...),
     )
