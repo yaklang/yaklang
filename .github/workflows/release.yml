@@ -110,8 +110,7 @@ jobs:
       # 获取 latest 之前的 tag
       - name: Get previous version
         run: |
-          git fetch --tags
-          git describe --abbrev=0 --tags --exclude "refs/tags/v*"
+          git tag --sort=-v:refname | awk 'NR==2 { sub(/^v/, "", $0); print }'
         id: previous_version
       - name: Download Windows YAK
         uses: actions/download-artifact@v2
@@ -164,7 +163,7 @@ jobs:
           bucket: yaklang
           assets: |
             ./version.txt:/yak/latest/version.txt
-            ./previous_version.txt:/yak/latest/previous_version.txt
+            ./previous_version.txt:/yak/previous/previous_version.txt
             yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe
             yak_windows_amd64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
             yak_linux_amd64:/yak/latest/yak_linux_amd64
