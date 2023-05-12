@@ -175,6 +175,7 @@ func (s *StructDocForYamlMarshal) IsBuildInLib() bool {
 	}
 	for _, r := range []string{
 		"palm/",
+		"github.com/yaklang/",
 	} {
 		if strings.HasPrefix(s.StructName, r) {
 			return false
