@@ -101,6 +101,7 @@ func LibDocsToCompletionJsonEx(all bool, libs ...LibDoc) ([]byte, error) {
 
 			// 判断是否要过滤一些不重要的数据？
 			if stct.IsBuildInLib() {
+				//log.Infof("fetch struct: %v", stct.StructName)
 				// 如果是内置库的话，需要判断是不是符合白名单
 				if len(whiteStructListGlob) > 0 {
 					if !utils.MatchAnyOfGlob(stct.StructName, whiteStructListGlob...) {
