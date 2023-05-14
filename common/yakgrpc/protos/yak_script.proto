@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package ypb;
 option go_package = "/;ypb";
-import "protoc/message.proto";
+import "message.proto";
 
 
 service YakScriptService {
@@ -23,6 +23,37 @@ service YakScriptService {
   rpc QueryYakScriptLocalAndUser(QueryYakScriptLocalAndUserRequest) returns (QueryYakScriptLocalAndUserResponse);
   rpc QueryYakScriptByOnlineGroup(QueryYakScriptByOnlineGroupRequest) returns (QueryYakScriptLocalAndUserResponse);
   rpc QueryYakScriptLocalAll(Empty) returns (QueryYakScriptLocalAndUserResponse);
+
+  // 对插件结果的操作
+  rpc QueryYakScriptExecResult(QueryYakScriptExecResultRequest) returns (QueryYakScriptExecResultResponse);
+  rpc QueryYakScriptNameInExecResult(Empty) returns (YakScriptNames);
+  rpc DeleteYakScriptExecResult(DeleteYakScriptExecResultRequest) returns (Empty);
+  rpc DeleteYakScriptExec(Empty) returns (Empty);
+
+  // 获取 Tags
+  rpc GetAvailableYakScriptTags(Empty) returns (Fields);
+  rpc ForceUpdateAvailableYakScriptTags(Empty) returns (Empty);
+}
+
+message YakScriptNames {
+  repeated string YakScriptNames = 1;
+}
+
+message DeleteYakScriptExecResultRequest {
+  repeated int64 Id = 1;
+  string YakScriptName = 2;
+}
+
+message QueryYakScriptExecResultResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated ExecResult Data = 3;
+}
+
+
+message QueryYakScriptExecResultRequest {
+  Paging Pagination = 1;
+  string YakScriptName = 2;
 }
 
 message QueryYakScriptByOnlineGroupRequest {
@@ -80,20 +111,6 @@ message ExecBatchYakScriptResult {
   int64 Timestamp = 16;
 }
 
-
-message ExecResult {
-  string Hash = 1;
-  string OutputJson = 2;
-  bytes Raw = 3;
-  bool IsMessage = 4;
-  bytes Message = 5;
-
-  // 如果是一个保存过的 ExecResult 他应该有数据库记录 ID
-  int64 Id = 6;
-
-  string RuntimeID = 7;
-  float Progress = 8;
-}
 
 message ExportYakScriptResponse {
   string OutputDir = 2;

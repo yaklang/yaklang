@@ -116,279 +116,32 @@ service Yak {
   // version
   rpc Version(Empty) returns (VersionResponse);
 
+  // machine id
+  rpc GetMachineID(Empty) returns (GetMachineIDResponse);
+
   // echo 通常用于测试服务是否通畅
   rpc Echo(EchoRequest) returns(EchoResposne);
 
-  // 中间人劫持
-  rpc MITM(stream MITMRequest) returns (stream MITMResponse);
-  rpc SetMITMFilter(SetMITMFilterRequest) returns (SetMITMFilterResponse);
-  rpc GetMITMFilter(Empty) returns (SetMITMFilterRequest);
-  rpc DownloadMITMCert(Empty) returns (MITMCert);
 
   // 开启端口
   rpc OpenPort(stream Input) returns (stream Output);
 
 
-  // 分析一个 HTTP 请求详情
-  rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
-
-  // 编码解码
-  rpc Codec(CodecRequest) returns (CodecResponse);
-
-  // Payload 相关接口
-  rpc QueryPayload(QueryPayloadRequest) returns (QueryPayloadResponse);
-  rpc DeletePayloadByGroup(DeletePayloadByGroupRequest) returns (Empty);
-  rpc DeletePayload(DeletePayloadRequest) returns (Empty);
-  rpc SavePayload(SavePayloadRequest) returns (Empty);
-  rpc SavePayloadStream(SavePayloadRequest) returns (stream SavePayloadProgress);
-  rpc GetAllPayloadGroup(Empty) returns (GetAllPayloadGroupResponse);
-  rpc UpdatePayload(UpdatePayloadRequest) returns (Empty);
-  rpc GetAllPayload(GetAllPayloadRequest) returns (GetAllPayloadResponse);
-
-  // 自动生成补全
-  rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
-  rpc GetYakVMBuildInMethodCompletion(GetYakVMBuildInMethodCompletionRequest) returns (GetYakVMBuildInMethodCompletionResponse);
-  rpc StaticAnalyzeError(StaticAnalyzeErrorRequest) returns (StaticAnalyzeErrorResponse);
-  rpc YaklangCompileAndFormat(YaklangCompileAndFormatRequest) returns (YaklangCompileAndFormatResponse);
-
-  // 端口扫描的封装
-  rpc PortScan(PortScanRequest) returns (stream ExecResult);
-  rpc ViewPortScanCode(Empty) returns (SimpleScript);
-
-  rpc SimpleDetect(RecordPortScanRequest) returns (stream ExecResult);
-  rpc SaveCancelSimpleDetect(RecordPortScanRequest) returns (Empty);
-
-  rpc GetSimpleDetectUnfinishedTask(Empty) returns (GetSimpleDetectUnfinishedTaskResponse);
-  rpc GetSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
-  rpc PopSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
-  rpc RecoverSimpleDetectUnfinishedTask(RecoverExecBatchYakScriptUnfinishedTaskRequest) returns (stream ExecResult);
-
-
-  // 资产管理
-  rpc QueryPorts(QueryPortsRequest) returns (QueryPortsResponse);
-  rpc DeletePorts(DeletePortsRequest) returns (Empty);
-  rpc QueryHosts(QueryHostsRequest) returns (QueryHostsResponse);
-  rpc DeleteHosts(DeleteHostsRequest) returns (Empty);
-  rpc QueryDomains(QueryDomainsRequest) returns(QueryDomainsResponse);
-  rpc DeleteDomains(DeleteDomainsRequest)returns(Empty);
-
-  // Yakit Store
-  rpc UpdateFromYakitResource(UpdateFromYakitResourceRequest) returns (Empty);
-  rpc UpdateFromGithub(UpdateFromGithubRequest) returns (Empty);
-
-  // Menu
-  rpc AddToMenu(AddToMenuRequest) returns (Empty);
-  rpc RemoveFromMenu(RemoveFromMenuRequest) returns (Empty);
-  rpc YakScriptIsInMenu(YakScriptIsInMenuRequest) returns (Empty);
-  rpc GetAllMenuItem(Empty) returns (MenuByGroup);
-  rpc DeleteAllMenuItem(Empty) returns (Empty);
-  rpc ImportMenuItem(ImportMenuItemRequest) returns (Empty);
-  rpc ExportMenuItem(Empty) returns (ExportMenuItemResult);
-  rpc GetMenuItemById(GetMenuItemByIdRequest) returns (MenuItem);
-  rpc QueryGroupsByYakScriptId(QueryGroupsByYakScriptIdRequest) returns (GroupNames);
-  rpc AddMenus(AddMenuRequest) returns (Empty);
-  rpc QueryAllMenuItem(QueryAllMenuItemRequest) returns (MenuByGroup);
-  rpc DeleteAllMenu(QueryAllMenuItemRequest) returns (Empty);
-
-  // document
-  rpc SaveMarkdownDocument(SaveMarkdownDocumentRequest) returns (Empty);
-  rpc GetMarkdownDocument(GetMarkdownDocumentRequest) returns (GetMarkdownDocumentResponse);
-  rpc DeleteMarkdownDocument(GetMarkdownDocumentRequest) returns (Empty);
-
-  // Crawler
-  rpc StartBasicCrawler(StartBasicCrawlerRequest)returns (ExecResult);
-  rpc ViewBasicCrawlerCode(Empty) returns (SimpleScript);
-  rpc GenerateWebsiteTree(GenerateWebsiteTreeRequest) returns (GenerateWebsiteTreeResponse);
-
-  // 对插件结果的操作
-  rpc QueryYakScriptExecResult(QueryYakScriptExecResultRequest) returns (QueryYakScriptExecResultResponse);
-  rpc QueryYakScriptNameInExecResult(Empty) returns (YakScriptNames);
-  rpc DeleteYakScriptExecResult(DeleteYakScriptExecResultRequest) returns (Empty);
-  rpc DeleteYakScriptExec(Empty) returns (Empty);
-
-  // Bruter
-  rpc StartBrute(StartBruteParams) returns (stream ExecResult);
-  rpc GetAvailableBruteTypes(Empty) returns (GetAvailableBruteTypesResponse);
-
-  // Tunnel Server RMI/DNSLog
-  rpc GetTunnelServerExternalIP(GetTunnelServerExternalIPParams) returns (GetTunnelServerExternalIPResponse);
-  rpc VerifyTunnelServerDomain(VerifyTunnelServerDomainParams) returns (VerifyTunnelServerDomainResponse) ;
-  rpc StartFacades(StartFacadesParams) returns (stream ExecResult);
-  rpc StartFacadesWithYsoObject(StartFacadesWithYsoParams) returns (stream ExecResult);
-  rpc ApplyClassToFacades(ApplyClassToFacadesParamsWithVerbose) returns (Empty);
-  rpc BytesToBase64(BytesToBase64Request) returns (BytesToBase64Response);
-  rpc ConfigGlobalReverse(ConfigGlobalReverseParams) returns (stream Empty);
-  rpc AvailableLocalAddr(Empty) returns (AvailableLocalAddrResponse);
-  rpc GetGlobalReverseServer(Empty) returns (GetGlobalReverseServerResponse);
-
-  // Risk
-  rpc QueryRisks(QueryRisksRequest) returns (QueryRisksResponse);
-  rpc QueryRisk(QueryRiskRequest) returns (Risk);
-  rpc DeleteRisk(DeleteRiskRequest) returns (Empty);
-  rpc QueryAvailableRiskType(Empty) returns (Fields);
-  rpc QueryAvailableRiskLevel(Empty) returns (Fields);
-  rpc QueryRiskTableStats(Empty) returns (RiskTableStats);
-  rpc ResetRiskTableStats(Empty) returns (Empty);
-  rpc QueryAvailableTarget(Empty) returns (Fields);
-  rpc QueryNewRisk(QueryNewRiskRequest) returns (QueryNewRiskResponse);
-  rpc NewRiskRead(NewRiskReadRequest) returns (Empty);
-  rpc UploadRiskToOnline(UploadRiskToOnlineRequest) returns (Empty);
-
-  // Report
-  rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
-  rpc QueryReport(QueryReportRequest) returns (Report);
-  rpc DeleteReport(DeleteReportRequest) returns (Empty);
-  rpc QueryAvailableReportFrom(Empty) returns (Fields);
-
-  rpc DownloadReport(DownloadReportRequest) returns (Empty);
-
-  //Yso
-  rpc GetAllYsoGadgetOptions(Empty) returns (YsoOptionsWithVerbose);
-  rpc GetAllYsoClassOptions(YsoOptionsRequerstWithVerbose) returns (YsoOptionsWithVerbose);
-  rpc GetAllYsoClassGeneraterOptions(YsoOptionsRequerstWithVerbose) returns (YsoClassOptionsResponseWithVerbose);
-  rpc GenerateYsoCode(YsoOptionsRequerstWithVerbose) returns (YsoCodeResponse);
-  rpc GenerateYsoBytes(YsoOptionsRequerstWithVerbose) returns (YsoBytesResponse);
-  rpc YsoDump(YsoBytesObject)returns(YsoDumpResponse);
-
-  // DNSLog / ICMP / RandomTrigger
-  rpc SetYakBridgeLogServer(YakDNSLogBridgeAddr) returns (Empty);
-  rpc GetCurrentYakBridgeLogServer(Empty) returns (YakDNSLogBridgeAddr);
-  rpc RequireDNSLogDomain(YakDNSLogBridgeAddr) returns (DNSLogRootDomain);
-  rpc QueryDNSLogByToken(QueryDNSLogByTokenRequest) returns (QueryDNSLogByTokenResponse);
-  rpc RequireICMPRandomLength(Empty) returns (RequireICMPRandomLengthResponse);
-  rpc QueryICMPTrigger(QueryICMPTriggerRequest) returns (QueryICMPTriggerResponse);
-  rpc RequireRandomPortToken(Empty) returns (RandomPortInfo);
-  rpc QueryRandomPortTrigger(QueryRandomPortTriggerRequest) returns (RandomPortTriggerNotification);
-
-  // 获取 Tags
-  rpc GetAvailableYakScriptTags(Empty) returns (Fields);
-  rpc ForceUpdateAvailableYakScriptTags(Empty) returns (Empty);
-
   // 通用的漏洞检测技术方案
   rpc ExecYakitPluginsByYakScriptFilter(ExecYakitPluginsByYakScriptFilterRequest) returns (stream ExecResult);
 
-  // GenerateYakCodeByPacket
-  rpc GenerateYakCodeByPacket(GenerateYakCodeByPacketRequest) returns (GenerateYakCodeByPacketResponse);
-
-  // CSRF Generator
-  rpc GenerateCSRFPocByPacket(GenerateCSRFPocByPacketRequest) returns (GenerateCSRFPocByPacketResponse);
-
-  // MITM 衍生功能：
-  // Replacers 管理
-  rpc ExportMITMReplacerRules(Empty) returns (ExportMITMReplacerRulesResponse);
-  rpc ImportMITMReplacerRules(ImportMITMReplacerRulesRequest) returns (Empty);
-  rpc GetCurrentRules(Empty) returns (MITMContentReplacers);
-  rpc SetCurrentRules(MITMContentReplacers) returns (Empty);
 
   rpc ExtractDataToFile(stream ExtractDataToFileRequest) returns (stream ExtractDataToFileResult);
 
-  // 尝试自动解码
-  rpc AutoDecode(AutoDecodeRequest) returns (AutoDecodeResponse);
-
-  rpc GetSystemProxy(Empty) returns (GetSystemProxyResult);
-  rpc SetSystemProxy(SetSystemProxyRequest) returns (Empty);
-
-  // 设置通用存储
-  rpc GetKey(GetKeyRequest) returns (GetKeyResult);
-  rpc SetKey(SetKeyRequest) returns (Empty);
-  rpc DelKey(GetKeyRequest) returns (Empty);
-  rpc GetAllProcessEnvKey(Empty) returns (GetProcessEnvKeyResult);
-  rpc SetProcessEnvKey(SetKeyRequest) returns (Empty);
-
-  // Online
-  rpc GetOnlineProfile(Empty) returns (OnlineProfile);
-  rpc SetOnlineProfile(OnlineProfile) returns (Empty);
-  rpc DownloadOnlinePluginById(DownloadOnlinePluginByIdRequest) returns (Empty);
-  rpc DownloadOnlinePluginByIds(DownloadOnlinePluginByIdsRequest) returns (Empty);
-  rpc DownloadOnlinePluginAll(DownloadOnlinePluginByTokenRequest) returns (stream DownloadOnlinePluginProgress);
-  rpc DeletePluginByUserID(DeletePluginByUserIDRequest) returns (Empty);
-  rpc DeleteAllLocalPlugins(Empty) returns (Empty);
-  rpc GetYakScriptTagsAndType(Empty) returns (GetYakScriptTagsAndTypeResponse);
-  rpc DeleteLocalPluginsByWhere(DeleteLocalPluginsByWhereRequest) returns (Empty);
-  rpc DownloadOnlinePluginByScriptNames(DownloadOnlinePluginByScriptNamesRequest) returns (DownloadOnlinePluginByScriptNamesResponse);
   // 新的扫描模式
   rpc ExecPacketScan(ExecPacketScanRequest) returns (stream ExecResult);
 
-  rpc GetEngineDefaultProxy(Empty) returns (DefaultProxyResult);
-  rpc SetEngineDefaultProxy(DefaultProxyResult) returns (Empty);
-
-  // machine id
-  rpc GetMachineID(Empty) returns (GetMachineIDResponse);
-
-  // license
-  rpc GetLicense(Empty) returns (GetLicenseResponse);
-  rpc CheckLicense(CheckLicenseRequest) returns (Empty);
-
-  // Response Body 的魔法操作
-  rpc GetRequestBodyByHTTPFlowID(DownloadBodyByHTTPFlowIDRequest) returns (Bytes);
-  rpc GetResponseBodyByHTTPFlowID(DownloadBodyByHTTPFlowIDRequest) returns (Bytes);
-  rpc GetHTTPPacketBody(GetHTTPPacketBodyRequest) returns (Bytes);
-
-  // 注册一个 Facades HTTP 响应
-  rpc RegisterFacadesHTTP(RegisterFacadesHTTPRequest) returns (RegisterFacadesHTTPResponse);
-
-  // 重置到恢复出厂设置
-  rpc ResetAndInvalidUserData(ResetAndInvalidUserDataRequest) returns (Empty);
 
   // Yaklang Shell
   // 创建一个交互式 Shell
   rpc CreateYaklangShell(stream YaklangShellRequest) returns (stream YaklangShellResponse);
 
-  // 接入标准输出和标准错误流
-  rpc AttachCombinedOutput(AttachCombinedOutputRequest) returns (stream ExecResult);
 
-  // 判断当前引擎对网卡是否有操作权限？
-  // 主要是能否发包等敏感操作
-  // Windows 判断是否是管理员即可 I Am Admin
-  // Linux 和 MacOS 应该尝试 pcap 打开网卡就行
-  rpc IsPrivilegedForNetRaw(Empty) returns (IsPrivilegedForNetRawResponse);
-  rpc PromotePermissionForUserPcap(Empty) returns (Empty);
-
-  // 操作项目的相关接口，通过设置 ProjectDatabase
-  rpc SetCurrentProject(SetCurrentProjectRequest) returns (Empty);
-  rpc GetCurrentProject(Empty) returns (ProjectDescription);
-  rpc GetProjects(GetProjectsRequest) returns (GetProjectsResponse);
-  rpc NewProject(NewProjectRequest) returns (NewProjectResponse);
-  rpc IsProjectNameValid(IsProjectNameValidRequest) returns (Empty);
-  rpc RemoveProject(RemoveProjectRequest) returns (Empty);
-
-  rpc DeleteProject(DeleteProjectRequest) returns (Empty);
-  rpc GetDefaultProject(Empty) returns (ProjectDescription);
-  rpc QueryProjectDetail(QueryProjectDetailRequest) returns (ProjectDescription);
-
-  // 导入导出项目，带密码，带进度
-  rpc ExportProject(ExportProjectRequest) returns (stream ProjectIOProgress);
-  rpc ImportProject(ImportProjectRequest) returns (stream ProjectIOProgress);
-  // 迁移旧数据库
-  rpc MigrateLegacyDatabase(Empty) returns (Empty);
-
-  // 从规则中提取数据
-  rpc QueryMITMRuleExtractedData(QueryMITMRuleExtractedDataRequest) returns (QueryMITMRuleExtractedDataResponse);
-
-  /*
-    ChaosMakerRule: Bas
-  */
-  rpc ImportChaosMakerRules(ImportChaosMakerRulesRequest) returns (Empty);
-  rpc QueryChaosMakerRule(QueryChaosMakerRuleRequest) returns (QueryChaosMakerRuleResponse);
-  rpc DeleteChaosMakerRuleByID(DeleteChaosMakerRuleByIDRequest) returns (Empty);
-  rpc ExecuteChaosMakerRule(ExecuteChaosMakerRuleRequest) returns (stream ExecResult);
-  rpc IsRemoteAddrAvailable(IsRemoteAddrAvailableRequest) returns (IsRemoteAddrAvailableResponse);
-
-  // CVE
-  rpc IsCVEDatabaseReady(IsCVEDatabaseReadyRequest) returns (IsCVEDatabaseReadyResponse);
-  rpc UpdateCVEDatabase(UpdateCVEDatabaseRequest) returns (stream ExecResult);
-  rpc ExportsProfileDatabase(ExportsProfileDatabaseRequest) returns (stream ExecResult);
-  rpc ImportsProfileDatabase(ImportsProfileDatabaseRequest) returns (stream ExecResult);
-
-  rpc QueryCVE(QueryCVERequest) returns (QueryCVEResponse);
-  rpc GetCVE(GetCVERequest) returns (CVEDetailEx);
-  rpc SaveTextToTemporalFile(SaveTextToTemporalFileRequest) returns (SaveTextToTemporalFileResponse);
-
-  // Screcorder
-  rpc IsScrecorderReady(IsScrecorderReadyRequest) returns (IsScrecorderReadyResponse);
-  rpc InstallScrecorder(InstallScrecorderRequest) returns (stream ExecResult);
-  rpc StartScrecorder(StartScrecorderRequest) returns (stream ExecResult);
-  rpc QueryScreenRecorders(QueryScreenRecorderRequest) returns (QueryScreenRecorderResponse);
 }
 
 message ScreenRecorder {

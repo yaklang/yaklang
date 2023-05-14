@@ -2,7 +2,8 @@ syntax = "proto3";
 
 package ypb;
 option go_package = "/;ypb";
-import "protoc/message.proto";
+import "message.proto";
+import "http_flow.proto";
 
 
 service FuzzerService {

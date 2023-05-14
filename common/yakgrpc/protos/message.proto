@@ -3,6 +3,8 @@ syntax = "proto3";
 package ypb;
 option go_package = "/;ypb";
 
+message Empty {
+}
 
 // 执行脚本
 message ExecParamItem {
@@ -10,12 +12,18 @@ message ExecParamItem {
   string Value = 2;
 }
 
-message Empty {
-}
+message ExecResult {
+  string Hash = 1;
+  string OutputJson = 2;
+  bytes Raw = 3;
+  bool IsMessage = 4;
+  bytes Message = 5;
 
-message HTTPHeader {
-  string Header = 1;
-  string Value = 2;
+  // 如果是一个保存过的 ExecResult 他应该有数据库记录 ID
+  int64 Id = 6;
+
+  string RuntimeID = 7;
+  float Progress = 8;
 }
 
 message Paging {
@@ -25,71 +33,20 @@ message Paging {
   string Order = 54;
 }
 
-message HTTPFlow {
-  bool IsHTTPS = 2;
-  string Url = 3;
-  repeated HTTPHeader RequestHeader = 4;
-  bytes Request = 5;
-  repeated HTTPHeader ResponseHeader = 6;
-  bytes Response = 7;
-  string SourceType = 8;
-  string Path = 9;
-  string Method = 10;
-  int64 BodyLength = 11;
-  string BodySizeVerbose = 19;
-  int64 RequestLength = 31; // 设置 Request Body 长度
-  string RequestSizeVerbose = 32; // 设置 Request
-  string ContentType = 12;
-  int64 StatusCode = 13;
-  int64 GetParamsTotal = 14;
-  int64 PostParamsTotal = 15;
-  int64 CookieParamsTotal = 22;
-  int64 UpdatedAt = 16;
-  int64 CreatedAt = 17;
-  string Hash = 18;
-
-  repeated FuzzableParam GetParams = 20;
-  repeated FuzzableParam PostParams = 21;
-  repeated FuzzableParam CookieParams = 23;
-
-  string HostPort = 24;
-  string IPAddress = 25;
-
-  string HtmlTitle = 26;
-
-  string Tags = 27;
-  bool NoFixContentLength = 28;
-
-  uint64 Id = 29;
-
-  // websocket 相关字段
-  bool IsWebsocket = 30;
-  string WebsocketHash = 33;
-
-  // 标记 UTF8 Invalid
-  /*
-    一般这不是无损的情况，会涉及到用户 Copy Paste 直接 Body 的需求
-  */
-  bool InvalidForUTF8Request = 34;
-  bool InvalidForUTF8Response = 35;
-  string RawRequestBodyBase64 = 36;
-  string RawResponseBodyBase64 = 37;
-
-  // 可以安全的传输到 Fuzzer 的 HTTPRequest
-  string SafeHTTPRequest = 38;
-
-  /*
-  在完全数据下，可加载 Domain 和 RootDomain 还有 Json
-  */
-  repeated string Domains = 40;
-  repeated string RootDomains = 41;
-  repeated string JsonObjects = 42;
+message HTTPHeader {
+  string Header = 1;
+  string Value = 2;
 }
 
-message FuzzableParam {
-  string Position = 1;
-  string ParamName = 2;
-  bytes OriginValue = 3;
-  bytes AutoTemplate = 4;
-  bool IsHTTPS = 5;
+message FieldName {
+  string Name = 1;
+  string Verbose = 2;
+  int32 Total = 3;
+
+  // 比上一次的增量/变化量
+  int32 Delta = 4;
+}
+
+message Fields {
+  repeated FieldName Values = 1;
 }
