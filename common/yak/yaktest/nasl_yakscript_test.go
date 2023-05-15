@@ -23,7 +23,7 @@ func TestScanTarget(t *testing.T) {
 		{
 			Name: "测试扫描目标",
 			Src: `
-kbs,err = nasl.ScanTarget("182.54.177.31:3306",nasl.group("oracle"))
+kbs,err = nasl.ScanTarget("198.73.2.155:5061",nasl.group("oracle"))
 dump(kbs)
 `,
 		},

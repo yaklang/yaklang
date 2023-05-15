@@ -3,11 +3,15 @@ package antlr4nasl
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"regexp"
 	"testing"
 )
 
+func init() {
+	yak.SetNaslExports(Exports)
+}
 func PatchEngine(engine *Engine) {
 	engine.AddNaslLibPatch("http_func", func(s string) string {
 		s += `
@@ -191,9 +195,10 @@ func TestPocScanner(t *testing.T) {
 	//})
 	engine.SetGoroutineNum(1)
 	engine.SetIncludePath("/Users/z3/nasl/nasl-plugins") // 设置nasl依赖库位置
-	//engine.LoadScriptFromFile("/Users/z3/nasl/nasl-plugins/gb_apache_struts_detect.nasl")
+	engine.SetDependencies("/Users/z3/nasl/nasl-plugins")
+	engine.LoadScriptFromFile("/Users/z3/nasl/nasl-plugins/2023/oracle/gb_mysql_cpujan2023_2_lin.nasl")
 	//engine.LoadGroup(PluginGroupApache)
-	engine.LoadGroups(PluginGroupApache)
+	//engine.LoadGroups(PluginGroupApache)
 
 	engine.AddExcludeScripts(
 		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
@@ -206,8 +211,7 @@ func TestPocScanner(t *testing.T) {
 		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
 		//get_app_port_from_list，get_app_version_and_location_from_list
 	)
-
-	err := engine.Scan("182.54.177.31", "3306")
+	err := engine.Scan("107.167.224.123", "5060")
 	// 排查未定义的函数
 	var unknownErrors multiError
 	undefinedVars := []string{}

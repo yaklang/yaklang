@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"path"
 	"sync"
 )
 
@@ -74,6 +75,20 @@ type NaslScriptInfo struct {
 	Timeout         int
 }
 
+func (n *NaslScriptInfo) Run(e *Engine) error {
+	for _, dependency := range n.Dependencies {
+		ins, err := NewNaslScriptObjectFromFile(path.Join(e.dependenciesPath, dependency))
+		if err != nil {
+			return err
+		}
+		if err := ins.Run(e); err != nil {
+			return err
+		}
+	}
+	e.scriptObj = n
+	e.compiler.SetSourceCodeFilePath("script name: " + n.OriginFileName)
+	return e.SafeEval(n.Script)
+}
 func NewNaslScriptObject() *NaslScriptInfo {
 	return &NaslScriptInfo{
 		naslScript:  yakit.NewEmptyNaslScript(),

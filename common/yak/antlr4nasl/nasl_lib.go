@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -17,6 +18,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -113,10 +115,10 @@ func init() {
 			return nil, nil
 		},
 		"script_dependencies": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			var deps *yakvm.Value
-			for i := 0; deps != nil && !deps.IsUndefined(); i++ {
-				deps = params.getParamByNumber(0)
+			deps := params.getParamByNumber(0)
+			for i := 1; deps != nil && !deps.IsUndefined(); i++ {
 				engine.scriptObj.Dependencies = append(engine.scriptObj.Dependencies, deps.AsString())
+				deps = params.getParamByNumber(i)
 			}
 			return nil, nil
 		},
@@ -172,9 +174,11 @@ func init() {
 		},
 		"script_add_preference": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			addPreference := func(s1, s2, s3 string) {
-				engine.scriptObj.Preferences["name"] = s1
-				engine.scriptObj.Preferences["type"] = s2
-				engine.scriptObj.Preferences["value"] = s3
+				preferences := map[string]interface{}{}
+				preferences["name"] = s1
+				preferences["type"] = s2
+				preferences["value"] = s3
+				engine.scriptObj.Preferences[s1] = preferences
 			}
 			name := params.getParamByName("name")
 			type_ := params.getParamByName("type")
@@ -196,9 +200,19 @@ func init() {
 			return nil, nil
 		},
 		"script_get_preference_file_content": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//ref := params.getParamByNumber(0).AsString()
-			//
-			panic(fmt.Sprintf("method `script_get_preference_file_content` is not implement"))
+			ref := params.getParamByNumber(0, "").String()
+			if ref == "" {
+				return nil, errors.New("Argument error in the function script_get_preference()\nFunction usage is : pref = script_get_preference_file_content(<name>)")
+			}
+			if v, ok := engine.scriptObj.Preferences[ref]; ok {
+				if v1, ok := v.(map[string]interface{}); ok {
+					if v1["type"] == "file" {
+						return v1["value"], nil
+					}
+				} else {
+					return nil, utils.Errorf("BUG: Invalid script preferences value type")
+				}
+			}
 			return nil, nil
 		},
 		"script_get_preference_file_location": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -329,6 +343,9 @@ func init() {
 		},
 		"open_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
+			if timeout <= 0 {
+				timeout = 5
+			}
 			transport := params.getParamByName("transport", -1).Int()
 			if !params.getParamByName("priority").IsUndefined() {
 				return nil, utils.Errorf("priority is not support")
@@ -474,8 +491,11 @@ func init() {
 			return nil, nil
 		},
 		"cgibin": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `cgibin` is not implement"))
-			return nil, nil
+			if v, ok := engine.scriptObj.Preferences["cgi_path"]; ok {
+				return v, nil
+			} else {
+				return "/cgi-bin:/scripts", nil
+			}
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByName("port", 0).Int()
@@ -613,15 +633,14 @@ func init() {
 			return nil, nil
 		},
 		"islocalhost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return utils.IsPrivateIP(net.ParseIP(engine.host)), nil
+			return utils.IsLoopback(engine.host), nil
 		},
 		"is_public_addr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return !utils.IsPrivateIP(net.ParseIP(engine.host)), nil
 		},
 
 		"islocalnet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `islocalnet` is not implement"))
-			return nil, nil
+			return utils.IsPrivateIP(net.ParseIP(engine.host)), nil
 		},
 		"get_port_transport": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0, -1).Int()
@@ -784,16 +803,16 @@ func init() {
 						newRes = append(newRes, v)
 					}
 				}
+				res = newRes
 			}
-			return nil, nil
+			return res, nil
 		},
 		"chomp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `chomp` is not implement"))
 			return nil, nil
 		},
 		"int": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `int` is not implement"))
-			return nil, nil
+			return strconv.Atoi(params.getParamByNumber(0, "0").String())
 		},
 		"stridx": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := params.getParamByNumber(0).String()
@@ -840,8 +859,12 @@ func init() {
 			return nil, nil
 		},
 		"max_index": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `max_index` is not implement"))
-			return nil, nil
+			i := params.getParamByNumber(0, nil).Value
+			refV := reflect.ValueOf(i)
+			if refV.Type().Kind() == reflect.Array || refV.Type().Kind() == reflect.Slice {
+				return refV.Len(), nil
+			}
+			return -1, nil
 		},
 		"sort": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `sort` is not implement"))

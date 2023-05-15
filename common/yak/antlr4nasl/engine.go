@@ -23,16 +23,16 @@ const (
 )
 
 type Engine struct {
-	debug        bool
-	naslLibsPath string
-	naslLibPatch map[string]func(string) string
-	compiler     *visitors.Compiler
-	vm           *yakvm.VirtualMachine
-	description  bool
-	sourceCode   string
-	scriptObj    *NaslScriptInfo
-	host         string
-	proxy        string
+	debug                          bool
+	naslLibsPath, dependenciesPath string
+	naslLibPatch                   map[string]func(string) string
+	compiler                       *visitors.Compiler
+	vm                             *yakvm.VirtualMachine
+	description                    bool
+	sourceCode                     string
+	scriptObj                      *NaslScriptInfo
+	host                           string
+	proxy                          string
 }
 
 func New() *Engine {
@@ -101,6 +101,9 @@ func (engine *Engine) GetKBData() map[string]interface{} {
 func (engine *Engine) SetIncludePath(path string) {
 	engine.naslLibsPath = path
 }
+func (engine *Engine) SetDependenciesPath(path string) {
+	engine.dependenciesPath = path
+}
 func (engine *Engine) Debug(bool2 ...bool) {
 	if len(bool2) == 0 {
 		engine.debug = true
@@ -153,27 +156,27 @@ func (e *Engine) SafeRunFile(path string) (err error) {
 	return e.RunFile(path)
 }
 func (e *Engine) RunScript(script *NaslScriptInfo) error {
-	e.scriptObj = script
-	e.compiler.SetSourceCodeFilePath("script name: " + script.ScriptName)
-	return e.SafeEval(script.Script)
+	return script.Run(e)
 }
 
 func (e *Engine) EvalInclude(name string) error {
-	// 优先从内置库中查找
+	// 优先从本地文件中查找，否则从内置的文件中查找
 	var sourceBytes []byte
-	data, err := bindata.Asset("data/nasl-incs/" + name)
-	if err != nil {
-		libPath := path.Join(e.naslLibsPath, name)
-		codes, err := os.ReadFile(libPath)
+	libPath := path.Join(e.naslLibsPath, name)
+	codes, err := os.ReadFile(libPath)
+	if err == nil {
+		sourceBytes = codes
+		recoverPath := e.compiler.SetSourceCodeFilePath(libPath)
+		defer recoverPath()
+	}
+	//本地文件加载失败，从内置文件中加载
+	if sourceBytes == nil {
+		data, err := bindata.Asset("data/nasl-incs/" + name)
 		if err != nil {
 			err = utils.Errorf("not found include file: %s", name)
 			log.Error(err)
 			return err
 		}
-		sourceBytes = codes
-		recoverPath := e.compiler.SetSourceCodeFilePath(libPath)
-		defer recoverPath()
-	} else {
 		sourceBytes = data
 		recoverPath := e.compiler.SetSourceCodeFilePath(name)
 		defer recoverPath()

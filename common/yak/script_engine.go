@@ -26,7 +26,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/comparer"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/xhtml"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -51,8 +50,12 @@ import (
 var (
 	CRYPTO_KEY_SIZE    = 16
 	initYaklangLibOnce sync.Once
+	naslExports        interface{}
 )
 
+func SetNaslExports(lib map[string]interface{}) {
+	naslExports = lib
+}
 func init() {
 	InitYaklangLib()
 }
@@ -166,7 +169,7 @@ func initYaklangLib() {
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
-	yaklang.Import("nasl", antlr4nasl.Exports)
+	yaklang.Import("nasl", naslExports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)
