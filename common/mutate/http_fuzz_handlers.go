@@ -40,7 +40,6 @@ func QuickMutateSimple(target ...string) []string {
 }
 
 func InterfaceToFuzzResults(value interface{}, conds ...*RegexpMutateCondition) []string {
-	var values []string
 	switch ret := value.(type) {
 	case []byte:
 		return InterfaceToFuzzResults(string(ret), conds...)
@@ -60,8 +59,9 @@ func InterfaceToFuzzResults(value interface{}, conds ...*RegexpMutateCondition) 
 		return InterfaceToFuzzResults(funk.Map(ret, func(i interface{}) string {
 			return utils.InterfaceToString(i)
 		}))
+	default:
+		return InterfaceToFuzzResults(utils.InterfaceToString(value), conds...)
 	}
-	return values
 }
 
 func (f *FuzzHTTPRequest) Results() ([]*http.Request, error) {

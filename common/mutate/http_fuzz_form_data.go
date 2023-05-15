@@ -131,20 +131,19 @@ func _fetchFieldName(s string) string {
 func parseRequestToFormData(req *http.Request) *multipartData {
 	boundary := _fetchBoundaryRegexp(req.Header.Get("Content-Type"))
 	if boundary == "" {
-		log.Infof("cannot fetch boundary... maybe not a multipart request")
+		log.Debugf("cannot fetch boundary... maybe not a multipart request")
 		return NewMultiPartData()
-		//return nil, utils.
 	}
 
 	reader, err := req.MultipartReader()
 	if err != nil {
-		log.Infof("multipart read failed: %s", err)
+		log.Debugf("multipart read failed: %s", err)
 		return NewMultiPartData()
 	}
 
 	f, err := reader.ReadForm(1024 * 1024 * 100)
 	if err != nil {
-		log.Infof("read multipart form form failed: %s", err)
+		log.Debugf("read multipart form failed: %s", err)
 		return NewMultiPartData()
 	}
 	mdata := &multipartData{
