@@ -12,14 +12,14 @@ import (
 )
 
 type ScriptEngine struct {
-	Kbs                *NaslKBs
-	naslLibsPath       string
-	scripts            map[*NaslScriptInfo]struct{}
-	excludeScripts     map[string]struct{} // 基于OID排除一些脚本
-	scriptGroupDefines map[ScriptGroup][]string
-	goroutineNum       int
-	debug              bool
-	engineHooks        []func(engine *Engine)
+	Kbs                            *NaslKBs
+	naslLibsPath, dependenciesPath string
+	scripts                        map[*NaslScriptInfo]struct{}
+	excludeScripts                 map[string]struct{} // 基于OID排除一些脚本
+	scriptGroupDefines             map[ScriptGroup][]string
+	goroutineNum                   int
+	debug                          bool
+	engineHooks                    []func(engine *Engine)
 }
 
 func NewScriptEngine() *ScriptEngine {
@@ -146,14 +146,16 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			engine := New()
 			engine.host = host
 			engine.SetIncludePath(e.naslLibsPath)
+			engine.SetDependenciesPath(e.dependenciesPath)
 			engine.SetKBs(e.Kbs)
 			engine.InitBuildInLib()
+			engine.Debug(e.debug)
 			for _, hook := range e.engineHooks {
 				hook(engine)
 			}
 			err := engine.RunScript(script)
 			if err != nil {
-				log.Errorf("run script %s met error: %s", script.ScriptName, err)
+				log.Errorf("run script %s met error: %s", script.OriginFileName, err)
 				errorsMux.Lock()
 				allErrors = append(allErrors, err)
 				errorsMux.Unlock()
@@ -168,4 +170,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 }
 func (e *ScriptEngine) SetIncludePath(p string) {
 	e.naslLibsPath = p
+}
+func (e *ScriptEngine) SetDependencies(p string) {
+	e.dependenciesPath = p
 }

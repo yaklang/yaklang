@@ -24,7 +24,7 @@ var Exports = map[string]interface{}{
 	"UpdateDatabase": func(p string, group ...string) {
 		saveScript := func(path string) {
 			if !strings.HasSuffix(path, ".nasl") {
-				log.Error("Error load script %s: not a nasl file", path)
+				log.Errorf("Error load script %s: not a nasl file", path)
 				return
 			}
 			engine := New()

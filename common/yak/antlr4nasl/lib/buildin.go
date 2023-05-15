@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math"
 	"net"
-	"reflect"
 	"strings"
 	"time"
 )
@@ -56,13 +55,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	},
 	"__split": func(s string, sep string, keep bool) []string {
 		return strings.Split(s, sep)
-	},
-	"max_index": func(i interface{}) int {
-		refV := reflect.ValueOf(i)
-		if refV.Type().Kind() == reflect.Array || refV.Type().Kind() == reflect.Slice {
-			return refV.Len() - 1
-		}
-		return -1
 	},
 	"reEqual": func(s1, s2 string) bool { // 内置=~运算符号
 		return utils.MatchAllOfRegexp(s1, s2)
