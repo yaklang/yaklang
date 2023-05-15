@@ -14,9 +14,32 @@ import (
 
 var (
 	isInAttached         = NewBool(false)
+	isInCached           = NewBool(false)
 	attachOutputCallback = new(sync.Map)
+	cachedLog            *CircularQueue
 )
 
+func GetCachedLog() (res []string) {
+	for _, e := range cachedLog.GetElements() {
+		res = append(res, e.(string))
+	}
+	return
+}
+func StartCacheLog(ctx context.Context, n int) {
+	cachedLog = NewCircularQueue(n)
+	if isInCached.IsSet() {
+		return
+	}
+	isInCached.Set()
+	go func() {
+		if err := HandleStdout(ctx, func(s string) {
+			cachedLog.Push(s)
+		}); err != nil {
+			log.Error(err)
+		}
+		isInCached.UnSet()
+	}()
+}
 func HandleStdout(ctx context.Context, handle func(string)) error {
 	if isInAttached.IsSet() {
 		uuid := uuid2.NewV4().String()
@@ -141,7 +164,7 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	os.Stdout = tempOutputs
 	os.Stderr = tempOutputs
 	log.SetOutput(tempOutputs)
-
+	log.DefaultLogger.Printer.IsTerminal = true
 	for {
 		select {
 		case <-ctx.Done():
