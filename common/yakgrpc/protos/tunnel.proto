@@ -3,7 +3,6 @@ syntax = "proto3";
 package ypb;
 option go_package = "/;ypb";
 import "message.proto";
-import "ysoserial_go.proto";
 
 
 service TunnelService {

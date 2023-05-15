@@ -3,8 +3,6 @@ syntax = "proto3";
 package ypb;
 option go_package = "/;ypb";
 import "message.proto";
-import "port_scan.proto";
-
 
 service AssetsService {
   // 资产管理
