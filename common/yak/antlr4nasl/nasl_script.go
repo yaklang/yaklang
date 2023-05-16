@@ -86,7 +86,7 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 		}
 	}
 	e.scriptObj = n
-	e.compiler.SetSourceCodeFilePath("script name: " + n.OriginFileName)
+	e.compiler.SetSourceCodeFilePath(n.OriginFileName)
 	return e.SafeEval(n.Script)
 }
 func NewNaslScriptObject() *NaslScriptInfo {
