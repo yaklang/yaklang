@@ -3,8 +3,10 @@ package jsonpath
 import (
 	"container/list"
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"reflect"
 )
 
 type iterKey struct {
@@ -12,7 +14,7 @@ type iterKey struct {
 	JsonPath string
 }
 
-func iterKeys(l *list.List, raw map[string]any, prefix string) *list.List {
+func iterKeys(l *list.List, raw any, prefix string) *list.List {
 	if l == nil {
 		l = list.New()
 	}
@@ -25,21 +27,50 @@ func iterKeys(l *list.List, raw map[string]any, prefix string) *list.List {
 		return l
 	}
 
-	for k, v := range raw {
-		l.PushBack(&iterKey{Key: utils.InterfaceToString(k), JsonPath: prefix + k})
-		raw, err := utils.InterfaceToMapInterfaceE(v)
-		if err != nil {
-			continue
+	if reflect.TypeOf(raw).Kind() == reflect.Map {
+		for k, v := range utils.InterfaceToMapInterface(raw) {
+			l.PushBack(&iterKey{Key: utils.InterfaceToString(k), JsonPath: prefix + k})
+			fixedVal, err := utils.InterfaceToMapInterfaceE(v)
+			if err == nil {
+				iterKeys(l, fixedVal, prefix+k+".")
+				continue
+			}
+
+			if raw, err := utils.InterfaceToSliceInterfaceE(v); err == nil {
+				for index, val := range raw {
+					jp := prefix + fmt.Sprintf("%v[%v]", k, index)
+					l.PushBack(&iterKey{JsonPath: jp})
+					iterKeys(l, val, jp+".")
+				}
+				continue
+			}
 		}
-		iterKeys(l, raw, prefix+k+".")
 	}
+
+	if reflect.TypeOf(raw).Kind() == reflect.Slice {
+		for index, val := range utils.InterfaceToSliceInterface(raw) {
+			jp := prefix + fmt.Sprintf("[%v]", index)
+			l.PushBack(&iterKey{JsonPath: jp})
+			iterKeys(l, val, jp+".")
+		}
+	}
+
 	return l
 }
 
 func fetchAllIterKey(i any) []*iterKey {
-	raw, err := ToMapInterface(i)
+	var (
+		raw       any
+		err       error
+		originObj any
+	)
+	raw, originObj, err = ToMapInterface(i)
 	if err != nil {
-		return nil
+		gSlice, err := utils.InterfaceToSliceInterfaceE(originObj)
+		if err != nil {
+			return nil
+		}
+		raw = gSlice
 	}
 
 	var a = iterKeys(nil, raw, "$.")
@@ -98,9 +129,10 @@ func RecursiveDeepReplace(i any, val any) []any {
 		isRawStr = true
 	}
 
+	extractedIterKey := fetchAllIterKey(i)
 	var results []any
-	for _, k := range fetchAllIterKey(i) {
-		data, err := Replace(i, k.JsonPath, val)
+	for _, k := range extractedIterKey {
+		data, err := ReplaceEx(i, k.JsonPath, val)
 		if err != nil {
 			log.Warnf("replace %s failed: %s", k.JsonPath, err)
 			continue
