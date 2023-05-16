@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -281,10 +282,52 @@ func SplitKV(i string) (string, string) {
 	}
 }
 
+// readCookies parses all "Cookie" values from the header h and
+// returns the successfully parsed Cookies.
+//
+// if filter isn't empty, only cookies of that name are returned
+// From Go Src
+func readCookies(h http.Header, filter string) []*http.Cookie {
+	lines := h["Cookie"]
+	if len(lines) == 0 {
+		return []*http.Cookie{}
+	}
+
+	cookies := make([]*http.Cookie, 0, len(lines)+strings.Count(lines[0], ";"))
+	for _, line := range lines {
+		line = textproto.TrimString(line)
+
+		var part string
+		for len(line) > 0 { // continue since we have rest
+			part, line, _ = strings.Cut(line, ";")
+			part = textproto.TrimString(part)
+			if part == "" {
+				continue
+			}
+			name, val, _ := strings.Cut(part, "=")
+			if strings.TrimSpace(name) == "" {
+				continue
+			}
+			if filter != "" && filter != name {
+				continue
+			}
+
+			if strings.Contains(val, "%") {
+				valUnesc, err := url.QueryUnescape(val)
+				if err == nil {
+					val = valUnesc
+				}
+			}
+			cookies = append(cookies, &http.Cookie{Name: name, Value: val})
+		}
+	}
+	return cookies
+}
+
 func ParseCookie(i string) []*http.Cookie {
 	var header = http.Header{}
 	header.Add("Cookie", i)
-	return (&http.Request{Header: header}).Cookies()
+	return readCookies(header, "")
 }
 
 func MergeCookies(cookies ...*http.Cookie) string {

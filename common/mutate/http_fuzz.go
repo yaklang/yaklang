@@ -83,6 +83,9 @@ type FuzzHTTPRequestIf interface {
 	// 测试文件上传内容
 	FuzzUploadKVPair(k, v interface{}) FuzzHTTPRequestIf
 
+	// CookieJsonPath
+	FuzzCookieJsonPath(any, string, any) FuzzHTTPRequestIf
+
 	Results() ([]*http.Request, error)
 
 	Exec(...HttpPoolConfigOption) (chan *_httpResult, error)
