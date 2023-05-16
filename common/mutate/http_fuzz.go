@@ -86,6 +86,10 @@ type FuzzHTTPRequestIf interface {
 	// CookieJsonPath
 	FuzzCookieJsonPath(any, string, any) FuzzHTTPRequestIf
 
+	// 测试被 Base64 编码后的 Get Post 参数
+	FuzzGetBase64JsonPath(any, string, any) FuzzHTTPRequestIf
+	FuzzPostBase64JsonPath(any, string, any) FuzzHTTPRequestIf
+
 	Results() ([]*http.Request, error)
 
 	Exec(...HttpPoolConfigOption) (chan *_httpResult, error)

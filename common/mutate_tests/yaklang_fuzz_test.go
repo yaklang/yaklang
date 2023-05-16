@@ -303,6 +303,36 @@ c={"abc":{"c":{"d":true}}}&&d=1234444
 				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
 				"zk123", `%7B%22ccc%22%3A%22zk123%22%7D`,
 			},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab&&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+Host: www.baidu.com
+Cookie: abc={"ccc":2311}
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetBase64JsonPath(`c`, `$.dd`, `ddda`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n",
+				"a=ab", "c=ey",
+				"eyJkZCI6ImRkZGEifQ%3D%3D",
+				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+			},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab&&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+Host: www.baidu.com
+Cookie: abc={"ccc":2311}
+
+c=eyJkZCI6MTI1fQ%3D%3D&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzPostBase64JsonPath(`c`, `$.dd`, `ddda`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n",
+				"a=ab", "c=ey",
+				"eyJkZCI6ImRkZGEifQ%3D%3D",
+				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+			},
 			Debug: true,
 		},
 	}
