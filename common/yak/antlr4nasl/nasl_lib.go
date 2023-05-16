@@ -195,7 +195,7 @@ func init() {
 				return nil, genNotMatchedArgumentTypeError("script_get_preference")
 			}
 			if v, ok := engine.scriptObj.Preferences[pref.AsString()]; ok {
-				return v, nil
+				return v.(map[string]interface{})["value"], nil
 			}
 			return nil, nil
 		},
@@ -373,8 +373,15 @@ func init() {
 			return conn, nil
 		},
 		"open_sock_udp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `open_sock_udp` is not implement"))
-			return nil, nil
+			port := params.getParamByNumber(0, 0).Int()
+			if port == 0 {
+				return nil, utils.Errorf("port is empty")
+			}
+			conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", engine.host, port))
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
 		},
 		"open_priv_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `open_priv_sock_tcp` is not implement"))
@@ -927,11 +934,13 @@ func init() {
 			return rand.Int(), nil
 		},
 		"usleep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `usleep` is not implement"))
+			t := params.getParamByNumber(0, 0).Int()
+			time.Sleep(time.Duration(t) * time.Microsecond)
 			return nil, nil
 		},
 		"sleep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `sleep` is not implement"))
+			t := params.getParamByNumber(0, 0).Int()
+			time.Sleep(time.Duration(t) * time.Second)
 			return nil, nil
 		},
 		"isnull": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
