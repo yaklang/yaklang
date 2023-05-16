@@ -320,7 +320,7 @@ c={"abc":{"c":{"d":true}}}&&d=1234444
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab&&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 Cookie: abc={"ccc":2311}
 
@@ -333,7 +333,6 @@ c=eyJkZCI6MTI1fQ%3D%3D&&d=1234444
 				"eyJkZCI6ImRkZGEifQ%3D%3D",
 				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
 			},
-			Debug: true,
 		},
 	}
 
