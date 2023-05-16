@@ -286,6 +286,25 @@ c={"abc":{"c":{"d":true}}}&&d=1234444
 				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
 			},
 		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+Cookie: abc={"ccc":2311}
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`).FuzzCookieJsonPath(`abc`, `$.ccc`, `zk123`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+				"; filename=\"abc.php\"",
+				`multipart/form-data; boundary=-`,
+				`name="your-filename"; filename="php.pp12.txt"`,
+				`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
+				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
+				"zk123", `%7B%22ccc%22%3A%22zk123%22%7D`,
+			},
+			Debug: true,
+		},
 	}
 
 	debugCases := funk.Filter(total, func(i *BaseCase) bool {

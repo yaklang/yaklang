@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -52,5 +53,5 @@ func IsValidInteger(raw string) bool {
 
 func IsValidFloat(raw string) bool {
 	_, err := strconv.ParseFloat(raw, 64)
-	return err == nil
+	return err == nil && strings.Contains(strings.Trim(raw, "."), ".")
 }
