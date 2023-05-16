@@ -129,12 +129,162 @@ Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0g
 			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
 		},
 		{
-			Debug: true,
 			InputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 `,
 			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzFormEncoded(`Key`, 123)",
 			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
+		},
+		{
+			InputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetJsonPathParams(`a`, `$.abc`, `a123aaa1`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "%7B%22abc%22%3A%22a123aaa1%22%7D"},
+		},
+		{
+			InputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "a=%24.abc", "ccc=12"},
+		},
+		{
+			InputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`).FuzzGetParamsRaw(`ccccccccccccccc`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "/?ccccccccccccccc"},
+		},
+		{
+			InputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /?ccccccccccccccc"},
+		},
+		{
+			InputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc"},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`/12`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1/12?ccccccccccccccc"},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc"},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+{"bc": 222}
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `{"bc":123}`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+{"bc": 222}
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `"bc":123`, `"ddddddd":"dd1"`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `"bc":123`, `"ddddddd":"dd1"`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`, `d=abc`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`).FuzzPostRaw(`dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`)",
+			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFile(`ccc`, `abc.php`, `<?=1+1?>`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+				"; filename=\"abc.php\"", `<?=1+1?>` + "\r\n--",
+				`multipart/form-data; boundary=-`,
+			},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+				"; filename=\"abc.php\"",
+				`multipart/form-data; boundary=-`,
+			},
+		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+				"; filename=\"abc.php\"",
+				`multipart/form-data; boundary=-`,
+				`name="your-filename"; filename="php.pp12.txt"`,
+				`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
+				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
+			},
 		},
 	}
 
@@ -193,7 +343,8 @@ if str.MatchAllOfSubString(raw, keywords...) || str.MatchAllOfRegexp(raw, regexp
 			test.Fail("getvar[check] failed")
 		}
 		if !checked.(bool) {
-			println(string(data.InputPacket))
+			fmt.Println("CHECK FAILED CODE: ")
+			fmt.Println(data.Code)
 			test.FailNow("check failed")
 		}
 	}

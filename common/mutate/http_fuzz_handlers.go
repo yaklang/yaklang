@@ -364,12 +364,18 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		var replacedValue = []string{
-			jsonpath.ReplaceString(rawJson, jsonPath, value),
-		}
+		var replacedValue []string
 		if govalidator.IsIn(value) {
 			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atoi(value)))
 		}
+		if govalidator.IsFloat(value) {
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atof(value)))
+		}
+		if value == `true` || value == `false` {
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atob(value)))
+		}
+		replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, value))
+
 		for _, i := range replacedValue {
 			newReq := lowhttp.CopyRequest(req)
 			if newReq == nil {
@@ -713,6 +719,45 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		if ok {
 			isInteger = utils.IsValidInteger(fmt.Sprintf("%#v", originValue))
 			isFloat = utils.IsValidFloat(fmt.Sprintf("%#v", originValue))
+		}
+
+		if utils.IsValidInteger(value) {
+			forkedMap, _ := deepCopyMapRaw(newParam)
+			if forkedMap != nil {
+				forkedMap[key] = utils.Atoi(value)
+				raw, _ := json.Marshal(forkedMap)
+				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
+				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
+				if _req != nil {
+					reqs = append(reqs, _req)
+				}
+			}
+		}
+
+		if utils.IsValidFloat(value) && strings.Contains(strings.Trim(value, `.`), ".") {
+			forkedMap, _ := deepCopyMapRaw(newParam)
+			if forkedMap != nil {
+				forkedMap[key] = utils.Atof(value)
+				raw, _ := json.Marshal(forkedMap)
+				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
+				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
+				if _req != nil {
+					reqs = append(reqs, _req)
+				}
+			}
+		}
+
+		if value == "true" || value == "false" {
+			forkedMap, _ := deepCopyMapRaw(newParam)
+			if forkedMap != nil {
+				forkedMap[key] = utils.Atob(value)
+				raw, _ := json.Marshal(forkedMap)
+				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
+				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
+				if _req != nil {
+					reqs = append(reqs, _req)
+				}
+			}
 		}
 
 		switch true {
