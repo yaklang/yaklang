@@ -3,6 +3,7 @@ package mutate
 import (
 	"bytes"
 	"fmt"
+	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/mixer"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -48,13 +50,13 @@ func (d *multipartData) ReplaceFileName(fieldName, fileName string) {
 			{
 				FieldName:   fieldName,
 				IsFile:      true,
-				FileContent: []byte("..."),
+				FileContent: nil,
 				FileName:    fieldName,
 				Header: map[string][]string{
 					"Content-Disposition": {
-						fmt.Sprintf(`form-data; name="%v"; filename="%v"`,
-							codec.EncodeUrlCode(fieldName),
-							codec.EncodeUrlCode(fileName),
+						fmt.Sprintf(`form-data; name=%v; filename=%v`,
+							strconv.Quote(fieldName),
+							strconv.Quote(fileName),
 						),
 					},
 					"Content-Type": {"application/octet-stream"},
@@ -78,13 +80,55 @@ func (d *multipartData) Write(w *multipart.Writer) error {
 
 	for _, v := range d.Files {
 		for _, item := range v {
+			if item.Header == nil {
+				item.Header = make(textproto.MIMEHeader)
+			}
+			if item.Header.Get(`Content-Disposition`) == "" {
+				if item.IsFile {
+					item.Header.Set(
+						`Content-Disposition`,
+						fmt.Sprintf(`form-data; name=%v; filename=%v`, strconv.Quote(item.FieldName), strconv.Quote(item.FileName)),
+					)
+					if item.Header.Get("Content-Type") == "" {
+						mimeType := `application/octet-stream`
+						if t, _ := filetype.Match(item.FileContent); t.MIME.Value != "" {
+							mimeType = t.MIME.Value
+						}
+						item.Header.Set("Content-Type", mimeType)
+					}
+				} else {
+					val := item.FieldValue
+					if val == "" {
+						val = item.FileName
+					}
+					item.Header.Set(
+						`Content-Disposition`,
+						fmt.Sprintf(`form-data; name=%v`, strconv.Quote(item.FieldName)),
+					)
+				}
+			}
 			f, err := w.CreatePart(item.Header)
 			if err != nil {
 				return utils.Errorf("multipart write file[%v:%v] failed: %s", item.FieldName, item.FileName, err)
 			}
-			_, err = f.Write(item.FileContent)
-			if err != nil {
-				return utils.Errorf("multipart write file content failed: %s", err)
+
+			if item.IsFile {
+				_, err = f.Write(item.FileContent)
+				if err != nil {
+					return utils.Errorf("multipart write file content failed: %s", err)
+				}
+			} else {
+				if len(item.FileContent) > 0 {
+					_, err = f.Write(item.FileContent)
+					if err != nil {
+						return utils.Errorf("multipart write value content failed: %s", err)
+					}
+					return nil
+				}
+				if _, err := f.Write([]byte(item.FieldValue)); err != nil {
+					return utils.Errorf("multipart write value content failed: %s", err)
+				}
+				return nil
 			}
 		}
 	}

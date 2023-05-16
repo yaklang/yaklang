@@ -764,6 +764,11 @@ func Atof(i string) float64 {
 	return raw
 }
 
+func Atob(i string) bool {
+	raw, _ := strconv.ParseBool(i)
+	return raw
+}
+
 func CopyBytes(rsp []byte) []byte {
 	b := make([]byte, len(rsp))
 	copy(b, rsp)
