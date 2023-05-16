@@ -62,15 +62,6 @@ func TestReplace2(t *testing.T) {
 				`{"a":1,"b":"112"}`,
 			},
 		},
-		{
-			Raw:      `[{"abc": 123, "ccc": true}]`,
-			Replaced: "112",
-			Expected: []string{
-				`{"a":"112","b":{"c":"d"}}`,
-				`{"a":1,"b":{"c":"112"}}`,
-				`{"a":1,"b":"112"}`,
-			},
-		},
 	} {
 		result := RecursiveDeepReplaceString(c.Raw, c.Replaced)
 		if len(result) <= 0 {
