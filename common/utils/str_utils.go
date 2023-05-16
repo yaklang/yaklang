@@ -878,7 +878,7 @@ var (
 		WriteTimeout: 5 * time.Second,
 	}
 	RetryableDNSClient = &retryabledns.Client{
-		TCPFallback: false,
+		TCPFallback: true,
 	}
 	DefaultDNSConn   = dns.Dial
 	DefaultDNSServer = []string{
