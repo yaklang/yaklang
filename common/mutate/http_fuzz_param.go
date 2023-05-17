@@ -13,17 +13,21 @@ import (
 type httpParamPositionType string
 
 var (
-	posMethod        httpParamPositionType = "method"
-	posGetQuery      httpParamPositionType = "get-query"
-	posGetQueryJson  httpParamPositionType = "get-query-json"
-	posPath          httpParamPositionType = "path"
-	posHeader        httpParamPositionType = "header"
-	posPostQuery     httpParamPositionType = "post-query"
-	posPostQueryJson httpParamPositionType = "post-query-json"
-	posPostJson      httpParamPositionType = "post-json"
-	posCookie        httpParamPositionType = "cookie"
-	posPathAppend    httpParamPositionType = "path-append"
-	posPathBlock     httpParamPositionType = "path-block"
+	posMethod              httpParamPositionType = "method"
+	posGetQuery            httpParamPositionType = "get-query"
+	posGetQueryJson        httpParamPositionType = "get-query-json"
+	posGetQueryBase64Json  httpParamPositionType = "get-query-base64-json"
+	posPath                httpParamPositionType = "path"
+	posHeader              httpParamPositionType = "header"
+	posPostQuery           httpParamPositionType = "post-query"
+	posPostQueryJson       httpParamPositionType = "post-query-json"
+	posPostQueryBase64Json httpParamPositionType = "post-query-base64-json"
+	posPostJson            httpParamPositionType = "post-json"
+	posCookie              httpParamPositionType = "cookie"
+	posCookieJson          httpParamPositionType = "cookie-json"
+	posCookieBase64Json    httpParamPositionType = "cookie-base64-json"
+	posPathAppend          httpParamPositionType = "path-append"
+	posPathBlock           httpParamPositionType = "path-block"
 )
 
 func PositionTypeVerbose(pos httpParamPositionType) string {
@@ -137,6 +141,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzGetParams(p.param, i)
 	case posGetQueryJson:
 		return p.origin.FuzzGetJsonPathParams(p.param, p.jsonPath, i)
+	case posGetQueryBase64Json:
+		return p.origin.FuzzGetBase64JsonPath(p.param, p.jsonPath, i)
 	case posHeader:
 		return p.origin.FuzzHTTPHeader(p.param, i)
 	case posPath:
@@ -145,10 +151,16 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzPostJsonParams(p, i)
 	case posCookie:
 		return p.origin.FuzzCookie(p.param, InterfaceToFuzzResults(i))
+	case posCookieJson:
+		return p.origin.FuzzCookieJsonPath(p.param, p.jsonPath, i)
+	case posCookieBase64Json:
+		return p.origin.FuzzCookieBase64JsonPath(p.param, p.jsonPath, i)
 	case posPostQuery:
 		return p.origin.FuzzPostParams(p.param, i)
 	case posPostQueryJson:
 		return p.origin.FuzzPostJsonPathParams(p.param, p.jsonPath, i)
+	case posPostQueryBase64Json:
+		return p.origin.FuzzPostBase64JsonPath(p.param, p.jsonPath, i)
 	case posPathAppend:
 		return p.origin.FuzzPath(funk.Map(InterfaceToFuzzResults(i), func(s string) string {
 			if !strings.HasPrefix(s, "/") {
