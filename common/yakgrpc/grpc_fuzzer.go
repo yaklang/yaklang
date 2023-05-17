@@ -201,7 +201,7 @@ func (s *Server) PreloadHTTPFuzzerParams(ctx context.Context, req *ypb.PreloadHT
 	return &ypb.PreloadHTTPFuzzerParamsResponse{Values: results}, nil
 }
 
-func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) (finalError error) {
+func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.FuzzerApi_HTTPFuzzerServer) (finalError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			finalError = utils.Errorf("panic from httpfuzzer: %v", err)

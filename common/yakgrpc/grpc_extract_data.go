@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-func (s *Server) ExtractData(server ypb.Yak_ExtractDataServer) error {
+func (s *Server) ExtractData(server ypb.FuzzerApi_ExtractDataServer) error {
 	for {
 		req, err := server.Recv()
 		if err != nil {

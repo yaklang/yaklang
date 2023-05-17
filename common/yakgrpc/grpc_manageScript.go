@@ -65,7 +65,7 @@ func (s *Server) LoadNucleiTemplates(ctx context.Context, req *ypb.Empty) (*ypb.
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) AutoUpdateYakModule(_ *ypb.Empty, stream ypb.Yak_AutoUpdateYakModuleServer) error {
+func (s *Server) AutoUpdateYakModule(_ *ypb.Empty, stream ypb.ExecYakScriptApi_AutoUpdateYakModuleServer) error {
 	err := s.Exec(&ypb.ExecRequest{
 		Script: `yakit.AutoInitYakit()
 
@@ -153,7 +153,7 @@ func (s *Server) ForceUpdateAvailableYakScriptTags(ctx context.Context, req *ypb
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) QueryYakScriptByYakScriptName(req *ypb.QueryYakScriptRequest, stream ypb.Yak_QueryYakScriptByYakScriptNameServer) error {
+func (s *Server) QueryYakScriptByYakScriptName(req *ypb.QueryYakScriptRequest, stream ypb.YakScriptApi_QueryYakScriptByYakScriptNameServer) error {
 	var names [][]string
 	if len(req.GetIncludedScriptNames()) > 0 {
 		names = utils.SliceGroup(req.GetIncludedScriptNames(), 50)
@@ -381,7 +381,7 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript
 	}
 }
 
-func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScriptServer) error {
+func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.ExecYakScriptApi_ExecYakScriptServer) error {
 	script, err := yakit.GetYakScript(s.GetProfileDatabase(), req.GetYakScriptId())
 	if err != nil {
 		return utils.Errorf("cannot fetch yak script: %s", err.Error())

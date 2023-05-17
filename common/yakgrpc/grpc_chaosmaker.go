@@ -60,7 +60,7 @@ func (s *Server) DeleteChaosMakerRuleByID(ctx context.Context, req *ypb.DeleteCh
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, stream ypb.Yak_ExecuteChaosMakerRuleServer) error {
+func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, stream ypb.ChaosMakerApi_ExecuteChaosMakerRuleServer) error {
 	sendLog := func(level, msg string, items ...interface{}) {
 		stream.Send(yaklib.NewYakitLogExecResult("info", msg, items...))
 	}

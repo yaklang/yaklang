@@ -246,11 +246,11 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 	return nil
 }
 
-func (s *Server) Exec(req *ypb.ExecRequest, stream ypb.Yak_ExecServer) error {
+func (s *Server) Exec(req *ypb.ExecRequest, stream ypb.ExecYakScriptApi_ExecServer) error {
 	return s.ExecWithContext(stream.Context(), req, stream)
 }
 
-func (s *Server) ExecWithContext(ctx context.Context, req *ypb.ExecRequest, stream ypb.Yak_ExecServer) error {
+func (s *Server) ExecWithContext(ctx context.Context, req *ypb.ExecRequest, stream ypb.ExecYakScriptApi_ExecServer) error {
 	if ctx == nil {
 		ctx = stream.Context()
 	}

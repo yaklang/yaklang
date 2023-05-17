@@ -72,7 +72,7 @@ func (s *Server) DeletePayload(ctx context.Context, req *ypb.DeletePayloadReques
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_SavePayloadStreamServer) error {
+func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.PayloadsApi_SavePayloadStreamServer) error {
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 

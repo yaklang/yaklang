@@ -198,7 +198,7 @@ swg.Wait()
 manager.Wait()
 `
 
-func (s *Server) ExecYakitPluginsByYakScriptFilter(req *ypb.ExecYakitPluginsByYakScriptFilterRequest, stream ypb.Yak_ExecYakitPluginsByYakScriptFilterServer) error {
+func (s *Server) ExecYakitPluginsByYakScriptFilter(req *ypb.ExecYakitPluginsByYakScriptFilterRequest, stream ypb.ExecYakScriptApi_ExecYakitPluginsByYakScriptFilterServer) error {
 	if req.GetFilter() == nil {
 		return utils.Error("empty filter")
 	}

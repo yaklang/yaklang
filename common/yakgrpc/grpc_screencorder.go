@@ -52,7 +52,7 @@ func (s *Server) IsScrecorderReady(ctx context.Context, req *ypb.IsScrecorderRea
 	}, nil
 }
 
-func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb.Yak_InstallScrecorderServer) error {
+func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb.ScreenRecorderApi_InstallScrecorderServer) error {
 	info := func(s string, items ...interface{}) {
 		var msg string
 		if len(items) > 0 {
@@ -140,7 +140,7 @@ func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb
 	return nil
 }
 
-func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak_StartScrecorderServer) error {
+func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.ScreenRecorderApi_StartScrecorderServer) error {
 	info := func(s string, items ...interface{}) {
 		var msg string
 		if len(items) > 0 {

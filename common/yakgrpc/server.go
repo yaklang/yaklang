@@ -17,7 +17,43 @@ import (
 )
 
 type Server struct {
-	ypb.YakServer
+	ypb.AnalyzerApiServer
+	ypb.AssetsApiServer
+	ypb.AttachApiServer
+	ypb.BruteApiServer
+	ypb.ChaosMakerApiServer
+	ypb.CodecApiServer
+	ypb.CompletionApiServer
+	ypb.CrawlerApiServer
+	ypb.CVEApiServer
+	ypb.DocumentApiServer
+	ypb.ExecYakScriptApiServer
+	ypb.ExportApiServer
+	ypb.FacadesApiServer
+	ypb.FuzzerApiServer
+	ypb.GenerateCodeApiServer
+	ypb.HTTPFlowApiServer
+	ypb.LicenseApiServer
+	ypb.MenuApiServer
+	ypb.MiscApiServer
+	ypb.MITMApiServer
+	ypb.OnlineApiServer
+	ypb.PayloadsApiServer
+	ypb.PortScanApiServer
+	ypb.ProjectApiServer
+	ypb.ProxyApiServer
+	ypb.ReportApiServer
+	ypb.RisksApiServer
+	ypb.ScreenRecorderApiServer
+	ypb.StoreApiServer
+	ypb.SystemProxyApiServer
+	ypb.TunnelApiServer
+	ypb.UpdateApiServer
+	ypb.WebSocketApiServer
+	ypb.YakApiServer
+	ypb.YakScriptApiServer
+	ypb.YakShellApiServer
+	ypb.YsoSerialGoApiServer
 	homeDir            string
 	cacheDir           string
 	_abandonedDatabase *gorm.DB

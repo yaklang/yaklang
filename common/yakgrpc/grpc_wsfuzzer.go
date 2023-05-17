@@ -14,7 +14,7 @@ import (
 	"github.com/asaskevich/govalidator"
 )
 
-func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServer) error {
+func (s *Server) CreateWebsocketFuzzer(stream ypb.WebSocketApi_CreateWebsocketFuzzerServer) error {
 	firstReq, err := stream.Recv()
 	if err != nil {
 		return utils.Errorf("first websocket fuzzer: %s", err)

@@ -196,7 +196,7 @@ for _, t := range str.Split(bruteTypes, ",") {
     scan(t)
 }`
 
-func (s *Server) StartBrute(params *ypb.StartBruteParams, stream ypb.Yak_StartBruteServer) error {
+func (s *Server) StartBrute(params *ypb.StartBruteParams, stream ypb.BruteApi_StartBruteServer) error {
 	reqParams := &ypb.ExecRequest{Script: startBruteScript}
 
 	types := utils.PrettifyListFromStringSplited(params.GetType(), ",")

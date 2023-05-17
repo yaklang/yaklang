@@ -51,7 +51,7 @@ for req = range res {
 }
 `
 
-func (s *Server) generateMITMTask(pluginName string, ctx ypb.Yak_ExecServer, params []*ypb.ExecParamItem) error {
+func (s *Server) generateMITMTask(pluginName string, ctx ypb.ExecYakScriptApi_ExecServer, params []*ypb.ExecParamItem) error {
 	params = append(params, &ypb.ExecParamItem{
 		Key:   "plugin-name",
 		Value: pluginName,

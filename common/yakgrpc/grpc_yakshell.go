@@ -86,7 +86,7 @@ func (y *YakExecServerWrapper) Send(result *ypb.ExecResult) error {
 	}
 	return nil
 }
-func (s *Server) CreateYaklangShell(server ypb.Yak_CreateYaklangShellServer) error {
+func (s *Server) CreateYaklangShell(server ypb.YakShellApi_CreateYaklangShellServer) error {
 	var engine *antlr4yak.Engine
 	sendToClient := func(msg []byte, isMsg bool) {
 		server.Send(&ypb.YaklangShellResponse{

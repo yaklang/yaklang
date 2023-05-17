@@ -440,7 +440,7 @@ type palm/common/yakgrpc/yakit.(Report) struct {
 }
 */`
 
-func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServer) error {
+func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.PortScanApi_PortScanServer) error {
 
 	reqParams := &ypb.ExecRequest{
 		Script: scanPort,

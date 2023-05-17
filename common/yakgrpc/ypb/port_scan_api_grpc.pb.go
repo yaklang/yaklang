@@ -19,45 +19,45 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	PortScanService_PortScan_FullMethodName                           = "/ypb.PortScanService/PortScan"
-	PortScanService_ViewPortScanCode_FullMethodName                   = "/ypb.PortScanService/ViewPortScanCode"
-	PortScanService_SimpleDetect_FullMethodName                       = "/ypb.PortScanService/SimpleDetect"
-	PortScanService_SaveCancelSimpleDetect_FullMethodName             = "/ypb.PortScanService/SaveCancelSimpleDetect"
-	PortScanService_GetSimpleDetectUnfinishedTask_FullMethodName      = "/ypb.PortScanService/GetSimpleDetectUnfinishedTask"
-	PortScanService_GetSimpleDetectUnfinishedTaskByUid_FullMethodName = "/ypb.PortScanService/GetSimpleDetectUnfinishedTaskByUid"
-	PortScanService_PopSimpleDetectUnfinishedTaskByUid_FullMethodName = "/ypb.PortScanService/PopSimpleDetectUnfinishedTaskByUid"
-	PortScanService_RecoverSimpleDetectUnfinishedTask_FullMethodName  = "/ypb.PortScanService/RecoverSimpleDetectUnfinishedTask"
+	PortScanApi_PortScan_FullMethodName                           = "/ypb.PortScanApi/PortScan"
+	PortScanApi_ViewPortScanCode_FullMethodName                   = "/ypb.PortScanApi/ViewPortScanCode"
+	PortScanApi_SimpleDetect_FullMethodName                       = "/ypb.PortScanApi/SimpleDetect"
+	PortScanApi_SaveCancelSimpleDetect_FullMethodName             = "/ypb.PortScanApi/SaveCancelSimpleDetect"
+	PortScanApi_GetSimpleDetectUnfinishedTask_FullMethodName      = "/ypb.PortScanApi/GetSimpleDetectUnfinishedTask"
+	PortScanApi_GetSimpleDetectUnfinishedTaskByUid_FullMethodName = "/ypb.PortScanApi/GetSimpleDetectUnfinishedTaskByUid"
+	PortScanApi_PopSimpleDetectUnfinishedTaskByUid_FullMethodName = "/ypb.PortScanApi/PopSimpleDetectUnfinishedTaskByUid"
+	PortScanApi_RecoverSimpleDetectUnfinishedTask_FullMethodName  = "/ypb.PortScanApi/RecoverSimpleDetectUnfinishedTask"
 )
 
-// PortScanServiceClient is the client API for PortScanService service.
+// PortScanApiClient is the client API for PortScanApi service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PortScanServiceClient interface {
+type PortScanApiClient interface {
 	// 端口扫描的封装
-	PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (PortScanService_PortScanClient, error)
+	PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (PortScanApi_PortScanClient, error)
 	ViewPortScanCode(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SimpleScript, error)
-	SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (PortScanService_SimpleDetectClient, error)
+	SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (PortScanApi_SimpleDetectClient, error)
 	SaveCancelSimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetSimpleDetectUnfinishedTask(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSimpleDetectUnfinishedTaskResponse, error)
 	GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error)
 	PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error)
-	RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (PortScanService_RecoverSimpleDetectUnfinishedTaskClient, error)
+	RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (PortScanApi_RecoverSimpleDetectUnfinishedTaskClient, error)
 }
 
-type portScanServiceClient struct {
+type portScanApiClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPortScanServiceClient(cc grpc.ClientConnInterface) PortScanServiceClient {
-	return &portScanServiceClient{cc}
+func NewPortScanApiClient(cc grpc.ClientConnInterface) PortScanApiClient {
+	return &portScanApiClient{cc}
 }
 
-func (c *portScanServiceClient) PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (PortScanService_PortScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PortScanService_ServiceDesc.Streams[0], PortScanService_PortScan_FullMethodName, opts...)
+func (c *portScanApiClient) PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (PortScanApi_PortScanClient, error) {
+	stream, err := c.cc.NewStream(ctx, &PortScanApi_ServiceDesc.Streams[0], PortScanApi_PortScan_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &portScanServicePortScanClient{stream}
+	x := &portScanApiPortScanClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -67,16 +67,16 @@ func (c *portScanServiceClient) PortScan(ctx context.Context, in *PortScanReques
 	return x, nil
 }
 
-type PortScanService_PortScanClient interface {
+type PortScanApi_PortScanClient interface {
 	Recv() (*ExecResult, error)
 	grpc.ClientStream
 }
 
-type portScanServicePortScanClient struct {
+type portScanApiPortScanClient struct {
 	grpc.ClientStream
 }
 
-func (x *portScanServicePortScanClient) Recv() (*ExecResult, error) {
+func (x *portScanApiPortScanClient) Recv() (*ExecResult, error) {
 	m := new(ExecResult)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -84,21 +84,21 @@ func (x *portScanServicePortScanClient) Recv() (*ExecResult, error) {
 	return m, nil
 }
 
-func (c *portScanServiceClient) ViewPortScanCode(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SimpleScript, error) {
+func (c *portScanApiClient) ViewPortScanCode(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SimpleScript, error) {
 	out := new(SimpleScript)
-	err := c.cc.Invoke(ctx, PortScanService_ViewPortScanCode_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, PortScanApi_ViewPortScanCode_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portScanServiceClient) SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (PortScanService_SimpleDetectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PortScanService_ServiceDesc.Streams[1], PortScanService_SimpleDetect_FullMethodName, opts...)
+func (c *portScanApiClient) SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (PortScanApi_SimpleDetectClient, error) {
+	stream, err := c.cc.NewStream(ctx, &PortScanApi_ServiceDesc.Streams[1], PortScanApi_SimpleDetect_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &portScanServiceSimpleDetectClient{stream}
+	x := &portScanApiSimpleDetectClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -108,16 +108,16 @@ func (c *portScanServiceClient) SimpleDetect(ctx context.Context, in *RecordPort
 	return x, nil
 }
 
-type PortScanService_SimpleDetectClient interface {
+type PortScanApi_SimpleDetectClient interface {
 	Recv() (*ExecResult, error)
 	grpc.ClientStream
 }
 
-type portScanServiceSimpleDetectClient struct {
+type portScanApiSimpleDetectClient struct {
 	grpc.ClientStream
 }
 
-func (x *portScanServiceSimpleDetectClient) Recv() (*ExecResult, error) {
+func (x *portScanApiSimpleDetectClient) Recv() (*ExecResult, error) {
 	m := new(ExecResult)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -125,48 +125,48 @@ func (x *portScanServiceSimpleDetectClient) Recv() (*ExecResult, error) {
 	return m, nil
 }
 
-func (c *portScanServiceClient) SaveCancelSimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *portScanApiClient) SaveCancelSimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, PortScanService_SaveCancelSimpleDetect_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, PortScanApi_SaveCancelSimpleDetect_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portScanServiceClient) GetSimpleDetectUnfinishedTask(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSimpleDetectUnfinishedTaskResponse, error) {
+func (c *portScanApiClient) GetSimpleDetectUnfinishedTask(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSimpleDetectUnfinishedTaskResponse, error) {
 	out := new(GetSimpleDetectUnfinishedTaskResponse)
-	err := c.cc.Invoke(ctx, PortScanService_GetSimpleDetectUnfinishedTask_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, PortScanApi_GetSimpleDetectUnfinishedTask_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portScanServiceClient) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error) {
+func (c *portScanApiClient) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error) {
 	out := new(RecordPortScanRequest)
-	err := c.cc.Invoke(ctx, PortScanService_GetSimpleDetectUnfinishedTaskByUid_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, PortScanApi_GetSimpleDetectUnfinishedTaskByUid_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portScanServiceClient) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error) {
+func (c *portScanApiClient) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (*RecordPortScanRequest, error) {
 	out := new(RecordPortScanRequest)
-	err := c.cc.Invoke(ctx, PortScanService_PopSimpleDetectUnfinishedTaskByUid_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, PortScanApi_PopSimpleDetectUnfinishedTaskByUid_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portScanServiceClient) RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (PortScanService_RecoverSimpleDetectUnfinishedTaskClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PortScanService_ServiceDesc.Streams[2], PortScanService_RecoverSimpleDetectUnfinishedTask_FullMethodName, opts...)
+func (c *portScanApiClient) RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *SimpleDetectYakScriptUnfinishedTaskByUidRequest, opts ...grpc.CallOption) (PortScanApi_RecoverSimpleDetectUnfinishedTaskClient, error) {
+	stream, err := c.cc.NewStream(ctx, &PortScanApi_ServiceDesc.Streams[2], PortScanApi_RecoverSimpleDetectUnfinishedTask_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &portScanServiceRecoverSimpleDetectUnfinishedTaskClient{stream}
+	x := &portScanApiRecoverSimpleDetectUnfinishedTaskClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -176,16 +176,16 @@ func (c *portScanServiceClient) RecoverSimpleDetectUnfinishedTask(ctx context.Co
 	return x, nil
 }
 
-type PortScanService_RecoverSimpleDetectUnfinishedTaskClient interface {
+type PortScanApi_RecoverSimpleDetectUnfinishedTaskClient interface {
 	Recv() (*ExecResult, error)
 	grpc.ClientStream
 }
 
-type portScanServiceRecoverSimpleDetectUnfinishedTaskClient struct {
+type portScanApiRecoverSimpleDetectUnfinishedTaskClient struct {
 	grpc.ClientStream
 }
 
-func (x *portScanServiceRecoverSimpleDetectUnfinishedTaskClient) Recv() (*ExecResult, error) {
+func (x *portScanApiRecoverSimpleDetectUnfinishedTaskClient) Recv() (*ExecResult, error) {
 	m := new(ExecResult)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -193,258 +193,258 @@ func (x *portScanServiceRecoverSimpleDetectUnfinishedTaskClient) Recv() (*ExecRe
 	return m, nil
 }
 
-// PortScanServiceServer is the server API for PortScanService service.
-// All implementations must embed UnimplementedPortScanServiceServer
+// PortScanApiServer is the server API for PortScanApi service.
+// All implementations must embed UnimplementedPortScanApiServer
 // for forward compatibility
-type PortScanServiceServer interface {
+type PortScanApiServer interface {
 	// 端口扫描的封装
-	PortScan(*PortScanRequest, PortScanService_PortScanServer) error
+	PortScan(*PortScanRequest, PortScanApi_PortScanServer) error
 	ViewPortScanCode(context.Context, *Empty) (*SimpleScript, error)
-	SimpleDetect(*RecordPortScanRequest, PortScanService_SimpleDetectServer) error
+	SimpleDetect(*RecordPortScanRequest, PortScanApi_SimpleDetectServer) error
 	SaveCancelSimpleDetect(context.Context, *RecordPortScanRequest) (*Empty, error)
 	GetSimpleDetectUnfinishedTask(context.Context, *Empty) (*GetSimpleDetectUnfinishedTaskResponse, error)
 	GetSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error)
 	PopSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error)
-	RecoverSimpleDetectUnfinishedTask(*SimpleDetectYakScriptUnfinishedTaskByUidRequest, PortScanService_RecoverSimpleDetectUnfinishedTaskServer) error
-	mustEmbedUnimplementedPortScanServiceServer()
+	RecoverSimpleDetectUnfinishedTask(*SimpleDetectYakScriptUnfinishedTaskByUidRequest, PortScanApi_RecoverSimpleDetectUnfinishedTaskServer) error
+	mustEmbedUnimplementedPortScanApiServer()
 }
 
-// UnimplementedPortScanServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedPortScanServiceServer struct {
+// UnimplementedPortScanApiServer must be embedded to have forward compatible implementations.
+type UnimplementedPortScanApiServer struct {
 }
 
-func (UnimplementedPortScanServiceServer) PortScan(*PortScanRequest, PortScanService_PortScanServer) error {
+func (UnimplementedPortScanApiServer) PortScan(*PortScanRequest, PortScanApi_PortScanServer) error {
 	return status.Errorf(codes.Unimplemented, "method PortScan not implemented")
 }
-func (UnimplementedPortScanServiceServer) ViewPortScanCode(context.Context, *Empty) (*SimpleScript, error) {
+func (UnimplementedPortScanApiServer) ViewPortScanCode(context.Context, *Empty) (*SimpleScript, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ViewPortScanCode not implemented")
 }
-func (UnimplementedPortScanServiceServer) SimpleDetect(*RecordPortScanRequest, PortScanService_SimpleDetectServer) error {
+func (UnimplementedPortScanApiServer) SimpleDetect(*RecordPortScanRequest, PortScanApi_SimpleDetectServer) error {
 	return status.Errorf(codes.Unimplemented, "method SimpleDetect not implemented")
 }
-func (UnimplementedPortScanServiceServer) SaveCancelSimpleDetect(context.Context, *RecordPortScanRequest) (*Empty, error) {
+func (UnimplementedPortScanApiServer) SaveCancelSimpleDetect(context.Context, *RecordPortScanRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveCancelSimpleDetect not implemented")
 }
-func (UnimplementedPortScanServiceServer) GetSimpleDetectUnfinishedTask(context.Context, *Empty) (*GetSimpleDetectUnfinishedTaskResponse, error) {
+func (UnimplementedPortScanApiServer) GetSimpleDetectUnfinishedTask(context.Context, *Empty) (*GetSimpleDetectUnfinishedTaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSimpleDetectUnfinishedTask not implemented")
 }
-func (UnimplementedPortScanServiceServer) GetSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error) {
+func (UnimplementedPortScanApiServer) GetSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSimpleDetectUnfinishedTaskByUid not implemented")
 }
-func (UnimplementedPortScanServiceServer) PopSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error) {
+func (UnimplementedPortScanApiServer) PopSimpleDetectUnfinishedTaskByUid(context.Context, *SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*RecordPortScanRequest, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PopSimpleDetectUnfinishedTaskByUid not implemented")
 }
-func (UnimplementedPortScanServiceServer) RecoverSimpleDetectUnfinishedTask(*SimpleDetectYakScriptUnfinishedTaskByUidRequest, PortScanService_RecoverSimpleDetectUnfinishedTaskServer) error {
+func (UnimplementedPortScanApiServer) RecoverSimpleDetectUnfinishedTask(*SimpleDetectYakScriptUnfinishedTaskByUidRequest, PortScanApi_RecoverSimpleDetectUnfinishedTaskServer) error {
 	return status.Errorf(codes.Unimplemented, "method RecoverSimpleDetectUnfinishedTask not implemented")
 }
-func (UnimplementedPortScanServiceServer) mustEmbedUnimplementedPortScanServiceServer() {}
+func (UnimplementedPortScanApiServer) mustEmbedUnimplementedPortScanApiServer() {}
 
-// UnsafePortScanServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PortScanServiceServer will
+// UnsafePortScanApiServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PortScanApiServer will
 // result in compilation errors.
-type UnsafePortScanServiceServer interface {
-	mustEmbedUnimplementedPortScanServiceServer()
+type UnsafePortScanApiServer interface {
+	mustEmbedUnimplementedPortScanApiServer()
 }
 
-func RegisterPortScanServiceServer(s grpc.ServiceRegistrar, srv PortScanServiceServer) {
-	s.RegisterService(&PortScanService_ServiceDesc, srv)
+func RegisterPortScanApiServer(s grpc.ServiceRegistrar, srv PortScanApiServer) {
+	s.RegisterService(&PortScanApi_ServiceDesc, srv)
 }
 
-func _PortScanService_PortScan_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _PortScanApi_PortScan_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(PortScanRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(PortScanServiceServer).PortScan(m, &portScanServicePortScanServer{stream})
+	return srv.(PortScanApiServer).PortScan(m, &portScanApiPortScanServer{stream})
 }
 
-type PortScanService_PortScanServer interface {
+type PortScanApi_PortScanServer interface {
 	Send(*ExecResult) error
 	grpc.ServerStream
 }
 
-type portScanServicePortScanServer struct {
+type portScanApiPortScanServer struct {
 	grpc.ServerStream
 }
 
-func (x *portScanServicePortScanServer) Send(m *ExecResult) error {
+func (x *portScanApiPortScanServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _PortScanService_ViewPortScanCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PortScanApi_ViewPortScanCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortScanServiceServer).ViewPortScanCode(ctx, in)
+		return srv.(PortScanApiServer).ViewPortScanCode(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortScanService_ViewPortScanCode_FullMethodName,
+		FullMethod: PortScanApi_ViewPortScanCode_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortScanServiceServer).ViewPortScanCode(ctx, req.(*Empty))
+		return srv.(PortScanApiServer).ViewPortScanCode(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortScanService_SimpleDetect_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _PortScanApi_SimpleDetect_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(RecordPortScanRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(PortScanServiceServer).SimpleDetect(m, &portScanServiceSimpleDetectServer{stream})
+	return srv.(PortScanApiServer).SimpleDetect(m, &portScanApiSimpleDetectServer{stream})
 }
 
-type PortScanService_SimpleDetectServer interface {
+type PortScanApi_SimpleDetectServer interface {
 	Send(*ExecResult) error
 	grpc.ServerStream
 }
 
-type portScanServiceSimpleDetectServer struct {
+type portScanApiSimpleDetectServer struct {
 	grpc.ServerStream
 }
 
-func (x *portScanServiceSimpleDetectServer) Send(m *ExecResult) error {
+func (x *portScanApiSimpleDetectServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _PortScanService_SaveCancelSimpleDetect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PortScanApi_SaveCancelSimpleDetect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RecordPortScanRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortScanServiceServer).SaveCancelSimpleDetect(ctx, in)
+		return srv.(PortScanApiServer).SaveCancelSimpleDetect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortScanService_SaveCancelSimpleDetect_FullMethodName,
+		FullMethod: PortScanApi_SaveCancelSimpleDetect_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortScanServiceServer).SaveCancelSimpleDetect(ctx, req.(*RecordPortScanRequest))
+		return srv.(PortScanApiServer).SaveCancelSimpleDetect(ctx, req.(*RecordPortScanRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortScanService_GetSimpleDetectUnfinishedTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PortScanApi_GetSimpleDetectUnfinishedTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortScanServiceServer).GetSimpleDetectUnfinishedTask(ctx, in)
+		return srv.(PortScanApiServer).GetSimpleDetectUnfinishedTask(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortScanService_GetSimpleDetectUnfinishedTask_FullMethodName,
+		FullMethod: PortScanApi_GetSimpleDetectUnfinishedTask_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortScanServiceServer).GetSimpleDetectUnfinishedTask(ctx, req.(*Empty))
+		return srv.(PortScanApiServer).GetSimpleDetectUnfinishedTask(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortScanService_GetSimpleDetectUnfinishedTaskByUid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PortScanApi_GetSimpleDetectUnfinishedTaskByUid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SimpleDetectYakScriptUnfinishedTaskByUidRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortScanServiceServer).GetSimpleDetectUnfinishedTaskByUid(ctx, in)
+		return srv.(PortScanApiServer).GetSimpleDetectUnfinishedTaskByUid(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortScanService_GetSimpleDetectUnfinishedTaskByUid_FullMethodName,
+		FullMethod: PortScanApi_GetSimpleDetectUnfinishedTaskByUid_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortScanServiceServer).GetSimpleDetectUnfinishedTaskByUid(ctx, req.(*SimpleDetectYakScriptUnfinishedTaskByUidRequest))
+		return srv.(PortScanApiServer).GetSimpleDetectUnfinishedTaskByUid(ctx, req.(*SimpleDetectYakScriptUnfinishedTaskByUidRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortScanService_PopSimpleDetectUnfinishedTaskByUid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PortScanApi_PopSimpleDetectUnfinishedTaskByUid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SimpleDetectYakScriptUnfinishedTaskByUidRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortScanServiceServer).PopSimpleDetectUnfinishedTaskByUid(ctx, in)
+		return srv.(PortScanApiServer).PopSimpleDetectUnfinishedTaskByUid(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortScanService_PopSimpleDetectUnfinishedTaskByUid_FullMethodName,
+		FullMethod: PortScanApi_PopSimpleDetectUnfinishedTaskByUid_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortScanServiceServer).PopSimpleDetectUnfinishedTaskByUid(ctx, req.(*SimpleDetectYakScriptUnfinishedTaskByUidRequest))
+		return srv.(PortScanApiServer).PopSimpleDetectUnfinishedTaskByUid(ctx, req.(*SimpleDetectYakScriptUnfinishedTaskByUidRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortScanService_RecoverSimpleDetectUnfinishedTask_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _PortScanApi_RecoverSimpleDetectUnfinishedTask_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SimpleDetectYakScriptUnfinishedTaskByUidRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(PortScanServiceServer).RecoverSimpleDetectUnfinishedTask(m, &portScanServiceRecoverSimpleDetectUnfinishedTaskServer{stream})
+	return srv.(PortScanApiServer).RecoverSimpleDetectUnfinishedTask(m, &portScanApiRecoverSimpleDetectUnfinishedTaskServer{stream})
 }
 
-type PortScanService_RecoverSimpleDetectUnfinishedTaskServer interface {
+type PortScanApi_RecoverSimpleDetectUnfinishedTaskServer interface {
 	Send(*ExecResult) error
 	grpc.ServerStream
 }
 
-type portScanServiceRecoverSimpleDetectUnfinishedTaskServer struct {
+type portScanApiRecoverSimpleDetectUnfinishedTaskServer struct {
 	grpc.ServerStream
 }
 
-func (x *portScanServiceRecoverSimpleDetectUnfinishedTaskServer) Send(m *ExecResult) error {
+func (x *portScanApiRecoverSimpleDetectUnfinishedTaskServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-// PortScanService_ServiceDesc is the grpc.ServiceDesc for PortScanService service.
+// PortScanApi_ServiceDesc is the grpc.ServiceDesc for PortScanApi service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var PortScanService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ypb.PortScanService",
-	HandlerType: (*PortScanServiceServer)(nil),
+var PortScanApi_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "ypb.PortScanApi",
+	HandlerType: (*PortScanApiServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ViewPortScanCode",
-			Handler:    _PortScanService_ViewPortScanCode_Handler,
+			Handler:    _PortScanApi_ViewPortScanCode_Handler,
 		},
 		{
 			MethodName: "SaveCancelSimpleDetect",
-			Handler:    _PortScanService_SaveCancelSimpleDetect_Handler,
+			Handler:    _PortScanApi_SaveCancelSimpleDetect_Handler,
 		},
 		{
 			MethodName: "GetSimpleDetectUnfinishedTask",
-			Handler:    _PortScanService_GetSimpleDetectUnfinishedTask_Handler,
+			Handler:    _PortScanApi_GetSimpleDetectUnfinishedTask_Handler,
 		},
 		{
 			MethodName: "GetSimpleDetectUnfinishedTaskByUid",
-			Handler:    _PortScanService_GetSimpleDetectUnfinishedTaskByUid_Handler,
+			Handler:    _PortScanApi_GetSimpleDetectUnfinishedTaskByUid_Handler,
 		},
 		{
 			MethodName: "PopSimpleDetectUnfinishedTaskByUid",
-			Handler:    _PortScanService_PopSimpleDetectUnfinishedTaskByUid_Handler,
+			Handler:    _PortScanApi_PopSimpleDetectUnfinishedTaskByUid_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "PortScan",
-			Handler:       _PortScanService_PortScan_Handler,
+			Handler:       _PortScanApi_PortScan_Handler,
 			ServerStreams: true,
 		},
 		{
 			StreamName:    "SimpleDetect",
-			Handler:       _PortScanService_SimpleDetect_Handler,
+			Handler:       _PortScanApi_SimpleDetect_Handler,
 			ServerStreams: true,
 		},
 		{
 			StreamName:    "RecoverSimpleDetectUnfinishedTask",
-			Handler:       _PortScanService_RecoverSimpleDetectUnfinishedTask_Handler,
+			Handler:       _PortScanApi_RecoverSimpleDetectUnfinishedTask_Handler,
 			ServerStreams: true,
 		},
 	},

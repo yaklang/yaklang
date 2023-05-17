@@ -5,7 +5,7 @@ option go_package = "/;ypb";
 import "message_api.proto";
 
 
-service PortScanService{
+service PortScanApi{
   // 端口扫描的封装
   rpc PortScan(PortScanRequest) returns (stream ExecResult);
   rpc ViewPortScanCode(Empty) returns (SimpleScript);

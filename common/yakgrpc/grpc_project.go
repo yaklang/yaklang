@@ -213,7 +213,7 @@ func (s *Server) GetCurrentProject(ctx context.Context, _ *ypb.Empty) (*ypb.Proj
 	return proj.ToGRPCModel(), nil
 }
 
-func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_ExportProjectServer) error {
+func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.ProjectApi_ExportProjectServer) error {
 	var outputFile string
 	feedProgress := func(verbose string, progress float64) {
 		stream.Send(&ypb.ProjectIOProgress{
@@ -344,7 +344,7 @@ func (s *Server) MigrateLegacyDatabase(ctx context.Context, req *ypb.Empty) (*yp
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_ImportProjectServer) error {
+func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.ProjectApi_ImportProjectServer) error {
 	feedProgress := func(verbose string, progress float64) {
 		stream.Send(&ypb.ProjectIOProgress{
 			TargetPath: req.GetProjectFilePath(),

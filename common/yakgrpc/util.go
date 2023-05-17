@@ -15,7 +15,7 @@ import (
 type OpenPortServerStreamerHelperRWC struct {
 	io.ReadWriteCloser
 
-	stream     ypb.Yak_OpenPortServer
+	stream     ypb.YakApi_OpenPortServer
 	rbuf       []byte
 	LocalAddr  string
 	RemoveAddr string
@@ -61,7 +61,7 @@ func (s *OpenPortServerStreamerHelperRWC) Close() (err error) {
 type YakOutputStreamerHelperWC struct {
 	io.WriteCloser
 
-	stream ypb.Yak_ExecServer
+	stream ypb.ExecYakScriptApi_ExecServer
 	rbuf   []byte
 }
 

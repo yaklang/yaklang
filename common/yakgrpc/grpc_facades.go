@@ -94,7 +94,7 @@ func (s *Server) AvailableLocalAddr(ctx context.Context, empty *ypb.Empty) (*ypb
 	return &ypb.AvailableLocalAddrResponse{Interfaces: data}, nil
 }
 
-func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream ypb.Yak_ConfigGlobalReverseServer) error {
+func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream ypb.FacadesApi_ConfigGlobalReverseServer) error {
 	localReverseHost = req.GetLocalAddr()
 	if localReverseHost == "" {
 		localReverseHost = "127.0.0.1"
@@ -181,7 +181,7 @@ func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream 
 	return nil
 }
 
-func (s *Server) StartFacades(req *ypb.StartFacadesParams, stream ypb.Yak_StartFacadesServer) error {
+func (s *Server) StartFacades(req *ypb.StartFacadesParams, stream ypb.FacadesApi_StartFacadesServer) error {
 	ctx := stream.Context()
 	defer log.Info("exit facades local server all...")
 
@@ -362,7 +362,7 @@ func (s *Server) StartFacades(req *ypb.StartFacadesParams, stream ypb.Yak_StartF
 	return nil
 }
 
-func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, stream ypb.Yak_StartFacadesWithYsoObjectServer) error {
+func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, stream ypb.FacadesApi_StartFacadesWithYsoObjectServer) error {
 	ctx := stream.Context()
 	//校验必要参数
 	reversePort := req.GetReversePort()

@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-func (s *Server) OpenPort(inputStream ypb.Yak_OpenPortServer) error {
+func (s *Server) OpenPort(inputStream ypb.YakApi_OpenPortServer) error {
 	firstInput, err := inputStream.Recv()
 	if err != nil {
 		return utils.Errorf("recv first openPort input failed: %s", err)

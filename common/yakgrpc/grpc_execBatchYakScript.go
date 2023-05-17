@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream ypb.Yak_ExecBatchYakScriptServer) error {
+func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream ypb.ExecYakScriptApi_ExecBatchYakScriptServer) error {
 	// 用于管理进度保存相关内容
 	manager := NewProgressManager(s.GetProjectDatabase())
 
@@ -368,7 +368,7 @@ func ConvertMultiYakScriptToExecRequest(req *ypb.ExecRequest, script []*ypb.YakS
 	return &ypb.ExecRequest{Params: params, Script: generalBatchExecutor}, defers, nil
 }
 
-func (s *Server) RecoverExecBatchYakScriptUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverExecBatchYakScriptUnfinishedTaskServer) error {
+func (s *Server) RecoverExecBatchYakScriptUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.ExecYakScriptApi_RecoverExecBatchYakScriptUnfinishedTaskServer) error {
 	manager := NewProgressManager(s.GetProjectDatabase())
 	reqTask, err := manager.GetProgressByUid(req.GetUid(), true)
 	if err != nil {

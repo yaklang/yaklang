@@ -69,7 +69,7 @@ func (s *Server) DownloadOnlinePluginByIds(ctx context.Context, req *ypb.Downloa
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) DownloadOnlinePluginAll(req *ypb.DownloadOnlinePluginByTokenRequest, stream ypb.Yak_DownloadOnlinePluginAllServer) error {
+func (s *Server) DownloadOnlinePluginAll(req *ypb.DownloadOnlinePluginByTokenRequest, stream ypb.OnlineApi_DownloadOnlinePluginAllServer) error {
 	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
 	if err != nil {
 		return utils.Errorf("download failed: %s", err.Error())

@@ -13,7 +13,7 @@ var (
 	attachOutputCallback = new(sync.Map)
 )
 
-func (s *Server) AttachCombinedOutput(req *ypb.AttachCombinedOutputRequest, server ypb.Yak_AttachCombinedOutputServer) error {
+func (s *Server) AttachCombinedOutput(req *ypb.AttachCombinedOutputRequest, server ypb.AttachApi_AttachCombinedOutputServer) error {
 	return utils.HandleStdout(server.Context(), func(s string) {
 		server.Send(&ypb.ExecResult{
 			Raw: []byte(s),

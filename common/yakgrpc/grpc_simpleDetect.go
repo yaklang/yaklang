@@ -481,7 +481,7 @@ yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
 `
 
-func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_SimpleDetectServer) error {
+func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.PortScanApi_SimpleDetectServer) error {
 	reqParams := &ypb.ExecRequest{
 		Script: simpleDetect,
 	}
@@ -721,7 +721,7 @@ func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPort
 	return nil, nil
 }
 
-func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverSimpleDetectUnfinishedTaskServer) error {
+func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.SimpleDetectYakScriptUnfinishedTaskByUidRequest, stream ypb.PortScanApi_RecoverSimpleDetectUnfinishedTaskServer) error {
 	manager := NewProgressManager(s.GetProjectDatabase())
 	reqTask, err := manager.GetSimpleProgressByUid(req.GetUid(), true, false)
 	if err != nil {

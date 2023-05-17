@@ -72,7 +72,7 @@ func (s *Server) generatePacketHackParams(req *ypb.ExecutePacketYakScriptParams)
 	return params, codes[0], nil
 }
 
-func (s *Server) ExecutePacketYakScript(req *ypb.ExecutePacketYakScriptParams, stream ypb.Yak_ExecutePacketYakScriptServer) error {
+func (s *Server) ExecutePacketYakScript(req *ypb.ExecutePacketYakScriptParams, stream ypb.ExecYakScriptApi_ExecutePacketYakScriptServer) error {
 	params, code, err := s.generatePacketHackParams(req)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (s *Server) ExecutePacketYakScript(req *ypb.ExecutePacketYakScriptParams, s
 		})
 }
 
-func (s *Server) ExecuteBatchPacketYakScript(req *ypb.ExecuteBatchPacketYakScriptParams, stream ypb.Yak_ExecuteBatchPacketYakScriptServer) error {
+func (s *Server) ExecuteBatchPacketYakScript(req *ypb.ExecuteBatchPacketYakScriptParams, stream ypb.ExecYakScriptApi_ExecuteBatchPacketYakScriptServer) error {
 	if len(req.GetScriptName()) <= 0 {
 		return utils.Error("empty plugin is selected")
 	}

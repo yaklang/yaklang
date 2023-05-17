@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error {
+func (s *Server) ExtractDataToFile(input ypb.ExportApi_ExtractDataToFileServer) error {
 	var results []map[string]string
 	var csvData [][]string
 	var existedKeys = make(map[string]int)

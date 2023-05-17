@@ -133,7 +133,7 @@ if packetRawFile != "" {
 }
 `
 
-func (s *Server) ExecPacketScan(req *ypb.ExecPacketScanRequest, stream ypb.Yak_ExecPacketScanServer) error {
+func (s *Server) ExecPacketScan(req *ypb.ExecPacketScanRequest, stream ypb.ExecYakScriptApi_ExecPacketScanServer) error {
 	reqParams := &ypb.ExecRequest{Script: execPacketScanCode}
 	var err error
 

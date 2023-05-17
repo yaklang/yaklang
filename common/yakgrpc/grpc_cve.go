@@ -129,7 +129,7 @@ func (s *Server) IsCVEDatabaseReady(ctx context.Context, req *ypb.IsCVEDatabaseR
 	}, nil
 }
 
-func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb.Yak_UpdateCVEDatabaseServer) error {
+func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb.CVEApi_UpdateCVEDatabaseServer) error {
 
 	const targetUrl = "https://cve-db.oss-cn-beijing.aliyuncs.com/default-cve.db.gzip"
 	info := func(progress float64, s string, items ...interface{}) {
