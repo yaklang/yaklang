@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -25,6 +26,20 @@ import (
 
 var empty = yakvm.NewValue("empty", nil, "empty")
 
+type IpPacket struct {
+	Data   string
+	Ip_hl  uint8
+	Ip_v   uint8
+	Ip_tos uint8
+	Ip_len uint16
+	Ip_id  uint16
+	Ip_off uint16
+	Ip_ttl uint8
+	Ip_p   uint8
+	Ip_sum uint16
+	Ip_src string
+	Ip_dst string
+}
 type NaslBuildInMethodParam struct {
 	mapParams  map[string]*yakvm.Value
 	listParams []*yakvm.Value
@@ -478,8 +493,12 @@ func init() {
 			return nil, nil
 		},
 		"close": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `close` is not implement"))
-			return nil, nil
+			iconn := params.getParamByNumber(0, nil).Value
+			if iconn == nil {
+				return nil, nil
+			}
+			conn := iconn.(net.Conn)
+			return conn.Close(), nil
 		},
 		"join_multicast_group": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `join_multicast_group` is not implement"))
@@ -695,8 +714,7 @@ func init() {
 			return nil, nil
 		},
 		"ord": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `ord` is not implement"))
-			return nil, nil
+			return int(params.getParamByNumber(0, 0).String()[0]), nil
 		},
 		"hex": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `hex` is not implement"))
@@ -862,8 +880,8 @@ func init() {
 			return array, nil
 		},
 		"keys": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `keys` is not implement"))
-			return nil, nil
+			keys := funk.Keys(params.getParamByNumber(0, map[string]interface{}{}).Value)
+			return keys, nil
 		},
 		"max_index": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			i := params.getParamByNumber(0, nil).Value
@@ -878,8 +896,7 @@ func init() {
 			return nil, nil
 		},
 		"unixtime": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `unixtime` is not implement"))
-			return nil, nil
+			return time.Now().Unix(), nil
 		},
 		"gettimeofday": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `gettimeofday` is not implement"))
@@ -951,8 +968,33 @@ func init() {
 			return ok, nil
 		},
 		"forge_ip_packet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `forge_ip_packet` is not implement"))
-			return nil, nil
+			data := params.getParamByName("data").String()
+			ip_hl := params.getParamByName("ip_hl", 5).Int()
+			ip_v := params.getParamByName("ip_v", 4).Int()
+			ip_tos := params.getParamByName("ip_tos", 0).Int()
+			ip_id := params.getParamByName("ip_id", rand.Int()).Int()
+			ip_off := params.getParamByName("ip_off", 0).Int()
+			ip_ttl := params.getParamByName("ip_ttl", 64).Int()
+			ip_p := params.getParamByName("ip_p", 0).Int()
+			ip_sum := params.getParamByName("ip_sum", 0).Int()
+			ip_src := params.getParamByName("ip_src").String()
+			ip_dst := params.getParamByName("ip_dst").String()
+			ip_len := params.getParamByName("ip_len", 0).Int()
+			ipPacket := &IpPacket{
+				Data:   data,
+				Ip_hl:  uint8(ip_hl),
+				Ip_v:   uint8(ip_v),
+				Ip_tos: uint8(ip_tos),
+				Ip_id:  uint16(ip_id),
+				Ip_off: uint16(ip_off),
+				Ip_ttl: uint8(ip_ttl),
+				Ip_p:   uint8(ip_p),
+				Ip_sum: uint16(ip_sum),
+				Ip_src: ip_src,
+				Ip_dst: ip_dst,
+				Ip_len: uint16(ip_len),
+			}
+			return ipPacket, nil
 		},
 		"forge_ipv6_packet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `forge_ipv6_packet` is not implement"))
@@ -1382,6 +1424,12 @@ func init() {
 			}
 			return nil, nil
 		},
+		"wmi_versioninfo": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		"smb_versioninfo": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
 	}
 	for name, method := range naslLib {
 		NaslLib[name] = func(name string, m NaslBuildInMethod) func(engine *Engine, params *NaslBuildInMethodParam) interface{} {
@@ -1391,10 +1439,15 @@ func init() {
 				//		log.Errorf("call function `%s` panic error: %v", name, e)
 				//	}
 				//}()
+				timeStart := time.Now()
 				res, err := m(engine, params)
 				if err != nil {
 					log.Errorf("call build in function `%s` error: %v", name, err)
 					return res
+				}
+				du := time.Now().Sub(timeStart).Seconds()
+				if engine.IsDebug() && du > 3 {
+					log.Infof("call build in function `%s` cost: %f", name, du)
 				}
 				return res
 			}

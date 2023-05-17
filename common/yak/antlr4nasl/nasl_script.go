@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"path"
@@ -76,17 +77,35 @@ type NaslScriptInfo struct {
 }
 
 func (n *NaslScriptInfo) Run(e *Engine) error {
+	defer func() {
+		e.runedScripts[n.OriginFileName] = struct{}{}
+	}()
 	for _, dependency := range n.Dependencies {
-		ins, err := NewNaslScriptObjectFromFile(path.Join(e.dependenciesPath, dependency))
+		if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
+			continue
+		}
+		if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
+			continue
+		}
+		if _, ok := e.runedScripts[dependency]; ok {
+			continue
+		}
+		e.SetDescription(true)
+		err := e.RunFile(path.Join(e.dependenciesPath, dependency))
+		e.SetDescription(false)
 		if err != nil {
 			return err
 		}
+		ins := e.GetScriptObject()
 		if err := ins.Run(e); err != nil {
 			return err
 		}
 	}
 	e.scriptObj = n
 	e.compiler.SetSourceCodeFilePath(n.OriginFileName)
+	if e.debug {
+		log.Infof("Running script %s", n.OriginFileName)
+	}
 	return e.SafeEval(n.Script)
 }
 func NewNaslScriptObject() *NaslScriptInfo {

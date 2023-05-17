@@ -11,7 +11,7 @@ func (c *Compiler) VisitIterationStatement(i nasl.IIterationStatementContext) {
 		return
 	}
 	c.visitHook(c, i)
-	c.pushScope()
+	//c.pushScope()
 	if forStatement, ok := i.(*nasl.TraditionalForContext); ok {
 		c.VisitForStatement(forStatement)
 	}
@@ -24,7 +24,7 @@ func (c *Compiler) VisitIterationStatement(i nasl.IIterationStatementContext) {
 	if repeatStatement, ok := i.(*nasl.RepeatContext); ok {
 		c.VisitRepeatStatement(repeatStatement)
 	}
-	c.pushScopeEnd()
+	//c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitForStatement(i *nasl.TraditionalForContext) {
