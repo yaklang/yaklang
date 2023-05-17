@@ -176,13 +176,19 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 	fileUpload, _ := conf.GetValue("crawler", "fileUpload")
 	blackList, _ := conf.GetValue("crawler", "blackList")
 	whiteList, _ := conf.GetValue("crawler", "whiteList")
+	vue, _ := conf.GetValue("crawler", "vue")
+	vueBool := false
+	if vue == "true" || vue == "True" || vue == "TRUE" {
+		vueBool = true
+	}
+	log.Info(vueBool)
 	opts = append(opts,
 		newcrawlerx.WithNewBrowser(string(browserBytes)),
 		newcrawlerx.WithFormFill(getMapFromString(formFill)),
 		newcrawlerx.WithFileInput(getMapFromString(fileUpload)),
 		newcrawlerx.WithBlackList(getSliceFromString(blackList)...),
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
-		newcrawlerx.WithVueWeb(false),
+		newcrawlerx.WithVueWeb(vueBool),
 		newcrawlerx.WithExtraWaitLoadTime(1000),
 	)
 	return opts
