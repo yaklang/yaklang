@@ -34,6 +34,14 @@ type HttpRequest struct {
 	res *http.Response
 }
 
+func CreateGetRequest(url string) *HttpRequest {
+	r := HttpRequest{
+		url: url,
+	}
+	r.init()
+	return &r
+}
+
 func CreateFileRequest(url, method string, params, files map[string]string) *HttpRequest {
 	r := HttpRequest{
 		url:    url,
@@ -70,7 +78,15 @@ func (request *HttpRequest) Request() error {
 }
 
 func (request *HttpRequest) GetRequest() error {
-	paramsToStr(request.params)
+	//paramsToStr(request.params)
+	req, err := http.NewRequest("GET", request.url, nil)
+	if err != nil {
+		return utils.Errorf("[get request]create http new request error: %s", err)
+	}
+	for k, v := range request.defaultHeaders {
+		req.Header.Set(k, v)
+	}
+	request.req = req
 	return nil
 }
 
@@ -134,10 +150,14 @@ func (request *HttpRequest) Do() error {
 	return nil
 }
 
-func (request *HttpRequest) Show() {
+func (request *HttpRequest) Show() (string, error) {
 	//fmt.Println(request.res.)
-	bodyBytes, _ := ioutil.ReadAll(request.res.Body)
-	fmt.Println(string(bodyBytes))
+	bodyBytes, err := ioutil.ReadAll(request.res.Body)
+	if err != nil {
+		return "", utils.Errorf("read response body error: %s", err)
+	}
+	//fmt.Println(string(bodyBytes))
+	return string(bodyBytes), nil
 }
 
 func writeFile(writer *multipart.Writer, filename, filePath string) error {

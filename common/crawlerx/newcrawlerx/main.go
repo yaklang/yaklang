@@ -24,11 +24,14 @@ type CrawlerCore struct {
 	waitGroup *utils.SizedWaitGroup
 }
 
-func NewCrawler(targetUrl string, opts ...ConfigOpt) *CrawlerCore {
+func NewCrawler(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	config := NewConfig()
 	ctx := context.Background()
 	pageVisit, resultSent := filter.NewCountFilter(), filter.NewCountFilter()
-	uChan, _ := NewUChan(128)
+	uChan, err := NewUChan(128)
+	if err != nil {
+		return nil, utils.Errorf("data channel create error: %s", err)
+	}
 	urlTree := CreateTree(targetUrl)
 	pageSizedWaitGroup := utils.NewSizedWaitGroup(20)
 	opts = append(opts,
@@ -51,7 +54,7 @@ func NewCrawler(targetUrl string, opts ...ConfigOpt) *CrawlerCore {
 		waitGroup: &pageSizedWaitGroup,
 	}
 	core.init()
-	return core
+	return core, nil
 }
 
 func (core *CrawlerCore) init() {

@@ -158,3 +158,12 @@ func stringSuffixList(s string, suffixes []string) bool {
 	}
 	return false
 }
+
+func stringPrefixList(origin string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(origin, prefix) {
+			return true
+		}
+	}
+	return false
+}

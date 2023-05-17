@@ -55,6 +55,7 @@ type BrowserStarter struct {
 
 	concurrent int
 	maxUrl     int
+	maxDepth   int
 	stopSignal bool
 
 	getUrlFunction func(*rod.Page) error
@@ -67,6 +68,7 @@ type BrowserStarter struct {
 	transport http.Transport
 
 	extraWaitLoad int
+	checkHTML     bool
 }
 
 func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -98,12 +100,14 @@ func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) 
 
 		concurrent: baseConfig.concurrent,
 		maxUrl:     baseConfig.maxUrlCount,
+		maxDepth:   baseConfig.maxDepth,
 		stopSignal: false,
 
 		pageActions: make([]func(*rod.Page) error, 0),
 		actionMap:   make(map[string]func(*rod.Page) error),
 
 		extraWaitLoad: baseConfig.extraWaitLoadTime,
+		checkHTML:     true,
 	}
 	ctx, cancel := context.WithCancel(baseConfig.ctx)
 	starter.ctx = ctx
@@ -266,6 +270,8 @@ func (starter *BrowserStarter) newPageDetectEvent() {
 					PromptText: "",
 				}.Call(page)
 			})()
+			// wait for page navigate
+			time.Sleep(500 * time.Millisecond)
 			err = page.WaitLoad()
 			if err != nil {
 				log.Errorf("targetID %s wait load error: %s", targetID, err)
@@ -273,6 +279,16 @@ func (starter *BrowserStarter) newPageDetectEvent() {
 			}
 			if starter.extraWaitLoad != 0 {
 				time.Sleep(time.Duration(starter.extraWaitLoad) * time.Millisecond)
+			}
+			if starter.checkHTML {
+				pageInfo, err := page.HTML()
+				if err == nil {
+					bodyInfo := matchBody(pageInfo)
+					if bodyInfo == `<body></body>` {
+						log.Errorf("blank info in page: %s", page)
+					}
+					starter.checkHTML = false
+				}
 			}
 			page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
 			err = starter.PageScan(page)
@@ -335,10 +351,10 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		// do tree
 		//
 
-		//if pageUrl != hijack.Request.URL().String() {
-		//starter.urlTree.Add(pageUrl, hijack.Request.URL().String())
-		//log.Info(pageUrl, " -> ", hijack.Request.URL().String())
-		//}
+		if pageUrl != hijack.Request.URL().String() {
+			starter.urlTree.Add(pageUrl, hijack.Request.URL().String())
+			//log.Info(pageUrl, " -> ", hijack.Request.URL().String())
+		}
 
 		result := RequestResult{}
 		result.request = hijack.Request
@@ -354,7 +370,11 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 }
 
 func (starter *BrowserStarter) Run() {
-	starter.StartBrowser()
+	err := starter.StartBrowser()
+	if err != nil {
+		log.Errorf("browser start error: %s", err)
+		return
+	}
 	headlessBrowser := starter.browser
 	for v := range starter.uChan.Out {
 		urlStr, ok := v.(string)
@@ -363,7 +383,10 @@ func (starter *BrowserStarter) Run() {
 		}
 		starter.mainWaitGroup.Add()
 		p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
-		starter.createPageHijack(p)
+		if starter.baseConfig.hijack {
+			starter.createPageHijack(p)
+		}
+		//log.Infof("open url: %s...", urlStr)
 		err := p.Navigate(urlStr)
 		if err != nil {
 			log.Errorf("page navigate %s error: %s", urlStr, err)
@@ -383,6 +406,7 @@ func (starter *BrowserStarter) Run() {
 					continue
 				}
 				starter.createPageHijack(p)
+				//log.Infof("open url: %s...", urlStr)
 				err = p.Navigate(urlStr)
 				if err != nil {
 					log.Errorf("page navigate %s error: %s", urlStr, err)
@@ -398,7 +422,11 @@ func (starter *BrowserStarter) Run() {
 }
 
 func (starter *BrowserStarter) MultiRun() {
-	starter.StartBrowser()
+	err := starter.StartBrowser()
+	if err != nil {
+		log.Errorf("browser start error: %s", err)
+		return
+	}
 	headlessBrowser := starter.browser
 	for v := range starter.uChan.Out {
 		urlStr, ok := v.(string)
@@ -410,6 +438,7 @@ func (starter *BrowserStarter) MultiRun() {
 		if starter.baseConfig.hijack {
 			starter.createPageHijack(p)
 		}
+		//log.Infof("open url: %s...", urlStr)
 		err := p.Navigate(urlStr)
 		if err != nil {
 			log.Errorf("page navigate %s error: %s", urlStr, err)
@@ -430,6 +459,7 @@ func (starter *BrowserStarter) MultiRun() {
 				if starter.baseConfig.hijack {
 					starter.createPageHijack(p)
 				}
+				//log.Infof("open url: %s...", urlStr)
 				err = p.Navigate(urlStr)
 				if err != nil {
 					log.Errorf("page navigate %s error: %s", urlStr, err)

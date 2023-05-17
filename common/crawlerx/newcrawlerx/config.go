@@ -88,6 +88,7 @@ func NewConfig() *Config {
 			hijack:         true,
 			vue:            false,
 			maxUrlCount:    0,
+			maxDepth:       0,
 			blackList:      make([]*regexp.Regexp, 0),
 			whiteList:      make([]*regexp.Regexp, 0),
 			formFill:       defaultInputMap,

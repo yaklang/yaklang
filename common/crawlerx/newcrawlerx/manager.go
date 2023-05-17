@@ -30,10 +30,12 @@ func (manager *BrowserManager) CreateBrowserStarters() {
 func (manager *BrowserManager) Run() {
 	if manager.config.baseConfig.vue {
 		for _, starter := range manager.browsers {
+			//log.Info("vue mode run.")
 			go starter.Run()
 		}
 	} else {
 		for _, starter := range manager.browsers {
+			//log.Info("normal mode run.")
 			go starter.MultiRun()
 		}
 	}
