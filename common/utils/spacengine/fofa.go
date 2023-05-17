@@ -127,6 +127,7 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, maxRecord i
 					count++
 					if maxRecord > 0 && count >= maxRecord {
 						nextFinished = true
+						break
 					}
 				}
 			}
