@@ -29,6 +29,11 @@ func (starter *BrowserStarter) PageScan(page *rod.Page) error {
 func (starter *BrowserStarter) DefaultGetUrlFunctionGenerator(doGetUrl func(string, string) error) func(*rod.Page) error {
 	return func(page *rod.Page) error {
 		originUrl, _ := getCurrentUrl(page)
+		currentNode := starter.urlTree.Find(originUrl)
+		if starter.maxDepth != 0 && currentNode.Level() > starter.maxDepth {
+			//log.Infof("url %s reach max depth.", originUrl)
+			return nil
+		}
 		urlObj, err := page.Eval(findOnlyHref)
 		if err != nil {
 			return utils.Errorf("page %s get url by eval js error: %s", page, err)
@@ -59,10 +64,12 @@ func (starter *BrowserStarter) DefaultDoGetUrl() func(string, string) error {
 		afterUrl := starter.urlAfterRepeat(targetUrl)
 		for _, f := range starter.checkFunctions {
 			if !f(afterUrl) {
+				//log.Errorf("check failed: %s", targetUrl)
 				return nil
 			}
 		}
-		//starter.urlTree.Add(originUrl, targetUrl)
+		starter.urlTree.Add(originUrl, targetUrl)
+		//log.Info(originUrl, " -> ", targetUrl)
 		starter.uChan.In <- targetUrl
 		return nil
 	}
@@ -117,6 +124,7 @@ func (starter *BrowserStarter) DefaultDoClick() func(*rod.Page, string, string) 
 			return utils.Errorf("get url function null")
 		}
 		starter.getUrlFunction(page)
+		//log.Infof("in %s click selector: %s, current url: %s", originUrl, selector, currentUrl)
 		if currentUrl != "" && currentUrl != originUrl {
 			page.NavigateBack()
 			//page.MustWaitLoad()

@@ -68,6 +68,11 @@ var scanRangeMap = map[scanRangeLevel]func(string) string{
 	subDomain:  subDomainRange,
 }
 
+var generalScanRangeMap = map[scanRangeLevel]func(string) []string{
+	mainDomain: generalMainDomainRange,
+	subDomain:  generalSubDomainRange,
+}
+
 var inputStringElementTypes = []string{
 	"text", "password", "textarea", "search",
 }
