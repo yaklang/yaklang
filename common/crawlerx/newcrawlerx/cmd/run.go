@@ -29,7 +29,7 @@ func run(targetURL, proxy, path string) {
 	if browserInfoStr != "{}" {
 		opts = append(opts, newcrawlerx.WithNewBrowser(browserInfoStr))
 	}
-	channel := newcrawlerx.StartCrawler(targetURL, opts...)
+	channel, _ := newcrawlerx.StartCrawler(targetURL, opts...)
 	for item := range channel {
 		fmt.Println(item.Method() + " " + item.Url())
 	}
@@ -89,7 +89,7 @@ func do() {
 				generateBlackList("logout", "captcha"),
 			)
 		}
-		channel := newcrawlerx.StartCrawler(url, opts...)
+		channel, _ := newcrawlerx.StartCrawler(url, opts...)
 		exportFile := c.String("out")
 		if exportFile == "" {
 			for item := range channel {
@@ -182,7 +182,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 		newcrawlerx.WithFileInput(getMapFromString(fileUpload)),
 		newcrawlerx.WithBlackList(getSliceFromString(blackList)...),
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
-		newcrawlerx.WithVueWeb(true),
+		newcrawlerx.WithVueWeb(false),
 		newcrawlerx.WithExtraWaitLoadTime(1000),
 	)
 	return opts

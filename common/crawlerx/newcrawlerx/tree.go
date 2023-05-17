@@ -32,6 +32,10 @@ func (node *UrlNode) Next(nextNode *UrlNode) {
 	node.next = nextNode
 }
 
+func (node *UrlNode) Level() int {
+	return node.level
+}
+
 type UrlTree struct {
 	sync.Mutex
 
