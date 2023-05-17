@@ -75,11 +75,11 @@ func (c *Compiler) VisitBlock(i nasl.IBlockContext) {
 	if !ok {
 		return
 	}
-	c.pushScope()
+	//c.pushScope()
 	if block.StatementList() != nil {
 		c.VisitStatementList(block.StatementList())
 	}
-	c.pushScopeEnd()
+	//c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitIfStatement(i nasl.IIfStatementContext) {

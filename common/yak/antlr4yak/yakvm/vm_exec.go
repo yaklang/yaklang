@@ -251,6 +251,7 @@ func (v *Frame) execCode(c *Code, debug bool) {
 	}
 }
 func (v *Frame) _execCode(c *Code, debug bool) {
+	isNasl := v.vm.GetConfig().vmMode == NASL
 	//if v.codePointer == 40 {
 	//	println()
 	//}
@@ -920,11 +921,20 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		scope := v.CurrentScope()
 		if op1.IsValueList() { // 处理左值是iterablecall的情况
 			value = v.getValueForLeftIterableCall(op1.ValueList())
-		} else if value, ok = scope.GetValueByID(op1.SymbolId); !ok && value != undefined {
-			if name, ok := scope.GetValueByID(op1.SymbolId); ok {
-				panic(fmt.Sprintf("cannot get variable[%v] value", name))
-			} else {
-				panic(fmt.Sprintf("cannot get variable-id[%v] value", op1.SymbolId))
+		} else {
+			switch v.vm.GetConfig().vmMode {
+			case NASL:
+				if value, ok = scope.GetValueByID(op1.SymbolId); !ok {
+					value = undefined
+				}
+			default:
+				if value, ok = scope.GetValueByID(op1.SymbolId); !ok && value != undefined {
+					if name, ok := scope.GetValueByID(op1.SymbolId); ok {
+						panic(fmt.Sprintf("cannot get variable[%v] value", name))
+					} else {
+						panic(fmt.Sprintf("cannot get variable-id[%v] value", op1.SymbolId))
+					}
+				}
 			}
 		}
 
@@ -957,6 +967,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 		// 将结果重新赋值
 		op1.Assign(v, ret)
+		if isNasl {
+			v.push(ret)
+		}
 	case OpJMP: /*note: control index by your self!*/
 		v.setCodeIndex(c.Unary)
 		return

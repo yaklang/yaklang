@@ -25,6 +25,7 @@ const (
 type Engine struct {
 	debug                          bool
 	naslLibsPath, dependenciesPath string
+	runedScripts                   map[string]struct{}
 	naslLibPatch                   map[string]func(string) string
 	compiler                       *visitors.Compiler
 	vm                             *yakvm.VirtualMachine
@@ -45,6 +46,7 @@ func New() *Engine {
 		compiler:     visitors.NewCompilerWithSymbolTable(table),
 		vm:           vm,
 		naslLibPatch: make(map[string]func(string) string),
+		runedScripts: make(map[string]struct{}),
 	}
 
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
@@ -146,6 +148,9 @@ func (e *Engine) Compile(code string) error {
 		return e.compiler.GetMergeError()
 	}
 	return nil
+}
+func (e *Engine) IsDebug() bool {
+	return e.debug
 }
 func (e *Engine) SafeRunFile(path string) (err error) {
 	defer func() {

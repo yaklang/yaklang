@@ -273,6 +273,12 @@ local_var a;
 a[1] = 1;
 `)
 }
+func TestPlusEq(t *testing.T) {
+	DebugExec(`
+a += "123";
+assert(a == "123","a!=123");
+`)
+}
 func TestIterableVarCall(t *testing.T) {
 	DebugExec(`
 a = [1];
