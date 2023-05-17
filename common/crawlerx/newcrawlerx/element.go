@@ -32,10 +32,10 @@ func GetDefaultClickElementSelectors(page *rod.Page) []string {
 		"input": {
 			"type": {
 				"submit",
-				//"button",
+				"button",
 			},
 		},
-		//"button": {},
+		"button": {},
 	}
 	elements, _ := customizedGetElement(page, searchInfo)
 	return getElementsSelectors(elements)

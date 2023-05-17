@@ -5,7 +5,7 @@
     browserData = {
         "ws_address":"",
         "exe_path":"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "proxy_address":"http://127.0.0.1:8083",
+        // "proxy_address":"http://127.0.0.1:8083",
         "proxy_username":"",
         "proxy_password":"",
     }
@@ -15,8 +15,10 @@
     formFill = newcrawlerx.formFill(formFillMap)
     fileUpload = newcrawlerx.fileInput({"default":"/Users/chenyangbao/1.txt"})
     blackList = newcrawlerx.blackList("logout","captcha")
+    vue = newcrawlerx.vueWebsite(false)
+    timeout = newcrawlerx.extraWaitLoad(1000)
     
-    ch = newcrawlerx.startCrawler("http://101.200.140.25/login.php",formFill, fileUpload, blackList, browserInfo)
+    ch,_ = newcrawlerx.startCrawler("http://testphp.vulnweb.com/",formFill, fileUpload, blackList, browserInfo, vue, timeout)
     for item = range ch{
         println(item.Method() + " " + item.Url())
     }
@@ -65,7 +67,7 @@
 
 #### 定义
 
-`func newcrawlerx.startCrawler(url string, opts ...newcrawlerx.ConfigOpt) return (ch: chan newcrawlerx.ReqInfo)`
+`func newcrawlerx.startCrawler(url string, opts ...newcrawlerx.ConfigOpt) return (ch: chan newcrawlerx.ReqInfo, err: error)`
 
 #### 参数
 
@@ -79,6 +81,7 @@
 | 返回值 | 返回值类型                    | 返回值解释         |
 |-----|--------------------------|---------------|
 | ch  | chan newcrawlerx.ReqInfo | 爬虫结果传递channel |
+| err | error                    | 错误信息          |
 
 ### newcrawlerx.browserInfo
 
@@ -459,3 +462,44 @@ url中的query名称查重忽略设置
 | 返回值  | 返回值类型                    | 返回值解释  |
 |------|--------------------------|--------|
 | r0   | newcrawlerx.ConfigOpt    | 参数设置函数 |
+
+### newcrawlerx.extraWaitLoad
+
+设置页面的额外等待时间 因为有些时候通过devtools拿到的页面状态为加载完成 但是实际上页面仍然在渲染部分内容
+此时可以通过该函数进行额外的等待时间的设置
+
+#### 定义
+
+`func newcrawlerx.extraWaitLoad(timeout int) return (r0: newcrawlerx.ConfigOpt)`
+
+#### 参数
+
+| 参数名     | 参数类型 | 参数解释                   |
+|---------|------|------------------------|
+| timeout | int  | 额外等待时间 (单位Millisecond) |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | newcrawlerx.ConfigOpt    | 参数设置函数 |
+
+### newcrawlerx.maxDepth
+
+设置最大爬取深度
+
+#### 定义
+
+`func newcrawlerx.maxDepth(depth int) return (r0: newcrawlerx.ConfigOpt)`
+
+#### 参数
+
+| 参数名   | 参数类型 | 参数解释   |
+|-------|------|--------|
+| depth | int  | 最大爬虫深度 |
+
+#### 返回值
+
+| 返回值 | 返回值类型                 | 返回值解释  |
+|-----|-----------------------|--------|
+| r0  | newcrawlerx.ConfigOpt | 参数设置函数 |

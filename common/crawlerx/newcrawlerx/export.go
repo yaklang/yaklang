@@ -33,4 +33,5 @@ var NewCrawlerXExports = map[string]interface{}{
 
 	"vueWebsite":    WithVueWeb,
 	"extraWaitLoad": WithExtraWaitLoadTime,
+	"maxDepth":      WithMaxDepth,
 }

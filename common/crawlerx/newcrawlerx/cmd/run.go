@@ -29,7 +29,7 @@ func run(targetURL, proxy, path string) {
 	if browserInfoStr != "{}" {
 		opts = append(opts, newcrawlerx.WithNewBrowser(browserInfoStr))
 	}
-	channel := newcrawlerx.StartCrawler(targetURL, opts...)
+	channel, _ := newcrawlerx.StartCrawler(targetURL, opts...)
 	for item := range channel {
 		fmt.Println(item.Method() + " " + item.Url())
 	}
@@ -89,7 +89,7 @@ func do() {
 				generateBlackList("logout", "captcha"),
 			)
 		}
-		channel := newcrawlerx.StartCrawler(url, opts...)
+		channel, _ := newcrawlerx.StartCrawler(url, opts...)
 		exportFile := c.String("out")
 		if exportFile == "" {
 			for item := range channel {
@@ -176,13 +176,19 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 	fileUpload, _ := conf.GetValue("crawler", "fileUpload")
 	blackList, _ := conf.GetValue("crawler", "blackList")
 	whiteList, _ := conf.GetValue("crawler", "whiteList")
+	vue, _ := conf.GetValue("crawler", "vue")
+	vueBool := false
+	if vue == "true" || vue == "True" || vue == "TRUE" {
+		vueBool = true
+	}
+	log.Info(vueBool)
 	opts = append(opts,
 		newcrawlerx.WithNewBrowser(string(browserBytes)),
 		newcrawlerx.WithFormFill(getMapFromString(formFill)),
 		newcrawlerx.WithFileInput(getMapFromString(fileUpload)),
 		newcrawlerx.WithBlackList(getSliceFromString(blackList)...),
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
-		newcrawlerx.WithVueWeb(true),
+		newcrawlerx.WithVueWeb(vueBool),
 		newcrawlerx.WithExtraWaitLoadTime(1000),
 	)
 	return opts

@@ -153,7 +153,7 @@ func unLimitLevelRepeatCheckGenerator(extraParams ...string) func(*rod.HijackReq
 //
 
 func scanRangeFunctionGenerate(targetUrl string, scanRange scanRangeLevel) func(string) bool {
-	rangeFunction, ok := scanRangeMap[scanRange]
+	rangeFunction, ok := generalScanRangeMap[scanRange]
 	if !ok {
 		return nil
 	}
@@ -162,7 +162,7 @@ func scanRangeFunctionGenerate(targetUrl string, scanRange scanRangeLevel) func(
 		if stringSuffixList(checkUrl, extraUrlKeywords) {
 			return true
 		}
-		if strings.HasPrefix(checkUrl, rangeUrl) {
+		if stringPrefixList(checkUrl, rangeUrl) {
 			return true
 		}
 		return false
@@ -174,9 +174,29 @@ func mainDomainRange(targetUrl string) string {
 	return url.Scheme + "://" + url.Host
 }
 
+func generalMainDomainRange(targetUrl string) []string {
+	url, _ := u.Parse(targetUrl)
+	ranges := make([]string, 0)
+	ranges = append(ranges, url.Scheme+"://"+url.Host)
+	if !strings.HasPrefix(url.Host, "www.") {
+		ranges = append(ranges, url.Scheme+"://www."+url.Host)
+	}
+	return ranges
+}
+
 func subDomainRange(targetUrl string) string {
 	url, _ := u.Parse(targetUrl)
 	return url.Scheme + "://" + url.Host + url.Path
+}
+
+func generalSubDomainRange(targetUrl string) []string {
+	url, _ := u.Parse(targetUrl)
+	ranges := make([]string, 0)
+	ranges = append(ranges, url.Scheme+"://"+url.Host+url.Path)
+	if !strings.HasPrefix(url.Host, "www.") {
+		ranges = append(ranges, url.Scheme+"://www."+url.Host+url.Path)
+	}
+	return ranges
 }
 
 func whiteListCheckGenerator(whitelist []*regexp.Regexp) func(string) bool {
