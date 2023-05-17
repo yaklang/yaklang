@@ -15,10 +15,10 @@ import (
 
 func isBase64JSON(raw string) (string, bool) {
 	decoded, err := codec.DecodeBase64Url(raw)
-	if err == nil {
-		raw = string(decoded)
+	if err != nil {
+		return raw, false
 	}
-	return utils.IsJSON(raw)
+	return utils.IsJSON(string(decoded))
 }
 
 func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {

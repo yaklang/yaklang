@@ -14,6 +14,7 @@ type httpParamPositionType string
 
 var (
 	posMethod              httpParamPositionType = "method"
+	posBody                httpParamPositionType = "body"
 	posGetQuery            httpParamPositionType = "get-query"
 	posGetQueryJson        httpParamPositionType = "get-query-json"
 	posGetQueryBase64Json  httpParamPositionType = "get-query-base64-json"
@@ -34,10 +35,14 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 	switch pos {
 	case posMethod:
 		return "HTTP方法"
+	case posBody:
+		return "Body"
 	case posGetQuery:
 		return "GET参数"
 	case posGetQueryJson:
 		return "GET参数(JSON)"
+	case posGetQueryBase64Json:
+		return "GET参数(Base64+JSON)"
 	case posPathAppend:
 		return "URL路径(追加)"
 	case posPathBlock:
@@ -47,13 +52,19 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 	case posHeader:
 		return "Header"
 	case posPostQuery:
-		return "POST参数(urlencode)"
+		return "POST参数"
 	case posPostQueryJson:
-		return "POST参数(参数内JSON)"
+		return "POST参数(JSON)"
+	case posPostQueryBase64Json:
+		return "POST参数(Base64+JSON)"
 	case posPostJson:
-		return "POST参数(json object)"
+		return "JSON-Body参数"
 	case posCookie:
 		return "Cookie参数"
+	case posCookieJson:
+		return "Cookie参数(JSON)"
+	case posCookieBase64Json:
+		return "Cookie参数(Base64+JSON)"
 	default:
 		return string(pos)
 	}
@@ -168,6 +179,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 			}
 			return p.origin.GetPath() + s
 		}).([]string)...)
+	case posBody:
+		return p.origin.FuzzPostRaw(InterfaceToFuzzResults(i)...)
 	case posPathBlock:
 		var result = strings.Split(p.origin.GetPath(), "/")
 		if len(result) <= 0 {
@@ -191,4 +204,16 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		log.Warnf("cannot found fuzz params method identify: %v", posGetQueryJson)
 		return p.origin
 	}
+}
+
+func (p *FuzzHTTPRequestParam) String() string {
+	if p.jsonPath != "" {
+		return fmt.Sprintf("Name:%-20s JsonPath: %-12s Position:[%v(%v)]\n", p.Name(), p.jsonPath, p.PositionVerbose(), p.Position())
+	}
+	return fmt.Sprintf("Name:%-20s Position:[%v(%v)]\n", p.Name(), p.PositionVerbose(), p.Position())
+}
+
+func (p *FuzzHTTPRequestParam) Debug() *FuzzHTTPRequestParam {
+	fmt.Print(p.String())
+	return p
 }

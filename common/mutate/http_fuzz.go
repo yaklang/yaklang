@@ -164,8 +164,7 @@ func (f *FuzzHTTPRequest) IsBodyUrlEncoded() bool {
 }
 
 func (f *FuzzHTTPRequest) IsBodyFormEncoded() bool {
-	log.Errorf("not supported body form encoded...  yet....")
-	return false
+	return lowhttp.IsMultipartFormDataRequest(f.GetBytes())
 }
 
 type buildFuzzHTTPRequestConfig struct {
@@ -457,14 +456,22 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	}
 	bodyRaw := httpRequestReadBody(req)
 
-	var params map[string]interface{}
+	var params any
 	err = json.Unmarshal(bytes.TrimSpace(bodyRaw), &params)
 	if err != nil {
 		return nil
 	}
 
-	fuzzParams := getPostJsonFuzzParams("", params, f)
-
+	var fuzzParams []*FuzzHTTPRequestParam
+	for _, jsonPath := range jsonpath.RecursiveDeepJsonPath(params) {
+		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+			typePosition:     posPostJson,
+			param:            "",
+			paramOriginValue: nil,
+			jsonPath:         jsonPath,
+			origin:           f,
+		})
+	}
 	return fuzzParams
 }
 
@@ -624,6 +631,30 @@ func (f *FuzzHTTPRequest) GetCommonParams() []*FuzzHTTPRequestParam {
 	ret = append(ret, f.GetCookieParams()...)
 
 	return ret
+}
+
+func (f *FuzzHTTPRequest) GetAllParams() []*FuzzHTTPRequestParam {
+	var params []*FuzzHTTPRequestParam
+	params = append(params, f.GetGetQueryParams()...)
+	if ret := f.GetPostParams(); len(ret) <= 0 {
+		ret = f.GetPostJsonParams()
+		params = append(params, ret...)
+	} else {
+		params = append(params, ret...)
+	}
+	params = append(params, f.GetCookieParams()...)
+	params = append(params, f.GetHeaderParams()...)
+	params = append(params, f.GetPathParams()...)
+	params = append(params, &FuzzHTTPRequestParam{
+		typePosition:     posMethod,
+		paramOriginValue: f.GetMethod(),
+	})
+	params = append(params, &FuzzHTTPRequestParam{
+		typePosition:     posBody,
+		paramOriginValue: f.GetBody(),
+	})
+	f.IsBodyFormEncoded()
+	return params
 }
 
 func (f *FuzzHTTPRequest) GetHeaderParams() []*FuzzHTTPRequestParam {

@@ -13,11 +13,16 @@ import (
 	"testing"
 )
 
-func init() {
+func initDB() {
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
 
 	_ = yaklang.New()
+	_ = yak.NewScriptEngine(1)
+}
+
+func init() {
+	initDB()
 }
 
 type BaseCase struct {
@@ -99,7 +104,6 @@ type github.com/yaklang/yaklang/common/mutate.(FuzzHTTPRequest) struct {
 */
 
 func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {
-	_ = yak.NewScriptEngine(1)
 
 	total := []*BaseCase{
 		{
