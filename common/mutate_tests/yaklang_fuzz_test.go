@@ -334,6 +334,22 @@ c=eyJkZCI6MTI1fQ%3D%3D&&d=1234444
 				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
 			},
 		},
+		{
+			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+Cookie: c=eyJkZCI6MTI1fQ%3D%3D
+
+d=1234444&&qa=1
+`,
+			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookieBase64JsonPath(`c`, `$.dd`, `ddda`)",
+			ExpectKeywordInOutputPacket: []string{
+				"ABC: CCC\r\n",
+				"a=ab", "Cookie: c=ey",
+				"eyJkZCI6ImRkZGEifQ%3D%3D",
+				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+			},
+			Debug: true,
+		},
 	}
 
 	debugCases := funk.Filter(total, func(i *BaseCase) bool {
