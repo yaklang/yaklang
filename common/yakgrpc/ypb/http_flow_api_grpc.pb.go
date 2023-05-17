@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	HTTPFlowApi_GetHTTPFlowByHash_FullMethodName           = "/ypb.HTTPFlowApi/GetHTTPFlowByHash"
 	HTTPFlowApi_GetHTTPFlowById_FullMethodName             = "/ypb.HTTPFlowApi/GetHTTPFlowById"
+	HTTPFlowApi_QueryHTTPFlowByIds_FullMethodName          = "/ypb.HTTPFlowApi/QueryHTTPFlowByIds"
 	HTTPFlowApi_GetHTTPFlowByIds_FullMethodName            = "/ypb.HTTPFlowApi/GetHTTPFlowByIds"
 	HTTPFlowApi_QueryHTTPFlows_FullMethodName              = "/ypb.HTTPFlowApi/QueryHTTPFlows"
 	HTTPFlowApi_DeleteHTTPFlows_FullMethodName             = "/ypb.HTTPFlowApi/DeleteHTTPFlows"
@@ -38,6 +39,7 @@ const (
 type HTTPFlowApiClient interface {
 	GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFlowByHashRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
 	GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
+	QueryHTTPFlowByIds(ctx context.Context, in *GetHTTPFlowByIdsRequest, opts ...grpc.CallOption) (*HTTPFlows, error)
 	GetHTTPFlowByIds(ctx context.Context, in *GetHTTPFlowByIdsRequest, opts ...grpc.CallOption) (*HTTPFlows, error)
 	QueryHTTPFlows(ctx context.Context, in *QueryHTTPFlowRequest, opts ...grpc.CallOption) (*QueryHTTPFlowResponse, error)
 	DeleteHTTPFlows(ctx context.Context, in *DeleteHTTPFlowRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -70,6 +72,15 @@ func (c *hTTPFlowApiClient) GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFl
 func (c *hTTPFlowApiClient) GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequest, opts ...grpc.CallOption) (*HTTPFlow, error) {
 	out := new(HTTPFlow)
 	err := c.cc.Invoke(ctx, HTTPFlowApi_GetHTTPFlowById_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *hTTPFlowApiClient) QueryHTTPFlowByIds(ctx context.Context, in *GetHTTPFlowByIdsRequest, opts ...grpc.CallOption) (*HTTPFlows, error) {
+	out := new(HTTPFlows)
+	err := c.cc.Invoke(ctx, HTTPFlowApi_QueryHTTPFlowByIds_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +174,7 @@ func (c *hTTPFlowApiClient) GetHTTPPacketBody(ctx context.Context, in *GetHTTPPa
 type HTTPFlowApiServer interface {
 	GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error)
 	GetHTTPFlowById(context.Context, *GetHTTPFlowByIdRequest) (*HTTPFlow, error)
+	QueryHTTPFlowByIds(context.Context, *GetHTTPFlowByIdsRequest) (*HTTPFlows, error)
 	GetHTTPFlowByIds(context.Context, *GetHTTPFlowByIdsRequest) (*HTTPFlows, error)
 	QueryHTTPFlows(context.Context, *QueryHTTPFlowRequest) (*QueryHTTPFlowResponse, error)
 	DeleteHTTPFlows(context.Context, *DeleteHTTPFlowRequest) (*Empty, error)
@@ -185,6 +197,9 @@ func (UnimplementedHTTPFlowApiServer) GetHTTPFlowByHash(context.Context, *GetHTT
 }
 func (UnimplementedHTTPFlowApiServer) GetHTTPFlowById(context.Context, *GetHTTPFlowByIdRequest) (*HTTPFlow, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPFlowById not implemented")
+}
+func (UnimplementedHTTPFlowApiServer) QueryHTTPFlowByIds(context.Context, *GetHTTPFlowByIdsRequest) (*HTTPFlows, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryHTTPFlowByIds not implemented")
 }
 func (UnimplementedHTTPFlowApiServer) GetHTTPFlowByIds(context.Context, *GetHTTPFlowByIdsRequest) (*HTTPFlows, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPFlowByIds not implemented")
@@ -258,6 +273,24 @@ func _HTTPFlowApi_GetHTTPFlowById_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(HTTPFlowApiServer).GetHTTPFlowById(ctx, req.(*GetHTTPFlowByIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HTTPFlowApi_QueryHTTPFlowByIds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHTTPFlowByIdsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HTTPFlowApiServer).QueryHTTPFlowByIds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HTTPFlowApi_QueryHTTPFlowByIds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HTTPFlowApiServer).QueryHTTPFlowByIds(ctx, req.(*GetHTTPFlowByIdsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -438,6 +471,10 @@ var HTTPFlowApi_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHTTPFlowById",
 			Handler:    _HTTPFlowApi_GetHTTPFlowById_Handler,
+		},
+		{
+			MethodName: "QueryHTTPFlowByIds",
+			Handler:    _HTTPFlowApi_QueryHTTPFlowByIds_Handler,
 		},
 		{
 			MethodName: "GetHTTPFlowByIds",
