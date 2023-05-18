@@ -1,12 +1,18 @@
 package screcorder
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"github.com/alfg/mp4"
+	"github.com/disintegration/imaging"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"image/jpeg"
 	"io"
+	"os"
 	"os/exec"
 	"path"
 	"runtime"
@@ -214,4 +220,60 @@ func NewRecorder(opt ...ConfigOpt) *Recorder {
 		i(c)
 	}
 	return &Recorder{conf: c, started: utils.NewBool(false), running: utils.NewBool(true)}
+}
+
+func VideoCoverBase64(fileName string)  (imgBase64 string, err error) {
+	reader := ExampleReadFrameAsJpeg(fileName, 1)
+	img, err := imaging.Decode(reader)
+	if err != nil {
+		return "", err
+	}
+	buffer := &bytes.Buffer{}
+	err = jpeg.Encode(buffer, img, nil)
+	if err != nil {
+		return "", utils.Errorf("failed: %s", err)
+	}
+	imgData := buffer.Bytes()
+
+	// 将图像字节数组转换为 Base64 编码的字符串
+	base64Image := base64.StdEncoding.EncodeToString(imgData)
+	return base64Image, nil
+}
+
+func ExampleReadFrameAsJpeg(inFileName string, frameNum int) io.Reader {
+	cmd := exec.CommandContext(context.Background(), consts.GetFfmpegPath(), "-i", inFileName,  "-vf", fmt.Sprintf("select=gte(n\\,%d),scale=-1:600", frameNum), "-frames:v", "1", "-f", "image2", "-codec:v", "mjpeg", "pipe:1")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return nil
+	}
+	return &out
+}
+
+func VideoDuration(path string) string {
+	file, err := os.OpenFile(path, os.O_APPEND, 0777)
+	if err != nil {
+		return "0"
+	}
+	defer file.Close()
+	mp4info, err := mp4.Open(path)
+	moov := mp4info.Moov
+	if moov == nil {
+		return "0"
+	}
+	mvhd := moov.Mvhd
+	if mvhd == nil {
+		return "0"
+	}
+	duration := mvhd.Duration
+	if duration > 0 {
+		timeFormat := time.Duration(duration) * time.Millisecond
+		h := int(timeFormat.Hours())
+		m := int(timeFormat.Minutes()) % 60
+		s := int(timeFormat.Seconds()) % 60
+		time := fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+		return time
+	}
+	return "0"
 }
