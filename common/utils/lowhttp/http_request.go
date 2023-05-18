@@ -485,16 +485,22 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 	}
 
 	var cache = make(map[string]string)
+	var host string
+	var cachedHeader = make(map[string][]string)
 	// 这里用来恢复 Req 的大小写
 	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
-		if index := strings.Index(line, ":"); index > 0 {
-			key := line[:index]
-			ckey := textproto.CanonicalMIMEHeaderKey(key)
-			_, ok := commonHeader[ckey]
-			// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
-			if ckey != key && !ok {
-				cache[ckey] = key
-			}
+		key, value := SplitHTTPHeader(line)
+		cachedHeader[key] = append(cachedHeader[key], value)
+
+		if strings.ToLower(key) == "host" && value != "" {
+			host = value
+		}
+
+		ckey := textproto.CanonicalMIMEHeaderKey(key)
+		_, ok := commonHeader[ckey]
+		// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
+		if ckey != key && !ok {
+			cache[ckey] = key
 		}
 	})
 
@@ -505,6 +511,11 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 			delete(req.Header, ckey)
 		}
 	}
+
+	for key, values := range cachedHeader {
+		req.Header[key] = values
+	}
+	req.Host = host
 
 	//black magic fix when browser use http proxy the RequestURI is not canonical
 	if strings.HasPrefix(req.RequestURI, "http://") || strings.HasPrefix(req.RequestURI, "https://") {
