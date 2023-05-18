@@ -55,27 +55,12 @@ func (s *OnlineClient) UploadScreenRecordersToOnline(ctx context.Context,
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
-	/*raw, err := json.Marshal(ScreenRecordersUploadToOnlineRequest{
-		Token: token,
-		FileInfo: file,
-		NoteInfo:  noteInfo,
-		Project:   project,
-		Hash:      hash,
-		VideoName: videoName,
-		Cover:     cover,
-		ScreenRecordersCreatedAt: screenRecordersCreatedAt,
-	})
-	if err != nil {
-		return utils.Errorf("marshal params failed: %s", err)
-	}*/
-
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 
 	files, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("Error opening file:", err)
-		//return
+		return utils.Errorf("Error opening file:", err)
 	}
 	defer file.Close()
 
@@ -101,14 +86,6 @@ func (s *OnlineClient) UploadScreenRecordersToOnline(ctx context.Context,
 
 	writer.Close()
 
-	//request, _ := http.NewRequest("POST", urlIns.String(), body)
-	//request.Header.Set("Content-Type",  writer.FormDataContentType())
-
-	// 发送 HTTP 请求
-	//client := &http.Client{}
-	//rsp, err := client.Do(request)
-
-	//rsp, err := s.client.Post(urlIns.String(), "multipart/form-data", bytes.NewBuffer(raw))
 	rsp, err := s.client.Post(urlIns.String(), writer.FormDataContentType(), body)
 	if err != nil {
 		return utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, writer.FormDataContentType())
@@ -119,7 +96,6 @@ func (s *OnlineClient) UploadScreenRecordersToOnline(ctx context.Context,
 	}
 	var responseData map[string]interface{}
 	err = json.Unmarshal(rawResponse, &responseData)
-	fmt.Printf("responseData------------%v", responseData)
 	if err != nil {
 		return utils.Errorf("unmarshal upload ScreenRecorder to online response failed: %s", err)
 	}
