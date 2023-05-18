@@ -102,7 +102,7 @@ func WithFramerate(i int) ConfigOpt {
 func WithMouseCapture(i bool) ConfigOpt {
 	return func(config *Config) {
 		if i {
-			config.MouseCapture = true
+			config.MouseCapture = false
 			config.MouseClickCapture = true
 		} else {
 			config.MouseCapture = true

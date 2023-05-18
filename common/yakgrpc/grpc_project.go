@@ -477,7 +477,7 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	if req.GetId() > 0 {
 		db := s.GetProfileDatabase()
 		db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
-		projects := yakit.YieldProject(db.Debug(), ctx)
+		projects := yakit.YieldProject(db, ctx)
 		if projects == nil {
 			return nil, utils.Error("删除项目不存在")
 		}

@@ -9,6 +9,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/ReneKroon/ttlcache v1.6.0
 	github.com/akutz/memconn v0.1.0
+	github.com/alfg/mp4 v0.0.0-20210728035756-55ea58c08aeb
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.4
 	github.com/antchfx/htmlquery v1.2.5
@@ -28,6 +29,7 @@ require (
 	github.com/denisenkom/go-mssqldb v0.0.0-20190412130859-3b1d194e553a
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
+	github.com/disintegration/imaging v1.6.2
 	github.com/dlclark/regexp2 v1.2.0
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0
@@ -164,7 +166,7 @@ require (
 	github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042 // indirect
 	github.com/lib/pq v1.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/mattn/go-colorable v0.1.7 // indirect
+	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
@@ -212,7 +214,7 @@ require (
 	go.opentelemetry.io/otel/trace v0.19.0 // indirect
 	go.uber.org/goleak v1.1.11 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
-	golang.org/x/image v0.0.0-20190802002840-cff245a6509b // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
