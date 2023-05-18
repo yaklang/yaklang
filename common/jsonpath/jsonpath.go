@@ -37,18 +37,21 @@ import (
 	"text/scanner"
 )
 
-func ToMapInterface(origin any) (map[string]interface{}, error) {
-	var originMap = make(map[string]interface{})
+func ToMapInterface(origin any) (map[string]interface{}, any, error) {
 	switch origin.(type) {
 	case string, []byte, []rune:
-		err := json.Unmarshal([]byte(fmt.Sprintf("%v", origin)), &originMap)
+		var genericObj any
+		err := json.Unmarshal([]byte(fmt.Sprintf("%v", origin)), &genericObj)
 		if err != nil {
-			return nil, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
+			return nil, origin, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
 		}
-	default:
-		originMap = utils.InterfaceToMapInterface(origin)
+		origin = genericObj
 	}
-	return originMap, nil
+	if origin == nil {
+		return make(map[string]interface{}), origin, utils.Errorf("empty origin")
+	}
+	m, err := utils.InterfaceToMapInterfaceE(origin)
+	return m, origin, err
 }
 
 func deepCopyMapRaw(h map[string]interface{}) (map[string]interface{}, error) {
@@ -76,32 +79,60 @@ func Read(value interface{}, path string) (interface{}, error) {
 	return filter(value)
 }
 
-// Replace
+// Prepare a path for reuse with multiple JSON values.
 func Replace(origin any, path string, replaceValue interface{}) (map[string]interface{}, error) {
-	var originMap, err = ToMapInterface(origin)
+	result, err := ReplaceEx(origin, path, replaceValue)
+	m, ok := result.(map[string]any)
+	if ok {
+		return m, nil
+	}
+	return nil, err
+}
+
+// ReplaceEx replace the value of the path in origin
+func ReplaceEx(origin any, path string, replaceValue interface{}) (any, error) {
+	var data any
+	var originMap, originObj, err = ToMapInterface(origin)
+	var isMap bool
+
 	if err != nil {
-		return make(map[string]any), utils.Errorf("cannot parse[%v] to map[str]any: %v", spew.Sdump(err), err)
+		sliceMaybe, err := utils.InterfaceToSliceInterfaceE(originObj)
+		if err != nil {
+			return make(map[string]any), utils.Errorf("cannot parse[%v] to map[str]any / []any: %v", spew.Sdump(err), err)
+		}
+		data = sliceMaybe
+	} else {
+		isMap = true
+		data = originMap
 	}
 
-	var (
-		newMap map[string]interface{}
-	)
-
-	newMap, _ = deepCopyMapRaw(originMap)
-	if newMap == nil {
-		newMap = make(map[string]any)
+	if isMap {
+		var (
+			newMap map[string]interface{}
+		)
+		newMap, _ = deepCopyMapRaw(originMap)
+		if newMap == nil {
+			newMap = make(map[string]any)
+		}
+		data = newMap
+	} else {
+		data = utils.InterfaceToSliceInterface(data)
 	}
 
+	if strings.HasPrefix(path, "$.[") {
+		_, after, _ := strings.Cut(path, ".")
+		path = "$" + after
+	}
 	p := newScannerWithReplaceValue(path, replaceValue)
 	if err := p.parse(); err != nil {
 		return nil, err
 	}
 	filter := p.prepareFilterFunc()
-	_, err = filter(newMap)
+	_, err = filter(data)
 	if err != nil {
 		return nil, err
 	}
-	return newMap, nil
+	return data, nil
 }
 
 // Prepare will parse the path and return a filter function that can then be applied to decoded JSON values.

@@ -13,27 +13,36 @@ import (
 type httpParamPositionType string
 
 var (
-	posMethod        httpParamPositionType = "method"
-	posGetQuery      httpParamPositionType = "get-query"
-	posGetQueryJson  httpParamPositionType = "get-query-json"
-	posPath          httpParamPositionType = "path"
-	posHeader        httpParamPositionType = "header"
-	posPostQuery     httpParamPositionType = "post-query"
-	posPostQueryJson httpParamPositionType = "post-query-json"
-	posPostJson      httpParamPositionType = "post-json"
-	posCookie        httpParamPositionType = "cookie"
-	posPathAppend    httpParamPositionType = "path-append"
-	posPathBlock     httpParamPositionType = "path-block"
+	posMethod              httpParamPositionType = "method"
+	posBody                httpParamPositionType = "body"
+	posGetQuery            httpParamPositionType = "get-query"
+	posGetQueryJson        httpParamPositionType = "get-query-json"
+	posGetQueryBase64Json  httpParamPositionType = "get-query-base64-json"
+	posPath                httpParamPositionType = "path"
+	posHeader              httpParamPositionType = "header"
+	posPostQuery           httpParamPositionType = "post-query"
+	posPostQueryJson       httpParamPositionType = "post-query-json"
+	posPostQueryBase64Json httpParamPositionType = "post-query-base64-json"
+	posPostJson            httpParamPositionType = "post-json"
+	posCookie              httpParamPositionType = "cookie"
+	posCookieJson          httpParamPositionType = "cookie-json"
+	posCookieBase64Json    httpParamPositionType = "cookie-base64-json"
+	posPathAppend          httpParamPositionType = "path-append"
+	posPathBlock           httpParamPositionType = "path-block"
 )
 
 func PositionTypeVerbose(pos httpParamPositionType) string {
 	switch pos {
 	case posMethod:
 		return "HTTP方法"
+	case posBody:
+		return "Body"
 	case posGetQuery:
 		return "GET参数"
 	case posGetQueryJson:
 		return "GET参数(JSON)"
+	case posGetQueryBase64Json:
+		return "GET参数(Base64+JSON)"
 	case posPathAppend:
 		return "URL路径(追加)"
 	case posPathBlock:
@@ -43,13 +52,19 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 	case posHeader:
 		return "Header"
 	case posPostQuery:
-		return "POST参数(urlencode)"
+		return "POST参数"
 	case posPostQueryJson:
-		return "POST参数(参数内JSON)"
+		return "POST参数(JSON)"
+	case posPostQueryBase64Json:
+		return "POST参数(Base64+JSON)"
 	case posPostJson:
-		return "POST参数(json object)"
+		return "JSON-Body参数"
 	case posCookie:
 		return "Cookie参数"
+	case posCookieJson:
+		return "Cookie参数(JSON)"
+	case posCookieBase64Json:
+		return "Cookie参数(Base64+JSON)"
 	default:
 		return string(pos)
 	}
@@ -137,6 +152,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzGetParams(p.param, i)
 	case posGetQueryJson:
 		return p.origin.FuzzGetJsonPathParams(p.param, p.jsonPath, i)
+	case posGetQueryBase64Json:
+		return p.origin.FuzzGetBase64JsonPath(p.param, p.jsonPath, i)
 	case posHeader:
 		return p.origin.FuzzHTTPHeader(p.param, i)
 	case posPath:
@@ -145,10 +162,16 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzPostJsonParams(p, i)
 	case posCookie:
 		return p.origin.FuzzCookie(p.param, InterfaceToFuzzResults(i))
+	case posCookieJson:
+		return p.origin.FuzzCookieJsonPath(p.param, p.jsonPath, i)
+	case posCookieBase64Json:
+		return p.origin.FuzzCookieBase64JsonPath(p.param, p.jsonPath, i)
 	case posPostQuery:
 		return p.origin.FuzzPostParams(p.param, i)
 	case posPostQueryJson:
 		return p.origin.FuzzPostJsonPathParams(p.param, p.jsonPath, i)
+	case posPostQueryBase64Json:
+		return p.origin.FuzzPostBase64JsonPath(p.param, p.jsonPath, i)
 	case posPathAppend:
 		return p.origin.FuzzPath(funk.Map(InterfaceToFuzzResults(i), func(s string) string {
 			if !strings.HasPrefix(s, "/") {
@@ -156,6 +179,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 			}
 			return p.origin.GetPath() + s
 		}).([]string)...)
+	case posBody:
+		return p.origin.FuzzPostRaw(InterfaceToFuzzResults(i)...)
 	case posPathBlock:
 		var result = strings.Split(p.origin.GetPath(), "/")
 		if len(result) <= 0 {
@@ -179,4 +204,16 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		log.Warnf("cannot found fuzz params method identify: %v", posGetQueryJson)
 		return p.origin
 	}
+}
+
+func (p *FuzzHTTPRequestParam) String() string {
+	if p.jsonPath != "" {
+		return fmt.Sprintf("Name:%-20s JsonPath: %-12s Position:[%v(%v)]\n", p.Name(), p.jsonPath, p.PositionVerbose(), p.Position())
+	}
+	return fmt.Sprintf("Name:%-20s Position:[%v(%v)]\n", p.Name(), p.PositionVerbose(), p.Position())
+}
+
+func (p *FuzzHTTPRequestParam) Debug() *FuzzHTTPRequestParam {
+	fmt.Print(p.String())
+	return p
 }
