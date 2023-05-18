@@ -35,7 +35,7 @@ func (s *ScreenRecorder) BeforeSave() error {
 func CreateOrUpdateScreenRecorder(db *gorm.DB, hash string, i interface{}) error {
 	db = db.Model(&ScreenRecorder{})
 
-	if db := db.Debug().Where("hash = ?", hash).Assign(i).FirstOrCreate(&ScreenRecorder{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&ScreenRecorder{}); db.Error != nil {
 		return utils.Errorf("create/update ScreenRecorder failed: %s", db.Error)
 	}
 
