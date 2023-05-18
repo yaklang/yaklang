@@ -216,3 +216,10 @@ func TestWalkScriptMethod(t *testing.T) {
 	})
 	spew.Dump(resMap)
 }
+func TestCallYak(t *testing.T) {
+	engine := New()
+	engine.InitBuildInLib()
+	engine.SafeEval(`
+call_yak_method("println", "hello world");
+`)
+}

@@ -48,6 +48,14 @@ func (n *NaslKBs) GetKB(name string) interface{} {
 	}
 	return nil
 }
+func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
+	for k, v := range n.data {
+		if utils.MatchAllOfGlob(k, name) {
+			res[k] = v
+		}
+	}
+	return
+}
 
 type NaslScriptInfo struct {
 	Kbs             *NaslKBs
@@ -91,12 +99,15 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 			continue
 		}
 		e.SetDescription(true)
+		oldIns := e.GetScriptObject()
+		e.scriptObj = NewNaslScriptObject()
 		err := e.RunFile(path.Join(e.dependenciesPath, dependency))
+		ins := e.scriptObj
+		e.scriptObj = oldIns
 		e.SetDescription(false)
 		if err != nil {
 			return err
 		}
-		ins := e.GetScriptObject()
 		if err := ins.Run(e); err != nil {
 			return err
 		}
@@ -106,7 +117,7 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 	if e.debug {
 		log.Infof("Running script %s", n.OriginFileName)
 	}
-	return e.SafeEval(n.Script)
+	return e.safeEvalWithFileName(n.Script, n.OriginFileName)
 }
 func NewNaslScriptObject() *NaslScriptInfo {
 	return &NaslScriptInfo{

@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
+	"os"
 	"regexp"
 	"testing"
 )
@@ -211,6 +212,15 @@ func TestPocScanner(t *testing.T) {
 		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
 		//get_app_port_from_list，get_app_version_and_location_from_list
 	)
+	engine.AddEngineHooks(func(engine *Engine) {
+		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
+			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
+			if err != nil {
+				return code
+			}
+			return string(codeBytes)
+		})
+	})
 	err := engine.Scan("107.167.224.123", "5060")
 	// 排查未定义的函数
 	var unknownErrors multiError

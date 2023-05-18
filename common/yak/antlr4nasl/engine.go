@@ -186,11 +186,7 @@ func (e *Engine) EvalInclude(name string) error {
 		recoverPath := e.compiler.SetSourceCodeFilePath(name)
 		defer recoverPath()
 	}
-
-	if v, ok := e.naslLibPatch[name]; ok {
-		sourceBytes = []byte(v(string(sourceBytes)))
-	}
-	return e.SafeEval(string(sourceBytes))
+	return e.safeEvalWithFileName(string(sourceBytes), name)
 }
 func (e *Engine) RunFile(path string) error {
 	e.scriptObj.OriginFileName = filepath.Base(path)
@@ -200,7 +196,7 @@ func (e *Engine) RunFile(path string) error {
 	}
 	recoverSource := e.compiler.SetSourceCodeFilePath(path)
 	defer recoverSource()
-	return e.SafeEval(string(code))
+	return e.safeEvalWithFileName(string(code), e.scriptObj.OriginFileName)
 }
 
 func (e *Engine) Eval(code string) error {
@@ -237,7 +233,7 @@ func (e *Engine) Eval(code string) error {
 	}
 	return nil
 }
-func (e *Engine) SafeEval(code string) (err error) {
+func (e *Engine) safeEvalWithFileName(code string, fileName string) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			if er, ok := e.(error); ok {
@@ -247,8 +243,16 @@ func (e *Engine) SafeEval(code string) (err error) {
 			}
 		}
 	}()
+	if fileName != "" {
+		if v, ok := e.naslLibPatch[fileName]; ok {
+			code = v(code)
+		}
+	}
 	err = e.Eval(code)
 	return
+}
+func (e *Engine) SafeEval(code string) (err error) {
+	return e.safeEvalWithFileName(code, "")
 }
 func (e *Engine) AddNaslLibPatch(lib string, handle func(string2 string) string) {
 	e.naslLibPatch[lib] = handle

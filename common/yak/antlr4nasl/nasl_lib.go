@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"net"
@@ -627,7 +630,7 @@ func init() {
 			return utils.IsIPv6(engine.host), nil
 		},
 		"get_host_open_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_host_open_port` is not implement"))
+			engine.CallNativeFunction("get_kb_item", nil, []interface{}{"Ports/tcp/*"})
 			return nil, nil
 		},
 		"get_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -849,8 +852,15 @@ func init() {
 			return strings.Index(s, subs), nil
 		},
 		"str_replace": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `str_replace` is not implement"))
-			return nil, nil
+			a := params.getParamByName("string").String()
+			b := params.getParamByName("find").String()
+			r := params.getParamByName("replace").String()
+			count := params.getParamByName("count", 0).Int()
+			if count == 0 {
+				return strings.Replace(a, b, r, -1), nil
+			} else {
+				return strings.Replace(a, b, r, count), nil
+			}
 		},
 		"make_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			res := make([]interface{}, 0)
@@ -1428,6 +1438,69 @@ func init() {
 			return nil, nil
 		},
 		"smb_versioninfo": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		"register_host_detail": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			name := params.getParamByName("name", "").String()
+			value := params.getParamByName("value", "").Value
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": "HostDetails", "value": name}, nil)
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": "HostDetails/NVT", "value": engine.GetScriptObject().OID}, nil)
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": fmt.Sprintf("HostDetails/NVT/%s/%s", engine.GetScriptObject().OID, name), "value": value}, nil)
+			return nil, nil
+		},
+		"pingHost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			proxys := []string{}
+			if engine.proxy != "" {
+				proxys = append(proxys, engine.proxy)
+			}
+			result := pingutil.PingAuto(engine.host, "", time.Second*5, proxys...)
+			return result.Ok, nil
+		},
+		"call_yak_method": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			var methodName string
+			var args []interface{}
+			first := true
+			forEachParams(params, func(value *yakvm.Value) {
+				if first {
+					methodName = value.String()
+					first = false
+				} else {
+					args = append(args, value.Value)
+				}
+			})
+			yakEngine := yaklang.New()
+			yakEngine.SetVar("params", args)
+			code := fmt.Sprintf("result = %s(params...)", methodName)
+			err := yakEngine.SafeEval(context.Background(), code)
+			if err != nil {
+				return nil, utils.Errorf("call yak method `%s` error: %v", methodName, err)
+			}
+			val, ok := yakEngine.GetVar("result")
+			if !ok {
+				return nil, nil
+			}
+			return val, nil
+		},
+		"plugin_run_find_service": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			//nasl_builitin_find_service.c 写了具体的指纹识别逻辑，和nmap的指纹不同，这里需要转换下
+			register_service := func(port int, service string) {
+				engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": fmt.Sprintf("Services/%s", service), "value": port}, nil)
+			}
+			iinfos := engine.scriptObj.Kbs.GetKB("Host/port_infos")
+			if iinfos != nil {
+				infos := iinfos.([]*fp.MatchResult)
+				for _, info := range infos {
+					if !info.IsOpen() {
+						continue
+					}
+					var ServiceName string
+					switch info.Fingerprint.ServiceName {
+					case "http", "https":
+						ServiceName = "www"
+					}
+					register_service(info.Port, ServiceName)
+				}
+			}
 			return nil, nil
 		},
 	}
