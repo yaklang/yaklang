@@ -1,11 +1,30 @@
 package lowhttp
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestExtractURLFromHTTPRequest(t *testing.T) {
+	const packet = `GET / HTTP/1.1
+Host: asdfasd:123
+ Cookie: 123
+  d: 1
+`
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(packet), false)
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(u.String())
+	var a = FixHTTPRequestOut([]byte(packet))
+	if !strings.Contains(string(a), "\r\n Cookie: 123\r\n  d: 1\r\n") {
+		panic(1)
+	}
+}
 
 func TestParseStringToHttpRequest2(t *testing.T) {
 	req, err := ParseStringToHttpRequest(`
