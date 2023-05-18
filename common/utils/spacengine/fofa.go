@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func FofaQuery(email string, fofaKey string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
+func FofaQuery(email string, fofaKey string, filter string, pageSize, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
 	// build fofa client
 	client := fofa.NewFofaClient([]byte(email), []byte(fofaKey))
 	userInfo, err := client.UserInfo()
@@ -35,6 +35,7 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, maxRecord i
 			}
 			match, err := client.QueryAsJSON(
 				uint(page),
+				uint(pageSize),
 				[]byte(filter),
 			)
 			if err != nil {

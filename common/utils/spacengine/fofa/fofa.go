@@ -103,7 +103,7 @@ func (ff *Fofa) Get(u string) ([]byte, error) {
 // echo 'domain="nosec.org"' | base64 - | xargs -I{}
 // curl "https://fofa.info/api/v1/search/all?email=${FOFA_EMAIL}&key=${FOFA_KEY}&qbase64={}"
 // host title ip domain port country city
-func (ff *Fofa) QueryAsJSON(page uint, args ...[]byte) ([]byte, error) {
+func (ff *Fofa) QueryAsJSON(page uint, pageSize uint, args ...[]byte) ([]byte, error) {
 	var (
 		query  = []byte(nil)
 		fields = []byte("domain,host,ip,port,title,country,city")
@@ -124,6 +124,7 @@ func (ff *Fofa) QueryAsJSON(page uint, args ...[]byte) ([]byte, error) {
 		[]byte("&qbase64="), q,
 		[]byte("&fields="), fields,
 		[]byte("&page="), []byte(strconv.Itoa(int(page))),
+		[]byte("&size="), []byte(strconv.Itoa(int(pageSize))),
 	}, []byte(""))
 	fmt.Printf("%s\n", q)
 	content, err := ff.Get(string(q))
@@ -143,11 +144,11 @@ func (ff *Fofa) QueryAsJSON(page uint, args ...[]byte) ([]byte, error) {
 // return array data as result
 // echo 'domain="nosec.org"' | base64 - | xargs -I{}
 // curl "https://fofa.info/api/v1/search/all?email=${FOFA_EMAIL}&key=${FOFA_KEY}&qbase64={}"
-func (ff *Fofa) QueryAsArray(page uint, args ...[]byte) (result Results, err error) {
+func (ff *Fofa) QueryAsArray(page uint, pageSize uint, args ...[]byte) (result Results, err error) {
 
 	var content []byte
 
-	content, err = ff.QueryAsJSON(page, args...)
+	content, err = ff.QueryAsJSON(page, pageSize, args...)
 	if err != nil {
 		return nil, err
 	}
