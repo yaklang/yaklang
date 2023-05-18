@@ -2,6 +2,8 @@ package cartesian
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func Product[T any](origin [][]T) ([][]T, error) {
@@ -34,6 +36,15 @@ func ProductExContext[T any](ctx context.Context, origin [][]T, handler func(raw
 }
 
 func cartesianProductRaw[T any](ctx context.Context, sets [][]T, ch chan<- []T) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("cartesian product failed: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			utils.TryCloseChannel(ch)
+			return
+		}
+	}()
+
 	n := len(sets)
 	positions := make([]int, n)
 	done := n == 0

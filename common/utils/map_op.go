@@ -2,8 +2,8 @@ package utils
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 )
@@ -99,6 +99,36 @@ func MapGetString(m map[string]interface{}, key string) string {
 func InterfaceToMapInterface(i interface{}) map[string]interface{} {
 	raw, _ := InterfaceToMapInterfaceE(i)
 	return raw
+}
+
+func InterfaceToSliceInterface(i interface{}) []any {
+	raw, _ := InterfaceToSliceInterfaceE(i)
+	return raw
+}
+
+func InterfaceToSliceInterfaceE(i interface{}) ([]any, error) {
+	result := make([]any, 0)
+	if i == nil {
+		return result, Error("empty")
+	}
+	switch ret := i.(type) {
+	case []interface{}:
+		for _, v := range ret {
+			result = append(result, v)
+		}
+		return result, nil
+	default:
+		if reflect.TypeOf(i).Kind() == reflect.Slice {
+			v := reflect.ValueOf(i)
+			for j := 0; j < v.Len(); j++ {
+				result = append(result, v.Index(j).Interface())
+			}
+			return result, nil
+		} else {
+			result = append(result, i)
+			return result, Errorf("interfaceToRawMap error, got: %v", spew.Sdump(i))
+		}
+	}
 }
 
 func InterfaceToMapInterfaceE(i interface{}) (map[string]interface{}, error) {

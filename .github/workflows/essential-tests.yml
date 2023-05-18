@@ -8,6 +8,7 @@ on:
       - 'common/jsonextractor/**'
       - 'common/domainextractor/**'
       - 'common/yak/**'
+      - 'common/**'
 
 jobs:
 
@@ -54,3 +55,6 @@ jobs:
 
       - name: Test HttpTpl(YakTemplate)
         run: go test -timeout 1m ./common/yak/httptpl -v
+
+      - name: Test Fuzz/Mutate
+        run: go test -timeout 1m ./common/mutate_tests -v

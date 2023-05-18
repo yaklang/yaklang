@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -37,9 +39,79 @@ func ExtractCookieJarFromHTTPResponse(rawResponse []byte) []*http.Cookie {
 	return rsp.Cookies()
 }
 
+func CookieSafeQuoteString(i string) string {
+	if ret, ok := utils.IsJSON(i); ok {
+		return url.QueryEscape(ret)
+	} else if strings.ContainsAny(i, " ,") {
+		return `"` + url.QueryEscape(i) + `"`
+	} else {
+		return i
+	}
+}
+
+func CookieSafeUnquoteString(i string) string {
+	if strings.HasPrefix(i, `"`) && strings.HasSuffix(i, `"`) {
+		i = i[1 : len(i)-1]
+	}
+	if ret, err := url.QueryUnescape(i); err == nil {
+		return ret
+	}
+	return i
+}
+
+// CookieTimeFormat is the time format to use when generating times in HTTP
+// headers. It is like time.RFC1123 but hard-codes GMT as the time
+// zone. The time being formatted must be in UTC for Format to
+// generate the correct format.
+//
+// For parsing this time format, see ParseTime.
+const CookieTimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
+
 func CookiesToString(cookies []*http.Cookie) string {
-	results := funk.Map(cookies, func(cookie *http.Cookie) string {
-		return cookie.String()
+	results := funk.Map(cookies, func(c *http.Cookie) string {
+		var b strings.Builder
+		b.Grow(len(c.Name) + len(c.Value) + len(c.Domain) + len(c.Path) + 110 /*RFC 6265 Sec 4.1. extraCookieLength*/)
+		b.WriteString(url.QueryEscape(c.Name))
+		b.WriteRune('=')
+		b.WriteString(CookieSafeQuoteString(c.Value))
+		if len(c.Path) > 0 {
+			b.WriteString("; Path=")
+			b.WriteString(CookieSafeQuoteString(c.Path))
+		}
+
+		if len(c.Domain) > 0 {
+			b.WriteString("; Domain=")
+			b.WriteString(CookieSafeQuoteString(strings.TrimLeft(c.Domain, ".")))
+		}
+
+		var buf [len(CookieTimeFormat)]byte
+		if !c.Expires.IsZero() {
+			b.WriteString("; Expires=")
+			b.Write(c.Expires.UTC().AppendFormat(buf[:0], CookieTimeFormat))
+		}
+		if c.MaxAge > 0 {
+			b.WriteString("; Max-Age=")
+			b.Write(strconv.AppendInt(buf[:0], int64(c.MaxAge), 10))
+		} else if c.MaxAge < 0 {
+			b.WriteString("; Max-Age=0")
+		}
+		if c.HttpOnly {
+			b.WriteString("; HttpOnly")
+		}
+		if c.Secure {
+			b.WriteString("; Secure")
+		}
+		switch c.SameSite {
+		case http.SameSiteDefaultMode:
+			// Skip, default mode is obtained by not emitting the attribute.
+		case http.SameSiteNoneMode:
+			b.WriteString("; SameSite=None")
+		case http.SameSiteLaxMode:
+			b.WriteString("; SameSite=Lax")
+		case http.SameSiteStrictMode:
+			b.WriteString("; SameSite=Strict")
+		}
+		return b.String()
 	})
 	return strings.Join(results.([]string), "; ")
 }
