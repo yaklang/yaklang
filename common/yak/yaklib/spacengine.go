@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	spacengine2 "github.com/yaklang/yaklang/common/utils/spacengine"
 )
 
@@ -13,11 +14,13 @@ var SpaceEngineExports = map[string]interface{}{
 
 	"maxPage":   _spaceEngine_MaxPage,
 	"maxRecord": _spaceEngine_MaxRecord,
+	"pageSize":  _spaceEngine_PageSize,
 }
 
 type _spaceEngineConfig struct {
 	maxRecord int
 	maxPage   int
+	pageSize  int
 }
 
 type _spaceEngineConfigOpt func(c *_spaceEngineConfig)
@@ -31,6 +34,12 @@ func _spaceEngine_MaxRecord(i int) _spaceEngineConfigOpt {
 func _spaceEngine_MaxPage(i int) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.maxPage = i
+	}
+}
+
+func _spaceEngine_PageSize(i int) _spaceEngineConfigOpt {
+	return func(c *_spaceEngineConfig) {
+		c.pageSize = i
 	}
 }
 
@@ -77,13 +86,19 @@ func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (cha
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
+		pageSize:  100,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return spacengine2.FofaQuery(email, key, filter, config.maxPage, config.maxRecord)
+	if config.pageSize > 10000 {
+		log.Warn("fofa page size maximum 10000")
+		config.pageSize = 10000
+	}
+
+	return spacengine2.FofaQuery(email, key, filter, config.pageSize, config.maxPage, config.maxRecord)
 }
 
 func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
