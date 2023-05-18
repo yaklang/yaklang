@@ -310,6 +310,10 @@ type YakClient interface {
 	InstallScrecorder(ctx context.Context, in *InstallScrecorderRequest, opts ...grpc.CallOption) (Yak_InstallScrecorderClient, error)
 	StartScrecorder(ctx context.Context, in *StartScrecorderRequest, opts ...grpc.CallOption) (Yak_StartScrecorderClient, error)
 	QueryScreenRecorders(ctx context.Context, in *QueryScreenRecorderRequest, opts ...grpc.CallOption) (*QueryScreenRecorderResponse, error)
+	DeleteScreenRecorders(ctx context.Context, in *QueryScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error)
+	UploadScreenRecorders(ctx context.Context, in *UploadScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetOneScreenRecorders(ctx context.Context, in *GetOneScreenRecorderRequest, opts ...grpc.CallOption) (*ScreenRecorder, error)
+	UpdateScreenRecorders(ctx context.Context, in *UpdateScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type yakClient struct {
@@ -3198,6 +3202,42 @@ func (c *yakClient) QueryScreenRecorders(ctx context.Context, in *QueryScreenRec
 	return out, nil
 }
 
+func (c *yakClient) DeleteScreenRecorders(ctx context.Context, in *QueryScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteScreenRecorders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UploadScreenRecorders(ctx context.Context, in *UploadScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/UploadScreenRecorders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetOneScreenRecorders(ctx context.Context, in *GetOneScreenRecorderRequest, opts ...grpc.CallOption) (*ScreenRecorder, error) {
+	out := new(ScreenRecorder)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetOneScreenRecorders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateScreenRecorders(ctx context.Context, in *UpdateScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/UpdateScreenRecorders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3494,6 +3534,10 @@ type YakServer interface {
 	InstallScrecorder(*InstallScrecorderRequest, Yak_InstallScrecorderServer) error
 	StartScrecorder(*StartScrecorderRequest, Yak_StartScrecorderServer) error
 	QueryScreenRecorders(context.Context, *QueryScreenRecorderRequest) (*QueryScreenRecorderResponse, error)
+	DeleteScreenRecorders(context.Context, *QueryScreenRecorderRequest) (*Empty, error)
+	UploadScreenRecorders(context.Context, *UploadScreenRecorderRequest) (*Empty, error)
+	GetOneScreenRecorders(context.Context, *GetOneScreenRecorderRequest) (*ScreenRecorder, error)
+	UpdateScreenRecorders(context.Context, *UpdateScreenRecorderRequest) (*Empty, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -4193,6 +4237,18 @@ func (UnimplementedYakServer) StartScrecorder(*StartScrecorderRequest, Yak_Start
 }
 func (UnimplementedYakServer) QueryScreenRecorders(context.Context, *QueryScreenRecorderRequest) (*QueryScreenRecorderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryScreenRecorders not implemented")
+}
+func (UnimplementedYakServer) DeleteScreenRecorders(context.Context, *QueryScreenRecorderRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteScreenRecorders not implemented")
+}
+func (UnimplementedYakServer) UploadScreenRecorders(context.Context, *UploadScreenRecorderRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadScreenRecorders not implemented")
+}
+func (UnimplementedYakServer) GetOneScreenRecorders(context.Context, *GetOneScreenRecorderRequest) (*ScreenRecorder, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOneScreenRecorders not implemented")
+}
+func (UnimplementedYakServer) UpdateScreenRecorders(context.Context, *UpdateScreenRecorderRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateScreenRecorders not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -8500,6 +8556,78 @@ func _Yak_QueryScreenRecorders_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DeleteScreenRecorders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryScreenRecorderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteScreenRecorders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeleteScreenRecorders",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteScreenRecorders(ctx, req.(*QueryScreenRecorderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UploadScreenRecorders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadScreenRecorderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UploadScreenRecorders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/UploadScreenRecorders",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UploadScreenRecorders(ctx, req.(*UploadScreenRecorderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetOneScreenRecorders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOneScreenRecorderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetOneScreenRecorders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetOneScreenRecorders",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetOneScreenRecorders(ctx, req.(*GetOneScreenRecorderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateScreenRecorders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateScreenRecorderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateScreenRecorders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/UpdateScreenRecorders",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateScreenRecorders(ctx, req.(*UpdateScreenRecorderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -9290,6 +9418,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryScreenRecorders",
 			Handler:    _Yak_QueryScreenRecorders_Handler,
+		},
+		{
+			MethodName: "DeleteScreenRecorders",
+			Handler:    _Yak_DeleteScreenRecorders_Handler,
+		},
+		{
+			MethodName: "UploadScreenRecorders",
+			Handler:    _Yak_UploadScreenRecorders_Handler,
+		},
+		{
+			MethodName: "GetOneScreenRecorders",
+			Handler:    _Yak_GetOneScreenRecorders_Handler,
+		},
+		{
+			MethodName: "UpdateScreenRecorders",
+			Handler:    _Yak_UpdateScreenRecorders_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
