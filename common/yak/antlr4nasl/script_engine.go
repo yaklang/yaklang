@@ -119,21 +119,25 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	if err != nil {
 		return err
 	}
+	e.Kbs.SetKB("Host/scanned", 1)
 	openPorts := []int{}
+	portInfos := []*fp.MatchResult{}
 	for _, result := range servicesInfo {
 		if result.State == fp.OPEN {
 			openPorts = append(openPorts, result.Port)
-			e.Kbs.AddKB("Host/scanned", result.Port)
-			var ServiceName string
-			switch result.Fingerprint.ServiceName {
-			case "http", "https":
-				ServiceName = "www"
-			}
-			if ServiceName != "" {
-				e.Kbs.SetKB(fmt.Sprintf("Services/%s", ServiceName), result.Port)
-			}
+			portInfos = append(portInfos, result)
+			e.Kbs.SetKB(fmt.Sprintf("Ports/tcp/%d", result.Port), 1)
+			//var ServiceName string
+			//switch result.Fingerprint.ServiceName {
+			//case "http", "https":
+			//	ServiceName = "www"
+			//}
+			//if ServiceName != "" {
+			//	e.Kbs.SetKB(fmt.Sprintf("Services/%s", ServiceName), result.Port)
+			//}
 		}
 	}
+	e.Kbs.SetKB("Host/port_infos", portInfos)
 	swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	errorsMux := sync.Mutex{}
 	for script, _ := range e.scripts {
