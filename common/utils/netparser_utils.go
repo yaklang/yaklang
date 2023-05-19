@@ -2,8 +2,10 @@ package utils
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"math/big"
 	"net"
+	"strconv"
 )
 
 func InetNtoA(ip int64) net.IP {
@@ -31,4 +33,60 @@ func IPv4ToCClassNetwork(s string) (string, error) {
 		return network.String(), nil
 	}
 	return "", Errorf("invalid ipv4: %v", s)
+}
+
+func NetworkByteOrderUint8ToBytes(i any) []byte {
+	raw, err := strconv.ParseUint(fmt.Sprint(i), 10, 8)
+	if err != nil {
+		log.Warnf("cannot convert %v to uint8", i)
+		return make([]byte, 1)
+	}
+	return []byte{byte(raw)}
+}
+
+func NetworkByteOrderUint16ToBytes(i any) []byte {
+	raw, err := strconv.ParseUint(fmt.Sprint(i), 10, 16)
+	if err != nil {
+		log.Warnf("cannot convert %v to uint16", i)
+		return make([]byte, 2)
+	}
+
+	return []byte{
+		byte(raw >> 8),
+		byte(raw),
+	}
+}
+
+func NetworkByteOrderUint32ToBytes(i any) []byte {
+	raw, err := strconv.ParseUint(fmt.Sprint(i), 10, 32)
+	if err != nil {
+		log.Warnf("cannot convert %v to uint32", i)
+		return make([]byte, 4)
+	}
+
+	return []byte{
+		byte(raw >> 24),
+		byte(raw >> 16),
+		byte(raw >> 8),
+		byte(raw),
+	}
+}
+
+func NetworkByteOrderUint64ToBytes(i any) []byte {
+	raw, err := strconv.ParseUint(fmt.Sprint(i), 10, 64)
+	if err != nil {
+		log.Warnf("cannot convert %v to uint64", i)
+		return make([]byte, 8)
+	}
+
+	return []byte{
+		byte(raw >> 56),
+		byte(raw >> 48),
+		byte(raw >> 40),
+		byte(raw >> 32),
+		byte(raw >> 24),
+		byte(raw >> 16),
+		byte(raw >> 8),
+		byte(raw),
+	}
 }
