@@ -15,6 +15,18 @@ type BuilderConfig struct {
 
 type BuilderConfigOption func(config *BuilderConfig)
 
+func WithPayload(payload []byte) BuilderConfigOption {
+	return func(config *BuilderConfig) {
+		config.Payload = payload
+	}
+}
+
+func WithLoopback() BuilderConfigOption {
+	return func(config *BuilderConfig) {
+		config.Loopback = true
+	}
+}
+
 func PacketBuilder(opts ...any) ([]byte, error) {
 	var (
 		baseConfig     = &BuilderConfig{}
