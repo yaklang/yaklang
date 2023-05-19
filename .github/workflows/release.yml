@@ -16,6 +16,7 @@ jobs:
           - windows-latest
           - macos-latest
           - ubuntu-20.04
+          - centos-7
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
