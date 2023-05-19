@@ -95,6 +95,16 @@ e = 1
 assert d.$e == 23
 3.
 */
+func TestBuildinMethod(t *testing.T) {
+	code := `
+assert "abc".StartsWith("a"),"StartsWith error"
+assert "abc".HasPrefix("a"),"StartsWith error"
+assert b"abc".EndsWith("c"),"EndsWith error"
+`
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
+}
 
 // 本测试只针对try-catch与流程控制、return共用的情况,try-catch的其他情况在其他测试中已经覆盖
 func TestTryCatchWithProcessControl(t *testing.T) {
