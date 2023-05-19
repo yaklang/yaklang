@@ -10,6 +10,7 @@ on:
 jobs:
   build_and_release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/')  || startsWith(github.ref, 'refs/heads/citest/') }}
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - name: Set Yak Version by Tag
