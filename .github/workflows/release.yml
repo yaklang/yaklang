@@ -94,7 +94,7 @@ jobs:
           path: ./yak_linux_amd64
 
   download_artifacts_and_release:
-#    if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/') }}
+    #    if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/ci/') }}
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     needs:
       - build_and_release
@@ -107,6 +107,11 @@ jobs:
           source: ${{ github.ref }}
           find: 'refs/tags/v'
           replace: ''
+      # 获取 latest 之前的 tag
+      - name: Get previous version
+        run: |
+          git tag --sort=-v:refname | awk 'NR==2 { sub(/^v/, "", $0); print }'
+        id: previous_version
       - name: Download Windows YAK
         uses: actions/download-artifact@v2
         with:
@@ -120,18 +125,18 @@ jobs:
         with:
           name: yak_linux_amd64
       # download yakit
-#      - name: Download Yakit (Darwin Arm64)
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
-#      - name: Download Yakit (Darwin Amd64)
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
-#      - name: Download Yakit (Windows amd64)
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+      #      - name: Download Yakit (Darwin Arm64)
+      #        uses: actions/download-artifact@v2
+      #        with:
+      #          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+      #      - name: Download Yakit (Darwin Amd64)
+      #        uses: actions/download-artifact@v2
+      #        with:
+      #          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+      #      - name: Download Yakit (Windows amd64)
+      #        uses: actions/download-artifact@v2
+      #        with:
+      #          name: Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -147,6 +152,8 @@ jobs:
         run: ls
       - name: Update OSS latest file
         run: echo ${{ steps.fetchtag_release.outputs.value }} > ./version.txt
+      - name: Store previous version in a file
+        run: echo ${{ steps.previous_version.outputs.value }} > previous_version.txt
       - name: Upload yak to oss Latest
         uses: tvrcgo/upload-to-oss@master
         with:
@@ -156,42 +163,43 @@ jobs:
           bucket: yaklang
           assets: |
             ./version.txt:/yak/latest/version.txt
+            ./previous_version.txt:/yak/previous/previous_version.txt
             yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe
             yak_windows_amd64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
             yak_linux_amd64:/yak/latest/yak_linux_amd64
             yak_linux_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_linux_amd64
             yak_darwin_amd64:/yak/latest/yak_darwin_amd64
             yak_darwin_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_amd64
-#      - name: Upload Yakit to oss(MacOS m1)
-#        uses: tvrcgo/upload-to-oss@master
-#        with:
-#          key-id: ${{ secrets.OSS_KEY_ID }}
-#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
-#          region: oss-accelerate
-#          bucket: yaklang
-#          assets: |
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
-#      - name: Upload Yakit to oss(windows)
-#        uses: tvrcgo/upload-to-oss@master
-#        with:
-#          key-id: ${{ secrets.OSS_KEY_ID }}
-#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
-#          region: oss-accelerate
-#          bucket: yaklang
-#          assets: |
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
-#      - name: Upload Yakit to oss(MacOS intel)
-#        uses: tvrcgo/upload-to-oss@master
-#        with:
-#          key-id: ${{ secrets.OSS_KEY_ID }}
-#          key-secret: ${{ secrets.OSS_KEY_SECRET }}
-#          region: oss-accelerate
-#          bucket: yaklang
-#          assets: |
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
-#            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+      #      - name: Upload Yakit to oss(MacOS m1)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          assets: |
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-arm64.dmg
+      #      - name: Upload Yakit to oss(windows)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          assets: |
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-win32-x64.exe:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-windows-amd64.exe
+      #      - name: Upload Yakit to oss(MacOS intel)
+      #        uses: tvrcgo/upload-to-oss@master
+      #        with:
+      #          key-id: ${{ secrets.OSS_KEY_ID }}
+      #          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+      #          region: oss-accelerate
+      #          bucket: yaklang
+      #          assets: |
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/${{ steps.fetchtag_release.outputs.value }}/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
+      #            Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-x64.dmg:/yak/latest/Yakit-${{ steps.fetchtag_release.outputs.value }}-darwin-amd64.dmg
       #      - name: Upload to oss Latest (Windows)
       #        uses: tvrcgo/upload-to-oss@master
       #        with:
