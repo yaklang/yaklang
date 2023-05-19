@@ -472,8 +472,8 @@ func init() {
 	aliasStringBuildinMethod("ReplaceAll", "Replace")
 	aliasStringBuildinMethod("Find", "IndexOf")
 	aliasStringBuildinMethod("Rfind", "LastIndexOf")
-	aliasStringBuildinMethod("StartsWith", "HasPrefix")
-	aliasStringBuildinMethod("EndsWith", "HasSuffix")
+	aliasStringBuildinMethod("HasPrefix", "StartsWith")
+	aliasStringBuildinMethod("HasSuffix", "EndsWith")
 }
 
 func aliasStringBuildinMethod(origin string, target string) {
