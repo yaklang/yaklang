@@ -79,6 +79,35 @@ func (y *YakMatcher) ExecuteRawResponse(rsp []byte, vars map[string]interface{},
 	return y.Execute(&lowhttp.LowhttpResponse{RawPacket: rsp}, vars, suf...)
 }
 
+func (y *YakMatcher) ExecuteRaw(rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
+	if len(y.SubMatchers) > 0 {
+		if strings.TrimSpace(strings.ToLower(y.SubMatcherCondition)) == "or" {
+			for _, matcher := range y.SubMatchers {
+				if b, _ := matcher.ExecuteRaw(rsp, vars, suf...); b {
+					return true, nil
+				}
+			}
+			return false, nil
+		} else {
+			for _, matcher := range y.SubMatchers {
+				if b, _ := matcher.ExecuteRaw(rsp, vars, suf...); !b {
+					return false, nil
+				}
+			}
+			return true, nil
+		}
+	}
+
+	if y.Negative {
+		res, err := y.executeRaw(rsp, 0, vars, suf...)
+		if err != nil {
+			return false, err
+		}
+		return !res, err
+	}
+	return y.executeRaw(rsp, 0, vars, suf...)
+}
+
 func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
 	if len(y.SubMatchers) > 0 {
 		if strings.TrimSpace(strings.ToLower(y.SubMatcherCondition)) == "or" {
@@ -108,10 +137,7 @@ func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]inter
 	return y.execute(rsp, vars, suf...)
 }
 
-func (y *YakMatcher) execute(rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
-	rsp := utils.CopyBytes(rspIns.RawPacket)
-	var duration = rspIns.GetDurationFloat()
-
+func (y *YakMatcher) executeRaw(rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	var nucleiSandbox = NewNucleiDSLYakSandbox()
 	var isExpr = false
 	getMaterial := func() string {
@@ -304,4 +330,10 @@ func (y *YakMatcher) execute(rspIns *lowhttp.LowhttpResponse, vars map[string]in
 		}
 		return false, nil
 	}
+}
+
+func (y *YakMatcher) execute(rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
+	rsp := utils.CopyBytes(rspIns.RawPacket)
+	var duration = rspIns.GetDurationFloat()
+	return y.executeRaw(rsp, duration, vars, sufs...)
 }
