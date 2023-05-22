@@ -157,16 +157,21 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 
 	reqs := utils.MapGetFirstRaw(mid, "requests", "http")
 	if reqs == nil || (reqs != nil && reflect.TypeOf(reqs).Kind() != reflect.Slice) {
-
-		if utils.MapGetFirstRaw(mid, "network") != nil {
-			return nil, utils.Errorf("nuclei template `network(tcp)` is not supported (*)")
-		}
-
-		if utils.MapGetFirstRaw(mid, "headless") != nil {
+		if ret := utils.MapGetFirstRaw(mid, "network", "tcp"); ret != nil {
+			if reflect.TypeOf(ret).Kind() != reflect.Slice {
+				return nil, utils.Error("nuclei template `network` is not slice")
+			}
+			// network means tcp packets...
+			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret))
+			if err != nil {
+				return nil, utils.Errorf("parse network bulk failed: %v", err)
+			}
+			return yakTemp, nil
+		} else if utils.MapGetFirstRaw(mid, "headless") != nil {
 			return nil, utils.Errorf("nuclei template `headless(crawler)` is not supported (*)")
+		} else {
+			return nil, utils.Errorf("nuclei template requests is not slice")
 		}
-
-		return nil, utils.Errorf("nuclei template requests is not slice")
 	}
 
 	yakTemp.Variables = generateYakVariables(mid)
@@ -229,7 +234,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 				} else if strings.HasPrefix(path, "{{RootURL}}") {
 					firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{RootURL}}", ""))
 				}
-				firstLine = nucleiFormatRequestTemplate(firstLine)
+				firstLine = nucleiFormatToFuzzTagMode(firstLine)
 
 				// 处理
 				var lines []string
@@ -242,14 +247,14 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 					lines = append(lines, "Host: {{params(__hostname__)}}")
 				}
 				for k, v := range headers {
-					lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatRequestTemplate(utils.InterfaceToString(v))))
+					lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatToFuzzTagMode(utils.InterfaceToString(v))))
 				}
 				if len(headers) <= 0 {
 					lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
 				}
 				var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
 				rawPacket += utils.MapGetString(req, "body")
-				rawPacket = nucleiFormatRequestTemplate(rawPacket)
+				rawPacket = nucleiFormatToFuzzTagMode(rawPacket)
 				reqIns.HTTPRequests = append(reqIns.HTTPRequests, &YakHTTPRequestPacket{Request: rawPacket})
 			}
 		}
@@ -269,7 +274,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 var variableRegexp = regexp.MustCompile(`(?i)\{\{([a-z_][a-z0-9_]*)}}`)
 var exprRegexp = regexp.MustCompile(`(?i)\{\{[^}\r\n]+}}`)
 
-func nucleiFormatRequestTemplate(r string) string {
+func nucleiFormatToFuzzTagMode(r string) string {
 	r = strings.ReplaceAll(r, "{{BaseURL}}", "{{params(__base_url__)}}")
 	r = strings.ReplaceAll(r, "{{BaseUrl}}", "{{params(__base_url__)}}")
 	r = strings.ReplaceAll(r, "{{RootURL}}", "{{params(__root_url__)}}")
@@ -334,7 +339,7 @@ func nucleiRawPacketToYakHTTPRequestPacket(i string) *YakHTTPRequestPacket {
 	if strings.HasSuffix(packet.Request, "\r\n") {
 		packet.Request += "\r\n"
 	}
-	packet.Request = nucleiFormatRequestTemplate(packet.Request)
+	packet.Request = nucleiFormatToFuzzTagMode(packet.Request)
 	return packet
 }
 

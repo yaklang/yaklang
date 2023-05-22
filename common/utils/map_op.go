@@ -207,6 +207,10 @@ func MapGetInt(m map[string]interface{}, key string) int {
 	return MapGetIntOr(m, key, 0)
 }
 
+func MapGetIntEx(m map[string]interface{}, key ...string) int {
+	return Atoi(InterfaceToString(MapGetFirstRaw(m, key...)))
+}
+
 func MapGetFloat64Or(m map[string]interface{}, key string, value float64) float64 {
 	if m == nil {
 		return value
@@ -354,6 +358,16 @@ func ToMapParams(params interface{}) (map[string]interface{}, error) {
 
 func MergeStringMap(ms ...map[string]string) map[string]string {
 	res := map[string]string{}
+	for _, m := range ms {
+		for k, v := range m {
+			res[k] = v
+		}
+	}
+	return res
+}
+
+func MergeGeneralMap(ms ...map[string]any) map[string]any {
+	res := map[string]any{}
 	for _, m := range ms {
 		for k, v := range m {
 			res[k] = v

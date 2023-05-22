@@ -46,7 +46,7 @@ func ScanPacket(req []byte, opts ...interface{}) {
 		lowhttpConfig.Ctx = baseContext
 	}
 
-	config.AppendResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+	config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
 		if result {
 			log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
 		}
@@ -354,24 +354,31 @@ var Exports = map[string]interface{}{
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
 	"mode":                    WithMode,
 	"resultCallback":          _callback,
+	"tcpResultCallback":       _tcpCallback,
 	"https":                   lowhttp.WithHttps,
 	"http2":                   lowhttp.WithHttp2,
 }
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {
 	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-		//log.Info("reqBulk ")
-		//spew.Dump(reqBulk)
-		//log.Info("y: ")
-		//spew.Dump(y)
-		//log.Info("rsp: ")
-		//spew.Dump(rsp)
-		//log.Info("extractor: ")
-		//spew.Dump(extractor)
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
 			"responses": rsp,
+			"response":  rsp,
+			"match":     result,
+			"extractor": extractor,
+		})
+	})
+}
+
+func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
+	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []byte, result bool, extractor map[string]interface{}) {
+		handler(map[string]interface{}{
+			"template":  y,
+			"requests":  reqBulk,
+			"responses": rsp,
+			"response":  rsp,
 			"match":     result,
 			"extractor": extractor,
 		})
