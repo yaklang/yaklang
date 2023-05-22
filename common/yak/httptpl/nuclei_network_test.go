@@ -1,9 +1,11 @@
 package httptpl
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"strings"
 	"testing"
 )
 
@@ -58,6 +60,24 @@ network:
 	if err != nil {
 		panic(err)
 	}
+
+	if len(data.TCPRequestSequences) != 1 {
+		panic("len(data.TCPRequestSequences) != 1")
+	}
+
+	if ret := data.TCPRequestSequences[0].Inputs; len(ret) != 2 {
+		panic("len(data.TCPRequestSequences[0].Inputs) != 2")
+	} else {
+		if ret[0].Read != 1024 {
+			panic("ret[0].Read != 1024")
+		}
+
+		if !strings.Contains(ret[1].Data, "b200000185a6ff0900000001ff000000000") {
+			spew.Dump(ret[1])
+			panic("strings.Contains(ret[1].Data, \"b200000185a6ff0900000001ff000000000\")")
+		}
+	}
+
 	n, err := data.Exec(nil, false, []byte("GET /bai/path HTTP/1.1\r\n"+
 		"Host: www.baidu.com\r\n\r\n"), lowhttp.WithHost(server), lowhttp.WithPort(port))
 	if err != nil {

@@ -170,6 +170,7 @@ func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream 
 			}
 			select {
 			case <-stream.Context().Done():
+				log.Error("user canceled stream.Context()： Done()")
 				return
 			default:
 				time.Sleep(1 * time.Second)
