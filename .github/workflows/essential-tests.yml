@@ -56,4 +56,4 @@ jobs:
         run: go test -timeout 1m ./common/mutate_tests -v
 
       - name: Test MustPass - full yak scripts
-        run: go test -timeout 1m ./common/yak/mustpass -v
+        run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
