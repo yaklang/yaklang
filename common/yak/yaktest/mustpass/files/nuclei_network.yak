@@ -1,4 +1,6 @@
 host, port := tcp.MockServe(f`asdfiofasjkdfkasdfasd. ${codec.DecodeHex('0700000200000002000000')~} asdjofasdjklfasjkldasd`)
+
+var matched = false
 nuclei.ScanAuto(str.HostPort(host, port), nuclei.timeout(3), nuclei.debug(true), nuclei.rawTemplate(`
 id: tidb-unauth
 
@@ -32,4 +34,13 @@ network:
 
 # Enhanced by mp on 2022/07/20
 
-`))
+`), nuclei.tcpResultCallback(s => {
+    dump(s)
+    if s.match {
+        matched = true
+    }
+}))
+
+if !matched{
+    panic("BasicSmoking for nuclei.AutoScan - network!")
+}
