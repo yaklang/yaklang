@@ -14,7 +14,41 @@ import (
 	"strings"
 )
 
-type ResultCallback func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{})
+type ResultCallback func(y *YakTemplate, reqBulk any /**YakRequestBulkConfig / YakNetworkBulkConfig*/, rsp any /*[]*lowhttp.LowhttpResponse / [][]byte*/, result bool, extractor map[string]interface{})
+type HTTPResultCallback func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{})
+type TCPResultCallback func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []byte, result bool, extractor map[string]interface{})
+
+func HTTPResultCallbackWrapper(callback HTTPResultCallback) ResultCallback {
+	return func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+		bulk, ok := reqBulk.(*YakRequestBulkConfig)
+		if !ok {
+			return
+		}
+
+		results, ok := rsp.([]*lowhttp.LowhttpResponse)
+		if !ok {
+			return
+		}
+
+		callback(y, bulk, results, result, extractor)
+	}
+}
+
+func TCPResultCallbackWrapper(callback TCPResultCallback) ResultCallback {
+	return func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+		bulk, ok := reqBulk.(*YakNetworkBulkConfig)
+		if !ok {
+			return
+		}
+
+		results, ok := rsp.([]byte)
+		if !ok {
+			return
+		}
+
+		callback(y, bulk, results, result, extractor)
+	}
+}
 
 type ConfigOption func(*Config)
 
@@ -136,13 +170,34 @@ func WithMode(s string) ConfigOption {
 	}
 }
 
-func WithResultCallback(f ResultCallback) ConfigOption {
+func WithResultCallback(f HTTPResultCallback) ConfigOption {
 	return func(config *Config) {
-		config.Callback = f
+		config.Callback = HTTPResultCallbackWrapper(f)
+	}
+}
+
+func WithTCPResultCallback(f TCPResultCallback) ConfigOption {
+	return func(config *Config) {
+		config.Callback = TCPResultCallbackWrapper(f)
 	}
 }
 
 func (c *Config) ExecuteResultCallback(y *YakTemplate, bulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+	if c == nil {
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("httptpl execute result callback failed: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	if c.Callback != nil {
+		c.Callback(y, bulk, rsp, result, extractor)
+	}
+}
+
+func (c *Config) ExecuteTCPResultCallback(y *YakTemplate, bulk *YakNetworkBulkConfig, rsp [][]byte, result bool, extractor map[string]interface{}) {
 	if c == nil {
 		return
 	}
@@ -181,9 +236,37 @@ func (c *Config) AppendResultCallback(handler ResultCallback) {
 	}
 
 	origin := c.Callback
-	c.Callback = func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+	c.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
 		origin(y, reqBulk, rsp, result, extractor)
 		handler(y, reqBulk, rsp, result, extractor)
+	}
+}
+
+func (c *Config) AppendHTTPResultCallback(handler HTTPResultCallback) {
+	handlerRaw := HTTPResultCallbackWrapper(handler)
+	if c.Callback == nil {
+		c.Callback = handlerRaw
+		return
+	}
+
+	origin := c.Callback
+	c.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+		origin(y, reqBulk, rsp, result, extractor)
+		handlerRaw(y, reqBulk, rsp, result, extractor)
+	}
+}
+
+func (c *Config) AppendTCPResultCallback(handler TCPResultCallback) {
+	handlerRaw := TCPResultCallbackWrapper(handler)
+	if c.Callback == nil {
+		c.Callback = handlerRaw
+		return
+	}
+
+	origin := c.Callback
+	c.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+		origin(y, reqBulk, rsp, result, extractor)
+		handlerRaw(y, reqBulk, rsp, result, extractor)
 	}
 }
 
