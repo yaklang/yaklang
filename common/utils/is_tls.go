@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/socksproxy"
@@ -52,6 +53,21 @@ func GetAutoProxyConn(target string, proxy string, connectTimeout time.Duration)
 	}
 
 	return net.DialTimeout("tcp", target, connectTimeout)
+}
+
+func GetAutoProxyConnEx(target string, proxies []string, connectTimeout time.Duration) (net.Conn, error) {
+	if len(proxies) <= 0 {
+		return GetAutoProxyConn(target, "", connectTimeout)
+	}
+	for _, proxy := range proxies {
+		conn, err := GetAutoProxyConn(target, proxy, connectTimeout)
+		if err != nil {
+			log.Infof("peek proxy [%v] to connect [%v] failed: %s", proxy, target, err)
+			continue
+		}
+		return conn, nil
+	}
+	return nil, fmt.Errorf("all proxies[%v] failed", spew.Sdump(proxies))
 }
 
 func GetAutoProxyConnWithTLS(target string, proxy string, connectTimeout time.Duration, c *tls.Config) (net.Conn, error) {

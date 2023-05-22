@@ -28,6 +28,7 @@ type YakTemplate struct {
 	// interactsh
 	ReverseConnectionNeed bool `json:"reverseConnectionNeed"`
 
+	TCPRequestSequences  []*YakNetworkBulkConfig
 	HTTPRequestSequences []*YakRequestBulkConfig
 	Variables            *YakVariables
 }

@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -70,7 +71,6 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 	}
 
 	tplConcurrent := config.ConcurrentInTemplates
-	swg := utils.NewSizedWaitGroup(tplConcurrent)
 
 	handleReqSeqs := func(reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, params map[string]interface{}) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}) {
 		defer func() {
@@ -210,18 +210,57 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 		return responses, funk.Any(matchResults...), extracted
 	}
 
-	for reqSeqs := range y.generateRequests() {
-		swg.Add()
-		varsOperatorMutex.Lock()
-		p := utils.CopyMapInterface(vars)
-		varsOperatorMutex.Unlock()
-		go func(ret *RequestBulk, params map[string]interface{}) {
-			defer swg.Done()
+	if len(y.HTTPRequestSequences) > 0 {
+		swg := utils.NewSizedWaitGroup(tplConcurrent)
+		for reqSeqs := range y.generateRequests() {
+			swg.Add()
+			varsOperatorMutex.Lock()
+			p := utils.CopyMapInterface(vars)
+			varsOperatorMutex.Unlock()
+			go func(ret *RequestBulk, params map[string]interface{}) {
+				defer swg.Done()
 
-			rsps, result, extracted := handleReqSeqs(ret.RequestConfig, ret.Requests, params)
-			config.ExecuteResultCallback(y, ret.RequestConfig, rsps, result, extracted)
-		}(reqSeqs, p)
+				rsps, result, extracted := handleReqSeqs(ret.RequestConfig, ret.Requests, params)
+				config.ExecuteResultCallback(y, ret.RequestConfig, rsps, result, extracted)
+			}(reqSeqs, p)
+		}
+		swg.Wait()
+		return int(count), nil
+	} else if len(y.TCPRequestSequences) > 0 {
+		swg := utils.NewSizedWaitGroup(tplConcurrent)
+		for _, tcpReq := range y.TCPRequestSequences {
+			swg.Add()
+			tcpReq := tcpReq
+
+			go func() {
+				defer swg.Done()
+				defer func() {
+					if err := recover(); err != nil {
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				varsOperatorMutex.Lock()
+				p := utils.CopyMapInterface(vars)
+				varsOperatorMutex.Unlock()
+
+				lowhttpConfig := lowhttp.NewLowhttpOption()
+				for _, opt := range opts {
+					opt(lowhttpConfig)
+				}
+
+				err := tcpReq.Execute(p, lowhttpConfig, func(matched bool, extractorResults map[string]any) {
+					atomic.AddInt64(&count, 1)
+					config.ExecuteTCPResultCallback(y, tcpReq, nil, matched, extractorResults)
+					spew.Dump(matched, extractorResults)
+				})
+				if err != nil {
+					log.Errorf("tcpReq.Execute failed: %s", err)
+				}
+			}()
+		}
+		swg.Wait()
+		return int(count), nil
+	} else {
+		return 0, utils.Errorf("[%s] tcp/http is all empty!", y.Name)
 	}
-	swg.Wait()
-	return int(count), nil
 }
