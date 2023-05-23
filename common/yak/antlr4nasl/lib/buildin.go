@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math"
 	"net"
@@ -20,6 +21,55 @@ type ExitSignal struct {
 
 var oid = codec.Md5("code")
 var NaslBuildInNativeMethod = map[string]interface{}{
+	"get_array_elem": func(icaller interface{}, index interface{}) interface{} {
+		switch caller := icaller.(type) {
+		case *vm.NaslArray: // array类型
+			if caller == nil {
+				panic("iterableValue.Value is nil")
+			}
+			if index == nil {
+				panic("index is nil")
+			}
+			i, ok := index.(int)
+			if ok {
+				val, ok := caller.Num_elt[i]
+				if ok {
+					return val
+				} else {
+					return nil
+				}
+			}
+			stringIndex, ok := index.(string)
+			if ok {
+				val, ok := caller.Hash_elt[stringIndex]
+				if ok {
+					return val
+				} else {
+					return nil
+				}
+			}
+			panic("arg must be int or string")
+		case string, []byte: // data类型
+			data := utils.InterfaceToBytes(caller)
+			if index == nil {
+				panic("index is nil")
+			}
+			i, ok := index.(int)
+			if ok {
+				if i >= len(data) {
+					return nil
+				}
+				if _, ok := icaller.(string); ok {
+					return string(data[i])
+				}
+				return data[i]
+			}
+			panic("arg must be int")
+		default:
+			panic("nasl array element call not support type")
+		}
+
+	},
 	"sleep": func(n int) {
 		time.Sleep(time.Duration(n) * time.Second)
 	},

@@ -2,6 +2,7 @@ package antlr4nasl
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -187,6 +188,7 @@ function smtp_get_port( default_list, ignore_broken, ignore_unscanned ) {
 //		//BuildInMethodCheck(engine) // 检测当前已经加载的脚本内置函数是否存在
 //	}
 func TestPocScanner(t *testing.T) {
+	consts.GetGormProjectDatabase()
 	engine := NewScriptEngine()
 	//engine.vm.GetConfig().SetStopRecover(true)
 	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
@@ -194,25 +196,11 @@ func TestPocScanner(t *testing.T) {
 	//engine.AddEngineHooks(func(engine *Engine) {
 	//	PatchEngine(engine) // 一些库缺少函数
 	//})
-	engine.SetGoroutineNum(1)
-	engine.SetIncludePath("/Users/z3/nasl/nasl-plugins") // 设置nasl依赖库位置
-	engine.SetDependencies("/Users/z3/nasl/nasl-plugins")
-	engine.LoadScriptFromFile("/Users/z3/nasl/nasl-plugins/2023/oracle/gb_mysql_cpujan2023_2_lin.nasl")
-	//engine.LoadGroup(PluginGroupApache)
 	//engine.LoadGroups(PluginGroupApache)
-
-	engine.AddExcludeScripts(
-		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
-		"gb_apache_couchdb_priv_esc_vuln_apr22_active.nasl", // service_get_port
-		"gb_log4j_CVE-2021-44228_sip_active.nasl",           // sip.inc.open_priv_sock_udp
-		"gb_struts_log4j_rce_vuln_dec21_active.nasl",        //pcap_src_ip_filter_from_hostnames
-		"gb_struts_s2-048.nasl",                             // found
-		"gb_log4j_CVE-2021-44228_http_web_dirs_active.nasl", //pcap_src_ip_filter_from_hostnames
-		"gb_struts_config_browser_plugin_exposed_http.nasl", //http_cgi_dirs
-		"gb_log4j_CVE-2021-44228_http_active.nasl",          // http_cgi_dirs
-		//get_app_port_from_list，get_app_version_and_location_from_list
-	)
+	engine.LoadScriptFromDb("gb_apache_tomcat_detect.nasl")
+	engine.SetGoroutineNum(1)
 	engine.AddEngineHooks(func(engine *Engine) {
+		engine.vm.GetConfig().SetStopRecover(true)
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
 			if err != nil {
@@ -220,8 +208,15 @@ func TestPocScanner(t *testing.T) {
 			}
 			return string(codeBytes)
 		})
+		engine.AddNaslLibPatch("gb_apache_tomcat_open_redirect_vuln_lin.nasl", func(code string) string {
+			codeBytes, err := os.ReadFile("/Users/z3/nasl/nasl-plugins/2018/apache/gb_apache_tomcat_open_redirect_vuln_lin.nasl")
+			if err != nil {
+				return code
+			}
+			return string(codeBytes)
+		})
 	})
-	err := engine.Scan("107.167.224.123", "5060")
+	err := engine.Scan("hairbeautydiffusion.com", "80")
 	// 排查未定义的函数
 	var unknownErrors multiError
 	undefinedVars := []string{}
@@ -263,5 +258,7 @@ func TestPocScanner(t *testing.T) {
 	println("undefinedVars:")
 	spew.Dump(undefinedVars)
 	println("engine.GetKBData():")
-	spew.Dump(engine.GetKBData())
+	data := engine.GetKBData()
+	data["Host/port_infos"] = nil
+	spew.Dump()
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"testing"
 )
 
@@ -168,19 +169,14 @@ func TestAssigment(t *testing.T) {
 		"dump": func(i interface{}) {
 			spew.Dump(i)
 		},
-		"getMap": func() map[string]string {
-			return map[string]string{
+		"getMap": func() *vm.NaslArray {
+			array, _ := vm.NewNaslArray(map[string]string{
 				"a": "b",
-			}
-		},
-		"getStruct": func() interface{} {
-			return &struct {
-				A string
-			}{
-				A: "a",
-			}
+			})
+			return array
 		},
 	})
+
 	engine.GetCompiler().RegisterVisitHook("a", func(compiler *visitors.Compiler, ctx antlr.ParserRuleContext) {
 		if id, ok := ctx.(*nasl.IdentifierExpressionContext); ok {
 			if id.GetText() == "__this__" {
@@ -199,12 +195,7 @@ dump(b);
 dump(c);
 assert(a==1,"a!=1");
 assert(b[0]=="0","b[0] != 0");
-assert(c.a == "1","c[a]!=1");
 assert(c["a"] == "1","c[a]!=1");
-
-d = getStruct();
-d.A = "1";
-assert(d.A == "1","d.A!=1");
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -263,6 +254,7 @@ local_var a,b,c,d,e,f;
 a[1] = 1;
 c = [1,2,3];
 assert(c[1]==2,"c[1]!=2");
+dump(a);
 assert(a[1]==1,"a[1]!=1");
 dump(NULL);
 `)

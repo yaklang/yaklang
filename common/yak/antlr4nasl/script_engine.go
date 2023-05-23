@@ -61,6 +61,14 @@ func (engine *ScriptEngine) AddExcludeScripts(paths ...string) {
 func (engine *ScriptEngine) LoadScript(script *NaslScriptInfo) {
 	engine.scripts[script] = struct{}{}
 }
+func (engine *ScriptEngine) LoadScriptFromDb(name string) {
+	script, err := NewNaslScriptObjectFromDb(name)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	engine.LoadScript(script)
+}
 func (engine *ScriptEngine) LoadScriptFromFile(path string) {
 	if utils.IsDir(path) {
 		raw, err := utils.ReadFilesRecursively(path)
@@ -79,29 +87,30 @@ func (engine *ScriptEngine) LoadScriptFromFile(path string) {
 	}
 }
 
-func (engine *ScriptEngine) AddScriptIntoGroup(group ScriptGroup, paths ...string) {
-	engine.scriptGroupDefines[group] = append(engine.scriptGroupDefines[group], paths...)
+func (engine *ScriptEngine) AddScriptIntoGroup(group ScriptGroup, familys ...string) {
+	engine.scriptGroupDefines[group] = append(engine.scriptGroupDefines[group], familys...)
 }
 func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
 	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
 	for _, group := range groups {
-		if v, ok := e.scriptGroupDefines[group]; ok {
-			for _, p := range v {
-				e.LoadScriptFromFile(p)
-			}
-		}
-		if db == nil {
+		familys, ok := e.scriptGroupDefines[group]
+		if !ok {
 			continue
 		}
-		var scripts []*yakit.NaslScript
-		if db := db.Find(&scripts).Where("group = ?", group); db.Error != nil {
-			continue
-		}
-		for _, script := range scripts {
-			if _, ok := e.excludeScripts[script.OID]; ok {
+		for _, family := range familys {
+			var scripts []*yakit.NaslScript
+			if db := db.Find(&scripts).Where("family = ?", family); db.Error != nil {
 				continue
 			}
-			e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
+			for _, script := range scripts {
+				if _, ok := e.excludeScripts[script.OID]; ok {
+					continue
+				}
+				e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
+			}
 		}
 	}
 }

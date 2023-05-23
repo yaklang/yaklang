@@ -2,11 +2,23 @@ package yaktest
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"testing"
 )
 
 func init() {
 	consts.GetGormProjectDatabase()
+	yaklang.Import("nasl", antlr4nasl.Exports)
+}
+func TestDeleteScript(t *testing.T) {
+	cases := []YakTestCase{
+		{
+			Name: "测试从数据库删除Script",
+			Src:  `nasl.RemoveDatabase()`,
+		},
+	}
+	Run("测试从数据库删除Script", t, cases...)
 }
 func TestUpdateScript(t *testing.T) {
 	cases := []YakTestCase{
@@ -60,7 +72,7 @@ func TestInitNaslDatabase(t *testing.T) {
 			Name: "测试初始化NaslScript",
 			Src: `
 
-libraryPath = "/Users/z3/Downloads/nasllib"
+libraryPath = "/Users/z3/nasl/nasl-plugins"
 err = nasl.UpdateDatabase(libraryPath)
 if err{
 	log.Error(err)

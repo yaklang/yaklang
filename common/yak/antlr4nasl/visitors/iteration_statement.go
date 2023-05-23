@@ -110,7 +110,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	c.pushRef("__NewIterator")
 	c.VisitSingleExpression(i.SingleExpression())
 	c.pushCall(1)
-	c.pushInteger(0)
+	c.pushInt(0)
 	c.pushBool(false)
 	itCode := c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCode.Unary = 1
@@ -134,7 +134,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	// if !ok {break}
 	tmpIdCode := c.pushOpcodeFlag(yakvm.OpPushRef)
 	tmpIdCode.Unary = tmpId
-	c.pushInteger(1)
+	c.pushInt(1)
 	c.pushBool(false)
 	itCall := c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCall.Unary = 1
@@ -144,7 +144,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	c.pushLeftRef(itemName)
 	tmpIdCode = c.pushOpcodeFlag(yakvm.OpPushRef)
 	tmpIdCode.Unary = tmpId
-	c.pushInteger(0)
+	c.pushInt(0)
 	c.pushBool(false)
 	itCall = c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCall.Unary = 1
