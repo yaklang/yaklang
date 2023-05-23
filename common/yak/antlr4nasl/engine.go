@@ -188,15 +188,44 @@ func (e *Engine) EvalInclude(name string) error {
 	}
 	return e.safeEvalWithFileName(string(sourceBytes), name)
 }
+func (e *Engine) LoadScript(path string) (*NaslScriptInfo, error) {
+	e.SetDescription(true)
+	oldIns := e.GetScriptObject()
+	defer func() {
+		e.SetDescription(false)
+		e.scriptObj = oldIns
+	}()
+	e.scriptObj = NewNaslScriptObject()
+	e.scriptObj.OriginFileName = filepath.Base(path)
+	code, err := os.ReadFile(path)
+	if err != nil {
+		script, err := NewNaslScriptObjectFromDb(e.scriptObj.OriginFileName)
+		if err != nil {
+			return nil, utils.Errorf("not found script file: %s", path)
+		}
+		return script, err
+	} else {
+		recoverSource := e.compiler.SetSourceCodeFilePath(path)
+		defer recoverSource()
+		err = e.safeEvalWithFileName(string(code), e.scriptObj.OriginFileName)
+		return e.scriptObj, err
+	}
+}
 func (e *Engine) RunFile(path string) error {
 	e.scriptObj.OriginFileName = filepath.Base(path)
 	code, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		script, err := NewNaslScriptObjectFromDb(e.scriptObj.OriginFileName)
+		if err != nil {
+			return utils.Errorf("not found script file: %s", path)
+		}
+		return e.RunScript(script)
+	} else {
+		recoverSource := e.compiler.SetSourceCodeFilePath(path)
+		defer recoverSource()
+		return e.safeEvalWithFileName(string(code), e.scriptObj.OriginFileName)
 	}
-	recoverSource := e.compiler.SetSourceCodeFilePath(path)
-	defer recoverSource()
-	return e.safeEvalWithFileName(string(code), e.scriptObj.OriginFileName)
+
 }
 
 func (e *Engine) Eval(code string) error {

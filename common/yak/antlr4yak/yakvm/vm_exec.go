@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
 	"reflect"
@@ -306,23 +307,36 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			arg2 := v.pop()
 			arg1 := v.pop()
+
 			if arg1.IsLeftValueRef() {
 				arg1.AssignBySymbol(v.CurrentScope(), arg2)
+				arg1.Assign(v, arg2)
 			} else {
+				assignOk := false
 				if v1, ok := arg1.Value.([]*Value); ok {
 					if len(v1) == 2 {
-						if v1[0].IsUndefined() {
-							if v1[0].SymbolId > 0 {
-								initMap := NewAutoValue(map[interface{}]interface{}{})
-								v.CurrentScope().NewValueByID(v1[0].SymbolId, initMap)
-								v1[0] = initMap
+						if v1[0].Value == nil {
+							array := NewAutoValue(vm.NewEmptyNaslArray())
+							v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
+							v1[0] = array
+						}
+						if v2, ok := v1[0].Value.(*vm.NaslArray); ok {
+							if v1[1].IsInt() {
+								v2.AddEleToList(v1[1].Int(), arg2.Value)
+								assignOk = true
+							} else if v1[1].IsString() {
+								v2.AddEleToArray(v1[1].String(), arg2.Value)
+								assignOk = true
 							} else {
-								panic("unreasonable undefined")
+								panic("nasl array index must be int or string")
 							}
 						}
 					}
+
 				}
-				arg1.Assign(v, arg2)
+				if !assignOk {
+					panic("assign error")
+				}
 			}
 			v.push(arg2)
 			return
@@ -622,6 +636,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if val.Value == nil {
 				val = NewUndefined(id)
 			}
+			val.SymbolId = id
 			v.push(val)
 			return
 		case YAK:
@@ -1203,6 +1218,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		return
 	case OpNewSlice:
 		vals := v.popArgN(c.Unary)
+		if v.vm.GetConfig().vmMode == NASL {
+			array := vm.NewEmptyNaslArray()
+			for i, val := range vals {
+				array.AddEleToList(i, val.Value)
+			}
+			v.push(NewAutoValue(array))
+			return
+		}
 		elementType := GuessValuesTypeToBasicType(vals...)
 		sliceType := reflect.SliceOf(elementType)
 		value := reflect.MakeSlice(sliceType, c.Unary, c.Unary)
@@ -1413,6 +1436,21 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpNewMap:
 		switch v.vm.GetConfig().vmMode {
+		case NASL:
+			array := vm.NewEmptyNaslArray()
+			for i := 0; i < c.Unary; i++ {
+				k := v.pop()
+				v := v.pop()
+				if k.IsString() {
+					array.AddEleToArray(k.String(), v.Value)
+				}
+				if k.IsInt() {
+					array.AddEleToList(k.Int(), v.Value)
+				}
+				panic("array index must be int or string")
+			}
+			v.push(NewAutoValue(array))
+			return
 		case LUA:
 			var vals []*Value
 			if c.Op1 == undefined {

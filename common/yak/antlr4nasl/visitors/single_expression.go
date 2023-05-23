@@ -128,7 +128,7 @@ func (c *Compiler) VisitXExpression(i *nasl.XExpressionContext) {
 	iId := c.symbolTable.NewSymbolWithoutName()
 	code := c.pushOpcodeFlag(yakvm.OpPushLeftRef)
 	code.Unary = iId
-	c.pushInteger(0)
+	c.pushInt(0)
 	c.pushAssigin()
 	c.pushOpcodeFlag(yakvm.OpPop)
 
@@ -165,10 +165,10 @@ func (c *Compiler) VisitMemberIndexExpression(i *nasl.MemberIndexExpressionConte
 	}
 	c.visitHook(c, i)
 
+	c.pushRef("get_array_elem")
 	c.VisitSingleExpression(i.SingleExpression(0))
 	c.VisitSingleExpression(i.SingleExpression(1))
-	c.pushBool(false)
-	c.pushIterableCall()
+	c.pushCall(2)
 }
 func (c *Compiler) VisitPostIncrementExpression(i *nasl.PostIncrementExpressionContext) {
 	if i == nil {
@@ -530,7 +530,7 @@ func (c *Compiler) VisitLiteralExpression(i *nasl.LiteralExpressionContext) {
 					if err != nil {
 						panic("invalid integer literal")
 					}
-					c.pushInteger(i)
+					c.pushInt(i)
 				}
 				if flit := numlit_.FloatLiteral(); flit != nil {
 					f, err := strconv.ParseFloat(flit.GetText(), 64)
@@ -545,7 +545,7 @@ func (c *Compiler) VisitLiteralExpression(i *nasl.LiteralExpressionContext) {
 					if err != nil {
 						panic("invalid hex literal")
 					}
-					c.pushInteger(int(i))
+					c.pushInt(int(i))
 				}
 			}
 		}
@@ -599,7 +599,7 @@ func (c *Compiler) VisitCallExpression(i *nasl.CallExpressionContext) {
 	paramsLen := 0
 	if _, ok := c.naslLib[funcName]; ok {
 		c.pushRef("__method_proxy__")
-		c.pushInteger(c.GetSymbolId(i.SingleExpression().GetText()))
+		c.pushInt(c.GetSymbolId(i.SingleExpression().GetText()))
 		paramsLen++
 	} else {
 		c.VisitSingleExpression(i.SingleExpression())
@@ -708,6 +708,7 @@ func (c *Compiler) VisitParenthesizedExpression(i *nasl.ParenthesizedExpressionC
 	c.VisitExpressionSequence(i.ExpressionSequence())
 }
 func (c *Compiler) VisitMemberDotExpression(i *nasl.MemberDotExpressionContext) {
+	panic("implement me")
 	if i == nil {
 		return
 	}

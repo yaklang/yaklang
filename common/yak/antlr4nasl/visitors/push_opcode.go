@@ -13,7 +13,7 @@ func (c *Compiler) pushOpcodeFlag(f yakvm.OpcodeFlag) *yakvm.Code {
 	return code
 }
 
-func (c *Compiler) pushOpcode(code *yakvm.Code) {
+func (c *Compiler) pushOpcode(code *yakvm.Code) *yakvm.Code {
 	code.StartLineNumber = c.position[0]
 	code.StartColumnNumber = c.position[1]
 	code.EndLineNumber = c.position[2]
@@ -21,6 +21,7 @@ func (c *Compiler) pushOpcode(code *yakvm.Code) {
 	code.SourceCodePointer = c.sourceCodePointer
 	code.SourceCodeFilePath = c.sourceCodeFilePath
 	c.codes = append(c.codes, code)
+	return code
 }
 
 func (c *Compiler) pushScope() {
@@ -34,17 +35,18 @@ func (c *Compiler) pushScopeEnd() {
 		Opcode: yakvm.OpScopeEnd,
 	})
 }
-func (s *Compiler) pushInteger(i int) {
-	s.pushOpcode(&yakvm.Code{
+func (s *Compiler) pushInt(i int) *yakvm.Code {
+	return s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1: &yakvm.Value{
-			TypeVerbose: "int",
+			TypeVerbose: "nasl_int",
 			Value:       i,
 			Literal:     fmt.Sprintf("%d", i),
 		},
 	})
 }
 func (s *Compiler) pushFloat(f float64) {
+	panic("not implemented")
 	s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1: &yakvm.Value{
@@ -56,23 +58,18 @@ func (s *Compiler) pushFloat(f float64) {
 }
 
 func (s *Compiler) pushBool(i bool) *yakvm.Code {
-	code := &yakvm.Code{
-		Opcode: yakvm.OpPush,
-		Op1: &yakvm.Value{
-			TypeVerbose: "bool",
-			Value:       i,
-			Literal:     fmt.Sprint(i),
-		},
+	if i {
+		return s.pushInt(1)
+	} else {
+		return s.pushInt(0)
 	}
-	s.pushOpcode(code)
-	return code
 }
 
 func (s *Compiler) pushString(i string) {
 	s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1: &yakvm.Value{
-			TypeVerbose: "string",
+			TypeVerbose: "nasl_string",
 			Value:       i,
 			Literal:     i,
 		},

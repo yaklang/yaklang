@@ -98,13 +98,7 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 		if _, ok := e.runedScripts[dependency]; ok {
 			continue
 		}
-		e.SetDescription(true)
-		oldIns := e.GetScriptObject()
-		e.scriptObj = NewNaslScriptObject()
-		err := e.RunFile(path.Join(e.dependenciesPath, dependency))
-		ins := e.scriptObj
-		e.scriptObj = oldIns
-		e.SetDescription(false)
+		ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
 		if err != nil {
 			return err
 		}
@@ -127,6 +121,21 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Preferences: make(map[string]interface{}),
 		Kbs:         NewNaslKBs(),
 	}
+}
+func NewNaslScriptObjectFromDb(originName string) (*NaslScriptInfo, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Errorf("gorm database is nil")
+	}
+	var scripts []*yakit.NaslScript
+	if err := db.Where("origin_file_name = ?", originName).First(&scripts).Error; err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if len(scripts) > 0 {
+		return NewNaslScriptObjectFromNaslScript(scripts[0]), nil
+	}
+	return nil, utils.Errorf("script %s not found", originName)
 }
 func NewNaslScriptObjectFromFile(path string) (*NaslScriptInfo, error) {
 	e := New()
@@ -177,6 +186,7 @@ func NewNaslScriptObjectFromNaslScript(s *yakit.NaslScript) *NaslScriptInfo {
 		return nil
 	}
 	n()
+	info.OriginFileName = s.OriginFileName
 	info.Group = s.Group
 	info.Hash = s.Hash
 	info.OID = s.OID

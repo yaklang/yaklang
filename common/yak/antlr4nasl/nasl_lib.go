@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -313,6 +313,9 @@ func init() {
 			name := params.getParamByNumber(0)
 			res := []interface{}{}
 			s := name.String()
+			if strings.Contains(s, "*") {
+				return engine.scriptObj.Kbs.GetKBByPattern(s), nil
+			}
 			for k, v := range engine.scriptObj.Kbs.data {
 				if utils.MatchAllOfGlob(k, s) {
 					res = append(res, v)
@@ -863,35 +866,87 @@ func init() {
 			}
 		},
 		"make_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			res := make([]interface{}, 0)
+			res := vm.NewEmptyNaslArray()
+			i := 0
 			forEachParams(params, func(value *yakvm.Value) {
-				if reflect.ValueOf(value.Value).Kind() == reflect.Array || reflect.ValueOf(value.Value).Kind() == reflect.Slice {
-					for i := 0; i < reflect.ValueOf(value.Value).Len(); i++ {
-						res = append(res, reflect.ValueOf(value.Value).Index(i).Interface())
+				defer func() { i++ }()
+				if value.Value == nil {
+					log.Errorf("nasl_make_list: undefined variable #%d skipped\n", i)
+					return
+				}
+				// 列表的每一个元素添加到新的列表中
+				switch ret := value.Value.(type) {
+				case *vm.NaslArray: // array类型
+					for _, v := range ret.Num_elt {
+						if res.AddEleToList(i, v) != nil {
+							i++
+						}
 					}
-				} else {
-					res = append(res, value.Value)
+					for _, v := range ret.Hash_elt {
+						if res.AddEleToList(i, v) != nil {
+							i++
+						}
+					}
+				default: // int, string, data类型
+					if res.AddEleToList(i, value.Value) != nil {
+						i++
+					}
 				}
 			})
 			return res, nil
 		},
 		"make_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			array := make(map[interface{}]interface{})
+			array := vm.NewEmptyNaslArray()
 			iskey := false
 			var v interface{}
+			v1 := 0
 			forEachParams(params, func(value *yakvm.Value) {
+				defer func() { v1++ }()
 				if !iskey {
 					v = value.Value
 				} else {
-					array[value.Value] = v
+					v2 := value.Value
+					switch ret := v2.(type) {
+					case []byte, string, int, *vm.NaslArray:
+						switch ret2 := v.(type) {
+						case int:
+							array.AddEleToList(ret2, ret)
+						case string, []byte:
+							array.AddEleToArray(utils.InterfaceToString(ret2), ret)
+						}
+					default:
+						err := utils.Errorf("make_array: bad value type %s for arg #%d\n", reflect.TypeOf(v2).Kind(), v1)
+						log.Error(err)
+					}
 				}
 				iskey = !iskey
 			})
 			return array, nil
 		},
 		"keys": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			keys := funk.Keys(params.getParamByNumber(0, map[string]interface{}{}).Value)
-			return keys, nil
+			array := vm.NewEmptyNaslArray()
+			i := 0
+			p := params.getParamByNumber(0, nil)
+			if p == nil {
+				return nil, nil
+			}
+			if v, ok := p.Value.(*vm.NaslArray); ok {
+				if len(v.Num_elt) > 0 {
+					for k := range v.Num_elt {
+						array.AddEleToList(i, k)
+						i++
+					}
+				}
+				if len(v.Hash_elt) > 0 {
+					for k := range v.Hash_elt {
+						array.AddEleToList(i, k)
+						i++
+					}
+				}
+				return array, nil
+			} else {
+				return nil, utils.Errorf("keys: bad value type %s for arg #%d\n", reflect.TypeOf(p.Value).Kind(), 0)
+			}
 		},
 		"max_index": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			i := params.getParamByNumber(0, nil).Value
@@ -1521,6 +1576,13 @@ func init() {
 				du := time.Now().Sub(timeStart).Seconds()
 				if engine.IsDebug() && du > 3 {
 					log.Infof("call build in function `%s` cost: %f", name, du)
+				}
+				if res == nil {
+					return res
+				}
+				array, err := vm.NewNaslArray(res)
+				if err != nil {
+					return array
 				}
 				return res
 			}

@@ -12,10 +12,11 @@ func DebugExec(code string, init ...bool) {
 
 func _Exec(debug bool, code string, init ...bool) {
 	engine := New()
+	//engine.vm.GetConfig().SetStopRecover(true)
 	if len(init) == 0 {
 		engine.InitBuildInLib()
 	}
-	err := engine.SafeEval(code)
+	err := engine.Eval(code)
 	if debug {
 		yakvm.ShowOpcodes(engine.compiler.GetCodes())
 	}
