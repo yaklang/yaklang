@@ -32,12 +32,7 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 			}
 			i, ok := index.(int)
 			if ok {
-				val, ok := caller.Num_elt[i]
-				if ok {
-					return val
-				} else {
-					return nil
-				}
+				return caller.GetElementByNum(i)
 			}
 			stringIndex, ok := index.(string)
 			if ok {

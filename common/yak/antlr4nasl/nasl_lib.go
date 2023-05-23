@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -295,7 +296,7 @@ func init() {
 			if name.IsUndefined() || value.IsUndefined() {
 				return nil, utils.Errorf("<name> or <value> is empty")
 			}
-			return nil, engine.scriptObj.Kbs.SetKB(name.String(), value.Value)
+			return nil, engine.Kbs.SetKB(name.String(), value.Value)
 		},
 		"set_kb_item": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByName("name")
@@ -303,20 +304,20 @@ func init() {
 			if name.IsUndefined() || value.IsUndefined() {
 				return nil, utils.Errorf("<name> or <value> is empty")
 			}
-			return nil, engine.scriptObj.Kbs.SetKB(name.String(), value.Value)
+			return nil, engine.Kbs.SetKB(name.String(), value.Value)
 		},
 		"get_kb_item": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0)
-			return engine.scriptObj.Kbs.GetKB(name.String()), nil
+			return engine.Kbs.GetKB(name.String()), nil
 		},
 		"get_kb_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0)
 			res := []interface{}{}
 			s := name.String()
 			if strings.Contains(s, "*") {
-				return engine.scriptObj.Kbs.GetKBByPattern(s), nil
+				return engine.Kbs.GetKBByPattern(s), nil
 			}
-			for k, v := range engine.scriptObj.Kbs.data {
+			for k, v := range engine.Kbs.data {
 				if utils.MatchAllOfGlob(k, s) {
 					res = append(res, v)
 				}
@@ -638,7 +639,7 @@ func init() {
 		},
 		"get_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0).Int()
-			if v, ok := engine.scriptObj.Kbs.data["Host/scanned"]; ok {
+			if v, ok := engine.Kbs.data["Host/scanned"]; ok {
 				if v2, ok := v.([]int); ok {
 					return utils.IntArrayContains(v2, port), nil
 				}
@@ -927,8 +928,8 @@ func init() {
 			array := vm.NewEmptyNaslArray()
 			i := 0
 			p := params.getParamByNumber(0, nil)
-			if p == nil {
-				return nil, nil
+			if p == nil || p.Value == nil {
+				return array, nil
 			}
 			if v, ok := p.Value.(*vm.NaslArray); ok {
 				if len(v.Num_elt) > 0 {
@@ -950,15 +951,28 @@ func init() {
 		},
 		"max_index": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			i := params.getParamByNumber(0, nil).Value
-			refV := reflect.ValueOf(i)
-			if refV.Type().Kind() == reflect.Array || refV.Type().Kind() == reflect.Slice {
-				return refV.Len(), nil
+			if i == nil {
+				return -1, nil
 			}
-			return -1, nil
+			switch ret := i.(type) {
+			case *vm.NaslArray:
+				return ret.GetMaxIdx(), nil
+			default:
+				return nil, utils.Errorf("max_index: bad value type %s for arg #%d\n", reflect.TypeOf(i).Kind(), 0)
+			}
 		},
 		"sort": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `sort` is not implement"))
-			return nil, nil
+			i := params.getParamByNumber(0, nil).Value
+			if i == nil {
+				return nil, nil
+			}
+			switch ret := i.(type) {
+			case *vm.NaslArray:
+				newArray := ret.Copy()
+				sort.Sort(vm.SortableArrayByString(newArray.Num_elt))
+				return newArray, nil
+			}
+			return i, nil
 		},
 		"unixtime": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return time.Now().Unix(), nil
@@ -1541,7 +1555,7 @@ func init() {
 			register_service := func(port int, service string) {
 				engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": fmt.Sprintf("Services/%s", service), "value": port}, nil)
 			}
-			iinfos := engine.scriptObj.Kbs.GetKB("Host/port_infos")
+			iinfos := engine.Kbs.GetKB("Host/port_infos")
 			if iinfos != nil {
 				infos := iinfos.([]*fp.MatchResult)
 				for _, info := range infos {
@@ -1557,6 +1571,14 @@ func init() {
 				}
 			}
 			return nil, nil
+		},
+		"is_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			p := params.getParamByNumber(0)
+			if p == nil || p.Value == nil {
+				return false, nil
+			}
+			_, ok := p.Value.(*vm.NaslArray)
+			return ok, nil
 		},
 	}
 	for name, method := range naslLib {
@@ -1581,7 +1603,7 @@ func init() {
 					return res
 				}
 				array, err := vm.NewNaslArray(res)
-				if err != nil {
+				if err == nil {
 					return array
 				}
 				return res

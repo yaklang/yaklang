@@ -49,6 +49,7 @@ func (n *NaslKBs) GetKB(name string) interface{} {
 	return nil
 }
 func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
+	res = make(map[string]interface{})
 	for k, v := range n.data {
 		if utils.MatchAllOfGlob(k, name) {
 			res[k] = v
@@ -58,7 +59,6 @@ func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
 }
 
 type NaslScriptInfo struct {
-	Kbs             *NaslKBs
 	naslScript      *yakit.NaslScript
 	OriginFileName  string
 	Hash            string
@@ -107,7 +107,6 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 		}
 	}
 	e.scriptObj = n
-	e.compiler.SetSourceCodeFilePath(n.OriginFileName)
 	if e.debug {
 		log.Infof("Running script %s", n.OriginFileName)
 	}
@@ -119,7 +118,6 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Tags:        make(map[string]interface{}),
 		Xrefs:       make(map[string]string),
 		Preferences: make(map[string]interface{}),
-		Kbs:         NewNaslKBs(),
 	}
 }
 func NewNaslScriptObjectFromDb(originName string) (*NaslScriptInfo, error) {
