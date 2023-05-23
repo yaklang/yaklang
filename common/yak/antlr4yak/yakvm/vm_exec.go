@@ -1443,11 +1443,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				v := v.pop()
 				if k.IsString() {
 					array.AddEleToArray(k.String(), v.Value)
-				}
-				if k.IsInt() {
+				} else if k.IsInt() {
 					array.AddEleToList(k.Int(), v.Value)
+				} else {
+					panic("nasl array index must be int or string")
 				}
-				panic("array index must be int or string")
 			}
 			v.push(NewAutoValue(array))
 			return

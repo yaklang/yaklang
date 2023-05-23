@@ -34,9 +34,10 @@ type Engine struct {
 	scriptObj                      *NaslScriptInfo
 	host                           string
 	proxy                          string
+	Kbs                            *NaslKBs
 }
 
-func New() *Engine {
+func NewWithKbs(kbs *NaslKBs) *Engine {
 	table := yakvm.NewSymbolTable()
 	vm := yakvm.NewWithSymbolTable(table)
 	vm.GetConfig().SetClosureSupport(false)
@@ -47,6 +48,7 @@ func New() *Engine {
 		vm:           vm,
 		naslLibPatch: make(map[string]func(string) string),
 		runedScripts: make(map[string]struct{}),
+		Kbs:          kbs,
 	}
 
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
@@ -91,6 +93,9 @@ func New() *Engine {
 	engine.scriptObj = NewNaslScriptObject()
 	return engine
 }
+func New() *Engine {
+	return NewWithKbs(NewNaslKBs())
+}
 func (engine *Engine) SetProxy(proxy string) {
 	engine.proxy = proxy
 }
@@ -98,7 +103,7 @@ func (engine *Engine) GetScriptObject() *NaslScriptInfo {
 	return engine.scriptObj
 }
 func (engine *Engine) GetKBData() map[string]interface{} {
-	return engine.scriptObj.Kbs.GetData()
+	return engine.Kbs.GetData()
 }
 func (engine *Engine) SetIncludePath(path string) {
 	engine.naslLibsPath = path
@@ -130,7 +135,7 @@ func (engin *Engine) CallNativeFunction(name string, mapParam map[string]interfa
 }
 
 func (engine *Engine) SetKBs(kbs *NaslKBs) {
-	engine.scriptObj.Kbs = kbs
+	engine.Kbs = kbs
 }
 
 func (engine *Engine) ServiceScan(target string, ports string) ([]*fp.MatchResult, error) {
@@ -171,8 +176,6 @@ func (e *Engine) EvalInclude(name string) error {
 	codes, err := os.ReadFile(libPath)
 	if err == nil {
 		sourceBytes = codes
-		recoverPath := e.compiler.SetSourceCodeFilePath(libPath)
-		defer recoverPath()
 	}
 	//本地文件加载失败，从内置文件中加载
 	if sourceBytes == nil {
@@ -183,8 +186,6 @@ func (e *Engine) EvalInclude(name string) error {
 			return err
 		}
 		sourceBytes = data
-		recoverPath := e.compiler.SetSourceCodeFilePath(name)
-		defer recoverPath()
 	}
 	return e.safeEvalWithFileName(string(sourceBytes), name)
 }
@@ -277,6 +278,8 @@ func (e *Engine) safeEvalWithFileName(code string, fileName string) (err error) 
 			code = v(code)
 		}
 	}
+	recoverFunc := e.compiler.SetSourceCodeFilePath(fileName)
+	defer recoverFunc()
 	err = e.Eval(code)
 	return
 }

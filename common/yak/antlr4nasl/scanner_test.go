@@ -200,7 +200,7 @@ func TestPocScanner(t *testing.T) {
 	engine.LoadScriptFromDb("gb_apache_tomcat_detect.nasl")
 	engine.SetGoroutineNum(1)
 	engine.AddEngineHooks(func(engine *Engine) {
-		engine.vm.GetConfig().SetStopRecover(true)
+
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
 			if err != nil {

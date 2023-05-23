@@ -13,10 +13,17 @@ type NaslData []byte
 type NaslInt int64
 type NaslString string
 type NaslArray struct {
-	Max_idx  int
+	max_idx  int
 	Hash_elt map[string]interface{}
-	Num_elt  map[int]interface{}
+	Num_elt  []interface{}
 }
+type SortableArrayByString []interface{}
+
+func (a SortableArrayByString) Len() int { return len(a) }
+func (a SortableArrayByString) Less(i, j int) bool {
+	return utils.InterfaceToString(a[i]) < utils.InterfaceToString(a[j])
+}
+func (a SortableArrayByString) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (n *NaslData) Interface() interface{} {
 	return *n
@@ -41,10 +48,20 @@ func NewNaslString(s string) *NaslString {
 }
 func NewEmptyNaslArray() *NaslArray {
 	return &NaslArray{
-		Max_idx:  0,
+		max_idx:  0,
 		Hash_elt: make(map[string]interface{}),
-		Num_elt:  make(map[int]interface{}),
 	}
+}
+func (n *NaslArray) Copy() *NaslArray {
+	res := NewEmptyNaslArray()
+	res.max_idx = n.max_idx
+	for k, v := range n.Hash_elt {
+		res.Hash_elt[k] = v
+	}
+	for _, v := range n.Num_elt {
+		res.Num_elt = append(res.Num_elt, v)
+	}
+	return res
 }
 func (n *NaslArray) AddEleToList(index int, ele interface{}) error {
 	if index < 0 {
@@ -52,19 +69,32 @@ func (n *NaslArray) AddEleToList(index int, ele interface{}) error {
 		log.Error(err)
 		return err
 	}
-	if index > n.Max_idx {
-		n.Max_idx = index + 1
+	if index > n.max_idx {
+		n.max_idx = index + 1
 	} else {
-		n.Max_idx += 1
+		n.max_idx += 1
+	}
+	for len(n.Num_elt) < n.max_idx {
+		n.Num_elt = append(n.Num_elt, nil)
 	}
 	n.Num_elt[index] = ele
 	return nil
+}
+
+func (n *NaslArray) GetMaxIdx() int {
+	return n.max_idx
 }
 func (n *NaslArray) AddEleToArray(index string, ele interface{}) error {
 	n.Hash_elt[index] = ele
 	return nil
 }
 
+func (n *NaslArray) GetElementByNum(i int) interface{} {
+	if i < 0 || i >= len(n.Num_elt) {
+		return nil
+	}
+	return n.Num_elt[i]
+}
 func NewNaslArray(data interface{}) (*NaslArray, error) {
 	res := NewEmptyNaslArray()
 	if data == nil {
@@ -94,6 +124,8 @@ func NewNaslArray(data interface{}) (*NaslArray, error) {
 		default:
 			return nil, utils.Error("not support")
 		}
+	} else {
+		return nil, utils.Error("not support")
 	}
 	return res, nil
 }
