@@ -9,11 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestStringToUrl(t *testing.T) {
@@ -299,62 +298,66 @@ requests:
 
 
 `
+	_ = rawTemp
+	tcpTemp := `id: tidb-unauth
+
+info:
+  name: TiDB - Unauthenticated Access
+  author: lu4nx
+  severity: high
+  description: TiDB server was able to be accessed because no authentication was required.
+  metadata:
+    zoomeye-query: tidb +port:"4000"
+  tags: network,tidb,unauth
+
+network:
+  - inputs:
+      - read: 1024              # skip handshake packet
+      - data: b200000185a6ff0900000001ff0000000000000000000000000000000000000000000000726f6f7400006d7973716c5f6e61746976655f70617373776f72640075045f70696406313337353030095f706c6174666f726d067838365f3634035f6f73054c696e75780c5f636c69656e745f6e616d65086c69626d7973716c076f735f757365720578787878780f5f636c69656e745f76657273696f6e06382e302e32360c70726f6772616d5f6e616d65056d7973716c  # authentication
+        type: hex
+
+    host:
+      - "{{Hostname}}"
+      - "{{Host}}:4000"
+
+    read-size: 1024
+
+    matchers:
+      - type: binary
+        binary:
+          # resp format:
+          # 07: length, 02: sequence number, 00: success
+          - "0700000200000002000000"
+
+    extractors:
+      - type: regex
+        regex:
+          - 'Kernel Version \d\.\d\d\.\d\d\d'
+
+      - type: regex
+        regex:
+          - 'Kernel 111Version \d\.\d\d\.\d\d\d'
+
+# Enhanced by mp on 2022/07/20`
 	Scan := func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
 		//var targetVul *tools.PocVul
 		filterVul := filter.NewFilter()
-		calcSha1 := utils.CalcSha1(target)
+		i := bb(target, filterVul, vCh)
+		c, _, _ := toConfig(opt)
+		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+		if err != nil {
+			log.Errorf("create yak template failed (raw): %s", err)
+			close(vCh) // 关闭通道，避免泄漏
+			return vCh, err
+		}
+		if len(tpl.HTTPRequestSequences) > 0 {
+			opt = append(opt, _callback(i))
+		}
+		if len(tpl.TCPRequestSequences) > 0 {
+			opt = append(opt, _tcpCallback(i))
+		}
 
-		opt = append(opt, _callback(func(i map[string]interface{}) {
-
-			if i["match"].(bool) {
-
-				tpl := i["template"].(*YakTemplate)
-				resp := i["responses"].([]*lowhttp.LowhttpResponse)
-				reqBulk := i["requests"].(*YakRequestBulkConfig)
-				//log.Infof("Scan callback: %#v", tpl)
-				details := make(map[string]interface{})
-				if len(resp) == 1 {
-					details["request"] = string(resp[0].RawRequest)
-					details["response"] = string(resp[0].RawPacket)
-				} else {
-					for idx, r := range resp {
-						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
-						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
-					}
-				}
-				payloads, err := payloadsToString(reqBulk.Payloads)
-				if err != nil {
-					log.Errorf("payloadsToString failed: %v", err)
-				}
-				pv := &tools.PocVul{
-					Source:        "nuclei",
-					Target:        resp[0].RemoteAddr,
-					PocName:       tpl.Name,
-					MatchedAt:     utils.DatetimePretty(),
-					Tags:          strings.Join(tpl.Tags, ","),
-					Timestamp:     time.Now().Unix(),
-					Severity:      tpl.Severity,
-					Details:       details,
-					CVE:           tpl.CVE,
-					DescriptionZh: tpl.DescriptionZh,
-					Description:   tpl.Description,
-					Payload:       payloads,
-				}
-				log.Infof("calcSha1: %s", calcSha1)
-				if !filterVul.Exist(calcSha1) {
-					filterVul.Insert(calcSha1)
-					risk := tools.PocVulToRisk(pv)
-					err = yakit.SaveRisk(risk)
-					log.Info("save risk")
-					if err != nil {
-						log.Errorf("save risk failed: %s", err)
-					}
-					vCh <- pv
-				}
-
-			}
-		}))
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)
@@ -362,10 +365,19 @@ requests:
 
 		return vCh, nil
 	}
+	flag, _ := codec.DecodeHex(`0700000200000002000000`)
+	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 111\r\n" +
+		"Server: nginx\r\n\r\n" +
+		"" +
+		"Kernel Version 1.11.111  " + string(flag)))
+	fmt.Println(server, port)
 	res, _ := Scan(
-		"http://192.168.3.113:8085/S2-032/index.action",
+		fmt.Sprintf("%s:%d", server, port),
 		//WithTemplateName("[CVE-2016-3081]: Apache S2-032 Struts - Remote Code Execution"),
-		WithTemplateRaw(rawTemp),
+		//WithTemplateRaw(rawTemp),
+		WithTemplateRaw(tcpTemp),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
 	)
 	for r := range res {
 		fmt.Println("xxx : ", r)
