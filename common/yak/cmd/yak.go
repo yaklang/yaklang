@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
@@ -129,7 +130,7 @@ var installSubCommand = cli.Command{
 	Usage: "安装 Yak/Install Yak  (Add to ENV PATH)",
 	Action: func(c *cli.Context) error {
 		file, err := exec.LookPath(os.Args[0])
-		if err != nil {
+		if err != nil && !errors.Is(err, exec.ErrDot) {
 			return utils.Errorf("fetch current binary yak path failed: %s", err)
 		}
 
