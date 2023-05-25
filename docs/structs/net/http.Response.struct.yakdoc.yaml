@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: poc
+libname: httpool
 struct_name: net/http.Response
 description: ""
 fields:
@@ -100,13 +100,7 @@ methods:
     type_alias: ""
     description: ""
     type_str: '[]*http.Cookie'
-  relative_struct_name:
-  - structname: net/http.Cookie
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
-    isbuildinstruct: true
+  relative_struct_name: []
 - ptr: true
   description: ""
   structname: net/http.Response
@@ -122,11 +116,7 @@ methods:
     type_alias: ""
     description: ""
     type_str: error
-  relative_struct_name:
-  - structname: net/url.URL
-    isbuildinstruct: true
-  - structname: net/url.Userinfo
-    isbuildinstruct: true
+  relative_struct_name: []
 - ptr: true
   description: ""
   structname: net/http.Response

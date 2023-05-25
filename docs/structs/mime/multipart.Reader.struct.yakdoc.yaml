@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: http
+libname: httpool
 struct_name: mime/multipart.Reader
 description: ""
 fields: []

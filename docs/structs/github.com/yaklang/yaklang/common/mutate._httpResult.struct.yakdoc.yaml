@@ -1,5 +1,5 @@
 is_build_in_struct: false
-libname: fuzz
+libname: httpool
 struct_name: github.com/yaklang/yaklang/common/mutate._httpResult
 description: ""
 fields:

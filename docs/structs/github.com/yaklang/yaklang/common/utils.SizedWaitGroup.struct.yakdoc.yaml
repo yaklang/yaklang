@@ -1,5 +1,5 @@
 is_build_in_struct: false
-libname: tools
+libname: sync
 struct_name: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
 description: ""
 fields:
