@@ -7,7 +7,7 @@ import (
 
 func parseNetworkInputs(data map[string]any) []*YakTcpInput {
 	var inputs []*YakTcpInput
-	for _, inputItemRaw := range utils.InterfaceToMapInterface(utils.MapGetFirstRaw(data, "inputs", "input")) {
+	for _, inputItemRaw := range utils.InterfaceToSliceInterface(utils.MapGetFirstRaw(data, "inputs", "input")) {
 		var inputItem = utils.InterfaceToMapInterface(inputItemRaw)
 		var (
 			// data / read(int) / type: hex

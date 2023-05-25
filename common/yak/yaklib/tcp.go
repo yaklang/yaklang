@@ -153,7 +153,8 @@ func _tcpClientProxy(proxy string) dialerOpt {
 }
 
 var TcpExports = map[string]interface{}{
-	"Connect": _tcpConnect,
+	"MockServe": utils.DebugMockHTTP,
+	"Connect":   _tcpConnect,
 
 	// 设置超时和 local
 	"clientTimeout": _tcpTimeout,

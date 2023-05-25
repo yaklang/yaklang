@@ -1,6 +1,8 @@
 package httptpl
 
 import (
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -8,13 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
 
 func (y *YakNetworkBulkConfig) handleConn(
+	config *Config,
 	conn net.Conn, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	vars map[string]any, callback func(matched bool, extractorResults map[string]any),
+	vars map[string]any, callback func(r []byte, matched bool, extractorResults map[string]any),
 ) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -55,6 +59,12 @@ func (y *YakNetworkBulkConfig) handleConn(
 			}
 
 			if len(raw) > 0 {
+				if config.Debug || config.DebugRequest {
+					fmt.Println("---------------------TCP REQUEST---------------------")
+					spew.Dump(string(raw))
+					fmt.Println("------------------------------------------------------")
+					fmt.Println(strconv.Quote(string(raw)))
+				}
 				conn.Write(raw)
 			}
 			bufferSize := inputElement.Read
@@ -104,19 +114,20 @@ func (y *YakNetworkBulkConfig) handleConn(
 			if err != nil {
 				log.Errorf("YakNetworkBulkConfig matcher.ExecuteRaw failed: %s", err)
 			}
-			callback(matched, extractorResults)
+			callback([]byte(response), matched, extractorResults)
 		}
 	}
 
 	if !haveResponse {
-		callback(false, extractorResults)
+		callback(nil, false, extractorResults)
 	}
 	return err
 }
 
 func (y *YakNetworkBulkConfig) Execute(
+	config *Config,
 	vars map[string]interface{}, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	callback func(matched bool, extractorResults map[string]any),
+	callback func(r []byte, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
 		return utils.Error("YakNetworkBulkConfig hosts is empty")
@@ -152,12 +163,15 @@ func (y *YakNetworkBulkConfig) Execute(
 			actualPort = 80
 		}
 		target := utils.HostPort(actualHost, actualPort)
+		if config.Debug || config.DebugRequest {
+			log.Infof("YakNetworkBulkConfig to target: %v", target)
+		}
 		conn, err := utils.GetAutoProxyConnEx(target, lowhttpConfig.Proxy, lowhttpConfig.Timeout)
 		if err != nil {
 			log.Errorf("get conn[%v] failed: %s", target, err)
 			continue
 		}
-		err = y.handleConn(conn, lowhttpConfig, vars, callback)
+		err = y.handleConn(config, conn, lowhttpConfig, vars, callback)
 		if conn != nil {
 			conn.Close()
 		}
