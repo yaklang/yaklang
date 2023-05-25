@@ -4,10 +4,6 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'common/utils/lowhttp/**'
-      - 'common/jsonextractor/**'
-      - 'common/domainextractor/**'
-      - 'common/yak/**'
       - 'common/**'
 
 jobs:
@@ -58,3 +54,6 @@ jobs:
 
       - name: Test Fuzz/Mutate
         run: go test -timeout 1m ./common/mutate_tests -v
+
+      - name: Test MustPass - full yak scripts
+        run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
