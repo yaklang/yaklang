@@ -39,7 +39,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+  - structname: github.com/yaklang/yaklang/common/utils/spacengine.NetSpaceEngineResult
     isbuildinstruct: false
 - name: spacengine.HunterQuery
   type_str: 'func (v1: string, v2: string, v3: string, v4 ...func _spaceEngineConfigOpt(v1:
@@ -81,7 +81,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+  - structname: github.com/yaklang/yaklang/common/utils/spacengine.NetSpaceEngineResult
     isbuildinstruct: false
 - name: spacengine.QuakeQuery
   type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
@@ -117,7 +117,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+  - structname: github.com/yaklang/yaklang/common/utils/spacengine.NetSpaceEngineResult
     isbuildinstruct: false
 - name: spacengine.ShodanQuery
   type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
@@ -153,7 +153,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+  - structname: github.com/yaklang/yaklang/common/utils/spacengine.NetSpaceEngineResult
     isbuildinstruct: false
 - name: spacengine.ZoomeyeQuery
   type_str: 'func (v1: string, v2: string, v3 ...func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
@@ -190,7 +190,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/server/dbm/falcons/spacengine.NetSpaceEngineResult
+  - structname: github.com/yaklang/yaklang/common/utils/spacengine.NetSpaceEngineResult
     isbuildinstruct: false
 - name: spacengine.maxPage
   type_str: 'func (v1: int) return(func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
@@ -224,6 +224,23 @@ functions:
   - name: r0
     param_alias: ""
     type_alias: opt
+    description: ""
+    type_str: 'func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig) '
+- name: spacengine.pageSize
+  type_str: 'func (v1: int) return(func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
     description: ""
     type_str: 'func _spaceEngineConfigOpt(v1: *yaklib._spaceEngineConfig) '
 variables: []

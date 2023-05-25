@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: http
+libname: str
 struct_name: net/url.URL
 description: ""
 fields:
@@ -21,6 +21,12 @@ fields:
   type_alias: ""
   description: ""
   type_str: string
+- structname: net/url.URL
+  name: OmitHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
 - structname: net/url.URL
   name: Opaque
   param_alias: ""
@@ -108,6 +114,24 @@ methods:
     type_alias: ""
     description: ""
     type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/url.URL
+  name: JoinPath
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
   relative_struct_name: []
 - ptr: true
   description: ""

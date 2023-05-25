@@ -64,19 +64,19 @@ functions:
     relative_structname: palm/common/yserx.JavaArray
     type_str: '*yserx.JavaArray'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaArray
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaArray
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaBlockDataBytes
   type_str: 'func (v1: []uint8) return(*yserx.JavaBlockData) '
@@ -96,7 +96,7 @@ functions:
     relative_structname: palm/common/yserx.JavaBlockData
     type_str: '*yserx.JavaBlockData'
   relative_structs:
-  - structname: palm/common/yserx.JavaBlockData
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaBlockData
     isbuildinstruct: false
 - name: java.NewJavaClass
   type_str: 'func (v1: *yserx.JavaClassDesc) return(*yserx.JavaClass) '
@@ -117,15 +117,15 @@ functions:
     relative_structname: palm/common/yserx.JavaClass
     type_str: '*yserx.JavaClass'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClass
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClass
     isbuildinstruct: false
 - name: java.NewJavaClassData
   type_str: 'func (v1: []yserx.JavaSerializable, v2: []yserx.JavaSerializable) return(*yserx.JavaClassData) '
@@ -150,7 +150,7 @@ functions:
     relative_structname: palm/common/yserx.JavaClassData
     type_str: '*yserx.JavaClassData'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassData
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassData
     isbuildinstruct: false
 - name: java.NewJavaClassDesc
   type_str: 'func (v1: string, v2: []uint8, v3: uint8, v4: *yserx.JavaClassFields,
@@ -198,23 +198,23 @@ functions:
     relative_structname: palm/common/yserx.JavaClassDesc
     type_str: '*yserx.JavaClassDesc'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
 - name: java.NewJavaClassDetails
   type_str: 'func (v1: string, v2: []uint8, v3: uint8, v4: *yserx.JavaClassFields,
@@ -262,21 +262,21 @@ functions:
     relative_structname: palm/common/yserx.JavaClassDetails
     type_str: '*yserx.JavaClassDetails'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
 - name: java.NewJavaClassField
   type_str: 'func (v1: string, v2: uint8, v3: yserx.JavaSerializable) return(*yserx.JavaClassField) '
@@ -306,7 +306,7 @@ functions:
     relative_structname: palm/common/yserx.JavaClassField
     type_str: '*yserx.JavaClassField'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
 - name: java.NewJavaClassFields
   type_str: 'func (v1 ...*yserx.JavaClassField) return(*yserx.JavaClassFields) '
@@ -328,11 +328,11 @@ functions:
     relative_structname: palm/common/yserx.JavaClassFields
     type_str: '*yserx.JavaClassFields'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
 - name: java.NewJavaEndBlockData
   type_str: 'func () return(*yserx.JavaEndBlockData) '
@@ -346,7 +346,7 @@ functions:
     relative_structname: palm/common/yserx.JavaEndBlockData
     type_str: '*yserx.JavaEndBlockData'
   relative_structs:
-  - structname: palm/common/yserx.JavaEndBlockData
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaEndBlockData
     isbuildinstruct: false
 - name: java.NewJavaEnum
   type_str: 'func (v1: *yserx.JavaClassDesc, v2: *yserx.JavaString) return(*yserx.JavaEnumDesc) '
@@ -373,17 +373,17 @@ functions:
     relative_structname: palm/common/yserx.JavaEnumDesc
     type_str: '*yserx.JavaEnumDesc'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaString
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaString
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaEnumDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaEnumDesc
     isbuildinstruct: false
 - name: java.NewJavaFieldArrayValue
   type_str: 'func (v1: yserx.JavaSerializable) return(*yserx.JavaFieldValue) '
@@ -403,7 +403,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldBoolValue
   type_str: 'func (v1: bool) return(*yserx.JavaFieldValue) '
@@ -423,7 +423,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldByteValue
   type_str: 'func (v1: uint8) return(*yserx.JavaFieldValue) '
@@ -443,7 +443,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldCharValue
   type_str: 'func (v1: int) return(*yserx.JavaFieldValue) '
@@ -463,7 +463,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldDoubleValue
   type_str: 'func (v1: float64) return(*yserx.JavaFieldValue) '
@@ -483,7 +483,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldFloatValue
   type_str: 'func (v1: float32) return(*yserx.JavaFieldValue) '
@@ -503,7 +503,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldIntValue
   type_str: 'func (v1: uint64) return(*yserx.JavaFieldValue) '
@@ -523,7 +523,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldLongValue
   type_str: 'func (v1: uint64) return(*yserx.JavaFieldValue) '
@@ -543,7 +543,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldObjectValue
   type_str: 'func (v1: yserx.JavaSerializable) return(*yserx.JavaFieldValue) '
@@ -563,7 +563,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldShortValue
   type_str: 'func (v1: int) return(*yserx.JavaFieldValue) '
@@ -583,7 +583,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaFieldValue
   type_str: 'func (v1: uint8, v2: []uint8) return(*yserx.JavaFieldValue) '
@@ -608,7 +608,7 @@ functions:
     relative_structname: palm/common/yserx.JavaFieldValue
     type_str: '*yserx.JavaFieldValue'
   relative_structs:
-  - structname: palm/common/yserx.JavaFieldValue
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
     isbuildinstruct: false
 - name: java.NewJavaLongString
   type_str: 'func (v1: string) return(*yserx.JavaString) '
@@ -628,7 +628,7 @@ functions:
     relative_structname: palm/common/yserx.JavaString
     type_str: '*yserx.JavaString'
   relative_structs:
-  - structname: palm/common/yserx.JavaString
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaString
     isbuildinstruct: false
 - name: java.NewJavaNull
   type_str: 'func () return(*yserx.JavaNull) '
@@ -642,7 +642,7 @@ functions:
     relative_structname: palm/common/yserx.JavaNull
     type_str: '*yserx.JavaNull'
   relative_structs:
-  - structname: palm/common/yserx.JavaNull
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaNull
     isbuildinstruct: false
 - name: java.NewJavaObject
   type_str: 'func (v1: *yserx.JavaClassDesc, v2 ...*yserx.JavaClassData) return(*yserx.JavaObject) '
@@ -670,17 +670,17 @@ functions:
     relative_structname: palm/common/yserx.JavaObject
     type_str: '*yserx.JavaObject'
   relative_structs:
-  - structname: palm/common/yserx.JavaClassDesc
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassDetails
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassFields
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassField
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaClassData
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassData
     isbuildinstruct: false
-  - structname: palm/common/yserx.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaObject
     isbuildinstruct: false
 - name: java.NewJavaReference
   type_str: 'func (v1: uint64) return(*yserx.JavaReference) '
@@ -700,7 +700,7 @@ functions:
     relative_structname: palm/common/yserx.JavaReference
     type_str: '*yserx.JavaReference'
   relative_structs:
-  - structname: palm/common/yserx.JavaReference
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaReference
     isbuildinstruct: false
 - name: java.NewJavaString
   type_str: 'func (v1: string) return(*yserx.JavaString) '
@@ -720,7 +720,7 @@ functions:
     relative_structname: palm/common/yserx.JavaString
     type_str: '*yserx.JavaString'
   relative_structs:
-  - structname: palm/common/yserx.JavaString
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaString
     isbuildinstruct: false
 - name: java.ParseHexJavaObjectStream
   type_str: 'func (v1: string) return([]yserx.JavaSerializable, error) '

@@ -1,0 +1,20 @@
+is_build_in_struct: false
+libname: hook
+struct_name: github.com/yaklang/yaklang/common/yak.CallerHooks
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak.CallerHooks
+  name: HookName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak.CallerHooks
+  name: Hooks
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+  type_str: '[]*yak.CallerHookDescription'
+methods: []
+ptr_methods: []

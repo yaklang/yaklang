@@ -10,6 +10,12 @@ fields:
   description: ""
   type_str: '[]string'
 - structname: os/exec.Cmd
+  name: Cancel
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func () return(error) '
+- structname: os/exec.Cmd
   name: Dir
   param_alias: ""
   type_alias: ""
@@ -21,6 +27,12 @@ fields:
   type_alias: ""
   description: ""
   type_str: '[]string'
+- structname: os/exec.Cmd
+  name: Err
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: error
 - structname: os/exec.Cmd
   name: ExtraFiles
   param_alias: ""
@@ -73,6 +85,12 @@ fields:
   description: ""
   relative_structname: syscall.SysProcAttr
   type_str: '*syscall.SysProcAttr'
+- structname: os/exec.Cmd
+  name: WaitDelay
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
 methods:
 - ptr: true
   description: ""
@@ -89,6 +107,17 @@ methods:
     type_alias: ""
     description: ""
     type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: os/exec.Cmd
+  name: Environ
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
   relative_struct_name: []
 - ptr: true
   description: ""

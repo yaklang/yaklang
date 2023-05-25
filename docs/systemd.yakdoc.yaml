@@ -1,0 +1,687 @@
+name: systemd
+functions:
+- name: systemd.Create
+  type_str: 'func (v1: string, v2 ...func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) return(string, string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]systemd.ConfigOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: systemd.extra_raw
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.install_wanted_by
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_environment
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_environment_file
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_exec_start
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_exec_start_post
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_exec_start_pre
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_exec_stop
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_exec_stop_post
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_group
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_kill9
+  type_str: 'func () return(func ConfigOption(v1: *systemd.SystemdServiceConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_kill_mode
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_kill_signal
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_raw
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_restart
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_restart_sec
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_stderr
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_stdin
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_stdout
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_timeout_start_sec
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_type
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_umask
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.service_user
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_active_sec
+  type_str: 'func (v1: int64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_boot_sec
+  type_str: 'func (v1: int64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_calendar
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_raw
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_startup_sec
+  type_str: 'func (v1: int64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_unit
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_unit_active_sec
+  type_str: 'func (v1: int64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.timer_unit_inactive_sec
+  type_str: 'func (v1: int64) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_after
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_before
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_binds_to
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_description
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_documentation
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_extra_line
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_requires
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+- name: systemd.unit_wants
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *systemd.SystemdServiceConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *systemd.SystemdServiceConfig) '
+variables: []

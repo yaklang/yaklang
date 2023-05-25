@@ -12,9 +12,9 @@ functions:
     relative_structname: palm/common/utils/bot.Client
     type_str: '*bot.Client'
   relative_structs:
-  - structname: palm/common/utils/bot.Client
+  - structname: github.com/yaklang/yaklang/common/utils/bot.Client
     isbuildinstruct: false
-  - structname: palm/common/utils/bot.Config
+  - structname: github.com/yaklang/yaklang/common/utils/bot.Config
     isbuildinstruct: false
 - name: bot.New
   type_str: 'func (v1 ...func ConfigOpt(v1: *bot.Client) ) return(*bot.Client) '
@@ -35,9 +35,9 @@ functions:
     relative_structname: palm/common/utils/bot.Client
     type_str: '*bot.Client'
   relative_structs:
-  - structname: palm/common/utils/bot.Client
+  - structname: github.com/yaklang/yaklang/common/utils/bot.Client
     isbuildinstruct: false
-  - structname: palm/common/utils/bot.Config
+  - structname: github.com/yaklang/yaklang/common/utils/bot.Config
     isbuildinstruct: false
 - name: bot.ding
   type_str: 'func (v1: string, v2: string) return(func ConfigOpt(v1: *bot.Client)

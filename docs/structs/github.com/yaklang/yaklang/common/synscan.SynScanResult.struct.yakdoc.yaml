@@ -1,0 +1,35 @@
+is_build_in_struct: false
+libname: synscan
+struct_name: github.com/yaklang/yaklang/common/synscan.SynScanResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
+  name: Port
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

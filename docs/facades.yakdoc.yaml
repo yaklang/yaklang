@@ -30,9 +30,9 @@ functions:
     relative_structname: '[facades]:palm/common/facades.FacadeServer'
     type_str: '*facades.FacadeServer'
   relative_structs:
-  - structname: palm/common/facades.FacadeServer
+  - structname: github.com/yaklang/yaklang/common/facades.FacadeServer
     isbuildinstruct: false
-  - structname: palm/common/facades.HttpResource
+  - structname: github.com/yaklang/yaklang/common/facades.HttpResource
     isbuildinstruct: false
 - name: facades.Serve
   type_str: 'func (v1: string, v2: int, v3 ...func FacadeServerConfig(v1: *facades.FacadeServer)

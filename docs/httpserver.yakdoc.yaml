@@ -1,5 +1,43 @@
 name: httpserver
 functions:
+- name: httpserver.LocalFileSystemServe
+  type_str: 'func (v1: string, v2: int, v3: string, v4: string, v5 ...func _httpServerConfigOpt(v1:
+    *yaklib._httpServerConfig) ) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yaklib._httpServerConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: httpserver.Serve
   type_str: 'func (v1: string, v2: int, v3 ...func _httpServerConfigOpt(v1: *yaklib._httpServerConfig)
     ) return(error) '

@@ -1,0 +1,54 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpMethod
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpRawHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpRawUri
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpUri
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HttpUserAgent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  name: HaveBeenSet
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

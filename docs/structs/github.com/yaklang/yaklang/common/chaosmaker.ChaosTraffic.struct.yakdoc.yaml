@@ -1,0 +1,81 @@
+is_build_in_struct: false
+libname: pcapx
+struct_name: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: ChaosRule
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
+  type_str: '*chaosmaker.ChaosMakerRule'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: HttpRequest
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: HttpResponse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: ICMPIPInboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: ICMPIPOutboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: LinkLayerPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: LocalIP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: RawTCP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: SuricataRule
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata.Rule
+  type_str: '*suricata.Rule'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: TCPIPPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: UDPIPInboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
+  name: UDPIPOutboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

@@ -1,0 +1,84 @@
+is_build_in_struct: false
+libname: file
+struct_name: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: GetLastRecordPtr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: GetPercent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: Next
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: SetCurrFileIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: SetRecoverPtr
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+  name: Text
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

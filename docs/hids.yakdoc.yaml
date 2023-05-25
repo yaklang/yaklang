@@ -1,0 +1,71 @@
+name: hids
+functions:
+- name: hids.CPUAverageCallback
+  type_str: 'func (v1: func (v1: float64) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: float64) '
+- name: hids.CPUPercent
+  type_str: 'func () return(float64) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: hids.CPUPercentCallback
+  type_str: 'func (v1: func (v1: float64) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: float64) '
+- name: hids.Init
+  type_str: 'func () '
+  long_description: ""
+  description: ""
+- name: hids.MemoryPercent
+  type_str: 'func () return(float64) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: hids.MemoryPercentCallback
+  type_str: 'func (v1: func (v1: float64) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: float64) '
+- name: hids.SetMonitorInterval
+  type_str: 'func (v1: float64) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+- name: hids.ShowMonitorInterval
+  type_str: 'func () '
+  long_description: ""
+  description: ""
+variables: []

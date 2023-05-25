@@ -34,13 +34,13 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true
@@ -84,15 +84,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils/pingutil.PingResult
+  - structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
     isbuildinstruct: false
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true
@@ -129,13 +129,13 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true
@@ -172,13 +172,13 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true
@@ -221,13 +221,13 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true

@@ -1,0 +1,78 @@
+is_build_in_struct: false
+libname: yakit
+struct_name: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Fragment
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Highlight
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: IsHTTPS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Level
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: RiskName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: Url
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: SetFragment
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitHTTPFlowRisk
+  name: SetLevel
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

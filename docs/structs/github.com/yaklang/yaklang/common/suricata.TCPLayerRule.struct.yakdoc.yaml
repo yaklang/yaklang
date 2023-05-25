@@ -1,0 +1,49 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: Ack
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: Flags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: NegativeWindow
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: Seq
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: TCPHeader
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: TCPMss
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  name: Window
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

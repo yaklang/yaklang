@@ -1,0 +1,44 @@
+is_build_in_struct: false
+libname: servicescan
+struct_name: github.com/yaklang/yaklang/common/fp.HTTPFlow
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: CPEs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  type_str: '[]*webfingerprint.CPE'
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: IsHTTPS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: RequestBody
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: RequestHeader
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: ResponseBody
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
+  name: ResponseHeader
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

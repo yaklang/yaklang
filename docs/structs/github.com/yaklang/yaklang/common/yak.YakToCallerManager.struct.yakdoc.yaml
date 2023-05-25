@@ -1,0 +1,466 @@
+is_build_in_struct: false
+libname: hook
+struct_name: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: Add
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
+    type_str: '[]*ypb.ExecParamItem'
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v6
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: yaklang.YaklangEngine) return(error) '
+  - name: v7
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: AddForYakit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*ypb.ExecParamItem'
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v6
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface { Send(*ypb.ExecResult) error }
+  - name: v7
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: AddGoNative
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1 ...interface {}) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallByNameEx
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func() interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallByNameExSync
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func() interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallPluginKeyByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallPluginKeyByNameEx
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func() interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: CallPluginKeyByNameExWithAsync
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func() interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: GetCurrentHooks
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*yak.CallerHooks'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: GetCurrentHooksGRPCModel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*ypb.YakScriptHooks'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: LoadPlugin
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: LoadPluginContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: Remove
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
+    type_str: '*ypb.RemoveHookParams'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: yaklang.YaklangEngine) return(error) '
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: SetConcurrent
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: SetDividedContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: SetForYakit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface { Send(*ypb.ExecResult) error }
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: SetLoadPluginTimeout
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: SyncCallPluginKeyByNameEx
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func() interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: Wait
+  relative_struct_name: []
+ptr_methods: []

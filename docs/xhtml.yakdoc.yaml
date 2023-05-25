@@ -28,7 +28,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/xhtml.DiffInfo
+  - structname: github.com/yaklang/yaklang/common/xhtml.DiffInfo
     isbuildinstruct: false
   - structname: golang.org/x/net/html.Node
     isbuildinstruct: true
@@ -57,7 +57,7 @@ functions:
     relative_structname: palm/common/xhtml.MatchNodeInfo
     type_str: '[]*xhtml.MatchNodeInfo'
   relative_structs:
-  - structname: palm/common/xhtml.MatchNodeInfo
+  - structname: github.com/yaklang/yaklang/common/xhtml.MatchNodeInfo
     isbuildinstruct: false
   - structname: golang.org/x/net/html.Node
     isbuildinstruct: true

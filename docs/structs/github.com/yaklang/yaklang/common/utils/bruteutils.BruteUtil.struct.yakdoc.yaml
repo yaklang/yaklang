@@ -1,0 +1,175 @@
+is_build_in_struct: false
+libname: tools
+struct_name: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: FinishingThreshold
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: OkToStop
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: OnlyNeedPassword
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: TargetTaskConcurrent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: Feed
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*bruteutils.BruteItem'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItem
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: GetAllTargetsProcessing
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*bruteutils.targetProcessing'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.targetProcessing
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: GetProcessingByTarget
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*bruteutils.targetProcessing'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: RemoteProcessingByTarget
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: Run
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: RunWithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: SetResultCallback
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteItemResultCallback(v1: *bruteutils.BruteItemResult) '
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
+  name: StreamBruteContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v6
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: v7
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteItemResultCallback(v1: *bruteutils.BruteItemResult) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

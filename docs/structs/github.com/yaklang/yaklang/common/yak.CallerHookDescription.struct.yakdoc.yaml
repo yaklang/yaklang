@@ -1,0 +1,25 @@
+is_build_in_struct: false
+libname: hook
+struct_name: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+  name: VerboseName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+  name: YakScriptId
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
+  name: YakScriptName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

@@ -116,7 +116,7 @@ functions:
     relative_structname: palm/common/utils.SizedWaitGroup
     type_str: '*utils.SizedWaitGroup'
   relative_structs:
-  - structname: palm/common/utils.SizedWaitGroup
+  - structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
     isbuildinstruct: false
 - name: sync.NewWaitGroup
   type_str: 'func () return(*sync.WaitGroup) '
