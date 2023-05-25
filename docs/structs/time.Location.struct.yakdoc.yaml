@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: risk
+libname: db
 struct_name: time.Location
 description: ""
 fields: []

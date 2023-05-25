@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: str
+libname: db
 struct_name: net.IPNet
 description: ""
 fields:
