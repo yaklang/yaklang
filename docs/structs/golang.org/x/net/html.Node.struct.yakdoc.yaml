@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: xpath
+libname: xhtml
 struct_name: golang.org/x/net/html.Node
 description: ""
 fields:

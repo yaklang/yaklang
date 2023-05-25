@@ -1,0 +1,535 @@
+is_build_in_struct: false
+libname: db
+struct_name: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Author
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: BaseOnlineId
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Content
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: CreatedAt
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: EnablePluginSelector
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: FromGit
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GeneralModuleKey
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GeneralModuleVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: HeadImg
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Help
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Id
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: IsGeneralModule
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: IsHistory
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: IsIgnore
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Level
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineBaseUrl
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineContributors
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineId
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineIsPrivate
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineOfficial
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: OnlineScriptName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Params
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  type_str: '[]*ypb.YakScriptParam'
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: PluginSelectorTypes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: ScriptName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Tags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: UUID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: UserId
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Descriptor
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetAuthor
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetBaseOnlineId
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetContent
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetCreatedAt
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetEnablePluginSelector
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetFromGit
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetGeneralModuleKey
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetGeneralModuleVerbose
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetHeadImg
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetHelp
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetId
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetIsGeneralModule
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetIsHistory
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetIsIgnore
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetLevel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineBaseUrl
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineContributors
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineId
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineIsPrivate
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineOfficial
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetOnlineScriptName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetParams
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+    type_str: '[]*ypb.YakScriptParam'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetPluginSelectorTypes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetScriptName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetTags
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetType
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetUUID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: GetUserId
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: ProtoMessage
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: ProtoReflect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: protoreflect.Message
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: Reset
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []
