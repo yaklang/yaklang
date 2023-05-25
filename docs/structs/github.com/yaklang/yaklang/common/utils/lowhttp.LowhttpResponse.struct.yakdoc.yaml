@@ -1,0 +1,85 @@
+is_build_in_struct: false
+libname: httpool
+struct_name: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: Http2
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: Https
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: PortIsOpen
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: Proxy
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: RawPacket
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: RawRequest
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: RedirectRawPackets
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[][]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: RemoteAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: Source
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: TraceInfo
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  type_str: '*lowhttp.LowhttpTraceInfo'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: Url
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: GetDurationFloat
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  relative_struct_name: []
+ptr_methods: []

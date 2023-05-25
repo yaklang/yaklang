@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: db
+libname: httpool
 struct_name: encoding/asn1.BitString
 description: ""
 fields:

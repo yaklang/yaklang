@@ -1,0 +1,48 @@
+is_build_in_struct: false
+libname: httpool
+struct_name: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: AvailableDNSServers
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: ConnTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: DNSTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: ServerTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: TotalTime
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+  name: GetServerDurationMS
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  relative_struct_name: []
+ptr_methods: []
