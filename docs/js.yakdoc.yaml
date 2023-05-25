@@ -23,7 +23,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javascript.ASTWalkerResult
+  - structname: github.com/yaklang/yaklang/common/javascript.ASTWalkerResult
     isbuildinstruct: false
 - name: js.CallFunctionFromCode
   type_str: 'func (v1: interface {}, v2: string, v3 ...interface {}) return(otto.Value,
@@ -60,9 +60,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.FalseValue
   type_str: 'func () return(otto.Value) '
@@ -76,9 +76,9 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Value
     type_str: otto.Value
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.NaNValue
   type_str: 'func () return(otto.Value) '
@@ -92,9 +92,9 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Value
     type_str: otto.Value
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.New
   type_str: 'func () return(*otto.Otto) '
@@ -108,15 +108,15 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Otto
     type_str: '*otto.Otto'
   relative_structs:
-  - structname: palm/common/javascript/otto.Otto
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Otto
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Script
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Script
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Context
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Context
     isbuildinstruct: false
 - name: js.NullValue
   type_str: 'func () return(otto.Value) '
@@ -130,9 +130,9 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Value
     type_str: otto.Value
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.Run
   type_str: 'func (v1: interface {}) return(*otto.Otto, otto.Value, error) '
@@ -163,19 +163,19 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javascript/otto.Otto
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Otto
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Script
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Script
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Context
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Context
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.ToValue
   type_str: 'func (v1: interface {}) return(otto.Value, error) '
@@ -200,9 +200,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.TrueValue
   type_str: 'func () return(otto.Value) '
@@ -216,9 +216,9 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Value
     type_str: otto.Value
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 - name: js.UndefinedValue
   type_str: 'func () return(otto.Value) '
@@ -232,9 +232,9 @@ functions:
     relative_structname: github.com/robertkrimen/otto.Value
     type_str: otto.Value
   relative_structs:
-  - structname: palm/common/javascript/otto.Value
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
-  - structname: palm/common/javascript/otto.Object
+  - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
 variables:
 - name: js.PoweredBy

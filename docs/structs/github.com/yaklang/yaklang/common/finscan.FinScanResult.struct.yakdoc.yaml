@@ -1,0 +1,41 @@
+is_build_in_struct: false
+libname: finscan
+struct_name: github.com/yaklang/yaklang/common/finscan.FinScanResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+  name: Host
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+  name: Port
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+  name: Status
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

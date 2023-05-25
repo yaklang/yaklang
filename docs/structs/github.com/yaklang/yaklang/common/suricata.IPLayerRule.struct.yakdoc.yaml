@@ -1,0 +1,73 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: FragBits
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: FragOffset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: Geoip
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: IPOpts
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: IPProto
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: IPv4Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: IPv6Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: Id
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: Sameip
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: TTL
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  name: Tos
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

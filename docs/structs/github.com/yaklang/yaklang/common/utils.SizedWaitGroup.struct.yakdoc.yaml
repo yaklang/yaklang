@@ -1,0 +1,51 @@
+is_build_in_struct: false
+libname: tools
+struct_name: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: Size
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: WaitingEventCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: Add
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: AddWithContext
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: context.Context
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: Done
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
+  name: Wait
+  relative_struct_name: []
+ptr_methods: []

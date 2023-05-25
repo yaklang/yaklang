@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: file
+libname: os
 struct_name: os.File
 description: ""
 fields: []

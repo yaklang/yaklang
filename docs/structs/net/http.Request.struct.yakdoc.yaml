@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: http
+libname: str
 struct_name: net/http.Request
 description: ""
 fields:
@@ -145,7 +145,13 @@ methods:
     type_alias: ""
     description: ""
     type_str: '*http.Cookie'
-  relative_struct_name: []
+  relative_struct_name:
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
 - ptr: true
   description: ""
   structname: net/http.Request

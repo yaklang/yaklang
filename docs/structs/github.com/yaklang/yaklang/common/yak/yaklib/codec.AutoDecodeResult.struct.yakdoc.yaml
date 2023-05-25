@@ -1,0 +1,31 @@
+is_build_in_struct: false
+libname: codec
+struct_name: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
+  name: Origin
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
+  name: Result
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

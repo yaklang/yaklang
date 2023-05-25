@@ -1,0 +1,42 @@
+is_build_in_struct: false
+libname: dyn
+struct_name: github.com/yaklang/yaklang/common/yak.yakVariable
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak.yakVariable
+  name: Engine
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yaklang.YaklangEngine
+- structname: github.com/yaklang/yaklang/common/yak.yakVariable
+  name: FilePath
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak.yakVariable
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+- structname: github.com/yaklang/yaklang/common/yak.yakVariable
+  name: YakMod
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.yakVariable
+  name: Callable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

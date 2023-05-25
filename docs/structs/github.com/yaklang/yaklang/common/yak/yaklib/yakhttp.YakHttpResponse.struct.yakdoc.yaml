@@ -1,0 +1,202 @@
+is_build_in_struct: false
+libname: http
+struct_name: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Response
+  type_str: '*http.Response'
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name:
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Cookies
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*http.Cookie'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Data
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: GetHeader
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Json
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Location
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Location
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*url.URL'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: ProtoAtLeast
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Raw
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+  name: Write
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: io.Writer
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

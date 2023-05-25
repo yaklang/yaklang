@@ -1,0 +1,73 @@
+is_build_in_struct: false
+libname: cve
+struct_name: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+  name: CVE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+  type_str: cveresources.CVE
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+  name: ConfidenceLevel
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: float64
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+  name: CNNVD
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: cveresources.CNNVD
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CNNVD
+    isbuildinstruct: false
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+  name: CWE
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+  name: Year
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+ptr_methods: []

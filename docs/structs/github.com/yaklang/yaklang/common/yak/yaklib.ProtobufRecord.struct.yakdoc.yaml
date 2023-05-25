@@ -1,0 +1,47 @@
+is_build_in_struct: false
+libname: fuzz
+struct_name: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+  name: Index
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: protowire.Number
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
+  name: ToBytes
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []

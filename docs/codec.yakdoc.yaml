@@ -31,6 +31,68 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: codec.AESCBCDecryptWithPKCS7Padding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESCBCDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: codec.AESCBCEncrypt
   type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
   long_description: ""
@@ -48,6 +110,68 @@ functions:
     type_str: interface {}
   - name: v3
     param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESCBCEncryptWithPKCS7Padding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESCBCEncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]uint8'
@@ -124,7 +248,131 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: codec.AESECBDecryptWithPKCS7Padding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESECBDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: codec.AESECBEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESECBEncryptWithPKCS7Padding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESECBEncryptWithZeroPadding
   type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
   long_description: ""
   description: ""
@@ -217,6 +465,68 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: codec.AESGCMDecryptWithNonceSize12
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESGCMDecryptWithNonceSize16
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: codec.AESGCMEncrypt
   type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
   long_description: ""
@@ -234,6 +544,68 @@ functions:
     type_str: interface {}
   - name: v3
     param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESGCMEncryptWithNonceSize12
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.AESGCMEncryptWithNonceSize16
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]uint8'
@@ -266,7 +638,7 @@ functions:
     relative_structname: palm/common/yak/yaklib/codec.AutoDecodeResult
     type_str: '[]*codec.AutoDecodeResult'
   relative_structs:
-  - structname: palm/common/yak/yaklib/codec.AutoDecodeResult
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/codec.AutoDecodeResult
     isbuildinstruct: false
 - name: codec.DESCBCDecrypt
   type_str: 'func (v1: []uint8, v2: []uint8, v3: []uint8) return([]uint8, error) '
@@ -1105,9 +1477,9 @@ functions:
     description: ""
     type_str: string
 - name: codec.MMH3Hash32
-  type_str: 'func (v1: interface {}) return(uint32) '
+  type_str: 'func (v1: interface {}) return(int64) '
   long_description: ""
-  description: 计算 mmh3 的 hash32
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -1119,7 +1491,7 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: uint32
+    type_str: int64
 - name: codec.Md5
   type_str: 'func (v1: interface {}) return(string) '
   long_description: ""
@@ -1205,6 +1577,58 @@ functions:
     type_alias: ""
     description: ""
     type_str: '[]uint8'
+- name: codec.RC4Decrypt
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.RC4Encrypt
+  type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: codec.RSADecryptWithPKCS1v15
   type_str: 'func (v1: []uint8, v2: interface {}) return([]uint8, error) '
   long_description: ""
@@ -1814,6 +2238,68 @@ functions:
     type_str: interface {}
   - name: v3
     param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBEncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]uint8'

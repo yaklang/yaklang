@@ -1,0 +1,163 @@
+is_build_in_struct: false
+libname: cwe
+struct_name: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Abstraction
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: CAPECVectors
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: CVEExamples
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: CWESolution
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: DescriptionZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: ExtendedDescription
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: ExtendedDescriptionZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Id
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: IdStr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Incomplete
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: InferTo
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: NameZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Parent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: RelativeLanguage
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Requires
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Siblings
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Stable
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: Status
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: BeforeSave
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: CWEString
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+  name: ToGRPCModel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+    type_str: '*ypb.CWEDetail'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+    isbuildinstruct: false
+ptr_methods: []

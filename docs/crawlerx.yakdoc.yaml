@@ -1,5 +1,33 @@
 name: crawlerx
 functions:
+- name: crawlerx.PageScreenShot
+  type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *core.Config) ) return(string,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]core.ConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: crawlerx.StartCrawler
   type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *core.Config) ) return(chan
     core.ReqInfo, error) '
@@ -28,6 +56,28 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: crawlerx.StartCrawlerV2
+  type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *core.Config) ) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]core.ConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: crawlerx.blackList
   type_str: 'func (v1: string) return(func ConfigOpt(v1: *core.Config) ) '
   long_description: ""
@@ -48,6 +98,22 @@ functions:
   type_str: 'func () return(func ConfigOpt(v1: *core.Config) ) '
   long_description: ""
   description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *core.Config) '
+- name: crawlerx.chromeWS
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *core.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
   returns:
   - name: r0
     param_alias: ""
@@ -113,6 +179,23 @@ functions:
     type_alias: ""
     description: ""
     type_str: map[string]string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *core.Config) '
+- name: crawlerx.extraHeaders
+  type_str: 'func (v1 ...string) return(func ConfigOpt(v1: *core.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
@@ -245,6 +328,22 @@ functions:
     description: ""
     type_str: '[]string'
     is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *core.Config) '
+- name: crawlerx.remote
+  type_str: 'func (v1: bool) return(func ConfigOpt(v1: *core.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
   returns:
   - name: r0
     param_alias: ""

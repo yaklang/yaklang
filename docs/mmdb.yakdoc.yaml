@@ -68,7 +68,7 @@ functions:
     isbuildinstruct: true
   - structname: github.com/oschwald/maxminddb-golang.Networks
     isbuildinstruct: true
-  - structname: palm/common/geo.City
+  - structname: github.com/yaklang/yaklang/common/geo.City
     isbuildinstruct: false
   - structname: .
     isbuildinstruct: true

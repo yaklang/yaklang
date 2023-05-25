@@ -29,7 +29,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/subdomain.SubdomainResult
+  - structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
     isbuildinstruct: false
 - name: subdomain.dnsServer
   type_str: 'func (v1: []string) return(func ConfigOption(v1: *subdomain.SubdomainScannerConfig)

@@ -1,0 +1,54 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: FileData
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HttpContentLength
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HttpContentType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HttpHeaderNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HttpProtocol
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HttpStart
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  name: HaveBeenSet
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

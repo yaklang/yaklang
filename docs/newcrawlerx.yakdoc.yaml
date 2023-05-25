@@ -1,0 +1,362 @@
+name: newcrawlerx
+functions:
+- name: newcrawlerx.blackList
+  type_str: 'func (v1 ...string) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.browserInfo
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.cookie
+  type_str: 'func (v1: string, v2 ...string) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.cookies
+  type_str: 'func (v1: string, v2: map[string]string) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.extraWaitLoad
+  type_str: 'func (v1: int) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.fileInput
+  type_str: 'func (v1: map[string]string) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.formFill
+  type_str: 'func (v1: map[string]string) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.fullTimeout
+  type_str: 'func (v1: int) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.header
+  type_str: 'func (v1 ...string) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.headers
+  type_str: 'func (v1: map[string]string) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.ignoreQuery
+  type_str: 'func (v1 ...string) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.maxDepth
+  type_str: 'func (v1: int) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.maxUrl
+  type_str: 'func (v1: int) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.scanRange
+  type_str: 'func (v1: newcrawlerx.scanRangeLevel) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: newcrawlerx.scanRangeLevel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.scanRepeat
+  type_str: 'func (v1: newcrawlerx.limitLevel) return(func ConfigOpt(v1: *newcrawlerx.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: newcrawlerx.limitLevel
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.startCrawler
+  type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *newcrawlerx.Config) ) return(chan
+    newcrawlerx.ReqInfo, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]newcrawlerx.ConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: chan newcrawlerx.ReqInfo
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: newcrawlerx.timeout
+  type_str: 'func (v1: int) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.vueWebsite
+  type_str: 'func (v1: bool) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+- name: newcrawlerx.whiteList
+  type_str: 'func (v1 ...string) return(func ConfigOpt(v1: *newcrawlerx.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *newcrawlerx.Config) '
+variables:
+- name: newcrawlerx.AllDomainScan
+  typestr: newcrawlerx.scanRangeLevel
+  description: //
+- name: newcrawlerx.ExtremeRepeatLevel
+  typestr: newcrawlerx.limitLevel
+  description: //
+- name: newcrawlerx.HighRepeatLevel
+  typestr: newcrawlerx.limitLevel
+  description: //
+- name: newcrawlerx.LowRepeatLevel
+  typestr: newcrawlerx.limitLevel
+  description: //
+- name: newcrawlerx.MediumRepeatLevel
+  typestr: newcrawlerx.limitLevel
+  description: //
+- name: newcrawlerx.SubMenuScan
+  typestr: newcrawlerx.scanRangeLevel
+  description: //
+- name: newcrawlerx.UnLimitRepeat
+  typestr: newcrawlerx.limitLevel
+  description: //

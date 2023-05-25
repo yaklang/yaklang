@@ -1,0 +1,61 @@
+is_build_in_struct: false
+libname: java
+struct_name: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: Detail
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
+  type_str: '*yserx.JavaClassDetails'
+- structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: Map
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
+  type_str: map[uint64]*yserx.JavaClassDetails
+- structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yserx.JavaClassDesc
+  name: SetDetails
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*yserx.JavaClassDetails'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassDetails
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassFields
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yserx.JavaClassField
+    isbuildinstruct: false
+ptr_methods: []

@@ -175,6 +175,6 @@ functions:
     relative_structname: palm/common/utils/comparer.Discriminator
     type_str: '*comparer.Discriminator'
   relative_structs:
-  - structname: palm/common/utils/comparer.Discriminator
+  - structname: github.com/yaklang/yaklang/common/utils/comparer.Discriminator
     isbuildinstruct: false
 variables: []
