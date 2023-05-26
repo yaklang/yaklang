@@ -132,6 +132,17 @@ func GetProxyFromEnv() string {
 	return ""
 }
 
+func DisableProxyFromCurrentEnv() {
+	for _, k := range []string{
+		"HTTP_PROXY", "http_proxy",
+		"HTTPS_PROXY", "https_proxy",
+		"all_proxy", "all_proxy",
+		"proxy", "proxy",
+	} {
+		os.Setenv(k, "")
+	}
+}
+
 func TCPConnect(target string, timeout time.Duration, proxies ...string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: timeout}
 	if len(proxies) <= 0 {
