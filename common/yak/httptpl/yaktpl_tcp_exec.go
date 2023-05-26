@@ -14,7 +14,7 @@ import (
 
 func (y *YakNetworkBulkConfig) handleConn(
 	conn net.Conn, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	vars map[string]any, callback func(matched bool, extractorResults map[string]any),
+	vars map[string]any, callback func(rsp []byte, matched bool, extractorResults map[string]any),
 ) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -104,19 +104,19 @@ func (y *YakNetworkBulkConfig) handleConn(
 			if err != nil {
 				log.Errorf("YakNetworkBulkConfig matcher.ExecuteRaw failed: %s", err)
 			}
-			callback(matched, extractorResults)
+			callback([]byte(response+"-"+conn.RemoteAddr().String()), matched, extractorResults)
 		}
 	}
 
 	if !haveResponse {
-		callback(false, extractorResults)
+		callback(nil, false, extractorResults)
 	}
 	return err
 }
 
 func (y *YakNetworkBulkConfig) Execute(
 	vars map[string]interface{}, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	callback func(matched bool, extractorResults map[string]any),
+	callback func(rsp []byte, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
 		return utils.Error("YakNetworkBulkConfig hosts is empty")

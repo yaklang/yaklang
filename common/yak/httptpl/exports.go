@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -46,11 +47,11 @@ func ScanPacket(req []byte, opts ...interface{}) {
 		lowhttpConfig.Ctx = baseContext
 	}
 
-	config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-		if result {
-			log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
-		}
-	})
+	//config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+	//	if result {
+	//		log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
+	//	}
+	//})
 
 	var urlStr string
 	u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, lowhttpConfig.Https)
@@ -235,7 +236,7 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 	}
 }
 
-func payloadsToString(payloads *YakPayloads) (string, error) {
+func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 	result := make(map[string]string)
 	for key, value := range payloads.raw {
 		result[key] = fmt.Sprintf("%+v - %+v", value.FromFile, value.Data)
@@ -247,37 +248,79 @@ func payloadsToString(payloads *YakPayloads) (string, error) {
 	return string(jsonBytes), nil
 }
 
+func tcpPayloadsToString(input []*YakTcpInput) string {
+	result := make(map[string]string)
+	for k, i := range input {
+		if len(i.Data) > 0 {
+			index := fmt.Sprintf("data_%d", k+1)
+			result[index] = fmt.Sprintf("%s-(%s)", i.Data, i.Type)
+		}
+	}
+	jsonBytes, _ := json.Marshal(result)
+
+	return string(jsonBytes)
+}
+
 func bb(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)
-			resp := i["responses"].([]*lowhttp.LowhttpResponse)
-			reqBulk := i["requests"].(*YakRequestBulkConfig)
-			// 根据 payload , tpl 名称 , target 条件过滤
-			calcSha1 := utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-			details := make(map[string]interface{})
-			if len(resp) == 1 {
-				details["request"] = string(resp[0].RawRequest)
-				details["response"] = string(resp[0].RawPacket)
-			} else {
-				for idx, r := range resp {
-					details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
-					details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+			var (
+				payloads string
+				err      error
+				calcSha1 string
+			)
+			if len(tpl.HTTPRequestSequences) > 0 {
+				resp := i["responses"].([]*lowhttp.LowhttpResponse)
+				reqBulk := i["requests"].(*YakRequestBulkConfig)
+				// 根据 payload , tpl 名称 , target 条件过滤
+				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
+				details := make(map[string]interface{})
+				if len(resp) == 1 {
+					details["request"] = string(resp[0].RawRequest)
+					details["response"] = string(resp[0].RawPacket)
+				} else {
+					for idx, r := range resp {
+						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
+						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+					}
+				}
+				payloads, err = httpPayloadsToString(reqBulk.Payloads)
+				if err != nil {
+					log.Errorf("httpPayloadsToString failed: %v", err)
 				}
 			}
-			payloads, err := payloadsToString(reqBulk.Payloads)
-			if err != nil {
-				log.Errorf("payloadsToString failed: %v", err)
+
+			if len(tpl.TCPRequestSequences) > 0 {
+				resp := i["responses"].([]byte)
+				//spew.Dump(resp)
+				_ = resp
+				reqBulk := i["requests"].(*YakNetworkBulkConfig)
+				_ = reqBulk
+				extractor := i["extractor"]
+				_ = extractor
+				//spew.Dump(extractor)
+				spew.Dump(reqBulk.Hosts)
+				payloads = tcpPayloadsToString(reqBulk.Inputs)
+				//for _, host := range reqBulk.Hosts {
+				//	_ = host
+				//	hosts, err := mutate.FuzzTagExec(host)
+				//	if err != nil {
+				//		log.Errorf("mutate.FuzzTagExec failed: %v", err)
+				//	}
+				//	fmt.Println(hosts)
+				//}
 			}
+
 			pv := &tools.PocVul{
-				Source:        "nuclei",
-				Target:        resp[0].RemoteAddr,
-				PocName:       tpl.Name,
-				MatchedAt:     utils.DatetimePretty(),
-				Tags:          strings.Join(tpl.Tags, ","),
-				Timestamp:     time.Now().Unix(),
-				Severity:      tpl.Severity,
-				Details:       details,
+				Source: "nuclei",
+				//Target:        resp[0].RemoteAddr,
+				PocName:   tpl.Name,
+				MatchedAt: utils.DatetimePretty(),
+				Tags:      strings.Join(tpl.Tags, ","),
+				Timestamp: time.Now().Unix(),
+				Severity:  tpl.Severity,
+				//Details:       details,
 				CVE:           tpl.CVE,
 				DescriptionZh: tpl.DescriptionZh,
 				Description:   tpl.Description,

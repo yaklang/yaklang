@@ -197,7 +197,7 @@ func (c *Config) ExecuteResultCallback(y *YakTemplate, bulk *YakRequestBulkConfi
 	}
 }
 
-func (c *Config) ExecuteTCPResultCallback(y *YakTemplate, bulk *YakNetworkBulkConfig, rsp [][]byte, result bool, extractor map[string]interface{}) {
+func (c *Config) ExecuteTCPResultCallback(y *YakTemplate, bulk *YakNetworkBulkConfig, rsp []byte, result bool, extractor map[string]interface{}) {
 	if c == nil {
 		return
 	}
