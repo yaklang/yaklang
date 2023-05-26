@@ -158,7 +158,7 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 			}
 			go func(c net.Conn) {
 				c.Write(rsp)
-				time.Sleep(5 * time.Second)
+				time.Sleep(50 * time.Millisecond)
 				c.Close()
 			}(conn)
 		}
