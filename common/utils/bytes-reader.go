@@ -113,6 +113,7 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 				switch true {
 				case MatchAllOfGlob(msg, "*i/o timeout"):
 				default:
+					time.Sleep(time.Second)
 					log.Errorf("conn[%s] met error: %v", conn.RemoteAddr().String(), err)
 				}
 			}

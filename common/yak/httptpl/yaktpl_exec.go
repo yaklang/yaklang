@@ -2,7 +2,6 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -248,10 +247,10 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					opt(lowhttpConfig)
 				}
 
-				err := tcpReq.Execute(p, lowhttpConfig, func(matched bool, extractorResults map[string]any) {
+				err := tcpReq.Execute(p, lowhttpConfig, func(rsp []byte, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
-					config.ExecuteTCPResultCallback(y, tcpReq, nil, matched, extractorResults)
-					spew.Dump(matched, extractorResults)
+					config.ExecuteTCPResultCallback(y, tcpReq, rsp, matched, extractorResults)
+					//spew.Dump(matched, extractorResults)
 				})
 				if err != nil {
 					log.Errorf("tcpReq.Execute failed: %s", err)

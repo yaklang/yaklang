@@ -318,7 +318,7 @@ network:
 
     host:
       - "{{Hostname}}"
-      - "{{Host}}:4000"
+      - "{{Host}}:8085"
 
     read-size: 1024
 
@@ -344,7 +344,7 @@ network:
 		//var targetVul *tools.PocVul
 		filterVul := filter.NewFilter()
 		i := bb(target, filterVul, vCh)
-		c, _, _ := toConfig(opt)
+		c, _, _ := toConfig(opt...)
 		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
 		if err != nil {
 			log.Errorf("create yak template failed (raw): %s", err)
@@ -373,11 +373,10 @@ network:
 		"Kernel Version 1.11.111  " + string(flag)))
 	fmt.Println(server, port)
 	res, _ := Scan(
-		fmt.Sprintf("%s:%d", server, port),
+		utils.HostPort(server, port),
 		//WithTemplateName("[CVE-2016-3081]: Apache S2-032 Struts - Remote Code Execution"),
 		//WithTemplateRaw(rawTemp),
 		WithTemplateRaw(tcpTemp),
-		lowhttp.WithHost(server), lowhttp.WithPort(port),
 	)
 	for r := range res {
 		fmt.Println("xxx : ", r)
