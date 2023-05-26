@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <title>Sample of websocket with golang</title>
+    <script src="/websocket/jquery.min.js"></script>
+    <script>
+        $(function () {
+            var ws = new WebSocket('ws://' + window.location.host + '/websocket/ws');
+            ws.onmessage = function (e) {
+                $('<li>').text(event.data).appendTo($ul);
+                ws.send('{"message":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
+            };
+            var $ul = $('#msg-list');
+        });
+    </script>
+</head>
+<body>
+<h1>This is websocket playground</h1>
+<br>
+<ul id="msg-list"></ul>
+</body>
+</html>

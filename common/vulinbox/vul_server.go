@@ -16,7 +16,11 @@ type VulinServer struct {
 	router   *mux.Router
 }
 
-func NewVulinServer(ctx context.Context, ports ...int) (string, error) {
+func NewVulinServer(ctx context.Context, port ...int) (string, error) {
+	return NewVulinServerEx(ctx, "127.0.0.1", port...)
+}
+
+func NewVulinServerEx(ctx context.Context, host string, ports ...int) (string, error) {
 	var router = mux.NewRouter()
 
 	var port int
@@ -31,7 +35,6 @@ func NewVulinServer(ctx context.Context, ports ...int) (string, error) {
 	server := &VulinServer{database: m, router: router}
 	server.init()
 
-	var host = "127.0.0.1"
 	if port <= 0 {
 		port = utils.GetRandomAvailableTCPPort()
 	}
