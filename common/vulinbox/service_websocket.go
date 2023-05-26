@@ -27,7 +27,9 @@ func (s *VulinServer) registerWebsocket() {
 	var upgrader = websocket.Upgrader{}
 	wsHandlerFactory := func(compress int) func(writer http.ResponseWriter, request *http.Request) {
 		return func(writer http.ResponseWriter, request *http.Request) {
-			ws, err := upgrader.Upgrade(writer, request, nil)
+			ws, err := upgrader.Upgrade(writer, request, http.Header(map[string][]string{
+				"Your-WebsiteDomainHook": {"yaklang.io"},
+			}))
 			if err != nil {
 				log.Errorf("websocket upgrade failed: %s", err)
 				return
@@ -51,7 +53,7 @@ func (s *VulinServer) registerWebsocket() {
 			}()
 
 			for {
-				err = ws.WriteMessage(websocket.TextMessage, []byte("hello, now: "+time.Now().String()))
+				err = ws.WriteMessage(websocket.TextMessage, []byte("hello yaklang.io / yaklang.com, time now: "+time.Now().String()))
 				if err != nil {
 					log.Errorf("websocket write message failed: %s", err)
 					return
