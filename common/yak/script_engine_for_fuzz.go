@@ -3,16 +3,17 @@ package yak
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+	"sync"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
-	"reflect"
-	"regexp"
-	"strings"
-	"sync"
 )
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)
@@ -48,18 +49,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte) {
 				}
 			}()
 			if engine != nil {
-				engine.SetVar("ORIGIN", bytes)
-				engine.SetVar("result", nil)
-				err := engine.SafeEval(context.Background(), ";result = beforeRequest(ORIGIN);")
+				resultRequest, err := engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{bytes})
 				if err != nil {
 					log.Infof("eval beforeRequest hook failed: %s", err)
 				}
-				resultRequest, ok := engine.GetVar("result")
-				if ok {
-					requestRawNew, typeOk := resultRequest.([]byte)
-					if typeOk {
-						return requestRawNew
-					}
+				requestRawNew, typeOk := resultRequest.([]byte)
+				if typeOk {
+					return requestRawNew
 				}
 			}
 			return bytes
@@ -78,18 +74,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte) {
 			}()
 
 			if engine != nil {
-				engine.SetVar("RESPONSE", bytes)
-				engine.SetVar("result", nil)
-				err := engine.SafeEval(context.Background(), ";result = afterRequest(RESPONSE);")
+				resultResponse, err := engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{bytes})
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
 				}
-				resultResponse, ok := engine.GetVar("result")
-				if ok {
-					responseNew, typeOk := resultResponse.([]byte)
-					if typeOk {
-						return responseNew
-					}
+				responseNew, typeOk := resultResponse.([]byte)
+				if typeOk {
+					return responseNew
 				}
 			}
 			return bytes
