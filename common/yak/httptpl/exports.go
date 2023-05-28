@@ -266,16 +266,18 @@ func bb(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)
 			var (
-				payloads string
-				err      error
-				calcSha1 string
+				currTarget string
+				payloads   string
+				err        error
+				calcSha1   string
 			)
+			details := make(map[string]interface{}, 2)
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
+				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				// 根据 payload , tpl 名称 , target 条件过滤
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-				details := make(map[string]interface{})
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
 					details["response"] = string(resp[0].RawPacket)
@@ -292,35 +294,26 @@ func bb(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func
 			}
 
 			if len(tpl.TCPRequestSequences) > 0 {
-				resp := i["responses"].([]byte)
-				//spew.Dump(resp)
-				_ = resp
+				resp := i["responses"].(*NucleiTcpResponse)
+				currTarget = resp.RemoteAddr
+
+				details["request"] = spew.Sdump(resp.RawRequest)
+				details["response"] = spew.Sdump(resp.RawPacket)
+
 				reqBulk := i["requests"].(*YakNetworkBulkConfig)
-				_ = reqBulk
-				extractor := i["extractor"]
-				_ = extractor
-				//spew.Dump(extractor)
-				spew.Dump(reqBulk.Hosts)
+
 				payloads = tcpPayloadsToString(reqBulk.Inputs)
-				//for _, host := range reqBulk.Hosts {
-				//	_ = host
-				//	hosts, err := mutate.FuzzTagExec(host)
-				//	if err != nil {
-				//		log.Errorf("mutate.FuzzTagExec failed: %v", err)
-				//	}
-				//	fmt.Println(hosts)
-				//}
 			}
 
 			pv := &tools.PocVul{
-				Source: "nuclei",
-				//Target:        resp[0].RemoteAddr,
-				PocName:   tpl.Name,
-				MatchedAt: utils.DatetimePretty(),
-				Tags:      strings.Join(tpl.Tags, ","),
-				Timestamp: time.Now().Unix(),
-				Severity:  tpl.Severity,
-				//Details:       details,
+				Source:        "nuclei",
+				Target:        currTarget,
+				PocName:       tpl.Name,
+				MatchedAt:     utils.DatetimePretty(),
+				Tags:          strings.Join(tpl.Tags, ","),
+				Timestamp:     time.Now().Unix(),
+				Severity:      tpl.Severity,
+				Details:       details,
 				CVE:           tpl.CVE,
 				DescriptionZh: tpl.DescriptionZh,
 				Description:   tpl.Description,
@@ -420,7 +413,7 @@ func _callback(handler func(i map[string]interface{})) ConfigOption {
 }
 
 func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
-	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []byte, result bool, extractor map[string]interface{}) {
+	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp *NucleiTcpResponse, result bool, extractor map[string]interface{}) {
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
