@@ -248,20 +248,7 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 	return string(jsonBytes), nil
 }
 
-func tcpPayloadsToString(input []*YakTcpInput) string {
-	result := make(map[string]string)
-	for k, i := range input {
-		if len(i.Data) > 0 {
-			index := fmt.Sprintf("data_%d", k+1)
-			result[index] = fmt.Sprintf("%s-(%s)", i.Data, i.Type)
-		}
-	}
-	jsonBytes, _ := json.Marshal(result)
-
-	return string(jsonBytes)
-}
-
-func bb(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func(i map[string]interface{}) {
+func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)
@@ -294,15 +281,19 @@ func bb(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func
 			}
 
 			if len(tpl.TCPRequestSequences) > 0 {
-				resp := i["responses"].(*NucleiTcpResponse)
-				currTarget = resp.RemoteAddr
+				resp := i["responses"].([]*NucleiTcpResponse)
+				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 
-				details["request"] = spew.Sdump(resp.RawRequest)
-				details["response"] = spew.Sdump(resp.RawPacket)
-
-				reqBulk := i["requests"].(*YakNetworkBulkConfig)
-
-				payloads = tcpPayloadsToString(reqBulk.Inputs)
+				currTarget = resp[0].RemoteAddr
+				if len(resp) == 1 {
+					details["request"] = spew.Sdump(resp[0].RawRequest)
+					details["response"] = spew.Sdump(resp[0].RawPacket)
+				} else {
+					for idx, r := range resp {
+						details[fmt.Sprintf("request_%d", idx+1)] = spew.Sdump(r.RawRequest)
+						details[fmt.Sprintf("response_%d", idx+1)] = spew.Sdump(r.RawPacket)
+					}
+				}
 			}
 
 			pv := &tools.PocVul{
@@ -337,8 +328,20 @@ var Exports = map[string]interface{}{
 	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		var vCh = make(chan *tools.PocVul)
 		filterVul := filter.NewFilter()
-		i := bb(target, filterVul, vCh)
-		opt = append(opt, _callback(i))
+		i := processVulnerability(target, filterVul, vCh)
+		c, _, _ := toConfig(opt...)
+		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+		if err != nil {
+			log.Errorf("create yak template failed (raw): %s", err)
+			close(vCh)
+			return vCh, err
+		}
+		if len(tpl.HTTPRequestSequences) > 0 {
+			opt = append(opt, _callback(i))
+		}
+		if len(tpl.TCPRequestSequences) > 0 {
+			opt = append(opt, _tcpCallback(i))
+		}
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)
@@ -413,7 +416,7 @@ func _callback(handler func(i map[string]interface{})) ConfigOption {
 }
 
 func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
-	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp *NucleiTcpResponse, result bool, extractor map[string]interface{}) {
+	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{}) {
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
