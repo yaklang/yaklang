@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: http
+libname: httpool
 struct_name: time.Time
 description: ""
 fields: []
@@ -114,6 +114,22 @@ methods:
     description: ""
     type_str: int
   - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: Compare
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  returns:
+  - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
@@ -527,5 +543,20 @@ methods:
     type_alias: ""
     description: ""
     type_str: int
+  relative_struct_name: []
+- description: ""
+  structname: time.Time
+  name: ZoneBounds
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: time.Time
   relative_struct_name: []
 ptr_methods: []

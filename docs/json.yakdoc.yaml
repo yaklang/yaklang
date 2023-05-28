@@ -1,5 +1,42 @@
 name: json
 functions:
+- name: json.ExtractJSON
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: json.ExtractJSONEx
+  type_str: 'func (v1: string) return([]string, []string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
 - name: json.Find
   type_str: 'func (v1: interface {}, v2: string) return(interface {}) '
   long_description: ""
@@ -86,8 +123,35 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib.yakJson
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.yakJson
     isbuildinstruct: false
+- name: json.ReplaceAll
+  type_str: 'func (v1: interface {}, v2: string, v3: interface {}) return(map[string]interface
+    {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]interface {}
 - name: json.dumps
   type_str: 'func (v1: interface {}) return(string) '
   long_description: ""

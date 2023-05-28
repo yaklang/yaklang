@@ -101,7 +101,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.YakScript
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -109,9 +109,9 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.YakScript
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
     isbuildinstruct: false
 - name: db.QueryDomainsByDomainKeyword
   type_str: 'func (v1: string) return(chan *yakit.Domain, error) '
@@ -136,7 +136,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Domain
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -167,7 +167,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Domain
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -198,7 +198,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Domain
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -218,7 +218,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
     type_str: chan *yakit.HTTPFlow
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -226,11 +226,11 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPFlow
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.FuzzableParam
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPHeader
     isbuildinstruct: false
 - name: db.QueryHTTPFlowsByID
   type_str: 'func (v1 ...int64) return(chan *yakit.HTTPFlow) '
@@ -251,7 +251,7 @@ functions:
     relative_structname: '[db]:palm/common/yakgrpc/yakit.HTTPFlow'
     type_str: chan *yakit.HTTPFlow
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -259,11 +259,11 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPFlow
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.FuzzableParam
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPHeader
     isbuildinstruct: false
 - name: db.QueryHTTPFlowsByKeyword
   type_str: 'func (v1: string) return(chan *yakit.HTTPFlow) '
@@ -283,7 +283,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.HTTPFlow
     type_str: chan *yakit.HTTPFlow
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -291,11 +291,11 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPFlow
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.FuzzableParam
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPHeader
     isbuildinstruct: false
 - name: db.QueryHostPortByKeyword
   type_str: 'func (v1: string) return(chan *yakit.Host, error) '
@@ -320,7 +320,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Host
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -367,7 +367,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Host
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -398,7 +398,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/geo.City
+  - structname: github.com/yaklang/yaklang/common/geo.City
     isbuildinstruct: false
   - structname: .
     isbuildinstruct: true
@@ -425,8 +425,86 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/geo.ISP
+  - structname: github.com/yaklang/yaklang/common/geo.ISP
     isbuildinstruct: false
+- name: db.QueryPayloadGroups
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: db.QueryPortsByTaskName
+  type_str: 'func (v1: string) return(chan *yakit.Port, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Port
+    type_str: chan *yakit.Port
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Port
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: db.QueryPortsByUpdatedAt
+  type_str: 'func (v1: int64) return(chan *yakit.Port, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Port
+    type_str: chan *yakit.Port
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Port
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
 - name: db.QueryUrlsAll
   type_str: 'func () return(chan string) '
   long_description: ""
@@ -806,15 +884,21 @@ functions:
     description: ""
     type_str: error
 - name: db.SavePortFromResult
-  type_str: 'func (v1: interface {}) return(error) '
+  type_str: 'func (v1: interface {}, v2 ...string) return(error) '
   long_description: ""
-  description: 从某个结果中保存端口
+  description: ""
   params:
   - name: v1
-    param_alias: result
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
@@ -896,7 +980,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.YakScript
     type_str: chan *yakit.YakScript
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.YakScript
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -904,9 +988,9 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.YakScript
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScript
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
     isbuildinstruct: false
 variables:
 - name: db.YAKIT_PLUGIN_TYPE_CODEC

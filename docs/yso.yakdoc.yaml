@@ -4,7 +4,7 @@ functions:
   type_str: 'func (v1: []uint8, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "从Bytes中加载Class"
   params:
   - name: v1
     param_alias: ""
@@ -30,17 +30,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateDNSlogEvilClassObject
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个制定域名的DNSLog恶意类"
   params:
   - name: v1
     param_alias: ""
@@ -66,17 +66,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateModifyTomcatMaxHeaderSizeEvilClassObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
     error) '
   long_description: ""
-  description: ""
+  description: "生成一个修改Tomcat最大头长度的恶意类"
   params:
   - name: v1
     param_alias: ""
@@ -97,17 +97,48 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateMultiEchoClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: "生成一个兼容性Echo回显恶意对象"
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateProcessBuilderExecEvilClassObject
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个ProcessBuilderExec方式的恶意类对象"
   params:
   - name: v1
     param_alias: ""
@@ -133,17 +164,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateProcessImplExecEvilClassObject
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个ProcessImpl执行的恶意类对象"
   params:
   - name: v1
     param_alias: ""
@@ -169,17 +200,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateRuntimeExecEvilClassObject
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个RuntimeExec的恶意类"
   params:
   - name: v1
     param_alias: ""
@@ -205,17 +236,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateSpringEchoEvilClassObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
     error) '
   long_description: ""
-  description: ""
+  description: 生成一个SpringEcho恶意类对象""
   params:
   - name: v1
     param_alias: ""
@@ -236,17 +267,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateTcpReverseEvilClassObject
   type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个TCP反连的恶意类对象"
   params:
   - name: v1
     param_alias: ""
@@ -277,17 +308,17 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GenerateTcpReverseShellEvilClassObject
   type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: ""
+  description: "生成一个TCP反弹Shell的恶意类对象"
   params:
   - name: v1
     param_alias: ""
@@ -318,16 +349,47 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/javaclassparser.ClassObject
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.ConstantUtf8Info
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
     isbuildinstruct: false
-  - structname: palm/common/javaclassparser.MemberInfo
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateTomcatEchoClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: "生成一个Tomcat回显恶意类"
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
 - name: yso.GetAllGadget
   type_str: 'func () return([]interface {}) '
   long_description: ""
-  description: ""
+  description: "获取所有可以生成的工具 Gadget"
   returns:
   - name: r0
     param_alias: ""
@@ -337,7 +399,7 @@ functions:
 - name: yso.GetAllRuntimeExecGadget
   type_str: 'func () return([]yso.RuntimeExecGadget) '
   long_description: ""
-  description: ""
+  description: "获取所有命令执行的 Gadget"
   returns:
   - name: r0
     param_alias: ""
@@ -347,7 +409,7 @@ functions:
 - name: yso.GetAllTemplatesGadget
   type_str: 'func () return([]yso.TemplatesGadget) '
   long_description: ""
-  description: ""
+  description: "获取所有模版执行的 Gadget"
   returns:
   - name: r0
     param_alias: ""
@@ -357,7 +419,7 @@ functions:
 - name: yso.GetBeanShell1JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
   long_description: ""
-  description: ""
+  description: "生成 BeanShell1 Java反序列化对象"
   params:
   - name: v1
     param_alias: ""
@@ -377,15 +439,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetClick1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: ""
+  description: "生成 Click1 恶意对象"
   params:
   - name: v1
     param_alias: ""
@@ -406,15 +468,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsBeanutils183NOCCJavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: ""
+  description: "CB183NoCC依赖的Java恶意对象"
   params:
   - name: v1
     param_alias: ""
@@ -435,15 +497,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsBeanutils192NOCCJavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: ""
+  description: "CB192NOCC的Java恶意对象"
   params:
   - name: v1
     param_alias: ""
@@ -464,15 +526,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsBeanutils1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: ""
+  description: "CB1"
   params:
   - name: v1
     param_alias: ""
@@ -493,9 +555,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections1JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -520,9 +582,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections2JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -549,9 +611,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections3JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -578,9 +640,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections4JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -607,9 +669,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections5JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -634,9 +696,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections6JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -661,9 +723,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections7JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -688,9 +750,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollections8JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -717,9 +779,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollectionsK1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -746,9 +808,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollectionsK2JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -775,9 +837,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollectionsK3JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -802,9 +864,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetCommonsCollectionsK4JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
@@ -829,9 +891,36 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetFindGadgetByDNSJavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetGadgetNameByFun
   type_str: 'func (v1: interface {}) return(string, error) '
@@ -877,9 +966,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJBossInterceptors1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -906,9 +995,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJSON1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -935,9 +1024,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJavaObjectFromBytes
   type_str: 'func (v1: []uint8) return(*yso.JavaObject, error) '
@@ -962,9 +1051,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJavassistWeld1JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -991,9 +1080,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJdk7u21JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -1020,9 +1109,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetJdk8u20JavaObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
@@ -1049,9 +1138,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.GetSimplePrincipalCollectionJavaObject
   type_str: 'func () return(*yso.JavaObject, error) '
@@ -1070,9 +1159,36 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yso.JavaObject
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
     isbuildinstruct: false
-  - structname: palm/common/yso.GadgetInfo
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+    isbuildinstruct: false
+- name: yso.GetURLDNSJavaObject
+  type_str: 'func (v1: string) return(*yso.JavaObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yso.JavaObject
+    type_str: '*yso.JavaObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yso.JavaObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
 - name: yso.ToBcel
   type_str: 'func (v1: interface {}) return(string, error) '
@@ -1379,6 +1495,16 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useClassMultiEchoTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
 - name: yso.useConstructorExecutor
   type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
   long_description: ""
@@ -1417,6 +1543,16 @@ functions:
     description: ""
     type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
 - name: yso.useModifyTomcatMaxHeaderSizeTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useMultiEchoEvilClass
   type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
   long_description: ""
   description: ""
@@ -1572,6 +1708,26 @@ functions:
     description: ""
     type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
 - name: yso.useTcpReverseTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTomcatEchoEvilClass
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useTomcatEchoTemplate
   type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
   long_description: ""
   description: ""

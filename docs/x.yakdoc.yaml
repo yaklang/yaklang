@@ -734,6 +734,6 @@ functions:
     relative_structname: palm/common/go-funk.Tuple
     type_str: '[]funk.Tuple'
   relative_structs:
-  - structname: palm/common/go-funk.Tuple
+  - structname: github.com/yaklang/yaklang/common/go-funk.Tuple
     isbuildinstruct: false
 variables: []

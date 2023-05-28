@@ -55,19 +55,19 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
 - name: hook.LoadYakitPluginByName
   type_str: 'func (v1: *yak.YakToCallerManager, v2: string, v3 ...string) return(error) '
@@ -98,19 +98,19 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
 - name: hook.LoadYakitPluginContext
   type_str: 'func (v1: *yak.YakToCallerManager, v2: context.Context, v3: string, v4
@@ -147,19 +147,19 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
 - name: hook.NewManager
   type_str: 'func () return(*yak.YakToCallerManager) '
@@ -173,19 +173,19 @@ functions:
     relative_structname: palm/common/yak.YakToCallerManager
     type_str: '*yak.YakToCallerManager'
   relative_structs:
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
 - name: hook.NewMixPluginCaller
   type_str: 'func () return(*yak.MixPluginCaller, error) '
@@ -204,29 +204,29 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak.MixPluginCaller
+  - structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
     isbuildinstruct: false
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
-  - structname: palm/common/fp.MatchResult
+  - structname: github.com/yaklang/yaklang/common/fp.MatchResult
     isbuildinstruct: false
-  - structname: palm/common/fp.FingerprintInfo
+  - structname: github.com/yaklang/yaklang/common/fp.FingerprintInfo
     isbuildinstruct: false
-  - structname: palm/common/fp/webfingerprint.CPE
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
     isbuildinstruct: false
-  - structname: palm/common/fp.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/fp.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/dlclark/regexp2.Match
     isbuildinstruct: true
@@ -234,7 +234,7 @@ functions:
     isbuildinstruct: true
   - structname: github.com/dlclark/regexp2.Capture
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/yakit.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -242,11 +242,11 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.HTTPFlow
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPFlow
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.FuzzableParam
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.FuzzableParam
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.HTTPHeader
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPHeader
     isbuildinstruct: false
 - name: hook.RemoveYakitPluginByName
   type_str: 'func (v1: *yak.YakToCallerManager, v2 ...string) '
@@ -266,18 +266,18 @@ functions:
     type_str: '[]string'
     is_variadic: true
   relative_structs:
-  - structname: palm/common/yak.YakToCallerManager
+  - structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.ExecParamItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ExecParamItem
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHooks
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHooks
     isbuildinstruct: false
-  - structname: palm/common/yak.CallerHookDescription
+  - structname: github.com/yaklang/yaklang/common/yak.CallerHookDescription
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHooks
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHooks
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.YakScriptHookItem
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptHookItem
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/ypb.RemoveHookParams
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.RemoveHookParams
     isbuildinstruct: false
 variables: []

@@ -24,7 +24,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib/tools.templateDesc
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.templateDesc
     isbuildinstruct: false
   - structname: .
     isbuildinstruct: true
@@ -57,9 +57,9 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.Risk
     type_str: '*yakit.Risk'
   relative_structs:
-  - structname: palm/common/yak/yaklib/tools.PocVul
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.PocVul
     isbuildinstruct: false
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -67,7 +67,7 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: nuclei.PullDatabase
   type_str: 'func (v1: string, v2 ...string) return(string, error) '
@@ -107,28 +107,28 @@ functions:
     description: ""
     type_str: error
 - name: nuclei.Scan
-  type_str: 'func (v1: string, v2 ...func nucleiOpt(v1: *types.Options) ) return(chan
-    *tools.PocVul, error) '
+  type_str: 'func (v1: interface {}, v2 ...interface {}) return(chan *tools.PocVul,
+    error) '
   long_description: ""
-  description: nuclei 核心函数，v1 为扫描目标，输入网段/IP/域名/URL 都可以，会被自动解析为 URL（可能会自动补充 www.）
+  description: ""
   params:
   - name: v1
-    param_alias: targets
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: interface {}
   - name: v2
-    param_alias: nucleiParams
-    type_alias: '...params'
-    description: nuclei的额外参数
-    type_str: '[]tools.nucleiOpt'
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
     is_variadic: true
   returns:
   - name: r0
-    param_alias: pocChannel
+    param_alias: ""
     type_alias: ""
-    description: 扫描漏洞结果
-    relative_structname: palm/common/yak/yaklib/tools.PocVul
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.PocVul
     type_str: chan *tools.PocVul
   - name: r1
     param_alias: ""
@@ -136,45 +136,24 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib/tools.PocVul
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.PocVul
     isbuildinstruct: false
-- name: nuclei.ScanWithContext
-  type_str: 'func (v1: context.Context, v2: string, v3 ...func nucleiOpt(v1: *types.Options)
-    ) return(chan *tools.PocVul, error) '
+- name: nuclei.ScanAuto
+  type_str: 'func (v1: interface {}, v2 ...interface {}) '
   long_description: ""
-  description: 带上下文进行扫描，通过上下文控制通断
+  description: ""
   params:
   - name: v1
-    param_alias: ctx
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: context.Context
+    type_str: interface {}
   - name: v2
-    param_alias: targets
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
-  - name: v3
-    param_alias: opts
-    type_alias: ""
-    description: ""
-    type_str: '[]tools.nucleiOpt'
+    type_str: '[]interface {}'
     is_variadic: true
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    relative_structname: palm/common/yak/yaklib/tools.PocVul
-    type_str: chan *tools.PocVul
-  - name: r1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: error
-  relative_structs:
-  - structname: palm/common/yak/yaklib/tools.PocVul
-    isbuildinstruct: false
 - name: nuclei.UpdateDatabase
   type_str: 'func (v1 ...string) return(error) '
   long_description: ""
@@ -192,23 +171,13 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
-- name: nuclei.UpdatePoC
-  type_str: 'func () return(error) '
-  long_description: ""
-  description: 更新 PoC
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: error
 - name: nuclei.bulkSize
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】同 nuclei 每个模板最大并行的主机数(默认25)
+  description: ""
   params:
   - name: v1
-    param_alias: size
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: int
@@ -217,11 +186,11 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.debug
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】调试模式，打印更多的调试信息
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -233,11 +202,11 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.debugRequest
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】打印所有发出的请求，调试
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -249,11 +218,11 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.debugResponse
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】调试响应信息
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -265,45 +234,61 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.dnsResolver
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: []string) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
   long_description: ""
-  description: 【参数】设置 DNS 解析服务器
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]string'
-    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
+- name: nuclei.enableReverseConnection
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.excludeTags
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】排除 nuclei 扫描模版中的 Tag
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]string'
+    type_str: '[]interface {}'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.excludeTemplates
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...string) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】排除 Nuclei 模版中特定模版
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -316,28 +301,63 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.fuzzQueryTemplate
+  type_str: 'func (v1 ...string) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.headers
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】设置特定 Headers（x-bug-bounty:hacker）
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]string'
+    type_str: '[]interface {}'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.headless
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】启动浏览器无界面模式
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: nuclei.http2
+  type_str: 'func (v1: bool) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
+  long_description: ""
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -349,75 +369,112 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
+- name: nuclei.https
+  type_str: 'func (v1: bool) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.logFile
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】设置日志文件
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.metrics
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】打印统计信息
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
+- name: nuclei.mode
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.newTemplates
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】表明当前进行新模版的编写模式
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.noColor
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】输入不带颜色
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.noInteractsh
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】不要交互式 Shell
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -429,78 +486,66 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.noMeta
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】不显示匹配的元数据
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.output
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】设置最终结果输出到的文件
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.pageTimeout
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: float64) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
   long_description: ""
-  description: 【参数】页超时时间
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: int
+    type_str: float64
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.project
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】避免发送相同请求，声明当前是同一个项目
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.proxy
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...string) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
   long_description: ""
-  description: 为 nuclei 设置代理
+  description: ""
   params:
   - name: v1
-    param_alias: proxies
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]string'
@@ -510,59 +555,96 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.rateLimit
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: float64) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
   long_description: ""
-  description: 【参数】限制每秒最大请求（150默认）
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: int
+    type_str: float64
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
+- name: nuclei.rawTemplate
+  type_str: 'func (v1: string) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.reportingConfig
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】配置报告
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.reportingDB
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】报告数据库
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
+- name: nuclei.resultCallback
+  type_str: 'func (v1: func (v1: map[string]interface {}) ) return(func ConfigOption(v1:
+    *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: map[string]interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.retry
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1: int) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
   long_description: ""
-  description: 【参数】设置重试次数
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -574,108 +656,113 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.reverseUrl
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 反连 URL
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.severity
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】设置扫描级别（middle/high/critical/low），筛选 nuclei templates
+  description: ""
   params:
   - name: v1
-    param_alias: level
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]string'
+    type_str: '[]interface {}'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.showBrowser
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】展示浏览器
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.silent
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】尽量少的输出结果，只展示成功的结果
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.stopAtFirstMatch
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】第一次检测出结果就马上停止
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.systemDnsResolver
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】使用系统 DNS
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.tags
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...string) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】扫描特定 nuclei templates，通过 tags 筛选
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -688,27 +775,61 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.targetConcurrent
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.tcpResultCallback
+  type_str: 'func (v1: func (v1: map[string]interface {}) ) return(func ConfigOption(v1:
+    *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: map[string]interface {}) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.templateList
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】展示所有的 templates
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: bool
+    type_str: '[]interface {}'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
 - name: nuclei.templates
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...string) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
-  description: 【参数】设置想要扫描的 templates 或者存放 templates 的目录
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -721,134 +842,139 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.templatesDir
-  type_str: 'func (v1: string) return(func nucleiOpt(v1: *types.Options) ) '
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
-  description: 【参数】设置存放 templates 的目录
+  description: ""
   params:
   - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.templatesThreads
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】设置 templates 的线程
-  params:
-  - name: v1
-    param_alias: threadSize
-    type_alias: ""
-    description: ""
-    type_str: int
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.templatesVersion
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】展示 templates 的版本
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.timeout
-  type_str: 'func (v1: int) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】设置超时时间
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: int
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.updateTemplates
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】更新 nuclei template
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.verbose
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】设置输出更多的调试信息
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.version
-  type_str: 'func (v1: bool) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】展示版本信息
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
-- name: nuclei.workflows
-  type_str: 'func (v1 ...string) return(func nucleiOpt(v1: *types.Options) ) '
-  long_description: ""
-  description: 【参数】使用 templates 中的特定 workflow 来扫描
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: '[]string'
+    type_str: '[]interface {}'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func nucleiOpt(v1: *types.Options) '
+    type_str: interface {}
+- name: nuclei.templatesThreads
+  type_str: 'func (v1: int) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.templatesVersion
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: nuclei.timeout
+  type_str: 'func (v1: float64) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
+- name: nuclei.updateTemplates
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: nuclei.verbose
+  type_str: 'func (v1: bool) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.version
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: nuclei.workflows
+  type_str: 'func (v1 ...interface {}) return(interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
 variables: []

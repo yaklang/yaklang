@@ -1,0 +1,24 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
+  name: HttpResponseLine
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
+  name: HaveBeenSet
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

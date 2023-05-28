@@ -1,0 +1,82 @@
+is_build_in_struct: false
+libname: httpool
+struct_name: github.com/yaklang/yaklang/common/mutate._httpResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: DurationMs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Error
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: error
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: LowhttpResponse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  type_str: '*lowhttp.LowhttpResponse'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Payloads
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Request
+  type_str: '*http.Request'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: RequestRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: net/http.Response
+  type_str: '*http.Response'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: ResponseRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: ServerDurationMs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Source
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Timestamp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/mutate._httpResult
+  name: Url
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

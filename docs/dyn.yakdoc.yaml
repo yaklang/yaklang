@@ -24,81 +24,31 @@ functions:
     description: ""
     type_str: error
 - name: dyn.Import
-  type_str: 'func (v1: string, v2: string) return(*yak.yakVariable, error) '
-  long_description: |
-    要注意的是，执行的新的代码 `YAK_MAIN` 会设置为 false，如果想要编写渗透测试工具，进行模块化编程，测试代码可以放在 `if YAK_MAIN {}` 中；
-
-    一般来说，这个函数经常会用作导入别的脚本的函数，我们创建如下两个文件
-
-    ```go title='a.yak'
-    def abc(caller) {
-      println(`abc from function is called by`, caller)
-    }
-    ```
-
-    ```go title='b.yak'
-    v, err := dyn.Import(`a`, `abc`)
-    die(err)
-
-    v.Value("b.yak")
-    ```
-
-    然后通过 `yak b.yak` 来执行 `b.yak`
-
-    得到的结果如下：
-
-    ```
-    abc from function is called by b.yak
-    ```
-  description: 加载一个 yak 文件，并把代码中的某些变量提取出来
+  type_str: 'func (v1: string, v2: string) return(interface {}, error) '
+  long_description: ""
+  description: ""
   params:
   - name: v1
-    param_alias: fileOrModel
+    param_alias: ""
     type_alias: ""
-    description: 可以是一个文件名（加不加 `.yak` 后缀均可）如果是一个文件夹的话，会自动寻找这个文件夹下的 `main.yak` 文件
+    description: ""
     type_str: string
   - name: v2
-    param_alias: varName
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: string
   returns:
   - name: r0
-    param_alias: yakVariable
+    param_alias: ""
     type_alias: ""
-    description: yak 的变量对象
-    relative_structname: palm/common/yak.yakVariable
-    type_str: '*yak.yakVariable'
+    description: ""
+    type_str: interface {}
   - name: r1
-    param_alias: err
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
-  relative_structs:
-  - structname: palm/common/yak.yakVariable
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang.YakEngine
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Function
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Class
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Object
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Stack
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.StackValue
-    isbuildinstruct: false
-  - structname: reflect.Value
-    isbuildinstruct: true
-  - structname: reflect.MapIter
-    isbuildinstruct: true
-  - structname: palm/common/yak/yaklang/exec.Context
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Code
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.ReservedInstr
-    isbuildinstruct: false
 - name: dyn.IsYakFunc
   type_str: 'func (v1: interface {}) return(bool) '
   long_description: ""
@@ -149,29 +99,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak.yakVariable
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang.YakEngine
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Function
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Class
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Object
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Stack
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.StackValue
-    isbuildinstruct: false
-  - structname: reflect.Value
-    isbuildinstruct: true
-  - structname: reflect.MapIter
-    isbuildinstruct: true
-  - structname: palm/common/yak/yaklang/exec.Context
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.Code
-    isbuildinstruct: false
-  - structname: palm/common/yak/yaklang/exec.ReservedInstr
+  - structname: github.com/yaklang/yaklang/common/yak.yakVariable
     isbuildinstruct: false
 - name: dyn.params
   type_str: 'func (v1: map[string]interface {}) return(func yakEvalConfigOpt(v1: *yak.yakEvalConfig)

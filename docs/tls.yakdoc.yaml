@@ -207,7 +207,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils/tlsutils.TLSInspectResult
+  - structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
     isbuildinstruct: false
 - name: tls.SignClientCertAndKey
   type_str: 'func (v1: []uint8, v2: []uint8) return([]uint8, []uint8, error) '

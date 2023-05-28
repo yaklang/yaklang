@@ -24,7 +24,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpRequest
     isbuildinstruct: false
   - structname: net/http.Cookie
     isbuildinstruct: true
@@ -140,7 +140,7 @@ functions:
     isbuildinstruct: true
 - name: http.Get
   type_str: 'func (v1: string, v2 ...func HttpOption(v1: *yakhttp.YakHttpRequest)
-    ) return(*http.Response, error) '
+    ) return(*yakhttp.YakHttpResponse, error) '
   long_description: ""
   description: ""
   params:
@@ -160,14 +160,16 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: net/http.Response
-    type_str: '*http.Response'
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    type_str: '*yakhttp.YakHttpResponse'
   - name: r1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
   relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    isbuildinstruct: false
   - structname: net/http.Response
     isbuildinstruct: true
   - structname: net/http.Request
@@ -225,79 +227,21 @@ functions:
   - structname: net/url.Userinfo
     isbuildinstruct: true
 - name: http.GetAllBody
-  type_str: 'func (v1: *http.Response) return([]uint8) '
+  type_str: 'func (v1: interface {}) return([]uint8) '
   long_description: ""
   description: ""
   params:
   - name: v1
-    param_alias: response
+    param_alias: ""
     type_alias: ""
-    description: 想要读取 body 的 `*http.Response`
-    relative_structname: net/http.Response
-    type_str: '*http.Response'
+    description: ""
+    type_str: interface {}
   returns:
   - name: r0
     param_alias: ""
-    type_alias: '[]byte'
+    type_alias: ""
     description: ""
     type_str: '[]uint8'
-  relative_structs:
-  - structname: net/http.Response
-    isbuildinstruct: true
-  - structname: net/http.Request
-    isbuildinstruct: true
-  - structname: crypto/tls.ConnectionState
-    isbuildinstruct: true
-  - structname: crypto/x509.Certificate
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.Name
-    isbuildinstruct: true
-  - structname: net.IPNet
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.CertificateList
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.TBSCertificateList
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.AlgorithmIdentifier
-    isbuildinstruct: true
-  - structname: encoding/asn1.RawValue
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.AttributeTypeAndValue
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.RevokedCertificate
-    isbuildinstruct: true
-  - structname: math/big.Int
-    isbuildinstruct: true
-  - structname: math/rand.Rand
-    isbuildinstruct: true
-  - structname: crypto/x509/pkix.Extension
-    isbuildinstruct: true
-  - structname: encoding/asn1.BitString
-    isbuildinstruct: true
-  - structname: crypto/x509.VerifyOptions
-    isbuildinstruct: true
-  - structname: crypto/x509.CertPool
-    isbuildinstruct: true
-  - structname: .
-    isbuildinstruct: true
-  - structname: mime/multipart.FileHeader
-    isbuildinstruct: true
-  - structname: mime/multipart.Reader
-    isbuildinstruct: true
-  - structname: mime/multipart.Part
-    isbuildinstruct: true
-  - structname: mime/multipart.Form
-    isbuildinstruct: true
-  - structname: net/http.Cookie
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
-    isbuildinstruct: true
-  - structname: net/url.URL
-    isbuildinstruct: true
-  - structname: net/url.Userinfo
-    isbuildinstruct: true
 - name: http.NewRequest
   type_str: 'func (v1: string, v2: string, v3 ...func HttpOption(v1: *yakhttp.YakHttpRequest)
     ) return(*yakhttp.YakHttpRequest, error) '
@@ -333,7 +277,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib/yakhttp.YakHttpRequest
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpRequest
     isbuildinstruct: false
   - structname: net/http.Cookie
     isbuildinstruct: true
@@ -393,7 +337,7 @@ functions:
     isbuildinstruct: true
 - name: http.Post
   type_str: 'func (v1: string, v2 ...func HttpOption(v1: *yakhttp.YakHttpRequest)
-    ) return(*http.Response, error) '
+    ) return(*yakhttp.YakHttpResponse, error) '
   long_description: ""
   description: ""
   params:
@@ -413,14 +357,16 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: net/http.Response
-    type_str: '*http.Response'
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    type_str: '*yakhttp.YakHttpResponse'
   - name: r1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
   relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    isbuildinstruct: false
   - structname: net/http.Response
     isbuildinstruct: true
   - structname: net/http.Request
@@ -558,7 +504,7 @@ functions:
     isbuildinstruct: true
 - name: http.Request
   type_str: 'func (v1: string, v2: string, v3 ...func HttpOption(v1: *yakhttp.YakHttpRequest)
-    ) return(*http.Response, error) '
+    ) return(*yakhttp.YakHttpResponse, error) '
   long_description: ""
   description: ""
   params:
@@ -583,14 +529,16 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: net/http.Response
-    type_str: '*http.Response'
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    type_str: '*yakhttp.YakHttpResponse'
   - name: r1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
   relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/yakhttp.YakHttpResponse
+    isbuildinstruct: false
   - structname: net/http.Response
     isbuildinstruct: true
   - structname: net/http.Request
@@ -849,6 +797,16 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: http.fakeua
+  type_str: 'func () return(func HttpOption(v1: *yakhttp.YakHttpRequest) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func HttpOption(v1: *yakhttp.YakHttpRequest) '
 - name: http.header
   type_str: 'func (v1: interface {}, v2: interface {}) return(func HttpOption(v1:
     *yakhttp.YakHttpRequest) ) '
@@ -889,8 +847,18 @@ functions:
     description: ""
     type_str: 'func HttpOption(v1: *yakhttp.YakHttpRequest) '
 - name: http.noredirect
-  type_str: 'func (v1: func (v1: *http.Request, v2: []*http.Request) return(bool)
-    ) return(func HttpOption(v1: *yakhttp.YakHttpRequest) ) '
+  type_str: 'func () return(func HttpOption(v1: *yakhttp.YakHttpRequest) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func HttpOption(v1: *yakhttp.YakHttpRequest) '
+- name: http.params
+  type_str: 'func (v1: interface {}) return(func HttpOption(v1: *yakhttp.YakHttpRequest)
+    ) '
   long_description: ""
   description: ""
   params:
@@ -898,7 +866,24 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func (v1: *http.Request, v2: []*http.Request) return(bool) '
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func HttpOption(v1: *yakhttp.YakHttpRequest) '
+- name: http.postparams
+  type_str: 'func (v1: interface {}) return(func HttpOption(v1: *yakhttp.YakHttpRequest)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
   returns:
   - name: r0
     param_alias: ""
@@ -934,6 +919,23 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func (v1: *http.Request, v2: []*http.Request) return(bool) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func HttpOption(v1: *yakhttp.YakHttpRequest) '
+- name: http.session
+  type_str: 'func (v1: interface {}) return(func HttpOption(v1: *yakhttp.YakHttpRequest)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
   returns:
   - name: r0
     param_alias: ""

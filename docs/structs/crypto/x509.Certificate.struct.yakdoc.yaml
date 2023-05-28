@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: http
+libname: httpool
 struct_name: crypto/x509.Certificate
 description: ""
 fields:

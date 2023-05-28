@@ -84,6 +84,42 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.hijackHTTPRequest
+  type_str: 'func (v1: func (v1: bool, v2: string, v3: []uint8, v4: func (v1: []uint8)
+    , v5: func () ) ) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: bool, v2: string, v3: []uint8, v4: func (v1: []uint8) , v5:
+      func () ) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
+- name: mitm.hijackHTTPResponse
+  type_str: 'func (v1: func (v1: bool, v2: string, v3: []uint8, v4: func (v1: []uint8)
+    , v5: func () ) ) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: bool, v2: string, v3: []uint8, v4: func (v1: []uint8) , v5:
+      func () ) '
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func mitmConfigOpt(v1: *yaklib.mitmConfig) '
 - name: mitm.host
   type_str: 'func (v1: string) return(func mitmConfigOpt(v1: *yaklib.mitmConfig) ) '
   long_description: ""

@@ -1,27 +1,28 @@
 name: httpool
 functions:
 - name: httpool.Pool
-  type_str: 'func (v1: interface {}, v2 ...func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: interface {}, v2 ...func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) return(chan *mutate._httpResult, error) '
   long_description: ""
-  description: 批量执行 http 请求
+  description: ""
   params:
   - name: v1
-    param_alias: requests
-    type_alias: '[]*http.Request|FuzzHTTPRequest|FuzzHTTPRequestBatch|FuzzHTTPRequestIf|*http.Request'
-    description: 想要批量执行的请求
+    param_alias: ""
+    type_alias: ""
+    description: ""
     type_str: interface {}
   - name: v2
-    param_alias: params
-    type_alias: '...opt'
-    description: 额外选项
-    type_str: '[]mutate.httpPoolConfigOption'
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]mutate.HttpPoolConfigOption'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
+    relative_structname: github.com/yaklang/yaklang/common/mutate._httpResult
     type_str: chan *mutate._httpResult
   - name: r1
     param_alias: ""
@@ -29,7 +30,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/mutate._httpResult
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
     isbuildinstruct: false
   - structname: net/http.Request
     isbuildinstruct: true
@@ -87,11 +88,15 @@ functions:
     isbuildinstruct: true
   - structname: mime/multipart.Form
     isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
 - name: httpool.context
-  type_str: 'func (v1: context.Context) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: context.Context) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 为 pool 增加上下文
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -103,9 +108,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.fuzz
-  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: bool) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -120,9 +125,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.fuzzParams
-  type_str: 'func (v1: interface {}) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: interface {}) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -137,9 +142,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.host
-  type_str: 'func (v1: string, v2: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: string, v2: bool) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -159,29 +164,29 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.https
-  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: bool) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 为请求设置 HTTPS
+  description: ""
   params:
   - name: v1
-    param_alias: isHttps
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: bool
   returns:
   - name: r0
     param_alias: ""
-    type_alias: opt
+    type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.noFixContentLength
-  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: bool) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 新增不修复 Content-Length 的可能性
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -193,49 +198,49 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.perRequestTimeout
-  type_str: 'func (v1: float64) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: float64) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 【参数】为每个请求设置超时时间
+  description: ""
   params:
   - name: v1
-    param_alias: seconds
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: float64
   returns:
   - name: r0
     param_alias: ""
-    type_alias: opt
+    type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.port
-  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: int) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 【参数】设置请求发送到的真正 Port
+  description: ""
   params:
   - name: v1
-    param_alias: port
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: int
   returns:
   - name: r0
     param_alias: ""
-    type_alias: opt
+    type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.proxy
-  type_str: 'func (v1 ...string) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1 ...string) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 【参数】设置整个请求池的代理
+  description: ""
   params:
   - name: v1
-    param_alias: proxyUrls
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]string'
@@ -243,14 +248,14 @@ functions:
   returns:
   - name: r0
     param_alias: ""
-    type_alias: opt
+    type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.rawMode
-  type_str: 'func (v1: bool) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: bool) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: rawMode 模式意味着直接发送包，尽量少的去改动数据包内容
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -262,15 +267,15 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.redirectTimes
-  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: int) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 限制重定向次数
+  description: ""
   params:
   - name: v1
-    param_alias: count
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: int
@@ -279,22 +284,22 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: httpool.size
-  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: int) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
-  description: 【参数】设置每个请求的 body 的最大大小
+  description: ""
   params:
   - name: v1
-    param_alias: bodySize
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: int
   returns:
   - name: r0
     param_alias: ""
-    type_alias: opt
+    type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 variables: []

@@ -1,0 +1,55 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.AddressRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: Any
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: Env
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: IPv4CIDR
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: IPv6
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: Negative
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: SubRules
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  type_str: '[]*suricata.AddressRule'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  name: GetLocalIPAddress
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

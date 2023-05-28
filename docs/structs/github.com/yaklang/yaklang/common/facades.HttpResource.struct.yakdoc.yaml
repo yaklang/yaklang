@@ -1,0 +1,7 @@
+is_build_in_struct: false
+libname: facades
+struct_name: github.com/yaklang/yaklang/common/facades.HttpResource
+description: ""
+fields: []
+methods: []
+ptr_methods: []

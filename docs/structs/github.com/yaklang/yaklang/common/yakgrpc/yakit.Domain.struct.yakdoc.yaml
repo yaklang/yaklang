@@ -1,0 +1,77 @@
+is_build_in_struct: false
+libname: yakit
+struct_name: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: Domain
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: HTTPTitle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: Hash
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: IPAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: IPInteger
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: Model
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.Model
+  type_str: gorm.Model
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: Tags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: BeforeSave
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: CalcHash
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Domain
+  name: FillDomainHTTPInfo
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,73 @@
+is_build_in_struct: false
+libname: tls
+struct_name: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: Raw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: RelativeAccount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: RelativeDomains
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: RelativeEmail
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: RelativeURIs
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: Show
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/utils/tlsutils.TLSInspectResult
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

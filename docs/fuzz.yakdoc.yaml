@@ -1,5 +1,15 @@
 name: fuzz
 functions:
+- name: fuzz.FuzzCalcExpr
+  type_str: 'func () return(map[string]interface {}) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string]interface {}
 - name: fuzz.HTTPRequest
   type_str: 'func (v1: interface {}, v2 ...func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig)
     ) return(*mutate.FuzzHTTPRequest, error) '
@@ -30,9 +40,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/mutate.FuzzHTTPRequest
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
     isbuildinstruct: false
-  - structname: palm/common/mutate._httpResult
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
     isbuildinstruct: false
   - structname: net/http.Request
     isbuildinstruct: true
@@ -90,7 +100,102 @@ functions:
     isbuildinstruct: true
   - structname: mime/multipart.Form
     isbuildinstruct: true
-  - structname: palm/common/mutate.FuzzHTTPRequestParam
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
+    isbuildinstruct: false
+- name: fuzz.MustHTTPRequest
+  type_str: 'func (v1: interface {}, v2 ...func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig)
+    ) return(*mutate.FuzzHTTPRequest) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]mutate.BuildFuzzHTTPRequestOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
+    type_str: '*mutate.FuzzHTTPRequest'
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
     isbuildinstruct: false
 - name: fuzz.ProtobufBytes
   type_str: 'func (v1: interface {}) return(*yaklib.ProtobufRecords) '
@@ -110,9 +215,9 @@ functions:
     relative_structname: palm/common/yak/yaklib.ProtobufRecords
     type_str: '*yaklib.ProtobufRecords'
   relative_structs:
-  - structname: palm/common/yak/yaklib.ProtobufRecords
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecords
     isbuildinstruct: false
-  - structname: palm/common/yak/yaklib.ProtobufRecord
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
     isbuildinstruct: false
   - structname: gopkg.in/yaml.v3.Node
     isbuildinstruct: true
@@ -134,9 +239,9 @@ functions:
     relative_structname: palm/common/yak/yaklib.ProtobufRecords
     type_str: '*yaklib.ProtobufRecords'
   relative_structs:
-  - structname: palm/common/yak/yaklib.ProtobufRecords
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecords
     isbuildinstruct: false
-  - structname: palm/common/yak/yaklib.ProtobufRecord
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
     isbuildinstruct: false
   - structname: gopkg.in/yaml.v3.Node
     isbuildinstruct: true
@@ -158,9 +263,9 @@ functions:
     relative_structname: palm/common/yak/yaklib.ProtobufRecords
     type_str: '*yaklib.ProtobufRecords'
   relative_structs:
-  - structname: palm/common/yak/yaklib.ProtobufRecords
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecords
     isbuildinstruct: false
-  - structname: palm/common/yak/yaklib.ProtobufRecord
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
     isbuildinstruct: false
   - structname: gopkg.in/yaml.v3.Node
     isbuildinstruct: true
@@ -182,9 +287,9 @@ functions:
     relative_structname: palm/common/yak/yaklib.ProtobufRecords
     type_str: '*yaklib.ProtobufRecords'
   relative_structs:
-  - structname: palm/common/yak/yaklib.ProtobufRecords
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecords
     isbuildinstruct: false
-  - structname: palm/common/yak/yaklib.ProtobufRecord
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.ProtobufRecord
     isbuildinstruct: false
   - structname: gopkg.in/yaml.v3.Node
     isbuildinstruct: true
@@ -281,9 +386,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/mutate.FuzzHTTPRequest
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
     isbuildinstruct: false
-  - structname: palm/common/mutate._httpResult
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
     isbuildinstruct: false
   - structname: net/http.Request
     isbuildinstruct: true
@@ -341,7 +446,11 @@ functions:
     isbuildinstruct: true
   - structname: mime/multipart.Form
     isbuildinstruct: true
-  - structname: palm/common/mutate.FuzzHTTPRequestParam
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
     isbuildinstruct: false
 - name: fuzz.UrlsToHTTPRequests
   type_str: 'func (v1 ...interface {}) return(*mutate.FuzzHTTPRequestBatch, error) '
@@ -367,9 +476,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/mutate.FuzzHTTPRequestBatch
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch
     isbuildinstruct: false
-  - structname: palm/common/mutate._httpResult
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
     isbuildinstruct: false
   - structname: net/http.Request
     isbuildinstruct: true
@@ -427,12 +536,16 @@ functions:
     isbuildinstruct: true
   - structname: mime/multipart.Form
     isbuildinstruct: true
-  - structname: palm/common/mutate.FuzzHTTPRequest
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
     isbuildinstruct: false
-  - structname: palm/common/mutate.FuzzHTTPRequestParam
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
     isbuildinstruct: false
 - name: fuzz.WithConcurrentLimit
-  type_str: 'func (v1: int) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: int) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -447,9 +560,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: fuzz.WithDelay
-  type_str: 'func (v1: float64) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: float64) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -464,9 +577,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: fuzz.WithNamingContext
-  type_str: 'func (v1: string) return(func httpPoolConfigOption(v1: *mutate.httpPoolConfig)
+  type_str: 'func (v1: string) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
     ) '
   long_description: ""
   description: ""
@@ -481,7 +594,24 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func httpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
+- name: fuzz.WithTimeOut
+  type_str: 'func (v1: float64) return(func HttpPoolConfigOption(v1: *mutate.httpPoolConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func HttpPoolConfigOption(v1: *mutate.httpPoolConfig) '
 - name: fuzz.https
   type_str: 'func (v1: bool) return(func BuildFuzzHTTPRequestOption(v1: *mutate.buildFuzzHTTPRequestConfig)
     ) '

@@ -1,0 +1,67 @@
+is_build_in_struct: false
+libname: java
+struct_name: github.com/yaklang/yaklang/common/yserx.JavaArray
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Bytes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Bytescode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: ClassDesc
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yserx.JavaSerializable
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Handle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint64
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Size
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Values
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  type_str: '[]*yserx.JavaFieldValue'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yserx.JavaArray
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []

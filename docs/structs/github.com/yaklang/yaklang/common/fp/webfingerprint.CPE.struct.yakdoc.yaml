@@ -1,0 +1,71 @@
+is_build_in_struct: false
+libname: servicescan
+struct_name: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Edition
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Language
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Part
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Product
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Update
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Vendor
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: LikeSearchString
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

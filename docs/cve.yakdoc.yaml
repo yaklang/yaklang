@@ -1,0 +1,394 @@
+name: cve
+functions:
+- name: cve.Download
+  type_str: 'func (v1: string) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: cve.GetCVE
+  type_str: 'func (v1: string) return(*cveresources.CVE) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    type_str: '*cveresources.CVE'
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CVEDetail
+    isbuildinstruct: false
+- name: cve.LoadCVE
+  type_str: 'func (v1: string, v2: string, v3 ...int) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+    is_variadic: true
+- name: cve.MakeCtScript
+  type_str: 'func (v1: string, v2: string, v3: string, v4: string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: cve.NewStatistics
+  type_str: 'func (v1: string) return(*cve.Statistics) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/cve.Statistics
+    type_str: '*cve.Statistics'
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/cve.Statistics
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CVEDetail
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/cve.Graph
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/cve.KVPair
+    isbuildinstruct: false
+- name: cve.Query
+  type_str: 'func (v1: string, v2 ...func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) return([]cveresources.CVERes, int) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]cvequeryops.CVEOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+    type_str: '[]cveresources.CVERes'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CVERes
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CNNVD
+    isbuildinstruct: false
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+- name: cve.QueryEx
+  type_str: 'func (v1 ...interface {}) return(chan *cveresources.CVE) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    type_str: chan *cveresources.CVE
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CVE
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CVEDetail
+    isbuildinstruct: false
+- name: cve.after
+  type_str: 'func (v1: int, v2 ...int) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.before
+  type_str: 'func (v1: int, v2 ...int) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.cpe
+  type_str: 'func (v1: string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.cve
+  type_str: 'func (v1: string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.cwe
+  type_str: 'func (v1: string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.parseToCpe
+  type_str: 'func (v1: string) return(*webfingerprint.CPE, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+    type_str: '*webfingerprint.CPE'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/fp/webfingerprint.CPE
+    isbuildinstruct: false
+- name: cve.product
+  type_str: 'func (v1: string, v2 ...string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.score
+  type_str: 'func (v1: float64) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.severity
+  type_str: 'func (v1: string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+- name: cve.vendor
+  type_str: 'func (v1: string) return(func CVEOption(v1: *cvequeryops.CVEQueryInfo)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func CVEOption(v1: *cvequeryops.CVEQueryInfo) '
+variables: []

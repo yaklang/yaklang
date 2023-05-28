@@ -1,0 +1,19 @@
+is_build_in_struct: false
+libname: yso
+struct_name: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

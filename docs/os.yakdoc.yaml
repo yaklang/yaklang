@@ -16,6 +16,53 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: os.Chmod
+  type_str: 'func (v1: string, v2: fs.FileMode) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: fs.FileMode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Chown
+  type_str: 'func (v1: string, v2: int, v3: int) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: os.Clearenv
   type_str: 'func () '
   long_description: ""
@@ -71,6 +118,16 @@ functions:
     type_alias: ""
     description: 替换后的字符串
     type_str: string
+- name: os.GetDefaultDNSServers
+  type_str: 'func () return([]string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
 - name: os.GetMachineID
   type_str: 'func () return(string) '
   long_description: ""
@@ -101,6 +158,16 @@ functions:
     type_alias: ""
     description: ""
     type_str: int
+- name: os.Getegid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
 - name: os.Getenv
   type_str: 'func (v1: string) return(string) '
   long_description: ""
@@ -117,6 +184,86 @@ functions:
     type_alias: ""
     description: ""
     type_str: string
+- name: os.Geteuid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getgid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getpid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getppid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getuid
+  type_str: 'func () return(int) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+- name: os.Getwd
+  type_str: 'func () return(string, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: os.Hostname
+  type_str: 'func () return(string, error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: os.IsRemoteTCPPortOpen
   type_str: 'func (v1: string, v2: int) return(bool) '
   long_description: ""
@@ -223,6 +370,38 @@ functions:
     type_alias: ""
     description: ""
     type_str: bool
+- name: os.LookupHost
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+- name: os.LookupIP
+  type_str: 'func (v1: string) return([]string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
 - name: os.Pipe
   type_str: 'func () return(*os.File, *os.File, error) '
   long_description: ""
@@ -332,6 +511,16 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: os.TempDir
+  type_str: 'func () return(string) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
 - name: os.Unsetenv
   type_str: 'func (v1: string) return(error) '
   long_description: ""

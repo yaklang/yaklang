@@ -2,11 +2,13 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"strconv"
 	"sync/atomic"
 )
 
@@ -247,10 +249,24 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					opt(lowhttpConfig)
 				}
 
-				err := tcpReq.Execute(p, lowhttpConfig, func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
+				err := tcpReq.Execute(config, p, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
-					config.ExecuteTCPResultCallback(y, tcpReq, rsp, matched, extractorResults)
-					//spew.Dump(matched, extractorResults)
+					config.ExecuteTCPResultCallback(y, tcpReq, response, matched, extractorResults)
+					if config.Debug || config.DebugResponse {
+						fmt.Println("---------------------TCP RESPONSE---------------------")
+						spew.Dump(response)
+						fmt.Println("------------------------------------------------------")
+						fmt.Println(strconv.Quote(string(response)))
+					}
+
+					if config.Debug {
+						fmt.Println("---------------------TCP RESULT---------------------")
+						fmt.Printf("%v Matched: %v\n", y.Name, matched)
+						fmt.Println("--------------------- EXTRACTOR ----------------------")
+						spew.Dump(extractorResults)
+					} else {
+						log.Infof("%v Matched: %v", y.Name, matched)
+					}
 				})
 				if err != nil {
 					log.Errorf("tcpReq.Execute failed: %s", err)
