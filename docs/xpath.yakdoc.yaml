@@ -23,7 +23,7 @@ functions:
     isbuildinstruct: true
   - structname: golang.org/x/net/html.Attribute
     isbuildinstruct: true
-  - structname: palm/common/utils/htmlquery.NodeNavigator
+  - structname: github.com/yaklang/yaklang/common/utils/htmlquery.NodeNavigator
     isbuildinstruct: false
   - structname: golang.org/x/net/html.Node
     isbuildinstruct: true

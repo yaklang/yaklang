@@ -1,0 +1,191 @@
+is_build_in_struct: false
+libname: db
+struct_name: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: DefaultValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: ExtraSetting
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Field
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: FieldVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Group
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Help
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Required
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Descriptor
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetDefaultValue
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetExtraSetting
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetField
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetFieldVerbose
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetGroup
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetHelp
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetRequired
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: GetTypeVerbose
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: ProtoMessage
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: ProtoReflect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: protoreflect.Message
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: Reset
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

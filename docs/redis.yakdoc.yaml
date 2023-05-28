@@ -19,7 +19,7 @@ functions:
     relative_structname: palm/common/yak/yaklib.redisClient
     type_str: '*yaklib.redisClient'
   relative_structs:
-  - structname: palm/common/yak/yaklib.redisClient
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.redisClient
     isbuildinstruct: false
 - name: redis.addr
   type_str: 'func (v1: string) return(func redisConfigOpt(v1: *yaklib.redisConfig)

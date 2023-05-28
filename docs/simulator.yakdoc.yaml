@@ -12,9 +12,9 @@ functions:
     relative_structname: palm/common/simulator/extend.CaptchaIdentifier
     type_str: '*extend.CaptchaIdentifier'
   relative_structs:
-  - structname: palm/common/simulator/extend.CaptchaIdentifier
+  - structname: github.com/yaklang/yaklang/common/simulator/extend.CaptchaIdentifier
     isbuildinstruct: false
-  - structname: palm/common/simulator/core.GeneralElement
+  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralElement
     isbuildinstruct: false
   - structname: github.com/go-rod/rod.Element
     isbuildinstruct: true
@@ -125,7 +125,7 @@ functions:
   - structname: github.com/go-rod/rod/lib/proto.DOMRect
     isbuildinstruct: true
 - name: simulator.Page
-  type_str: 'func () return(*simulator.StartMode) '
+  type_str: 'func () return(*core.StartMode) '
   long_description: ""
   description: ""
   returns:
@@ -133,14 +133,14 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: palm/common/simulator.StartMode
-    type_str: '*simulator.StartMode'
+    relative_structname: github.com/yaklang/yaklang/common/simulator/core.StartMode
+    type_str: '*core.StartMode'
   relative_structs:
-  - structname: palm/common/simulator.StartMode
+  - structname: github.com/yaklang/yaklang/common/simulator/core.StartMode
     isbuildinstruct: false
-  - structname: palm/common/simulator/core.GeneralPage
+  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralPage
     isbuildinstruct: false
-  - structname: palm/common/simulator/core.GeneralElement
+  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralElement
     isbuildinstruct: false
   - structname: github.com/go-rod/rod.Element
     isbuildinstruct: true
@@ -250,4 +250,162 @@ functions:
     isbuildinstruct: true
   - structname: github.com/go-rod/rod/lib/proto.DOMRect
     isbuildinstruct: true
-variables: []
+- name: simulator.captchaMode
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.captchaUrl
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.defaultBrute
+  type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *examples.Config) ) return(*examples.BruteForceResult,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]examples.ConfigOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/simulator/examples.BruteForceResult
+    type_str: '*examples.BruteForceResult'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/simulator/examples.BruteForceResult
+    isbuildinstruct: false
+- name: simulator.passwordList
+  type_str: 'func (v1: []string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.proxy
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.proxyDetails
+  type_str: 'func (v1: string, v2: string, v3: string) return(func ConfigOpt(v1: *examples.Config)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.usernameList
+  type_str: 'func (v1: []string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+- name: simulator.wsAddress
+  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOpt(v1: *examples.Config) '
+variables:
+- name: simulator.simple
+  typestr: map[string]interface {}
+  description: //

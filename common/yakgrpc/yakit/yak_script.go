@@ -134,6 +134,7 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		OnlineBaseUrl:        s.OnlineBaseUrl,
 		BaseOnlineId:         s.BaseOnlineId,
 		OnlineOfficial:       s.OnlineOfficial,
+		OnlineGroup:          s.OnlineGroup,
 	}
 	if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins

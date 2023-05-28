@@ -1,0 +1,48 @@
+is_build_in_struct: false
+libname: yso
+struct_name: github.com/yaklang/yaklang/common/yso.JavaObject
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yso.JavaObject
+  name: JavaSerializable
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yserx.JavaSerializable
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/yso.JavaObject
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yso.JavaObject
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yso.JavaObject
+  name: Verbose
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+    type_str: '*yso.GadgetInfo'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+    isbuildinstruct: false
+ptr_methods: []

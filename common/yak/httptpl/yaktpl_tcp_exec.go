@@ -1,6 +1,8 @@
 package httptpl
 
 import (
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -8,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,6 +22,7 @@ type NucleiTcpResponse struct {
 }
 
 func (y *YakNetworkBulkConfig) handleConn(
+	config *Config,
 	conn net.Conn, lowhttpConfig *lowhttp.LowhttpExecConfig,
 	vars map[string]any, callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) (fErr error) {
@@ -65,6 +69,12 @@ func (y *YakNetworkBulkConfig) handleConn(
 
 			if len(raw) > 0 {
 				tcpResp.RawRequest = raw
+				if config.Debug || config.DebugRequest {
+					fmt.Println("---------------------TCP REQUEST---------------------")
+					spew.Dump(string(raw))
+					fmt.Println("------------------------------------------------------")
+					fmt.Println(strconv.Quote(string(raw)))
+				}
 				conn.Write(raw)
 			}
 			bufferSize := inputElement.Read
@@ -131,6 +141,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 }
 
 func (y *YakNetworkBulkConfig) Execute(
+	config *Config,
 	vars map[string]interface{}, lowhttpConfig *lowhttp.LowhttpExecConfig,
 	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) error {
@@ -168,12 +179,15 @@ func (y *YakNetworkBulkConfig) Execute(
 			actualPort = 80
 		}
 		target := utils.HostPort(actualHost, actualPort)
+		if config.Debug || config.DebugRequest {
+			log.Infof("YakNetworkBulkConfig to target: %v", target)
+		}
 		conn, err := utils.GetAutoProxyConnEx(target, lowhttpConfig.Proxy, lowhttpConfig.Timeout)
 		if err != nil {
 			log.Errorf("get conn[%v] failed: %s", target, err)
 			continue
 		}
-		err = y.handleConn(conn, lowhttpConfig, vars, callback)
+		err = y.handleConn(config, conn, lowhttpConfig, vars, callback)
 		if conn != nil {
 			conn.Close()
 		}

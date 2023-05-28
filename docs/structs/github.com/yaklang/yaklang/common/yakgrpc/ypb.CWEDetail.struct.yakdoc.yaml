@@ -1,0 +1,276 @@
+is_build_in_struct: false
+libname: cwe
+struct_name: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: CWE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Description
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: DescriptionZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Incomplete
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: LongDescription
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: LongDescriptionZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: NameZh
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: RelativeCVE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: RelativeLanguage
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Solution
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Stable
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Status
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Descriptor
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]int'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetCWE
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetDescription
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetDescriptionZh
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetIncomplete
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetLongDescription
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetLongDescriptionZh
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetNameZh
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetRelativeCVE
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetRelativeLanguage
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetSolution
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetStable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: GetStatus
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: ProtoMessage
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: ProtoReflect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: protoreflect.Message
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: Reset
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

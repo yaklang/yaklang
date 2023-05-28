@@ -54,35 +54,35 @@ functions:
     description: ""
     type_str: '[]uint8'
 - name: poc.HTTP
-  type_str: 'func (v1: interface {}, v2 ...func pocConfig(v1: *yaklib._pocConfig)
+  type_str: 'func (v1: interface {}, v2 ...func PocConfig(v1: *yaklib._pocConfig)
     ) return([]uint8, []uint8, error) '
   long_description: ""
-  description: 直接使用一个数据包，发送 HTTP 请求
+  description: ""
   params:
   - name: v1
-    param_alias: packet
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: interface {}
   - name: v2
-    param_alias: extraParams
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]yaklib.pocConfig'
+    type_str: '[]yaklib.PocConfig'
     is_variadic: true
   returns:
   - name: r0
-    param_alias: responsePacket
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]uint8'
   - name: r1
-    param_alias: requestPacket
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]uint8'
   - name: r2
-    param_alias: err
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
@@ -345,7 +345,7 @@ functions:
     description: ""
     type_str: '[]uint8'
 - name: poc.Websocket
-  type_str: 'func (v1: interface {}, v2 ...func pocConfig(v1: *yaklib._pocConfig)
+  type_str: 'func (v1: interface {}, v2 ...func PocConfig(v1: *yaklib._pocConfig)
     ) return([]uint8, []uint8, error) '
   long_description: ""
   description: ""
@@ -359,7 +359,7 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]yaklib.pocConfig'
+    type_str: '[]yaklib.PocConfig'
     is_variadic: true
   returns:
   - name: r0
@@ -378,12 +378,12 @@ functions:
     description: ""
     type_str: error
 - name: poc.host
-  type_str: 'func (v1: string) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: string) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
-  description: 强制指定连接 Host（一般用于 host）
+  description: ""
   params:
   - name: v1
-    param_alias: host
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: string
@@ -392,9 +392,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.http2
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -408,57 +408,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.https
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
-  long_description: ""
-  description: forceHttps
-  params:
-  - name: v1
-    param_alias: b
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
-- name: poc.jsRedirect
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
-  long_description: ""
-  description: 控制 js 跳转是否启用
-  params:
-  - name: v1
-    param_alias: enable
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
-- name: poc.noFixContentLength
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
-  long_description: ""
-  description: 不修复 ContentLength 控制开关
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: bool
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
-- name: poc.noRedirect
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -472,15 +424,63 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.jsRedirect
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.noFixContentLength
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.noRedirect
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.params
-  type_str: 'func (v1: interface {}) return(func pocConfig(v1: *yaklib._pocConfig)
+  type_str: 'func (v1: interface {}) return(func PocConfig(v1: *yaklib._pocConfig)
     ) '
   long_description: ""
-  description: 构造数据包时的参数，需要一个 map[string]any
+  description: ""
   params:
   - name: v1
-    param_alias: params
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: interface {}
@@ -489,11 +489,11 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.port
-  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: int) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
-  description: 强行设置远端连接的端口（默认可以自动设置）
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -505,14 +505,14 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.proxy
-  type_str: 'func (v1 ...string) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1 ...string) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
-  description: 设置代理
+  description: ""
   params:
   - name: v1
-    param_alias: proxyUrl
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: '[]string'
@@ -522,12 +522,12 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.redirectHandler
   type_str: 'func (v1: func (v1: bool, v2: []uint8, v3: []uint8) return(bool) ) return(func
-    pocConfig(v1: *yaklib._pocConfig) ) '
+    PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
-  description: 设置重定向处理函数
+  description: ""
   params:
   - name: v1
     param_alias: ""
@@ -539,14 +539,14 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.redirectTimes
-  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: int) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
-  description: 设置重定向的次数
+  description: ""
   params:
   - name: v1
-    param_alias: maxRetry
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: int
@@ -555,9 +555,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.retryInStatusCode
-  type_str: 'func (v1 ...int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1 ...int) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -572,9 +572,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.retryNotInStatusCode
-  type_str: 'func (v1 ...int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1 ...int) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -589,9 +589,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.retryTimes
-  type_str: 'func (v1: int) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+  type_str: 'func (v1: int) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -605,25 +605,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
-- name: poc.timeout
-  type_str: 'func (v1: float64) return(func pocConfig(v1: *yaklib._pocConfig) ) '
-  long_description: ""
-  description: 设置 PoC Timeout
-  params:
-  - name: v1
-    param_alias: seconds
-    type_alias: ""
-    description: ""
-    type_str: float64
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
-- name: poc.websocket
-  type_str: 'func (v1: bool) return(func pocConfig(v1: *yaklib._pocConfig) ) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.save
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
   params:
@@ -637,9 +621,74 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.session
+  type_str: 'func (v1: interface {}) return(func PocConfig(v1: *yaklib._pocConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.source
+  type_str: 'func (v1: string) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.timeout
+  type_str: 'func (v1: float64) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
+- name: poc.websocket
+  type_str: 'func (v1: bool) return(func PocConfig(v1: *yaklib._pocConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.websocketFromServer
-  type_str: 'func (v1: func (v1: []uint8, v2: func () ) ) return(func pocConfig(v1:
+  type_str: 'func (v1: func (v1: []uint8, v2: func () ) ) return(func PocConfig(v1:
     *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
@@ -654,9 +703,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 - name: poc.websocketOnClient
-  type_str: 'func (v1: func (v1: *lowhttp.WebsocketClient) ) return(func pocConfig(v1:
+  type_str: 'func (v1: func (v1: *lowhttp.WebsocketClient) ) return(func PocConfig(v1:
     *yaklib._pocConfig) ) '
   long_description: ""
   description: ""
@@ -671,5 +720,5 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func pocConfig(v1: *yaklib._pocConfig) '
+    type_str: 'func PocConfig(v1: *yaklib._pocConfig) '
 variables: []

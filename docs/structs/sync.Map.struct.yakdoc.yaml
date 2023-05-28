@@ -7,6 +7,55 @@ methods:
 - ptr: true
   description: ""
   structname: sync.Map
+  name: CompareAndDelete
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Map
+  name: CompareAndSwap
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Map
   name: Delete
   params:
   - name: v2
@@ -112,5 +161,32 @@ methods:
     type_alias: ""
     description: ""
     type_str: interface {}
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Map
+  name: Swap
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
   relative_struct_name: []
 ptr_methods: []

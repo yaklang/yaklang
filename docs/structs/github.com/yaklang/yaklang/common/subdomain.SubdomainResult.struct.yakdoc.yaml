@@ -1,0 +1,70 @@
+is_build_in_struct: false
+libname: subdomain
+struct_name: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: Domain
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: FromDNSServer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: FromModeRaw
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: FromTarget
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: IP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: Tags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: Hash
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: Show
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/subdomain.SubdomainResult
+  name: ToString
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

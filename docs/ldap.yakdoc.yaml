@@ -106,4 +106,52 @@ functions:
     isbuildinstruct: true
   - structname: crypto/tls.ConnectionState
     isbuildinstruct: true
+- name: ldap.password
+  type_str: 'func (v1: string) return(func (v1: *yaklib.ldapClientConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yaklib.ldapClientConfig) '
+- name: ldap.port
+  type_str: 'func (v1: int) return(func (v1: *yaklib.ldapClientConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yaklib.ldapClientConfig) '
+- name: ldap.username
+  type_str: 'func (v1: string) return(func (v1: *yaklib.ldapClientConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yaklib.ldapClientConfig) '
 variables: []

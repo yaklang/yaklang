@@ -1,0 +1,75 @@
+is_build_in_struct: false
+libname: pcapx
+struct_name: github.com/yaklang/yaklang/common/pcapx.Statistics
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: ICMPStatistics
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]int64
+- structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: LinkLayerStatistics
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]int64
+- structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: NetworkLayerStatistics
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]int64
+- structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: TransportationLayerStatistics
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]int64
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: AddICMPStatistics
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: AddLinkLayerStatistics
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: AddNetworkLayerStatistics
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/pcapx.Statistics
+  name: AddTransportationLayerStatistics
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

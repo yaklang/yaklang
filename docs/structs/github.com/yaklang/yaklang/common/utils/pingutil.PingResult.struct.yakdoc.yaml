@@ -1,0 +1,31 @@
+is_build_in_struct: false
+libname: synscan
+struct_name: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
+  name: IP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
+  name: Ok
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
+  name: RTT
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
+  name: Reason
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

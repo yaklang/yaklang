@@ -23,15 +23,15 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils/bruteutils.BruteUtil
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteUtil
     isbuildinstruct: false
-  - structname: palm/common/utils/bruteutils.BruteItem
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItem
     isbuildinstruct: false
-  - structname: palm/common/utils/bruteutils.BruteItemResult
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
     isbuildinstruct: false
-  - structname: palm/common/utils/bruteutils.targetProcessing
+  - structname: github.com/yaklang/yaklang/common/utils/bruteutils.targetProcessing
     isbuildinstruct: false
-  - structname: palm/common/utils.SizedWaitGroup
+  - structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
     isbuildinstruct: false
 - name: tools.NewPocInvoker
   type_str: 'func () return(*tools.PocInvoker, error) '
@@ -50,8 +50,8 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib/tools.PocInvoker
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.PocInvoker
     isbuildinstruct: false
-  - structname: palm/common/yak/yaklib/tools.PocVul
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib/tools.PocVul
     isbuildinstruct: false
 variables: []

@@ -61,7 +61,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/crawler.Req
+  - structname: github.com/yaklang/yaklang/common/crawler.Req
     isbuildinstruct: false
   - structname: net/http.Request
     isbuildinstruct: true

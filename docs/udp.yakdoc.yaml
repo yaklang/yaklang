@@ -30,7 +30,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib.udpConn
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.udpConn
     isbuildinstruct: false
   - structname: net.UDPConn
     isbuildinstruct: true

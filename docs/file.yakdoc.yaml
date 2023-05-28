@@ -70,7 +70,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib._yakFile
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib._yakFile
     isbuildinstruct: false
   - structname: os.File
     isbuildinstruct: true
@@ -95,7 +95,7 @@ functions:
     description: ""
     type_str: '[]*utils.FileInfo'
   relative_structs:
-  - structname: palm/common/utils.FileInfo
+  - structname: github.com/yaklang/yaklang/common/utils.FileInfo
     isbuildinstruct: false
 - name: file.GetDirPath
   type_str: 'func (v1: string) return(string) '
@@ -227,7 +227,7 @@ functions:
     description: ""
     type_str: '[]*utils.FileInfo'
   relative_structs:
-  - structname: palm/common/utils.FileInfo
+  - structname: github.com/yaklang/yaklang/common/utils.FileInfo
     isbuildinstruct: false
 - name: file.Lstat
   type_str: 'func (v1: string) return(fs.FileInfo, error) '
@@ -303,6 +303,32 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: file.NewMultiFileLineReader
+  type_str: 'func (v1 ...string) return(*mfreader.MultiFileLineReader, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+    type_str: '*mfreader.MultiFileLineReader'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/utils/mfreader.MultiFileLineReader
+    isbuildinstruct: false
 - name: file.Open
   type_str: 'func (v1: string) return(*yaklib._yakFile, error) '
   long_description: ""
@@ -326,7 +352,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib._yakFile
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib._yakFile
     isbuildinstruct: false
   - structname: os.File
     isbuildinstruct: true
@@ -368,7 +394,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib._yakFile
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib._yakFile
     isbuildinstruct: false
   - structname: os.File
     isbuildinstruct: true
@@ -420,7 +446,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils.FileInfo
+  - structname: github.com/yaklang/yaklang/common/utils.FileInfo
     isbuildinstruct: false
 - name: file.ReadFile
   type_str: 'func (v1: string) return([]uint8, error) '
@@ -466,7 +492,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils.FileInfo
+  - structname: github.com/yaklang/yaklang/common/utils.FileInfo
     isbuildinstruct: false
 - name: file.ReadLines
   type_str: 'func (v1: interface {}) return([]string) '
@@ -660,7 +686,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib._yakFile
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib._yakFile
     isbuildinstruct: false
   - structname: os.File
     isbuildinstruct: true

@@ -1,0 +1,25 @@
+name: cwe
+functions:
+- name: cwe.Get
+  type_str: 'func (v1: interface {}) return(*cveresources.CWE) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+    type_str: '*cveresources.CWE'
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/cve/cveresources.CWE
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.CWEDetail
+    isbuildinstruct: false
+variables: []

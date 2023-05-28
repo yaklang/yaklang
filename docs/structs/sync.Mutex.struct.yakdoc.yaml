@@ -1,7 +1,28 @@
 is_build_in_struct: true
-libname: str
+libname: sync
 struct_name: sync.Mutex
 description: ""
 fields: []
-methods: []
+methods:
+- ptr: true
+  description: ""
+  structname: sync.Mutex
+  name: Lock
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Mutex
+  name: TryLock
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: sync.Mutex
+  name: Unlock
+  relative_struct_name: []
 ptr_methods: []

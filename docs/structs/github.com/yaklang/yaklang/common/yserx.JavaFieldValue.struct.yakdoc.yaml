@@ -1,0 +1,54 @@
+is_build_in_struct: false
+libname: java
+struct_name: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: Bytes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: FieldType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: FieldTypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: Object
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: yserx.JavaSerializable
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: TypeVerbose
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yserx.JavaFieldValue
+  name: Marshal
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+ptr_methods: []

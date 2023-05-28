@@ -1,0 +1,38 @@
+is_build_in_struct: false
+libname: yakit
+struct_name: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+  name: Domains
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+  name: IP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+  name: IPInteger
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+  name: IsInPublicNet
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Host
+  name: Model
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.Model
+  type_str: gorm.Model
+methods: []
+ptr_methods: []

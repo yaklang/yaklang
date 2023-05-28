@@ -23,7 +23,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/cybertunnel/tpb.DNSLogEvent
+  - structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
     isbuildinstruct: false
 - name: risk.CheckICMPTriggerByLength
   type_str: 'func (v1: int) return(*tpb.ICMPTriggerNotification, error) '
@@ -48,7 +48,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/cybertunnel/tpb.ICMPTriggerNotification
+  - structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.ICMPTriggerNotification
     isbuildinstruct: false
 - name: risk.CheckRandomTriggerByToken
   type_str: 'func (v1: string) return(*tpb.RandomPortTriggerEvent, error) '
@@ -73,7 +73,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/cybertunnel/tpb.RandomPortTriggerEvent
+  - structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.RandomPortTriggerEvent
     isbuildinstruct: false
 - name: risk.CreateRisk
   type_str: 'func (v1: string, v2 ...func RiskParamsOpt(v1: *yakit.Risk) ) return(*yakit.Risk) '
@@ -99,7 +99,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.Risk
     type_str: '*yakit.Risk'
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -107,7 +107,7 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: risk.ExtractTokenFromUrl
   type_str: 'func (v1: string) return(string) '
@@ -342,7 +342,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -350,7 +350,7 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: risk.Save
   type_str: 'func (v1: *yakit.Risk) return(error) '
@@ -370,7 +370,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -378,7 +378,35 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
+    isbuildinstruct: false
+- name: risk.YieldRiskByCreateAt
+  type_str: 'func (v1: int64) return(chan *yakit.Risk) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
+    type_str: chan *yakit.Risk
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
+    isbuildinstruct: false
+  - structname: github.com/jinzhu/gorm.Model
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: risk.YieldRiskByRuntimeId
   type_str: 'func (v1: string) return(chan *yakit.Risk) '
@@ -398,7 +426,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.Risk
     type_str: chan *yakit.Risk
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -406,7 +434,7 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: risk.YieldRiskByTarget
   type_str: 'func (v1: string) return(chan *yakit.Risk) '
@@ -426,7 +454,7 @@ functions:
     relative_structname: palm/common/yakgrpc/yakit.Risk
     type_str: chan *yakit.Risk
   relative_structs:
-  - structname: palm/common/yakgrpc/yakit.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -434,9 +462,25 @@ functions:
     isbuildinstruct: true
   - structname: time.Location
     isbuildinstruct: true
-  - structname: palm/common/yakgrpc/ypb.Risk
+  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
 - name: risk.cve
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.description
   type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
   long_description: ""
   description: ""
@@ -597,6 +641,22 @@ functions:
     description: ""
     type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
 - name: risk.severity
+  type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.solution
   type_str: 'func (v1: string) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
   long_description: ""
   description: ""

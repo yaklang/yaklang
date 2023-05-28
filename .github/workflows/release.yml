@@ -100,6 +100,8 @@ jobs:
       - build_and_release
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
       - name: Set Yak Version by Tag
         uses: mad9000/actions-find-and-replace-string@1
         id: fetchtag_release
@@ -110,7 +112,7 @@ jobs:
       # 获取 latest 之前的 tag
       - name: Get previous version
         run: |
-          git tag --sort=-v:refname | awk 'NR==2 { sub(/^v/, "", $0); print }'
+          echo "::set-output name=value::$(git tag --sort=-v:refname | awk 'NR==2 { sub(/^v/, "", $0); print }')"
         id: previous_version
       - name: Download Windows YAK
         uses: actions/download-artifact@v2

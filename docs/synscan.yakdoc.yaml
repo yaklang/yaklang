@@ -1,5 +1,15 @@
 name: synscan
 functions:
+- name: synscan.FixPermission
+  type_str: 'func () return(error) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: synscan.Scan
   type_str: 'func (v1: string, v2: string, v3 ...func scanOpt(v1: *tools._yakPortScanConfig)
     ) return(chan *synscan.SynScanResult, error) '
@@ -35,7 +45,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/synscan.SynScanResult
+  - structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
     isbuildinstruct: false
 - name: synscan.ScanFromPing
   type_str: 'func (v1: chan *pingutil.PingResult, v2: string, v3 ...func scanOpt(v1:
@@ -73,9 +83,9 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/utils/pingutil.PingResult
+  - structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
     isbuildinstruct: false
-  - structname: palm/common/synscan.SynScanResult
+  - structname: github.com/yaklang/yaklang/common/synscan.SynScanResult
     isbuildinstruct: false
 - name: synscan.callback
   type_str: 'func (v1: func (v1: *synscan.SynScanResult) ) return(func scanOpt(v1:

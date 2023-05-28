@@ -1,0 +1,198 @@
+name: finscan
+functions:
+- name: finscan.Scan
+  type_str: 'func (v1: string, v2: string, v3 ...func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) return(chan *finscan.FinScanResult, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]tools.finScanOpt'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+    type_str: chan *finscan.FinScanResult
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/finscan.FinScanResult
+    isbuildinstruct: false
+- name: finscan.concurrent
+  type_str: 'func (v1: int) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.excludeHosts
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.excludePorts
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.initHostFilter
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.initPortFilter
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.outputFile
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.outputPrefix
+  type_str: 'func (v1: string) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.rateLimit
+  type_str: 'func (v1: int, v2: int) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+- name: finscan.wait
+  type_str: 'func (v1: float64) return(func finScanOpt(v1: *tools._yakFinPortScanConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func finScanOpt(v1: *tools._yakFinPortScanConfig) '
+variables: []

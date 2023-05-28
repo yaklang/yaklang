@@ -25,7 +25,7 @@ functions:
     relative_structname: palm/common/utils/pingutil.PingResult
     type_str: '*pingutil.PingResult'
   relative_structs:
-  - structname: palm/common/utils/pingutil.PingResult
+  - structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
     isbuildinstruct: false
 - name: ping.Scan
   type_str: 'func (v1: string, v2 ...func _pingConfigOpt(v1: *yaklib._pingConfig)
@@ -52,7 +52,7 @@ functions:
     relative_structname: palm/common/utils/pingutil.PingResult
     type_str: chan *pingutil.PingResult
   relative_structs:
-  - structname: palm/common/utils/pingutil.PingResult
+  - structname: github.com/yaklang/yaklang/common/utils/pingutil.PingResult
     isbuildinstruct: false
 - name: ping.concurrent
   type_str: 'func (v1: int) return(func _pingConfigOpt(v1: *yaklib._pingConfig) ) '

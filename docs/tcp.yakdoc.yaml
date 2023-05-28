@@ -35,7 +35,7 @@ functions:
     description: ""
     type_str: error
   relative_structs:
-  - structname: palm/common/yak/yaklib.tcpConnection
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.tcpConnection
     isbuildinstruct: false
   - structname: time.Time
     isbuildinstruct: true
@@ -67,6 +67,27 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: tcp.MockServe
+  type_str: 'func (v1: []uint8) return(string, int) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
 - name: tcp.Serve
   type_str: 'func (v1: interface {}, v2: int, v3 ...func tcpServerConfigOpt(v1: *yaklib.tcpServerConfig)
     ) return(error) '

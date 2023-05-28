@@ -1,0 +1,48 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: Count
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: LimitMode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: Seconds
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: ThresholdMode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: Track
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  name: Repeat
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+ptr_methods: []
