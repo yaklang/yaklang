@@ -20,7 +20,7 @@ type NucleiTcpResponse struct {
 
 func (y *YakNetworkBulkConfig) handleConn(
 	conn net.Conn, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	vars map[string]any, callback func(rsp *NucleiTcpResponse, matched bool, extractorResults map[string]any),
+	vars map[string]any, callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -37,13 +37,14 @@ func (y *YakNetworkBulkConfig) handleConn(
 		extractorResults  = make(map[string]any)
 		availableResponse []*NucleiTcpResponse
 	)
-	tcpResp := &NucleiTcpResponse{
-		RemoteAddr: conn.RemoteAddr().String(),
-	}
+
 	var err error
 	if len(y.Inputs) > 0 {
 	REQ:
 		for _, inputElement := range y.Inputs {
+			tcpResp := &NucleiTcpResponse{
+				RemoteAddr: conn.RemoteAddr().String(),
+			}
 			var raw []byte
 			switch strings.ToLower(strings.TrimSpace(inputElement.Type)) {
 			case "hex":
@@ -87,7 +88,10 @@ func (y *YakNetworkBulkConfig) handleConn(
 			}
 		}
 	} else {
-		tcpResp.RawRequest = nil
+		tcpResp := &NucleiTcpResponse{
+			RemoteAddr: conn.RemoteAddr().String(),
+			RawRequest: nil,
+		}
 		response := utils.StableReaderEx(conn, 5*time.Second, y.ReadSize)
 		for _, extractor := range y.Extractor {
 			extractorVars, err := extractor.Execute(response)
@@ -116,7 +120,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 			if err != nil {
 				log.Errorf("YakNetworkBulkConfig matcher.ExecuteRaw failed: %s", err)
 			}
-			callback(response, matched, extractorResults)
+			callback(availableResponse, matched, extractorResults)
 		}
 	}
 
@@ -128,7 +132,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 
 func (y *YakNetworkBulkConfig) Execute(
 	vars map[string]interface{}, lowhttpConfig *lowhttp.LowhttpExecConfig,
-	callback func(rsp *NucleiTcpResponse, matched bool, extractorResults map[string]any),
+	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
 		return utils.Error("YakNetworkBulkConfig hosts is empty")
