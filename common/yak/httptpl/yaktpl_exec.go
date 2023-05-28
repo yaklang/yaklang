@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"strconv"
 	"sync/atomic"
 )
 
@@ -256,7 +255,6 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 						fmt.Println("---------------------TCP RESPONSE---------------------")
 						spew.Dump(response)
 						fmt.Println("------------------------------------------------------")
-						fmt.Println(strconv.Quote(string(response)))
 					}
 
 					if config.Debug {
