@@ -260,5 +260,5 @@ func TestPocScanner(t *testing.T) {
 	println("engine.GetKBData():")
 	data := engine.GetKBData()
 	data["Host/port_infos"] = nil
-	spew.Dump()
+	spew.Dump(data)
 }
