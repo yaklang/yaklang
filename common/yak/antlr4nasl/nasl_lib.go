@@ -840,8 +840,8 @@ func init() {
 			return res, nil
 		},
 		"chomp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `chomp` is not implement"))
-			return nil, nil
+			s := params.getParamByNumber(0, "").AsString()
+			return strings.TrimSpace(s), nil
 		},
 		"int": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return strconv.Atoi(params.getParamByNumber(0, "0").String())
