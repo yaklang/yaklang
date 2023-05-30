@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
@@ -234,6 +235,7 @@ func init() {
 			}
 			return nil, nil
 		},
+		// 新版加的函数，只有一个脚本使用
 		"script_get_preference_file_location": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `script_get_preference_file_location` is not implement"))
 			return nil, nil
@@ -284,8 +286,10 @@ func init() {
 			return preference, nil
 		},
 		"safe_checks": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `safe_checks` is not implement"))
-			return nil, nil
+			if v, ok := GlobalPrefs["safe_checks"]; ok {
+				return v == "yes", nil
+			}
+			return false, nil
 		},
 		"get_script_oid": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return engine.scriptObj.OID, nil
@@ -366,7 +370,7 @@ func init() {
 		"open_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
 			if timeout <= 0 {
-				timeout = 5
+				timeout = 5000
 			}
 			transport := params.getParamByName("transport", -1).Int()
 			if !params.getParamByName("priority").IsUndefined() {
@@ -381,7 +385,7 @@ func init() {
 			}
 			var conn net.Conn
 
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, engine.proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxys...)
 			if err != nil {
 				return nil, err
 			}
@@ -409,6 +413,7 @@ func init() {
 			panic(fmt.Sprintf("method `open_priv_sock_udp` is not implement"))
 			return nil, nil
 		},
+		// 需要把net.Conn封装一下，携带error信息
 		"socket_get_error": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `socket_get_error` is not implement"))
 			return nil, nil
@@ -537,7 +542,7 @@ func init() {
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, engine.proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxys...)
 			if err != nil {
 				return nil, err
 			}
@@ -558,23 +563,70 @@ func init() {
 			return conn, nil
 		},
 		"http_head": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_head` is not implement"))
-			return nil, nil
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("HEAD").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 		},
 		"http_get": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			res := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
 			return res, nil
 		},
 		"http_post": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_post` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("POST").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_delete": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_delete` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("DELETE").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_put": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_put` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("PUT").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_close_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -646,11 +698,15 @@ func init() {
 			return utils.IsPortAvailableWithUDP(engine.host, port), nil
 		},
 		"scanner_add_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `scanner_add_port` is not implement"))
+			port := params.getParamByName("port", -1).Int()
+			proto := params.getParamByName("proto", "tcp").String()
+			if port > 0 {
+				engine.Kbs.SetKB(fmt.Sprintf("Ports/%s/%d", proto, port), 1)
+			}
 			return nil, nil
 		},
 		"scanner_status": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `scanner_status` is not implement"))
+			/* Kept for backward compatibility. */
 			return nil, nil
 		},
 		"scanner_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -777,8 +833,17 @@ func init() {
 			return re.FindStringSubmatch(s), nil
 		},
 		"match": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `match` is not implement"))
-			return nil, nil
+			pattern := params.getParamByName("pattern").String()
+			s := params.getParamByName("string").String()
+			icase := params.getParamByName("icase").Bool()
+			if icase {
+				pattern = "(?i)" + pattern
+			}
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return false, err
+			}
+			return re.MatchString(s), nil
 		},
 		"substr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			str := params.getParamByNumber(0, "").String()
@@ -806,8 +871,19 @@ func init() {
 			return strings.ToUpper(params.getParamByNumber(0).String()), nil
 		},
 		"crap": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `crap` is not implement"))
-			return nil, nil
+			data := params.getParamByName("data").String()
+			length := params.getParamByName("length", -1).Int()
+			length2 := params.getParamByNumber(0, -1).Int()
+			if length == -1 {
+				length = length2
+			}
+			if length == -1 {
+				return nil, errors.New("crap length is invalid")
+			}
+			for i := 0; i < length; i++ {
+				data += data
+			}
+			return data, nil
 		},
 		"strlen": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return len(params.getParamByNumber(0).String()), nil

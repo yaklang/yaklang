@@ -23,6 +23,8 @@ type ScriptEngine struct {
 	goroutineNum                   int
 	debug                          bool
 	engineHooks                    []func(engine *Engine)
+	loadedScripts                  map[string]struct{}
+	loadedScriptsLock              *sync.Mutex
 }
 
 func NewScriptEngine() *ScriptEngine {
@@ -32,6 +34,8 @@ func NewScriptEngine() *ScriptEngine {
 		scriptGroupDefines: make(map[ScriptGroup][]string),
 		goroutineNum:       10,
 		Kbs:                NewNaslKBs(),
+		loadedScripts:      make(map[string]struct{}),
+		loadedScriptsLock:  &sync.Mutex{},
 	}
 }
 func (engine *ScriptEngine) GetAllScriptGroups() map[ScriptGroup][]string {
@@ -108,6 +112,9 @@ func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
 			if db := db.Find(&scripts).Where("family = ?", family); db.Error != nil {
 				continue
 			}
+			if len(scripts) > 100 {
+				scripts = scripts[:100]
+			}
 			for _, script := range scripts {
 				if _, ok := e.excludeScripts[script.OID]; ok {
 					continue
@@ -173,6 +180,8 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			engine.SetKBs(e.Kbs)
 			engine.InitBuildInLib()
 			engine.Debug(e.debug)
+			engine.loadedScripts = e.loadedScripts
+			engine.loadedScriptsLock = e.loadedScriptsLock
 			for _, hook := range e.engineHooks {
 				hook(engine)
 			}

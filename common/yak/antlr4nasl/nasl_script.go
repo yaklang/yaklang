@@ -59,35 +59,38 @@ func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
 }
 
 type NaslScriptInfo struct {
-	naslScript      *yakit.NaslScript
-	OriginFileName  string
-	Hash            string
-	OID             string
-	Group           string
-	CVE             []string
-	ScriptName      string
-	Script          string
-	Tags            map[string]interface{}
-	Version         string
-	Category        string
-	Family          string
-	Copyright       string
-	Dependencies    []string
-	RequirePorts    []string
-	RequireKeys     []string
-	ExcludeKeys     []string
+	naslScript     *yakit.NaslScript
+	OriginFileName string
+	Hash           string
+	OID            string
+	Group          string
+	CVE            []string
+	ScriptName     string
+	Script         string
+	Tags           map[string]interface{}
+	Version        string
+	Category       string
+	Family         string
+	Copyright      string
+	Dependencies   []string // 依赖脚本
+
 	Xrefs           map[string]string
 	Preferences     map[string]interface{}
-	RequireUdpPorts []string
+	RequirePorts    []string // 前置条件断言
+	RequireKeys     []string // 前置条件断言
+	ExcludeKeys     []string // 前置条件断言
+	RequireUdpPorts []string // 前置条件断言
 	BugtraqId       []int
-	MandatoryKeys   []string
-	Timeout         int
+	MandatoryKeys   []string // 前置条件断言
+	Timeout         int      // milliseconds
 }
 
 func (n *NaslScriptInfo) Run(e *Engine) error {
-	defer func() {
-		e.runedScripts[n.OriginFileName] = struct{}{}
-	}()
+	if e.IsScriptLoaded(n.ScriptName) {
+		return nil
+	}
+	e.MarkScriptIsLoaded(n.ScriptName)
+	// 缺乏循环依赖检查
 	for _, dependency := range n.Dependencies {
 		if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
 			continue
@@ -95,7 +98,7 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 		if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
 			continue
 		}
-		if _, ok := e.runedScripts[dependency]; ok {
+		if e.IsScriptLoaded(dependency) {
 			continue
 		}
 		ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
