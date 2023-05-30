@@ -1,0 +1,6 @@
+dump(YAK_DIR)
+VULINBOX = param("VULINBOX")
+if VULINBOX == undefined || VULINBOX == nil || VULINBOX == "" {
+    die("VULINBOX IS NOT DEFINED")
+}
+dump(VULINBOX)
