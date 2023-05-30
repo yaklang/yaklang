@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 )
 
 type ScriptGroup string
@@ -25,7 +26,6 @@ const (
 type Engine struct {
 	debug                          bool
 	naslLibsPath, dependenciesPath string
-	runedScripts                   map[string]struct{}
 	naslLibPatch                   map[string]func(string) string
 	compiler                       *visitors.Compiler
 	vm                             *yakvm.VirtualMachine
@@ -35,6 +35,8 @@ type Engine struct {
 	host                           string
 	proxys                         []string
 	Kbs                            *NaslKBs
+	loadedScripts                  map[string]struct{}
+	loadedScriptsLock              *sync.Mutex
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {
@@ -44,11 +46,12 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 	vm.GetConfig().SetFunctionNumberCheck(false)
 	vm.GetConfig().SetYVMMode(yakvm.NASL)
 	engine := &Engine{
-		compiler:     visitors.NewCompilerWithSymbolTable(table),
-		vm:           vm,
-		naslLibPatch: make(map[string]func(string) string),
-		runedScripts: make(map[string]struct{}),
-		Kbs:          kbs,
+		compiler:          visitors.NewCompilerWithSymbolTable(table),
+		vm:                vm,
+		naslLibPatch:      make(map[string]func(string) string),
+		Kbs:               kbs,
+		loadedScripts:     make(map[string]struct{}),
+		loadedScriptsLock: &sync.Mutex{},
 	}
 
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
@@ -93,6 +96,17 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 }
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
+}
+func (e *Engine) MarkScriptIsLoaded(scriptName string) {
+	e.loadedScriptsLock.Lock()
+	defer e.loadedScriptsLock.Unlock()
+	e.loadedScripts[scriptName] = struct{}{}
+}
+func (e *Engine) IsScriptLoaded(scriptName string) bool {
+	e.loadedScriptsLock.Lock()
+	defer e.loadedScriptsLock.Unlock()
+	_, ok := e.loadedScripts[scriptName]
+	return ok
 }
 func (engine *Engine) SetProxys(proxys ...string) {
 	engine.proxys = proxys
