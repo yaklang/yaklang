@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -46,11 +47,11 @@ func ScanPacket(req []byte, opts ...interface{}) {
 		lowhttpConfig.Ctx = baseContext
 	}
 
-	config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-		if result {
-			log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
-		}
-	})
+	//config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+	//	if result {
+	//		log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
+	//	}
+	//})
 
 	var urlStr string
 	u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, lowhttpConfig.Https)
@@ -235,7 +236,7 @@ func nucleiOptionDummy(n string) func(i ...any) any {
 	}
 }
 
-func payloadsToString(payloads *YakPayloads) (string, error) {
+func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 	result := make(map[string]string)
 	for key, value := range payloads.raw {
 		result[key] = fmt.Sprintf("%+v - %+v", value.FromFile, value.Data)
@@ -247,19 +248,23 @@ func payloadsToString(payloads *YakPayloads) (string, error) {
 	return string(jsonBytes), nil
 }
 
-var Exports = map[string]interface{}{
-	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-		var vCh = make(chan *tools.PocVul)
-		filterVul := filter.NewFilter()
-
-		opt = append(opt, _callback(func(i map[string]interface{}) {
-			if i["match"].(bool) {
-				tpl := i["template"].(*YakTemplate)
+func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func(i map[string]interface{}) {
+	return func(i map[string]interface{}) {
+		if i["match"].(bool) {
+			tpl := i["template"].(*YakTemplate)
+			var (
+				currTarget string
+				payloads   string
+				err        error
+				calcSha1   string
+			)
+			details := make(map[string]interface{}, 2)
+			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
+				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				// 根据 payload , tpl 名称 , target 条件过滤
-				calcSha1 := utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-				details := make(map[string]interface{})
+				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
 					details["response"] = string(resp[0].RawPacket)
@@ -269,36 +274,74 @@ var Exports = map[string]interface{}{
 						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
 					}
 				}
-				payloads, err := payloadsToString(reqBulk.Payloads)
+				payloads, err = httpPayloadsToString(reqBulk.Payloads)
 				if err != nil {
-					log.Errorf("payloadsToString failed: %v", err)
+					log.Errorf("httpPayloadsToString failed: %v", err)
 				}
-				pv := &tools.PocVul{
-					Source:        "nuclei",
-					Target:        resp[0].RemoteAddr,
-					PocName:       tpl.Name,
-					MatchedAt:     utils.DatetimePretty(),
-					Tags:          strings.Join(tpl.Tags, ","),
-					Timestamp:     time.Now().Unix(),
-					Severity:      tpl.Severity,
-					Details:       details,
-					CVE:           tpl.CVE,
-					DescriptionZh: tpl.DescriptionZh,
-					Description:   tpl.Description,
-					Payload:       payloads,
-				}
-				if !filterVul.Exist(calcSha1) {
-					filterVul.Insert(calcSha1)
-					risk := tools.PocVulToRisk(pv)
-					err = yakit.SaveRisk(risk)
-					if err != nil {
-						log.Errorf("save risk failed: %s", err)
-					}
-					vCh <- pv
-				}
-
 			}
-		}))
+
+			if len(tpl.TCPRequestSequences) > 0 {
+				resp := i["responses"].([]*NucleiTcpResponse)
+				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
+
+				currTarget = resp[0].RemoteAddr
+				if len(resp) == 1 {
+					details["request"] = spew.Sdump(resp[0].RawRequest)
+					details["response"] = spew.Sdump(resp[0].RawPacket)
+				} else {
+					for idx, r := range resp {
+						details[fmt.Sprintf("request_%d", idx+1)] = spew.Sdump(r.RawRequest)
+						details[fmt.Sprintf("response_%d", idx+1)] = spew.Sdump(r.RawPacket)
+					}
+				}
+			}
+
+			pv := &tools.PocVul{
+				Source:        "nuclei",
+				Target:        currTarget,
+				PocName:       tpl.Name,
+				MatchedAt:     utils.DatetimePretty(),
+				Tags:          strings.Join(tpl.Tags, ","),
+				Timestamp:     time.Now().Unix(),
+				Severity:      tpl.Severity,
+				Details:       details,
+				CVE:           tpl.CVE,
+				DescriptionZh: tpl.DescriptionZh,
+				Description:   tpl.Description,
+				Payload:       payloads,
+			}
+			if !filterVul.Exist(calcSha1) {
+				filterVul.Insert(calcSha1)
+				risk := tools.PocVulToRisk(pv)
+				err = yakit.SaveRisk(risk)
+				if err != nil {
+					log.Errorf("save risk failed: %s", err)
+				}
+				vCh <- pv
+			}
+
+		}
+	}
+}
+
+var Exports = map[string]interface{}{
+	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
+		var vCh = make(chan *tools.PocVul)
+		filterVul := filter.NewFilter()
+		i := processVulnerability(target, filterVul, vCh)
+		c, _, _ := toConfig(opt...)
+		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+		if err != nil {
+			log.Errorf("create yak template failed (raw): %s", err)
+			close(vCh)
+			return vCh, err
+		}
+		if len(tpl.HTTPRequestSequences) > 0 {
+			opt = append(opt, _callback(i))
+		}
+		if len(tpl.TCPRequestSequences) > 0 {
+			opt = append(opt, _tcpCallback(i))
+		}
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)
@@ -373,7 +416,7 @@ func _callback(handler func(i map[string]interface{})) ConfigOption {
 }
 
 func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
-	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []byte, result bool, extractor map[string]interface{}) {
+	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{}) {
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
