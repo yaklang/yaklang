@@ -265,6 +265,7 @@ var mirrorGRPCServerCommand = cli.Command{
 		cli.StringFlag{Name: "server", Usage: "远程 Yak Bridge X 服务器"},
 		cli.StringFlag{Name: "secret", Usage: "远程 Yak Bridge X 服务器密码"},
 		cli.StringFlag{Name: "note", Usage: "可携带的基础信息"},
+		cli.StringFlag{Name: "gen-tls-crt", Value: "build/"},
 	},
 	Hidden: true,
 	Action: func(c *cli.Context) error {
@@ -283,7 +284,7 @@ var mirrorGRPCServerCommand = cli.Command{
 					"--secret", secret,
 					"--host", "127.0.0.1",
 					"--port", fmt.Sprint(port),
-					"--gen-tls-crt", "build/",
+					"--gen-tls-crt", c.String("gen-tls-crt"),
 				})
 				if err != nil {
 					log.Errorf("grpc panic: %s", err)
@@ -300,7 +301,7 @@ var mirrorGRPCServerCommand = cli.Command{
 		server := c.String("server")
 		serverSecret := c.String("secret")
 
-		pubpem, err := ioutil.ReadFile(filepath.Join("build/", "yakit-grpc-cert.pem"))
+		pubpem, err := ioutil.ReadFile(filepath.Join(c.String("gen-tls-crt"), "yakit-grpc-cert.pem"))
 		if err != nil {
 			return err
 		}
@@ -504,6 +505,7 @@ var startGRPCServerCommand = cli.Command{
 			log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
 				"    yak grpc --host 0.0.0.0")
 		}
+		log.Infof("yak grpc ok")  // 勿删
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)
