@@ -1,8 +1,11 @@
 package bruteutils
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
+	mssql "github.com/denisenkom/go-mssqldb"
+	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
@@ -16,7 +19,7 @@ import (
 var mssqlAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mssql",
 	DefaultPorts:     "1433",
-	DefaultUsernames: []string{"administrator", "admin", "root", "mssql", "manager"},
+	DefaultUsernames: []string{"administrator", "admin", "root", "mssql", "manager", "sa"},
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		// connect: connection refused
@@ -44,17 +47,25 @@ var mssqlAuth = &DefaultServiceAuthInfo{
 		target := fixToTarget(item.Target, 1433)
 		result := item.Result()
 
+		query := url.Values{}
+		query.Add("trustservercertificate", "true")
+		//query.Add("encrypt", "DISABLE")
+
 		u := &url.URL{
-			Scheme: "sqlserver",
-			User:   url.UserPassword(item.Username, item.Password),
-			Host:   target,
+			Scheme:   "sqlserver",
+			User:     url.UserPassword(item.Username, item.Password),
+			Host:     target,
+			RawQuery: query.Encode(),
 		}
-		db, err := sql.Open("sqlserver", u.String())
-		if err != nil {
-			log.Errorf("sqlserver conn failed: %s", err)
-			return result
-		}
-		_, err = db.Exec("select 1")
+		connStr := u.String()
+
+		cfg, _, _ := msdsn.Parse(connStr)
+		cfg.TLSConfig.MinVersion = tls.VersionTLS10
+
+		conn := mssql.NewConnectorConfig(cfg)
+		db := sql.OpenDB(conn)
+
+		_, err := db.Exec("select 1")
 		if err != nil {
 			switch true {
 			// connect: connection refused

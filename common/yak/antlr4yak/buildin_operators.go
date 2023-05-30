@@ -687,7 +687,12 @@ func init() {
 				for i := 0; i < rv2.Len(); i++ {
 					vals[i] = rv2.Index(i).Interface()
 				}
-				formatted := fmt.Sprintf(op1.AsString(), vals...)
+				var formatted string
+				if op2.IsStringOrBytes() {
+					formatted = fmt.Sprintf(op1.AsString(), op2.String())
+				} else {
+					formatted = fmt.Sprintf(op1.AsString(), vals...)
+				}
 				if op1.IsBytes() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
