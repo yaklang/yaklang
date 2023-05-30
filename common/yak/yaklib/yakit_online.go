@@ -363,17 +363,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 
 		existedYakScript, _ := yakit.GetYakScriptByName(db, i.ScriptName)
 		if existedYakScript != nil && existedYakScript.OnlineId <= 0 {
-			existedYakScript.ID = 0
-			originName := existedYakScript.ScriptName
-			existedYakScript.ScriptName = fmt.Sprintf("%v [local]", existedYakScript.ScriptName)
-			existedYakScript.IsHistory = true
-			existedYakScript.Ignored = true
-			yakit.CreateOrUpdateYakScriptByName(
-				db,
-				existedYakScript.ScriptName,
-				existedYakScript,
-			)
-			yakit.DeleteYakScriptByName(db, originName)
+			yakit.DeleteYakScriptByName(db, existedYakScript.ScriptName)
 		}
 		var scriptName = i.ScriptName
 

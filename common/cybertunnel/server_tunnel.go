@@ -92,7 +92,7 @@ func GetTunnels() []*Tunnel {
 
 func GetTunnel(id string) (*Tunnel, error) {
 	ins, ok := tunnels.Load(id)
-	registeredTunnel.Set(id, ins)
+	//registeredTunnel.Set(id, ins)
 	if ok {
 		return ins.(*Tunnel), nil
 	}
