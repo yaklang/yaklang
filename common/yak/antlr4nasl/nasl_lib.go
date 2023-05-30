@@ -381,11 +381,7 @@ func init() {
 			}
 			var conn net.Conn
 
-			proxys := []string{}
-			if engine.proxy != "" {
-				proxys = append(proxys, engine.proxy)
-			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, engine.proxys...)
 			if err != nil {
 				return nil, err
 			}
@@ -541,11 +537,7 @@ func init() {
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			proxys := []string{}
-			if engine.proxy != "" {
-				proxys = append(proxys, engine.proxy)
-			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Second, engine.proxys...)
 			if err != nil {
 				return nil, err
 			}
@@ -639,19 +631,19 @@ func init() {
 		},
 		"get_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0).Int()
-			if v, ok := engine.Kbs.data["Host/scanned"]; ok {
-				if v2, ok := v.([]int); ok {
-					return utils.IntArrayContains(v2, port), nil
+			if v, ok := engine.Kbs.data[fmt.Sprintf("Ports/tcp/%d", port)]; ok {
+				if v2, ok := v.(int); ok {
+					return v2, nil
 				}
 			}
 			return false, nil
 		},
 		"get_tcp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return utils.IsTCPPortAvailable(params.getParamByNumber(0, 0).Int()), nil
+			return utils.IsPortAvailable(engine.host, params.getParamByNumber(0, 0).Int()), nil
 		},
 		"get_udp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0, 0).Int()
-			return utils.IsUDPPortAvailable(port), nil
+			return utils.IsPortAvailableWithUDP(engine.host, port), nil
 		},
 		"scanner_add_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `scanner_add_port` is not implement"))
@@ -1445,12 +1437,7 @@ func init() {
 			if port == -1 {
 				return nil, fmt.Errorf("port is invalid")
 			}
-
-			proxys := []string{}
-			if engine.proxy != "" {
-				proxys = append(proxys, engine.proxy)
-			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, engine.proxys...)
 			if err != nil {
 				return nil, fmt.Errorf("connect pop3 server error：%s", err)
 			}
@@ -1518,11 +1505,7 @@ func init() {
 			return nil, nil
 		},
 		"pingHost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			proxys := []string{}
-			if engine.proxy != "" {
-				proxys = append(proxys, engine.proxy)
-			}
-			result := pingutil.PingAuto(engine.host, "", time.Second*5, proxys...)
+			result := pingutil.PingAuto(engine.host, "", time.Second*5, engine.proxys...)
 			return result.Ok, nil
 		},
 		"call_yak_method": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1602,11 +1585,17 @@ func init() {
 				if res == nil {
 					return res
 				}
-				array, err := vm.NewNaslArray(res)
-				if err == nil {
-					return array
+				switch ret := res.(type) {
+				case []byte:
+					return string(ret)
+				default:
+					array, err := vm.NewNaslArray(res)
+					if err == nil {
+						return array
+					} else {
+						return res
+					}
 				}
-				return res
 			}
 		}(name, method)
 	}
