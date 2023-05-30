@@ -7,7 +7,8 @@ import (
 	"os"
 )
 
-func ServiceScan(hosts string, ports string) ([]*fp.MatchResult, error) {
+// 临时的，用于测试
+func ServiceScan(hosts string, ports string, proxys ...string) ([]*fp.MatchResult, error) {
 	result := []*fp.MatchResult{}
 	os.Setenv("YAKMODE", "vm")
 	yakEngine := yaklang.New()

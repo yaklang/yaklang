@@ -216,7 +216,7 @@ func TestPocScanner(t *testing.T) {
 			return string(codeBytes)
 		})
 	})
-	err := engine.Scan("hairbeautydiffusion.com", "80")
+	err := engine.Scan("61.216.101.66", "80")
 	// 排查未定义的函数
 	var unknownErrors multiError
 	undefinedVars := []string{}

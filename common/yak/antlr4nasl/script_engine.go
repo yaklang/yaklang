@@ -6,12 +6,15 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type ScriptEngine struct {
+	proxys                         []string
 	Kbs                            *NaslKBs
 	naslLibsPath, dependenciesPath string
 	scripts                        map[*NaslScriptInfo]struct{}
@@ -123,8 +126,14 @@ func (e *ScriptEngine) ScanTarget(target string) error {
 }
 func (e *ScriptEngine) Scan(host string, ports string) error {
 	var allErrors multiError
+	res := pingutil.PingAuto(host, "80,443,22,8080", 3*time.Second, e.proxys...)
+	if res.Ok {
+		e.Kbs.SetKB("Host/dead", 0)
+	} else {
+		e.Kbs.SetKB("Host/dead", 1)
+	}
 	log.Infof("start syn scan host: %s, ports: %s", host, ports)
-	servicesInfo, err := ServiceScan(host, ports)
+	servicesInfo, err := ServiceScan(host, ports, e.proxys...)
 	if err != nil {
 		return err
 	}
@@ -158,6 +167,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			defer swg.Done()
 			engine := New()
 			engine.host = host
+			engine.SetProxys(e.proxys...)
 			engine.SetIncludePath(e.naslLibsPath)
 			engine.SetDependenciesPath(e.dependenciesPath)
 			engine.SetKBs(e.Kbs)

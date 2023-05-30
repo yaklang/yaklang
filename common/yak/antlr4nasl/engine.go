@@ -33,7 +33,7 @@ type Engine struct {
 	sourceCode                     string
 	scriptObj                      *NaslScriptInfo
 	host                           string
-	proxy                          string
+	proxys                         []string
 	Kbs                            *NaslKBs
 }
 
@@ -85,7 +85,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 		//panic("call build in method error: not found symbol id")
 	})
 	vm.SetVar("__OpCallCallBack__", func(name string) {
-		if name == "strIn" {
+		if name == "http_keepalive_send_recv" {
 			println()
 		}
 	})
@@ -96,8 +96,8 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
 }
-func (engine *Engine) SetProxy(proxy string) {
-	engine.proxy = proxy
+func (engine *Engine) SetProxys(proxys ...string) {
+	engine.proxys = proxys
 }
 func (engine *Engine) GetScriptObject() *NaslScriptInfo {
 	return engine.scriptObj
@@ -206,8 +206,6 @@ func (e *Engine) LoadScript(path string) (*NaslScriptInfo, error) {
 		}
 		return script, err
 	} else {
-		recoverSource := e.compiler.SetSourceCodeFilePath(path)
-		defer recoverSource()
 		err = e.safeEvalWithFileName(string(code), e.scriptObj.OriginFileName)
 		return e.scriptObj, err
 	}

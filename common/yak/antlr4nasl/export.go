@@ -10,8 +10,8 @@ import (
 )
 
 type NaslScriptConfig struct {
-	group []string
-	proxy string
+	group  []string
+	proxys []string
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -135,9 +135,7 @@ var Exports = map[string]interface{}{
 		for _, g := range config.group {
 			engine.LoadGroups(ScriptGroup(g))
 		}
-		engine.AddEngineHooks(func(engine *Engine) {
-			engine.SetProxy(config.proxy)
-		})
+		engine.proxys = config.proxys
 		err := engine.ScanTarget(target)
 		//if err != nil {
 		//	return nil, err
@@ -149,9 +147,9 @@ var Exports = map[string]interface{}{
 			c.group = append(c.group, groupName)
 		}
 	},
-	"proxy": func(proxy string) NaslScriptConfigOptFunc {
+	"proxy": func(proxy ...string) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
-			c.proxy = proxy
+			c.proxys = proxy
 		}
 	},
 }
