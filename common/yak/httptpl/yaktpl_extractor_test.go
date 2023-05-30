@@ -428,7 +428,7 @@ as
 }
 
 // lack testcase for kval and xpath attribute
-func TestYakExtractor_KVAL(t *testing.T) {
+func TestYakExtractor_REGEXP(t *testing.T) {
 	for index, extractor := range [][]any{
 		{
 			`HTTP/1.1 200 Ok
@@ -494,6 +494,44 @@ Content-Type: text/html; charset=utf-8
 			},
 			"data0",
 			"999",
+		},
+	} {
+		data, extractor, key, value := extractor[0].(string), extractor[1].(*YakExtractor), extractor[2].(string), extractor[3].(string)
+		vars, err := extractor.Execute([]byte(data))
+		if err != nil {
+			log.Infof("INDEX: %v failed: %v", index, err)
+			panic(err)
+		}
+		ret, _ := vars[key]
+		if toString(ret) != value {
+			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
+			panic("failed")
+		}
+		spew.Dump(vars)
+	}
+}
+
+func TestYakExtractor_KVAL(t *testing.T) {
+	for index, extractor := range [][]any{
+		{
+			`HTTP/1.1 200 OK
+Date: Mon, 23 May 2005 22:38:34 GMT
+Content-Type: text/html; charset=UTF-8
+Content-Encoding: UTF-8
+
+<html><!doctype html>
+<html>
+<body>
+  <div id="result">%d</div>
+</body>
+</html></html>`,
+			&YakExtractor{
+				Name:   "k1",
+				Type:   "kv",
+				Groups: []string{`id`},
+			},
+			"k1",
+			"result",
 		},
 	} {
 		data, extractor, key, value := extractor[0].(string), extractor[1].(*YakExtractor), extractor[2].(string), extractor[3].(string)
