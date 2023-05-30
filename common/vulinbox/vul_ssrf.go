@@ -74,7 +74,7 @@ func (s *VulinServer) registerSSRF() {
 	<input type="email" id="email" name="email" ><br><br>
 
 	<label for="age">年龄:</label>
-	<input type="number" id="age" name="age" min="18" max="120" ><br><br>
+	<input type="number" id="age" name="age" min="2" max="120" ><br><br>
 
 	
 	<label for="url">URL</label>
@@ -120,5 +120,40 @@ func (s *VulinServer) registerSSRF() {
 			return
 		}
 		writer.Write(rawResponse)
+	})
+	s.router.HandleFunc("/ssrf-in-post-multipart", func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == "GET" {
+			writer.Header().Set("Content-Type", "text/html; charset=utf8")
+			writer.Write([]byte(`
+<form action="/ssrf-in-post" method="post" enctype="multipart/form-data">
+	<label for="name">姓名:</label>
+	<input type="text" id="name" name="name" ><br><br>
+
+	<label for="email">邮箱:</label>
+	<input type="email" id="email" name="email" ><br><br>
+
+	<label for="age">年龄:</label>
+	<input type="number" id="age" name="age" min="2" max="120" ><br><br>
+
+	
+	<label for="url">URL</label>
+	<input id='url' name="url"><br><br>
+
+	<label for="gender">性别:</label>
+	<select id="gender" name="gender" >
+		<option value="">请选择</option>
+		<option value="male">男</option>
+		<option value="female">女</option>
+		<option value="other">其他</option>
+	</select><br><br>
+
+	<label for="message">留言:</label>
+	<textarea id="message" name="message" rows="5" ></textarea><br><br>
+
+	<input type="submit" value="提交">
+</form>
+`))
+			return
+		}
 	})
 }

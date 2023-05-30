@@ -1,8 +1,10 @@
 package mustpass
 
 import (
+	"context"
 	"embed"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
 	"path/filepath"
 	"sort"
@@ -16,6 +18,8 @@ var (
 
 //go:embed files/*
 var testFiles embed.FS
+
+var vulinboxAddr string
 
 func init() {
 	dirs, err := testFiles.ReadDir("files")
@@ -35,6 +39,11 @@ func init() {
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
 	yak.NewScriptEngine(1)
+
+	vulinboxAddr, err = vulinbox.NewVulinServer(context.Background())
+	if err != nil {
+		panic("VULINBOX START ERROR")
+	}
 }
 
 func TestMustPass(t *testing.T) {
@@ -56,9 +65,15 @@ func TestMustPass(t *testing.T) {
 		return cases[i][0] < cases[j][0]
 	})
 
+	if vulinboxAddr == "" {
+		panic("VULINBOX START ERROR")
+	}
+
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
-			err := yak.NewScriptEngine(1).Execute(i[1])
+			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
+				"VULINBOX": vulinboxAddr,
+			})
 			if err != nil {
 				t.Fatalf("[%v] error: %v", i[0], err)
 			}
@@ -67,7 +82,9 @@ func TestMustPass(t *testing.T) {
 
 	for _, i := range cases {
 		t.Run(i[0], func(t *testing.T) {
-			err := yak.NewScriptEngine(1).Execute(i[1])
+			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
+				"VULINBOX": vulinboxAddr,
+			})
 			if err != nil {
 				t.Fatalf("[%v] error: %v", i[0], err)
 			}

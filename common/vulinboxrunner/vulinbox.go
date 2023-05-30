@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -57,6 +59,18 @@ func main() {
 		if err != nil {
 			log.Errorf("new vulinbox server failed: %v", err)
 			return err
+		}
+		ifs, _ := net.Interfaces()
+		for _, i := range ifs {
+			addrs, _ := i.Addrs()
+			for _, addr := range addrs {
+				ip := addr.String()
+				ip, _, _ = strings.Cut(ip, "/")
+				if !utils.IsIPv4(ip) {
+					continue
+				}
+				log.Infof("checking on: %v:%v", ip, c.Int("port"))
+			}
 		}
 		log.Infof("VULINBOX RUNNING IN: %s", servers)
 		for {
