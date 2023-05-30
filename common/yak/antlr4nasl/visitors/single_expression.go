@@ -602,7 +602,7 @@ func (c *Compiler) VisitCallExpression(i *nasl.CallExpressionContext) {
 		c.pushInt(c.GetSymbolId(i.SingleExpression().GetText()))
 		paramsLen++
 	} else {
-		c.VisitSingleExpression(i.SingleExpression())
+		c.pushRef("__function__" + funcName)
 	}
 	iarguments := i.ArgumentList()
 	var argLen int

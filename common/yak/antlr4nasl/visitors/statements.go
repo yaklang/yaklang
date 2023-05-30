@@ -218,7 +218,7 @@ func (c *Compiler) VisitFunctionDeclarationStatement(i nasl.IFunctionDeclaration
 		return
 	}
 	functionName := functionDeclarationStatement.Identifier().GetText()
-	c.pushLeftRef(functionName)
+	c.pushLeftRef("__function__" + functionName)
 	iparamList := functionDeclarationStatement.ParameterList()
 	symbols := []int{}
 	if iparamList != nil {
