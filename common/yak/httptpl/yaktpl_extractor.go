@@ -53,7 +53,7 @@ type YakExtractor struct {
 
 // group1 for key
 // group2 for value
-var kvExtractorRegexp = regexp.MustCompile(`([^\s=:,]+)\s*((:)|(=))\s*?(^\s[^\n\r]*)`)
+var kvExtractorRegexp = regexp.MustCompile(`([^\s=:,]+)\s*((:)|(=))\s*?(\S[^\n\r]*)`)
 
 func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 	var material string
@@ -117,14 +117,17 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 			}
 		}
 	case "kv", "key-value", "kval":
-		for _, result := range kvExtractorRegexp.FindAllStringSubmatch(material, -1) {
-			if len(result) > 5 {
-
-				var key = strings.Trim(result[1], `"{}'`+"`,")
-				var value = strings.Trim(result[5], `"{}'`+"`,")
-				if len(y.Groups) == 0 || utils.StringSliceContain(y.Groups, key) {
-					results[key] = value
-				}
+		kvResult := ExtractKValFromResponse([]byte(material))
+		var tag string
+		for index, group := range y.Groups {
+			if y.Name == "" {
+				tag = fmt.Sprintf("data%v", index)
+			} else {
+				tag = y.Name
+			}
+			if v, ok := kvResult[group]; ok {
+				results[tag] = v
+				results[group] = v
 			}
 		}
 	case "json", "jq":
