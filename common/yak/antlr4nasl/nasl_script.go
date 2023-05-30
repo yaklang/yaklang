@@ -37,9 +37,6 @@ func (n *NaslKBs) AddKB(name string, value interface{}) error {
 	return n.SetKB(name, []interface{}{value})
 }
 func (n *NaslKBs) SetKB(name string, value interface{}) error {
-	if name == "Host/dead" {
-		print()
-	}
 	n.mux.Lock()
 	defer n.mux.Unlock()
 	n.data[name] = value

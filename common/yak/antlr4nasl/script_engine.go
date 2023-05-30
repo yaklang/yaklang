@@ -101,7 +101,7 @@ func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
 	for _, group := range groups {
 		familys, ok := e.scriptGroupDefines[group]
 		if !ok {
-			continue
+			familys = []string{string(group)}
 		}
 		for _, family := range familys {
 			var scripts []*yakit.NaslScript

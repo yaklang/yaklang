@@ -85,9 +85,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 		//panic("call build in method error: not found symbol id")
 	})
 	vm.SetVar("__OpCallCallBack__", func(name string) {
-		if name == "http_keepalive_send_recv" {
-			println()
-		}
+		// 做一些函数调试的工作
 	})
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	engine.scriptObj = NewNaslScriptObject()

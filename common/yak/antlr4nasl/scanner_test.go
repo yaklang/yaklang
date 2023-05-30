@@ -197,8 +197,9 @@ func TestPocScanner(t *testing.T) {
 	//	PatchEngine(engine) // 一些库缺少函数
 	//})
 	//engine.LoadGroups(PluginGroupApache)
-	engine.LoadScriptFromDb("gb_apache_tomcat_detect.nasl")
-	engine.SetGoroutineNum(1)
+	//engine.LoadScriptFromDb("gb_apache_tomcat_detect.nasl")
+	engine.LoadGroups("Product detection")
+	engine.SetGoroutineNum(1000)
 	engine.AddEngineHooks(func(engine *Engine) {
 
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
