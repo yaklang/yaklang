@@ -134,6 +134,7 @@ additiveBinaryOperator
     : '+' | '-'
     ;
 
+// `%` 作为二元运算符同时充当取余和格式化功能
 multiplicativeBinaryOperator
     : '*' | '/' | '%'
     ;
