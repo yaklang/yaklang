@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math"
 	"net"
 	"strings"
@@ -19,7 +18,6 @@ type ExitSignal struct {
 	Flag interface{}
 }
 
-var oid = codec.Md5("code")
 var NaslBuildInNativeMethod = map[string]interface{}{
 	"get_array_elem": func(icaller interface{}, index interface{}) interface{} {
 		switch caller := icaller.(type) {
@@ -94,9 +92,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 
 	"isnull": func(i interface{}) bool {
 		return i == nil
-	},
-	"get_script_oid": func() string {
-		return oid
 	},
 	"__split": func(s string, sep string, keep bool) []string {
 		return strings.Split(s, sep)
