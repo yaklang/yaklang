@@ -1151,6 +1151,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						} else {
 							val = -1
 						}
+					} else if array, ok := val.(*vm.NaslArray); ok {
+						for i := 0; i < array.GetMaxIdx(); i++ {
+							if array.GetElementByNum(i) != nil {
+								val = array.GetElementByNum(i)
+								break
+							}
+						}
 					} else {
 						panic("getOne call must return a slice or array")
 					}

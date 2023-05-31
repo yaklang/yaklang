@@ -201,7 +201,7 @@ func TestPocScanner(t *testing.T) {
 	engine.LoadGroups("Product detection")
 	engine.SetGoroutineNum(1000)
 	engine.AddEngineHooks(func(engine *Engine) {
-
+		engine.SetAutoLoadDependencies(false)
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
 			if err != nil {
@@ -217,7 +217,7 @@ func TestPocScanner(t *testing.T) {
 			return string(codeBytes)
 		})
 	})
-	err := engine.Scan("61.216.101.66", "80")
+	err := engine.Scan("209.141.41.173", "80")
 	// 排查未定义的函数
 	var unknownErrors multiError
 	undefinedVars := []string{}

@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"regexp"
@@ -445,10 +446,10 @@ func init() {
 				if n == 0 {
 					break
 				}
+				buf.Write(byt[:n])
 				if byt[0] == '\n' {
 					break
 				}
-				buf.Write(byt[:n])
 			}
 			//if len(line) > length {
 			//	return line[:length], nil
@@ -532,7 +533,7 @@ func init() {
 			}
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			port := params.getParamByName("port", 0).Int()
+			port := params.getParamByNumber(0, -1).Int()
 			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
 			var n int
@@ -1638,6 +1639,23 @@ func init() {
 			}
 			_, ok := p.Value.(*vm.NaslArray)
 			return ok, nil
+		},
+		"http_get_remote_headers": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByNumber(0).Int()
+			host := engine.host
+			if port != 80 {
+				host = fmt.Sprintf("%s:%d", host, port)
+			}
+			url := fmt.Sprintf("http://%s/", host)
+			resp, err := http.Head(url)
+			if err != nil {
+				return nil, err
+			}
+			header, err := utils.HttpDumpWithBody(resp, false)
+			if err != nil {
+				return nil, err
+			}
+			return header, nil
 		},
 	}
 	for name, method := range naslLib {

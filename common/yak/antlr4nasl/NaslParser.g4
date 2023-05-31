@@ -87,35 +87,33 @@ arrayElement
     : (singleExpression | identifier) ','?
     ;
 singleExpression
-    : singleExpression '(' argumentList? ')'                                 # CallExpression
-
-    | singleExpression '[' singleExpression ']'                              # MemberIndexExpression
-    | singleExpression ( '**' | '*' | '/' | '%') singleExpression                    # MultiplicativeExpression
-    | singleExpression ('+' | '-') singleExpression                          # AdditiveExpression
-    | singleExpression ('<<' | '>>' | '>>>' | '>>=' | '>>>=' ) singleExpression                # BitShiftExpression
-    | singleExpression ('<' | '>' | '<=' | '>=') singleExpression            # RelationalExpression
-    | singleExpression ('==' | '>!<' | '><' | '!=' | '!~' | '=~') singleExpression        # EqualityExpression
-    | singleExpression '&' singleExpression                                  # BitAndExpression
-    | singleExpression '^' singleExpression                                  # BitXOrExpression
-    | singleExpression '|' singleExpression                                  # BitOrExpression
-    | identifier                                                             # IdentifierExpression
+    : identifier                                                             # IdentifierExpression
     | literal                                                                # LiteralExpression
     | arrayLiteral                                                           # ArrayLiteralExpression
     | singleExpression '.' Identifier                                        # MemberDotExpression
-    | singleExpression (('[' singleExpression ']')|('.' Identifier))? assignmentOperator singleExpression     # AssignmentExpression
-    | '!' singleExpression                                                   # NotExpression
+    | singleExpression '(' argumentList? ')'                                 # CallExpression
     | '(' expressionSequence ')'                                             # ParenthesizedExpression
-    | singleExpression X singleExpression                                      # XExpression
-    | singleExpression  '++'                                                 # PostIncrementExpression
-    | singleExpression  '--'                                                 # PostDecreaseExpression
+    | singleExpression '[' singleExpression ']'                              # MemberIndexExpression
     | '++' singleExpression                                                  # PreIncrementExpression
     | '--' singleExpression                                                  # PreDecreaseExpression
     | '+' singleExpression                                                   # UnaryPlusExpression
     | '-' singleExpression                                                   # UnaryMinusExpression
     | '~' singleExpression                                                   # BitNotExpression
+    | '!' singleExpression                                                   # NotExpression
+    | singleExpression  '++'                                                 # PostIncrementExpression
+    | singleExpression  '--'                                                 # PostDecreaseExpression
+    | singleExpression ( '**' | '*' | '/' | '%') singleExpression                    # MultiplicativeExpression
+    | singleExpression ('+' | '-') singleExpression                          # AdditiveExpression
+    | singleExpression ('<<' | '>>' | '>>>' | '>>=' | '>>>=' ) singleExpression                # BitShiftExpression
+    | singleExpression ('<' | '>' | '<=' | '>=') singleExpression            # RelationalExpression
+    | singleExpression X singleExpression                                      # XExpression
+    | singleExpression ('==' | '>!<' | '><' | '!=' | '!~' | '=~') singleExpression        # EqualityExpression
+    | singleExpression '&' singleExpression                                  # BitAndExpression
+    | singleExpression '|' singleExpression                                  # BitOrExpression
+    | singleExpression '^' singleExpression                                  # BitXOrExpression
     | singleExpression '&&' singleExpression                                 # LogicalAndExpression
     | singleExpression '||' singleExpression                                 # LogicalOrExpression
-
+    | singleExpression (('[' singleExpression ']')|('.' Identifier))? assignmentOperator singleExpression     # AssignmentExpression
     ;
 //memberDotExp:
 //    singleExpression '.' identifier;

@@ -91,22 +91,24 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 	}
 	e.MarkScriptIsLoaded(n.ScriptName)
 	// 缺乏循环依赖检查
-	for _, dependency := range n.Dependencies {
-		if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
-			continue
-		}
-		if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
-			continue
-		}
-		if e.IsScriptLoaded(dependency) {
-			continue
-		}
-		ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
-		if err != nil {
-			return err
-		}
-		if err := ins.Run(e); err != nil {
-			return err
+	if e.autoLoadDependencies {
+		for _, dependency := range n.Dependencies {
+			if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
+				continue
+			}
+			if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
+				continue
+			}
+			if e.IsScriptLoaded(dependency) {
+				continue
+			}
+			ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
+			if err != nil {
+				return err
+			}
+			if err := ins.Run(e); err != nil {
+				return err
+			}
 		}
 	}
 	e.scriptObj = n

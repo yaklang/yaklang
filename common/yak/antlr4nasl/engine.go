@@ -37,6 +37,7 @@ type Engine struct {
 	Kbs                            *NaslKBs
 	loadedScripts                  map[string]struct{}
 	loadedScriptsLock              *sync.Mutex
+	autoLoadDependencies           bool
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {
@@ -89,6 +90,9 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 	})
 	vm.SetVar("__OpCallCallBack__", func(name string) {
 		// 做一些函数调试的工作
+		if name == "enable_keepalive" {
+			print()
+		}
 	})
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	engine.scriptObj = NewNaslScriptObject()
@@ -96,6 +100,9 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 }
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
+}
+func (engine *Engine) SetAutoLoadDependencies(autoLoad bool) {
+	engine.autoLoadDependencies = autoLoad
 }
 func (e *Engine) MarkScriptIsLoaded(scriptName string) {
 	e.loadedScriptsLock.Lock()

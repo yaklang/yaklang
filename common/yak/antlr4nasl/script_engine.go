@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -109,13 +110,13 @@ func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
 		}
 		for _, family := range familys {
 			var scripts []*yakit.NaslScript
-			if db := db.Find(&scripts).Where("family = ?", family); db.Error != nil {
+			if db := db.Where("family = ?", family).Find(&scripts); db.Error != nil {
 				continue
 			}
-			if len(scripts) > 100 {
-				scripts = scripts[:100]
-			}
 			for _, script := range scripts {
+				if !strings.Contains(strings.ToLower(script.ScriptName), "apache") {
+					continue
+				}
 				if _, ok := e.excludeScripts[script.OID]; ok {
 					continue
 				}
@@ -133,11 +134,14 @@ func (e *ScriptEngine) ScanTarget(target string) error {
 }
 func (e *ScriptEngine) Scan(host string, ports string) error {
 	var allErrors multiError
-	res := pingutil.PingAuto(host, "80,443,22,8080", 3*time.Second, e.proxys...)
+	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxys...)
 	if res.Ok {
 		e.Kbs.SetKB("Host/dead", 0)
+		e.Kbs.SetKB("Host/State", "up")
 	} else {
+		//ping检测不存活 或排除打印机设备时会标注为dead
 		e.Kbs.SetKB("Host/dead", 1)
+		e.Kbs.SetKB("Host/State", "down")
 	}
 	log.Infof("start syn scan host: %s, ports: %s", host, ports)
 	servicesInfo, err := ServiceScan(host, ports, e.proxys...)
@@ -149,19 +153,29 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	portInfos := []*fp.MatchResult{}
 	for _, result := range servicesInfo {
 		if result.State == fp.OPEN {
+			fingerprint := result.Fingerprint
 			openPorts = append(openPorts, result.Port)
 			portInfos = append(portInfos, result)
 			e.Kbs.SetKB(fmt.Sprintf("Ports/tcp/%d", result.Port), 1)
-			//var ServiceName string
-			//switch result.Fingerprint.ServiceName {
-			//case "http", "https":
-			//	ServiceName = "www"
-			//}
-			//if ServiceName != "" {
-			//	e.Kbs.SetKB(fmt.Sprintf("Services/%s", ServiceName), result.Port)
-			//}
+			if fingerprint.ServiceName != "" {
+				var serverName string
+				if fingerprint.ServiceName == "http" {
+					serverName = "www"
+				} else {
+					serverName = fingerprint.ServiceName
+				}
+				e.Kbs.SetKB(fmt.Sprintf("Services/%s", serverName), fingerprint.Port)
+				e.Kbs.SetKB(fmt.Sprintf("Known/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.ServiceName)
+			}
+			if fingerprint.Version != "" {
+				e.Kbs.SetKB(fmt.Sprintf("Version/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.Version)
+			}
+			for _, cpe := range fingerprint.CPEs {
+				e.Kbs.SetKB(fmt.Sprintf("APP/%s/%d", fingerprint.Proto, fingerprint.Port), cpe)
+			}
 		}
 	}
+	// 缺少os finger_print、tcp_seq_index、ipidseq、Traceroute
 	e.Kbs.SetKB("Host/port_infos", portInfos)
 	swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	errorsMux := sync.Mutex{}
