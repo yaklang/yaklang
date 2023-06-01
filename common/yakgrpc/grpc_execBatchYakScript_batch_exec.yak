@@ -15,7 +15,10 @@ go func {
 
     try {
         if nucleiPluginNames.Length() > 0 {
-            for pocVul in nuclei.Scan(target, nuclei.templates(nucleiPluginNames...),
+            for result in nucleiPluginNames {
+                yakit.Info("加载漏洞检测模版: %v", result)
+            }
+            for pocVul in nuclei.Scan(target, nuclei.templates(nucleiPluginNames...), nuclei.debug(true),
                                       poc.https(str.IsTLSServer(target)~))~ {
                 yakit.Output(pocVul)
                 yakit.Output(nuclei.PocVulToRisk(pocVul))
