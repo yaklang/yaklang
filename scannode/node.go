@@ -21,7 +21,7 @@ type WebServerConfig struct {
 	WebServerPort string `json:"web_server_port"`
 }
 
-func NewScanNodeWithAMQPUrl(id string, amqpUrl string, serverIp string) (*ScanNode, error) {
+func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp string) (*ScanNode, error) {
 	base, err := node.NewNodeBase(
 		spec.NodeType_Scanner,
 		spec.CommonRPCExchange,
@@ -36,7 +36,7 @@ func NewScanNodeWithAMQPUrl(id string, amqpUrl string, serverIp string) (*ScanNo
 	agent := node
 	agent.node.HookAfterRegisteringFinished(
 		func() {
-			node.GetIpecho(serverIp, node.node.WebServerPort)
+			node.GetIpecho(serverIp, serverPort)
 		},
 	)
 	// 回传日志信息
@@ -62,8 +62,8 @@ func NewScanNodeWithAMQPUrl(id string, amqpUrl string, serverIp string) (*ScanNo
 	return node, nil
 }
 
-func NewScanNode(id string, amqpConfig *spec.AMQPConfig) (*ScanNode, error) {
-	return NewScanNodeWithAMQPUrl(id, amqpConfig.GetAMQPUrl(), amqpConfig.Host)
+func NewScanNode(id, serverPort string, amqpConfig *spec.AMQPConfig) (*ScanNode, error) {
+	return NewScanNodeWithAMQPUrl(id, serverPort, amqpConfig.GetAMQPUrl(), amqpConfig.Host)
 }
 
 func (s *ScanNode) Run() {
