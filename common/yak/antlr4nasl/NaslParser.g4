@@ -87,9 +87,7 @@ arrayElement
     : (singleExpression | identifier) ','?
     ;
 singleExpression
-    : identifier                                                             # IdentifierExpression
-    | literal                                                                # LiteralExpression
-    | arrayLiteral                                                           # ArrayLiteralExpression
+    : arrayLiteral                                                           # ArrayLiteralExpression
     | singleExpression '.' Identifier                                        # MemberDotExpression
     | singleExpression '(' argumentList? ')'                                 # CallExpression
     | '(' expressionSequence ')'                                             # ParenthesizedExpression
@@ -114,6 +112,8 @@ singleExpression
     | singleExpression '&&' singleExpression                                 # LogicalAndExpression
     | singleExpression '||' singleExpression                                 # LogicalOrExpression
     | singleExpression (('[' singleExpression ']')|('.' Identifier))? assignmentOperator singleExpression     # AssignmentExpression
+    | identifier                                                             # IdentifierExpression
+    | literal                                                                # LiteralExpression
     ;
 //memberDotExp:
 //    singleExpression '.' identifier;

@@ -1530,8 +1530,11 @@ func init() {
 			return response, nil
 		},
 		"http_cgi_dirs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_cgi_dirs` is not implement"))
-			return nil, nil
+			cgiPath, ok := GlobalPrefs["cgi_path"]
+			if ok {
+				return cgiPath, nil
+			}
+			return "", nil
 		},
 		"include": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0, "").String()
@@ -1640,6 +1643,14 @@ func init() {
 			_, ok := p.Value.(*vm.NaslArray)
 			return ok, nil
 		},
+		"ssh_connect": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			p := params.getParamByNumber(0)
+			if p == nil || p.Value == nil {
+				return false, nil
+			}
+			_, ok := p.Value.(*vm.NaslArray)
+			return ok, nil
+		},
 		"http_get_remote_headers": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0).Int()
 			host := engine.host
@@ -1656,6 +1667,84 @@ func init() {
 				return nil, err
 			}
 			return header, nil
+		},
+		"service_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			idefault_port_list := params.getParamByName("default_port_list", "").Value
+			default_port_array, ok := idefault_port_list.(*vm.NaslArray)
+			if !ok {
+				return nil, utils.Errorf("service_get_ports: default_port_list is not array")
+			}
+			default_port_list := []int{}
+			for i := 0; i < default_port_array.GetMaxIdx(); i++ {
+				iport := default_port_array.GetElementByNum(i)
+				port, ok := iport.(int)
+				if !ok {
+					continue
+				}
+				default_port_list = append(default_port_list, port)
+			}
+			nodefault := params.getParamByName("nodefault", 0).Bool()
+			service := params.getParamByName("proto", "").String()
+			ipproto := params.getParamByName("ipproto", "tcp").String()
+			var port = -1
+			if ipproto == "tcp" {
+				p := engine.Kbs.GetKB(fmt.Sprintf("Services/%s", service))
+				if p != nil {
+					if p1, ok := p.(int); ok {
+						port = p1
+					}
+				}
+			} else {
+				p := engine.Kbs.GetKB(fmt.Sprintf("Services/%s/%s", ipproto, service))
+				if p != nil {
+					if p1, ok := p.(int); ok {
+						port = p1
+					}
+				}
+			}
+			if port != -1 {
+				return []int{port}, nil
+			}
+			if nodefault {
+				return default_port_list, nil
+			} else {
+				return -1, nil
+			}
+		},
+		"service_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			res, err := engine.CallNativeFunction("service_get_ports", map[string]interface{}{
+				"proto":             params.getParamByName("proto", "").Value,
+				"ipproto":           params.getParamByName("ipproto", "").Value,
+				"default_port_list": []int{params.getParamByName("default", "").Int()},
+				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+			if err != nil {
+				return nil, err
+			}
+			ports, ok := res.([]int)
+			if !ok {
+				return -1, nil
+			}
+			if len(ports) == 0 {
+				return -1, nil
+			}
+			return ports[0], nil
+		},
+		"unknownservice_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("service_get_port", map[string]interface{}{
+				"proto":     "unknown",
+				"ipproto":   params.getParamByName("ipproto", "").Value,
+				"default":   params.getParamByName("default", 0).Int(),
+				"nodefault": params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+		},
+		"unknownservice_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("service_get_port", map[string]interface{}{
+				"proto":             "unknown",
+				"ipproto":           params.getParamByName("ipproto", "").Value,
+				"default_port_list": params.getParamByName("default_port_list", "").Value,
+				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
 		},
 	}
 	for name, method := range naslLib {
