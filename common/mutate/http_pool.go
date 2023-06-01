@@ -6,11 +6,14 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"reflect"
@@ -25,6 +28,7 @@ type httpPoolConfig struct {
 	Size              int
 	PerRequestTimeout time.Duration
 	IsHttps           bool
+	IsGmTLS           bool
 	Host              string
 	Port              int
 	NoSystemProxy     bool
@@ -247,6 +251,12 @@ func _httpPool_IsHttps(f bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_IsGmTLS(f bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.IsGmTLS = f
+	}
+}
+
 func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Proxies = proxies
@@ -303,6 +313,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		Size:              50,
 		PerRequestTimeout: 10 * time.Second,
 		IsHttps:           false,
+		IsGmTLS:           false,
 		UseRawMode:        true,
 		RedirectTimes:     5,
 		NoFollowRedirect:  true,
@@ -434,6 +445,22 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					}
 					if targetRequest.URL.Scheme == "https" {
 						https = true
+					}
+					if config.IsGmTLS {
+						https = true
+						httpTr := client.Transport.(*http.Transport)
+						httpTr.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+							dialer := &net.Dialer{}
+							conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
+								GMSupport:          &gmtls.GMSupport{},
+								InsecureSkipVerify: true,
+							})
+							if err != nil {
+								return nil, err
+							}
+							ctx, _ = context.WithTimeout(ctx, 30*time.Second)
+							return ctxio.NewConn(ctx, conn), nil
+						}
 					}
 
 					url, err := lowhttp.ExtractURLFromHTTPRequest(targetRequest, https)
@@ -646,6 +673,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
 						lowhttp.WithDNSServers(config.DNSServers),
 						lowhttp.WithETCHosts(config.EtcHosts),
+						lowhttp.WithGmTLS(config.IsGmTLS),
 					)
 					var rsp []byte
 					if rspInstance != nil {
@@ -801,6 +829,7 @@ var WithPoolOpt_RedirectTimes = _httpPool_redirectTimes
 var WithPoolOpt_RawMode = _httpPool_RawMode
 var ExecPool = _httpPool
 var WithPoolOpt_Https = _httpPool_IsHttps
+var WithPoolOpt_GmTLS = _httpPool_IsGmTLS
 var WithPoolOpt_NoFollowRedirect = _httpPool_SetNoFollowRedirect
 var WithPoolOpt_FollowJSRedirect = _httpPool_SetFollowJSRedirect
 var WithPoolOpt_Context = _httpPool_SetContext
