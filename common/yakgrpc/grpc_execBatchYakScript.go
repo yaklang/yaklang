@@ -11,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -323,45 +325,43 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 				var logToExecResult = func(l *yaklib.YakitLog) *ypb.ExecResult {
 					return yaklib.NewYakitLogExecResult(l.Level, l.Data)
 				}
-				engine.HookOsExit()
-				coreEngine, err := engine.ExecuteExWithContext(subCtx, string(batchExecScripts), map[string]interface{}{
-					"target":    target,
-					"templates": templates,
-					"ordinary":  ordinaries,
-					"ctx":       subCtx,
-					"feedbacker": func(result *ypb.ExecResult) error {
-						return stream.Send(&ypb.ExecBatchYakScriptResult{
+				var feedbackClient = yaklib.NewVirtualYakitClient(func(i interface{}) error {
+					switch ret := i.(type) {
+					case *ypb.ExecResult:
+						stream.Send(&ypb.ExecBatchYakScriptResult{
 							Status:     "data",
-							Result:     result,
+							Result:     ret,
 							Target:     target,
 							ExtraParam: extraParams,
 							TaskId:     taskId,
 							Timestamp:  time.Now().Unix(),
 						})
-					},
-					"yakitclient": yaklib.NewVirtualYakitClient(func(i interface{}) error {
-						switch ret := i.(type) {
-						case *ypb.ExecResult:
-							stream.Send(&ypb.ExecBatchYakScriptResult{
-								Status:     "data",
-								Result:     ret,
-								Target:     target,
-								ExtraParam: extraParams,
-								TaskId:     taskId,
-								Timestamp:  time.Now().Unix(),
-							})
-						case *yaklib.YakitLog:
-							stream.Send(&ypb.ExecBatchYakScriptResult{
-								Status:     "data",
-								Result:     logToExecResult(ret),
-								Target:     target,
-								ExtraParam: extraParams,
-								TaskId:     taskId,
-								Timestamp:  time.Now().Unix(),
-							})
-						}
-						return nil
-					}),
+					case *yaklib.YakitLog:
+						stream.Send(&ypb.ExecBatchYakScriptResult{
+							Status:     "data",
+							Result:     logToExecResult(ret),
+							Target:     target,
+							ExtraParam: extraParams,
+							TaskId:     taskId,
+							Timestamp:  time.Now().Unix(),
+						})
+					}
+					return nil
+				})
+				engine.HookOsExit()
+				engine.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+					switch ret := engine.(type) {
+					case *antlr4yak.Engine:
+						yaklib.SetEngineClient(ret, feedbackClient)
+					}
+					return nil
+				})
+				coreEngine, err := engine.ExecuteExWithContext(subCtx, string(batchExecScripts), map[string]interface{}{
+					"target":      target,
+					"templates":   templates,
+					"ordinary":    ordinaries,
+					"ctx":         subCtx,
+					"yakitclient": feedbackClient,
 				})
 				if err != nil {
 					log.Errorf("execute batch exec script failed: %s", err)
