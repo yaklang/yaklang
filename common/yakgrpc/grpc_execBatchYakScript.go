@@ -2,13 +2,16 @@ package yakgrpc
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -20,6 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+//go:embed grpc_execBatchYakScript_batch_exec.yak
+var batchExecScripts []byte
 
 func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream ypb.Yak_ExecBatchYakScriptServer) error {
 	// 用于管理进度保存相关内容
@@ -248,19 +254,43 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 				}()
 
 				taskId := uuid.NewV4().String() // codec.Sha512(target + script.ScriptName + fmt.Sprint(script.Id))
-				params, defers, err := ConvertMultiYakScriptToExecRequest(&ypb.ExecRequest{
-					Params: append(extraParams, &ypb.ExecParamItem{Key: "target", Value: target}),
-					//YakScriptId: script.Id,
-				}, scriptGroup, true)
-				defer func() {
-					for _, r := range defers {
-						r()
+
+				/**
+				这儿需要小心点处理：
+
+				批量执行将不再建议使用 “进程”
+
+				通过上下文控制即可。
+
+				不同插件的调用方式和目标处理都不一样，一个插件组可能有不同的插件类型，因此需要写一个脚本同时调用 N 种插件
+				*/
+				var templates []string
+				var ordinaries []string
+				for _, i := range scriptGroup {
+					switch i.GetType() {
+					case "nuclei", "nuclei-templates":
+						templates = append(templates, i.ScriptName)
+					default:
+						ordinaries = append(ordinaries, i.ScriptName)
 					}
-				}()
-				if err != nil {
-					log.Errorf("generate exec request params failed: %s", err)
-					return
 				}
+
+				engine := yak.NewScriptEngine(10)
+				subCtx, cancel := context.WithTimeout(ctx, time.Duration(int64(30*time.Second)*int64(len(scriptGroup))))
+				defer cancel()
+
+				//params, defers, err := ConvertMultiYakScriptToExecBatchRequest(&ypb.ExecRequest{
+				//	Params: append(extraParams, &ypb.ExecParamItem{Key: "target", Value: target}),
+				//}, scriptGroup, true)
+				//defer func() {
+				//	for _, r := range defers {
+				//		r()
+				//	}
+				//}()
+				//if err != nil {
+				//	log.Errorf("generate exec request params failed: %s", err)
+				//	return
+				//}
 
 				stream.Send(&ypb.ExecBatchYakScriptResult{
 					Status: "data",
@@ -272,24 +302,76 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					TaskId:     taskId,
 					Timestamp:  time.Now().Unix(),
 				})
-				time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)
-				subCtx, cancel := context.WithTimeout(ctx, time.Duration(int64(30*time.Second)*int64(len(scriptGroup))))
-				defer cancel()
-				err = s.execRequest(params, `general-batch`, subCtx, func(result *ypb.ExecResult, logItem *yaklib.YakitLog) error {
-					if logItem == nil {
-						return nil
-					}
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
-					stream.Send(&ypb.ExecBatchYakScriptResult{
-						Status:     "data",
-						Result:     result,
-						Target:     target,
-						ExtraParam: extraParams,
-						TaskId:     taskId,
-						Timestamp:  time.Now().Unix(),
-					})
-					return nil
-				}, ioutil.Discard)
+				//// 启动一个带上下文引擎的内容
+				//err = s.execRequest(params, `general-batch`, subCtx, func(result *ypb.ExecResult, logItem *yaklib.YakitLog) error {
+				//	if logItem == nil {
+				//		return nil
+				//	}
+				//
+				//	stream.Send(&ypb.ExecBatchYakScriptResult{
+				//		Status:     "data",
+				//		Result:     result,
+				//		Target:     target,
+				//		ExtraParam: extraParams,
+				//		TaskId:     taskId,
+				//		Timestamp:  time.Now().Unix(),
+				//	})
+				//	return nil
+				//}, ioutil.Discard)
+
+				var logToExecResult = func(l *yaklib.YakitLog) *ypb.ExecResult {
+					return yaklib.NewYakitLogExecResult(l.Level, l.Data)
+				}
+				engine.HookOsExit()
+				coreEngine, err := engine.ExecuteExWithContext(subCtx, string(batchExecScripts), map[string]interface{}{
+					"target":    target,
+					"templates": templates,
+					"ordinary":  ordinaries,
+					"ctx":       subCtx,
+					"feedbacker": func(result *ypb.ExecResult) error {
+						return stream.Send(&ypb.ExecBatchYakScriptResult{
+							Status:     "data",
+							Result:     result,
+							Target:     target,
+							ExtraParam: extraParams,
+							TaskId:     taskId,
+							Timestamp:  time.Now().Unix(),
+						})
+					},
+					"yakitclient": yaklib.NewVirtualYakitClient(func(i interface{}) error {
+						switch ret := i.(type) {
+						case *ypb.ExecResult:
+							stream.Send(&ypb.ExecBatchYakScriptResult{
+								Status:     "data",
+								Result:     ret,
+								Target:     target,
+								ExtraParam: extraParams,
+								TaskId:     taskId,
+								Timestamp:  time.Now().Unix(),
+							})
+						case *yaklib.YakitLog:
+							if ret.Level != "info" {
+								spew.Dump(ret)
+							}
+							stream.Send(&ypb.ExecBatchYakScriptResult{
+								Status:     "data",
+								Result:     logToExecResult(ret),
+								Target:     target,
+								ExtraParam: extraParams,
+								TaskId:     taskId,
+								Timestamp:  time.Now().Unix(),
+							})
+						}
+						return nil
+					}),
+				})
+				if err != nil {
+					log.Errorf("execute batch exec script failed: %s", err)
+				}
+				_ = coreEngine
+
 				defer func() {
 					time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)
 					stream.Send(&ypb.ExecBatchYakScriptResult{
@@ -326,7 +408,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 	return nil
 }
 
-func ConvertMultiYakScriptToExecRequest(req *ypb.ExecRequest, script []*ypb.YakScript, batchMode bool) (*ypb.ExecRequest, []func(), error) {
+func ConvertMultiYakScriptToExecBatchRequest(req *ypb.ExecRequest, script []*ypb.YakScript, batchMode bool) (*ypb.ExecRequest, []func(), error) {
 	if len(script) <= 0 {
 		return nil, nil, utils.Error("empty yakScripts")
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -65,10 +64,9 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 				Handler: func(args ...interface{}) {
 					defer func() {
 						if err := recover(); err != nil {
-
 							log.Errorf("call [%v] yakvm native function failed: %s", funcName, err)
 							fmt.Println()
-							debug.PrintStack()
+							utils.PrintCurrentGoroutineRuntimeStack()
 						}
 					}()
 

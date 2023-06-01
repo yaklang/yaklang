@@ -182,7 +182,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	}
 	c.SetLoadPluginTimeout(10)
 	var err error
-	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig())
+	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
 		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
 	}
