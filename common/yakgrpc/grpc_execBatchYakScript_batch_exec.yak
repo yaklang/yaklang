@@ -42,17 +42,20 @@ go func {
         try {caller.SetFeedback(getParam("feedbacker"))} catch err {}
         caller.SetConcurrent(20)
         caller.SetDividedContext(true)
-        caller.SetLoadPluginTimeout(10)
 
         nonNucleiPluginNames.Map(i => {
             yakit.Info("开始加载插件:[%v]", i)
             caller.LoadPlugin(i)
         })
         for result in str.ParseStringToUrlsWith3W(target) {
-            _, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
-            caller.MirrorHTTPFlowEx(false, str.IsTLSServer(target)~, result, bytes, []byte(""), []byte(""))
+            https, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
+            rsp, req, err = poc.HTTP(bytes, poc.https(https))
+            if err != nil {
+                continue
+            }
+            _, body = poc.Split(rsp)~
+            caller.MirrorHTTPFlowEx(true, str.IsTLSServer(target)~, result, req, rsp, body)
         }
-
         caller.Wait()
     } catch err {
         yakit.Warn("calssical plugin caller failed: %s", err)
