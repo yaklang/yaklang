@@ -78,6 +78,8 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				continue
 			}
 
+			log.Infof("start to using template %v", tpl.Name)
+
 			tpl := tpl
 			err := swg.AddWithContext(lowhttpConfig.Ctx)
 			if err != nil {
