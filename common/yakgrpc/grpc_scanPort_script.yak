@@ -190,7 +190,7 @@ handleCrawler = func(result) {
         addr = str.HostPort(result.Target, result.Port)
         res, err = crawler.Start(
             addr, crawler.maxRequest(crawlerMaxRequest),
-            crawler.autoLogin("admin", "password"), crawler.urlRegexpExclude(` + "`" + `(?i).*?\/?(logout|reset|delete|setup).*` + "`" + `),
+            crawler.autoLogin("admin", "password"), crawler.urlRegexpExclude(`(?i).*?\/?(logout|reset|delete|setup).*`),
         )
         if err != nil {
             yakit.Error("basic crawler start failed: %s", err)
