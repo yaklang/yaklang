@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -352,9 +351,6 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 								Timestamp:  time.Now().Unix(),
 							})
 						case *yaklib.YakitLog:
-							if ret.Level != "info" {
-								spew.Dump(ret)
-							}
 							stream.Send(&ypb.ExecBatchYakScriptResult{
 								Status:     "data",
 								Result:     logToExecResult(ret),
