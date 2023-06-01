@@ -203,10 +203,12 @@ func _scanStream(ch chan any, opt ...interface{}) {
 			return
 		}
 
-		for _, u := range utils.ParseStringToUrlsWith3W(rawStr) {
+		addrs := utils.ParseStringToUrlsWith3W(rawStr)
+		for _, u := range addrs {
 			if !utils.IsHttp(u) {
 				continue
 			}
+			u := u
 			swg.Add()
 			go func() {
 				defer func() {
@@ -214,7 +216,6 @@ func _scanStream(ch chan any, opt ...interface{}) {
 				}()
 				ScanUrl(u, opt...)
 			}()
-			return
 		}
 	}
 
@@ -223,7 +224,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 		count++
 		handleData(data)
 	}
-	log.Infof("waiting for ScanStream total: %v", count)
+	log.Infof("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
 	swg.Wait()
 	log.Infof("finished ScanStream total: %v", count)
 }

@@ -2,15 +2,23 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"io"
 	"net"
 	"testing"
 	"time"
 )
+
+func init() {
+	consts.GetGormProfileDatabase()
+	consts.GetGormProjectDatabase()
+}
 
 func NewLocalClient() (ypb.YakClient, error) {
 	port := utils.GetRandomAvailableTCPPort()
@@ -59,11 +67,10 @@ func TestNewServer(t *testing.T) {
 	}
 
 	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
-		Target:              "localhost",
-		Keyword:             "struts",
+		Target:              "16.170.15.55:8005",
+		Keyword:             "thinkphp",
 		Limit:               10,
-		TotalTimeoutSeconds: 10,
-		Type:                "nuclei",
+		TotalTimeoutSeconds: 1000,
 		Concurrent:          4,
 	})
 	if err != nil {
@@ -71,7 +78,14 @@ func TestNewServer(t *testing.T) {
 		return
 	}
 
-	stream.Recv()
-	stream.Recv()
-	stream.Recv()
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			panic(err)
+		}
+		spew.Dump(rsp)
+	}
 }

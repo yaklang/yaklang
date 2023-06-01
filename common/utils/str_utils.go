@@ -392,7 +392,17 @@ func GetFirstIPByDnsWithCache(domain string, timeout time.Duration, dnsServers .
 	var count = 0
 	for {
 		count++
-		r := GetFirstIPFromHostWithTimeout(timeout, domain, dnsServers)
+		r, err := GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServers)
+		if err != nil {
+			switch ret := err.(type) {
+			case *net.DNSError:
+				if !ret.Temporary() {
+					// not a temporary error, return
+					return ""
+				}
+			}
+			log.Errorf("get ip from host %s error: %s", domain, err.Error())
+		}
 		if r == "" {
 			if count >= 5 {
 				return ""
@@ -950,6 +960,7 @@ func GetIPFromHostWithContextAndDNSServers(
 		}
 	}
 
+	var finalError error
 	nativeDNS := func() bool {
 		defer func() {
 			if err := recover(); err != nil {
@@ -963,7 +974,15 @@ func GetIPFromHostWithContextAndDNSServers(
 
 		ips, err := net.DefaultResolver.LookupIPAddr(ctx, strings.TrimRight(domain, "."))
 		if err != nil {
-			log.Errorf("default resolver parse failed: %s", err)
+			switch retErr := err.(type) {
+			case *net.DNSError:
+				if retErr.IsNotFound {
+					finalError = retErr
+					return false
+				}
+			default:
+				log.Errorf("default resolver parse failed: %s", err)
+			}
 			return false
 		}
 		for _, i := range ips {
@@ -1071,6 +1090,10 @@ Main:
 	if !haveResult.IsSet() {
 		if nativeDNS() {
 			return nil
+		}
+
+		if finalError != nil {
+			return finalError
 		}
 		return Errorf("empty results: QueryErrors: \n"+
 			"%v"+

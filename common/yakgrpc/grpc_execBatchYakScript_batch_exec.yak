@@ -1,9 +1,9 @@
-yakit.AutoInitYakit()
-host, port := tcp.MockServe("TETSSDFSDFSDF")
-target = str.HostPort(host, port)
+yakit.InitYakit(getParam("yakitclient"))
 
-var nucleiPluginNames = [] // ["[wordpress-plugins-lifterlms]: WordPress Plugin lifterlms Listing"]// ["[wordpress-plugins-lifterlms]: WordPress Plugin lifterlms Listing"]
-var nonNucleiPluginNames = [] // ["ThinkPHP RCE 被动扫描"]
+target = getParam("target")
+var nucleiPluginNames = getParam("templates")
+var nonNucleiPluginNames = getParam("ordinary")
+var ctx = getParam("ctx")
 
 wg = sync.NewWaitGroup()
 wg.Add(2)
@@ -15,7 +15,7 @@ go func {
 
     try {
         if nucleiPluginNames.Length() > 0 {
-            for pocVul in nuclei.Scan(target, nuclei.templates(nucleiPluginNames...), nuclei.debug(true),
+            for pocVul in nuclei.Scan(target, nuclei.templates(nucleiPluginNames...),
                                       poc.https(str.IsTLSServer(target)~))~ {
                 yakit.Output(pocVul)
                 yakit.Output(nuclei.PocVulToRisk(pocVul))
@@ -36,13 +36,18 @@ go func {
 
     try {
         caller = hook.NewMixPluginCaller()~
+        try {caller.SetFeedback(getParam("feedbacker"))} catch err {}
+        caller.SetConcurrent(20)
+        caller.SetDividedContext(true)
+        caller.SetLoadPluginTimeout(10)
+
         nonNucleiPluginNames.Map(i => {
             yakit.Info("开始加载插件:[%v]", i)
             caller.LoadPlugin(i)
         })
         for result in str.ParseStringToUrlsWith3W(target) {
             _, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
-            caller.MirrorHTTPFlow(str.IsTLSServer(target)~, result, bytes, []byte(""), []byte(""))
+            caller.MirrorHTTPFlowEx(false, str.IsTLSServer(target)~, result, bytes, []byte(""), []byte(""))
         }
 
         caller.Wait()
@@ -51,4 +56,3 @@ go func {
     }
 }
 wg.Wait()
-
