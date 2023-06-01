@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -34,6 +35,7 @@ type LowhttpExecConfig struct {
 	Packet               []byte
 	Https                bool
 	Http2                bool
+	GmTLS                bool
 	Timeout              time.Duration
 	RedirectTimes        int
 	RetryTimes           int
@@ -135,6 +137,12 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.EtcHosts = hosts
+	}
+}
+
+func WithGmTLS(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.GmTLS = b
 	}
 }
 
@@ -320,6 +328,7 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 	var (
 		forceHttps           = option.Https
 		forceHttp2           = option.Http2
+		gmTLS                = option.GmTLS
 		host                 = option.Host
 		port                 = option.Port
 		r                    = option.Packet
@@ -366,6 +375,7 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 
 	requestOptions = append(commonOptions,
 		WithHttps(forceHttps),
+		WithGmTLS(gmTLS),
 		WithHost(host),
 		WithPort(port),
 		WithPacket(r),
@@ -520,6 +530,7 @@ func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse
 	var (
 		forceHttps           = option.Https
 		forceHttp2           = option.Http2
+		gmTLS                = option.GmTLS
 		host                 = option.Host
 		port                 = option.Port
 		r                    = option.Packet
@@ -584,6 +595,10 @@ func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse
 	proxy = newProxy
 
 	https := forceHttps
+
+	if gmTLS {
+		https = true
+	}
 	// 获取url
 	url, err := ExtractURLFromHTTPRequestRaw(r, https)
 	if err != nil {
@@ -813,23 +828,10 @@ RECONNECT:
 			}
 			response.PortIsOpen = true
 
-			config := &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-				ServerName:         host,
-			}
-			if enableHttp2 {
-				config.NextProtos = []string{http2.NextProtoTLS}
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			var tlsConn = tls.Client(rawConn, config)
-			if err := tlsConn.HandshakeContext(ctx); err != nil {
-				rawConn.Close()
+			conn, err = GetTLSConn(gmTLS, enableHttp2, host, rawConn, timeout)
+			if err != nil {
 				return response, err
 			}
-			conn = tlsConn
 			//conn, err = tls.DialWithDialer(tcpDailer, "tcp", utils.HostPort(ip, port))
 			//if err != nil {
 			//	return nil, utils.Errorf("tls dial %v failed: %s", utils.HostPort(ip, port), err)
@@ -837,23 +839,10 @@ RECONNECT:
 		}
 	} else {
 		if https {
-			config := &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-				ServerName:         host,
-			}
-			if enableHttp2 {
-				config.NextProtos = []string{http2.NextProtoTLS}
-			}
-			var tlsConn = tls.Client(conn, config)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			if err := tlsConn.HandshakeContext(ctx); err != nil {
-				conn.Close()
+			conn, err = GetTLSConn(gmTLS, enableHttp2, host, conn, timeout)
+			if err != nil {
 				return response, err
 			}
-			conn = tlsConn
 		}
 	}
 
@@ -1088,6 +1077,47 @@ func SendHTTPRequestRaw(https bool, host string, port int, r *http.Request, time
 	}
 
 	return nil, utils.Errorf("read failed: empty with: Err[%v]", err)
+}
+
+func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
+	if isGM {
+		gmSupport := gmtls.NewGMSupport()
+		gmSupport.EnableMixMode()
+
+		config := &gmtls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
+			ServerName:         host,
+			GMSupport:          gmSupport,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		var tlsConn = gmtls.Client(rawConn, config)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			rawConn.Close()
+			return nil, err
+		}
+		return tlsConn, nil
+	}
+	config := &tls.Config{
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+		MaxVersion:         tls.VersionTLS13,
+		ServerName:         host,
+	}
+	if enableHttp2 {
+		config.NextProtos = []string{http2.NextProtoTLS}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var tlsConn = tls.Client(rawConn, config)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		rawConn.Close()
+		return nil, err
+	}
+	return tlsConn, nil
 }
 
 func SendPacketQuick(
