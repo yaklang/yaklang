@@ -220,7 +220,7 @@ func (s *Server) CreateYaklangShell(server ypb.Yak_CreateYaklangShellServer) err
 			timer.Reset(10 * time.Second)
 			if engine == nil {
 				engine = yaklang.NewAntlrEngine().(*antlr4yak.Engine)
-				engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(func(i interface{}) error {
+				yaklib.SetEngineClient(engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
 					switch ret := i.(type) {
 					case *yaklib.YakitLog:
 						raw, _ := yaklib.YakitMessageGenerator(ret)
@@ -236,7 +236,7 @@ func (s *Server) CreateYaklangShell(server ypb.Yak_CreateYaklangShellServer) err
 						}
 					}
 					return nil
-				})))
+				}))
 			}
 			if err := engine.SafeEvalInline(server.Context(), script); err != nil {
 				sendError(err)
