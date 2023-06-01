@@ -1,5 +1,3 @@
-yakit.InitYakit(getParam("yakitclient"))
-
 target = getParam("target")
 var nucleiPluginNames = getParam("templates")
 var nonNucleiPluginNames = getParam("ordinary")
