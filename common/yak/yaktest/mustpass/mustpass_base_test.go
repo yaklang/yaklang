@@ -47,7 +47,7 @@ func init() {
 }
 
 func TestMustPass(t *testing.T) {
-	var debugName = "nuclei_network.yak"
+	var debugName = "nuclei_scan.yak"
 	var debugCases [][]string
 	var cases [][]string
 	for k, v := range files {
@@ -69,6 +69,7 @@ func TestMustPass(t *testing.T) {
 		panic("VULINBOX START ERROR")
 	}
 
+	totalTest := t
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
 			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
@@ -76,6 +77,7 @@ func TestMustPass(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatalf("[%v] error: %v", i[0], err)
+				totalTest.FailNow()
 			}
 		})
 	}

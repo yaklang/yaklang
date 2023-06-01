@@ -138,7 +138,7 @@ execNuclei = func(target) {
 	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
     
 	res, err = nuclei.Scan(
-        target, nuclei.templates(nucleiPoCName),
+        target, nuclei.fuzzQueryTemplate(nucleiPoCName),
         nuclei.retry(0), nuclei.stopAtFirstMatch(true), nuclei.timeout(10), 
         nuclei.proxy(proxy...),
     )

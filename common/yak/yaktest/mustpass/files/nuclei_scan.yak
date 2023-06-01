@@ -1,0 +1,27 @@
+proxy = make([]string)
+nucleiPoCName = "Thinkphp"
+
+yakit.AutoInitYakit()
+execNuclei = func(target) {
+    if len(proxy) > 0 {
+        yakit.Info("PROXY: %v", proxy)
+    }
+	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
+
+	res, err = nuclei.Scan(
+        target, nuclei.fuzzQueryTemplate(nucleiPoCName),
+        nuclei.retry(0), nuclei.stopAtFirstMatch(true), nuclei.timeout(10),
+        nuclei.proxy(proxy...),
+    )
+	if err != nil {
+		yakit.Error("扫描[%v]失败: %s", target, err)
+		die(err)
+	}
+    yakit.Info("开始等待插件: %v 针对: %v 的返回结果", nucleiPoCName, target)
+	for pocVul = range res {
+		yakit.Output(pocVul)
+		yakit.Output(nuclei.PocVulToRisk(pocVul))
+	}
+}
+
+execNuclei("vulinbox.aws-4c16.yaklang.io")

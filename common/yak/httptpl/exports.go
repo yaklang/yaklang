@@ -329,19 +329,20 @@ var Exports = map[string]interface{}{
 		var vCh = make(chan *tools.PocVul)
 		filterVul := filter.NewFilter()
 		i := processVulnerability(target, filterVul, vCh)
+		opt = append(opt, _callback(i))
+		opt = append(opt, _tcpCallback(i))
+
 		c, _, _ := toConfig(opt...)
-		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
-		if err != nil {
-			log.Errorf("create yak template failed (raw): %s", err)
-			close(vCh)
-			return vCh, err
+		if strings.TrimSpace(c.SingleTemplateRaw) != "" {
+			tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+			if err != nil {
+				log.Errorf("create yak template failed (raw): %s", err)
+				close(vCh)
+				return vCh, err
+			}
+			_ = tpl
 		}
-		if len(tpl.HTTPRequestSequences) > 0 {
-			opt = append(opt, _callback(i))
-		}
-		if len(tpl.TCPRequestSequences) > 0 {
-			opt = append(opt, _tcpCallback(i))
-		}
+
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)
