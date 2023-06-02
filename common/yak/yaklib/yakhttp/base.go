@@ -69,6 +69,10 @@ func dumpWithBody(i interface{}, body bool) ([]byte, error) {
 }
 
 func _dumpWithBody(i interface{}, body bool) (isReq bool, _ []byte, _ error) {
+	if i == nil {
+		return false, nil, utils.Error("nil interface for http.dump")
+	}
+
 	switch ret := i.(type) {
 	case *http.Request:
 		raw, err := httputil.DumpRequest(ret, body)
@@ -83,6 +87,9 @@ func _dumpWithBody(i interface{}, body bool) (isReq bool, _ []byte, _ error) {
 	case YakHttpResponse:
 		return _dumpWithBody(ret.Response, body)
 	case *YakHttpResponse:
+		if ret == nil {
+			return false, nil, utils.Error("nil YakHttpResponse for http.dump")
+		}
 		return _dumpWithBody(ret.Response, body)
 	case YakHttpRequest:
 		return _dumpWithBody(ret.Request, body)

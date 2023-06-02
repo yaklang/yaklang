@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
 	"time"
@@ -153,7 +155,10 @@ func (c *YakitClient) Output(t interface{}) error {
 	if t == nil {
 		return nil
 	}
-
+	switch t.(type) {
+	case *ypb.ExecResult:
+		return c.send(t)
+	}
 	level, data := MarshalYakitOutput(t)
 	if level == "" {
 		return utils.Errorf("marshal yakit output failed")
@@ -184,4 +189,11 @@ func (c *YakitClient) Save(t interface{}) error {
 	default:
 		return c.OutputLog("json", string(raw))
 	}
+}
+func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
+	//修改yakit库的客户端
+	e.ImportSubLibs("yakit", GetExtYakitLibByClient(client))
+
+	//修改全局默认客户端
+	InitYakit(client)
 }

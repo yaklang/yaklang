@@ -138,7 +138,7 @@ execNuclei = func(target) {
 	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
     
 	res, err = nuclei.Scan(
-        target, nuclei.templates(nucleiPoCName),
+        target, nuclei.fuzzQueryTemplate(nucleiPoCName),
         nuclei.retry(0), nuclei.stopAtFirstMatch(true), nuclei.timeout(10), 
         nuclei.proxy(proxy...),
     )
@@ -182,7 +182,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	}
 	c.SetLoadPluginTimeout(10)
 	var err error
-	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig())
+	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
 		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
 	}

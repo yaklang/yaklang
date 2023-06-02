@@ -167,9 +167,13 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 				return nil, utils.Errorf("parse network bulk failed: %v", err)
 			}
 			return yakTemp, nil
+		} else if utils.MapGetFirstRaw(mid, "workflows") != nil {
+			return nil, utils.Error("yakit nuclei cannot support workflows now~")
 		} else if utils.MapGetFirstRaw(mid, "headless") != nil {
 			return nil, utils.Errorf("nuclei template `headless(crawler)` is not supported (*)")
 		} else {
+			log.Warnf("-----------------NUCLEI FORMATTER CANNOT FIX--------------------")
+			fmt.Println(raw)
 			return nil, utils.Errorf("nuclei template requests is not slice")
 		}
 	}

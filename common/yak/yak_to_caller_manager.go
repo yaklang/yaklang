@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -65,10 +64,9 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 				Handler: func(args ...interface{}) {
 					defer func() {
 						if err := recover(); err != nil {
-
 							log.Errorf("call [%v] yakvm native function failed: %s", funcName, err)
 							fmt.Println()
-							debug.PrintStack()
+							utils.PrintCurrentGoroutineRuntimeStack()
 						}
 					}()
 
@@ -194,7 +192,7 @@ func (y *YakToCallerManager) SetForYakit(
 	return y.Set(ctx, code, func(engine yaklang.YaklangEngine) error {
 		antlr4engine, ok := engine.(*antlr4yak.Engine)
 		if ok {
-			antlr4engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(func(i interface{}) error {
+			yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
 				switch ret := i.(type) {
 				case *yaklib.YakitProgress:
 					raw, _ := yaklib.YakitMessageGenerator(ret)
@@ -221,7 +219,7 @@ func (y *YakToCallerManager) SetForYakit(
 					}
 				}
 				return nil
-			})))
+			}))
 		}
 
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))

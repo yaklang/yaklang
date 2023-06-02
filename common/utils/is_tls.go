@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -18,17 +19,27 @@ import (
 	"time"
 )
 
+var isTlsCached = ttlcache.NewCache()
+
 func IsTLSService(addr string, proxies ...string) bool {
+	result, ok := isTlsCached.Get(addr)
+	if ok {
+		return result.(bool)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, err := net.DialTimeout("tcp", addr, time.Second*5)
+
+	conn, err := GetAutoProxyConn(addr, strings.Join(proxies, ","), 5*time.Second)
 	if err == nil {
 		defer conn.Close()
 		host, _, _ := ParseStringToHostPort(addr)
 		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionSSL30, ServerName: host})
 		if err = tlsConn.HandshakeContext(ctx); err != nil {
+			isTlsCached.SetWithTTL(addr, false, 30*time.Second)
 			return false
 		}
+		isTlsCached.SetWithTTL(addr, true, 30*time.Second)
 		return true
 	}
 	return false
