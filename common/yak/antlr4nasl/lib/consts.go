@@ -236,3 +236,36 @@ var BuildInVars = map[string]interface{}{
 	"IP_MAX_SOCK_SRC_FILTER":    128,
 	"IP_MAX_SOCK_MUTE_FILTER":   128,
 }
+
+// "ACT_GATHER_INFO":        "ACT_GATHER_INFO",
+// "ACT_ATTACK":             "ACT_ATTACK",
+// "ACT_DENIAL":             "ACT_DENIAL",
+// "ACT_SETTINGS":           "ACT_SETTINGS",
+// "ACT_KILL":               "ACT_KILL",
+// "ACT_FLOOD":              "ACT_FLOOD",
+// "ACT_GATHER":             "ACT_GATHER",
+// "ACT_DESTRUCTIVE":        "ACT_DESTRUCTIVE",
+// "ACT_MIXED":              "ACT_MIXED",
+// "ACT_SCANNER":            "ACT_SCANNER",
+// "ACT_END":                "ACT_END",
+// "ACT_INIT":               "ACT_INIT",
+// "ACT_DESTRUCTIVE_ATTACK": "ACT_DESTRUCTIVE_ATTACK",
+// "ACT_MIXED_ATTACK":       "ACT_MIXED_ATTACK",
+// "ACT_KILL_HOST":          "ACT_KILL_HOST",
+var ActToChinese = map[string]string{
+	"ACT_GATHER_INFO": "收集信息",
+	"ACT_ATTACK":      "测试",
+	"ACT_DENIAL":      "DOS", // dos
+	"ACT_SETTINGS":    "设置",
+	//"ACT_KILL":               "杀死",
+	"ACT_FLOOD":              "洪水",
+	"ACT_GATHER":             "收集",
+	"ACT_DESTRUCTIVE":        "破坏",
+	"ACT_MIXED":              "混合",
+	"ACT_SCANNER":            "扫描",
+	"ACT_END":                "结束",  // 整理一些kb的结果
+	"ACT_INIT":               "初始化", // 一些基于namp扫描结果分析的脚本
+	"ACT_DESTRUCTIVE_ATTACK": "破坏性攻击",
+	"ACT_MIXED_ATTACK":       "混合攻击",
+	"ACT_KILL_HOST":          "杀死主机",
+}

@@ -166,10 +166,10 @@ func TestAssigment(t *testing.T) {
 	engine := New()
 	engine.InitBuildInLib()
 	engine.GetVirtualMachine().ImportLibs(map[string]interface{}{
-		"dump": func(i interface{}) {
+		"__function__dump": func(i interface{}) {
 			spew.Dump(i)
 		},
-		"getMap": func() *vm.NaslArray {
+		"__function__getMap": func() *vm.NaslArray {
 			array, _ := vm.NewNaslArray(map[string]string{
 				"a": "b",
 			})

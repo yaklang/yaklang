@@ -38,6 +38,7 @@ type Engine struct {
 	loadedScripts                  map[string]struct{}
 	loadedScriptsLock              *sync.Mutex
 	autoLoadDependencies           bool
+	buildInMethodHook              map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {
@@ -53,6 +54,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 		Kbs:               kbs,
 		loadedScripts:     make(map[string]struct{}),
 		loadedScriptsLock: &sync.Mutex{},
+		buildInMethodHook: make(map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)),
 	}
 
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
@@ -100,6 +102,12 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 }
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
+}
+func (engine *Engine) RegisterBuildInMethodHook(name string, hook func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)) {
+	engine.buildInMethodHook[name] = hook
+}
+func (engine *Engine) UnRegisterBuildInMethodHook(name string) {
+	delete(engine.buildInMethodHook, name)
 }
 func (engine *Engine) SetAutoLoadDependencies(autoLoad bool) {
 	engine.autoLoadDependencies = autoLoad

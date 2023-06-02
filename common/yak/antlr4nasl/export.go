@@ -123,9 +123,6 @@ var Exports = map[string]interface{}{
 		}
 		return ret
 	},
-	"KBToRisk": func(kbs *NaslKBs) *yakit.Risk {
-		return nil
-	},
 	"ScanTarget": func(target string, opts ...NaslScriptConfigOptFunc) (map[string]interface{}, error) {
 		config := NewNaslScriptConfig()
 		for _, opt := range opts {

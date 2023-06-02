@@ -86,6 +86,9 @@ type NaslScriptInfo struct {
 }
 
 func (n *NaslScriptInfo) Run(e *Engine) error {
+	if n == nil {
+		return utils.Errorf("script is nil")
+	}
 	if e.IsScriptLoaded(n.ScriptName) {
 		return nil
 	}
@@ -104,10 +107,12 @@ func (n *NaslScriptInfo) Run(e *Engine) error {
 			}
 			ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
 			if err != nil {
-				return err
+				log.Errorf("Load dependency %s failed: %s", dependency, err)
+				continue
 			}
 			if err := ins.Run(e); err != nil {
-				return err
+				log.Errorf("Run dependency %s failed: %s", dependency, err)
+				continue
 			}
 		}
 	}

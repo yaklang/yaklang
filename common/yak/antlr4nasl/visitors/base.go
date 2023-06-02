@@ -21,6 +21,7 @@ type Compiler struct {
 	TmpData                               *vmstack.Stack
 	needPop                               bool
 	extVarNames                           map[string]struct{}
+	extMethodNames                        map[string]struct{}
 	visitHookHandles                      map[string]func(compiler *Compiler, ctx antlr.ParserRuleContext)
 	visitHook                             func(compiler *Compiler, ctx antlr.ParserRuleContext)
 	checkId                               bool
@@ -62,6 +63,7 @@ func NewCompilerWithSymbolTable(table *yakvm.SymbolTable) *Compiler {
 		symbolTableSize:  0,
 		TmpData:          vmstack.New(),
 		extVarNames:      make(map[string]struct{}),
+		extMethodNames:   make(map[string]struct{}),
 		visitHookHandles: make(map[string]func(compiler *Compiler, ctx antlr.ParserRuleContext)),
 	}
 	compiler.visitHook = func(c *Compiler, ctx antlr.ParserRuleContext) {
