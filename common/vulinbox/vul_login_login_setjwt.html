@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Example</title>
+</head>
+<body>
+<script>
+    function refreshPageWithGetMethod() {
+        window.location.href = window.location.origin + window.location.pathname + window.location.search;
+    }
+
+    function storeAndUseJWT() {
+        // 假设从服务器获取 JWT 令牌
+        const jwtToken = {{params(jsonRaw)}};
+
+        // 将 JWT 令牌存储在 localStorage 中
+        localStorage.setItem('VULINBOX_JWT', jwtToken);
+        alert("VULINBOX LOGIN FINISHED")
+        setTimeout(()=>{
+            // 调用这个函数来刷新页面
+            refreshPageWithGetMethod();
+        }, 1000)
+    }
+    storeAndUseJWT()
+</script>
+</body>
+</html>
