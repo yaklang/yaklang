@@ -215,6 +215,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
 		}).([]*ypb.KVPair),
 		IsHTTPS: req.GetIsHTTPS(),
+		IsGmTLS: req.GetIsGmTLS(),
 	})
 	if err != nil {
 		return utils.Errorf("render variables failed: %v", err)
@@ -333,6 +334,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
 		mutate.WithPoolOpt_RawMode(true),
 		mutate.WithPoolOpt_Https(req.GetIsHTTPS()),
+		mutate.WithPoolOpt_GmTLS(req.GetIsGmTLS()),
 		mutate.WithPoolOpt_Context(stream.Context()),
 		mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),
 		mutate.WithPoolOpt_FollowJSRedirect(req.GetFollowJSRedirect()),
