@@ -524,7 +524,7 @@ var mqConnectCommand = cli.Command{
 	After:  nil,
 	Action: func(c *cli.Context) error {
 		config := spec.LoadAMQPConfigFromCliContext(c)
-		node, err := scannode.NewScanNode(c.String("id"), c.String("server-port"), config)
+		node, err := scannode.NewScanNode(c.String("id"), config)
 		if err != nil {
 			return err
 		}
