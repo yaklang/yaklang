@@ -505,7 +505,7 @@ var startGRPCServerCommand = cli.Command{
 			log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
 				"    yak grpc --host 0.0.0.0")
 		}
-		log.Infof("yak grpc ok")  // 勿删
+		log.Infof("yak grpc ok") // 勿删
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)
@@ -524,7 +524,7 @@ var mqConnectCommand = cli.Command{
 	After:  nil,
 	Action: func(c *cli.Context) error {
 		config := spec.LoadAMQPConfigFromCliContext(c)
-		node, err := scannode.NewScanNode(c.String("id"), config)
+		node, err := scannode.NewScanNode(c.String("id"), c.String("server-port"), config)
 		if err != nil {
 			return err
 		}
