@@ -65,11 +65,11 @@ func NewAntlrEngine() YaklangEngine {
 	engine.ImportSubLibs("yakit", map[string]interface{}{
 		"AutoInitYakit": func() {
 			if client := yaklib.AutoInitYakit(); client != nil {
-				engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(client))
+				yaklib.SetEngineClient(engine, client)
 			}
 		},
 	})
-	engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.GetYakitClientInstance()))
+	yaklib.SetEngineClient(engine, yaklib.GetYakitClientInstance())
 	return engine
 }
 func New() YaklangEngine {

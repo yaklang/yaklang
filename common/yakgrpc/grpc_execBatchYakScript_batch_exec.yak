@@ -1,0 +1,62 @@
+target = getParam("target")
+var nucleiPluginNames = getParam("templates")
+var nonNucleiPluginNames = getParam("ordinary")
+var ctx = getParam("ctx")
+
+wg = sync.NewWaitGroup()
+wg.Add(2)
+
+go func {
+    defer func {
+        wg.Done()
+    }
+
+    try {
+        if nucleiPluginNames.Length() > 0 {
+            for result in nucleiPluginNames {
+                yakit.Info("加载漏洞检测模版: %v", result)
+            }
+            for pocVul in nuclei.Scan(target, nuclei.templates(nucleiPluginNames...), nuclei.debug(true),
+                                      poc.https(str.IsTLSServer(target)~))~ {
+                yakit.Output(pocVul)
+                yakit.Output(nuclei.PocVulToRisk(pocVul))
+            }
+
+        }
+
+    } catch err {
+        yakit.Info("httptpl templates scan failed: %s", err)
+    }
+}
+
+
+go func {
+    defer func {
+        wg.Done()
+    }
+
+    try {
+        caller = hook.NewMixPluginCaller()~
+        try {caller.SetFeedback(getParam("feedbacker"))} catch err {}
+        caller.SetConcurrent(20)
+        caller.SetDividedContext(true)
+
+        nonNucleiPluginNames.Map(i => {
+            yakit.Info("开始加载插件:[%v]", i)
+            caller.LoadPlugin(i)
+        })
+        for result in str.ParseStringToUrlsWith3W(target) {
+            https, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
+            rsp, req, err = poc.HTTP(bytes, poc.https(https))
+            if err != nil {
+                continue
+            }
+            _, body = poc.Split(rsp)~
+            caller.MirrorHTTPFlowEx(true, str.IsTLSServer(target)~, result, req, rsp, body)
+        }
+        caller.Wait()
+    } catch err {
+        yakit.Warn("calssical plugin caller failed: %s", err)
+    }
+}
+wg.Wait()

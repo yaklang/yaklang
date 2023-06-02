@@ -78,6 +78,8 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				continue
 			}
 
+			log.Infof("start to using template %v", tpl.Name)
+
 			tpl := tpl
 			err := swg.AddWithContext(lowhttpConfig.Ctx)
 			if err != nil {
@@ -203,10 +205,12 @@ func _scanStream(ch chan any, opt ...interface{}) {
 			return
 		}
 
-		for _, u := range utils.ParseStringToUrlsWith3W(rawStr) {
+		addrs := utils.ParseStringToUrlsWith3W(rawStr)
+		for _, u := range addrs {
 			if !utils.IsHttp(u) {
 				continue
 			}
+			u := u
 			swg.Add()
 			go func() {
 				defer func() {
@@ -214,7 +218,6 @@ func _scanStream(ch chan any, opt ...interface{}) {
 				}()
 				ScanUrl(u, opt...)
 			}()
-			return
 		}
 	}
 
@@ -223,7 +226,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 		count++
 		handleData(data)
 	}
-	log.Infof("waiting for ScanStream total: %v", count)
+	log.Infof("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
 	swg.Wait()
 	log.Infof("finished ScanStream total: %v", count)
 }
@@ -329,19 +332,20 @@ var Exports = map[string]interface{}{
 		var vCh = make(chan *tools.PocVul)
 		filterVul := filter.NewFilter()
 		i := processVulnerability(target, filterVul, vCh)
+		opt = append(opt, _callback(i))
+		opt = append(opt, _tcpCallback(i))
+
 		c, _, _ := toConfig(opt...)
-		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
-		if err != nil {
-			log.Errorf("create yak template failed (raw): %s", err)
-			close(vCh)
-			return vCh, err
+		if strings.TrimSpace(c.SingleTemplateRaw) != "" {
+			tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+			if err != nil {
+				log.Errorf("create yak template failed (raw): %s", err)
+				close(vCh)
+				return vCh, err
+			}
+			_ = tpl
 		}
-		if len(tpl.HTTPRequestSequences) > 0 {
-			opt = append(opt, _callback(i))
-		}
-		if len(tpl.TCPRequestSequences) > 0 {
-			opt = append(opt, _tcpCallback(i))
-		}
+
 		go func() {
 			defer close(vCh)
 			ScanAuto(target, opt...)

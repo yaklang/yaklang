@@ -475,7 +475,13 @@ func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interf
 func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (yaklang.YaklangEngine, error) {
 	return e.exec(context.Background(), uuid.New().String(), code, params, true)
 }
-func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (yaklang.YaklangEngine, error) {
+func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (_ yaklang.YaklangEngine, fErr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("execute ex with context error: %v", err)
+			fErr = utils.Errorf("final error: %v", err)
+		}
+	}()
 	return e.exec(ctx, uuid.New().String(), code, params, true)
 }
 

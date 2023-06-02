@@ -37,7 +37,7 @@ var YakitExports = map[string]interface{}{
 	"NewWordCloud":    NewWordCloud,
 	"NewHTTPFlowRisk": NewHTTPFlowRisk,
 
-	"InitYakit":               initYakit,
+	"InitYakit":               InitYakit,
 	"UpdateOnlineYakitStore":  updateOnlineYakitStore,
 	"UpdateYakitStore":        updateYakitStore,
 	"UpdateYakitStoreLocal":   yakit.LoadYakitFromLocalDir,
@@ -522,7 +522,7 @@ func yakitWarn(c *YakitClient) func(tmp string, items ...interface{}) {
 func init() {
 	AutoInitYakit()
 }
-func initYakit(y *YakitClient) {
+func InitYakit(y *YakitClient) {
 	*yakitClientInstanceP = y
 }
 
@@ -533,14 +533,14 @@ func AutoInitYakit() *YakitClient {
 	addr := _cliString("yakit-webhook")
 	if addr != "" {
 		client := NewYakitClient(addr)
-		initYakit(client)
+		InitYakit(client)
 		return client
 	} else {
 		client := NewVirtualYakitClient(func(i interface{}) error {
 			log.Error("not set yakit client")
 			return nil
 		})
-		initYakit(client)
+		InitYakit(client)
 		return client
 	}
 
