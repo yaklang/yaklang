@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Display</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+<table>
+    <thead>
+    <tr>
+        <th>Username</th>
+        <th>Age</th>
+        <th>Created</th>
+        <th>Updated</th>
+    </tr>
+    </thead>
+    <tbody id="profileTable">
+    </tbody>
+</table>
+
+<script>
+    const profileData = {{params(jsonRaw)}};
+
+    function displayProfiles() {
+        const tableBody = document.getElementById('profileTable');
+        profileData.forEach(profile => {
+            const row = document.createElement('tr');
+
+            const usernameCell = document.createElement('td');
+            usernameCell.textContent = profile.username;
+            row.appendChild(usernameCell);
+
+            const ageCell = document.createElement('td');
+            ageCell.textContent = profile.age;
+            row.appendChild(ageCell);
+
+            const createdCell = document.createElement('td');
+            createdCell.textContent = profile.created_at;
+            row.appendChild(createdCell);
+
+            const updatedCell = document.createElement('td');
+            updatedCell.textContent = profile.updated_at;
+            row.appendChild(updatedCell);
+
+
+
+            tableBody.appendChild(row);
+        });
+    }
+
+    displayProfiles();
+</script>
+</body>
+</html>
