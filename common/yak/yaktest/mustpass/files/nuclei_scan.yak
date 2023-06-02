@@ -40,7 +40,7 @@ go func {
             yakit.Info("开始加载插件:[%v]", i)
             caller.LoadPlugin(i)
         })
-        for result in str.ParseStringToUrlsWith3W(target) {
+        for result in str.ParseStringToUrls(target) {
             _, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
             caller.MirrorHTTPFlow(str.IsTLSServer(target)~, result, bytes, []byte(""), []byte(""))
         }
