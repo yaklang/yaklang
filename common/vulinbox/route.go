@@ -20,4 +20,5 @@ func (s *VulinServer) init() {
 	s.registerPingCMDI()
 	s.registerExprInj()
 	s.registerWebsocket()
+	s.registerLoginRoute()
 }
