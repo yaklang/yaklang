@@ -18,7 +18,8 @@ type ScriptEngine struct {
 	proxys                         []string
 	Kbs                            *NaslKBs
 	naslLibsPath, dependenciesPath string
-	scripts                        map[*NaslScriptInfo]struct{}
+	scriptFilter                   func(script *NaslScriptInfo) bool
+	scripts                        map[string]*NaslScriptInfo
 	excludeScripts                 map[string]struct{} // 基于OID排除一些脚本
 	scriptGroupDefines             map[ScriptGroup][]string
 	goroutineNum                   int
@@ -30,14 +31,20 @@ type ScriptEngine struct {
 
 func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
-		scripts:            make(map[*NaslScriptInfo]struct{}),
+		scripts:            make(map[string]*NaslScriptInfo),
 		excludeScripts:     make(map[string]struct{}),
 		scriptGroupDefines: make(map[ScriptGroup][]string),
 		goroutineNum:       10,
 		Kbs:                NewNaslKBs(),
 		loadedScripts:      make(map[string]struct{}),
 		loadedScriptsLock:  &sync.Mutex{},
+		scriptFilter: func(script *NaslScriptInfo) bool {
+			return true
+		},
 	}
+}
+func (engine *ScriptEngine) SetScriptFilter(filter func(script *NaslScriptInfo) bool) {
+	engine.scriptFilter = filter
 }
 func (engine *ScriptEngine) GetAllScriptGroups() map[ScriptGroup][]string {
 	return engine.scriptGroupDefines
@@ -67,7 +74,9 @@ func (engine *ScriptEngine) AddExcludeScripts(paths ...string) {
 	}
 }
 func (engine *ScriptEngine) LoadScript(script *NaslScriptInfo) {
-	engine.scripts[script] = struct{}{}
+	if engine.scriptFilter(script) {
+		engine.scripts[script.OriginFileName] = script
+	}
 }
 func (engine *ScriptEngine) LoadScriptFromDb(name string) {
 	script, err := NewNaslScriptObjectFromDb(name)
@@ -132,7 +141,24 @@ func (e *ScriptEngine) ScanTarget(target string) error {
 	}
 	return e.Scan(host, strconv.Itoa(port))
 }
+func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
+	//忽略了循环依赖
+	rootScripts := make(map[string]*NaslScriptInfo)
+	tmp := map[string]struct{}{}
+	for _, info := range e.scripts {
+		for _, dependency := range info.Dependencies {
+			tmp[dependency] = struct{}{}
+		}
+	}
+	for _, info := range e.scripts {
+		if _, ok := tmp[info.OriginFileName]; !ok {
+			rootScripts[info.OriginFileName] = info
+		}
+	}
+	return rootScripts
+}
 func (e *ScriptEngine) Scan(host string, ports string) error {
+
 	var allErrors multiError
 	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxys...)
 	if res.Ok {
@@ -179,7 +205,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	e.Kbs.SetKB("Host/port_infos", portInfos)
 	swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	errorsMux := sync.Mutex{}
-	for script, _ := range e.scripts {
+	for _, script := range e.GetRootScripts() {
 		if _, ok := e.excludeScripts[script.OID]; ok {
 			continue
 		}
@@ -194,6 +220,13 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			engine.SetKBs(e.Kbs)
 			engine.InitBuildInLib()
 			engine.Debug(e.debug)
+			//engine.RegisterBuildInMethodHook("log_message", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			//	irisk := params.getParamByName("data").Value
+			//	if v, ok := irisk.(*yakit.Risk); ok {
+			//		_ = v
+			//	}
+			//	return origin(engine, params)
+			//})
 			engine.loadedScripts = e.loadedScripts
 			engine.loadedScriptsLock = e.loadedScriptsLock
 			for _, hook := range e.engineHooks {

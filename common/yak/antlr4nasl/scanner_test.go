@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"os"
-	"regexp"
 	"testing"
 )
 
@@ -193,16 +192,14 @@ func TestPocScanner(t *testing.T) {
 	//engine.vm.GetConfig().SetStopRecover(true)
 	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
 	InitPluginGroup(engine) // 初始化插件组
-	//engine.AddEngineHooks(func(engine *Engine) {
-	//	PatchEngine(engine) // 一些库缺少函数
-	//})
-	//engine.LoadGroups(PluginGroupApache)
-	//engine.LoadScriptFromDb("gb_apache_tomcat_detect.nasl")
 	engine.LoadGroups("Product detection")
+	//engine.LoadScriptFromDb("gb_apache_tomcat_consolidation.nasl")
 	engine.SetGoroutineNum(1000)
 	engine.AddEngineHooks(func(engine *Engine) {
-		engine.SetAutoLoadDependencies(false)
+		engine.SetAutoLoadDependencies(true)
+		// 需要把ACT_SCAN的脚本都patch一遍
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
+
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
 			if err != nil {
 				return code
@@ -217,48 +214,10 @@ func TestPocScanner(t *testing.T) {
 			return string(codeBytes)
 		})
 	})
-	err := engine.Scan("209.141.41.173", "80")
-	// 排查未定义的函数
-	var unknownErrors multiError
-	undefinedVars := []string{}
+	err := engine.Scan("61.216.101.66", "80")
 	if err != nil {
-		if errors, ok := err.(multiError); ok {
-			re, err := regexp.Compile("cannot found value by variable name:\\[(.*)\\]")
-			if err != nil {
-				panic(err)
-			}
-			re2, err := regexp.Compile("method `(.*)` is not implement")
-			if err != nil {
-				panic(err)
-			}
-
-			for _, err2 := range errors {
-				res := re.FindStringSubmatch(err2.Error())
-				if len(res) > 0 {
-					undefinedVars = append(undefinedVars, res[1])
-				} else {
-					res = re2.FindStringSubmatch(err2.Error())
-					if len(res) > 0 {
-						undefinedVars = append(undefinedVars, res[1])
-					} else {
-						unknownErrors = append(unknownErrors, err2)
-					}
-				}
-			}
-		} else {
-			unknownErrors = append(unknownErrors, err)
-		}
+		log.Error(err)
 	}
-	println("errors")
-	log.Error(err)
-
-	println("unknownErrors:")
-	if len(unknownErrors) > 0 {
-		log.Error(unknownErrors)
-	}
-	println("undefinedVars:")
-	spew.Dump(undefinedVars)
-	println("engine.GetKBData():")
 	data := engine.GetKBData()
 	data["Host/port_infos"] = nil
 	spew.Dump(data)

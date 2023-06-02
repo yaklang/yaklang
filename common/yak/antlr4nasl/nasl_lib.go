@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"net"
 	"net/http"
@@ -343,16 +344,9 @@ func init() {
 			return nil, nil
 		},
 		"log_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			protocol := params.getParamByName("protocol")
-			if protocol.IsUndefined() {
-				protocol = params.getParamByName("proto")
-			}
-			port := params.getParamByName("port", -1)
-			data := params.getParamByName("data").AsString()
-			if data == "" {
-				data = "Success"
-			}
-			commonLogger.Info(data, port.Int(), protocol.String())
+			//port := params.getParamByName("port", -1)
+			data := params.getParamByName("data").Value
+			log.Info(data)
 			return nil, nil
 		},
 		"error_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -537,7 +531,9 @@ func init() {
 			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
 			var n int
-
+			if timeout == 0 {
+				timeout = 5000
+			}
 			if utils.IsTLSService(adderss) {
 				n = utils2.OPENVAS_ENCAPS_SSLv2
 			} else {
@@ -1746,6 +1742,60 @@ func init() {
 				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
 			}, nil)
 		},
+		//http_report_vuln_url(port: port, url: url1, url_only: TRUE);
+		"http_report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			//port := params.getParamByName("port", "").Int()
+			url := params.getParamByName("url", "").String()
+			//url_only := params.getParamByName("url_only", false).Bool()
+			return fmt.Sprintf("detect vuln on url: %s", url), nil
+		},
+		//build_detection_report(app: "OpenMairie Open Foncier", version: version,
+		//install: install, cpe: cpe, concluded: vers[0],
+		//concludedUrl: concUrl),
+		"build_detection_report": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			scriptObj := engine.scriptObj
+			app := params.getParamByName("app", "").String()
+			version := params.getParamByName("version", "").String()
+			install := params.getParamByName("install", "").String()
+			cpe := params.getParamByName("cpe", "").String()
+			concluded := params.getParamByName("concluded", "").String()
+			riskType := ""
+			if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
+				riskType = v
+			} else {
+				riskType = scriptObj.Category
+			}
+			source := "[NaslScript] " + engine.scriptObj.ScriptName
+			concludedUrl := params.getParamByName("concludedUrl", "").String()
+			solution := utils.MapGetString(engine.scriptObj.Tags, "solution")
+			summary := utils.MapGetString(engine.scriptObj.Tags, "summary")
+			cve := strings.Join(scriptObj.CVE, ", ")
+			//xrefStr := ""
+			//for k, v := range engine.scriptObj.Xrefs {
+			//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
+			//}
+			title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
+			if cve != "" {
+				title += fmt.Sprintf(", CVE: %s", summary)
+			}
+			return yakit.NewRisk(concludedUrl,
+				yakit.WithRiskParam_Title(title),
+				yakit.WithRiskParam_RiskType(riskType),
+				yakit.WithRiskParam_Severity("low"),
+				yakit.WithRiskParam_YakitPluginName(source),
+				yakit.WithRiskParam_Description(summary),
+				yakit.WithRiskParam_Solution(solution),
+				yakit.WithRiskParam_Details(map[string]interface{}{
+					"app":       app,
+					"version":   version,
+					"install":   install,
+					"cpe":       cpe,
+					"concluded": concluded,
+					"source":    source,
+					"cve":       cve,
+				}),
+			)
+		},
 	}
 	for name, method := range naslLib {
 		NaslLib[name] = func(name string, m NaslBuildInMethod) func(engine *Engine, params *NaslBuildInMethodParam) interface{} {
@@ -1755,8 +1805,14 @@ func init() {
 				//		log.Errorf("call function `%s` panic error: %v", name, e)
 				//	}
 				//}()
+				var res interface{}
+				var err error
 				timeStart := time.Now()
-				res, err := m(engine, params)
+				if v, ok := engine.buildInMethodHook[name]; ok {
+					res, err = v(m, engine, params)
+				} else {
+					res, err = m(engine, params)
+				}
 				if err != nil {
 					log.Errorf("call build in function `%s` error: %v", name, err)
 					return res

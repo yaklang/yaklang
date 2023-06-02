@@ -111,7 +111,7 @@ singleExpression
     | singleExpression '^' singleExpression                                  # BitXOrExpression
     | singleExpression '&&' singleExpression                                 # LogicalAndExpression
     | singleExpression '||' singleExpression                                 # LogicalOrExpression
-    | singleExpression (('[' singleExpression ']')|('.' Identifier))? assignmentOperator singleExpression     # AssignmentExpression
+    | identifier (('[' singleExpression ']')|('.' identifier))? assignmentOperator singleExpression     # AssignmentExpression
     | identifier                                                             # IdentifierExpression
     | literal                                                                # LiteralExpression
     ;

@@ -12,3 +12,4 @@ INT、STRING、DATA、ARRAY、UNDEF
 | UNDEF | 未定义 | nil              |
 
 array类型是一个特殊类型，和传统的array不同，它既是map又是list，后端存在形式是hash_index和num_index
+

@@ -621,8 +621,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						val = v1
 						ok = true
 					} else {
-						val = GetUndefined()
-						ok = true
+						if v.CurrentScope().GetSymTable().IdIsInited(id) {
+							val = GetUndefined()
+							ok = true
+						}
+
 						//panic("BUG: cannot found value by name:[" + name + "]")
 					}
 				}
