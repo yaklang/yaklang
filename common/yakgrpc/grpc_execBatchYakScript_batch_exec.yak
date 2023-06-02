@@ -45,7 +45,7 @@ go func {
             yakit.Info("开始加载插件:[%v]", i)
             caller.LoadPlugin(i)
         })
-        for result in str.ParseStringToUrlsWith3W(target) {
+        for result in str.ParseStringToUrls(target) {
             https, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
             rsp, req, err = poc.HTTP(bytes, poc.https(https))
             if err != nil {
