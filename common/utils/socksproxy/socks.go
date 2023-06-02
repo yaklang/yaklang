@@ -3,6 +3,7 @@ package socksproxy
 import (
 	"bytes"
 	"errors"
+	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"net/url"
 	"strconv"
@@ -136,6 +137,7 @@ func parse(proxyURI string) (*config, error) {
 }
 
 func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
+RECON:
 	proxy := cfg.Host
 
 	// dial TCP
@@ -172,6 +174,11 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 	} else if resp[0] != 5 {
 		return nil, errors.New("server does not support Socks 5")
 	} else if resp[1] != method {
+		if cfg.Auth != nil {
+			log.Warn("remote socks5 proxy do not have authentication, try fall back using no authentication")
+			cfg.Auth = nil
+			goto RECON
+		}
 		return nil, errors.New("socks method negotiation failed")
 	}
 	if cfg.Auth != nil {
