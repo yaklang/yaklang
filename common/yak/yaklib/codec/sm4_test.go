@@ -64,6 +64,26 @@ func TestECB(t *testing.T) {
 	spew.Dump(result)
 }
 
+func TestSM4ECBDec(t *testing.T) {
+	var raw, _ = DecodeBase64(`Kh1Ou151chL8Ondn6l5hgA==`)
+	results, err := SM4ECBDec([]byte(`1234123412341234`), raw, nil)
+	if err != nil {
+		panic(err)
+	}
+	if string(results) != "asdfasd" {
+		panic("SM4ECB FAILED")
+	}
+
+	raw, _ = DecodeBase64(`jw/eNRHMJAZZUsEV/Ue1rAQ/H/rvsFIXLDpbnGM9kYI=`)
+	results, err = SM4ECBDec([]byte(`1234123412341234`), raw, nil)
+	if err != nil {
+		panic(err)
+	}
+	if string(results) != "asdfasdfasdfasdf" {
+		panic("SM4ECB FAILED")
+	}
+}
+
 func TestPadding(t *testing.T) {
 	testData, _ := DecodeBase64(`r8+ZCQ5kPYBsVzlnWcwF2T4hm94cfWGr/B9sf5I9GoiJfm6w46gHvB7ua7hle7u3zfQlTB0g0ovoWmU583Ssl+u5mY2AOyOFJPn71HnKWaCLwrsDpOBEO2rHSRSdob4a`)
 	for _, i := range []string{
