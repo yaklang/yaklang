@@ -21,4 +21,5 @@ func (s *VulinServer) init() {
 	s.registerExprInj()
 	s.registerWebsocket()
 	s.registerLoginRoute()
+	s.registerCryptoJS()
 }

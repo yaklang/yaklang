@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>CryptoJS 加密表单提交（AES-ECB Pkcs7padding）</title>
+
+    <!-- 引入 CDN Crypto.js 开始 AES加密 注意引入顺序 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/enc-base64.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/md5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/evpkdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/cipher-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/aes.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/pad-pkcs7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/mode-ecb.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/enc-utf8.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/enc-hex.min.js"></script>
+    <!-- 引入 CDN Crypto.js 结束 -->
+
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <h1 class="mt-4">需要加密提交的表单内容</h1>
+    <form id="json-form" class="mt-4">
+        <div class="mb-3">
+            <label for="username" class="form-label">UserName</label>
+            <input id="username" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="age" class="form-label">Age</label>
+            <input id="age" class="form-control" type="text">
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <div class="mt-4">
+        <h2>加密前后表单数据</h2>
+    </div>
+    <pre id="input" class="mt-2"></pre>
+    <br>
+    <pre id="encrypt" class="mt-2" style="width: 600px; word-wrap: break-word"></pre>
+</div>
+
+<script>
+    const key = CryptoJS.enc.Utf8.parse("1234123412341234"); // 十六位十六进制数作为密钥
+    const iv = CryptoJS.enc.Utf8.parse("abcdabcdabcdabcd");  // 十六位十六进制数作为密钥偏移量
+
+    // 解密方法
+    function Decrypt(word) {
+        let encryptedHexStr = CryptoJS.enc.Hex.parse(word);
+        let srcs = CryptoJS.enc.Base64.stringify(encryptedHexStr);
+        let decrypt = CryptoJS.AES.decrypt(srcs, key, {
+            iv: iv,
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        let decryptedStr = decrypt.toString(CryptoJS.enc.Utf8);
+        return decryptedStr.toString();
+    }
+
+    // 加密方法
+    function Encrypt(word) {
+        let srcs = CryptoJS.enc.Utf8.parse(JSON.stringify(word));
+        let encrypted = CryptoJS.AES.encrypt(srcs, key, {
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        return encrypted.toString();
+    }
+
+    function submitJSON(event) {
+        event.preventDefault();
+
+        const url = "/crypto/js/basic";
+        let jsonData = {
+            "username": document.getElementById("username").value,
+            "password": document.getElementById("password").value,
+            "age": document.getElementById("age").value,
+        };
+        let submitResult = JSON.stringify({
+            "data": Encrypt(JSON.stringify(jsonData)),
+            key: key.toString(), iv: iv.toString(),
+        })
+        console.log("key", key)
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: submitResult,
+        })
+            .then(response => response.text())
+            .then(data => {
+                console.log("Success:", data);
+                document.body.innerHTML = data;
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+            });
+    }
+
+    document.getElementById("json-form").addEventListener("change", () => {
+        let jsonData = {
+            "username": document.getElementById("username").value,
+            "password": document.getElementById("password").value,
+            "age": document.getElementById("age").value,
+        };
+        document.getElementById("encrypt").innerHTML = JSON.stringify({
+            "data": Encrypt(JSON.stringify(jsonData, null, 2)),
+            key: key.toString(), iv: iv.toString(),
+        }, null, 2)
+        document.getElementById("input").innerHTML = JSON.stringify(jsonData, null, 2)
+    })
+    document.getElementById("json-form").addEventListener("submit", submitJSON)
+</script>
+
+<!-- Add Bootstrap JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.min.js"></script>
+
+</body>
+</html>
