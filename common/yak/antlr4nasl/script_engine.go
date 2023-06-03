@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -123,9 +122,6 @@ func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
 				continue
 			}
 			for _, script := range scripts {
-				if !strings.Contains(strings.ToLower(script.ScriptName), "apache") {
-					continue
-				}
 				if _, ok := e.excludeScripts[script.OID]; ok {
 					continue
 				}
