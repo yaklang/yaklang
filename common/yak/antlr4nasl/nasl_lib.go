@@ -1625,6 +1625,8 @@ func init() {
 					switch info.Fingerprint.ServiceName {
 					case "http", "https":
 						ServiceName = "www"
+					default:
+						ServiceName = info.Fingerprint.ServiceName
 					}
 					register_service(info.Port, ServiceName)
 				}
@@ -1740,6 +1742,13 @@ func init() {
 				"ipproto":           params.getParamByName("ipproto", "").Value,
 				"default_port_list": params.getParamByName("default_port_list", "").Value,
 				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+		},
+		"report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("http_report_vuln_url", map[string]interface{}{
+				"port":     params.getParamByName("port", 0).Value,
+				"url":      params.getParamByName("url", "").Value,
+				"url_only": params.getParamByName("url_only", false).Value,
 			}, nil)
 		},
 		//http_report_vuln_url(port: port, url: url1, url_only: TRUE);

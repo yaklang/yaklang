@@ -214,7 +214,7 @@ func TestPocScanner(t *testing.T) {
 			return string(codeBytes)
 		})
 	})
-	err := engine.Scan("61.216.101.66", "80")
+	err := engine.Scan("webmail.obecstablovice.cz", "3306")
 	if err != nil {
 		log.Error(err)
 	}
