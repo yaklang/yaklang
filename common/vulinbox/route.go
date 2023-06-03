@@ -22,4 +22,5 @@ func (s *VulinServer) init() {
 	s.registerWebsocket()
 	s.registerLoginRoute()
 	s.registerCryptoJS()
+	s.registerCryptoSM()
 }
