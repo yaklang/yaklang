@@ -19,6 +19,11 @@ import (
 var cryptoSM4BasicHtml []byte
 
 func (v *VulinServer) registerCryptoSM() {
+	// https://github.com/GuoHuiChen/gmjs/
+	
+	v.router.HandleFunc("/crypto/sm2", func(writer http.ResponseWriter, request *http.Request) {
+		// https://github.com/Saberization/SM2/blob/master/README.MD
+	})
 	v.router.HandleFunc("/crypto/sm4", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
