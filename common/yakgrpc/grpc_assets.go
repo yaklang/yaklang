@@ -17,6 +17,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -133,11 +135,8 @@ func (s *Server) DeletePorts(ctx context.Context, req *ypb.DeletePortsRequest) (
 		return &ypb.Empty{}, nil
 	}
 	if req.GetFilter() != nil {
-		rdb, _ := yakit.FilterByQueryPorts(s.GetProjectDatabase(), req.GetFilter())
-		if rdb != nil {
-			if db := rdb.Unscoped().Delete(&yakit.Port{}); db.Error != nil {
-				return nil, utils.Errorf("delete error: %s", db.Error)
-			}
+		if db := yakit.FilterPort(s.GetProjectDatabase(), req.GetFilter()).Unscoped().Delete(&yakit.Port{}); db.Error != nil {
+			return nil, utils.Errorf("delete error: %s", db.Error)
 		}
 		return &ypb.Empty{}, nil
 	}
@@ -736,4 +735,116 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 	}
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) QueryPortsGroup(ctx context.Context, req *ypb.Empty) (*ypb.QueryPortsGroupResponse, error)  {
+	data, err := yakit.PortsServiceTypeGroup()
+	var tagsCode ypb.QueryPortsGroupResponse
+	if data == nil {
+		return nil, err
+	}
+	tagsCode = PortsServiceTypeGroup(data)
+	return &tagsCode, nil
+}
+
+
+func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResponse{
+	var (
+		portGroup ypb.QueryPortsGroupResponse
+		databaseGroupList, webGroupList ypb.PortsGroup
+	)
+	serviceTypeKey := map[string]string{
+		"Nginx":                   "nginx",
+		"Apache":                  "apache",
+		"IIS":                     "iis",
+		"Litespeed":               "litespeed",
+		"Tomcat":                  "tomcat",
+		"OracleHTTPServer":        "oracle_http_server",
+		"Openresty":               "openresty",
+		"Jetty":                   "jetty",
+		"Caddy":                   "caddy",
+		"Gunicorn":                "gunicorn",
+		"Cowboy":                  "cowboy",
+		"Lighttpd":                "lighttpd",
+		"Resin":                   "resin",
+		"Zeus":                    "zeus",
+		"Cherrypy":                "cherrypy",
+		"Tengine":                 "tengine",
+		"Glassfish":               "glassfish",
+		"PhusionPassenger":        "phusion_passenger",
+		"Tornadoserver":           "tornadoserver",
+		"Hiawatha":                "hiawatha",
+		"OracleApplicationServer": "oracle_application_serve",
+		"AbyssWebServer":          "abyss_web_server",
+		"Boa":                     "boa",
+		"Xitami":                  "xitami",
+		"Simplehttp":              "simplehttp",
+		"Cherokee":                "cherokee",
+		"MonkeyHTTPServer":        "monkeyhttp_server",
+		"NodeJS":                  "node.js",
+		"Websphere":               "websphere",
+		"Zope":                    "zope",
+		"Mongoose":                "mongoose",
+		"Macos":                   "macos",
+		"Kestrel":                 "kestrel",
+		"Aolserver":               "aolserver",
+		"Dnsmasq":                 "dnsmasq",
+		"Ruby":                    "ruby",
+		"Webrick":                 "webrick",
+		"WeblogicServer":          "weblogic_server",
+		"Jboss":                   "jboss",
+		"SqlServer":               "sql_server",
+		"Mysql":                   "mysql",
+		"Mongodb":                 "mongodb",
+		"Redis":                   "redis",
+		"Elasticsearch":           "elasticsearch",
+		"Postgresql":              "postgresql",
+		"DB2":                     "db2",
+		"Hbase":                   "hbase",
+		"Memcached":               "memcached",
+	}
+	databaseValues := []string{
+		"sql_server",
+		"mysql",
+		"mongodb",
+		"redis",
+		"elasticsearch",
+		"postgresql",
+		"db2",
+		"hbase",
+		"memcached",
+		"splunkd",
+	}
+
+	for k, v := range serviceTypeKey {
+		if reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32) > 0 {
+			if IsValueInSortedSlice(v, databaseValues) {
+				databaseGroupList.GroupName = "数据库"
+				databaseGroupList.GroupLists = append(databaseGroupList.GroupLists, &ypb.GroupList{
+						ServiceType: v,
+						ShowServiceType: k,
+						Total: reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
+				})
+			} else {
+				webGroupList.GroupName = "Web服务器"
+				webGroupList.GroupLists = append(webGroupList.GroupLists, &ypb.GroupList{
+					ServiceType: v,
+					ShowServiceType: k,
+					Total: reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
+				})
+			}
+		}
+	}
+	if len(databaseGroupList.GroupLists) > 0 {
+		portGroup.PortsGroupList = append(portGroup.PortsGroupList, &databaseGroupList)
+	}
+	if len(webGroupList.GroupLists) > 0 {
+		portGroup.PortsGroupList = append(portGroup.PortsGroupList, &webGroupList)
+	}
+	return portGroup
+}
+
+func IsValueInSortedSlice(value string, slice []string) bool {
+	index := sort.SearchStrings(slice, value)
+	return index < len(slice) && slice[index] == value
 }
