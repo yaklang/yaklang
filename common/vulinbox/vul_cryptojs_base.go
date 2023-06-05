@@ -25,10 +25,13 @@ var cryptoRsaHtml []byte
 //go:embed vul_cryptojs_rsa_keyfromserver.html
 var cryptoRsaKeyFromServerHtml []byte
 
+//go:embed vul_cryptojs_rsa_keyfromserver_withresponse.html
+var cryptoRsaKeyFromServerHtmlWithResponse []byte
+
 func (v *VulinServer) registerCryptoJS() {
 	r := v.router
 
-	pri, pub, _ := tlsutils.GeneratePrivateAndPublicKeyPEM()
+	pri, pub, _ := tlsutils.GeneratePrivateAndPublicKeyPEMWithPrivateFormatter("pkcs8")
 	r.HandleFunc("/crypto/js/basic", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
@@ -239,6 +242,91 @@ func (v *VulinServer) registerCryptoJS() {
 	})
 	r.HandleFunc("/crypto/js/rsa/generator", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"ok": true, "publicKey": ` + strconv.Quote(string(pub)) + `, "privateKey": ` + strconv.Quote(string(pri)) + `}`))
+	})
+	r.HandleFunc("/crypto/js/rsa/fromserver/response", func(writer http.ResponseWriter, request *http.Request) {
+		var params = make(map[string]interface{})
+
+		var data, _ = utils.HttpDumpWithBody(request, true)
+		params["packet"] = string(data)
+
+		if request.Method == "GET" {
+			results, err := mutate.FuzzTagExec(cryptoRsaKeyFromServerHtmlWithResponse, mutate.Fuzz_WithParams(params))
+			if err != nil {
+				writer.Write([]byte("<pre>" + string(data) + "<pre> <br/> <br/> <h2>error</h2> <br/>" + err.Error()))
+				return
+			}
+			writer.Write([]byte(results[0]))
+			return
+		}
+
+		if request.Method == "POST" {
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
+			err := json.Unmarshal(body, &params)
+			if err != nil {
+				writer.Write([]byte("<pre>" + string(data) + "<pre> <br/> <br/> <h2>error</h2> <br/>" + err.Error()))
+				return
+			}
+
+			pubkey := pub
+			prikey := pri
+			_ = pubkey
+
+			println(prikey)
+
+			encrypted := utils.MapGetString(params, "data")
+			encryptedBase64Decoded, _ := codec.DecodeBase64(encrypted)
+
+			var origin, decErr = tlsutils.PemPkcsOAEPDecrypt([]byte(prikey), encryptedBase64Decoded)
+			spew.Dump(origin, decErr)
+			var handled string
+			var raw, _ = json.MarshalIndent(map[string]any{
+				"publicKey":                pubkey,
+				"privateKey":               prikey,
+				"encrypted":                encrypted,
+				"encrypted_base64_decoded": strconv.Quote(string(encryptedBase64Decoded)),
+				"decrypted":                string(origin),
+				"decrypted_error":          fmt.Sprint(decErr),
+			}, "", "    ")
+			handled = string(raw)
+
+			if !utf8.Valid(origin) {
+				origin = []byte(strconv.Quote(string(origin)))
+			} else {
+				if strings.HasPrefix(string(origin), `"`) && strings.HasSuffix(string(origin), `"`) {
+					var after, _ = strconv.Unquote(string(origin))
+					if after != "" {
+						origin = []byte(after)
+					}
+				}
+			}
+
+			var rawResponseBody = `<br>` +
+				`<pre>` + string(data) + `</pre> <br><br><br>	` +
+				`<pre>` + handled + `</pre> <br><br>	` +
+				`<pre>` + string(origin) + `</pre> <br><br>	` +
+				`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`
+			encryptedData, err := tlsutils.PemPkcsOAEPEncrypt(pub, `hackeddata=`+utils.RandSecret(10))
+			if err != nil {
+				writer.Write([]byte(rawResponseBody + "<br/> <br/> <h2>error</h2> <br/>" + err.Error()))
+				return
+			}
+			originData, err := tlsutils.PemPkcsOAEPDecrypt(pri, encryptedData)
+			println("-------------------")
+			println("-------------------")
+			println("-------------------")
+			spew.Dump(originData, err)
+			println("-------------------")
+			println("-------------------")
+			println("-------------------")
+			raw, _ = json.Marshal(map[string]any{
+				"data":   codec.EncodeBase64(encryptedData),
+				"origin": string(originData),
+			})
+			writer.Write(raw)
+			return
+		}
+
+		writer.WriteHeader(http.StatusMethodNotAllowed)
 	})
 
 }

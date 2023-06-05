@@ -2,6 +2,8 @@ package tlsutils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -67,13 +69,37 @@ func Decrypt(r string, priPem []byte) ([]byte, error) {
 }
 
 func GeneratePrivateAndPublicKeyPEM() (pri []byte, pub []byte, _ error) {
+	return GeneratePrivateAndPublicKeyPEMWithPrivateFormatter("pkcs#1")
+}
+
+func GeneratePrivateAndPublicKeyPEMWithPrivateFormatter(t string) (pri []byte, pub []byte, _ error) {
 	pk, err := rsa.GenerateKey(cryptorand.Reader, 4096)
 	if err != nil {
 		return
 	}
 
 	var priBuffer bytes.Buffer
-	priDer := x509.MarshalPKCS1PrivateKey(pk)
+	var priDer []byte
+	switch strings.ToLower(t) {
+	case "pkcs1", "pkcs#1":
+		priDer = x509.MarshalPKCS1PrivateKey(pk)
+	case "ec", "ecdsa":
+		pk, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+		priDer, err = x509.MarshalECPrivateKey(pk)
+		if err != nil {
+			return nil, nil, utils.Errorf("marshal ecdsa prikey failed: %s", err)
+		}
+	case "pkcs8", "pkcs#8":
+		fallthrough
+	default:
+		priDer, err = x509.MarshalPKCS8PrivateKey(pk)
+		if err != nil {
+			return nil, nil, utils.Errorf("marshal pkcs8 prikey failed: %s", err)
+		}
+	}
 	err = pem.Encode(&priBuffer, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: priDer,
@@ -143,7 +169,7 @@ func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 
 	results, err := rsa.EncryptOAEP(sha256.New(), cryptorand.Reader, pubKey, dataBytes, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.EncryptOAEP(cryptorand.Reader, pubKey, dataBytes) error`)
 	}
 	return results, err
 }
@@ -163,11 +189,15 @@ func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 		if !ok {
 			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
 		}
+
+		if pri == nil {
+			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
+		}
 	}
 
 	results, err := rsa.DecryptOAEP(sha256.New(), cryptorand.Reader, pri, dataBytes, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.PemPkcsOAEPDecrypt(cryptorand.Reader, pri, dataBytes) error`)
 	}
 	return results, err
 }
