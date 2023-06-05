@@ -20,7 +20,7 @@ var cryptoSM4BasicHtml []byte
 
 func (v *VulinServer) registerCryptoSM() {
 	// https://github.com/GuoHuiChen/gmjs/
-	
+
 	v.router.HandleFunc("/crypto/sm2", func(writer http.ResponseWriter, request *http.Request) {
 		// https://github.com/Saberization/SM2/blob/master/README.MD
 	})
