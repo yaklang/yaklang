@@ -84,7 +84,7 @@
             true,
             ["decrypt"]
         ).then(value => {
-            console.info("load private key finished")
+            console.info("load private key finished", value)
             return value
         });
     }
@@ -102,15 +102,13 @@
         })
     }
 
-    getKey().then(async (value) => {
-        console.info(value)
-
+    getKey().then(async (publicKey) => {
         // 加密方法
         async function Encrypt(word) {
             const encoder = new TextEncoder();
             const encodeData = encoder.encode(word);
             const encryptedData = await crypto.subtle.encrypt(
-                {name: "RSA-OAEP"}, value,
+                {name: "RSA-OAEP"}, publicKey,
                 encodeData,
             )
             return arrayBufferToBase64(encryptedData)
@@ -118,16 +116,22 @@
 
         // 解密
         async function Decrypt(word) {
-            const encoder = new TextEncoder();
-            const encodeData = encoder.encode(word);
+            const encodeData = new Uint8Array(word.split("").map(function (c) {
+                return c.charCodeAt(0);
+            }));
             console.info("privateKey", privateKey)
-            console.info("encodeData", encodeData)
-            const encryptedData = await crypto.subtle.decrypt(
-                {name: "RSA-OAEP"}, privateKey,
-                encodeData,
-            )
-            console.info(encryptedData)
-            return encryptedData
+            console.info("encodeData", encodeData, "originWordLength: ", word.length)
+            try {
+                const encryptedData = await crypto.subtle.decrypt(
+                    {name: "RSA-OAEP"}, privateKey,
+                    encodeData.buffer,
+                )
+                console.info(encryptedData)
+                return new TextDecoder().decode(encryptedData)
+            } catch (e) {
+                console.error("crypto.subtle.decrypt failed")
+                console.error(e)
+            }
         }
 
         async function submitJSON(event) {
@@ -139,9 +143,21 @@
                 "password": document.getElementById("password").value,
                 "age": document.getElementById("age").value,
             };
-            let submitResult = JSON.stringify({
-                "data": await Encrypt(JSON.stringify(jsonData)),
-            })
+
+            let encryptedData;
+            let submitResult;
+            try {
+                encryptedData = await Encrypt(JSON.stringify(jsonData))
+                submitResult = JSON.stringify({"data": encryptedData})
+                console.info("Encrypt jsonData: ", await Decrypt(atob(encryptedData)))
+            } catch (e) {
+                console.error("handle Encrypt error: ")
+                console.error(e)
+                console.error("handle Encrypt error, with pubkey: ", publicKey)
+                throw e
+            }
+
+
             fetch(url, {
                 method: "POST",
                 headers: {
@@ -153,7 +169,6 @@
                 .then(async data => {
                     console.log("Success:", data);
                     const waitingForEncrypted = atob(JSON.parse(data).data)
-                    console.info("WaitForEncrypted: ", waitingForEncrypted)
                     document.body.innerHTML = await Decrypt(waitingForEncrypted);
                 })
         }
