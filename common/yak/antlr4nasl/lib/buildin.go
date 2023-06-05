@@ -26,7 +26,7 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 				panic("iterableValue.Value is nil")
 			}
 			if index == nil {
-				panic("index is nil")
+				panic("call get_array_elem error: index is nil")
 			}
 			i, ok := index.(int)
 			if ok {
@@ -96,8 +96,8 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	"__split": func(s string, sep string, keep bool) []string {
 		return strings.Split(s, sep)
 	},
-	"reEqual": func(s1, s2 string) bool { // 内置=~运算符号
-		return utils.MatchAllOfRegexp(s1, s2)
+	"reEqual": func(s1, s2 interface{}) bool { // 内置=~运算符号
+		return utils.MatchAllOfRegexp(utils.InterfaceToString(s1), utils.InterfaceToString(s2))
 	},
 	"strIn": func(s1, s2 string) bool { // 内置><运算符号
 		return strings.Contains(s1, s2)

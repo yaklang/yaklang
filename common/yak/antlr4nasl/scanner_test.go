@@ -1,12 +1,18 @@
 package antlr4nasl
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
+	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -193,18 +199,98 @@ func TestPocScanner(t *testing.T) {
 	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
 	InitPluginGroup(engine) // 初始化插件组
 	engine.LoadGroups("Product detection")
-	//engine.LoadScriptFromDb("gb_apache_tomcat_consolidation.nasl")
-	engine.SetGoroutineNum(1000)
+	//engine.LoadScriptFromDb("gb_mysql_mariadb_os_detection.nasl")
+	engine.SetGoroutineNum(1)
 	engine.AddEngineHooks(func(engine *Engine) {
+		inFun := false
+		engine.vm.AddBreakPoint(func(v *yakvm.VirtualMachine) bool {
+			defer func() {
+				if err := recover(); err != nil {
+					fmt.Println(err)
+				}
+			}()
+			fm := v.CurrentFM()
+			if fm == nil {
+				return false
+			}
+			if fm.GetVerbose() == "function: recv_mysql_server_handshake" {
+				inFun = true
+			}
+			if inFun {
+				if fm.CurrentCode().StartLineNumber == 96 {
+					v, ok := fm.CurrentScope().GetValueByName("buf")
+					if ok {
+						println(v.Value)
+					}
+				}
+				inFun = false
+			}
+			return false
+		})
+		engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			scriptObj := engine.scriptObj
+			app := params.getParamByName("app", "").String()
+			version := params.getParamByName("version", "").String()
+			install := params.getParamByName("install", "").String()
+			cpe := params.getParamByName("cpe", "").String()
+			concluded := params.getParamByName("concluded", "").String()
+			if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
+				return origin(engine, params)
+			}
+			riskType := ""
+			if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
+				riskType = v
+			} else {
+				riskType = scriptObj.Category
+			}
+			source := "[NaslScript] " + engine.scriptObj.ScriptName
+			concludedUrl := params.getParamByName("concludedUrl", "").String()
+			solution := utils.MapGetString(engine.scriptObj.Tags, "solution")
+			summary := utils.MapGetString(engine.scriptObj.Tags, "summary")
+			cve := strings.Join(scriptObj.CVE, ", ")
+			//xrefStr := ""
+			//for k, v := range engine.scriptObj.Xrefs {
+			//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
+			//}
+			title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
+			if cve != "" {
+				title += fmt.Sprintf(", CVE: %s", summary)
+			}
+			yakit.NewRisk(concludedUrl,
+				yakit.WithRiskParam_Title(title),
+				yakit.WithRiskParam_RiskType(riskType),
+				yakit.WithRiskParam_Severity("low"),
+				yakit.WithRiskParam_YakitPluginName(source),
+				yakit.WithRiskParam_Description(summary),
+				yakit.WithRiskParam_Solution(solution),
+				yakit.WithRiskParam_Details(map[string]interface{}{
+					"app":       app,
+					"version":   version,
+					"install":   install,
+					"cpe":       cpe,
+					"concluded": concluded,
+					"source":    source,
+					"cve":       cve,
+				}),
+			)
+			return origin(engine, params)
+		})
 		engine.SetAutoLoadDependencies(true)
 		// 需要把ACT_SCAN的脚本都patch一遍
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
-
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
 			if err != nil {
 				return code
 			}
 			return string(codeBytes)
+		})
+		engine.AddNaslLibPatch("gb_altn_mdaemon_http_detect.nasl", func(code string) string {
+			codeLines := strings.Split(code, "\n")
+			if len(codeLines) > 55 {
+				codeLines[55] = "if ((res =~ \"MDaemon[- ]Webmail\" || res =~ \"Server\\s*:\\s*WDaemon\") && \"WorldClient.dll\" >< res) {"
+				code = strings.Join(codeLines, "\n")
+			}
+			return code
 		})
 		engine.AddNaslLibPatch("gb_apache_tomcat_open_redirect_vuln_lin.nasl", func(code string) string {
 			codeBytes, err := os.ReadFile("/Users/z3/nasl/nasl-plugins/2018/apache/gb_apache_tomcat_open_redirect_vuln_lin.nasl")
