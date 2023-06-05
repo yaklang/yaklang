@@ -1,7 +1,6 @@
 package antlr4nasl
 
 import (
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -39,14 +38,13 @@ var Exports = map[string]interface{}{
 			if len(group) > 0 {
 				scriptIns.Group = group[0]
 			}
-			scriptIns.OID = uuid.NewString()
 			err = scriptIns.Save()
 			if err != nil {
 				log.Errorf("Error save script %s: %s", path, err.Error())
 			}
 		}
 		if utils.IsDir(p) {
-			swg := utils.NewSizedWaitGroup(10)
+			swg := utils.NewSizedWaitGroup(100)
 			raw, err := utils.ReadFilesRecursively(p)
 			if err == nil {
 				for _, r := range raw {

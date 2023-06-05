@@ -18,13 +18,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"reflect"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -418,8 +418,15 @@ func init() {
 			//min := params.getParamByName("min", -1).Int()
 			iconn := params.getParamByName("socket", nil).Value
 			timeout := params.getParamByName("timeout", 2).Int()
+			length := params.getParamByName("length", -1).Int()
+			//min := params.getParamByName("min", -1).Int()
 			conn := iconn.(net.Conn)
-			res := utils.StableReader(conn, time.Second*time.Duration(timeout), 10240)
+			conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+			res := make([]byte, length)
+			_, err := conn.Read(res)
+			if err != nil {
+				return nil, err
+			}
 			return res, nil
 		},
 		"recv_line": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1737,7 +1744,7 @@ func init() {
 			}, nil)
 		},
 		"unknownservice_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return engine.CallNativeFunction("service_get_port", map[string]interface{}{
+			return engine.CallNativeFunction("service_get_ports", map[string]interface{}{
 				"proto":             "unknown",
 				"ipproto":           params.getParamByName("ipproto", "").Value,
 				"default_port_list": params.getParamByName("default_port_list", "").Value,
@@ -1784,26 +1791,95 @@ func init() {
 			//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
 			//}
 			title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
-			if cve != "" {
-				title += fmt.Sprintf(", CVE: %s", summary)
+			return fmt.Sprintf(`{"title":"%s","riskType":"%s","source":"%s","concluded":"%s","concludedUrl":"%s","solution":"%s","summary":"%s","cve":"%s","cpe":"%s","install":"%s"}`, title, riskType, source, concluded, concludedUrl, solution, summary, cve, cpe, install), nil
+		},
+		"ftp_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
 			}
-			return yakit.NewRisk(concludedUrl,
-				yakit.WithRiskParam_Title(title),
-				yakit.WithRiskParam_RiskType(riskType),
-				yakit.WithRiskParam_Severity("low"),
-				yakit.WithRiskParam_YakitPluginName(source),
-				yakit.WithRiskParam_Description(summary),
-				yakit.WithRiskParam_Solution(solution),
-				yakit.WithRiskParam_Details(map[string]interface{}{
-					"app":       app,
-					"version":   version,
-					"install":   install,
-					"cpe":       cpe,
-					"concluded": concluded,
-					"source":    source,
-					"cve":       cve,
-				}),
-			)
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"telnet_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"smtp_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"imap_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"http_can_host_php": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			ok := false
+			rsp, _ := http.Get(fmt.Sprintf("http://%s:%d/index.php", engine.host, params.getParamByName("port", 80).Int()))
+			if rsp != nil && rsp.StatusCode == 200 {
+				ok = true
+			}
+			if !ok {
+				rsp, _ := http.Get(fmt.Sprintf("https://%s:%d/index.php", engine.host, params.getParamByName("port", 443).Int()))
+				if rsp != nil && rsp.StatusCode == 200 {
+					ok = true
+				}
+			}
+			return ok, nil
+		},
+		"http_can_host_asp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			ok := false
+			rsp, _ := http.Get(fmt.Sprintf("http://%s:%d/index.asp", engine.host, params.getParamByName("port", 80).Int()))
+			if rsp != nil && rsp.StatusCode == 200 {
+				ok = true
+			}
+			if !ok {
+				rsp, _ := http.Get(fmt.Sprintf("https://%s:%d/index.asp", engine.host, params.getParamByName("port", 443).Int()))
+				if rsp != nil && rsp.StatusCode == 200 {
+					ok = true
+				}
+			}
+			return ok, nil
+		},
+		"os_host_runs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			if params.getParamByNumber(0, "").String() == runtime.GOOS {
+				return true, nil
+			}
+			return false, nil
+		},
+		"wmi_file_is_file_search_disabled": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return true, nil
+		},
+		"snmp_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		//需要把ssh相关插件重写
+		"ssh_session_id_from_sock": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			panic("not implement")
 		},
 	}
 	for name, method := range naslLib {
@@ -1856,4 +1932,18 @@ func GetNaslLibKeys() map[string]interface{} {
 		}{}
 	}
 	return res
+}
+
+func GetPortBannerByCache(engine *Engine, port int) (string, error) {
+	iport_infos, err := engine.CallNativeFunction("get_kb_item", map[string]interface{}{"key": "Services/ftp"}, nil)
+	if err != nil {
+		return "", err
+	}
+	port_infos := iport_infos.([]*fp.MatchResult)
+	for _, port_info := range port_infos {
+		if port_info.Port == port {
+			return port_info.Fingerprint.Banner, nil
+		}
+	}
+	return "", nil
 }

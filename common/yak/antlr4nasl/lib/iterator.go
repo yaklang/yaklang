@@ -19,6 +19,9 @@ type NaslIterator struct {
 }
 
 func NewIterator(v interface{}) (IteratorInterface, error) {
+	if v == nil {
+		return nil, utils.Error("not support iterator nil")
+	}
 	if val, ok := v.(*vm.NaslArray); ok {
 		return &NaslIterator{
 			data:  val,
@@ -35,6 +38,9 @@ func NewIterator(v interface{}) (IteratorInterface, error) {
 	}, nil
 }
 func (i *NaslIterator) Next() (interface{}, bool) {
+	if i == nil {
+		return nil, false
+	}
 	if i.index >= len(i.data.Num_elt) {
 		return nil, false
 	}
@@ -43,6 +49,9 @@ func (i *NaslIterator) Next() (interface{}, bool) {
 	return v, true
 }
 func (i *Iterator) Next() (interface{}, bool) {
+	if i == nil {
+		return nil, false
+	}
 	if i.index >= i.data.Len() {
 		return nil, false
 	}

@@ -56,7 +56,6 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 		loadedScriptsLock: &sync.Mutex{},
 		buildInMethodHook: make(map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)),
 	}
-
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
 	engine.compiler.RegisterVisitHook("a", func(c *visitors.Compiler, ctx antlr.ParserRuleContext) {
 		if start := ctx.GetStart(); start != nil {
@@ -276,6 +275,9 @@ func (e *Engine) Eval(code string) error {
 	err := e.Compile(code)
 	if err != nil {
 		return err
+	}
+	if e.debug {
+		e.vm.EnableExecCodeCallBack()
 	}
 	err = e.vm.ExecYakCode(context.Background(), code, e.compiler.GetCodes(), yakvm.None)
 	if err != nil {
