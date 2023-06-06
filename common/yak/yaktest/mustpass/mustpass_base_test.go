@@ -47,7 +47,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "nuclei_scan.yak"
+	var debugName = "mock_thinkphprce.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

@@ -132,20 +132,28 @@ func ScanUrl(u string, opt ...interface{}) {
 func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowhttp.LowhttpOpt) {
 	var configOpt []ConfigOption
 	var lowhttpOpt []lowhttp.LowhttpOpt
+	var pocOpt []yaklib.PocConfig
 	for _, opt := range opts {
 		switch ret := opt.(type) {
 		case lowhttp.LowhttpOpt:
 			lowhttpOpt = append(lowhttpOpt, ret)
+		case yaklib.PocConfig:
+			pocOpt = append(pocOpt, ret)
 		case ConfigOption:
 			configOpt = append(configOpt, ret)
 		}
 	}
+	pocConfig := yaklib.NewDefaultPoCConfig()
+	for _, opt := range pocOpt {
+		opt(pocConfig)
+	}
 	config := NewConfig(configOpt...)
 	lowhttpConfig := lowhttp.NewLowhttpOption()
-	for _, opt := range lowhttpOpt {
+	totalConfig := append(lowhttpOpt, pocConfig.ToLowhttpOptions()...)
+	for _, opt := range totalConfig {
 		opt(lowhttpConfig)
 	}
-	return config, lowhttpConfig, lowhttpOpt
+	return config, lowhttpConfig, totalConfig
 }
 
 func ScanAuto(items any, opt ...interface{}) {
