@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -780,7 +779,7 @@ func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResp
 		"Xitami":                  "xitami",
 		"Simplehttp":              "simplehttp",
 		"Cherokee":                "cherokee",
-		"MonkeyHTTPServer":        "monkeyhttp_server",
+		"MonkeyHTTPServer":        "monkey_http_server",
 		"NodeJS":                  "node.js",
 		"Websphere":               "websphere",
 		"Zope":                    "zope",
@@ -802,20 +801,9 @@ func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResp
 		"DB2":                     "db2",
 		"Hbase":                   "hbase",
 		"Memcached":               "memcached",
+		"Splunkd":                 "splunkd",
 	}
-	databaseValues := []string{
-		"sql_server",
-		"mysql",
-		"mongodb",
-		"redis",
-		"elasticsearch",
-		"postgresql",
-		"db2",
-		"hbase",
-		"memcached",
-		"splunkd",
-	}
-
+	databaseValues := []string{ "sql_server", "mysql", "mongodb", "redis", "elasticsearch", "postgresql", "db2", "hbase", "memcached", "splunkd"}
 	for k, v := range serviceTypeKey {
 		if reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32) > 0 {
 			if IsValueInSortedSlice(v, databaseValues) {
@@ -826,7 +814,7 @@ func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResp
 						Total: reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
 				})
 			} else {
-				webGroupList.GroupName = "Web服务器"
+				webGroupList.GroupName = "服务器"
 				webGroupList.GroupLists = append(webGroupList.GroupLists, &ypb.GroupList{
 					ServiceType: v,
 					ShowServiceType: k,
@@ -845,6 +833,10 @@ func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResp
 }
 
 func IsValueInSortedSlice(value string, slice []string) bool {
-	index := sort.SearchStrings(slice, value)
-	return index < len(slice) && slice[index] == value
+	for _, v := range slice {
+		if strings.Contains(v, value) {
+			return true
+		}
+	}
+	return false
 }
