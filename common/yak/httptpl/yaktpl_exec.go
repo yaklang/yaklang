@@ -132,6 +132,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 			var packetOpt []lowhttp.LowhttpOpt
 			packetOpt = append(
 				packetOpt, lowhttp.WithPacket([]byte(reqRaw)), lowhttp.WithHttps(isHttps),
+				lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource(y.Name),
 			)
 			packetOpt = append(packetOpt, opts...)
 			if config.Debug && config.DebugRequest {
@@ -221,6 +222,9 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				defer swg.Done()
 
 				rsps, result, extracted := handleReqSeqs(ret.RequestConfig, ret.Requests, params)
+				if result {
+					log.Infof("[%v]-[%v] matched", y.Name, y.Id)
+				}
 				config.ExecuteResultCallback(y, ret.RequestConfig, rsps, result, extracted)
 			}(reqSeqs, p)
 		}

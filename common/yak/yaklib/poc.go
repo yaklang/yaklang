@@ -3,6 +3,7 @@ package yaklib
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -55,24 +56,94 @@ type _pocConfig struct {
 	WebsocketClientHandler func(c *lowhttp.WebsocketClient)
 }
 
-func newDefaultPoCConfig() *_pocConfig {
+func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
+	var opts []lowhttp.LowhttpOpt
+	if c.Host != "" {
+		opts = append(opts, lowhttp.WithHost(c.Host))
+	}
+	if c.Port != 0 {
+		opts = append(opts, lowhttp.WithPort(c.Port))
+	}
+	opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
+	opts = append(opts, lowhttp.WithHttp2(c.ForceHttp2))
+	if c.Timeout > 0 {
+		opts = append(opts, lowhttp.WithTimeout(c.Timeout))
+	}
+	if c.RetryTimes > 0 {
+		opts = append(opts, lowhttp.WithRetryTimes(c.RetryTimes))
+	}
+	if len(c.RetryInStatusCode) > 0 {
+		opts = append(opts, lowhttp.WithRetryInStatusCode(c.RetryInStatusCode))
+	}
+	if len(c.RetryNotInStatusCode) > 0 {
+		opts = append(opts, lowhttp.WithRetryNotInStatusCode(c.RetryNotInStatusCode))
+	}
+	if c.RetryWaitTime > 0 {
+		opts = append(opts, lowhttp.WithRetryWaitTime(c.RetryWaitTime))
+	}
+	if c.RetryMaxWaitTime > 0 {
+		opts = append(opts, lowhttp.WithRetryMaxWaitTime(c.RetryMaxWaitTime))
+	}
+	if c.RedirectTimes > 0 {
+		opts = append(opts, lowhttp.WithRedirectTimes(c.RedirectTimes))
+	}
+	if c.NoRedirect {
+		opts = append(opts, lowhttp.WithRedirectTimes(0))
+	}
+
+	if c.Proxy != nil {
+		opts = append(opts, lowhttp.WithProxy(c.Proxy...))
+	}
+	if c.FuzzParams != nil {
+		log.Warnf("fuzz params is not nil, but not support now")
+	}
+
+	if c.NoFixContentLength {
+		opts = append(opts, lowhttp.WithNoFixContentLength(c.NoFixContentLength))
+	}
+	if c.JsRedirect {
+		opts = append(opts, lowhttp.WithJsRedirect(c.JsRedirect))
+	}
+	if c.RedirectHandler != nil {
+		opts = append(opts, lowhttp.WithRedirectHandler(c.RedirectHandler))
+	}
+	if c.Session != nil {
+		opts = append(opts, lowhttp.WithSession(c.Session))
+	}
+	if c.SaveHTTPFlow {
+		opts = append(opts, lowhttp.WithSaveHTTPFlow(c.SaveHTTPFlow))
+	}
+	if c.Source != "" {
+		opts = append(opts, lowhttp.WithSource(c.Source))
+	}
+	return opts
+}
+
+func NewDefaultPoCConfig() *_pocConfig {
 	config := &_pocConfig{
-		Host:                 "",
-		Port:                 0,
-		ForceHttps:           false,
-		ForceHttp2:           false,
-		Timeout:              15 * time.Second,
-		RetryTimes:           0,
-		RetryInStatusCode:    []int{},
-		RetryNotInStatusCode: []int{},
-		RetryWaitTime:        defaultWaitTime,
-		RetryMaxWaitTime:     defaultMaxWaitTime,
-		RedirectTimes:        5,
-		NoRedirect:           false,
-		Proxy:                nil,
-		NoFixContentLength:   false,
-		JsRedirect:           false,
-		SaveHTTPFlow:         consts.GetDefaultSaveHTTPFlowFromEnv(),
+		Host:                   "",
+		Port:                   0,
+		ForceHttps:             false,
+		ForceHttp2:             false,
+		Timeout:                15 * time.Second,
+		RetryTimes:             0,
+		RetryInStatusCode:      []int{},
+		RetryNotInStatusCode:   []int{},
+		RetryWaitTime:          defaultWaitTime,
+		RetryMaxWaitTime:       defaultMaxWaitTime,
+		RedirectTimes:          5,
+		NoRedirect:             false,
+		Proxy:                  nil,
+		FuzzParams:             nil,
+		NoFixContentLength:     false,
+		JsRedirect:             false,
+		RedirectHandler:        nil,
+		Session:                nil,
+		SaveHTTPFlow:           consts.GetDefaultSaveHTTPFlowFromEnv(),
+		Source:                 "",
+		Websocket:              false,
+		WebsocketHandler:       nil,
+		WebsocketClientHandler: nil,
 	}
 	return config
 }
@@ -232,7 +303,7 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 
 	// poc 模块收 proxy 影响
 	proxy := _cliStringSlice("proxy")
-	config := newDefaultPoCConfig()
+	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
 		opt(config)
