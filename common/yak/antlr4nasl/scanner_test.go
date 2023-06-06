@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -198,9 +199,10 @@ func TestPocScanner(t *testing.T) {
 	//engine.vm.GetConfig().SetStopRecover(true)
 	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
 	InitPluginGroup(engine) // 初始化插件组
-	engine.LoadGroups("Product detection")
-	//engine.LoadScriptFromDb("gb_mysql_mariadb_os_detection.nasl")
-	engine.SetGoroutineNum(1)
+	//engine.LoadGroups("Product detection")
+	//engine.LoadScriptFromDb("gb_cisco_asa_detect.nasl")
+	engine.LoadScriptFromDb("gb_apache_hadoop_detect.nasl")
+	engine.SetGoroutineNum(10)
 	engine.AddEngineHooks(func(engine *Engine) {
 		inFun := false
 		engine.vm.AddBreakPoint(func(v *yakvm.VirtualMachine) bool {
@@ -284,6 +286,14 @@ func TestPocScanner(t *testing.T) {
 			}
 			return string(codeBytes)
 		})
+		engine.AddNaslLibPatch("http_keepalive.inc", func(code string) string {
+			codeLines := strings.Split(code, "\n")
+			if len(codeLines) > 342 {
+				codeLines[342] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
+				code = strings.Join(codeLines, "\n")
+			}
+			return code
+		})
 		engine.AddNaslLibPatch("gb_altn_mdaemon_http_detect.nasl", func(code string) string {
 			codeLines := strings.Split(code, "\n")
 			if len(codeLines) > 55 {
@@ -300,10 +310,12 @@ func TestPocScanner(t *testing.T) {
 			return string(codeBytes)
 		})
 	})
-	err := engine.Scan("webmail.obecstablovice.cz", "3306")
+	start := time.Now()
+	err := engine.Scan("83.212.108.171", "9870")
 	if err != nil {
 		log.Error(err)
 	}
+	log.Info("scan time: ", time.Since(start))
 	data := engine.GetKBData()
 	data["Host/port_infos"] = nil
 	spew.Dump(data)

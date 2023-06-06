@@ -33,10 +33,12 @@ type Engine struct {
 	sourceCode                     string
 	scriptObj                      *NaslScriptInfo
 	host                           string
-	proxys                         []string
+	proxies                        []string
 	Kbs                            *NaslKBs
 	loadedScripts                  map[string]struct{}
 	loadedScriptsLock              *sync.Mutex
+	scriptExecMutexs               map[string]*sync.Mutex
+	scriptExecMutexsLock           *sync.Mutex
 	autoLoadDependencies           bool
 	buildInMethodHook              map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
 }
@@ -55,6 +57,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 		loadedScripts:     make(map[string]struct{}),
 		loadedScriptsLock: &sync.Mutex{},
 		buildInMethodHook: make(map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)),
+		scriptExecMutexs:  make(map[string]*sync.Mutex),
 	}
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
 	engine.compiler.RegisterVisitHook("a", func(c *visitors.Compiler, ctx antlr.ParserRuleContext) {
@@ -102,6 +105,15 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
 }
+func (engine *Engine) GetScriptMuxByName(name string) *sync.Mutex {
+	engine.scriptExecMutexsLock.Lock()
+	defer engine.scriptExecMutexsLock.Unlock()
+	if v, ok := engine.scriptExecMutexs[name]; ok {
+		return v
+	}
+	engine.scriptExecMutexs[name] = &sync.Mutex{}
+	return engine.scriptExecMutexs[name]
+}
 func (engine *Engine) RegisterBuildInMethodHook(name string, hook func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)) {
 	engine.buildInMethodHook[name] = hook
 }
@@ -122,8 +134,8 @@ func (e *Engine) IsScriptLoaded(scriptName string) bool {
 	_, ok := e.loadedScripts[scriptName]
 	return ok
 }
-func (engine *Engine) SetProxys(proxys ...string) {
-	engine.proxys = proxys
+func (engine *Engine) SetProxies(proxies ...string) {
+	engine.proxies = proxies
 }
 func (engine *Engine) GetScriptObject() *NaslScriptInfo {
 	return engine.scriptObj

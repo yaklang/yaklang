@@ -43,12 +43,16 @@ func (n *NaslKBs) SetKB(name string, value interface{}) error {
 	return nil
 }
 func (n *NaslKBs) GetKB(name string) interface{} {
+	n.mux.Lock()
+	defer n.mux.Unlock()
 	if v, ok := n.data[name]; ok {
 		return v
 	}
 	return nil
 }
 func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
+	n.mux.Lock()
+	defer n.mux.Unlock()
 	res = make(map[string]interface{})
 	for k, v := range n.data {
 		if utils.MatchAllOfGlob(k, name) {
@@ -58,6 +62,10 @@ func (n *NaslKBs) GetKBByPattern(name string) (res map[string]interface{}) {
 	return
 }
 
+type NaslVhost struct {
+	Hostname string
+	Source   string
+}
 type NaslScriptInfo struct {
 	naslScript     *yakit.NaslScript
 	OriginFileName string
@@ -83,16 +91,24 @@ type NaslScriptInfo struct {
 	BugtraqId       []int
 	MandatoryKeys   []string // 前置条件断言
 	Timeout         int      // milliseconds
+
+	Vhosts []*NaslVhost
+	Ip     string
 }
 
 func (n *NaslScriptInfo) Run(e *Engine) error {
 	if n == nil {
 		return utils.Errorf("script is nil")
 	}
-	if e.IsScriptLoaded(n.ScriptName) {
+	mux := e.GetScriptMuxByName(n.OID)
+	mux.Lock()
+	defer func() {
+		e.MarkScriptIsLoaded(n.OriginFileName)
+		mux.Unlock()
+	}()
+	if e.IsScriptLoaded(n.OriginFileName) {
 		return nil
 	}
-	e.MarkScriptIsLoaded(n.ScriptName)
 	// 缺乏循环依赖检查
 	if e.autoLoadDependencies {
 		for _, dependency := range n.Dependencies {

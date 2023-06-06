@@ -484,7 +484,7 @@ func (c *Compiler) VisitLiteralExpression(i *nasl.LiteralExpressionContext) {
 			//var err error
 			s := slit.GetText()
 			res = s[1 : len(s)-1]
-			if s[0] == '\'' {
+			if s[0] == '\'' || s[0] == '"' {
 				//res = strings.ReplaceAll(res, `\'`, `\\'`)
 				//res = strings.ReplaceAll(res, `"`, `\"`)
 				//res, err = strconv.Unquote(`"` + res + `"`)
