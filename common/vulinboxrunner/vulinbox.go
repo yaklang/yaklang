@@ -40,12 +40,13 @@ func init() {
 func main() {
 	app := cli.NewApp()
 
-	app.Commands = []cli.Command{}
-
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
 			Name:  "port,p",
 			Value: 8787,
+		},
+		cli.BoolFlag{
+			Name: "safe",
 		},
 	}
 
@@ -54,8 +55,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		// not implemented
-		servers, err := vulinbox.NewVulinServer(context.Background(), c.Int("port"))
+		servers, err := vulinbox.NewVulinServerEx(context.Background(), c.Bool("safe"), "0.0.0.0", c.Int("port"))
 		if err != nil {
 			log.Errorf("new vulinbox server failed: %v", err)
 			return err
