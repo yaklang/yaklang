@@ -5,6 +5,7 @@ on:
     paths:
       - 'common/vulinbox/**'
       - 'common/vulinboxrunner/**'
+      - '.github/workflows/vulinbox-release.yml'
 
 jobs:
   build_and_release:
@@ -29,15 +30,6 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.20.3
-      #      - name: Download Npcap SDK (Windows)
-      #        run: |
-      #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
-      #          Expand-Archive C:\NpcapSDK.zip -DestinationPath ..\wpdpack
-      #        if: runner.os == 'Windows'
-      - name: Install libpcap (macOS)
-        run: |
-          brew install libpcap
-        if: runner.os == 'macOS'
 
       - name: Install libpcap (Linux)
         run: |
@@ -54,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v2
         if: runner.os == 'Linux'
         with:
-          name: yak_linux_amd64
-          path: ./yak_linux_amd64
+          name: vulinbox_linux_amd64
+          path: ./vulinbox_linux_amd64
