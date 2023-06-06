@@ -285,3 +285,24 @@ assert(a[0]=="1","a[0]!=1");
 assert(a[1]==NULL,"a[1]!=NULL");
 `)
 }
+func TestString(t *testing.T) {
+	DebugExec(`
+a =string("a\nb\nc");
+res = split(a,sep:"\n");
+assert(res[0]=="a","res[0]!=a");
+`)
+}
+func TestEregmatch(t *testing.T) {
+	DebugExec(`
+if (a = eregmatch(string:"a",pattern:"aaa")){
+	assert(0,"a!=NULL");
+}
+
+`)
+}
+func TestEgrep(t *testing.T) {
+	DebugExec(`
+a = egrep( pattern:"^User-Agent:.+", string:"User-Agent: aaa", icase:TRUE );
+dump(a);
+`)
+}

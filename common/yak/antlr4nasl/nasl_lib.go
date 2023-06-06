@@ -317,18 +317,8 @@ func init() {
 			return engine.Kbs.GetKB(name.String()), nil
 		},
 		"get_kb_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			name := params.getParamByNumber(0)
-			res := []interface{}{}
-			s := name.String()
-			if strings.Contains(s, "*") {
-				return engine.Kbs.GetKBByPattern(s), nil
-			}
-			for k, v := range engine.Kbs.data {
-				if utils.MatchAllOfGlob(k, s) {
-					res = append(res, v)
-				}
-			}
-			return res, nil
+			name := params.getParamByNumber(0).String()
+			return engine.Kbs.GetKBByPattern(name), nil
 		},
 		"security_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			protocol := params.getParamByName("protocol")
@@ -380,7 +370,7 @@ func init() {
 			}
 			var conn net.Conn
 
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -421,17 +411,25 @@ func init() {
 			length := params.getParamByName("length", -1).Int()
 			//min := params.getParamByName("min", -1).Int()
 			conn := iconn.(net.Conn)
-			conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
-			res := make([]byte, length)
-			_, err := conn.Read(res)
-			if err != nil {
-				return nil, err
+			if length == -1 {
+				res := utils.StableReader(conn, time.Duration(timeout)*time.Second, 10240)
+				return res, nil
+			} else {
+				conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+				res := make([]byte, length)
+				n, err := conn.Read(res)
+				if err != nil {
+					return nil, err
+				}
+				return res[:n], nil
 			}
-			return res, nil
 		},
 		"recv_line": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			iconn := params.getParamByName("socket", nil).Value
-			//length := params.getParamByName("length", -1).Int()
+			length := params.getParamByName("length", -1).Int()
+			if length == -1 {
+				length = 4096
+			}
 			timeout := params.getParamByName("timeout", 5).Int()
 			conn := iconn.(net.Conn)
 			if err := conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout))); err != nil {
@@ -451,10 +449,10 @@ func init() {
 				if byt[0] == '\n' {
 					break
 				}
+				if buf.Len() >= length {
+					break
+				}
 			}
-			//if len(line) > length {
-			//	return line[:length], nil
-			//}
 			return buf.String(), nil
 		},
 		"send": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -462,6 +460,9 @@ func init() {
 			data := params.getParamByName("data").AsString()
 			option := params.getParamByName("option", 0)
 			length := params.getParamByName("length", 0)
+			if engine.debug {
+				log.Infof("send data: %s", data)
+			}
 			data_length := len(data)
 			_ = option
 			_ = length
@@ -546,7 +547,7 @@ func init() {
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -644,7 +645,17 @@ func init() {
 			}
 		},
 		"add_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `add_host_name` is not implement"))
+			hostname := params.getParamByName("hostname", "").String()
+			source := params.getParamByName("source", "").String()
+			if source == "" {
+				source = "NASL"
+			}
+			engine.scriptObj.Vhosts = append(engine.scriptObj.Vhosts, &NaslVhost{
+				Hostname: hostname,
+				Source:   source,
+			})
+			engine.Kbs.AddKB("internal/vhosts", strings.ToLower(hostname))
+			engine.Kbs.AddKB(fmt.Sprintf("internal/source/%s", strings.ToLower(hostname)), source)
 			return nil, nil
 		},
 		"get_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -752,7 +763,11 @@ func init() {
 			return os.Hostname()
 		},
 		"string": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return params.getParamByNumber(0).String(), nil
+			s := ""
+			forEachParams(params, func(value *yakvm.Value) {
+				s += value.String()
+			})
+			return s, nil
 		},
 		"raw_string": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return string(params.getParamByNumber(0, 0x00).Bytes()), nil
@@ -1517,7 +1532,7 @@ func init() {
 			if port == -1 {
 				return nil, fmt.Errorf("port is invalid")
 			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, engine.proxys...)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, engine.proxies...)
 			if err != nil {
 				return nil, fmt.Errorf("connect pop3 server error：%s", err)
 			}
@@ -1535,9 +1550,9 @@ func init() {
 		"http_cgi_dirs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			cgiPath, ok := GlobalPrefs["cgi_path"]
 			if ok {
-				return cgiPath, nil
+				return []string{cgiPath}, nil
 			}
-			return "", nil
+			return []string{}, nil
 		},
 		"include": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0, "").String()
@@ -1588,7 +1603,7 @@ func init() {
 			return nil, nil
 		},
 		"pingHost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			result := pingutil.PingAuto(engine.host, "", time.Second*5, engine.proxys...)
+			result := pingutil.PingAuto(engine.host, "", time.Second*5, engine.proxies...)
 			return result.Ok, nil
 		},
 		"call_yak_method": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1865,6 +1880,11 @@ func init() {
 			}
 			return ok, nil
 		},
+		"http_extract_body_from_response": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			res := params.getParamByName("data", "").String()
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(res))
+			return body, nil
+		},
 		"os_host_runs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			if params.getParamByNumber(0, "").String() == runtime.GOOS {
 				return true, nil
@@ -1880,6 +1900,9 @@ func init() {
 		//需要把ssh相关插件重写
 		"ssh_session_id_from_sock": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic("not implement")
+		},
+		"ssh_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
 		},
 	}
 	for name, method := range naslLib {
@@ -1913,6 +1936,11 @@ func init() {
 				case []byte:
 					return string(ret)
 				default:
+					if reflect.TypeOf(res).Kind() == reflect.Slice || reflect.TypeOf(res).Kind() == reflect.Array {
+						if reflect.ValueOf(res).Len() == 0 {
+							return nil
+						}
+					}
 					array, err := vm.NewNaslArray(res)
 					if err == nil {
 						return array

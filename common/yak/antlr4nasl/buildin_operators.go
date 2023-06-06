@@ -90,6 +90,12 @@ func init() {
 	yakvm.ImportBinaryOperator(yakvm.OpEq, _eq)
 	yakvm.ImportBinaryOperator(yakvm.OpNotEq, _neq)
 	yakvm.ImportBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+		if op1.IsUndefined() {
+			op1 = yakvm.NewAutoValue(0)
+		}
+		if op2.IsUndefined() {
+			op2 = yakvm.NewAutoValue(0)
+		}
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() > op2.Int64()
 			return &yakvm.Value{
@@ -117,6 +123,12 @@ func init() {
 	})
 
 	yakvm.ImportBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+		if op1.IsUndefined() {
+			op1 = yakvm.NewAutoValue(0)
+		}
+		if op2.IsUndefined() {
+			op2 = yakvm.NewAutoValue(0)
+		}
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() >= op2.Int64()
 			return &yakvm.Value{
@@ -144,6 +156,12 @@ func init() {
 	})
 
 	yakvm.ImportBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+		if op1.IsUndefined() {
+			op1 = yakvm.NewAutoValue(0)
+		}
+		if op2.IsUndefined() {
+			op2 = yakvm.NewAutoValue(0)
+		}
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() < op2.Int64()
 			return &yakvm.Value{
@@ -171,6 +189,12 @@ func init() {
 	})
 
 	yakvm.ImportBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+		if op1.IsUndefined() {
+			op1 = yakvm.NewAutoValue(0)
+		}
+		if op2.IsUndefined() {
+			op2 = yakvm.NewAutoValue(0)
+		}
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() <= op2.Int64()
 			return &yakvm.Value{

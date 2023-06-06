@@ -9,8 +9,8 @@ import (
 )
 
 type NaslScriptConfig struct {
-	group  []string
-	proxys []string
+	group   []string
+	proxies []string
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -44,7 +44,7 @@ var Exports = map[string]interface{}{
 			}
 		}
 		if utils.IsDir(p) {
-			swg := utils.NewSizedWaitGroup(100)
+			swg := utils.NewSizedWaitGroup(20)
 			raw, err := utils.ReadFilesRecursively(p)
 			if err == nil {
 				for _, r := range raw {
@@ -130,7 +130,7 @@ var Exports = map[string]interface{}{
 		for _, g := range config.group {
 			engine.LoadGroups(ScriptGroup(g))
 		}
-		engine.proxys = config.proxys
+		engine.proxies = config.proxies
 		err := engine.ScanTarget(target)
 		//if err != nil {
 		//	return nil, err
@@ -144,7 +144,7 @@ var Exports = map[string]interface{}{
 	},
 	"proxy": func(proxy ...string) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
-			c.proxys = proxy
+			c.proxies = proxy
 		}
 	},
 }

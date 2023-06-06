@@ -14,7 +14,7 @@ import (
 )
 
 type ScriptEngine struct {
-	proxys                         []string
+	proxies                        []string
 	Kbs                            *NaslKBs
 	naslLibsPath, dependenciesPath string
 	scriptFilter                   func(script *NaslScriptInfo) bool
@@ -26,6 +26,8 @@ type ScriptEngine struct {
 	engineHooks                    []func(engine *Engine)
 	loadedScripts                  map[string]struct{}
 	loadedScriptsLock              *sync.Mutex
+	scriptExecMutexs               map[string]*sync.Mutex
+	scriptExecMutexsLock           *sync.Mutex
 }
 
 func NewScriptEngine() *ScriptEngine {
@@ -40,7 +42,18 @@ func NewScriptEngine() *ScriptEngine {
 		scriptFilter: func(script *NaslScriptInfo) bool {
 			return true
 		},
+		scriptExecMutexsLock: &sync.Mutex{},
+		scriptExecMutexs:     make(map[string]*sync.Mutex),
 	}
+}
+func (engine *ScriptEngine) GetScriptMuxByName(name string) *sync.Mutex {
+	engine.scriptExecMutexsLock.Lock()
+	defer engine.scriptExecMutexsLock.Unlock()
+	if v, ok := engine.scriptExecMutexs[name]; ok {
+		return v
+	}
+	engine.scriptExecMutexs[name] = &sync.Mutex{}
+	return engine.scriptExecMutexs[name]
 }
 func (engine *ScriptEngine) SetScriptFilter(filter func(script *NaslScriptInfo) bool) {
 	engine.scriptFilter = filter
@@ -156,7 +169,7 @@ func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 func (e *ScriptEngine) Scan(host string, ports string) error {
 
 	var allErrors multiError
-	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxys...)
+	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxies...)
 	if res.Ok {
 		e.Kbs.SetKB("Host/dead", 0)
 		e.Kbs.SetKB("Host/State", "up")
@@ -166,7 +179,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 		e.Kbs.SetKB("Host/State", "down")
 	}
 	log.Infof("start syn scan host: %s, ports: %s", host, ports)
-	servicesInfo, err := ServiceScan(host, ports, e.proxys...)
+	servicesInfo, err := ServiceScan(host, ports, e.proxies...)
 	if err != nil {
 		return err
 	}
@@ -210,12 +223,14 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			defer swg.Done()
 			engine := New()
 			engine.host = host
-			engine.SetProxys(e.proxys...)
+			engine.SetProxies(e.proxies...)
 			engine.SetIncludePath(e.naslLibsPath)
 			engine.SetDependenciesPath(e.dependenciesPath)
 			engine.SetKBs(e.Kbs)
 			engine.InitBuildInLib()
 			engine.Debug(e.debug)
+			engine.scriptExecMutexsLock = e.scriptExecMutexsLock
+			engine.scriptExecMutexs = e.scriptExecMutexs
 			//engine.RegisterBuildInMethodHook("log_message", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			//	irisk := params.getParamByName("data").Value
 			//	if v, ok := irisk.(*yakit.Risk); ok {
