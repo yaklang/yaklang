@@ -151,7 +151,7 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 	}*/
 
 	var ret []*Port
-	paging, db := bizhelper.Paging(db.Debug(), int(p.Page), int(p.Limit), &ret)
+	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
@@ -286,7 +286,7 @@ func PortsServiceTypeGroup() ([]*PortsTypeGroup, error) {
 	db = db.Raw(`
 		SELECT
 		  SUM(CASE WHEN service_type LIKE '%nginx%' THEN 1 ELSE 0 END) as nginx,
-		  SUM(CASE WHEN service_type LIKE '%apache%' AND service_type NOT LIKE '%apache_tomcat%' THEN 1 ELSE 0 END) AS apache,
+		  SUM(CASE WHEN service_type LIKE '%apache%' THEN 1 ELSE 0 END) AS apache,
 		  SUM(CASE WHEN service_type LIKE '%iis%' THEN 1 ELSE 0 END) AS iis,
 		  SUM(CASE WHEN service_type LIKE '%litespeed%' THEN 1 ELSE 0 END) AS litespeed,
 		  SUM(CASE WHEN service_type LIKE '%tomcat%' THEN 1 ELSE 0 END) AS tomcat,
