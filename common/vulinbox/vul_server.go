@@ -14,13 +14,15 @@ import (
 type VulinServer struct {
 	database *dbm
 	router   *mux.Router
+
+	safeMode bool
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {
-	return NewVulinServerEx(ctx, "127.0.0.1", port...)
+	return NewVulinServerEx(ctx, false, "127.0.0.1", port...)
 }
 
-func NewVulinServerEx(ctx context.Context, host string, ports ...int) (string, error) {
+func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...int) (string, error) {
 	var router = mux.NewRouter()
 
 	var port int
