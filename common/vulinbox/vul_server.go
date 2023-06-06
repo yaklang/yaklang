@@ -34,7 +34,7 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 	if err != nil {
 		return "", err
 	}
-	server := &VulinServer{database: m, router: router}
+	server := &VulinServer{database: m, router: router, safeMode: safeMode}
 	server.init()
 
 	if port <= 0 {
