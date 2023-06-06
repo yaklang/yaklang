@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
 	"net/http"
 	"time"
@@ -52,9 +54,29 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 		}
 	}()
 	go func() {
-		err := http.Serve(lis, router)
-		if err != nil {
-			log.Error(err)
+		crep.InitMITMCert()
+		ca, key, _ := crep.GetDefaultCaAndKey()
+		if ca == nil {
+			log.Info("start to load no tls config")
+			err := http.Serve(lis, router)
+			if err != nil {
+				log.Error(err)
+			}
+		} else {
+			log.Info("start to load tls config")
+			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "vulinbox", time.Now().Add(time.Hour*24*180), false)
+			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			server := &http.Server{Handler: router}
+			server.TLSConfig = config
+			err = server.ServeTLS(lis, "", "")
+			//err := http.ServeTLS(lis, router, "server.crt", "server.key")
+			if err != nil {
+				log.Error(err)
+			}
 		}
 	}()
 	time.Sleep(time.Second)
