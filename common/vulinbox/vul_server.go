@@ -53,16 +53,20 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 			lis.Close()
 		}
 	}()
+	dealTls := make(chan bool)
+
 	go func() {
 		crep.InitMITMCert()
 		ca, key, _ := crep.GetDefaultCaAndKey()
 		if ca == nil {
+			dealTls <- false
 			log.Info("start to load no tls config")
 			err := http.Serve(lis, router)
 			if err != nil {
 				log.Error(err)
 			}
 		} else {
+			dealTls <- true
 			log.Info("start to load tls config")
 			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "vulinbox", time.Now().Add(time.Hour*24*180), false)
 			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
@@ -79,8 +83,12 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 			}
 		}
 	}()
+	var proto = "http"
+	if <-dealTls {
+		proto = "https"
+	}
 	time.Sleep(time.Second)
-	addr := fmt.Sprintf("http://%v", utils.HostPort(host, port))
+	addr := fmt.Sprintf("%s://%v", proto, utils.HostPort(host, port))
 	log.Infof("start vulinbox on: %v", addr)
 	return addr, nil
 }
