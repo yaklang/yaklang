@@ -117,7 +117,7 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	domain := m.Question[0].Name
 	visitorLog.SetDomain(domain)
 	log.Infof("dns req for: %s [%v]", domain, d.dotDomain)
-	if strings.HasSuffix(domain, d.dotDomain) {
+	if strings.HasSuffix(strings.ToLower(domain), strings.ToLower(d.dotDomain)) {
 		payload := domain[:len(domain)-len(d.dotDomain)]
 		visitorLog.Set("payload", payload)
 		if index := strings.LastIndex(payload, "."); index > 0 {
