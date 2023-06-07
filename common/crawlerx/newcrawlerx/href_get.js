@@ -55,3 +55,18 @@ function normalGetSelector(element) {
     }
     return domPath.toString().replaceAll(","," > ")
 }
+
+let nodes = document.createNodeIterator(document.getRootNode())
+let clickSelectors = [];
+let node;
+while ((node = nodes.nextNode())) {
+    var events = getEventListeners(node);
+    for (var eventName in events) {
+        if (eventName == "click") {
+            clickSelectors.push(node);
+            break;
+        }
+    }
+}
+
+// "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --remote-debugging-port=9222
