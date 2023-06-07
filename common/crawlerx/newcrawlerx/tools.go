@@ -150,7 +150,7 @@ func subCheck(s1, s2 string) bool {
 	return true
 }
 
-func stringSuffixList(s string, suffixes []string) bool {
+func StringSuffixList(s string, suffixes []string) bool {
 	for _, suffix := range suffixes {
 		if strings.HasSuffix(s, suffix) {
 			return true
@@ -159,7 +159,7 @@ func stringSuffixList(s string, suffixes []string) bool {
 	return false
 }
 
-func stringPrefixList(origin string, prefixes []string) bool {
+func StringPrefixList(origin string, prefixes []string) bool {
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(origin, prefix) {
 			return true

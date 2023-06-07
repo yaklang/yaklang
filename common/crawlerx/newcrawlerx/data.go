@@ -76,3 +76,22 @@ var generalScanRangeMap = map[scanRangeLevel]func(string) []string{
 var inputStringElementTypes = []string{
 	"text", "password", "textarea", "search",
 }
+
+var invalidSuffix = []string{
+	".js",
+	".css",
+	".xml",
+	".jpg", ".jpeg", ".png",
+	".mp3", ".mp4", ".ico", ".bmp",
+	".flv", ".aac", ".ogg", ".avi",
+	".svg", ".gif", ".woff", ".woff2",
+	".doc", ".docx", ".pptx",
+	".ppt", ".pdf",
+}
+
+var jsContentTypes = []string{
+	"text/javascript",
+	"application/javascript",
+	"application/x-javascript",
+	"application/ecmascript",
+}

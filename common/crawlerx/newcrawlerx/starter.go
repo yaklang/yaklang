@@ -61,8 +61,18 @@ type BrowserStarter struct {
 	getUrlFunction func(*rod.Page) error
 	clickFunction  func(*rod.Page) error
 	inputFunction  func(*rod.Page) error
+	vueFunction    func(*rod.Page) error
 	pageActions    []func(*rod.Page) error
-	actionMap      map[string]func(*rod.Page) error
+
+	getUrlsFunction      func(*rod.Page) ([]string, error)
+	doUrlsFunction       func(string, string) error
+	getClickFunction     func(*rod.Page) ([]string, error)
+	doClickFunction      func(*rod.Page, string, string) error
+	getInputFunction     func(*rod.Page) (rod.Elements, error)
+	doInputFunction      func(*rod.Element) error
+	getEventFunction     func(*rod.Page) ([]string, error)
+	doEventClickFunction func(*rod.Page, string, string) error
+	doActionOnPage       func(*rod.Page) error
 
 	client    http.Client
 	transport http.Transport
@@ -104,7 +114,6 @@ func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) 
 		stopSignal: false,
 
 		pageActions: make([]func(*rod.Page) error, 0),
-		actionMap:   make(map[string]func(*rod.Page) error),
 
 		extraWaitLoad: baseConfig.extraWaitLoadTime,
 		checkHTML:     true,
@@ -184,12 +193,8 @@ func (starter *BrowserStarter) StartBrowser() error {
 		return utils.Errorf("browser connect error: %s", err)
 	}
 	starter.browser.IgnoreCertErrors(true)
-	if starter.baseConfig.vue {
-		starter.vuePageActionGeneration()
-	} else {
-		starter.generateDefaultPageAction()
-	}
-	//starter.testActionGenerator()
+	//starter.generateDefaultPageAction()
+	starter.newDefaultPageActionGenerator()
 	starter.newPageDetectEvent()
 	return nil
 }
@@ -210,31 +215,11 @@ func (starter *BrowserStarter) generateDefaultPageAction() {
 	}
 	starter.getUrlFunction = starter.DefaultGetUrlFunctionGenerator(starter.DefaultDoGetUrl())
 	starter.clickFunction = starter.DefaultClickFunctionGenerator(starter.DefaultDoClick())
-	//starter.clickFunction = starter.EventClickFunctionGenerator(starter.DefaultDoClick())
 	starter.inputFunction = starter.DefaultInputFunctionGenerator(starter.DefaultDoInput())
+	starter.vueFunction = starter.EventClickFunctionGenerator(starter.vueClick(starter.DefaultDoGetUrl()))
 	starter.pageActions = append(starter.pageActions,
 		starter.inputFunction,
-		starter.getUrlFunction,
-		starter.clickFunction,
-	)
-}
-
-func (starter *BrowserStarter) vuePageActionGeneration() {
-	starter.checkFunctions = append(starter.checkFunctions,
-		scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
-		repeatCheckFunctionGenerate(starter.pageVisit),
-	)
-	starter.extraFunctions = append(starter.extraFunctions,
-		extraUrlCheck(extraUrlKeywords),
-	)
-	if len(starter.baseConfig.whiteList) != 0 {
-		starter.checkFunctionMap["whiteList"] = whiteListCheckGenerator(starter.baseConfig.whiteList)
-	}
-	if len(starter.baseConfig.blackList) != 0 {
-		starter.checkFunctionMap["blackList"] = blackListCheckGenerator(starter.baseConfig.blackList)
-	}
-	starter.pageActions = append(starter.pageActions,
-		starter.EventClickFunctionGenerator(starter.vueClick(starter.DefaultDoGetUrl())),
+		starter.actionOnPage(),
 	)
 }
 
@@ -251,6 +236,31 @@ func (starter *BrowserStarter) testActionGenerator() {
 	}
 	starter.getUrlFunction = starter.DefaultGetUrlFunctionGenerator(starter.DefaultDoGetUrl())
 	starter.pageActions = append(starter.pageActions, starter.getUrlFunction)
+}
+
+func (starter *BrowserStarter) newDefaultPageActionGenerator() {
+	starter.checkFunctions = append(starter.checkFunctions,
+		scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
+		repeatCheckFunctionGenerate(starter.pageVisit),
+	)
+	starter.extraFunctions = append(starter.extraFunctions,
+		extraUrlCheck(extraUrlKeywords),
+	)
+	if len(starter.baseConfig.whiteList) != 0 {
+		starter.checkFunctionMap["whiteList"] = whiteListCheckGenerator(starter.baseConfig.whiteList)
+	}
+	if len(starter.baseConfig.blackList) != 0 {
+		starter.checkFunctionMap["blackList"] = blackListCheckGenerator(starter.baseConfig.blackList)
+	}
+	starter.getUrlsFunction = starter.getUrlsFunctionGenerator()
+	starter.doUrlsFunction = starter.doUrlsFunctionGenerator()
+	starter.getClickFunction = starter.getClickFunctionGenerator()
+	starter.doClickFunction = starter.doClickFunctionGenerator()
+	starter.getInputFunction = starter.getInputFunctionGenerator()
+	starter.doInputFunction = starter.doInputFunctionGenerator()
+	starter.getEventFunction = starter.getEventFunctionGenerator()
+	starter.doEventClickFunction = starter.doEventClickFunctionGenerator()
+	starter.doActionOnPage = starter.ActionOnPage()
 }
 
 func (starter *BrowserStarter) newPageDetectEvent() {
@@ -291,7 +301,8 @@ func (starter *BrowserStarter) newPageDetectEvent() {
 				}
 			}
 			page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
-			err = starter.PageScan(page)
+			//err = starter.PageScan(page)
+			err = starter.doActionOnPage(page)
 			if err != nil {
 				log.Errorf("targetID %s do page scan error: %s", targetID, err)
 			}
@@ -311,6 +322,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 			hijack.ContinueRequest(&proto.FetchContinueRequest{})
 			result := SimpleResult{}
 			result.request = hijack.Request
+			result.resultType = "file upload result"
 			starter.ch <- &result
 			return
 		}
@@ -354,6 +366,29 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		if pageUrl != hijack.Request.URL().String() {
 			starter.urlTree.Add(pageUrl, hijack.Request.URL().String())
 			//log.Info(pageUrl, " -> ", hijack.Request.URL().String())
+		}
+
+		//log.Info(hijack.Response.Headers().Get("Content-Type"))
+		if StringArrayContains(jsContentTypes, hijack.Response.Headers().Get("Content-Type")) {
+			//log.Info("analysis js file: ", hijack.Request.URL().String())
+			jsUrls := analysisJsInfo(hijack.Request.URL().String(), hijack.Response.Body())
+			for _, jsUrl := range jsUrls {
+				var jsAfterRepeatUrl string
+				if starter.requestAfterRepeat != nil {
+					jsAfterRepeatUrl = starter.urlAfterRepeat(jsUrl)
+				} else {
+					jsAfterRepeatUrl = jsUrl
+				}
+				if !starter.resultSentFunc(jsAfterRepeatUrl) {
+					continue
+				}
+				result := SimpleResult{
+					url:        jsUrl,
+					resultType: "js url",
+					method:     "JS GET",
+				}
+				starter.ch <- &result
+			}
 		}
 
 		result := RequestResult{}
@@ -459,7 +494,7 @@ func (starter *BrowserStarter) MultiRun() {
 				if starter.baseConfig.hijack {
 					starter.createPageHijack(p)
 				}
-				//log.Infof("open url: %s...", urlStr)
+				//log.Infof("open url: %s... in page %s", urlStr, p.TargetID)
 				err = p.Navigate(urlStr)
 				if err != nil {
 					log.Errorf("page navigate %s error: %s", urlStr, err)

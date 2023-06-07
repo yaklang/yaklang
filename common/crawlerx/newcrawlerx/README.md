@@ -15,10 +15,9 @@
     formFill = newcrawlerx.formFill(formFillMap)
     fileUpload = newcrawlerx.fileInput({"default":"/Users/chenyangbao/1.txt"})
     blackList = newcrawlerx.blackList("logout","captcha")
-    vue = newcrawlerx.vueWebsite(false)
     timeout = newcrawlerx.extraWaitLoad(1000)
     
-    ch,_ = newcrawlerx.startCrawler("http://testphp.vulnweb.com/",formFill, fileUpload, blackList, browserInfo, vue, timeout)
+    ch,_ = newcrawlerx.startCrawler("http://testphp.vulnweb.com/",formFill, fileUpload, blackList, browserInfo, timeout)
     for item = range ch{
         println(item.Method() + " " + item.Url())
     }
@@ -442,26 +441,12 @@ url中的query名称查重忽略设置
 |------|--------------------------|--------|
 | r0   | newcrawlerx.ConfigOpt    | 参数设置函数 |
 
-### newcrawlerx.vueWebsite
+### ~~newcrawlerx.vueWebsite~~
 
-设置扫描目标为vue站点
-由于vue站点中的链接并不是直接写在href或src中，需要不同的策略进行获取，所以这里需要进行设置
+~~设置扫描目标为vue站点
+由于vue站点中的链接并不是直接写在href或src中，需要不同的策略进行获取，所以这里需要进行设置~~
 
-#### 定义
-
-`func newcrawlerx.vueWebsite(vue bool) return (r0: newcrawlerx.ConfigOpt)`
-
-#### 参数
-
-| 参数名  | 参数类型 | 参数解释      |
-|------|------|-----------|
-|  vue | bool | 是否为vue网站  |
-
-#### 返回值
-
-| 返回值  | 返回值类型                    | 返回值解释  |
-|------|--------------------------|--------|
-| r0   | newcrawlerx.ConfigOpt    | 参数设置函数 |
+已将普通扫描与vue扫描合并 系统自动识别 故删除该方法
 
 ### newcrawlerx.extraWaitLoad
 
