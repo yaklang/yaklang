@@ -123,7 +123,7 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		if index := strings.LastIndex(payload, "."); index > 0 {
 			token := payload[index:]
 			token = strings.Trim(token, ".")
-			visitorLog.Set("token", token)
+			visitorLog.Set("token", strings.ToLower(token))
 			log.Infof("dnslog set token: %v", token)
 		} else {
 			visitorLog.Set("token", payload)
