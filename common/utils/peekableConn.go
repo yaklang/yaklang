@@ -31,7 +31,7 @@ func _peekablePeek(r bufferable, i int) (_ []byte, fErr error) {
 		if a == nil {
 			return nil, io.EOF
 		}
-		n, err := io.ReadFull(a, buf[l:])
+		n, err := a.Read(buf[l:])
 		r.SetBuf(buf[:l+n])
 		return r.GetBuf(), err
 	}
@@ -49,9 +49,10 @@ func _peekableRead(p bufferable, b []byte) (int, error) {
 		return rl, nil
 	}
 	if l > 0 {
-		n := copy(b, p.GetBuf())
-		p.SetBuf(p.GetBuf()[n:])
-		return n, nil
+		n1 := copy(b, p.GetBuf())
+		p.SetBuf(p.GetBuf()[n1:])
+		n2, err := p.GetReader().Read(b[n1:])
+		return n1 + n2, err
 	}
 	return p.GetReader().Read(b)
 }
