@@ -122,7 +122,7 @@ type BruteItemResult struct {
 func (r *BruteItemResult) String() string {
 	var result = "FAIL"
 	if r.Ok {
-		result = "OK  "
+		result = "OK"
 	} else {
 		result = "FAIL"
 	}
