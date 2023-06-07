@@ -126,8 +126,8 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			visitorLog.Set("token", strings.ToLower(token))
 			log.Infof("dnslog set token: %v", token)
 		} else {
-			visitorLog.Set("token", payload)
-			log.Infof("dnslog set token: %v", payload)
+			visitorLog.Set("token", strings.ToLower(payload))
+			log.Infof("dnslog set(payload) token: %v", payload)
 		}
 	} else {
 		log.Warnf("no target domain: %v", domain)
