@@ -1,0 +1,48 @@
+host, port = tcp.MockServe("asdfadxv\\$Proxy51hfawqwexv")
+
+checked = false
+for result in nuclei.Scan("http://vulinbox.aws-4c16.yaklang.io:8004", poc.host(host), poc.port(port), nuclei.rawTemplate(`
+id: CVE-2018-2628
+
+info:
+  name: Oracle WebLogic Server Deserialization - Remote Code Execution
+  author: milo2012
+  severity: critical
+  description: |
+    The Oracle WebLogic Server component of Oracle Fusion Middleware (subcomponent: Web Services) versions 10.3.6.0, 12.1.3.0, 12.2.1.2 and 12.2.1.3 contains an easily exploitable vulnerability that allows unauthenticated attackers with network access via T3 to compromise Oracle WebLogic Server.
+  reference:
+    - https://www.nc-lp.com/blog/weaponize-oracle-weblogic-server-poc-cve-2018-2628
+    - https://nvd.nist.gov/vuln/detail/CVE-2018-2628
+    - http://www.oracle.com/technetwork/security-advisory/cpuapr2018-3678067.html
+    - http://web.archive.org/web/20211207132829/https://securitytracker.com/id/1040696
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 9.8
+    cve-id: CVE-2018-2628
+    cwe-id: CWE-502
+  tags: cve,cve2018,oracle,weblogic,network,deserialization,kev
+  metadata:
+    max-request: 1
+
+tcp:
+  - inputs:
+      - data: 74332031322e322e310a41533a3235350a484c3a31390a4d533a31303030303030300a0a
+        read: 1024
+        type: hex
+
+    host:
+      - "{{Hostname}}"
+
+    read-size: 1024
+    matchers:
+      - type: regex
+        regex:
+          - "\\$Proxy[0-9]+"
+
+# Enhanced by mp on 2022/04/14
+`), nuclei.debug(true), nuclei.debugRequest(true), nuclei.debugResponse(true))~ {
+    dump(result)
+    checked = true
+}
+
+if !checked { die("ERROR for nuclei smoking test!")}
