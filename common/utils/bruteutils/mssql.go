@@ -1,11 +1,8 @@
 package bruteutils
 
 import (
-	"crypto/tls"
 	"database/sql"
 	"fmt"
-	mssql "github.com/denisenkom/go-mssqldb"
-	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
@@ -48,8 +45,8 @@ var mssqlAuth = &DefaultServiceAuthInfo{
 		result := item.Result()
 
 		query := url.Values{}
-		query.Add("trustservercertificate", "true")
-		//query.Add("encrypt", "DISABLE")
+
+		query.Add("encrypt", "disable")
 
 		u := &url.URL{
 			Scheme:   "sqlserver",
@@ -59,23 +56,26 @@ var mssqlAuth = &DefaultServiceAuthInfo{
 		}
 		connStr := u.String()
 
-		cfg, _, _ := msdsn.Parse(connStr)
-		cfg.TLSConfig.MinVersion = tls.VersionTLS10
-
-		conn := mssql.NewConnectorConfig(cfg)
-		db := sql.OpenDB(conn)
-
-		_, err := db.Exec("select 1")
+		db, err := sql.Open("mssql", connStr)
+		if err != nil {
+			log.Errorf("sqlserver conn failed: %s", err)
+			return result
+		}
+		db.SetMaxIdleConns(0)
+		defer db.Close()
+		err = db.Ping()
 		if err != nil {
 			switch true {
 			// connect: connection refused
-			case strings.Contains(err.Error(), "i/o timeout"):
+			case strings.Contains(err.Error(), "i/o timeout"): // 超时
+				fallthrough
+			case strings.Contains(err.Error(), "invalid packet size"): // 不是mssql协议
 				fallthrough
 			case strings.Contains(err.Error(), "connect: connection refused"):
 				result.Finished = true
 				return result
 			}
-			log.Errorf("select 1 failed: %s", err)
+			log.Errorf("mssql db ping failed: %s", err)
 			return result
 		}
 		result.Ok = true
