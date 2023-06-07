@@ -172,13 +172,41 @@ func WithMode(s string) ConfigOption {
 
 func WithResultCallback(f HTTPResultCallback) ConfigOption {
 	return func(config *Config) {
-		config.Callback = HTTPResultCallbackWrapper(f)
+		if config.Callback != nil {
+			originCallback := config.Callback
+			config.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("httptpl execute result callback failed: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				originCallback(y, reqBulk, rsp, result, extractor)
+				HTTPResultCallbackWrapper(f)(y, reqBulk, rsp, result, extractor)
+			}
+		} else {
+			config.Callback = HTTPResultCallbackWrapper(f)
+		}
 	}
 }
 
 func WithTCPResultCallback(f TCPResultCallback) ConfigOption {
 	return func(config *Config) {
-		config.Callback = TCPResultCallbackWrapper(f)
+		if config.Callback != nil {
+			originCallback := config.Callback
+			config.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("httptpl execute result callback failed: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				originCallback(y, reqBulk, rsp, result, extractor)
+				TCPResultCallbackWrapper(f)(y, reqBulk, rsp, result, extractor)
+			}
+		} else {
+			config.Callback = TCPResultCallbackWrapper(f)
+		}
 	}
 }
 
@@ -192,6 +220,7 @@ func (c *Config) ExecuteResultCallback(y *YakTemplate, bulk *YakRequestBulkConfi
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+
 	if c.Callback != nil {
 		c.Callback(y, bulk, rsp, result, extractor)
 	}
