@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>RSA-OAEP 加密</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <h1 class="mt-4">RSA-OAEP 需要加密提交的表单内容</h1>
+    <form id="json-form" class="mt-4">
+        <div class="mb-3">
+            <label for="username" class="form-label">UserName</label>
+            <input id="username" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="age" class="form-label">Age</label>
+            <input id="age" class="form-control" type="text">
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <div class="mt-4">
+        <h2>加密前后表单数据</h2>
+    </div>
+    <pre id="input" class="mt-2"></pre>
+    <br>
+    <pre id="encrypt" class="mt-2" style="width: 600px; word-wrap: break-word"></pre>
+</div>
+
+<script>
+    // Convert ArrayBuffer to Base64
+    function arrayBufferToBase64(buffer) {
+        const binary = String.fromCharCode.apply(null, new Uint8Array(buffer));
+        return btoa(binary);
+    }
+
+    function stringToBase64(buffer) {
+        return btoa(buffer);
+    }
+
+    async function generateKey() {
+        return await crypto.subtle.generateKey({
+            name: "RSA-OAEP",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256",
+        }, true, ["encrypt", "decrypt"]);
+    }
+
+    generateKey().then(async (value) => {
+        console.info(value)
+
+        const pubkey = await crypto.subtle.exportKey("spki", value.publicKey)
+        const prikey = await crypto.subtle.exportKey("pkcs8", value.privateKey)
+
+        function toPem(base64String, type) {
+            const header = `-----BEGIN ${type} KEY-----`;
+            const footer = `-----END ${type} KEY-----`;
+            const formattedKey = base64String.match(/.{1,64}/g).join("\n");
+
+            return `${header}\n${formattedKey}\n${footer}`;
+        }
+
+        // 解密方法
+        async function Decrypt(word) {
+
+        }
+
+        // 加密方法
+        async function Encrypt(word) {
+            const encoder = new TextEncoder();
+            const encodeData = encoder.encode(word);
+            const encryptedData = await crypto.subtle.encrypt(
+                {name: "RSA-OAEP"}, value.publicKey,
+                encodeData,
+            )
+            return arrayBufferToBase64(encryptedData)
+        }
+
+        async function submitJSON(event) {
+            event.preventDefault();
+
+            const url = "/crypto/js/rsa";
+            let jsonData = {
+                "username": document.getElementById("username").value,
+                "password": document.getElementById("password").value,
+                "age": document.getElementById("age").value,
+            };
+            let submitResult = JSON.stringify({
+                "data": await Encrypt(JSON.stringify(jsonData)),
+                "publicKey": toPem(arrayBufferToBase64(pubkey), "PUBLIC"),
+                "publicKeyBase64": stringToBase64(toPem(arrayBufferToBase64(pubkey), "PUBLIC")),
+                "privateKey": toPem(arrayBufferToBase64(prikey), "RSA PRIVATE"),
+                "privateKeyBase64": stringToBase64(toPem(arrayBufferToBase64(prikey), "RSA PRIVATE")),
+            })
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: submitResult,
+            })
+                .then(response => response.text())
+                .then(data => {
+                    console.log("Success:", data);
+                    document.body.innerHTML = data;
+                })
+                .catch((error) => {
+                    console.error("Error:", error);
+                });
+        }
+
+        document.getElementById("json-form").addEventListener("change", async () => {
+            let jsonData = {
+                "username": document.getElementById("username").value,
+                "password": document.getElementById("password").value,
+                "age": document.getElementById("age").value,
+            };
+            document.getElementById("encrypt").innerHTML = JSON.stringify({
+                "data": await Encrypt(JSON.stringify(jsonData, null, 2)),
+                "publicKey": toPem(arrayBufferToBase64(pubkey), "PUBLIC"),
+                "publicKeyBase64": stringToBase64(toPem(arrayBufferToBase64(pubkey), "PUBLIC")),
+                "privateKey": toPem(arrayBufferToBase64(prikey), "RSA PRIVATE"),
+                "privateKeyBase64": stringToBase64(toPem(arrayBufferToBase64(prikey), "RSA PRIVATE")),
+            }, null, 2)
+            document.getElementById("input").innerHTML = JSON.stringify(jsonData, null, 2)
+        })
+        document.getElementById("json-form").addEventListener("submit", submitJSON)
+    }).catch(err => {
+        alert("crypto.subtle.generateKey RSA-OAEP：" + `${err}`)
+    })
+
+</script>
+
+<!-- Add Bootstrap JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.min.js"></script>
+
+</body>
+</html>
