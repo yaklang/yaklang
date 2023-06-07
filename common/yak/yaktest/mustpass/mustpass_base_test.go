@@ -3,10 +3,10 @@ package mustpass
 import (
 	"context"
 	"embed"
+	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -30,7 +30,8 @@ func init() {
 		if !strings.HasSuffix(i.Name(), ".yak") {
 			continue
 		}
-		raw, err := testFiles.ReadFile(filepath.Join("files", i.Name()))
+		// https://github.com/golang/go/issues/45230
+		raw, err := testFiles.ReadFile(fmt.Sprintf("files/%s", i.Name()))
 		if err != nil {
 			panic(err)
 		}
@@ -47,10 +48,11 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "nuclei_scan.yak"
+	var debugName = "mock_thinkphprce.yak"
+	var debugName2 = "mock_weblogic.yak"
 	var debugCases [][]string
 	for k, v := range files {
-		if k == debugName {
+		if k == debugName || k == debugName2 {
 			debugCases = append(debugCases, []string{k, v})
 		}
 	}

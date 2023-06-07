@@ -111,7 +111,7 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		opt(config)
 	}
 
-	pocConfig = newDefaultPoCConfig()
+	pocConfig = NewDefaultPoCConfig()
 	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, pocConfig.ForceHttps)
 	if err != nil {
 		return "", utils.Errorf("extract url failed: %s", err)
