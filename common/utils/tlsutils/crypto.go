@@ -2,8 +2,11 @@ package tlsutils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"github.com/pkg/errors"
@@ -66,13 +69,37 @@ func Decrypt(r string, priPem []byte) ([]byte, error) {
 }
 
 func GeneratePrivateAndPublicKeyPEM() (pri []byte, pub []byte, _ error) {
+	return GeneratePrivateAndPublicKeyPEMWithPrivateFormatter("pkcs#1")
+}
+
+func GeneratePrivateAndPublicKeyPEMWithPrivateFormatter(t string) (pri []byte, pub []byte, _ error) {
 	pk, err := rsa.GenerateKey(cryptorand.Reader, 4096)
 	if err != nil {
 		return
 	}
 
 	var priBuffer bytes.Buffer
-	priDer := x509.MarshalPKCS1PrivateKey(pk)
+	var priDer []byte
+	switch strings.ToLower(t) {
+	case "pkcs1", "pkcs#1":
+		priDer = x509.MarshalPKCS1PrivateKey(pk)
+	case "ec", "ecdsa":
+		pk, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+		priDer, err = x509.MarshalECPrivateKey(pk)
+		if err != nil {
+			return nil, nil, utils.Errorf("marshal ecdsa prikey failed: %s", err)
+		}
+	case "pkcs8", "pkcs#8":
+		fallthrough
+	default:
+		priDer, err = x509.MarshalPKCS8PrivateKey(pk)
+		if err != nil {
+			return nil, nil, utils.Errorf("marshal pkcs8 prikey failed: %s", err)
+		}
+	}
 	err = pem.Encode(&priBuffer, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: priDer,
@@ -122,12 +149,74 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	return results, err
 }
 
+func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, errors.Wrap(errors.New("empty pem block"), "pem decode public key failed")
+	}
+
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
+	}
+
+	pubKey, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.Wrap(err, "need *rsp.PublicKey, cannot found! ")
+	}
+	_, _ = dataBytes, pub
+
+	results, err := rsa.EncryptOAEP(sha256.New(), cryptorand.Reader, pubKey, dataBytes, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, `rsa.EncryptOAEP(cryptorand.Reader, pubKey, dataBytes) error`)
+	}
+	return results, err
+}
+
+func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	b, _ := pem.Decode(pemPriBytes)
+	pri, err := x509.ParsePKCS1PrivateKey(b.Bytes)
+	if err != nil {
+		parsedPri, err := x509.ParsePKCS8PrivateKey(b.Bytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private key failed: %s", err)
+		}
+
+		var ok bool
+		pri, ok = parsedPri.(*rsa.PrivateKey)
+		if !ok {
+			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
+		}
+
+		if pri == nil {
+			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
+		}
+	}
+
+	results, err := rsa.DecryptOAEP(sha256.New(), cryptorand.Reader, pri, dataBytes, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, `rsa.PemPkcsOAEPDecrypt(cryptorand.Reader, pri, dataBytes) error`)
+	}
+	return results, err
+}
+
 func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	b, _ := pem.Decode(pemPriBytes)
 	pri, err := x509.ParsePKCS1PrivateKey(b.Bytes)
 	if err != nil {
-		return nil, utils.Errorf("parse public key failed: %s", err)
+		parsedPri, err := x509.ParsePKCS8PrivateKey(b.Bytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private key failed: %s", err)
+		}
+
+		var ok bool
+		pri, ok = parsedPri.(*rsa.PrivateKey)
+		if !ok {
+			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
+		}
 	}
 
 	results, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes)

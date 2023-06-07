@@ -47,11 +47,11 @@ func TestCrawler(t *testing.T) {
 	}
 	for _, url := range crawlerUrls {
 		if len(url) != len(baseResult) {
-			panic("crawler unstable")
+			panic("crawler unstable(total)")
 		}
 		for k, _ := range baseResult {
 			if _, ok := url[k]; !ok {
-				panic("crawler unstable")
+				panic("crawler unstable(in BaseResult)")
 			}
 		}
 	}
