@@ -204,18 +204,19 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
-	if err != nil {
-		log.Errorf("exec yakScript %v failed: %s", f.Name(), err)
-		return nil, utils.Errorf("exec yakScript %v failed: %s", f.Name(), err)
-	}
-
 	defer func() {
+		log.Infof("auto gen report %v start...", f.Name())
 		// 不管 Run 成功与否，都执行生成报告的操作
 		err = genReportFromKey(ctx, node, s.helper, broker)
 		if err != nil {
 			log.Errorf("gen report from key failed: %s", err)
 		}
 	}()
+
+	if err != nil {
+		log.Errorf("exec yakScript %v failed: %s", f.Name(), err)
+		return nil, utils.Errorf("exec yakScript %v failed: %s", f.Name(), err)
+	}
 
 	return &res, nil
 }
