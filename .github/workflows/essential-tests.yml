@@ -57,3 +57,6 @@ jobs:
 
       - name: Test MustPass - full yak scripts
         run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
+
+      - name: Test PeekableConn
+        run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
