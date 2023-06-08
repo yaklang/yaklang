@@ -456,22 +456,33 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 	}
 }
 
-func CheckDNSLogByToken(token string) ([]*tpb.DNSLogEvent, error) {
+func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	var f float64
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5.0
+	}
 	var counter = 0
 	for {
 		counter++
 		if counter > 3 {
 			return nil, utils.Errorf("cannot found result for dnslog[%v]", token)
 		}
-		events, err := cybertunnel.QueryExistedDNSLogEvents(consts.GetDefaultPublicReverseServer(), token)
+		events, err := cybertunnel.QueryExistedDNSLogEventsEx(consts.GetDefaultPublicReverseServer(), token, f)
 		if err != nil {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 		for _, e := range events {
 			NewRisk(
-				fmt.Sprintf(`DNSLOG[%v] - %v from: %v`, e.Type, e.Domain, e.RemoteAddr),
-				WithRiskParam_Details(e.Raw), WithRiskParam_RiskType(fmt.Sprintf("dns[%v]", e.Type)),
+				"dnslog://"+e.RemoteAddr,
+				WithRiskParam_Title(fmt.Sprintf(`DNSLOG[%v] - %v from: %v`, e.Type, e.Domain, e.RemoteAddr)),
+				WithRiskParam_TitleVerbose(fmt.Sprintf(`DNSLOG 触发 - %v 源：%v`, e.Domain, e.RemoteAddr)),
+				WithRiskParam_Details(e.Raw),
+				WithRiskParam_RiskType(fmt.Sprintf("dns[%v]", e.Type)),
+				WithRiskParam_RiskType(fmt.Sprint("dnslog")),
 				WithRiskParam_Payload(e.Domain), WithRiskParam_Token(e.Token),
 			)
 		}
