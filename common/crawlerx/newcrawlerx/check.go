@@ -159,10 +159,10 @@ func scanRangeFunctionGenerate(targetUrl string, scanRange scanRangeLevel) func(
 	}
 	rangeUrl := rangeFunction(targetUrl)
 	return func(checkUrl string) bool {
-		if stringSuffixList(checkUrl, extraUrlKeywords) {
+		if StringSuffixList(checkUrl, extraUrlKeywords) {
 			return true
 		}
-		if stringPrefixList(checkUrl, rangeUrl) {
+		if StringPrefixList(checkUrl, rangeUrl) {
 			return true
 		}
 		return false
@@ -272,6 +272,6 @@ func getUrlQueryValue(url *u.URL, check func(string) bool) string {
 
 func extraUrlCheck(extraSuffix []string) func(string) bool {
 	return func(urlStr string) bool {
-		return stringSuffixList(urlStr, extraSuffix)
+		return StringSuffixList(urlStr, extraSuffix)
 	}
 }

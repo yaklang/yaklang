@@ -27,6 +27,23 @@ func getClickableElementSelectors(page *rod.Page) []string {
 	return nil
 }
 
+func GetDefaultClickElementSelectors_(page *rod.Page) ([]string, error) {
+	searchInfo := map[string]map[string][]string{
+		"input": {
+			"type": {
+				"submit",
+				"button",
+			},
+		},
+		"button": {},
+	}
+	elements, err := customizedGetElement(page, searchInfo)
+	if err != nil {
+		return []string{}, utils.Errorf("customized get element error: %s", err)
+	}
+	return getElementsSelectors(elements), nil
+}
+
 func GetDefaultClickElementSelectors(page *rod.Page) []string {
 	searchInfo := map[string]map[string][]string{
 		"input": {

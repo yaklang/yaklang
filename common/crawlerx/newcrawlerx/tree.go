@@ -75,14 +75,18 @@ func (tree *UrlTree) Level() int {
 func (tree *UrlTree) Add(parent string, sons ...string) {
 	tree.Lock()
 	defer tree.Unlock()
+	tree.add(parent, sons...)
+}
+
+func (tree *UrlTree) add(parent string, sons ...string) {
 	if parent == "" {
 		log.Infof("parent url %s invalid", parent)
 		return
 	}
 	upper := tree.Find(parent)
 	if upper == nil {
-		log.Infof("parent %s not found.", parent)
-		return
+		tree.add(tree.root.url, parent)
+		upper = tree.Find(parent)
 	}
 	for _, son := range sons {
 		if son == "" {
