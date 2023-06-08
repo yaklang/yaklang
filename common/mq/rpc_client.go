@@ -231,7 +231,7 @@ func (r *RPCClient) Call(ctx context.Context, f, node string, req interface{}) (
 
 	response, err := r.waitForResponse(request)
 	if err != nil {
-		return nil, errors.Errorf("wait for response failed: %v", err)
+		return nil, err
 	}
 
 	if response.Reason != "" {
@@ -247,7 +247,7 @@ func (r *RPCClient) waitForResponse(req *rpcRequest) (*rpcResponse, error) {
 		if req.Rsp != nil {
 			return req.Rsp, nil
 		}
-		return nil, errors.Errorf("context done")
+		return nil, context.Canceled
 	}
 }
 
