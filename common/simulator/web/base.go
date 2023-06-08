@@ -51,13 +51,13 @@ func Do_Post(url string, v interface{}) (string, error) {
 	if err != nil {
 		return "", utils.Errorf("read http resp body %s error:%s", respBody, err)
 	}
-	var result HTTPRspBody
-	if err = json.Unmarshal(respBody, &result); err != nil {
-		return "", utils.Errorf("unmarshal data error:%s", err)
-	}
-	if result.Result.HasError {
-		return "", utils.Errorf("post response: %s result error: %s", string(respBody), err)
-	}
+	//var result HTTPRspBody
+	//if err = json.Unmarshal(respBody, &result); err != nil {
+	//	return "", utils.Errorf("unmarshal data %s error:%s", respBody, err)
+	//}
+	//if result.Result.HasError {
+	//	return "", utils.Errorf("post response: %s result error: %s", string(respBody), err)
+	//}
 	return string(respBody), nil
 }
 

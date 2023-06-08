@@ -259,9 +259,7 @@
 
 - `configOpt = simulator.captchaUrl(captchaUrl string)` 设置验证码识别url
 
-- `configOpt = simulator.captchaMode(captchaMode string)` 设置验证码识别模式
-
-输入包括 common_alphanumeric 通用英数, common_arithmetic 通用算术, common_slider 通用滑块; 默认为通用英数
+默认的验证码数据接口匹配使用ddddocr的ocr_api_server项目：[ocr_api_server](https://github.com/sml2h3/ocr_api_server)
 
 - `configOpt = simulator.usernameList(usernameList []string)` 设置爆破的用户名列表
 
@@ -289,14 +287,14 @@ BruteForceResult包括如下输出：
 
 # 自动化爆破示例
 
-    url = "http://192.168.0.68/#/login"
+    url = "http://192.168.0.58/#/login"
     userlist = ["admin"]
-    passlist = ["admin","luckyadmin123"]
+    passlist = ["luckyadmin123"]
     userOpt = simulator.usernameList(userlist)
     passOpt = simulator.passwordList(passlist)
-    scanMode = simulator.captchaMode("common_arithmetic")
-    chromeAddress = simulator.wsAddress("http://192.168.0.115:7317/")
-    result, err = simulator.defaultBrute(url, userOpt, passOpt, scanMode, chromeAddress)
+    // captchaUrl = simulator.captchaUrl("http://192.168.0.115:9898/ocr/b64/json")
+    // chromeAddress = simulator.wsAddress("http://192.168.0.115:7317/")
+    result, err = simulator.defaultBrute(url, userOpt, passOpt, scanMode)
     
     println(result.Username())
     println(result.Password())
