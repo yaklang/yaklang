@@ -64,6 +64,21 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 		vars[k] = v
 	}
 
+	if y.ReverseConnectionNeed {
+		var err error
+		var require func(...float64) (string, string, error)
+		if config.OOBRequireCallback == nil {
+			require = RequireOOBAddr
+		} else {
+			require = config.OOBRequireCallback
+		}
+		vars["reverse_url"], vars["reverse_dnslog_token"], err = require(config.OOBTimeout)
+		if err != nil {
+			log.Errorf("require oob addr failed: %v", err)
+			return 0, err
+		}
+	}
+
 	if y.Variables != nil {
 		for k, v := range y.Variables.ToMap() {
 			vars[k] = v
@@ -184,7 +199,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				}
 
 				if !reqOrigin.AfterRequested {
-					matchResult, err := matcher.Execute(rsp, vars)
+					matchResult, err := matcher.ExecuteWithConfig(config, rsp, vars)
 					if err != nil {
 						log.Error("matcher execute failed: ", err)
 					}
@@ -200,7 +215,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 		if reqOrigin.AfterRequested {
 			if matcher != nil {
 				for _, rsp := range responses {
-					matchResult, err := matcher.Execute(rsp, vars)
+					matchResult, err := matcher.ExecuteWithConfig(config, rsp, vars)
 					if err != nil {
 						log.Error("matcher execute failed: ", err)
 					}
