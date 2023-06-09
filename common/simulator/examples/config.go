@@ -11,6 +11,12 @@ type Config struct {
 	proxy     string
 	proxyUser string
 	proxyPass string
+
+	usernameSelector     string
+	passwordSelector     string
+	captchaSelector      string
+	captchaImgSelector   string
+	submitButtonSelector string
 }
 
 type ConfigOpt func(*Config)
@@ -60,5 +66,35 @@ func WithProxyDetails(proxy, username, password string) ConfigOpt {
 		config.proxy = proxy
 		config.proxyUser = username
 		config.proxyPass = password
+	}
+}
+
+func WithUsernameSelector(selector string) ConfigOpt {
+	return func(config *Config) {
+		config.usernameSelector = selector
+	}
+}
+
+func WithPasswordSelector(selector string) ConfigOpt {
+	return func(config *Config) {
+		config.passwordSelector = selector
+	}
+}
+
+func WithCaptchaSelector(selector string) ConfigOpt {
+	return func(config *Config) {
+		config.captchaSelector = selector
+	}
+}
+
+func WithCaptchaImgSelector(selector string) ConfigOpt {
+	return func(config *Config) {
+		config.captchaImgSelector = selector
+	}
+}
+
+func WithSubmitButtonSelector(selector string) ConfigOpt {
+	return func(config *Config) {
+		config.submitButtonSelector = selector
 	}
 }
