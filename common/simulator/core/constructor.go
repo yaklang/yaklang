@@ -190,6 +190,7 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 		if proxy != "" {
 			launch.Proxy(proxy)
 		}
+		//launch.Headless(false)
 		controlUrl, _ := launch.Launch()
 		browser = browser.ControlURL(controlUrl)
 	}

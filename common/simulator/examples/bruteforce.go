@@ -34,7 +34,7 @@ func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResu
 
 	result := &BruteForceResult{}
 
-	userElement, passElement, captchaElement, capPicElement, loginElement, err := pageInfoCollection(page)
+	userElement, passElement, captchaElement, capPicElement, loginElement, err := pageInfoCollection(page, *config)
 	if err != nil {
 		return result, utils.Errorf("page info collection error: %s", err)
 	}
@@ -110,7 +110,7 @@ func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResu
 	return result, utils.Error("bruteforce failed.")
 }
 
-func pageInfoCollection(page *core.GeneralPage) (
+func pageInfoCollection(page *core.GeneralPage, config Config) (
 	*core.GeneralElement,
 	*core.GeneralElement,
 	*core.GeneralElement,
@@ -123,69 +123,111 @@ func pageInfoCollection(page *core.GeneralPage) (
 	if elements.Empty() {
 		return nil, nil, nil, nil, nil, utils.Errorf("none input found from page.")
 	}
+
 	// username
-	userelements := elements.FilteredKeywordElements("username")
-	var userelement *core.GeneralElement
-	if userelements.Single() {
-		userelement = userelements.First()
-	} else if userelements.Multi() {
-		userelement = userelements.FilteredKeywordElement("username")
+	var userElement *core.GeneralElement
+	if config.usernameSelector != "" {
+		_userElement, err := page.FindElement(config.usernameSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("username selector find error: %s", err)
+		}
+		userElement = _userElement
 	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("username element not found.")
-	}
-	elements = elements.Slice(userelement)
-	// password
-	passelements := elements.FilteredKeywordElements("password")
-	var passelement *core.GeneralElement
-	if passelements.Single() {
-		passelement = passelements.First()
-	} else if passelements.Multi() {
-		passelement = passelements.FilteredKeywordElement("password")
-	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("password element not found.")
-	}
-	elements = elements.Slice(passelement)
-	// captcha
-	captchaelements := elements.FilteredKeywordElements("captcha")
-	var captchaelement *core.GeneralElement
-	if captchaelements.Single() {
-		captchaelement = captchaelements.First()
-	} else if captchaelements.Multi() {
-		captchaelement = captchaelements.FilteredKeywordElement("captcha")
-	}
-	//capmodule := extend.CreateCaptcha()
-	var captchaimgelement *core.GeneralElement
-	if captchaelement != nil {
-		//capmodule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
-		//capmodule.SetRequestStruct(&extend.CaptchaRequest{})
-		//capmodule.SetResponseStruct(&extend.CaptchaResult{})
-		captchaimgelements, _ := captchaelement.GeneralGetLatestElements("img", 5)
-		if captchaimgelements.Length() == 0 {
-			return nil, nil, nil, nil, nil, utils.Errorf("captcha %s exist but captcha img not exist", captchaelement)
-		} else if captchaimgelements.Length() == 1 {
-			captchaimgelement = captchaimgelements.First()
+		userElements := elements.FilteredKeywordElements("username")
+		if userElements.Single() {
+			userElement = userElements.First()
+		} else if userElements.Multi() {
+			userElement = userElements.FilteredKeywordElement("username")
 		} else {
-			captchaimgelement = captchaimgelements.FilteredKeywordElement("captcha")
+			return nil, nil, nil, nil, nil, utils.Errorf("username element not found.")
+		}
+	}
+	elements = elements.Slice(userElement)
+
+	// password
+	var passElement *core.GeneralElement
+	if config.passwordSelector != "" {
+		_passElement, err := page.FindElement(config.passwordSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("password selector find error: %s", err)
+		}
+		passElement = _passElement
+	} else {
+		passElements := elements.FilteredKeywordElements("password")
+		if passElements.Single() {
+			passElement = passElements.First()
+		} else if passElements.Multi() {
+			passElement = passElements.FilteredKeywordElement("password")
+		} else {
+			return nil, nil, nil, nil, nil, utils.Errorf("password element not found.")
+		}
+	}
+	elements = elements.Slice(passElement)
+
+	// captcha
+	var captchaElement *core.GeneralElement
+	if config.captchaSelector != "" {
+		_captchaElement, err := page.FindElement(config.captchaSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("captcha selector find error: %s", err)
+		}
+		captchaElement = _captchaElement
+	} else {
+		captchaElements := elements.FilteredKeywordElements("captcha")
+		if captchaElements.Single() {
+			captchaElement = captchaElements.First()
+		} else if captchaElements.Multi() {
+			captchaElement = captchaElements.FilteredKeywordElement("captcha")
 		}
 	}
 
-	var button *core.GeneralElement
-	buttons, _ := page.GeneralFindElements("button")
-	buttons = buttons.Slice(userelement)
-	buttons = buttons.Slice(passelement)
-	if buttons.Single() {
-		button = buttons.First()
-	} else if buttons.Multi() {
-		button = buttons.FilteredKeywordElement("login")
-	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("button element not found.")
+	// captcha img
+	var captchaImgElement *core.GeneralElement
+	if captchaElement != nil {
+		if config.captchaImgSelector != "" {
+			_captchaImgElement, err := page.FindElement(config.captchaImgSelector)
+			if err != nil {
+				return nil, nil, nil, nil, nil, utils.Errorf("captcha image selector find error: %s", err)
+			}
+			captchaImgElement = _captchaImgElement
+		} else {
+			captchaImgElements, _ := captchaElement.GeneralGetLatestElements("img", 5)
+			if captchaImgElements.Length() == 0 {
+				return nil, nil, nil, nil, nil, utils.Errorf("captcha %s exist but captcha img not exist", captchaElement)
+			} else if captchaImgElements.Length() == 1 {
+				captchaImgElement = captchaImgElements.First()
+			} else {
+				captchaImgElement = captchaImgElements.FilteredKeywordElement("captcha")
+			}
+		}
 	}
-	log.Info("detect element: \nusername element: ", userelement,
-		"\npassword element: ", passelement,
-		"\ncaptcha element: ", captchaelement,
-		"\ncaptcha image element: ", captchaimgelement,
+
+	// submit button
+	var button *core.GeneralElement
+	if config.submitButtonSelector != "" {
+		_button, err := page.FindElement(config.submitButtonSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("button selector find error: %s", err)
+		}
+		button = _button
+	} else {
+		buttons, _ := page.GeneralFindElements("button")
+		buttons = buttons.Slice(userElement)
+		buttons = buttons.Slice(passElement)
+		if buttons.Single() {
+			button = buttons.First()
+		} else if buttons.Multi() {
+			button = buttons.FilteredKeywordElement("login")
+		} else {
+			return nil, nil, nil, nil, nil, utils.Errorf("button element not found.")
+		}
+	}
+	log.Info("detect element: \nusername element: ", userElement,
+		"\npassword element: ", passElement,
+		"\ncaptcha element: ", captchaElement,
+		"\ncaptcha image element: ", captchaImgElement,
 		"\nlogin button element: ", button)
-	return userelement, passelement, captchaelement, captchaimgelement, button, nil
+	return userElement, passElement, captchaElement, captchaImgElement, button, nil
 }
 
 func inputClickTry(
