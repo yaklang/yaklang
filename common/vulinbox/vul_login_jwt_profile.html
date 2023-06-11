@@ -38,11 +38,12 @@
 </table>
 
 <script>
-    const profileData = {{params(jsonRaw)}};
+    const profileData = `{{params(jsonRaw)}}`;
+    const profileDataArr = JSON.parse(profileData)
 
     function displayProfiles() {
         const tableBody = document.getElementById('profileTable');
-        profileData.forEach(profile => {
+        profileDataArr.forEach(profile => {
             const row = document.createElement('tr');
 
             const usernameCell = document.createElement('td');
@@ -60,7 +61,6 @@
             const updatedCell = document.createElement('td');
             updatedCell.textContent = profile.updated_at;
             row.appendChild(updatedCell);
-
 
 
             tableBody.appendChild(row);

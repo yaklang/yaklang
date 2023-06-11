@@ -14,7 +14,7 @@
 
     function storeAndUseJWT() {
         // 假设从服务器获取 JWT 令牌
-        const jwtToken = {{params(jsonRaw)}};
+        const jwtToken = `{{params(jsonRaw)}}`;
 
         // 将 JWT 令牌存储在 localStorage 中
         localStorage.setItem('VULINBOX_JWT', jwtToken);
