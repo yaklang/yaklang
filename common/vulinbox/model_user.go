@@ -12,6 +12,9 @@ type VulinUser struct {
 	Username string
 	Password string
 	Age      int
+
+	Role string // 添加角色字段
+
 }
 
 // 生成指定数量的随机用户数据
@@ -33,7 +36,12 @@ func generateRandomUsers(count int) []VulinUser {
 		age := rand.Intn(48) + 18
 
 		// 创建用户实例并将其添加到用户列表中
-		users[i] = VulinUser{Username: username, Password: password, Age: age}
+		users[i] = VulinUser{
+			Username: username,
+			Password: password,
+			Age:      age,
+			Role:     "user",
+		}
 	}
 
 	return users
