@@ -34,8 +34,8 @@ func (s *OnlineClient) HttpFlowShareWithToken(ctx context.Context, token string,
 		limitNum,
 	)
 	if err != nil {
-		log.Errorf("upload risk to online failed: %s", err.Error())
-		return nil, utils.Errorf("upload risk to online failed: %s", err.Error())
+		log.Errorf("httpFlow share failed: %s", err.Error())
+		return nil, utils.Errorf("httpFlow share failed: %s", err.Error())
 	}
 
 	return res, nil
@@ -72,10 +72,16 @@ func (s *OnlineClient) HttpFlowShare(ctx context.Context,
 		Data     *HttpFlowShare `json:"data"`
 	}
 	var _container HttpFlowShareResponse
-	err = json.Unmarshal(rawResponse, &_container.Data)
+	var responseData map[string]interface{}
+	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
 		return nil, utils.Errorf("unmarshal plugin response failed: %s", err)
 	}
+	if utils.MapGetString(responseData, "reason") != "" {
+		return nil, utils.Errorf("httpFlow share failed: %s", utils.MapGetString(responseData, "reason") )
+	}
+	_container.Data.ShareId = utils.MapGetString(responseData, "share_id")
+	_container.Data.ExtractCode = utils.MapGetString(responseData, "extract_code")
 	return _container.Data,  nil
 
 }
