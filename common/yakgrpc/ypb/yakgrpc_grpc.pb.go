@@ -321,6 +321,9 @@ type YakClient interface {
 	// 这个请求可能是一个，也可能是一系列
 	// 一般用来调试插件等
 	HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuilderParams, opts ...grpc.CallOption) (*HTTPRequestBuilderResponse, error)
+	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
+	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
+	DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error)
 }
 
 type yakClient struct {
@@ -3281,6 +3284,38 @@ func (c *yakClient) HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuild
 	return out, nil
 }
 
+func (c *yakClient) DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], "/ypb.Yak/DebugPlugin", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakDebugPluginClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_DebugPluginClient interface {
+	Recv() (*ExecResult, error)
+	grpc.ClientStream
+}
+
+type yakDebugPluginClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakDebugPluginClient) Recv() (*ExecResult, error) {
+	m := new(ExecResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3588,6 +3623,9 @@ type YakServer interface {
 	// 这个请求可能是一个，也可能是一系列
 	// 一般用来调试插件等
 	HTTPRequestBuilder(context.Context, *HTTPRequestBuilderParams) (*HTTPRequestBuilderResponse, error)
+	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
+	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
+	DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -4311,6 +4349,9 @@ func (UnimplementedYakServer) UpdateScreenRecorders(context.Context, *UpdateScre
 }
 func (UnimplementedYakServer) HTTPRequestBuilder(context.Context, *HTTPRequestBuilderParams) (*HTTPRequestBuilderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HTTPRequestBuilder not implemented")
+}
+func (UnimplementedYakServer) DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error {
+	return status.Errorf(codes.Unimplemented, "method DebugPlugin not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -8762,6 +8803,27 @@ func _Yak_HTTPRequestBuilder_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DebugPlugin_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DebugPluginRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).DebugPlugin(m, &yakDebugPluginServer{stream})
+}
+
+type Yak_DebugPluginServer interface {
+	Send(*ExecResult) error
+	grpc.ServerStream
+}
+
+type yakDebugPluginServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakDebugPluginServer) Send(m *ExecResult) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -9766,6 +9828,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StartScrecorder",
 			Handler:       _Yak_StartScrecorder_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DebugPlugin",
+			Handler:       _Yak_DebugPlugin_Handler,
 			ServerStreams: true,
 		},
 	},

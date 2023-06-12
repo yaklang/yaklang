@@ -1,0 +1,50 @@
+pluginName = "被动指纹检测"
+ctx = context.Background()
+reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
+Host: www.example.com
+`, "IsHttps": true}]
+
+if getParams("REQUESTS") != undefined {
+    reqs = getParams("REQUESTS")
+    ctx = getParams("CTX")
+    pluginName = getParams("PLUGIN_NAME")
+}
+
+
+
+/*
+Init Yakit
+*/
+yakit.AutoInitYakit()
+if getParams("YAKIT_CLIENT") != undefined {
+    yakit.InitYakit(getParams("YAKIT_CLIENT"))
+}
+yakit.Info("Start to load plugin: %v", pluginName)
+
+caller, err := hook.NewMixPluginCaller()
+if err != nil { die(err) }
+err = caller.LoadPlugin(pluginName)
+if err != nil { die(err) }
+
+caller.SetConcurrent(len(reqs))
+
+swg = sync.NewSizedWaitGroup(10)
+for req in reqs {
+    swg.Add()
+    req := req
+    go fn {
+        defer swg.Done()
+        try {
+            rsp, reqRaw := poc.HTTP(req.RawHTTPRequest, poc.https(req.IsHttps))~
+            isHttps = req.IsHttps
+            u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
+            header, body = poc.Split(rsp)~
+            caller.MirrorHTTPFlow(isHttps, u.String(), reqRaw, rsp, body)
+        } catch err {
+            println("===================packet=================== \n%v" % string(req.RawHTTPRequest))
+            log.warn("exec request failed: %v", err)
+        }
+    }
+}
+swg.Wait()
+caller.Wait()
