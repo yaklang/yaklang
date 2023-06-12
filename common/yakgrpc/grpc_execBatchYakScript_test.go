@@ -21,6 +21,9 @@ func init() {
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
+	consts.GetGormProfileDatabase()
+	consts.GetGormProjectDatabase()
+	
 	port := utils.GetRandomAvailableTCPPort()
 	addr := utils.HostPort("127.0.0.1", port)
 	grpcTrans := grpc.NewServer(
