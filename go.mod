@@ -151,7 +151,7 @@ require (
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/goxjs/gl v0.0.0-20210104184919-e3fafc6f8f2a // indirect
 	github.com/goxjs/glfw v0.0.0-20191126052801-d2efb5f20838 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/itchyny/timefmt-go v0.1.3 // indirect

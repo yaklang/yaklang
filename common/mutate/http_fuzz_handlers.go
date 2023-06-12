@@ -163,8 +163,8 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	var pathTotal = QuickMutateSimple(paths...)
 	var reqs []*http.Request
 	var originUrl = req.URL
-	var originUrlPath = req.URL.Path
 	req.RequestURI = ""
+
 	for _, targetPath := range pathTotal {
 		if !strings.HasPrefix(targetPath, "/") {
 			targetPath = "/" + targetPath
@@ -187,13 +187,32 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 			req.URL = originUrl
 			continue
 		} else {
-			req.URL.Path = targetPath
 			_req, err = rebuildHTTPRequest(req, 0)
 			if err != nil {
 				log.Errorf("rebuild http request path[%s] failed: %s", req.URL, err)
 				continue
 			}
-			req.URL.Path = originUrlPath
+			vals := _req.URL.Query()
+			if vals == nil || len(vals) <= 0 {
+				vals = make(url.Values)
+			}
+			if strings.Contains(targetPath, "?") {
+				path, query, _ := strings.Cut(targetPath, "?")
+				if query != "" {
+					if newVals, err := url.ParseQuery(query); err == nil {
+						for k, v := range newVals {
+							if len(v) > 0 {
+								vals.Set(k, v[0])
+							}
+						}
+					}
+				}
+				_req.URL.Path = path
+				_req.URL.RawQuery = vals.Encode()
+			} else {
+				_req.URL.Path = targetPath
+			}
+			_req.RequestURI = ""
 			reqs = append(reqs, _req)
 			continue
 		}
