@@ -2,13 +2,17 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -244,4 +248,190 @@ func (s *Server) GetResponseBodyByHTTPFlowID(ctx context.Context, req *ypb.Downl
 		return nil, utils.Error("empty body")
 	}
 	return &ypb.Bytes{Raw: body}, nil
+}
+
+func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequest) (*ypb.HTTPFlowsShareResponse, error) {
+	if req.GetIds() == nil || req.Module == "" ||  req.ExpiredTime == 0{
+		return nil, utils.Error("params empty")
+	}
+
+	type HTTPFlowShare struct {
+		*yakit.HTTPFlow
+		ExtractedList []*yakit.ExtractedData
+		WebsocketFlowsList []*yakit.WebsocketFlowShare
+	}
+	var (
+		data []HTTPFlowShare
+	    extractedData []*yakit.ExtractedData
+		websocketFlowsData []*yakit.WebsocketFlowShare
+	)
+
+	if len(req.GetIds()) > 50 {
+		return nil, utils.Error("exceed the limit")
+	}
+	ret := yakit.YieldHTTPFlows(s.GetProjectDatabase().Where("id in (?)", req.Ids), ctx)
+
+	for httpFlow := range ret {
+		if httpFlow.Hash != "" {
+			db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
+			extracted := yakit.BatchExtractedData(db1, ctx)
+			for v := range extracted {
+				extractedData = append(extractedData, &yakit.ExtractedData{
+					SourceType:  v.SourceType,
+					TraceId:     v.TraceId,
+					Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
+					RuleVerbose: utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
+					Data:        utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+				})
+			}
+		}
+		if httpFlow.WebsocketHash != "" {
+			db2 := bizhelper.ExactQueryString(s.GetProjectDatabase(), "websocket_request_hash", httpFlow.WebsocketHash)
+			websocketFlows := yakit.BatchWebsocketFlows(db2, ctx)
+			for v := range websocketFlows {
+				raw, _ := strconv.Unquote(v.QuotedData)
+				if len(raw) <= 0 {
+					raw = v.QuotedData
+				}
+				websocketFlowsData = append(websocketFlowsData, &yakit.WebsocketFlowShare{
+					WebsocketRequestHash: v.WebsocketRequestHash,
+					FrameIndex:           v.FrameIndex,
+					FromServer:           v.FromServer,
+					QuotedData:           []byte(raw),
+					MessageType:          v.MessageType,
+					Hash:                 v.Hash,
+				})
+			}
+		}
+
+		httpFlowShare := &yakit.HTTPFlow{
+			HiddenIndex:        httpFlow.HiddenIndex,
+			NoFixContentLength: httpFlow.NoFixContentLength,
+			Hash:               httpFlow.Hash,
+			IsHTTPS:            httpFlow.IsHTTPS,
+			Url:                httpFlow.Url,
+			Path:               httpFlow.Path,
+			Method:             httpFlow.Method,
+			BodyLength:         httpFlow.BodyLength,
+			ContentType:        httpFlow.ContentType,
+			StatusCode:         httpFlow.StatusCode,
+			SourceType:         httpFlow.SourceType,
+			//Request:            request,
+			//Response:           response,
+			Request:           httpFlow.Request,
+			Response:           httpFlow.Response,
+			GetParamsTotal:     httpFlow.GetParamsTotal,
+			PostParamsTotal:    httpFlow.PostParamsTotal,
+			CookieParamsTotal:  httpFlow.CookieParamsTotal,
+			IPAddress:          httpFlow.IPAddress,
+			RemoteAddr:         httpFlow.RemoteAddr,
+			IPInteger:          httpFlow.IPInteger,
+			Tags:               httpFlow.Tags,
+			IsWebsocket:        httpFlow.IsWebsocket,
+			WebsocketHash:      httpFlow.WebsocketHash,
+		}
+		data = append(data, HTTPFlowShare{
+			HTTPFlow: httpFlowShare ,
+			ExtractedList:      extractedData,
+			WebsocketFlowsList: websocketFlowsData,
+		} )
+	}
+	shareContent, err := json.Marshal(data)
+	if err != nil {
+		return nil, utils.Errorf("marshal params failed: %s", err)
+	}
+
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	shareRes, err := client.HttpFlowShareWithToken(ctx, req.Token, req.ExpiredTime, req.Module, string(shareContent), req.Pwd, req.LimitNum)
+	if err != nil {
+		return nil, utils.Errorf("HTTPFlowsShare failed: %s", err)
+	}
+	return &ypb.HTTPFlowsShareResponse{
+		ShareId:     shareRes.ShareId,
+		ExtractCode: shareRes.ExtractCode,
+	}, nil
+}
+
+func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtractRequest) (*ypb.Empty, error) {
+	if req.ShareExtractContent == "" {
+		return nil, utils.Error("params empty")
+	}
+	type HTTPFlowShare struct {
+		*yakit.HTTPFlow
+		ExtractedList []*yakit.ExtractedData
+		WebsocketFlowsList []*yakit.WebsocketFlowShare
+	}
+	var (
+		shareData []*HTTPFlowShare
+	)
+	err := json.Unmarshal([]byte(req.ShareExtractContent), &shareData)
+
+	if err != nil {
+		return nil, utils.Errorf("HTTPFlowsExtract failed: %s", err)
+	}
+	sw := s.GetProjectDatabase().Begin()
+	for _, data := range shareData {
+		shareHttpFlow := &yakit.HTTPFlow{
+			HiddenIndex:        data.HiddenIndex,
+			NoFixContentLength: data.NoFixContentLength,
+			Hash:               data.Hash,
+			IsHTTPS:            data.IsHTTPS,
+			Url:                data.Url,
+			Path:               data.Path,
+			Method:             data.Method,
+			BodyLength:         data.BodyLength,
+			ContentType:        data.ContentType,
+			StatusCode:         data.StatusCode,
+			SourceType:         data.SourceType,
+			Request:            data.Request,
+			Response:           data.Response,
+			GetParamsTotal:     data.GetParamsTotal,
+			PostParamsTotal:    data.PostParamsTotal,
+			CookieParamsTotal:  data.CookieParamsTotal,
+			IPAddress:          data.IPAddress,
+			RemoteAddr:         data.RemoteAddr,
+			IPInteger:          data.IPInteger,
+			Tags:               data.Tags,
+			IsWebsocket:        data.IsWebsocket,
+			WebsocketHash:      data.WebsocketHash,
+		}
+		if shareHttpFlow != nil {
+			err = yakit.CreateOrUpdateHTTPFlow(s.GetProjectDatabase(), shareHttpFlow.Hash, shareHttpFlow)
+			if err != nil {
+				sw.Rollback()
+				return nil, utils.Errorf("HTTPFlowsExtract CreateOrUpdateHTTPFlow failed: %s", err)
+			}
+		}
+
+		for _, v := range data.ExtractedList{
+			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &yakit.ExtractedData{
+				SourceType:  v.SourceType,
+				TraceId:     v.TraceId,
+				Regexp:      v.Regexp,
+				RuleVerbose: v.RuleVerbose,
+				Data:        v.Data,
+			})
+			if err != nil {
+				sw.Rollback()
+				return nil, utils.Errorf("HTTPFlowsExtract CreateOrUpdateExtractedData failed: %s", err.Error())
+			}
+		}
+
+		for _, v := range data.WebsocketFlowsList {
+			if db1 := s.GetProjectDatabase().Create(&yakit.WebsocketFlow{
+				WebsocketRequestHash:      v.WebsocketRequestHash,
+				FrameIndex:           v.FrameIndex,
+				FromServer:           v.FromServer,
+				QuotedData:           string(v.QuotedData),
+				MessageType:          v.MessageType,
+				Hash:                 v.Hash,
+			}); db1.Error != nil {
+				sw.Rollback()
+				return nil, utils.Errorf("HTTPFlowsExtract failed: %s", db1.Error)
+			}
+		}
+	}
+	sw.Commit()
+
+	return &ypb.Empty{}, nil
 }

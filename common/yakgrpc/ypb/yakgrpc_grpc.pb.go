@@ -67,6 +67,8 @@ type YakClient interface {
 	SetTagForHTTPFlow(ctx context.Context, in *SetTagForHTTPFlowRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryHTTPFlowsIds(ctx context.Context, in *QueryHTTPFlowsIdsRequest, opts ...grpc.CallOption) (*QueryHTTPFlowsIdsResponse, error)
 	HTTPFlowsFieldGroup(ctx context.Context, in *HTTPFlowsFieldGroupRequest, opts ...grpc.CallOption) (*HTTPFlowsFieldGroupResponse, error)
+	HTTPFlowsShare(ctx context.Context, in *HTTPFlowsShareRequest, opts ...grpc.CallOption) (*HTTPFlowsShareResponse, error)
+	HTTPFlowsExtract(ctx context.Context, in *HTTPFlowsExtractRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 从一个 FuzzerRequest 中提取 Url
 	ExtractUrl(ctx context.Context, in *FuzzerRequest, opts ...grpc.CallOption) (*ExtractedUrl, error)
 	// Fuzzer
@@ -925,6 +927,24 @@ func (c *yakClient) QueryHTTPFlowsIds(ctx context.Context, in *QueryHTTPFlowsIds
 func (c *yakClient) HTTPFlowsFieldGroup(ctx context.Context, in *HTTPFlowsFieldGroupRequest, opts ...grpc.CallOption) (*HTTPFlowsFieldGroupResponse, error) {
 	out := new(HTTPFlowsFieldGroupResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/HTTPFlowsFieldGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) HTTPFlowsShare(ctx context.Context, in *HTTPFlowsShareRequest, opts ...grpc.CallOption) (*HTTPFlowsShareResponse, error) {
+	out := new(HTTPFlowsShareResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/HTTPFlowsShare", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) HTTPFlowsExtract(ctx context.Context, in *HTTPFlowsExtractRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/HTTPFlowsExtract", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3301,6 +3321,8 @@ type YakServer interface {
 	SetTagForHTTPFlow(context.Context, *SetTagForHTTPFlowRequest) (*Empty, error)
 	QueryHTTPFlowsIds(context.Context, *QueryHTTPFlowsIdsRequest) (*QueryHTTPFlowsIdsResponse, error)
 	HTTPFlowsFieldGroup(context.Context, *HTTPFlowsFieldGroupRequest) (*HTTPFlowsFieldGroupResponse, error)
+	HTTPFlowsShare(context.Context, *HTTPFlowsShareRequest) (*HTTPFlowsShareResponse, error)
+	HTTPFlowsExtract(context.Context, *HTTPFlowsExtractRequest) (*Empty, error)
 	// 从一个 FuzzerRequest 中提取 Url
 	ExtractUrl(context.Context, *FuzzerRequest) (*ExtractedUrl, error)
 	// Fuzzer
@@ -3681,6 +3703,12 @@ func (UnimplementedYakServer) QueryHTTPFlowsIds(context.Context, *QueryHTTPFlows
 }
 func (UnimplementedYakServer) HTTPFlowsFieldGroup(context.Context, *HTTPFlowsFieldGroupRequest) (*HTTPFlowsFieldGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HTTPFlowsFieldGroup not implemented")
+}
+func (UnimplementedYakServer) HTTPFlowsShare(context.Context, *HTTPFlowsShareRequest) (*HTTPFlowsShareResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HTTPFlowsShare not implemented")
+}
+func (UnimplementedYakServer) HTTPFlowsExtract(context.Context, *HTTPFlowsExtractRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HTTPFlowsExtract not implemented")
 }
 func (UnimplementedYakServer) ExtractUrl(context.Context, *FuzzerRequest) (*ExtractedUrl, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExtractUrl not implemented")
@@ -5069,6 +5097,42 @@ func _Yak_HTTPFlowsFieldGroup_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).HTTPFlowsFieldGroup(ctx, req.(*HTTPFlowsFieldGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_HTTPFlowsShare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPFlowsShareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).HTTPFlowsShare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/HTTPFlowsShare",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).HTTPFlowsShare(ctx, req.(*HTTPFlowsShareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_HTTPFlowsExtract_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPFlowsExtractRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).HTTPFlowsExtract(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/HTTPFlowsExtract",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).HTTPFlowsExtract(ctx, req.(*HTTPFlowsExtractRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -8794,6 +8858,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HTTPFlowsFieldGroup",
 			Handler:    _Yak_HTTPFlowsFieldGroup_Handler,
+		},
+		{
+			MethodName: "HTTPFlowsShare",
+			Handler:    _Yak_HTTPFlowsShare_Handler,
+		},
+		{
+			MethodName: "HTTPFlowsExtract",
+			Handler:    _Yak_HTTPFlowsExtract_Handler,
 		},
 		{
 			MethodName: "ExtractUrl",
