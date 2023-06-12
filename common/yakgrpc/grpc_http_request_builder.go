@@ -43,16 +43,76 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return utils.Error("unsupported plugin type: " + req.GetPluginType())
 	}
 
-	var rsp, err = s.HTTPRequestBuilder(stream.Context(), req.GetHTTPRequestTemplate())
-	if err != nil {
-		return utils.Error("build http request failed: " + err.Error())
+	var builderResponse, _ = s.HTTPRequestBuilder(stream.Context(), req.GetHTTPRequestTemplate())
+
+	var reqs []any
+	feed := func(req []byte, isHttps bool) {
+		reqs = append(reqs, map[string]any{
+			"RawHTTPRequest": req,
+			"IsHttps":        isHttps,
+		})
 	}
-	if len(rsp.Results) <= 0 {
+	var results = builderResponse.GetResults()
+	if len(results) <= 0 {
+		var templates = []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+		for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
+			host, port, _ := utils.ParseStringToHostPort(res)
+			if host == "" {
+				host = res
+			}
+			if host == "" {
+				continue
+			}
+			if port > 0 {
+				if port == 443 {
+					feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), true)
+					continue
+				}
+
+				if port == 80 {
+					feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), false)
+					continue
+				}
+
+				feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))), strings.HasPrefix(res, "https://"))
+			} else {
+				feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), strings.HasPrefix(res, "https://"))
+			}
+		}
+	} else {
+		funk.ForEach(builderResponse.GetResults(), func(i *ypb.HTTPRequestBuilderResult) {
+			for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
+				host, port, _ := utils.ParseStringToHostPort(res)
+				if host == "" {
+					host = res
+				}
+				if host == "" {
+					continue
+				}
+				if port > 0 {
+					if i.GetIsHttps() && port == 443 {
+						feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
+						continue
+					}
+
+					if !i.GetIsHttps() && port == 80 {
+						feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
+						continue
+					}
+
+					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))), i.GetIsHttps())
+				} else {
+					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
+				}
+			}
+		})
+	}
+	if len(reqs) <= 0 {
 		return utils.Error("build http request failed: no results")
 	}
 
 	tempName := fmt.Sprintf("tmp-%v", ksuid.New().String())
-	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), tempName, &yakit.YakScript{
+	err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), tempName, &yakit.YakScript{
 		ScriptName: tempName,
 		Type:       req.GetPluginType(),
 		Content:    req.GetCode(),
@@ -82,40 +142,6 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 	default:
 		return utils.Error("unsupported plugin type: " + req.GetPluginType())
 	}
-
-	var reqs []any
-	funk.ForEach(rsp.Results, func(i *ypb.HTTPRequestBuilderResult) {
-		feed := func(req []byte) {
-			reqs = append(reqs, map[string]any{
-				"RawHTTPRequest": req,
-				"IsHttps":        i.GetIsHttps(),
-			})
-		}
-		for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
-			host, port, _ := utils.ParseStringToHostPort(res)
-			if host == "" {
-				host = res
-			}
-			if host == "" {
-				continue
-			}
-			if port > 0 {
-				if i.GetIsHttps() && port == 443 {
-					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
-					continue
-				}
-
-				if !i.GetIsHttps() && port == 80 {
-					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
-					continue
-				}
-
-				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))))
-			} else {
-				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
-			}
-		}
-	})
 
 	var feedbackClient = yaklib.NewVirtualYakitClient(func(i interface{}) error {
 		switch ret := i.(type) {

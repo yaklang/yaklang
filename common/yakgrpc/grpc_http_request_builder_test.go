@@ -93,3 +93,40 @@ aaabbbaaabbb`))
 		panic("plugin is not executed")
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug2(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	var host, port = utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+Content-Length: 12
+
+aaacccaaabbb`))
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
+		PluginType: "port-scan",
+		Input:      "http://" + utils.HostPort(host, port) + "/abc",
+	})
+	if err != nil {
+		panic(err)
+	}
+	var checked = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			log.Warn(err)
+			break
+		}
+		spew.Dump(exec)
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), "PLUGIN IS EXECUTED") {
+				checked = true
+			}
+		}
+	}
+	if !checked {
+		panic("plugin is not executed")
+	}
+}
