@@ -3,13 +3,146 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	_ "embed"
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
 	"strings"
 )
+
+//go:embed grpc_http_request_builder_debug.yak
+var debugScript string
+
+func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
+	if req.GetInput() == "" {
+		return utils.Error("input is empty")
+	}
+
+	if req.GetCode() == "" {
+		return utils.Error("code is empty")
+	}
+
+	switch strings.ToLower(req.GetPluginType()) {
+	case "mitm":
+		fallthrough
+	case "port-scan":
+		fallthrough
+	case "nuclei":
+	default:
+		return utils.Error("unsupported plugin type: " + req.GetPluginType())
+	}
+
+	var rsp, err = s.HTTPRequestBuilder(stream.Context(), req.GetHTTPRequestTemplate())
+	if err != nil {
+		return utils.Error("build http request failed: " + err.Error())
+	}
+	if len(rsp.Results) <= 0 {
+		return utils.Error("build http request failed: no results")
+	}
+
+	tempName := fmt.Sprintf("tmp-%v", ksuid.New().String())
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), tempName, &yakit.YakScript{
+		ScriptName: tempName,
+		Type:       req.GetPluginType(),
+		Content:    req.GetCode(),
+		Ignored:    false,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warn(err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+
+		log.Infof("start to remove temp plugin: %v", tempName)
+		err = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), tempName)
+		if err != nil {
+			log.Errorf("remove temp plugin failed: %v", err)
+		}
+	}()
+
+	// 不同的插件类型，需要不同的处理
+	switch strings.ToLower(req.GetPluginType()) {
+	case "mitm":
+	case "nuclei":
+	case "port-scan":
+	default:
+		return utils.Error("unsupported plugin type: " + req.GetPluginType())
+	}
+
+	var reqs []any
+	funk.ForEach(rsp.Results, func(i *ypb.HTTPRequestBuilderResult) {
+		feed := func(req []byte) {
+			reqs = append(reqs, map[string]any{
+				"RawHTTPRequest": req,
+				"IsHttps":        i.GetIsHttps(),
+			})
+		}
+		for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
+			host, port, _ := utils.ParseStringToHostPort(res)
+			if host == "" {
+				host = res
+			}
+			if host == "" {
+				continue
+			}
+			if port > 0 {
+				if i.GetIsHttps() && port == 443 {
+					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
+					continue
+				}
+
+				if !i.GetIsHttps() && port == 80 {
+					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
+					continue
+				}
+
+				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))))
+			} else {
+				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)))
+			}
+		}
+	})
+
+	var feedbackClient = yaklib.NewVirtualYakitClient(func(i interface{}) error {
+		switch ret := i.(type) {
+		case *ypb.ExecResult:
+			stream.Send(ret)
+		case *yaklib.YakitLog:
+			stream.Send(yaklib.NewYakitLogExecResult(ret.Level, ret.Data))
+		default:
+			spew.Dump(i)
+		}
+		return nil
+	})
+	engine := yak.NewScriptEngine(10)
+	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
+		"REQUESTS":     reqs,
+		"CTX":          stream.Context(),
+		"PLUGIN_NAME":  tempName,
+		"YAKIT_CLIENT": feedbackClient,
+	})
+	if err != nil {
+		log.Warnf("execute debug script failed: %v", err)
+		return err
+	}
+	_ = subEngine
+
+	return nil
+}
 
 func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
 	var isHttps = req.GetIsHttps()
@@ -65,7 +198,7 @@ func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBui
 		}
 		templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
 		return &ypb.HTTPRequestBuilderResponse{
-			Results:   nil,
+			Results:   reqs,
 			Templates: templates,
 		}, nil
 	}
@@ -165,5 +298,5 @@ Host: example.com
 	encoder.Encode(&data)
 	encoder.Close()
 	templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
-	return &ypb.HTTPRequestBuilderResponse{Templates: templates}, nil
+	return &ypb.HTTPRequestBuilderResponse{Templates: templates, Results: results}, nil
 }

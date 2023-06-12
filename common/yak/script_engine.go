@@ -430,6 +430,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 
 	// getParam 和 param 获取参数内容
 	engine.SetVar("getParam", paramGetter)
+	engine.SetVar("getParams", paramGetter)
 	engine.SetVar("param", paramGetter)
 	engine.SetVar("log", yaklib.CreateYakLogger(fmt.Sprint(yakAbsFile)))
 
