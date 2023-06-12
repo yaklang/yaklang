@@ -60,3 +60,6 @@ jobs:
 
       - name: Test PeekableConn
         run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
+
+      - name: Test gRPC MUSTPASS
+        run: go test -timeout 1m -run TestGRPCMUSTPASS ./common/yakgrpc -v

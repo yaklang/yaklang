@@ -48,11 +48,10 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "mock_thinkphprce.yak"
-	var debugName2 = "mock_weblogic.yak"
+	var debugName = "fuzzhttppath_case1.yak"
 	var debugCases [][]string
 	for k, v := range files {
-		if k == debugName || k == debugName2 {
+		if k == debugName {
 			debugCases = append(debugCases, []string{k, v})
 		}
 	}

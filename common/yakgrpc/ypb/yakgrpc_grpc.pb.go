@@ -317,6 +317,10 @@ type YakClient interface {
 	UploadScreenRecorders(ctx context.Context, in *UploadScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetOneScreenRecorders(ctx context.Context, in *GetOneScreenRecorderRequest, opts ...grpc.CallOption) (*ScreenRecorder, error)
 	UpdateScreenRecorders(ctx context.Context, in *UpdateScreenRecorderRequest, opts ...grpc.CallOption) (*Empty, error)
+	// 通过他可以构造一个 HTTP 请求
+	// 这个请求可能是一个，也可能是一系列
+	// 一般用来调试插件等
+	HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuilderParams, opts ...grpc.CallOption) (*HTTPRequestBuilderResponse, error)
 }
 
 type yakClient struct {
@@ -3268,6 +3272,15 @@ func (c *yakClient) UpdateScreenRecorders(ctx context.Context, in *UpdateScreenR
 	return out, nil
 }
 
+func (c *yakClient) HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuilderParams, opts ...grpc.CallOption) (*HTTPRequestBuilderResponse, error) {
+	out := new(HTTPRequestBuilderResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/HTTPRequestBuilder", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3571,6 +3584,10 @@ type YakServer interface {
 	UploadScreenRecorders(context.Context, *UploadScreenRecorderRequest) (*Empty, error)
 	GetOneScreenRecorders(context.Context, *GetOneScreenRecorderRequest) (*ScreenRecorder, error)
 	UpdateScreenRecorders(context.Context, *UpdateScreenRecorderRequest) (*Empty, error)
+	// 通过他可以构造一个 HTTP 请求
+	// 这个请求可能是一个，也可能是一系列
+	// 一般用来调试插件等
+	HTTPRequestBuilder(context.Context, *HTTPRequestBuilderParams) (*HTTPRequestBuilderResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -4291,6 +4308,9 @@ func (UnimplementedYakServer) GetOneScreenRecorders(context.Context, *GetOneScre
 }
 func (UnimplementedYakServer) UpdateScreenRecorders(context.Context, *UpdateScreenRecorderRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateScreenRecorders not implemented")
+}
+func (UnimplementedYakServer) HTTPRequestBuilder(context.Context, *HTTPRequestBuilderParams) (*HTTPRequestBuilderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HTTPRequestBuilder not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -8724,6 +8744,24 @@ func _Yak_UpdateScreenRecorders_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_HTTPRequestBuilder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPRequestBuilderParams)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).HTTPRequestBuilder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/HTTPRequestBuilder",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).HTTPRequestBuilder(ctx, req.(*HTTPRequestBuilderParams))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -9542,6 +9580,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateScreenRecorders",
 			Handler:    _Yak_UpdateScreenRecorders_Handler,
+		},
+		{
+			MethodName: "HTTPRequestBuilder",
+			Handler:    _Yak_HTTPRequestBuilder_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
