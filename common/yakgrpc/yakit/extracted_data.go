@@ -1,7 +1,9 @@
 package yakit
 
 import (
+	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -90,4 +92,39 @@ func SaveExtractedDataFromHTTPFlow(db *gorm.DB, flowHash string, ruleName string
 		Data:        data,
 	}
 	return CreateOrUpdateExtractedData(db, -1, extractData)
+}
+
+func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *ExtractedData {
+	outC := make(chan *ExtractedData)
+	go func() {
+		defer close(outC)
+
+		var page = 1
+		for {
+			var items []*ExtractedData
+			if _, b := bizhelper.NewPagination(&bizhelper.Param{
+				DB:    db,
+				Page:  page,
+				Limit: 1000,
+			}, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+	return outC
 }

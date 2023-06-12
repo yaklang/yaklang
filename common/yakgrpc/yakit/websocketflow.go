@@ -1,8 +1,10 @@
 package yakit
 
 import (
+	"context"
 	"github.com/asaskevich/govalidator"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,6 +24,18 @@ type WebsocketFlow struct {
 
 	Hash string `json:"hash"`
 }
+
+type WebsocketFlowShare struct {
+	// HTTPFlow 过来的应该有 WebsocketHash
+	WebsocketRequestHash string
+
+	FrameIndex  int
+	FromServer  bool
+	QuotedData  []byte
+	MessageType string
+	Hash string
+}
+
 
 func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 	raw, _ := strconv.Unquote(i.QuotedData)
@@ -162,4 +176,39 @@ func DeleteWebsocketFlowsByHTTPFlowHash(db *gorm.DB, hash []string) error {
 		return db.Error
 	}
 	return nil
+}
+
+func BatchWebsocketFlows(db *gorm.DB, ctx context.Context) chan *WebsocketFlow {
+	outC := make(chan *WebsocketFlow)
+	go func() {
+		defer close(outC)
+
+		var page = 1
+		for {
+			var items []*WebsocketFlow
+			if _, b := bizhelper.NewPagination(&bizhelper.Param{
+				DB:    db,
+				Page:  page,
+				Limit: 1000,
+			}, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+	return outC
 }
