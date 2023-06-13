@@ -81,12 +81,12 @@ aaabbbaaabbb`))
 	for {
 		t.Logf("stream.Recv() start...")
 		exec, err := stream.Recv()
+		println(spew.Sdump(exec))
 		if err != nil {
 			t.Logf("stream.Recv() error: %v", err)
 			log.Warn(err)
 			break
 		}
-		spew.Dump(exec)
 		if string(exec.Message) != "" {
 			if strings.Contains(string(exec.Message), "PLUGIN IS EXECUTED") {
 				checked = true
@@ -126,6 +126,7 @@ aaacccaaabbb`))
 	var checked = false
 	for {
 		exec, err := stream.Recv()
+		println(spew.Sdump(exec))
 		if err != nil {
 			log.Warn(err)
 			break
