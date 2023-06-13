@@ -454,7 +454,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		task.HTTPFlowSuccessCount++
 		var rsp = &ypb.FuzzerResponse{
 			Url:                   utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
-			Method:                result.Request.Method,
+			Method:                utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 			ResponseRaw:           result.ResponseRaw,
 			GuessResponseEncoding: Chardet(result.ResponseRaw),
 			RequestRaw:            result.RequestRaw,
@@ -495,11 +495,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		rsp.UUID = uuid.NewV4().String()
 		rsp.Timestamp = result.Timestamp
 		rsp.DurationMs = result.DurationMs
-		rsp.Host = result.Request.Header.Get("Host")
+		rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(result.Request.Header.Get("Host")))
 		if rsp.Host == "" {
 			rsp.Host = result.Request.Host
 		}
-		rsp.Host = utils.ParseStringToVisible(result.Request.Host)
+		rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(utils.ParseStringToVisible(result.Request.Host)))
 
 		if result.Response != nil {
 			rsp.Ok = true
