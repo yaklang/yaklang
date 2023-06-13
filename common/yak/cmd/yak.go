@@ -121,7 +121,10 @@ func init() {
 
 `, consts.GetYakVersion(), "yaklang.io")
 	} else {
-		initializeDatabase("", "")
+		err := initializeDatabase("", "")
+		if err != nil {
+			log.Warnf("initialize database failed: %s", err)
+		}
 	}
 }
 

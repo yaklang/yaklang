@@ -15,6 +15,11 @@ var ProfileTables = []interface{}{
 	&Project{},
 }
 
+func InitializeDefaultDatabase() {
+	consts.GetGormProfileDatabase().AutoMigrate(ProfileTables...)
+	consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...)
+}
+
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户
 var ProjectTables = []interface{}{
 	&WebsocketFlow{},
