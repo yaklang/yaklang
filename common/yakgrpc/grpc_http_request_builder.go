@@ -155,6 +155,8 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return nil
 	})
 	engine := yak.NewScriptEngine(10)
+	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
+	println(debugScript)
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
 		"REQUESTS":     reqs,
 		"CTX":          stream.Context(),
