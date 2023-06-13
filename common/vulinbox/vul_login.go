@@ -3,6 +3,7 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -26,19 +27,19 @@ func (s *VulinServer) registerLoginRoute() {
 
 	key := utils.RandStringBytes(20)
 	var keyF jwt.Keyfunc = func(token *jwt.Token) (interface{}, error) {
-		return key, nil
+		return []byte(key), nil
 	}
 
 	r.HandleFunc("/jwt/login/profile", func(writer http.ResponseWriter, request *http.Request) {
 		authToken := request.Header.Get("Authorization")
 		if authToken != "" {
-			first, _, _ := strings.Cut(" ", authToken)
-			if first != "Bearer" {
+			before, after, _ := strings.Cut(authToken, " ")
+			if before != "Bearer" {
 				writer.WriteHeader(401)
 				writer.Write([]byte("invalid auth token, use Bearer schema"))
 				return
 			}
-			token, err := jwt.Parse(authToken, keyF)
+			token, err := jwt.Parse(after, keyF)
 			if err != nil {
 				writer.WriteHeader(401)
 				writer.Write([]byte("invalid auth token"))
@@ -50,7 +51,7 @@ func (s *VulinServer) registerLoginRoute() {
 				return
 			}
 
-			writer.Header().Set("Content-Type", "text/html")
+			writer.Header().Set("Content-Type", "application/json")
 			name := utils.MapGetString(token.Header, "username")
 			users, err := s.database.GetUserByUsernameUnsafe(name)
 			if err != nil {
@@ -59,25 +60,23 @@ func (s *VulinServer) registerLoginRoute() {
 				return
 			}
 
-			jsonRaw, err := json.Marshal(funk.Map(users, func(u *VulinUser) map[string]any {
-				var a = make(map[string]any)
-				a["username"] = u.Username
-				a["id"] = u.ID
-				a["age"] = u.Age
-				a["updated_at"] = u.UpdatedAt.String()
-				a["created_at"] = u.CreatedAt.String()
-				return a
-			}))
+			profileData := funk.Map(users, func(u *VulinUser) map[string]interface{} {
+				return map[string]interface{}{
+					"username":   u.Username,
+					"id":         u.ID,
+					"age":        u.Age,
+					"updated_at": u.UpdatedAt.String(),
+					"created_at": u.CreatedAt.String(),
+				}
+			})
+			jsonData, err := json.Marshal(profileData)
 			if err != nil {
 				writer.WriteHeader(500)
 				writer.Write([]byte("internal error, cannot found user: " + name + " \n json.Marshal failed: " + err.Error()))
 				return
 			}
 
-			data, _ := mutate.FuzzTagExec(jwtLoginProfilePage, mutate.Fuzz_WithParams(map[string]any{
-				"jsonRaw": string(jsonRaw),
-			}))
-			writer.Write([]byte(data[0]))
+			writer.Write(jsonData)
 			return
 		}
 		writer.WriteHeader(401)
@@ -128,7 +127,8 @@ func (s *VulinServer) registerLoginRoute() {
 			token.Header["username"] = user.Username
 			token.Header["age"] = user.Age
 
-			tokenString, err := token.SignedString([]byte(key))
+			k, _ := keyF(token)
+			tokenString, err := token.SignedString(k)
 			if err != nil {
 				writer.WriteHeader(500)
 				writer.Write([]byte("internal error, cannot sign token: " + err.Error() + "\n " + spew.Sdump(key)))
@@ -136,9 +136,9 @@ func (s *VulinServer) registerLoginRoute() {
 			}
 
 			writer.Header().Set("Content-Type", "text/html")
-			jsonBytes := []byte(`{"token": "` + string(tokenString) + `"}`)
+			//jsonBytes := []byte(`{"token": "` + string(tokenString) + `"}`)
 			data, _ := mutate.FuzzTagExec(jwtLoginProfileSetJWTPage, mutate.Fuzz_WithParams(map[string]any{
-				"jsonRaw": string(jsonBytes),
+				"jsonRaw": fmt.Sprintf("%s", tokenString),
 			}))
 			writer.Write([]byte(data[0]))
 			return

@@ -27,8 +27,42 @@
         </div>
     </div>
     <script>
-        document.getElementById("authcheck").innerHTML = localStorage.getItem('VULINBOX_JWT') ? "<div class='alert alert-success'>已登录</div>" : "" +
-            `<div class="col-md-4">
+
+        const token = localStorage.getItem('VULINBOX_JWT');
+        if (token) {
+            document.getElementById("authcheck").innerHTML = "<div class='alert alert-success'>已登录</div>" ;
+
+            fetch('/jwt/login/profile', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // 处理个人资料数据
+                    const profileData = data[0];
+                    const profileContainer = document.createElement('div');
+                    profileContainer.innerHTML = `
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">个人资料</h3>
+            <p class="card-text">用户名：${profileData.username}</p>
+            <p class="card-text">ID：${profileData.id}</p>
+            <p class="card-text">年龄：${profileData.age}</p>
+            <p class="card-text">更新时间：${profileData.updated_at}</p>
+            <p class="card-text">创建时间：${profileData.created_at}</p>
+        </div>
+    </div>
+`;
+                    document.getElementById("authcheck").appendChild(profileContainer);
+                })
+                .catch(error => {
+                    console.error('请求个人资料失败:', error);
+                });
+        } else {
+            document.getElementById("authcheck").innerHTML = `<div class="col-md-4">
     <h2 class="text-center mb-4">登录</h2>
     <form action="/jwt/login" method="POST">
         <div class="mb-3">
@@ -43,8 +77,7 @@
     </form>
 </div>
             `
-
-        const token = localStorage.getItem('VULINBOX_JWT');
+        }
     </script>
 </div>
 
