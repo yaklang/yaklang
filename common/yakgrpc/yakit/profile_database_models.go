@@ -3,6 +3,7 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 )
 
@@ -13,6 +14,17 @@ var ProfileTables = []interface{}{
 	&YakScript{}, &Payload{}, &MenuItem{},
 	&GeneralStorage{}, &MarkdownDoc{},
 	&Project{},
+}
+
+func InitializeDefaultDatabase() {
+	log.Info("start to initialize default database")
+
+	if db := consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...); db.Error != nil {
+		log.Errorf("auto migrate database(project) failed: %s", db.Error)
+	}
+	if db := consts.GetGormProfileDatabase().AutoMigrate(ProfileTables...); db.Error != nil {
+		log.Errorf("auto migrate database(profile) failed: %s", db.Error)
+	}
 }
 
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户

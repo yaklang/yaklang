@@ -1,0 +1,14 @@
+check = false
+for result in fuzz.HTTPRequest(`GET / HTTP/1.1
+Host: www.baidu.com`)~.FuzzPath("/abc?cc=12", "/ccc").FuzzGetParams("def", "1").Results()~ {
+    a = http.dump(result)
+    s := string(a[0])
+    println(s)
+    if str.Contains(s, "cc=12") && str.Contains(s, "def=1") {
+        check = true
+    }
+}
+
+if !check{
+    die("query in path cannot be handled correct!")
+}
