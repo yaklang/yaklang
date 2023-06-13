@@ -325,12 +325,47 @@ func (e *ScriptEngine) init() {
 	})
 }
 
-func (e *ScriptEngine) RegisterEngineHooks(f func(engine yaklang.YaklangEngine) error) {
+func (e *ScriptEngine) RegisterEngineHooksLegacy(f func(engine yaklang.YaklangEngine) error) {
 	e.engineHooks = append(e.engineHooks, f)
 }
 
+func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) error) {
+	e.engineHooks = append(e.engineHooks, func(engine yaklang.YaklangEngine) error {
+		ins, ok := engine.(*antlr4yak.Engine)
+		if ok {
+			return f(ins)
+		}
+		return nil
+	})
+}
+
+func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
+	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		log.Infof("set yakit client: %v", client)
+		yaklib.SetEngineClient(engine, client)
+		vm := engine.GetVM()
+		if vm != nil {
+			vm.RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
+				origin, ok := i.(func() (*MixPluginCaller, error))
+				if !ok {
+					return origin
+				}
+				return func() (*MixPluginCaller, error) {
+					caller, err := origin()
+					if err != nil {
+						return nil, err
+					}
+					caller.SetFeedback(yaklib.RawHandlerToExecOutput(client.Output))
+					return caller, nil
+				}
+			})
+		}
+		return nil
+	})
+}
+
 func (e *ScriptEngine) HookOsExit() {
-	e.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+	e.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
 		val, ok := engine.(*antlr4yak.Engine).GetVar("os")
 		if !ok {
 			return nil
@@ -526,6 +561,12 @@ func (e *ScriptEngine) ExecuteWithTemplate(codeTmp string, i map[string][]string
 	}
 	wg.Wait()
 	return nil
+}
+
+func NewYakitVirtualClientScriptEngine(client *yaklib.YakitClient) *ScriptEngine {
+	e := NewScriptEngine(20)
+	e.SetYakitClient(client)
+	return e
 }
 
 func NewScriptEngine(maxConcurrent int) *ScriptEngine {

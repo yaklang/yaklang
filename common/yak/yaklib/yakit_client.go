@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
@@ -24,6 +25,26 @@ func NewVirtualYakitClient(h YakitMessageHandleFunc) *YakitClient {
 		return h(i)
 	}
 	return remoteClient
+}
+
+func NewVirtualYakitClientWithExecResult(h func(result *ypb.ExecResult) error) *YakitClient {
+	return NewVirtualYakitClient(func(i interface{}) error {
+		switch ret := i.(type) {
+		case *ypb.ExecResult:
+			return h(ret)
+		case *YakitLog:
+			return h(NewYakitLogExecResult(ret.Level, ret.Data))
+		default:
+			log.Warnf("unhandled yakit client message: %v", spew.Sdump(ret))
+		}
+		return nil
+	})
+}
+
+func RawHandlerToExecOutput(h func(any) error) func(result *ypb.ExecResult) error {
+	return func(result *ypb.ExecResult) error {
+		return h(result)
+	}
 }
 
 type YakitClient struct {
