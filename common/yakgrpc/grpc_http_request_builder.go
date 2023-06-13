@@ -21,7 +21,7 @@ import (
 	"strings"
 )
 
-//go:embed grpc_http_request_builder_debug.yak
+//go:embed grpc_http_request_builder_scripts.yak
 var debugScript string
 
 func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
