@@ -1,15 +1,13 @@
 package simulator
 
 import (
-	"github.com/yaklang/yaklang/common/simulator/core"
 	"github.com/yaklang/yaklang/common/simulator/examples"
-	"github.com/yaklang/yaklang/common/simulator/extend"
 	"github.com/yaklang/yaklang/common/simulator/simple"
 )
 
 var Exports = map[string]interface{}{
-	"Page":    core.PageCreator,
-	"Captcha": extend.CreateCaptcha,
+	//"Page":    core.PageCreator,
+	//"Captcha": extend.CreateCaptcha,
 
 	"defaultBrute": examples.BruteForceModuleV2,
 
@@ -21,6 +19,12 @@ var Exports = map[string]interface{}{
 	"wsAddress":    examples.WithWsAddress,
 	"proxy":        examples.WithProxy,
 	"proxyDetails": examples.WithProxyDetails,
+
+	"usernameSelector":     examples.WithUsernameSelector,
+	"passwordSelector":     examples.WithPasswordSelector,
+	"captchaInputSelector": examples.WithCaptchaSelector,
+	"captchaImgSelector":   examples.WithCaptchaImgSelector,
+	"submitButtonSelector": examples.WithSubmitButtonSelector,
 
 	"simple": SimpleExports,
 }

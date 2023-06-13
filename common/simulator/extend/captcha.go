@@ -12,6 +12,7 @@ type requestStructor interface {
 	InputBase64(string)
 	InputMode(string)
 	GetBase64() string
+	GeneratorData() interface{}
 }
 
 type CaptchaRequest struct {
@@ -29,6 +30,10 @@ func (req *CaptchaRequest) InputMode(mode string) {
 
 func (req *CaptchaRequest) GetBase64() string {
 	return req.Image
+}
+
+func (req *CaptchaRequest) GeneratorData() interface{} {
+	return &req
 }
 
 type responseStructor interface {
@@ -116,7 +121,7 @@ func (identifier *CaptchaIdentifier) Detect(generalElement *core.GeneralElement)
 	} else {
 		req.InputMode("common_alphanumeric")
 	}
-	resp, err := web.Do_Post(identifier.identifierUrl, &req)
+	resp, err := web.Do_Post(identifier.identifierUrl, req.GeneratorData())
 	if err != nil {
 		return "", utils.Errorf("post captcha req error: %s", err)
 	}

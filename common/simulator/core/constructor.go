@@ -55,6 +55,11 @@ func (generalPage *GeneralPage) OriginPage() *rod.Page {
 	return generalPage.currentPage
 }
 
+func (generalPage *GeneralPage) Refresh() {
+	generalPage.currentPage.Reload()
+	generalPage.currentPage.WaitLoad()
+}
+
 func CreateElement(element *rod.Element, page *GeneralPage) *GeneralElement {
 	newElement := &GeneralElement{
 		element: element,
@@ -185,6 +190,7 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 		if proxy != "" {
 			launch.Proxy(proxy)
 		}
+		//launch.Headless(false)
 		controlUrl, _ := launch.Launch()
 		browser = browser.ControlURL(controlUrl)
 	}
