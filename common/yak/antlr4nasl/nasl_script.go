@@ -71,7 +71,6 @@ type NaslScriptInfo struct {
 	OriginFileName string
 	Hash           string
 	OID            string
-	Group          string
 	CVE            []string
 	ScriptName     string
 	Script         string
@@ -211,7 +210,6 @@ func NewNaslScriptObjectFromNaslScript(s *yakit.NaslScript) *NaslScriptInfo {
 	}
 	n()
 	info.OriginFileName = s.OriginFileName
-	info.Group = s.Group
 	info.Hash = s.Hash
 	info.OID = s.OID
 	info.ScriptName = s.ScriptName
@@ -289,7 +287,6 @@ func (n *NaslScriptInfo) Save() error {
 	n.naslScript.MandatoryKeys = string(MandatoryKeys)
 	n.naslScript.Timeout = n.Timeout
 	n.naslScript.RequireKeys = string(RequireKeys)
-	n.naslScript.Group = n.Group
 	n.naslScript.OriginFileName = n.OriginFileName
 	return n.naslScript.CreateOrUpdateNaslScript(consts.GetGormProfileDatabase())
 }

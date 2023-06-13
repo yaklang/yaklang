@@ -56,11 +56,9 @@ var (
 func SetNaslExports(lib map[string]interface{}) {
 	naslExports = lib
 }
+
 func init() {
-	InitYaklangLib()
-}
-func Init() {
-	InitYaklangLib()
+	initYaklangLib()
 }
 func InitYaklangLib() {
 	initYaklangLibOnce.Do(func() {

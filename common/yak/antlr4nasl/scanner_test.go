@@ -197,11 +197,10 @@ func TestPocScanner(t *testing.T) {
 	consts.GetGormProjectDatabase()
 	engine := NewScriptEngine()
 	//engine.vm.GetConfig().SetStopRecover(true)
-	engine.Debug()          // 开启调试模式，脚本退出时会打印调试信息
-	InitPluginGroup(engine) // 初始化插件组
-	//engine.LoadGroups("Product detection")
+	engine.Debug() // 开启调试模式，脚本退出时会打印调试信息
+	engine.LoadFamilys("Product detection")
 	//engine.LoadScriptFromDb("gb_cisco_asa_detect.nasl")
-	engine.LoadScriptFromDb("gb_apache_hadoop_detect.nasl")
+	//engine.LoadScriptFromDb("gb_apache_hadoop_detect.nasl")
 	engine.SetGoroutineNum(10)
 	engine.AddEngineHooks(func(engine *Engine) {
 		inFun := false
@@ -288,8 +287,8 @@ func TestPocScanner(t *testing.T) {
 		})
 		engine.AddNaslLibPatch("http_keepalive.inc", func(code string) string {
 			codeLines := strings.Split(code, "\n")
-			if len(codeLines) > 342 {
-				codeLines[342] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
+			if len(codeLines) > 341 {
+				codeLines[341] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
 				code = strings.Join(codeLines, "\n")
 			}
 			return code

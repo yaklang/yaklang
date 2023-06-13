@@ -316,9 +316,14 @@ func init() {
 			name := params.getParamByNumber(0)
 			return engine.Kbs.GetKB(name.String()), nil
 		},
+		// 返回如果pattern包含*，则返回map，否则返回list
 		"get_kb_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0).String()
-			return engine.Kbs.GetKBByPattern(name), nil
+			if strings.Contains(name, "*") {
+				return engine.Kbs.GetKBByPattern(name), nil
+			} else {
+				return []interface{}{engine.Kbs.GetKB(name)}, nil
+			}
 		},
 		"security_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			protocol := params.getParamByName("protocol")
@@ -847,7 +852,7 @@ func init() {
 			}
 			re, err := regexp.Compile(pattern)
 			if err != nil {
-				return "", err
+				return []string{}, err
 			}
 			return re.FindStringSubmatch(s), nil
 		},
@@ -1921,8 +1926,9 @@ func init() {
 				} else {
 					res, err = m(engine, params)
 				}
+				paramstr := fmt.Sprintf("%v", params)
 				if err != nil {
-					log.Errorf("call build in function `%s` error: %v", name, err)
+					log.Errorf("call build in function `%s(%s)` error: %v", name, paramstr, err)
 					return res
 				}
 				du := time.Now().Sub(timeStart).Seconds()

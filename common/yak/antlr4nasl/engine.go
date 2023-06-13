@@ -16,13 +16,6 @@ import (
 	"sync"
 )
 
-type ScriptGroup string
-
-const (
-	PluginGroupApache ScriptGroup = "apache"
-	PluginGroupOracle ScriptGroup = "oracle"
-)
-
 type Engine struct {
 	debug                          bool
 	naslLibsPath, dependenciesPath string
@@ -269,7 +262,7 @@ func (e *Engine) Eval(code string) error {
 	defer func() {
 		if err := recover(); err != nil {
 			if v, ok := err.(*yakvm.VMPanicSignal); ok {
-				log.Infof("script exit with value: %v", v.Info)
+				log.Infof("script [%s] exit with value: %v", e.scriptObj.OriginFileName, v.Info)
 				if e.debug {
 					log.Infof("script additional info: %v", v.AdditionalInfo)
 				}

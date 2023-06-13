@@ -20,7 +20,6 @@ type ScriptEngine struct {
 	scriptFilter                   func(script *NaslScriptInfo) bool
 	scripts                        map[string]*NaslScriptInfo
 	excludeScripts                 map[string]struct{} // 基于OID排除一些脚本
-	scriptGroupDefines             map[ScriptGroup][]string
 	goroutineNum                   int
 	debug                          bool
 	engineHooks                    []func(engine *Engine)
@@ -32,13 +31,12 @@ type ScriptEngine struct {
 
 func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
-		scripts:            make(map[string]*NaslScriptInfo),
-		excludeScripts:     make(map[string]struct{}),
-		scriptGroupDefines: make(map[ScriptGroup][]string),
-		goroutineNum:       10,
-		Kbs:                NewNaslKBs(),
-		loadedScripts:      make(map[string]struct{}),
-		loadedScriptsLock:  &sync.Mutex{},
+		scripts:           make(map[string]*NaslScriptInfo),
+		excludeScripts:    make(map[string]struct{}),
+		goroutineNum:      10,
+		Kbs:               NewNaslKBs(),
+		loadedScripts:     make(map[string]struct{}),
+		loadedScriptsLock: &sync.Mutex{},
 		scriptFilter: func(script *NaslScriptInfo) bool {
 			return true
 		},
@@ -57,9 +55,6 @@ func (engine *ScriptEngine) GetScriptMuxByName(name string) *sync.Mutex {
 }
 func (engine *ScriptEngine) SetScriptFilter(filter func(script *NaslScriptInfo) bool) {
 	engine.scriptFilter = filter
-}
-func (engine *ScriptEngine) GetAllScriptGroups() map[ScriptGroup][]string {
-	return engine.scriptGroupDefines
 }
 func (engine *ScriptEngine) GetKBData() map[string]interface{} {
 	return engine.Kbs.GetData()
@@ -90,13 +85,15 @@ func (engine *ScriptEngine) LoadScript(script *NaslScriptInfo) {
 		engine.scripts[script.OriginFileName] = script
 	}
 }
-func (engine *ScriptEngine) LoadScriptFromDb(name string) {
-	script, err := NewNaslScriptObjectFromDb(name)
-	if err != nil {
-		log.Error(err)
-		return
+func (engine *ScriptEngine) LoadScriptsFromDb(plugins ...string) {
+	for _, plugin := range plugins {
+		script, err := NewNaslScriptObjectFromDb(plugin)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		engine.LoadScript(script)
 	}
-	engine.LoadScript(script)
 }
 func (engine *ScriptEngine) LoadScriptFromFile(path string) {
 	if utils.IsDir(path) {
@@ -116,30 +113,21 @@ func (engine *ScriptEngine) LoadScriptFromFile(path string) {
 	}
 }
 
-func (engine *ScriptEngine) AddScriptIntoGroup(group ScriptGroup, familys ...string) {
-	engine.scriptGroupDefines[group] = append(engine.scriptGroupDefines[group], familys...)
-}
-func (e *ScriptEngine) LoadGroups(groups ...ScriptGroup) {
+func (e *ScriptEngine) LoadFamilys(familys ...string) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return
 	}
-	for _, group := range groups {
-		familys, ok := e.scriptGroupDefines[group]
-		if !ok {
-			familys = []string{string(group)}
+	for _, family := range familys {
+		var scripts []*yakit.NaslScript
+		if db := db.Where("family = ?", family).Find(&scripts); db.Error != nil {
+			continue
 		}
-		for _, family := range familys {
-			var scripts []*yakit.NaslScript
-			if db := db.Where("family = ?", family).Find(&scripts); db.Error != nil {
+		for _, script := range scripts {
+			if _, ok := e.excludeScripts[script.OID]; ok {
 				continue
 			}
-			for _, script := range scripts {
-				if _, ok := e.excludeScripts[script.OID]; ok {
-					continue
-				}
-				e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
-			}
+			e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
 		}
 	}
 }
@@ -167,7 +155,10 @@ func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	return rootScripts
 }
 func (e *ScriptEngine) Scan(host string, ports string) error {
-
+	rootScripts := e.GetRootScripts()
+	if len(rootScripts) == 0 {
+		return utils.Errorf("no scripts to scan")
+	}
 	var allErrors multiError
 	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxies...)
 	if res.Ok {
@@ -214,7 +205,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	e.Kbs.SetKB("Host/port_infos", portInfos)
 	swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	errorsMux := sync.Mutex{}
-	for _, script := range e.GetRootScripts() {
+	for _, script := range rootScripts {
 		if _, ok := e.excludeScripts[script.OID]; ok {
 			continue
 		}
@@ -229,6 +220,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			engine.SetKBs(e.Kbs)
 			engine.InitBuildInLib()
 			engine.Debug(e.debug)
+			engine.SetAutoLoadDependencies(true)
 			engine.scriptExecMutexsLock = e.scriptExecMutexsLock
 			engine.scriptExecMutexs = e.scriptExecMutexs
 			//engine.RegisterBuildInMethodHook("log_message", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {

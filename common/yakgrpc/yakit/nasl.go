@@ -1,8 +1,12 @@
 package yakit
 
 import (
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"sync"
 )
 
@@ -44,13 +48,77 @@ func NewNaslScript(name, content string) *NaslScript {
 	obj.Hash = obj.CalcHash()
 	return obj
 }
-func QueryAllNaslScripts(db *gorm.DB) (*NaslScript, error) {
-	req := &NaslScript{}
-	if db := db.Model(&NaslScript{}); db.Error != nil {
-		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)
+func QueryNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*NaslScript, error) {
+	db = db.Debug()
+	if params == nil {
+		params = &ypb.QueryYakScriptRequest{}
 	}
-	return req, nil
+
+	/*pagination*/
+	if params.Pagination == nil {
+		params.Pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+
+	if !utils.StringArrayContains([]string{
+		"desc", "asc", "",
+	}, strings.ToLower(params.GetPagination().GetOrder())) {
+		return nil, nil, utils.Error("invalid order")
+	}
+
+	var orderOrdinary = "updated_at desc"
+	if utils.StringArrayContains([]string{
+		"created_at", "updated_at", "id", "script_name",
+		"author",
+	}, strings.ToLower(params.GetPagination().GetOrderBy())) {
+		orderOrdinary = fmt.Sprintf("%v %v", params.GetPagination().GetOrderBy(), params.GetPagination().GetOrder())
+		orderOrdinary = strings.TrimSpace(orderOrdinary)
+	}
+
+	p := params.Pagination
+	db = db.Model(&NaslScript{}).Order(orderOrdinary)
+	db = FilterNaslScript(db, params)
+
+	var ret []*NaslScript
+	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return paging, ret, nil
 }
+
+// FilterNaslScript 过滤nasl脚本，支持关键词搜索，family过滤，排除和指定脚本名
+func FilterNaslScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
+	if params.GetKeyword() != "" {
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+			"origin_file_name", "o_id", "cve", "script_name", "script", "family", "category", "tags",
+		}, strings.Split(params.GetKeyword(), ","), false)
+	}
+
+	familys := utils.StringArrayFilterEmpty(params.GetFamily())
+	if len(familys) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "family", familys)
+	}
+
+	// 排除特定脚本
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "script_name", params.GetExcludeScriptNames())
+	if len(params.GetIncludedScriptNames()) > 0 {
+		if len(utils.StringArrayFilterEmpty(params.GetExcludeScriptNames())) > 0 {
+			//db = db.Or("script_name IN(?)", params.GetIncludedScriptNames())
+			db = bizhelper.ExactOrQueryStringArrayOr(db, "script_name", params.GetIncludedScriptNames())
+		} else {
+			//db = db.Where("script_name IN(?)", params.GetIncludedScriptNames())
+			db = bizhelper.ExactQueryStringArrayOr(db, "script_name", params.GetIncludedScriptNames())
+		}
+	}
+
+	return db
+}
+
 func QueryNaslScriptByOID(db *gorm.DB, oid string) (*NaslScript, error) {
 	req := &NaslScript{}
 	if db := db.Model(&NaslScript{}).Where("o_id = ?", oid).First(req); db.Error != nil {
@@ -81,4 +149,28 @@ func (p *NaslScript) CreateOrUpdateNaslScript(db *gorm.DB) error {
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 	return nil
+}
+func (p *NaslScript) ToYakScript() *YakScript {
+	return &YakScript{
+		ScriptName:           "__NaslScript__" + p.ScriptName,
+		Type:                 "nasl",
+		Content:              p.Script,
+		Level:                "info",
+		Params:               "{}",
+		Help:                 "",
+		Author:               "",
+		Tags:                 p.Tags,
+		Ignored:              false,
+		FromLocal:            false,
+		LocalPath:            "",
+		IsHistory:            false,
+		FromStore:            false,
+		IsGeneralModule:      false,
+		FromGit:              "",
+		IsBatchScript:        false,
+		IsExternal:           false,
+		EnablePluginSelector: false,
+		PluginSelectorTypes:  "",
+		sourceScript:         p,
+	}
 }

@@ -97,7 +97,6 @@ singleExpression
     | '+' singleExpression                                                   # UnaryPlusExpression
     | '-' singleExpression                                                   # UnaryMinusExpression
     | '~' singleExpression                                                   # BitNotExpression
-    | '!' singleExpression                                                   # NotExpression
     | singleExpression  '++'                                                 # PostIncrementExpression
     | singleExpression  '--'                                                 # PostDecreaseExpression
     | singleExpression ( '**' | '*' | '/' | '%') singleExpression                    # MultiplicativeExpression
@@ -106,6 +105,7 @@ singleExpression
     | singleExpression ('<' | '>' | '<=' | '>=') singleExpression            # RelationalExpression
     | singleExpression X singleExpression                                      # XExpression
     | singleExpression ('==' | '>!<' | '><' | '!=' | '!~' | '=~') singleExpression        # EqualityExpression
+    | '!' singleExpression                                                   # NotExpression // 根据gb_wmi_access.nasl第65行调整!优先级
     | singleExpression '&' singleExpression                                  # BitAndExpression
     | singleExpression '|' singleExpression                                  # BitOrExpression
     | singleExpression '^' singleExpression                                  # BitXOrExpression
