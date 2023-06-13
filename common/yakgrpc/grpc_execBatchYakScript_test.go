@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 	"io"
@@ -21,8 +22,7 @@ func init() {
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
-	consts.GetGormProfileDatabase()
-	consts.GetGormProjectDatabase()
+	yakit.InitializeDefaultDatabase()
 
 	port := utils.GetRandomAvailableTCPPort()
 	addr := utils.HostPort("127.0.0.1", port)
