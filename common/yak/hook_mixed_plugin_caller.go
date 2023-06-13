@@ -93,6 +93,11 @@ type MixPluginCaller struct {
 	callers            *YakToCallerManager
 	fingerprintMatcher *fp.Matcher
 	swg                utils.SizedWaitGroup
+	cache              bool
+}
+
+func (m *MixPluginCaller) SetCache(b bool) {
+	m.cache = b
 }
 
 func (m *MixPluginCaller) ReplaceYakToCallerManager(c *YakToCallerManager) {
@@ -468,7 +473,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 						defer m.swg.Done()
 						addr := utils.HostPort(host, port)
 						log.Infof("(port/mitm) start to match %v", addr)
-						matchResult, err := m.fingerprintMatcher.Match(host, port)
+						matchResult, err := m.fingerprintMatcher.Match(host, port, fp.WithCache(m.cache))
 						if err != nil {
 							return
 						}
