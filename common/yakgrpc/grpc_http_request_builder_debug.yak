@@ -4,13 +4,13 @@ reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
 Host: www.example.com
 `, "IsHttps": true}]
 
+loglevel("debug")
+
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
     pluginName = getParams("PLUGIN_NAME")
 }
-
-
 
 /*
 Init Yakit
@@ -25,6 +25,7 @@ caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
 err = caller.LoadPlugin(pluginName)
 if err != nil { die(err) }
+caller.SetCache(false)
 
 caller.SetConcurrent(len(reqs))
 
