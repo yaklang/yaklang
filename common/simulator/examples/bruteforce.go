@@ -7,142 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/simulator/core"
 	"github.com/yaklang/yaklang/common/simulator/extend"
 	"github.com/yaklang/yaklang/common/utils"
+	"regexp"
 )
-
-func BruteForce(urlStr string) {
-	if urlStr == "" {
-		log.Errorf("url not null")
-		return
-	}
-	log.Infof("### bruteforce example ###")
-	log.Infof("### target url: %s", urlStr)
-	pack := core.PageCreator()
-	pack.SetURL(urlStr)
-	page := pack.Create()
-
-	log.Info("### Page Load End. Start Scan ###")
-	originHtml := page.HTML()
-	elements, _ := page.FindElements("input")
-	elements = elements.FilteredTypeElement("text", "password", "number", "tel")
-	if elements.Empty() {
-		log.Infof("none input found")
-		return
-	}
-	// username
-	userelements := elements.FilteredKeywordElements("username")
-	var userelement *core.GeneralElement
-	if userelements.Single() {
-		userelement = userelements.First()
-	} else if userelements.Multi() {
-		userelement = userelements.FilteredKeywordElement("username")
-	} else {
-		log.Infof("username element not found")
-		return
-	}
-	elements = elements.Slice(userelement)
-	// password
-	passelements := elements.FilteredKeywordElements("password")
-	var passelement *core.GeneralElement
-	if passelements.Single() {
-		passelement = passelements.First()
-	} else if passelements.Multi() {
-		passelement = passelements.FilteredKeywordElement("password")
-	} else {
-		log.Infof("pass element not found")
-		return
-	}
-	elements = elements.Slice(passelement)
-	// captcha
-	captchaelements := elements.FilteredKeywordElements("captcha")
-	var captchaelement *core.GeneralElement
-	if captchaelements.Single() {
-		captchaelement = captchaelements.First()
-	} else if captchaelements.Multi() {
-		captchaelement = captchaelements.FilteredKeywordElement("captcha")
-	}
-	capmodule := extend.CreateCaptcha()
-	var captchaimgelement *core.GeneralElement
-	if captchaelement != nil {
-		capmodule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
-		capmodule.SetRequestStruct(&extend.CaptchaRequest{})
-		capmodule.SetResponseStruct(&extend.CaptchaResult{})
-		captchaimgelements, _ := captchaelement.GeneralGetLatestElements("img", 5)
-		if captchaimgelements.Length() == 0 {
-			log.Infof("captcha %s exist but captcha img not exist", captchaelement)
-			return
-		} else if captchaimgelements.Length() == 1 {
-			captchaimgelement = captchaimgelements.First()
-		} else {
-			captchaimgelement = captchaimgelements.FilteredKeywordElement("captcha")
-		}
-	}
-
-	var button *core.GeneralElement
-	buttons, _ := page.GeneralFindElements("button")
-	buttons = buttons.Slice(userelement)
-	buttons = buttons.Slice(passelement)
-	if buttons.Single() {
-		button = buttons.First()
-	} else if buttons.Multi() {
-		button = buttons.FilteredKeywordElement("login")
-	} else {
-		log.Infof("button element not found")
-		return
-	}
-	fmt.Println(userelement, passelement, captchaelement, captchaimgelement, button)
-
-	go page.OriginPage().EachEvent(
-		func(e *proto.PageJavascriptDialogOpening) {
-			_ = proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}.Call(page.OriginPage())
-		},
-	)()
-
-	username := []string{"admin"}
-	password := []string{"123321", "luckyadmin123"}
-	for _, u := range username {
-		for _, p := range password {
-			fmt.Println(u, ":", p)
-			userelement.Input(u)
-			passelement.Input(p)
-			if captchaelement != nil {
-				capStr, err := capmodule.Detect(captchaimgelement)
-				if err != nil {
-					log.Info(err)
-					return
-				} else {
-					log.Info(capStr)
-				}
-				captchaelement.Input(capStr)
-			}
-			page.Screenshot("1.png")
-			err := page.StartListen()
-			if err != nil {
-				log.Info("start listen err: %s", err)
-			}
-			err = button.Click()
-			if err != nil {
-				log.Infof("login button click error: %s", err)
-				return
-			}
-			page.Wait()
-			currentHtml := page.HTML()
-			degree := extend.GetPageSimilarity(originHtml, currentHtml)
-			log.Info(degree)
-			//break
-			words, _ := page.StopListenWithBytes()
-			if len(words) > 500 {
-				words = words[:500]
-				words = append(words, 46, 46, 46)
-			}
-			page.Screenshot("test.png")
-			fmt.Printf("page element change info: \n%s\n", string(words))
-			if page.CurrentURL() != page.Url() {
-				fmt.Printf("login success! with username: %s & passwprd: %s", u, p)
-				return
-			}
-		}
-	}
-}
 
 func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResult, error) {
 	log.Infof("### bruteforce example ###")
@@ -168,21 +34,27 @@ func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResu
 
 	result := &BruteForceResult{}
 
-	userElement, passElement, captchaElement, capPicElement, loginElement, err := pageInfoCollection(page)
+	userElement, passElement, captchaElement, capPicElement, loginElement, err := pageInfoCollection(page, *config)
 	if err != nil {
 		return result, utils.Errorf("page info collection error: %s", err)
 	}
 
 	capModule := extend.CreateCaptcha()
-	if config.captchaUrl == "" {
-		capModule.SetIdentifyUrl("http://192.168.0.58:8008/runtime/text/invoke")
+	if config.captchaMode != "" {
+		if config.captchaUrl == "" {
+			capModule.SetIdentifyUrl("http://192.168.0.58:8008/runtime/text/invoke")
+		} else {
+			capModule.SetIdentifyUrl(config.captchaUrl)
+		}
+		capModule.SetRequestStruct(&extend.CaptchaRequest{})
+		capModule.SetResponseStruct(&extend.CaptchaResult{})
+		if config.captchaMode != "" {
+			capModule.SetIdentifyMode(config.captchaMode)
+		}
 	} else {
 		capModule.SetIdentifyUrl(config.captchaUrl)
-	}
-	capModule.SetRequestStruct(&extend.CaptchaRequest{})
-	capModule.SetResponseStruct(&extend.CaptchaResult{})
-	if config.captchaMode != "" {
-		capModule.SetIdentifyMode(config.captchaMode)
+		capModule.SetRequestStruct(&extend.DDDDCaptcha{})
+		capModule.SetResponseStruct(&extend.DDDDResult{})
 	}
 
 	originHtml := page.HTML()
@@ -238,52 +110,7 @@ func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResu
 	return result, utils.Error("bruteforce failed.")
 }
 
-func BruteForceModule(urlStr string, usernameList, passwordList []string, captchaUrl ...string) (string, string, string) {
-	log.Infof("### bruteforce example ###")
-	log.Infof("### target url: %s", urlStr)
-	pack := core.PageCreator()
-	pack.SetURL(urlStr)
-	page := pack.Create()
-	userElement, passElement, captchaElement, capPicElement, loginElement, err := pageInfoCollection(page)
-	if err != nil {
-		log.Infof("page info collection error: %s", err)
-	}
-
-	capModule := extend.CreateCaptcha()
-	if len(captchaUrl) == 0 {
-		capModule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
-	} else {
-		capModule.SetIdentifyUrl(captchaUrl[0])
-	}
-	capModule.SetRequestStruct(&extend.CaptchaRequest{})
-	capModule.SetResponseStruct(&extend.CaptchaResult{})
-	capModule.SetIdentifyMode("common_alphanumeric")
-
-	originHtml := page.HTML()
-
-	go page.OriginPage().EachEvent(
-		func(e *proto.PageJavascriptDialogOpening) {
-			_ = proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}.Call(page.OriginPage())
-		},
-	)()
-
-	for _, username := range usernameList {
-		for _, password := range passwordList {
-			b64, err := inputClickTry(
-				page,
-				userElement, passElement, captchaElement, capPicElement, loginElement,
-				capModule,
-				originHtml, username, password,
-			)
-			if err == nil {
-				return username, password, b64
-			}
-		}
-	}
-	return "", "", ""
-}
-
-func pageInfoCollection(page *core.GeneralPage) (
+func pageInfoCollection(page *core.GeneralPage, config Config) (
 	*core.GeneralElement,
 	*core.GeneralElement,
 	*core.GeneralElement,
@@ -296,69 +123,111 @@ func pageInfoCollection(page *core.GeneralPage) (
 	if elements.Empty() {
 		return nil, nil, nil, nil, nil, utils.Errorf("none input found from page.")
 	}
+
 	// username
-	userelements := elements.FilteredKeywordElements("username")
-	var userelement *core.GeneralElement
-	if userelements.Single() {
-		userelement = userelements.First()
-	} else if userelements.Multi() {
-		userelement = userelements.FilteredKeywordElement("username")
+	var userElement *core.GeneralElement
+	if config.usernameSelector != "" {
+		_userElement, err := page.FindElement(config.usernameSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("username selector find error: %s", err)
+		}
+		userElement = _userElement
 	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("username element not found.")
-	}
-	elements = elements.Slice(userelement)
-	// password
-	passelements := elements.FilteredKeywordElements("password")
-	var passelement *core.GeneralElement
-	if passelements.Single() {
-		passelement = passelements.First()
-	} else if passelements.Multi() {
-		passelement = passelements.FilteredKeywordElement("password")
-	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("password element not found.")
-	}
-	elements = elements.Slice(passelement)
-	// captcha
-	captchaelements := elements.FilteredKeywordElements("captcha")
-	var captchaelement *core.GeneralElement
-	if captchaelements.Single() {
-		captchaelement = captchaelements.First()
-	} else if captchaelements.Multi() {
-		captchaelement = captchaelements.FilteredKeywordElement("captcha")
-	}
-	capmodule := extend.CreateCaptcha()
-	var captchaimgelement *core.GeneralElement
-	if captchaelement != nil {
-		capmodule.SetIdentifyUrl("http://192.168.0.68:8008/runtime/text/invoke")
-		capmodule.SetRequestStruct(&extend.CaptchaRequest{})
-		capmodule.SetResponseStruct(&extend.CaptchaResult{})
-		captchaimgelements, _ := captchaelement.GeneralGetLatestElements("img", 5)
-		if captchaimgelements.Length() == 0 {
-			return nil, nil, nil, nil, nil, utils.Errorf("captcha %s exist but captcha img not exist", captchaelement)
-		} else if captchaimgelements.Length() == 1 {
-			captchaimgelement = captchaimgelements.First()
+		userElements := elements.FilteredKeywordElements("username")
+		if userElements.Single() {
+			userElement = userElements.First()
+		} else if userElements.Multi() {
+			userElement = userElements.FilteredKeywordElement("username")
 		} else {
-			captchaimgelement = captchaimgelements.FilteredKeywordElement("captcha")
+			return nil, nil, nil, nil, nil, utils.Errorf("username element not found.")
+		}
+	}
+	elements = elements.Slice(userElement)
+
+	// password
+	var passElement *core.GeneralElement
+	if config.passwordSelector != "" {
+		_passElement, err := page.FindElement(config.passwordSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("password selector find error: %s", err)
+		}
+		passElement = _passElement
+	} else {
+		passElements := elements.FilteredKeywordElements("password")
+		if passElements.Single() {
+			passElement = passElements.First()
+		} else if passElements.Multi() {
+			passElement = passElements.FilteredKeywordElement("password")
+		} else {
+			return nil, nil, nil, nil, nil, utils.Errorf("password element not found.")
+		}
+	}
+	elements = elements.Slice(passElement)
+
+	// captcha
+	var captchaElement *core.GeneralElement
+	if config.captchaSelector != "" {
+		_captchaElement, err := page.FindElement(config.captchaSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("captcha selector find error: %s", err)
+		}
+		captchaElement = _captchaElement
+	} else {
+		captchaElements := elements.FilteredKeywordElements("captcha")
+		if captchaElements.Single() {
+			captchaElement = captchaElements.First()
+		} else if captchaElements.Multi() {
+			captchaElement = captchaElements.FilteredKeywordElement("captcha")
 		}
 	}
 
-	var button *core.GeneralElement
-	buttons, _ := page.GeneralFindElements("button")
-	buttons = buttons.Slice(userelement)
-	buttons = buttons.Slice(passelement)
-	if buttons.Single() {
-		button = buttons.First()
-	} else if buttons.Multi() {
-		button = buttons.FilteredKeywordElement("login")
-	} else {
-		return nil, nil, nil, nil, nil, utils.Errorf("button element not found.")
+	// captcha img
+	var captchaImgElement *core.GeneralElement
+	if captchaElement != nil {
+		if config.captchaImgSelector != "" {
+			_captchaImgElement, err := page.FindElement(config.captchaImgSelector)
+			if err != nil {
+				return nil, nil, nil, nil, nil, utils.Errorf("captcha image selector find error: %s", err)
+			}
+			captchaImgElement = _captchaImgElement
+		} else {
+			captchaImgElements, _ := captchaElement.GeneralGetLatestElements("img", 5)
+			if captchaImgElements.Length() == 0 {
+				return nil, nil, nil, nil, nil, utils.Errorf("captcha %s exist but captcha img not exist", captchaElement)
+			} else if captchaImgElements.Length() == 1 {
+				captchaImgElement = captchaImgElements.First()
+			} else {
+				captchaImgElement = captchaImgElements.FilteredKeywordElement("captcha")
+			}
+		}
 	}
-	log.Info("detect element: \nusername element: ", userelement,
-		"\npassword element: ", passelement,
-		"\ncaptcha element: ", captchaelement,
-		"\ncaptcha image element: ", captchaimgelement,
+
+	// submit button
+	var button *core.GeneralElement
+	if config.submitButtonSelector != "" {
+		_button, err := page.FindElement(config.submitButtonSelector)
+		if err != nil {
+			return nil, nil, nil, nil, nil, utils.Errorf("button selector find error: %s", err)
+		}
+		button = _button
+	} else {
+		buttons, _ := page.GeneralFindElements("button")
+		buttons = buttons.Slice(userElement)
+		buttons = buttons.Slice(passElement)
+		if buttons.Single() {
+			button = buttons.First()
+		} else if buttons.Multi() {
+			button = buttons.FilteredKeywordElement("login")
+		} else {
+			return nil, nil, nil, nil, nil, utils.Errorf("button element not found.")
+		}
+	}
+	log.Info("detect element: \nusername element: ", userElement,
+		"\npassword element: ", passElement,
+		"\ncaptcha element: ", captchaElement,
+		"\ncaptcha image element: ", captchaImgElement,
 		"\nlogin button element: ", button)
-	return userelement, passelement, captchaelement, captchaimgelement, button, nil
+	return userElement, passElement, captchaElement, captchaImgElement, button, nil
 }
 
 func inputClickTry(
@@ -366,16 +235,20 @@ func inputClickTry(
 	userElement, passElement, captchaElement, capPicElement, loginElement *core.GeneralElement,
 	capModule *extend.CaptchaIdentifier,
 	originHtml, username, password string) (string, error) {
+	page.Refresh()
 	log.Info("current account: ", username, ":", password)
 	userElement.Input(username)
 	passElement.Input(password)
+	charCompiler, _ := regexp.Compile(`[^0-9a-zA-Z\-]`)
 	if captchaElement != nil {
 		capStr, err := capModule.Detect(capPicElement)
 		if err != nil {
 			log.Info(err)
 			return "", err
+		} else if charCompiler.MatchString(capStr) {
+			return "", utils.Errorf("invalid captcha char: %s", capStr)
 		} else {
-			//log.Info(capStr)
+			log.Infof("detect captcha result: %s", capStr)
 		}
 		captchaElement.Input(capStr)
 	}
