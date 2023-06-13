@@ -22,6 +22,7 @@ func init() {
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
+	consts.InitilizeDatabase("", "")
 	yakit.InitializeDefaultDatabase()
 
 	port := utils.GetRandomAvailableTCPPort()
