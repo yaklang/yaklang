@@ -3,6 +3,7 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 )
 
@@ -16,6 +17,7 @@ var ProfileTables = []interface{}{
 }
 
 func InitializeDefaultDatabase() {
+	log.Info("start to initialize default database")
 	consts.GetGormProfileDatabase().AutoMigrate(ProfileTables...)
 	consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...)
 }
