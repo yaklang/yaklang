@@ -56,6 +56,7 @@ Host: baidu.com
 Content-Length: 12
 
 aaabbbaaabbb`))
+	log.Infof("start to decug mock http on: %v", utils.HostPort(host, port))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
 		PluginType: "port-scan",
@@ -77,8 +78,10 @@ aaabbbaaabbb`))
 	}
 	var checked = false
 	for {
+		t.Logf("stream.Recv() start...")
 		exec, err := stream.Recv()
 		if err != nil {
+			t.Logf("stream.Recv() error: %v", err)
 			log.Warn(err)
 			break
 		}

@@ -428,7 +428,7 @@ ON "http_flows" (
   "source_type" ASC
 );`).Error
 	if err != nil {
-		log.Warn("failed to add index on http_flows.source_type")
+		log.Warnf("failed to add index on http_flows.source_type: %v", err)
 	}
 
 	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_tags"
@@ -436,7 +436,7 @@ ON "http_flows" (
   "tags" ASC
 );`).Error
 	if err != nil {
-		log.Warn("failed to add index on http_flows.tags")
+		log.Warnf("failed to add index on table: http_flows.tags: %v", err)
 	}
 }
 
