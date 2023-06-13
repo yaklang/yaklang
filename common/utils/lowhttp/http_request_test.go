@@ -255,6 +255,53 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 	}
 }
 
+func TestFixHTTPPacketCRLF3(t *testing.T) {
+	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+Host: www.example.com
+Content-Length: 203
+Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
+     
+--------------------------123
+Content-Disposition: form-data; name="{\"key\": \"value\"}"
+
+
+--------------------------123--`))
+	spew.Dump(results)
+	if !strings.Contains(string(results), `boundary=------------------------123`) {
+		panic(1)
+	}
+
+	if !strings.Contains(string(spew.Sdump(results)), `00000c0  2d 64 61 74 61 3b 20 6e  61 6d 65 3d 22 7b 5c 22  |-data; name="{\"|
+ 000000d0  6b 65 79 5c 22 3a 20 5c  22 76 61 6c 75 65 5c 22  |key\": \"value\"|
+ 000000e0  7d 22 0d 0a 0d 0a 0d 0a  2d 2d 2d 2d 2d 2d 2d 2d  |}"......--------|
+ 000000f0  2d 2d 2d 2d 2d 2d 2d 2d  2d 2d 2d 2d 2d 2d 2d 2d  |----------------|
+ 00000100  2d 2d 31 32 33 2d 2d 0d  0a                       |--123--..|`) {
+		panic("CRLF Fix Failed")
+	}
+}
+
+func TestFixHTTPPacketCRLF4(t *testing.T) {
+	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+Host: www.example.com
+Content-Length: 203
+Content-Type: 123123
+            
+   asdf`))
+	spew.Dump(results)
+	if !strings.Contains(string(results), "\r\n\r\n   asdf") {
+		panic(1)
+	}
+
+	if !strings.Contains(string(spew.Sdump(results)), ` 00000000  50 4f 53 54 20 2f 20 48  54 54 50 2f 31 2e 31 0d  |POST / HTTP/1.1.|
+ 00000010  0a 48 6f 73 74 3a 20 77  77 77 2e 65 78 61 6d 70  |.Host: www.examp|
+ 00000020  6c 65 2e 63 6f 6d 0d 0a  43 6f 6e 74 65 6e 74 2d  |le.com..Content-|
+ 00000030  4c 65 6e 67 74 68 3a 20  37 0d 0a 43 6f 6e 74 65  |Length: 7..Conte|
+ 00000040  6e 74 2d 54 79 70 65 3a  20 31 32 33 31 32 33 0d  |nt-Type: 123123.|
+ 00000050  0a 0d 0a 20 20 20 61 73  64 66                    |...   asdf|`) {
+		panic("CRLF Fix Failed")
+	}
+}
+
 func TestFixHTTPPacketBoundary(t *testing.T) {
 	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
 Host: www.example.com
