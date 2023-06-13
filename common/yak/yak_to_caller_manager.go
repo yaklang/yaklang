@@ -30,7 +30,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 	var fTable = map[string]*YakFunctionCaller{}
 
 	engine := NewScriptEngine(100)
-	engine.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+	engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
 		if hook != nil {
 			return hook(engine)
 		}
@@ -882,7 +882,7 @@ func init() {
 		}
 
 		engineRoot := NewScriptEngine(1)
-		engineRoot.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+		engineRoot.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
 			engine.SetVar("scriptName", script.ScriptName)
 			engine.SetVar("param", utils.InterfaceToString(s))
 			return nil

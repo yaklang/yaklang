@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -143,28 +142,14 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return utils.Error("unsupported plugin type: " + req.GetPluginType())
 	}
 
-	var feedbackClient = yaklib.NewVirtualYakitClient(func(i interface{}) error {
-		switch ret := i.(type) {
-		case *ypb.ExecResult:
-			stream.Send(ret)
-		case *yaklib.YakitLog:
-			stream.Send(yaklib.NewYakitLogExecResult(ret.Level, ret.Data))
-		default:
-			spew.Dump(i)
-		}
-		return nil
-	})
-	engine := yak.NewScriptEngine(10)
+	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(stream.Send)
+	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
+
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
-	println(debugScript)
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
-		"REQUESTS":     reqs,
-		"CTX":          stream.Context(),
-		"PLUGIN_NAME":  tempName,
-		"YAKIT_CLIENT": feedbackClient,
-		"FEEDBACK": func(i *ypb.ExecResult) error {
-			return stream.Send(i)
-		},
+		"REQUESTS":    reqs,
+		"CTX":         stream.Context(),
+		"PLUGIN_NAME": tempName,
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
