@@ -18,8 +18,13 @@ var ProfileTables = []interface{}{
 
 func InitializeDefaultDatabase() {
 	log.Info("start to initialize default database")
-	consts.GetGormProfileDatabase().AutoMigrate(ProfileTables...)
-	consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...)
+
+	if db := consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...); db.Error != nil {
+		log.Errorf("auto migrate database(project) failed: %s", db.Error)
+	}
+	if db := consts.GetGormProfileDatabase().AutoMigrate(ProfileTables...); db.Error != nil {
+		log.Errorf("auto migrate database(profile) failed: %s", db.Error)
+	}
 }
 
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户
