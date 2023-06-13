@@ -335,7 +335,7 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	// 修复这个小问题
 	req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(line)
 	if !ok {
-		return nil, utils.Errorf("malformed HTTP request header: %v", firstLine)
+		return nil, utils.Errorf("malformed HTTP request header:（origin:%v）line:%v", strconv.Quote(firstLine), strconv.Quote(line))
 	}
 	if req.ProtoMajor, req.ProtoMinor, ok = http.ParseHTTPVersion(req.Proto); !ok && !strings.HasPrefix(req.Proto, "HTTP/2") {
 		log.Warnf("malformed HTTP version: %v", req.Proto)

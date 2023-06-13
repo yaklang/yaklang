@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"golang.org/x/net/http/httpguts"
 )
@@ -158,7 +159,7 @@ func AddConnectionClosed(raw []byte) []byte {
 }
 
 func TrimLeftHTTPPacket(raw []byte) []byte {
-	return bytes.TrimLeft(raw, "\t \n\v\f\n\b\r")
+	return bytes.TrimLeftFunc(raw, unicode.IsSpace)
 }
 
 func TrimRightHTTPPacket(raw []byte) []byte {
@@ -166,7 +167,8 @@ func TrimRightHTTPPacket(raw []byte) []byte {
 }
 
 func TrimSpaceHTTPPacket(raw []byte) []byte {
-	return bytes.Trim(raw, "\t \n\v\f\n\b\r")
+	//return bytes.Trim(raw, "\t \n\v\f\n\b\r")
+	return bytes.TrimFunc(raw, unicode.IsSpace)
 }
 
 func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
