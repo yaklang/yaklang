@@ -4,8 +4,6 @@ reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
 Host: www.example.com
 `, "IsHttps": true}]
 
-loglevel("debug")
-
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
