@@ -162,6 +162,9 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		"CTX":          stream.Context(),
 		"PLUGIN_NAME":  tempName,
 		"YAKIT_CLIENT": feedbackClient,
+		"FEEDBACK": func(i *ypb.ExecResult) error {
+			return stream.Send(i)
+		},
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
