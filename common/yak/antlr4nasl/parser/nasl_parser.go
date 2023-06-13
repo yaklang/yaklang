@@ -186,21 +186,21 @@ func naslparserParserInit() {
 		5, 14, 0, 0, 248, 272, 3, 40, 20, 21, 249, 250, 5, 15, 0, 0, 250, 272,
 		3, 40, 20, 20, 251, 252, 5, 16, 0, 0, 252, 272, 3, 40, 20, 19, 253, 254,
 		5, 17, 0, 0, 254, 272, 3, 40, 20, 18, 255, 256, 5, 24, 0, 0, 256, 272,
-		3, 40, 20, 17, 257, 264, 3, 46, 23, 0, 258, 259, 5, 2, 0, 0, 259, 260,
-		3, 40, 20, 0, 260, 261, 5, 3, 0, 0, 261, 265, 1, 0, 0, 0, 262, 263, 5,
-		12, 0, 0, 263, 265, 3, 46, 23, 0, 264, 258, 1, 0, 0, 0, 264, 262, 1, 0,
-		0, 0, 264, 265, 1, 0, 0, 0, 265, 266, 1, 0, 0, 0, 266, 267, 3, 48, 24,
-		0, 267, 268, 3, 40, 20, 3, 268, 272, 1, 0, 0, 0, 269, 272, 3, 46, 23, 0,
-		270, 272, 3, 42, 21, 0, 271, 239, 1, 0, 0, 0, 271, 241, 1, 0, 0, 0, 271,
-		245, 1, 0, 0, 0, 271, 247, 1, 0, 0, 0, 271, 249, 1, 0, 0, 0, 271, 251,
-		1, 0, 0, 0, 271, 253, 1, 0, 0, 0, 271, 255, 1, 0, 0, 0, 271, 257, 1, 0,
-		0, 0, 271, 269, 1, 0, 0, 0, 271, 270, 1, 0, 0, 0, 272, 326, 1, 0, 0, 0,
-		273, 274, 10, 14, 0, 0, 274, 275, 7, 1, 0, 0, 275, 325, 3, 40, 20, 15,
-		276, 277, 10, 13, 0, 0, 277, 278, 7, 2, 0, 0, 278, 325, 3, 40, 20, 14,
-		279, 280, 10, 12, 0, 0, 280, 281, 7, 3, 0, 0, 281, 325, 3, 40, 20, 13,
-		282, 283, 10, 11, 0, 0, 283, 284, 7, 4, 0, 0, 284, 325, 3, 40, 20, 12,
-		285, 286, 10, 10, 0, 0, 286, 287, 5, 46, 0, 0, 287, 325, 3, 40, 20, 11,
-		288, 289, 10, 9, 0, 0, 289, 290, 7, 5, 0, 0, 290, 325, 3, 40, 20, 10, 291,
+		3, 40, 20, 9, 257, 264, 3, 46, 23, 0, 258, 259, 5, 2, 0, 0, 259, 260, 3,
+		40, 20, 0, 260, 261, 5, 3, 0, 0, 261, 265, 1, 0, 0, 0, 262, 263, 5, 12,
+		0, 0, 263, 265, 3, 46, 23, 0, 264, 258, 1, 0, 0, 0, 264, 262, 1, 0, 0,
+		0, 264, 265, 1, 0, 0, 0, 265, 266, 1, 0, 0, 0, 266, 267, 3, 48, 24, 0,
+		267, 268, 3, 40, 20, 3, 268, 272, 1, 0, 0, 0, 269, 272, 3, 46, 23, 0, 270,
+		272, 3, 42, 21, 0, 271, 239, 1, 0, 0, 0, 271, 241, 1, 0, 0, 0, 271, 245,
+		1, 0, 0, 0, 271, 247, 1, 0, 0, 0, 271, 249, 1, 0, 0, 0, 271, 251, 1, 0,
+		0, 0, 271, 253, 1, 0, 0, 0, 271, 255, 1, 0, 0, 0, 271, 257, 1, 0, 0, 0,
+		271, 269, 1, 0, 0, 0, 271, 270, 1, 0, 0, 0, 272, 326, 1, 0, 0, 0, 273,
+		274, 10, 15, 0, 0, 274, 275, 7, 1, 0, 0, 275, 325, 3, 40, 20, 16, 276,
+		277, 10, 14, 0, 0, 277, 278, 7, 2, 0, 0, 278, 325, 3, 40, 20, 15, 279,
+		280, 10, 13, 0, 0, 280, 281, 7, 3, 0, 0, 281, 325, 3, 40, 20, 14, 282,
+		283, 10, 12, 0, 0, 283, 284, 7, 4, 0, 0, 284, 325, 3, 40, 20, 13, 285,
+		286, 10, 11, 0, 0, 286, 287, 5, 46, 0, 0, 287, 325, 3, 40, 20, 12, 288,
+		289, 10, 10, 0, 0, 289, 290, 7, 5, 0, 0, 290, 325, 3, 40, 20, 11, 291,
 		292, 10, 8, 0, 0, 292, 293, 5, 18, 0, 0, 293, 325, 3, 40, 20, 9, 294, 295,
 		10, 7, 0, 0, 295, 296, 5, 20, 0, 0, 296, 325, 3, 40, 20, 8, 297, 298, 10,
 		6, 0, 0, 298, 299, 5, 19, 0, 0, 299, 325, 3, 40, 20, 7, 300, 301, 10, 5,
@@ -210,8 +210,8 @@ func naslparserParserInit() {
 		310, 312, 5, 4, 0, 0, 311, 313, 3, 24, 12, 0, 312, 311, 1, 0, 0, 0, 312,
 		313, 1, 0, 0, 0, 313, 314, 1, 0, 0, 0, 314, 325, 5, 5, 0, 0, 315, 316,
 		10, 23, 0, 0, 316, 317, 5, 2, 0, 0, 317, 318, 3, 40, 20, 0, 318, 319, 5,
-		3, 0, 0, 319, 325, 1, 0, 0, 0, 320, 321, 10, 16, 0, 0, 321, 325, 5, 13,
-		0, 0, 322, 323, 10, 15, 0, 0, 323, 325, 5, 14, 0, 0, 324, 273, 1, 0, 0,
+		3, 0, 0, 319, 325, 1, 0, 0, 0, 320, 321, 10, 17, 0, 0, 321, 325, 5, 13,
+		0, 0, 322, 323, 10, 16, 0, 0, 323, 325, 5, 14, 0, 0, 324, 273, 1, 0, 0,
 		0, 324, 276, 1, 0, 0, 0, 324, 279, 1, 0, 0, 0, 324, 282, 1, 0, 0, 0, 324,
 		285, 1, 0, 0, 0, 324, 288, 1, 0, 0, 0, 324, 291, 1, 0, 0, 0, 324, 294,
 		1, 0, 0, 0, 324, 297, 1, 0, 0, 0, 324, 300, 1, 0, 0, 0, 324, 303, 1, 0,
@@ -5876,7 +5876,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 		}
 		{
 			p.SetState(256)
-			p.singleExpression(17)
+			p.singleExpression(9)
 		}
 
 	case 9:
@@ -5966,8 +5966,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(273)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
 				}
 				{
 					p.SetState(274)
@@ -5982,7 +5982,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(275)
-					p.singleExpression(15)
+					p.singleExpression(16)
 				}
 
 			case 2:
@@ -5990,8 +5990,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(276)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
 				}
 				{
 					p.SetState(277)
@@ -6006,7 +6006,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(278)
-					p.singleExpression(14)
+					p.singleExpression(15)
 				}
 
 			case 3:
@@ -6014,8 +6014,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(279)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
 				}
 				{
 					p.SetState(280)
@@ -6030,7 +6030,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(281)
-					p.singleExpression(13)
+					p.singleExpression(14)
 				}
 
 			case 4:
@@ -6038,8 +6038,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(282)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
 				}
 				{
 					p.SetState(283)
@@ -6054,7 +6054,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(284)
-					p.singleExpression(12)
+					p.singleExpression(13)
 				}
 
 			case 5:
@@ -6062,8 +6062,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(285)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
 				}
 				{
 					p.SetState(286)
@@ -6071,7 +6071,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(287)
-					p.singleExpression(11)
+					p.singleExpression(12)
 				}
 
 			case 6:
@@ -6079,8 +6079,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(288)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
 				}
 				{
 					p.SetState(289)
@@ -6095,7 +6095,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				}
 				{
 					p.SetState(290)
-					p.singleExpression(10)
+					p.singleExpression(11)
 				}
 
 			case 7:
@@ -6254,8 +6254,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(320)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 17)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
 				}
 				{
 					p.SetState(321)
@@ -6267,8 +6267,8 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 				p.PushNewRecursionContext(localctx, _startState, NaslParserRULE_singleExpression)
 				p.SetState(322)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
+					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
 				}
 				{
 					p.SetState(323)
@@ -6902,22 +6902,22 @@ func (p *NaslParser) SingleExpression_Sempred(localctx antlr.RuleContext, predIn
 
 	switch predIndex {
 	case 0:
-		return p.Precpred(p.GetParserRuleContext(), 14)
+		return p.Precpred(p.GetParserRuleContext(), 15)
 
 	case 1:
-		return p.Precpred(p.GetParserRuleContext(), 13)
+		return p.Precpred(p.GetParserRuleContext(), 14)
 
 	case 2:
-		return p.Precpred(p.GetParserRuleContext(), 12)
+		return p.Precpred(p.GetParserRuleContext(), 13)
 
 	case 3:
-		return p.Precpred(p.GetParserRuleContext(), 11)
+		return p.Precpred(p.GetParserRuleContext(), 12)
 
 	case 4:
-		return p.Precpred(p.GetParserRuleContext(), 10)
+		return p.Precpred(p.GetParserRuleContext(), 11)
 
 	case 5:
-		return p.Precpred(p.GetParserRuleContext(), 9)
+		return p.Precpred(p.GetParserRuleContext(), 10)
 
 	case 6:
 		return p.Precpred(p.GetParserRuleContext(), 8)
@@ -6944,10 +6944,10 @@ func (p *NaslParser) SingleExpression_Sempred(localctx antlr.RuleContext, predIn
 		return p.Precpred(p.GetParserRuleContext(), 23)
 
 	case 14:
-		return p.Precpred(p.GetParserRuleContext(), 16)
+		return p.Precpred(p.GetParserRuleContext(), 17)
 
 	case 15:
-		return p.Precpred(p.GetParserRuleContext(), 15)
+		return p.Precpred(p.GetParserRuleContext(), 16)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

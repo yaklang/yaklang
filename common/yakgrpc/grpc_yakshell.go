@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -21,9 +20,6 @@ type YakExecServerWrapper struct {
 	grpc.ServerStream
 }
 
-func init() {
-	yak.InitYaklangLib()
-}
 func NewYakExecServerWrapper(stream grpc.ServerStream, handle func(result *ypb.ExecResult) error) *YakExecServerWrapper {
 	return &YakExecServerWrapper{ServerStream: stream, sendHandle: handle}
 }

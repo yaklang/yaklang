@@ -58,8 +58,10 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 				return data[i]
 			}
 			panic("arg must be int")
+		case nil:
+			return nil
 		default:
-			panic("nasl array element call not support type")
+			panic("not support caller type")
 		}
 
 	},

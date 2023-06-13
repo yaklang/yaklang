@@ -128,6 +128,7 @@ func init() {
 		}
 	}
 	yak.SetNaslExports(antlr4nasl.Exports)
+	yak.InitYaklangLib()
 }
 
 var installSubCommand = cli.Command{

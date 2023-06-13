@@ -35,8 +35,23 @@ func TestScanTarget(t *testing.T) {
 		{
 			Name: "测试扫描目标",
 			Src: `
-kbs,err = nasl.ScanTarget("198.73.2.155:5061",nasl.group("oracle"))
-dump(kbs)
+naslScriptName = "gb_apache_tomcat_consolidation.nasl"
+proxy = ""
+naslScanHandle = (target)=>{
+    opts = [nasl.plugin(naslScriptName)]
+    if proxy != nil && proxy != ""{
+        opts.Append(nasl.proxy(proxy))
+    }
+	opts.Append(nasl.riskHandle((risk)=>{
+		log.info("found risk: %v", risk)
+	}))
+    kbs ,err = nasl.ScanTarget(target,opts...)
+    if err{
+        log.error("%v", err)
+    }
+}
+
+naslScanHandle("183.234.44.226:8099")
 `,
 		},
 	}
@@ -54,18 +69,7 @@ dump(naslScripts.Length())
 	}
 	Run("测试查询NaslScript", t, cases...)
 }
-func TestQueryGroupNames(t *testing.T) {
-	cases := []YakTestCase{
-		{
-			Name: "测试查询NaslScript",
-			Src: `
-groupNames = nasl.QueryAllGroupNames()
-dump(groupNames)
-`,
-		},
-	}
-	Run("测试查询NaslScript", t, cases...)
-}
+
 func TestInitNaslDatabase(t *testing.T) {
 	cases := []YakTestCase{
 		{
