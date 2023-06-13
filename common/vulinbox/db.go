@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type dbm struct {
@@ -16,6 +17,7 @@ func newDBM() (*dbm, error) {
 		return nil, err
 	}
 	name := fp.Name()
+	log.Infof("db file: %s", name)
 	fp.Close()
 	db, err := gorm.Open("sqlite3", name)
 	if err != nil {
@@ -24,23 +26,21 @@ func newDBM() (*dbm, error) {
 	db.AutoMigrate(&VulinUser{})
 	db.Save(&VulinUser{
 		Username: "admin",
-		Password: "password",
+		Password: "admin",
 		Age:      25,
+		Role:     "admin",
 	})
 	db.Save(&VulinUser{
 		Username: "root",
 		Password: "p@ssword",
 		Age:      25,
+		Role:     "admin",
 	})
 	db.Save(&VulinUser{
 		Username: "user1",
 		Password: "password123",
 		Age:      25,
-	})
-	db.Save(&VulinUser{
-		Username: "admin",
-		Password: "123456",
-		Age:      25,
+		Role:     "user",
 	})
 	for _, u := range generateRandomUsers(200) {
 		db.Save(&u)
