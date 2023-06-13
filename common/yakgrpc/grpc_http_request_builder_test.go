@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -107,6 +108,13 @@ func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug2(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
+	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
+	rsp, err := http.Get("http://" + utils.HostPort(host, port))
+	if err != nil {
+		panic(err)
+	}
+	raw, _ := utils.HttpDumpWithBody(rsp, true)
+	println(string(raw))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
 		PluginType: "port-scan",
