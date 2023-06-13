@@ -34,8 +34,6 @@ func (s *VulinServer) init() {
 	s.registerCryptoJS()
 	s.registerCryptoSM()
 
-	s.registerPrivilegeEscalation()
-
 	// 靶场是否是安全的？
 	if !s.safeMode {
 		s.registerPingCMDI()
