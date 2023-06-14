@@ -33,7 +33,7 @@ var DistYakCommand = cli.Command{
 
 				engine := yak.NewScriptEngine(100)
 				engine.HookOsExit()
-				engine.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+				engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
 					var e = engine.(*antlr4yak.Engine)
 					_ = e
 					return nil
