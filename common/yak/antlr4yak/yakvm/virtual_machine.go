@@ -39,7 +39,6 @@ type VirtualMachine struct {
 	// debug
 	debug           bool // 内部debug
 	debugMode       bool // 外部debugger
-	execCallBack    bool
 	debugger        *Debugger
 	BreakPoint      []BreakPointFactoryFun
 	yakitFeedbacker YakitFeedbacker
@@ -72,9 +71,6 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 }
 func (v *VirtualMachine) SetDebug(debug bool) {
 	v.debug = debug
-}
-func (v *VirtualMachine) EnableExecCodeCallBack() {
-	v.execCallBack = true
 }
 func (v *VirtualMachine) SetDebugMode(debug bool, sourceCode string, codes []*Code, debugInit, debugCallback func(*Debugger)) {
 	v.debugMode = debug

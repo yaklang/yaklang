@@ -261,11 +261,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		debugger.Wait()
 		debugger.BreakPointCallback(v.codePointer)
 	}
-	if v.vm.execCallBack {
-		for _, fun := range v.vm.BreakPoint {
-			fun(v.vm)
-		}
-	}
 	// defer func() {
 	// 	// 如果debugger想要步过且code确实jmp了,则在其jmp位置设置临时断点
 	// 	// if v.vm.debugMode && v.vm.debugger.nextState != nil && v.vm.debugger.jmpIndex >= 0 {

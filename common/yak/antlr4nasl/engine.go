@@ -281,9 +281,6 @@ func (e *Engine) Eval(code string) error {
 	if err != nil {
 		return err
 	}
-	if e.debug {
-		e.vm.EnableExecCodeCallBack()
-	}
 	err = e.vm.ExecYakCode(context.Background(), code, e.compiler.GetCodes(), yakvm.None)
 	if err != nil {
 		return err
