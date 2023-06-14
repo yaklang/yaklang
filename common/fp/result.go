@@ -35,6 +35,7 @@ type FingerprintInfo struct {
 }
 
 type HTTPFlow struct {
+	StatusCode     int                   `json:"status_code"`
 	IsHTTPS        bool                  `json:"is_https"`
 	RequestHeader  []byte                `json:"request_header"`
 	RequestBody    []byte                `json:"request_body"`
