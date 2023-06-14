@@ -114,9 +114,9 @@ var resetFilterLock = new(sync.Mutex)
 var loadTemplateLock = new(sync.Mutex)
 
 const naslCodeExecTemplate = `
-naslScriptName = MITM_PARAMS.NASL_SCRIPT_NAME // 用于初次加载插件时的预处理操作
-proxy = MITM_PARAMS.NASL_SCRIPT_NAME // 代理
-naslScanHandle = (target)=>{
+naslScriptName = MITM_PARAMS["NASL_SCRIPT_NAME"] // 用于初次加载插件时的预处理操作
+proxy = MITM_PARAMS["PROXY"] // 代理
+execNasl = (target)=>{
     opts = [nasl.plugin(naslScriptName)]
     if proxy != nil && proxy != ""{
         opts.Append(nasl.proxy(proxy))
@@ -461,7 +461,7 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 		}
 	}()
 	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		defer func() {
@@ -479,6 +479,15 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 			}
 		}()
 		m.GetNativeCaller().CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
+	}()
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
+			}
+		}()
+		m.GetNativeCaller().CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
 	}()
 	wg.Wait()
 }
@@ -536,6 +545,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 			go func() {
 				defer m.swg.Done()
 				m.callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
+			}()
+			m.swg.Add()
+			go func() {
+				defer m.swg.Done()
+				m.callers.CallByName(HOOK_NaslScanHandle, urlObj.String())
 			}()
 		}
 

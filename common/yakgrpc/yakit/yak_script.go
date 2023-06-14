@@ -498,10 +498,15 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		params = &ypb.QueryYakScriptRequest{}
 	}
 	if params.Type == "nasl" {
-		p, scripts, err := QueryNaslScriptByYakScriptRequest(db, params)
+		p, scripts, err := QueryRootNaslScriptByYakScriptRequest(db, params)
 		var yakScripts []*YakScript
 		for _, i := range scripts {
-			yakScripts = append(yakScripts, i.ToYakScript())
+			yakScript := i.ToYakScript()
+			if yakScript == nil {
+				log.Errorf("convert nasl script to yak script failed: %v", i)
+				continue
+			}
+			yakScripts = append(yakScripts, yakScript)
 		}
 		return p, yakScripts, err
 	}
