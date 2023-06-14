@@ -8,6 +8,9 @@ import (
 	"text/template"
 )
 
+//go:embed vul_user_register.html
+var registerPage []byte
+
 //go:embed vul_user_login.html
 var loginPage []byte
 
@@ -16,17 +19,19 @@ var profilePage []byte
 
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
+
+	router.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/html")
+		writer.Write(registerPage)
+	}).Methods(http.MethodGet)
 	// 用户注册
 	router.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodPost {
-			writer.Write([]byte("Only POST requests are allowed"))
-			writer.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
 
 		// 解析请求体中的 JSON 数据
-		var user VulinUser
-		err := json.NewDecoder(request.Body).Decode(&user)
+		user := &VulinUser{
+			Role: "user",
+		}
+		err := json.NewDecoder(request.Body).Decode(user)
 		if err != nil {
 			writer.Write([]byte(err.Error()))
 			writer.WriteHeader(http.StatusBadRequest)
@@ -34,26 +39,41 @@ func (s *VulinServer) registerUserRoute() {
 		}
 
 		// 在这里执行用户注册逻辑，将用户信息存储到数据库
-		err = s.database.CreateUser(&user)
+		err = s.database.CreateUser(user)
 		if err != nil {
 			writer.Write([]byte(err.Error()))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		// 假设注册成功后，返回注册后的用户信息
+		// 假设验证通过，返回登录成功消息
 		responseData, err := json.Marshal(user)
 		if err != nil {
 			writer.Write([]byte(err.Error()))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
+		response := struct {
+			Id      uint   `json:"id"`
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+			Data    string `json:"data"`
+		}{
+			Id:      user.ID,
+			Success: true,
+			Message: "Register successful",
+			Data:    string(responseData),
+		}
 		writer.Header().Set("Content-Type", "application/json")
-		writer.Write(responseData)
+		err = json.NewEncoder(writer).Encode(response)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		writer.WriteHeader(http.StatusOK)
 		return
-	})
+	}).Methods(http.MethodPost)
 	// 用户登录
 	router.HandleFunc("/user/login", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
@@ -130,6 +150,11 @@ func (s *VulinServer) registerUserRoute() {
 		})
 		writer.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(writer).Encode(response)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		writer.WriteHeader(http.StatusOK)
 		return
 	})
