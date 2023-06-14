@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"math/rand"
 	"strings"
 	"time"
 )
@@ -28,12 +29,25 @@ func init() {
 
 func FuzzCalcExpr() map[string]interface{} {
 	vars := NewVars()
-	day := mutate.MutateQuick("{{ri(1-28|2)}}")[0]
-	vars.AutoSet("year", "{{rand_int(2000,2020)}}")
-	vars.AutoSet("month", "0{{rand_int(1,7)}}")
+	var day string
+	var month string
+	if rand.Intn(2) == 1 {
+		day = mutate.MutateQuick("{{zp({{ri(10,28)}}|2)}}")[0]
+	} else {
+		day = mutate.MutateQuick("{{zp({{ri(0,7)}}|2)}}")[0]
+	}
+	if rand.Intn(2) == 1 {
+		month = mutate.MutateQuick("{{zp({{ri(0,7)}}|2)}}")[0]
+	} else {
+		month = mutate.MutateQuick("{{zp({{ri(10,12)}}|2)}}")[0]
+	}
+	year := mutate.MutateQuick("{{zp({{ri(1970," + fmt.Sprint(time.Now().Year()) + ")}}|4)}}")[0]
+	result := utils.Atoi(strings.TrimLeft(year, "0")) - utils.Atoi(strings.TrimLeft(month, "0")) - utils.Atoi(strings.TrimLeft(day, "0"))
+	vars.AutoSet("year", year)
+	vars.AutoSet("month", month)
 	vars.AutoSet("day", day)
 	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
-	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
+	vars.AutoSet("result", fmt.Sprint(result))
 	var a = vars.ToMap()
 	return a
 }
@@ -389,7 +403,7 @@ var Exports = map[string]interface{}{
 	"systemDnsResolver":       nucleiOptionDummy("systemDnsResolver"),
 	"metrics":                 nucleiOptionDummy("metrics"),
 	"debug":                   WithDebug,
-	"interactshTimeout": WithOOBTimeout,
+	"interactshTimeout":       WithOOBTimeout,
 	"debugRequest":            WithDebugRequest,
 	"debugResponse":           WithDebugResponse,
 	"silent":                  nucleiOptionDummy("silent"),
