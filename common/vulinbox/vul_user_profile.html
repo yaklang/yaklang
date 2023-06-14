@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container">
+    <h2 class="text-center mt-5" style="color: #007bff;">User Profile</h2>
+    <form id="profileForm" class="mt-4">
+        <table class="table table-bordered">
+            <tr>
+                <th>ID</th>
+                <td>{{.ID}}</td>
+            </tr>
+            <tr>
+                <th>CreatedAt</th>
+                <td>{{.CreatedAt}}</td>
+            </tr>
+            <tr>
+                <th>UpdatedAt</th>
+                <td>{{.UpdatedAt}}</td>
+            </tr>
+            <tr>
+                <th>DeletedAt</th>
+                <td>{{.DeletedAt}}</td>
+            </tr>
+            <tr>
+                <th>Username</th>
+                <td>{{.Username}}</td>
+            </tr>
+            <tr>
+                <th>Password</th>
+                <td>{{.Password}}</td>
+            </tr>
+            <tr>
+                <th>Age</th>
+                <td>
+                    {{.Age}}
+                </td>
+            </tr>
+            <tr>
+                <th>Role</th>
+                <td>{{.Role}}</td>
+            </tr>
+            <tr>
+                <th>备注</th>
+                <td><input id="remakeInput" value="{{.Remake}}"/></td>
+            </tr>
+        </table>
+
+        <button id="updateButton" type="submit" class="btn btn-primary mt-4">Update Profile</button>
+    </form>
+</div>
+
+<script>
+    // 添加表单提交事件监听器
+    document.getElementById("profileForm").addEventListener("submit", function (e) {
+        e.preventDefault(); // 阻止表单默认提交行为
+
+        // 获取要更新的年龄值
+        const remake = document.getElementById("remakeInput").value;
+        let id = "{{.ID}}"
+        id = parseInt(id, 10);
+        // 创建一个XMLHttpRequest对象
+        const xhr = new XMLHttpRequest();
+
+        // 设置POST请求的目标URL
+        const url = "/user/update";
+
+        // 设置请求方法为POST
+        xhr.open("POST", url, true);
+
+        // 设置请求头
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        // 设置请求体，仅包含要更新的年龄字段
+        var data = {
+            "ID": id,
+            "Remake": remake
+        };
+
+        // 发送请求
+        xhr.send(JSON.stringify(data));
+
+        // 处理请求的响应
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                // 请求成功，根据需要执行逻辑
+                showNotification("Profile updated successfully.", "success");
+            } else {
+                // 请求失败，根据需要执行逻辑
+                showNotification("Failed to update profile.", "danger");
+            }
+        };
+    });
+
+    // 显示提示框
+    function showNotification(message, type) {
+        var notification = document.createElement("div");
+        notification.className = "alert alert-" + type;
+        notification.textContent = message;
+
+        var container = document.querySelector(".container");
+        container.appendChild(notification);
+
+        // 设置一段时间后自动隐藏提示框
+        setTimeout(function () {
+            notification.style.display = "none";
+        }, 3000);
+    }
+</script>
+
+</body>
+</html>
