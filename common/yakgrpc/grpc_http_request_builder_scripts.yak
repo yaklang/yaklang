@@ -30,6 +30,7 @@ for req in reqs {
     go fn {
         defer swg.Done()
         try {
+            println(string(req.RawHTTPRequest))
             rsp, reqRaw := poc.HTTP(req.RawHTTPRequest, poc.https(req.IsHttps))~
             isHttps = req.IsHttps
             u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
