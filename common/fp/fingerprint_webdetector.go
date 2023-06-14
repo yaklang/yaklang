@@ -136,6 +136,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 			requestHeader, requestBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.RequestRaw)
 			flow := &HTTPFlow{
+				StatusCode:     info.StatusCode,
 				IsHTTPS:        info.IsHttps,
 				RequestHeader:  []byte(requestHeader),
 				RequestBody:    requestBody,
