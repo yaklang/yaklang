@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <div id="authcheck" class="row justify-content-center mt-5">
+        <div class="col-md-4">
+            <h2 class="text-center mb-4">注册</h2>
+            <div id="message" style="color: red;"></div>
+            <form id="registerForm">
+                <div class="mb-3">
+                    <label for="username" class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" name="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="age" class="form-label">年龄</label>
+                    <input type="number" class="form-control" id="age" name="age" min="0" max="120" required>
+                </div>
+                <div class="mb-3">
+                    <label for="remake" class="form-label">备注</label>
+                    <input type="text" class="form-control" id="remake" name="remake" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">注册</button>
+            </form>
+            <button id="loginButton" class="btn btn-secondary w-100 mt-2">返回登录</button> <!-- 添加返回登录按钮 -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const registerForm = document.getElementById('registerForm');
+    const messageDiv = document.getElementById('message');
+    const loginButton = document.getElementById('loginButton'); // 获取返回登录按钮元素
+
+    registerForm.addEventListener('submit', function (event) {
+        event.preventDefault(); // 阻止默认表单提交行为
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const remake = document.getElementById('remake').value;
+        let age = document.getElementById('age').value;
+        age = parseInt(age, 10);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/user/register');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                const response = JSON.parse(xhr.responseText);
+                messageDiv.textContent = response.message;
+                messageDiv.style.color = 'green';
+            } else {
+                messageDiv.textContent = '注册失败：' + xhr.responseText;
+            }
+        };
+
+        const data = JSON.stringify({
+            username: username,
+            password: password,
+            age: age,
+            remake: remake
+        });
+        xhr.send(data);
+    });
+
+    // 返回登录按钮点击事件处理程序
+    loginButton.addEventListener('click', function () {
+        // 跳转回登录页面
+        window.location.href = '/user/login';
+    });
+</script>
+</body>
+</html>

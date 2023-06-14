@@ -46,7 +46,7 @@ func newDBM() (*dbm, error) {
 		Role:     "user",
 		Remake:   "我是用户",
 	})
-	for _, u := range generateRandomUsers(200) {
+	for _, u := range generateRandomUsers(20) {
 		db.Save(&u)
 	}
 	return &dbm{db}, nil
