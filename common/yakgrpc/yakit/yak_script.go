@@ -66,7 +66,7 @@ type YakScript struct {
 	BaseOnlineId   int64       `json:"BaseOnlineId"`
 	OnlineOfficial bool        `json:"online_official"`
 	OnlineGroup    string      `json:"online_group"`
-	sourceScript   interface{} // 用于存储原始的 script
+	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
 }
 
 func (s *YakScript) BeforeSave() error {
