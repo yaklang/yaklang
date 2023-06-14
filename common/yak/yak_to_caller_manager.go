@@ -94,6 +94,7 @@ type Caller struct {
 type YakToCallerManager struct {
 	table          *sync.Map
 	swg            *utils.SizedWaitGroup
+	baseWaitGroup  *sync.WaitGroup
 	dividedContext bool
 	timeout        time.Duration
 }
@@ -106,7 +107,7 @@ func (y *YakToCallerManager) SetDividedContext(b bool) {
 }
 
 func NewYakToCallerManager() *YakToCallerManager {
-	return &YakToCallerManager{table: new(sync.Map), timeout: 10 * time.Second}
+	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second}
 }
 
 func (m *YakToCallerManager) SetConcurrent(i int) error {
@@ -630,6 +631,10 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 			return
 		}
 	}()
+	y.baseWaitGroup.Add(1)
+	defer func() {
+		y.baseWaitGroup.Done()
+	}()
 
 	caller, ok := y.table.Load(name)
 	if !ok {
@@ -708,7 +713,17 @@ func (y *YakToCallerManager) Wait() {
 	if y.swg == nil {
 		return
 	}
-	y.swg.Wait()
+
+	var count = 0
+	for {
+		y.baseWaitGroup.Wait()
+		y.swg.Wait()
+		count++
+		time.Sleep(300 * time.Millisecond)
+		if count > 8 {
+			break
+		}
+	}
 }
 
 //func (y *YakToCallerManager) GetCurrentHookStack() {
