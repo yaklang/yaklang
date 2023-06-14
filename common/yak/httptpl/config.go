@@ -80,6 +80,22 @@ type Config struct {
 	DebugResponse bool
 
 	Verbose bool
+
+	OOBTimeout                float64
+	OOBRequireCallback        func(...float64) (string, string, error)
+	OOBRequireCheckingTrigger func(string, ...float64) bool
+}
+
+func WithOOBRequireCallback(f func(...float64) (string, string, error)) ConfigOption {
+	return func(config *Config) {
+		config.OOBRequireCallback = f
+	}
+}
+
+func WithOOBRequireCheckingTrigger(f func(string, ...float64) bool) ConfigOption {
+	return func(config *Config) {
+		config.OOBRequireCheckingTrigger = f
+	}
 }
 
 func WithDebug(b bool) ConfigOption {
@@ -87,6 +103,12 @@ func WithDebug(b bool) ConfigOption {
 		config.Debug = b
 		config.DebugResponse = b
 		config.DebugRequest = b
+	}
+}
+
+func WithOOBTimeout(f float64) ConfigOption {
+	return func(config *Config) {
+		config.OOBTimeout = f
 	}
 }
 

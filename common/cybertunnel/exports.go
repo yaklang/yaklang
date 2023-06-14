@@ -229,6 +229,18 @@ func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
 }
 
 func QueryExistedDNSLogEvents(addr string, token string) ([]*tpb.DNSLogEvent, error) {
+	return QueryExistedDNSLogEventsEx(addr, token, 5)
+}
+
+func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	var f = 5.0
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5
+	}
+
 	if addr == "" {
 		addr = consts.GetDefaultPublicReverseServer()
 	}
@@ -238,7 +250,7 @@ func QueryExistedDNSLogEvents(addr string, token string) ([]*tpb.DNSLogEvent, er
 	}
 	defer conn.Close()
 
-	rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(5), &tpb.QueryExistedDNSLogParams{Token: token})
+	rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token})
 	if err != nil {
 		return nil, err
 	}

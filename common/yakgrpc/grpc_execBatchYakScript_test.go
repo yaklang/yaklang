@@ -31,7 +31,7 @@ func NewLocalClient() (ypb.YakClient, error) {
 		grpc.MaxRecvMsgSize(100*1024*1024),
 		grpc.MaxSendMsgSize(100*1024*1024),
 	)
-	s, err := NewServer()
+	s, err := NewServerWithLogCache(false)
 	if err != nil {
 		log.Errorf("build yakit server failed: %s", err)
 		return nil, err

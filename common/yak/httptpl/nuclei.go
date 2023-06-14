@@ -420,6 +420,8 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 			match.Scope = "status"
 		case "raw", "":
 			match.Scope = "raw"
+		case "interactsh_protocol", "oob_protocol":
+			match.Scope = "oob_protocol"
 		}
 
 		switch utils.MapGetString(m, "type") {

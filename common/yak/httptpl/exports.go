@@ -389,6 +389,7 @@ var Exports = map[string]interface{}{
 	"systemDnsResolver":       nucleiOptionDummy("systemDnsResolver"),
 	"metrics":                 nucleiOptionDummy("metrics"),
 	"debug":                   WithDebug,
+	"interactshTimeout": WithOOBTimeout,
 	"debugRequest":            WithDebugRequest,
 	"debugResponse":           WithDebugResponse,
 	"silent":                  nucleiOptionDummy("silent"),
