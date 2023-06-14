@@ -1,11 +1,13 @@
 package yakit
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -48,8 +50,34 @@ func NewNaslScript(name, content string) *NaslScript {
 	obj.Hash = obj.CalcHash()
 	return obj
 }
+func FilterRootScriptsWithDbModelType(scripts []*NaslScript) []*NaslScript {
+	newScripts := []*NaslScript{}
+	tmp := map[string]struct{}{}
+	for _, script := range scripts {
+		var dep []string
+		err := json.Unmarshal([]byte(script.Dependencies), &dep)
+		if err != nil {
+			continue
+		}
+		for _, d := range dep {
+			tmp[d] = struct{}{}
+		}
+	}
+	for _, script := range scripts {
+		if _, ok := tmp[script.OriginFileName]; !ok {
+			newScripts = append(newScripts, script)
+		}
+	}
+	return newScripts
+}
+func QueryRootNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*NaslScript, error) {
+	p, scripts, err := QueryNaslScriptByYakScriptRequest(db, params)
+	if err != nil {
+		return nil, nil, err
+	}
+	return p, FilterRootScriptsWithDbModelType(scripts), nil
+}
 func QueryNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*NaslScript, error) {
-	db = db.Debug()
 	if params == nil {
 		params = &ypb.QueryYakScriptRequest{}
 	}
@@ -151,12 +179,18 @@ func (p *NaslScript) CreateOrUpdateNaslScript(db *gorm.DB) error {
 	return nil
 }
 func (p *NaslScript) ToYakScript() *YakScript {
+	params := []*ypb.YakScriptParam{}
+	raw, err := json.Marshal(params)
+	if err != nil {
+		return nil
+	}
+	paramsStr := strconv.Quote(string(raw))
 	return &YakScript{
-		ScriptName:           "__NaslScript__" + p.ScriptName,
+		ScriptName:           "__NaslScript__" + p.OriginFileName,
 		Type:                 "nasl",
 		Content:              p.Script,
 		Level:                "info",
-		Params:               "{}",
+		Params:               paramsStr,
 		Help:                 "",
 		Author:               "",
 		Tags:                 p.Tags,

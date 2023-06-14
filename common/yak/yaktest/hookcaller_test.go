@@ -39,10 +39,13 @@ func TestMixHookCaller(t *testing.T) {
 m = hook.NewMixPluginCaller()[0]
 m.SetDividedContext(true)
 
-err =  m.LoadPlugin("gb_apache_tomcat_consolidation.nasl")
+err =  m.LoadPlugin("__NaslScript__gb_apache_tomcat_consolidation.nasl")
 die(err)
 m.SetConcurrent(2)
-m.HandleServiceScanResult(result)
+res,err = servicescan.Scan("183.234.44.226", "8099")
+for result in res{
+	m.HandleServiceScanResult(result)    
+}
 m.Wait()
 `,
 	})
