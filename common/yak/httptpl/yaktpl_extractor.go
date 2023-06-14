@@ -64,7 +64,16 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 		y.RuleGroups = make(map[string]string)
 	}
 	for index, group := range y.Groups {
-		varName := fmt.Sprintf("data_%v", index)
+		prefix := y.Name
+		if prefix == "" {
+			prefix = "data"
+		}
+		var varName string
+		if index == 0 {
+			varName = prefix
+		} else {
+			varName = fmt.Sprintf("%v_%v", prefix, index)
+		}
 		if _, ok := y.RuleGroups[varName]; !ok { // 默认规则名优先级低于用户自定义规则名
 			y.RuleGroups[varName] = group
 		}
