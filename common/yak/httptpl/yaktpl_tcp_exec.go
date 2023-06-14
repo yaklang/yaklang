@@ -126,7 +126,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 	var haveResponse = len(availableResponse) > 0
 	for _, response := range availableResponse {
 		if y.Matcher != nil {
-			matched, err := y.Matcher.ExecuteRaw(response.RawPacket, vars)
+			matched, err := y.Matcher.ExecuteRawWithConfig(config, response.RawPacket, vars)
 			if err != nil {
 				log.Errorf("YakNetworkBulkConfig matcher.ExecuteRaw failed: %s", err)
 			}

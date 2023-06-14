@@ -33,7 +33,13 @@ func (*Server) GetProjectDatabase() *gorm.DB {
 }
 
 func NewServer() (*Server, error) {
-	utils.StartCacheLog(context.Background(), 200)
+	return NewServerWithLogCache(true)
+}
+
+func NewServerWithLogCache(b bool) (*Server, error) {
+	if b {
+		utils.StartCacheLog(context.Background(), 200)
+	}
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0777)
 	s := &Server{

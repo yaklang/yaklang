@@ -1,6 +1,7 @@
 package httptpl
 
 import (
+	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -49,6 +50,7 @@ type YakMatcher struct {
 	// header
 	// body
 	// raw
+	// interactsh_protocol
 	Scope string
 
 	// or
@@ -80,17 +82,21 @@ func (y *YakMatcher) ExecuteRawResponse(rsp []byte, vars map[string]interface{},
 }
 
 func (y *YakMatcher) ExecuteRaw(rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
+	return y.ExecuteRawWithConfig(nil, rsp, vars, suf...)
+}
+
+func (y *YakMatcher) ExecuteRawWithConfig(config *Config, rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
 	if len(y.SubMatchers) > 0 {
 		if strings.TrimSpace(strings.ToLower(y.SubMatcherCondition)) == "or" {
 			for _, matcher := range y.SubMatchers {
-				if b, _ := matcher.ExecuteRaw(rsp, vars, suf...); b {
+				if b, _ := matcher.ExecuteRawWithConfig(config, rsp, vars, suf...); b {
 					return true, nil
 				}
 			}
 			return false, nil
 		} else {
 			for _, matcher := range y.SubMatchers {
-				if b, _ := matcher.ExecuteRaw(rsp, vars, suf...); !b {
+				if b, _ := matcher.ExecuteRawWithConfig(config, rsp, vars, suf...); !b {
 					return false, nil
 				}
 			}
@@ -99,27 +105,31 @@ func (y *YakMatcher) ExecuteRaw(rsp []byte, vars map[string]interface{}, suf ...
 	}
 
 	if y.Negative {
-		res, err := y.executeRaw(rsp, 0, vars, suf...)
+		res, err := y.executeRaw(config, rsp, 0, vars, suf...)
 		if err != nil {
 			return false, err
 		}
 		return !res, err
 	}
-	return y.executeRaw(rsp, 0, vars, suf...)
+	return y.executeRaw(config, rsp, 0, vars, suf...)
 }
 
 func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
+	return y.ExecuteWithConfig(nil, rsp, vars, suf...)
+}
+
+func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
 	if len(y.SubMatchers) > 0 {
 		if strings.TrimSpace(strings.ToLower(y.SubMatcherCondition)) == "or" {
 			for _, matcher := range y.SubMatchers {
-				if b, _ := matcher.Execute(rsp, vars, suf...); b {
+				if b, _ := matcher.ExecuteWithConfig(config, rsp, vars, suf...); b {
 					return true, nil
 				}
 			}
 			return false, nil
 		} else {
 			for _, matcher := range y.SubMatchers {
-				if b, _ := matcher.Execute(rsp, vars, suf...); !b {
+				if b, _ := matcher.ExecuteWithConfig(config, rsp, vars, suf...); !b {
 					return false, nil
 				}
 			}
@@ -128,18 +138,21 @@ func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]inter
 	}
 
 	if y.Negative {
-		res, err := y.execute(rsp, vars, suf...)
+		res, err := y.execute(config, rsp, vars, suf...)
 		if err != nil {
 			return false, err
 		}
 		return !res, err
 	}
-	return y.execute(rsp, vars, suf...)
+	return y.execute(config, rsp, vars, suf...)
 }
 
-func (y *YakMatcher) executeRaw(rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
+func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	var nucleiSandbox = NewNucleiDSLYakSandbox()
 	var isExpr = false
+
+	var reverseProto []string
+
 	getMaterial := func() string {
 		if isExpr {
 			return string(rsp)
@@ -161,6 +174,30 @@ func (y *YakMatcher) executeRaw(rsp []byte, duration float64, vars map[string]an
 			case "body":
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
 				material = string(body)
+			case "interactsh_protocol", "oob_protocol":
+				var oobTimeout float64
+				if config == nil || config.OOBTimeout <= 0 {
+					oobTimeout = 5
+				}
+				if config == nil {
+					log.Errorf("oob feature need config is nil")
+					return ""
+				}
+				if !utils.StringSliceContain(reverseProto, "dns") {
+					var checkingDNS func(string, ...float64) bool
+					if config == nil || config.OOBRequireCheckingTrigger == nil {
+						checkingDNS = CheckingDNSLogOOB
+					} else {
+						checkingDNS = config.OOBRequireCheckingTrigger
+					}
+					token, ok := vars["reverse_dnslog_token"]
+					if ok {
+						if checkingDNS(strings.ToLower(fmt.Sprint(token)), oobTimeout) {
+							reverseProto = append(reverseProto, "dns")
+						}
+					}
+				}
+				material = strings.Join(reverseProto, ",")
 			case "raw":
 				fallthrough
 			default:
@@ -286,7 +323,6 @@ func (y *YakMatcher) executeRaw(rsp []byte, duration float64, vars map[string]an
 		}
 	default:
 		return false, utils.Errorf("unknown matcher type: %s", y.MatcherType)
-
 	}
 
 	material := getMaterial()
@@ -332,8 +368,8 @@ func (y *YakMatcher) executeRaw(rsp []byte, duration float64, vars map[string]an
 	}
 }
 
-func (y *YakMatcher) execute(rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
+func (y *YakMatcher) execute(config *Config, rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
 	rsp := utils.CopyBytes(rspIns.RawPacket)
 	var duration = rspIns.GetDurationFloat()
-	return y.executeRaw(rsp, duration, vars, sufs...)
+	return y.executeRaw(config, rsp, duration, vars, sufs...)
 }
