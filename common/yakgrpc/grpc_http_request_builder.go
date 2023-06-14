@@ -55,6 +55,15 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 	if len(results) <= 0 {
 		var templates = []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 		for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
+			res = strings.TrimSpace(res)
+			if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
+				isHttps, raw, err := lowhttp.ParseUrlToHttpRequestRaw("GET", res)
+				if err == nil {
+					feed(raw, isHttps)
+				}
+				continue
+			}
+
 			host, port, _ := utils.ParseStringToHostPort(res)
 			if host == "" {
 				host = res
@@ -81,6 +90,7 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 	} else {
 		funk.ForEach(builderResponse.GetResults(), func(i *ypb.HTTPRequestBuilderResult) {
 			for _, res := range utils.PrettifyListFromStringSplitEx(req.GetInput(), "\n", "|", ",") {
+				res = strings.TrimSpace(res)
 				host, port, _ := utils.ParseStringToHostPort(res)
 				if host == "" {
 					host = res
@@ -88,6 +98,13 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 				if host == "" {
 					continue
 				}
+				var handledRaw = bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port)))
+				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
+					https := strings.HasPrefix(res, "https://")
+					feed(lowhttp.UrlToGetRequestPacket(res, handledRaw, https), https)
+					continue
+				}
+
 				if port > 0 {
 					if i.GetIsHttps() && port == 443 {
 						feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
@@ -99,7 +116,7 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 						continue
 					}
 
-					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))), i.GetIsHttps())
+					feed(handledRaw, i.GetIsHttps())
 				} else {
 					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
 				}
