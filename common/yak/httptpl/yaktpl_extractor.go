@@ -47,6 +47,7 @@ type YakExtractor struct {
 	// all
 	Scope            string // header body all
 	Groups           []string
+	RuleGroups       map[string]string
 	RegexpMatchGroup []int
 	XPathAttribute   string
 }
@@ -56,6 +57,18 @@ type YakExtractor struct {
 var kvExtractorRegexp = regexp.MustCompile(`([^\s=:,]+)\s*((:)|(=))\s*?(\S[^\n\r]*)`)
 
 func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
+	if y.Name == "" {
+		y.Name = "default"
+	}
+	if y.RuleGroups == nil {
+		y.RuleGroups = make(map[string]string)
+	}
+	for index, group := range y.Groups {
+		varName := fmt.Sprintf("data_%v", index)
+		if _, ok := y.RuleGroups[varName]; !ok { // 默认规则名优先级低于用户自定义规则名
+			y.RuleGroups[varName] = group
+		}
+	}
 	var material string
 	switch strings.TrimSpace(strings.ToLower(y.Scope)) {
 	case "body":
@@ -72,14 +85,8 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 	t := strings.TrimSpace(strings.ToLower(y.Type))
 	switch t {
 	case "regex":
-		for index, group := range y.Groups {
+		for tag, group := range y.RuleGroups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				r, err := regexp.Compile(group)
 				if err != nil {
 					log.Errorf("compile[%v] failed: %v", group, err)
@@ -118,27 +125,14 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 		}
 	case "kv", "key-value", "kval":
 		kvResult := ExtractKValFromResponse([]byte(material))
-		var tag string
-		for index, group := range y.Groups {
-			if y.Name == "" {
-				tag = fmt.Sprintf("data%v", index)
-			} else {
-				tag = y.Name
-			}
+		for tag, group := range y.RuleGroups {
 			if v, ok := kvResult[group]; ok {
 				results[tag] = v
-				results[group] = v
 			}
 		}
 	case "json", "jq":
-		for index, group := range y.Groups {
+		for tag, group := range y.RuleGroups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				query, err := gojq.Parse(group)
 				if err != nil {
 					log.Errorf("parse jq query[%v] failed: %s", group, err)
@@ -179,14 +173,8 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				log.Warnf("parse xml failed: %s", err)
 				return nil, utils.Errorf("xmlquery.Parse failed: %s", err)
 			}
-			for index, group := range y.Groups {
+			for tag, group := range y.RuleGroups {
 				if group != "" {
-					var tag string
-					if y.Name == "" {
-						tag = fmt.Sprintf("data%v", index)
-					} else {
-						tag = y.Name
-					}
 					nodes, err := xmlquery.QueryAll(doc, group)
 					if err != nil {
 						log.Errorf("xpath[%v] failed: %s", group, err)
@@ -208,14 +196,8 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				return nil, utils.Errorf("htmlquery.Parse failed: %s", err)
 			}
 			count := 0
-			for index, group := range y.Groups {
+			for tag, group := range y.RuleGroups {
 				if group != "" {
-					var tag string
-					if y.Name == "" {
-						tag = fmt.Sprintf("data%v", index)
-					} else {
-						tag = y.Name
-					}
 					nodes, err := htmlquery.QueryAll(doc, group)
 					if err != nil {
 						log.Errorf("xpath[%v] failed: %s", group, err)
@@ -249,14 +231,8 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 	case "nuclei-dsl", "nuclei":
 		box := NewNucleiDSLYakSandbox()
 		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-		for index, group := range y.Groups {
+		for tag, group := range y.RuleGroups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				data, err := box.Execute(group, map[string]interface{}{
 					"body":     body,
 					"header":   header,
