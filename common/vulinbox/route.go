@@ -26,6 +26,7 @@ func (s *VulinServer) init() {
 			writer.Write(routeHtml)
 		}
 	})
+	// 通用型
 	s.registerSQLinj()
 	s.registerXSS()
 	s.registerSSRF()
@@ -35,6 +36,9 @@ func (s *VulinServer) init() {
 	s.registerLoginRoute()
 	s.registerCryptoJS()
 	s.registerCryptoSM()
+
+	// 业务型
+	s.registerUserRoute()
 
 	// 靶场是否是安全的？
 	if !s.safeMode {
