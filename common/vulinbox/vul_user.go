@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"text/template"
 )
 
@@ -223,22 +222,4 @@ func (s *VulinServer) registerUserRoute() {
 		}
 	})
 
-}
-
-func parseAuthCookie(authCookie string) map[string]string {
-	info := make(map[string]string)
-
-	// 按分号（;）拆分字符串
-	pairs := strings.Split(authCookie, "-")
-	for _, pair := range pairs {
-		// 按等号（=）拆分键值对
-		keyValue := strings.Split(pair, "=")
-		if len(keyValue) == 2 {
-			key := strings.TrimSpace(keyValue[0])
-			value := strings.TrimSpace(keyValue[1])
-			info[key] = value
-		}
-	}
-
-	return info
 }
