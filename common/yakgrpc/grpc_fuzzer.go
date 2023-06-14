@@ -817,16 +817,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 		}
 	*/
 	extractors := funk.Map(req.GetExtractors(), func(i *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
-		return &httptpl.YakExtractor{
-			Name:   i.GetName(),
-			Type:   i.GetType(),
-			Scope:  i.GetScope(),
-			Groups: i.GetGroups(),
-			RegexpMatchGroup: funk.Map(i.GetRegexpMatchGroup(), func(i int64) int {
-				return int(i)
-			}).([]int),
-			XPathAttribute: i.GetXPathAttribute(),
-		}
+		return httptpl.NewExtractorFromGRPCModel(i)
 	}).([]*httptpl.YakExtractor)
 
 	var params = make(map[string]interface{})

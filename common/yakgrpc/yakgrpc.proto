@@ -2710,6 +2710,10 @@ message MatchHTTPResponseResult {
   bool Matched = 1;
 }
 
+message ExtractorRule{
+  string Name = 1;
+  string Rule = 2;
+}
 message HTTPResponseExtractor {
   string Name = 1; // default for index
   string Type = 2; // regex / xpath / kval / json / nuclei-dsl
@@ -2717,8 +2721,8 @@ message HTTPResponseExtractor {
   repeated string Groups = 4;
   repeated int64 RegexpMatchGroup = 5;
   string XPathAttribute = 6;
+  repeated ExtractorRule RuleGroups = 7;
 }
-
 message ExtractHTTPResponseResult {
   repeated FuzzerParamItem Values = 1;
 }
