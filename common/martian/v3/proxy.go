@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -38,6 +39,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
@@ -309,26 +311,55 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 		s5config.DownstreamHTTPProxy = urlIns.String()
 	}
 
+	var currentConnCount int64 = 0
 	// 设置缓存并清除
 	var connsCached = new(sync.Map)
-	cacheConns := func(c net.Conn) {
-		ptr := fmt.Sprintf("%p", c)
-		connsCached.Store(ptr, c)
+	cacheConns := func(uid string, c net.Conn) {
+		connsCached.Store(uid, c)
+		atomic.AddInt64(&currentConnCount, 1)
+		log.Debugf("record connection from cache: %v=>%v, current count: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
 	}
-	removeConns := func(c net.Conn) {
-		ptr := fmt.Sprintf("%p", c)
-		connsCached.Delete(ptr)
+	removeConns := func(uid string, c net.Conn) {
+		connsCached.Delete(uid)
+		atomic.AddInt64(&currentConnCount, -1)
+		if c == nil {
+			log.Debugf("remove connection table from cache: %v=>%v, current coon: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
+		}
 	}
+
+	statusContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-statusContext.Done():
+			default:
+				if currentConnCount > 0 {
+					log.Infof("active connections count: %v", currentConnCount)
+				}
+				time.Sleep(3 * time.Second)
+			}
+		}
+	}()
+
 	go func() {
 		defer func() {
+			count := 0
 			connsCached.Range(func(key, value interface{}) bool {
+				count++
 				connIns, ok := value.(net.Conn)
-				if ok {
+				if ok && connIns != nil {
 					log.Infof("closing remote addr: %s", connIns.RemoteAddr())
 					connIns.Close()
 				}
 				return true
 			})
+			if count > 0 {
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+				log.Debugf("CONNECTION UNBALANCED: %v", count)
+			}
 		}()
 		for {
 			select {
@@ -353,18 +384,6 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 		}
 
 		conn, err := l.Accept()
-		nosigpipe.IgnoreSIGPIPE(conn)
-		if conn != nil {
-			cacheConns(conn)
-			select {
-			case <-ctx.Done():
-				log.Info("closing martian proxying...")
-				l.Close()
-				return nil
-			default:
-			}
-		}
-
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				if delay == 0 {
@@ -380,53 +399,67 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				time.Sleep(delay)
 				continue
 			}
-
 			log.Errorf("martian: failed to accept: %v", err)
 			return err
 		}
-		delay = 0
-
 		if conn == nil {
 			continue
 		}
 
-		log.Debugf("martian: accepted connection from %s", conn.RemoteAddr())
+		// generate ksuid
+		uid := ksuid.New().String()
 
+		nosigpipe.IgnoreSIGPIPE(conn)
+		select {
+		case <-ctx.Done():
+			conn.Close()
+			log.Info("closing martian proxying...")
+			l.Close()
+			return nil
+		default:
+			cacheConns(uid, conn)
+		}
+		delay = 0
+
+		log.Debugf("martian: accepted connection from %s", conn.RemoteAddr())
 		if tconn, ok := conn.(*net.TCPConn); ok {
-			tconn.SetKeepAlive(true)
-			tconn.SetKeepAlivePeriod(3 * time.Minute)
+			_ = tconn
+			//tconn.SetKeepAlive(true)
+			//tconn.SetKeepAlivePeriod(3 * time.Minute)
 		}
 
-		go func() {
+		go func(uidStr string, originConn net.Conn) {
 			defer func() {
-				if conn != nil {
-					log.Infof("start to recycle conn[%p]: %v", conn, conn.RemoteAddr())
-					removeConns(conn)
-				}
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
+					if originConn != nil {
+						originConn.Close()
+					}
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
 			var ok bool
-			conn, ok, err = s5config.IsSocks5HandleShake(conn)
+			var handledConnection net.Conn
+			handledConnection, ok, err = s5config.IsSocks5HandleShake(originConn)
 			if err != nil {
+				removeConns(uidStr, originConn)
 				log.Errorf("check socks5 handle shake failed: %s", err)
+				return
 			}
+			defer func() {
+				removeConns(uidStr, handledConnection)
+			}()
 			if ok {
-				conn := conn
-				log.Infof("recv s5 proxy request from: %v", conn.RemoteAddr())
-				err := s5config.ServeConn(conn)
+				err := s5config.ServeConn(handledConnection)
 				if err != nil {
 					log.Errorf("socks5 handle failed: %s", err)
 					return
 				}
 				return
+			} else {
+				p.handleLoop(handledConnection, ctx)
 			}
-			if conn != nil {
-				p.handleLoop(conn, ctx)
-			}
-		}()
+		}(uid, conn)
 	}
 }
 
