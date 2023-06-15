@@ -110,15 +110,15 @@ AC8d83&21Almnis710sds
 
 		jwt.SigningMethodHS256,
 		jwt.SigningMethodHS384,
-		jwt.SigningMethodES512,
+		jwt.SigningMethodHS512,
 
 		jwt.SigningMethodPS256,
 		jwt.SigningMethodPS384,
 		jwt.SigningMethodPS512,
 
 		jwt.SigningMethodRS256,
-		jwt.SigningMethodPS384,
-		jwt.SigningMethodPS512,
+		jwt.SigningMethodRS384,
+		jwt.SigningMethodRS512,
 
 		&AuthHackJWTSigningNone{},
 	}
@@ -154,6 +154,10 @@ func AvailableJWTTokensAlgs() []string {
 }
 
 func JwtGenerate(alg string, extraData map[string]interface{}, typ string, key []byte) (string, error) {
+	return JwtGenerateEx(alg, nil, extraData, typ, key)
+}
+
+func JwtGenerateEx(alg string, extraHeader map[string]interface{}, extraData map[string]interface{}, typ string, key []byte) (string, error) {
 	token, err := NewJWTHelper(alg)
 	if err != nil {
 		return "", err
@@ -168,6 +172,13 @@ func JwtGenerate(alg string, extraData map[string]interface{}, typ string, key [
 	} else {
 		token.Header["typ"] = typ
 	}
+
+	if extraHeader != nil && len(extraHeader) > 0 {
+		for k, v := range extraHeader {
+			token.Header[k] = v
+		}
+	}
+
 	return token.SignedString(key)
 }
 
