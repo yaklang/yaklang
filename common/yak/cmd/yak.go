@@ -381,7 +381,7 @@ var startGRPCServerCommand = cli.Command{
 				}
 			}()
 		}
-		log.SetLevel(log.DebugLevel)
+		//log.SetLevel(log.DebugLevel)
 		log.Info("start to initialize database")
 		err := initializeDatabase(c.String("project-db"), c.String("profile-db"))
 		if err != nil {
