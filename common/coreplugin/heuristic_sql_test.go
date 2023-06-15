@@ -41,5 +41,4 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 	Must(TestMitmPlug(plug, server, vul1, client, t), "SQL插件对于安全的SQL注入检测结果不符合预期")
 	Must(TestMitmPlug(plug, server, vul2, client, t), "SQL插件对于不安全的SQL注入(ID)检测结果不符合预期")
 	Must(TestMitmPlug(plug, server, vul3, client, t), "SQL插件对于不安全的SQL注入(NAME)检测结果不符合预期")
-
 }
