@@ -413,7 +413,7 @@ func ConvertMultiYakScriptToExecBatchRequest(req *ypb.ExecRequest, script []*ypb
 	var plugins []string
 	script = funk.Filter(script, func(i *ypb.YakScript) bool {
 		result := utils.StringSliceContain([]string{
-			"mitm", "port-scan", "nuclei",
+			"mitm", "port-scan", "nuclei", "nasl",
 		}, i.Type)
 		if result {
 			plugins = append(plugins, i.ScriptName)

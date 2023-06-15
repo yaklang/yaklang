@@ -11,7 +11,7 @@ func (c *Compiler) VisitIterationStatement(i nasl.IIterationStatementContext) {
 		return
 	}
 	c.visitHook(c, i)
-	c.pushScope()
+	//c.pushScope()
 	if forStatement, ok := i.(*nasl.TraditionalForContext); ok {
 		c.VisitForStatement(forStatement)
 	}
@@ -24,7 +24,7 @@ func (c *Compiler) VisitIterationStatement(i nasl.IIterationStatementContext) {
 	if repeatStatement, ok := i.(*nasl.RepeatContext); ok {
 		c.VisitRepeatStatement(repeatStatement)
 	}
-	c.pushScopeEnd()
+	//c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitForStatement(i *nasl.TraditionalForContext) {
@@ -110,7 +110,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	c.pushRef("__NewIterator")
 	c.VisitSingleExpression(i.SingleExpression())
 	c.pushCall(1)
-	c.pushInteger(0)
+	c.pushInt(0)
 	c.pushBool(false)
 	itCode := c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCode.Unary = 1
@@ -134,7 +134,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	// if !ok {break}
 	tmpIdCode := c.pushOpcodeFlag(yakvm.OpPushRef)
 	tmpIdCode.Unary = tmpId
-	c.pushInteger(1)
+	c.pushInt(1)
 	c.pushBool(false)
 	itCall := c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCall.Unary = 1
@@ -144,7 +144,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 	c.pushLeftRef(itemName)
 	tmpIdCode = c.pushOpcodeFlag(yakvm.OpPushRef)
 	tmpIdCode.Unary = tmpId
-	c.pushInteger(0)
+	c.pushInt(0)
 	c.pushBool(false)
 	itCall = c.pushOpcodeFlag(yakvm.OpIterableCall)
 	itCall.Unary = 1

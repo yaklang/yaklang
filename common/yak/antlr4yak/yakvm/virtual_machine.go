@@ -283,7 +283,7 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 
 	frame.debug = v.debug
 	// 初始化debugger
-	if v.debugMode {
+	if v.debugMode && v.debugger != nil && v.debugger.initFunc != nil {
 		v.debugger.InitCallBack()
 	}
 	frame.ctx = ctx

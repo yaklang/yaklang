@@ -30,3 +30,23 @@ if du >= 7 {
 `,
 	})
 }
+
+// 测试mixcaller调用nasl插件（未完成）
+func TestMixHookCaller(t *testing.T) {
+	Run("测试加载插件", t, YakTestCase{
+		Name: "测试加载插件崩溃",
+		Src: `
+m = hook.NewMixPluginCaller()[0]
+m.SetDividedContext(true)
+
+err =  m.LoadPlugin("__NaslScript__gb_apache_tomcat_consolidation.nasl")
+die(err)
+m.SetConcurrent(2)
+res,err = servicescan.Scan("183.234.44.226", "8099")
+for result in res{
+	m.HandleServiceScanResult(result)    
+}
+m.Wait()
+`,
+	})
+}

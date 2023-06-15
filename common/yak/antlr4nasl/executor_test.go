@@ -5,6 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"testing"
 )
 
@@ -19,6 +20,16 @@ a = 0;
 
 dump(a);
 assert(a == 6,"a != 6");
+
+res = [];
+if( ! isnull( res ) ) {
+      res = make_list( res );
+      foreach entry( res ) {
+        # both CPE and free-form entries can be registered under the "OS" banner
+        if( "cpe:/" >< entry )
+          return entry;
+      }
+    }
 `)
 }
 
@@ -153,25 +164,20 @@ dump(1) x 3;
 }
 func TestAssigment(t *testing.T) {
 	engine := New()
-	engine.Init()
+	engine.InitBuildInLib()
 	engine.GetVirtualMachine().ImportLibs(map[string]interface{}{
-		"dump": func(i interface{}) {
+		"__function__dump": func(i interface{}) {
 			spew.Dump(i)
 		},
-		"getMap": func() map[string]string {
-			return map[string]string{
+		"__function__getMap": func() *vm.NaslArray {
+			array, _ := vm.NewNaslArray(map[string]string{
 				"a": "b",
-			}
-		},
-		"getStruct": func() interface{} {
-			return &struct {
-				A string
-			}{
-				A: "a",
-			}
+			})
+			return array
 		},
 	})
-	engine.GetCompiler().AddVisitHook(func(compiler *visitors.Compiler, ctx antlr.ParserRuleContext) {
+
+	engine.GetCompiler().RegisterVisitHook("a", func(compiler *visitors.Compiler, ctx antlr.ParserRuleContext) {
 		if id, ok := ctx.(*nasl.IdentifierExpressionContext); ok {
 			if id.GetText() == "__this__" {
 				print()
@@ -189,12 +195,7 @@ dump(b);
 dump(c);
 assert(a==1,"a!=1");
 assert(b[0]=="0","b[0] != 0");
-assert(c.a == "1","c[a]!=1");
 assert(c["a"] == "1","c[a]!=1");
-
-d = getStruct();
-d.A = "1";
-assert(d.A == "1","d.A!=1");
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -253,6 +254,7 @@ local_var a,b,c,d,e,f;
 a[1] = 1;
 c = [1,2,3];
 assert(c[1]==2,"c[1]!=2");
+dump(a);
 assert(a[1]==1,"a[1]!=1");
 dump(NULL);
 `)
@@ -261,6 +263,12 @@ func TestUnInitedMap1(t *testing.T) {
 	DebugExec(`
 local_var a;
 a[1] = 1;
+`)
+}
+func TestPlusEq(t *testing.T) {
+	DebugExec(`
+a += "123";
+assert(a == "123","a!=123");
 `)
 }
 func TestIterableVarCall(t *testing.T) {
@@ -275,5 +283,26 @@ assert(a[0]==1,"a[0]!=1");
 a = "1";
 assert(a[0]=="1","a[0]!=1");
 assert(a[1]==NULL,"a[1]!=NULL");
+`)
+}
+func TestString(t *testing.T) {
+	DebugExec(`
+a =string("a\nb\nc");
+res = split(a,sep:"\n");
+assert(res[0]=="a","res[0]!=a");
+`)
+}
+func TestEregmatch(t *testing.T) {
+	DebugExec(`
+if (a = eregmatch(string:"a",pattern:"aaa")){
+	assert(0,"a!=NULL");
+}
+
+`)
+}
+func TestEgrep(t *testing.T) {
+	DebugExec(`
+a = egrep( pattern:"^User-Agent:.+", string:"User-Agent: aaa", icase:TRUE );
+dump(a);
 `)
 }

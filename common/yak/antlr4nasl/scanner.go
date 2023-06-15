@@ -2,19 +2,19 @@ package antlr4nasl
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"os"
 )
 
-func SynScan(hosts string, ports string) ([]int, error) {
-	openPorts := []int{}
+// 临时的，用于测试
+func ServiceScan(hosts string, ports string, proxies ...string) ([]*fp.MatchResult, error) {
+	result := []*fp.MatchResult{}
 	os.Setenv("YAKMODE", "vm")
-	yak.Init()
 	yakEngine := yaklang.New()
 
-	yakEngine.SetVar("addRes", func(n int) {
-		openPorts = append(openPorts, n)
+	yakEngine.SetVar("addRes", func(res *fp.MatchResult) {
+		result = append(result, res)
 	})
 
 	yakEngine.SetVar("hosts", hosts)
@@ -33,7 +33,7 @@ die(err)
 
 for result = range res {
 	if result.IsOpen(){
-		addRes(result.Port)	
+		addRes(result)	
 	}
 }
 
@@ -41,5 +41,5 @@ for result = range res {
 	if err != nil {
 		return nil, err
 	}
-	return openPorts, nil
+	return result, nil
 }

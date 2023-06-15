@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
 	"reflect"
@@ -251,6 +252,7 @@ func (v *Frame) execCode(c *Code, debug bool) {
 	}
 }
 func (v *Frame) _execCode(c *Code, debug bool) {
+	isNasl := v.vm.GetConfig().vmMode == NASL
 	//if v.codePointer == 40 {
 	//	println()
 	//}
@@ -305,23 +307,36 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			arg2 := v.pop()
 			arg1 := v.pop()
+
 			if arg1.IsLeftValueRef() {
 				arg1.AssignBySymbol(v.CurrentScope(), arg2)
+				arg1.Assign(v, arg2)
 			} else {
+				assignOk := false
 				if v1, ok := arg1.Value.([]*Value); ok {
 					if len(v1) == 2 {
-						if v1[0].IsUndefined() {
-							if v1[0].SymbolId > 0 {
-								initMap := NewAutoValue(map[interface{}]interface{}{})
-								v.CurrentScope().NewValueByID(v1[0].SymbolId, initMap)
-								v1[0] = initMap
+						if v1[0].Value == nil {
+							array := NewAutoValue(vm.NewEmptyNaslArray())
+							v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
+							v1[0] = array
+						}
+						if v2, ok := v1[0].Value.(*vm.NaslArray); ok {
+							if v1[1].IsInt() {
+								v2.AddEleToList(v1[1].Int(), arg2.Value)
+								assignOk = true
+							} else if v1[1].IsString() {
+								v2.AddEleToArray(v1[1].String(), arg2.Value)
+								assignOk = true
 							} else {
-								panic("unreasonable undefined")
+								panic("nasl array index must be int or string")
 							}
 						}
 					}
+
 				}
-				arg1.Assign(v, arg2)
+				if !assignOk {
+					panic("assign error")
+				}
 			}
 			v.push(arg2)
 			return
@@ -592,16 +607,30 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			id := c.Unary
+			//尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if !ok {
 				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 				if ok1 {
-					if v, ok1 := v.GlobalVariables[name]; ok1 {
-						val = NewValue("function", v, name)
+					//使用名字在全局变量中查找
+					if v1, ok1 := v.GlobalVariables[name]; ok1 {
+						val = NewValue("function", v1, name)
+						ok = true
+					} else if v1, ok2 := v.CurrentScope().GetValueByName(name + "s"); ok2 && v1.IsYakFunction() {
+						v1.AddExtraInfo("getOne", true)
+						val = v1
 						ok = true
 					} else {
-						panic("BUG: cannot found value by name:[" + name + "]")
+						if v.CurrentScope().GetSymTable().IdIsInited(id) {
+							val = GetUndefined()
+							ok = true
+						}
+
+						//panic("BUG: cannot found value by name:[" + name + "]")
 					}
+				}
+				if !ok {
+					panic("cannot found value by variable name:[" + name + "]")
 				}
 			}
 			if !ok {
@@ -610,6 +639,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if val.Value == nil {
 				val = NewUndefined(id)
 			}
+			val.SymbolId = id
 			v.push(val)
 			return
 		case YAK:
@@ -909,11 +939,20 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		scope := v.CurrentScope()
 		if op1.IsValueList() { // 处理左值是iterablecall的情况
 			value = v.getValueForLeftIterableCall(op1.ValueList())
-		} else if value, ok = scope.GetValueByID(op1.SymbolId); !ok && value != undefined {
-			if name, ok := scope.GetValueByID(op1.SymbolId); ok {
-				panic(fmt.Sprintf("cannot get variable[%v] value", name))
-			} else {
-				panic(fmt.Sprintf("cannot get variable-id[%v] value", op1.SymbolId))
+		} else {
+			switch v.vm.GetConfig().vmMode {
+			case NASL:
+				if value, ok = scope.GetValueByID(op1.SymbolId); !ok {
+					value = undefined
+				}
+			default:
+				if value, ok = scope.GetValueByID(op1.SymbolId); !ok && value != undefined {
+					if name, ok := scope.GetValueByID(op1.SymbolId); ok {
+						panic(fmt.Sprintf("cannot get variable[%v] value", name))
+					} else {
+						panic(fmt.Sprintf("cannot get variable-id[%v] value", op1.SymbolId))
+					}
+				}
 			}
 		}
 
@@ -946,6 +985,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 		// 将结果重新赋值
 		op1.Assign(v, ret)
+		if isNasl {
+			v.push(ret)
+		}
 	case OpJMP: /*note: control index by your self!*/
 		v.setCodeIndex(c.Unary)
 		return
@@ -1095,25 +1137,52 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if v1, ok := v.GlobalVariables["__OpCallCallBack__"]; ok {
 					if v2, ok := v1.(func(string)); ok {
 						if v3, ok := idValue.Value.(*Function); ok {
-							v2(v3.name)
+							if idValue.GetExtraInfo("getOne") != nil {
+								v2(v3.name[:len(v3.name)-1])
+							} else {
+								v2(v3.name)
+							}
 						}
 					}
 				}
 				val := idValue.Call(v, false, args...)
+				if idValue.GetExtraInfo("getOne") != nil {
+					refVal := reflect.ValueOf(val)
+					if refVal.Kind() == reflect.Slice || refVal.Kind() == reflect.Array {
+						if refVal.Len() > 0 {
+							val = refVal.Index(0).Interface()
+						} else {
+							val = -1
+						}
+					} else if array, ok := val.(*vm.NaslArray); ok {
+						ok1 := false
+						for i := 0; i < array.GetMaxIdx(); i++ {
+							if array.GetElementByNum(i) != nil {
+								val = array.GetElementByNum(i)
+								ok1 = true
+								break
+							}
+						}
+						if !ok1 {
+							val = -1
+						}
+					} else {
+						panic("getOne call must return a slice or array")
+					}
+				}
 				typeVerbose := "undefined"
 				if val != nil {
 					typeVerbose = reflect.TypeOf(val).String()
 				}
+
 				v.push(&Value{
 					TypeVerbose: typeVerbose,
 					Value:       val,
 				})
 			}
-			return
 			//外置函数手动调用
 			//symbolTable := v.CurrentScope().GetSymTable()
 			//funName, ok := symbolTable.GetNameByVariableId(idValue.Int())
-
 			return
 		case LUA:
 			args := v.popArgN(c.Unary)
@@ -1164,6 +1233,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		return
 	case OpNewSlice:
 		vals := v.popArgN(c.Unary)
+		if v.vm.GetConfig().vmMode == NASL {
+			array := vm.NewEmptyNaslArray()
+			for i, val := range vals {
+				array.AddEleToList(i, val.Value)
+			}
+			v.push(NewAutoValue(array))
+			return
+		}
 		elementType := GuessValuesTypeToBasicType(vals...)
 		sliceType := reflect.SliceOf(elementType)
 		value := reflect.MakeSlice(sliceType, c.Unary, c.Unary)
@@ -1374,6 +1451,21 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpNewMap:
 		switch v.vm.GetConfig().vmMode {
+		case NASL:
+			array := vm.NewEmptyNaslArray()
+			for i := 0; i < c.Unary; i++ {
+				k := v.pop()
+				v := v.pop()
+				if k.IsString() {
+					array.AddEleToArray(k.String(), v.Value)
+				} else if k.IsInt() {
+					array.AddEleToList(k.Int(), v.Value)
+				} else {
+					panic("nasl array index must be int or string")
+				}
+			}
+			v.push(NewAutoValue(array))
+			return
 		case LUA:
 			var vals []*Value
 			if c.Op1 == undefined {
@@ -1826,7 +1918,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpExit:
 		val := v.pop()
-		panic(NewVMPanic(&VMPanicSignal{Info: val}))
+		panic(NewVMPanic(&VMPanicSignal{Info: val, AdditionalInfo: c.Op1.Value}))
 	}
 }
 

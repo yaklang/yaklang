@@ -5,6 +5,7 @@ import (
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"strconv"
 )
 
 func (c *Compiler) VisitStatementList(i nasl.IStatementListContext) {
@@ -74,11 +75,11 @@ func (c *Compiler) VisitBlock(i nasl.IBlockContext) {
 	if !ok {
 		return
 	}
-	c.pushScope()
+	//c.pushScope()
 	if block.StatementList() != nil {
 		c.VisitStatementList(block.StatementList())
 	}
-	c.pushScopeEnd()
+	//c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitIfStatement(i nasl.IIfStatementContext) {
@@ -217,7 +218,7 @@ func (c *Compiler) VisitFunctionDeclarationStatement(i nasl.IFunctionDeclaration
 		return
 	}
 	functionName := functionDeclarationStatement.Identifier().GetText()
-	c.pushLeftRef(functionName)
+	c.pushLeftRef("__function__" + functionName)
 	iparamList := functionDeclarationStatement.ParameterList()
 	symbols := []int{}
 	if iparamList != nil {
@@ -261,5 +262,14 @@ func (c *Compiler) VisitExitStatement(i nasl.IExitStatementContext) {
 	c.visitHook(c, i)
 	exitExp := i.(*nasl.ExitStatementContext)
 	c.VisitSingleExpression(exitExp.SingleExpression())
-	c.pushOpcodeFlag(yakvm.OpExit)
+	code := c.pushOpcodeFlag(yakvm.OpExit)
+	var sourcePath string
+	if code.SourceCodeFilePath != nil {
+		sourcePath = *code.SourceCodeFilePath
+	}
+	code.Op1 = yakvm.NewAutoValue(map[string]string{
+		"file name":   sourcePath,
+		"line number": strconv.Itoa(code.StartLineNumber),
+	})
+
 }

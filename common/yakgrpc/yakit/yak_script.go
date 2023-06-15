@@ -61,12 +61,13 @@ type YakScript struct {
 	// 这个插件所属用户 ID
 	UserId int64 `json:"user_id"`
 	// 这个插件的 UUID
-	Uuid           string `json:"uuid"`
-	HeadImg        string `json:"head_img"`
-	OnlineBaseUrl  string `json:"online_base_url"`
-	BaseOnlineId   int64  `json:"BaseOnlineId"`
-	OnlineOfficial bool   `json:"online_official"`
-	OnlineGroup    string `json:"online_group"`
+	Uuid           string      `json:"uuid"`
+	HeadImg        string      `json:"head_img"`
+	OnlineBaseUrl  string      `json:"online_base_url"`
+	BaseOnlineId   int64       `json:"BaseOnlineId"`
+	OnlineOfficial bool        `json:"online_official"`
+	OnlineGroup    string      `json:"online_group"`
+	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
 }
 
 func (s *YakScript) BeforeSave() error {
@@ -500,6 +501,19 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*YakScript, error) {
 	if params == nil {
 		params = &ypb.QueryYakScriptRequest{}
+	}
+	if params.Type == "nasl" {
+		p, scripts, err := QueryRootNaslScriptByYakScriptRequest(db, params)
+		var yakScripts []*YakScript
+		for _, i := range scripts {
+			yakScript := i.ToYakScript()
+			if yakScript == nil {
+				log.Errorf("convert nasl script to yak script failed: %v", i)
+				continue
+			}
+			yakScripts = append(yakScripts, yakScript)
+		}
+		return p, yakScripts, err
 	}
 	//db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&YakScript{}) // .Debug()
