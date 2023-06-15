@@ -106,27 +106,14 @@ func (s *VulinServer) registerUserRoute() {
 			writer.Write([]byte("username or password cannot be empty"))
 			return
 		}
-
-		users, err := s.database.GetUserByUsernameUnsafe(username)
+		// sql 注入 , 万能密码
+		users, err := s.database.GetUserByUnsafe(username, password)
 		if err != nil {
 			writer.WriteHeader(500)
-			writer.Write([]byte("internal error, cannot found user: " + username))
+			writer.Write([]byte("internal error: " + err.Error()))
 			return
 		}
-		if len(users) == 0 {
-			writer.WriteHeader(400)
-			// 用户名可爆破
-			writer.Write([]byte("Incorrect username"))
-			return
-		}
-
 		user := users[0]
-		if user.Password != password {
-			writer.WriteHeader(400)
-			// 密码可爆破
-			writer.Write([]byte("Incorrect password"))
-			return
-		}
 
 		// 假设验证通过，返回登录成功消息
 		response := struct {
