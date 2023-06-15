@@ -356,6 +356,7 @@ func (e *ExportsFunctionDoc) Merge(target *ExportsFunctionDoc) {
 type VariableDoc struct {
 	Name           string
 	TypeStr        string
+	ValueVerbose   string
 	Description    string
 	RelativeStruct []*StructDoc `yaml:"relative_struct,omitempty"`
 }
