@@ -57,9 +57,6 @@ type YakExtractor struct {
 var kvExtractorRegexp = regexp.MustCompile(`([^\s=:,]+)\s*((:)|(=))\s*?(\S[^\n\r]*)`)
 
 func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
-	if y.Name == "" {
-		y.Name = "default"
-	}
 	if y.RuleGroups == nil {
 		y.RuleGroups = make(map[string]string)
 	}
