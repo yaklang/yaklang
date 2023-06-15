@@ -32,7 +32,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,7 +105,7 @@ func dataexDicts3389Txt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/3389.txt", size: 2340, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/3389.txt", size: 2340, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5e, 0x70, 0x66, 0x78, 0x68, 0x8a, 0xfe, 0xa7, 0x42, 0x63, 0x1f, 0x28, 0x6a, 0xd8, 0x5a, 0xa6, 0x8a, 0x9a, 0x2e, 0x9d, 0xa3, 0xaa, 0x9c, 0x45, 0x2, 0x69, 0xf7, 0x4e, 0x81, 0x31, 0xb1, 0x7}}
 	return a, nil
 }
@@ -126,7 +125,7 @@ func dataexDictsCmd_injTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/cmd_inj.txt", size: 20275, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/cmd_inj.txt", size: 20275, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x18, 0x23, 0xff, 0x88, 0x12, 0xbb, 0xc8, 0x98, 0x97, 0x5d, 0x2f, 0x85, 0x54, 0x3b, 0x84, 0x15, 0x20, 0x7d, 0x1e, 0x2e, 0x19, 0x86, 0x97, 0x9, 0xf7, 0xe1, 0xbc, 0x11, 0xab, 0xf3, 0xa0, 0xcd}}
 	return a, nil
 }
@@ -146,7 +145,7 @@ func dataexDictsCmd_inj_unixTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/cmd_inj_unix.txt", size: 1209, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/cmd_inj_unix.txt", size: 1209, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x22, 0x5e, 0x62, 0x93, 0x3d, 0xa8, 0x21, 0xf2, 0x2d, 0x9f, 0x8a, 0x68, 0x33, 0x27, 0xbb, 0x1, 0x47, 0xae, 0x82, 0xa4, 0xcd, 0x9f, 0x8, 0xc3, 0x5e, 0x77, 0xd4, 0x1b, 0xf9, 0x9e, 0xe8, 0x16}}
 	return a, nil
 }
@@ -166,7 +165,7 @@ func dataexDictsCrlfTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/crlf.txt", size: 587, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/crlf.txt", size: 587, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3b, 0x9e, 0x6d, 0x9c, 0xe3, 0xd8, 0x7f, 0x3a, 0xa, 0xaf, 0xa4, 0x6c, 0x3f, 0x25, 0x5e, 0x9b, 0x53, 0x5f, 0x17, 0x6f, 0x50, 0x61, 0xa, 0xea, 0x76, 0x4e, 0x10, 0x89, 0x5c, 0x2c, 0x28, 0xb4}}
 	return a, nil
 }
@@ -186,7 +185,7 @@ func dataexDictsCsv_injTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/csv_inj.txt", size: 399, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/csv_inj.txt", size: 399, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x68, 0xa2, 0xc8, 0x6, 0x50, 0x11, 0xa9, 0xd3, 0x8d, 0xf9, 0x9f, 0x27, 0x33, 0x55, 0x4, 0x64, 0x33, 0x61, 0x1a, 0xf, 0xb4, 0x48, 0xb1, 0xa0, 0x99, 0xed, 0x0, 0x86, 0x18, 0xc4, 0xce, 0x90}}
 	return a, nil
 }
@@ -206,7 +205,7 @@ func dataexDictsFckeditor_uriTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/fckeditor_uri.txt", size: 1460, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/fckeditor_uri.txt", size: 1460, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc8, 0xe0, 0x83, 0xdf, 0x9e, 0x83, 0x59, 0xaf, 0xf8, 0x47, 0x1d, 0xd8, 0xe3, 0x59, 0xbf, 0x4c, 0xec, 0x69, 0xdd, 0x15, 0x4, 0x85, 0x42, 0x58, 0xcb, 0x9, 0x2a, 0xb2, 0x5b, 0xfd, 0xd, 0x99}}
 	return a, nil
 }
@@ -226,7 +225,7 @@ func dataexDictsJsp_uriTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/jsp_uri.txt", size: 13192, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/jsp_uri.txt", size: 13192, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x28, 0xa0, 0x93, 0x84, 0xda, 0xc, 0x41, 0x90, 0xb0, 0x24, 0x89, 0x48, 0xca, 0xa8, 0xf4, 0x6a, 0x9d, 0x14, 0x91, 0xa5, 0xe2, 0xd, 0x1d, 0x0, 0x64, 0x65, 0xa, 0x1f, 0x0, 0x62, 0x6c, 0xcd}}
 	return a, nil
 }
@@ -246,7 +245,7 @@ func dataexDictsPhp_uriTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/php_uri.txt", size: 20299, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/php_uri.txt", size: 20299, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x63, 0x1f, 0x43, 0x16, 0x37, 0x49, 0xeb, 0xac, 0x8d, 0x3b, 0xab, 0xb1, 0x41, 0x5d, 0x54, 0xd1, 0xaa, 0x39, 0xd0, 0x29, 0xcc, 0xad, 0x1c, 0xca, 0x2f, 0x4f, 0x24, 0x84, 0x62, 0xb0, 0x7, 0x6a}}
 	return a, nil
 }
@@ -266,7 +265,7 @@ func dataexDictsSql_fuzz_authTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_auth.txt", size: 3051, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_auth.txt", size: 3051, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcb, 0x88, 0x3d, 0x95, 0x96, 0xfd, 0x44, 0xde, 0xf6, 0xd2, 0x5e, 0xa3, 0x4c, 0x93, 0x33, 0xbc, 0x7c, 0x3a, 0x10, 0xc8, 0x11, 0x84, 0xc2, 0x0, 0x26, 0xbd, 0xe8, 0x7c, 0x1d, 0x5f, 0xb1, 0x13}}
 	return a, nil
 }
@@ -286,7 +285,7 @@ func dataexDictsSql_fuzz_errorbaseTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_errorbase.txt", size: 2828, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_errorbase.txt", size: 2828, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x1b, 0x70, 0x97, 0x91, 0x1a, 0x20, 0x7f, 0xc2, 0x81, 0xd5, 0x37, 0x75, 0xf, 0x20, 0xe9, 0x46, 0x7, 0x7e, 0xe2, 0x8b, 0xeb, 0x63, 0x53, 0x61, 0x19, 0x7d, 0x3e, 0x2d, 0xc1, 0x63, 0xf9}}
 	return a, nil
 }
@@ -306,7 +305,7 @@ func dataexDictsSql_fuzz_sleepTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_sleep.txt", size: 2350, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_sleep.txt", size: 2350, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbf, 0xd, 0xb3, 0x2b, 0x11, 0x2e, 0xf7, 0xc5, 0x9c, 0xb, 0xd, 0x8d, 0x1c, 0x4d, 0x18, 0xc3, 0x68, 0x68, 0xf7, 0xb1, 0x6e, 0x7c, 0xed, 0x10, 0x69, 0xed, 0x80, 0x6a, 0x4f, 0xb1, 0xcc, 0xe2}}
 	return a, nil
 }
@@ -326,7 +325,7 @@ func dataexDictsSql_fuzz_smallTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_small.txt", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_small.txt", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0xce, 0xcc, 0x50, 0x37, 0x7f, 0xda, 0x32, 0xe6, 0x2d, 0x89, 0x8f, 0x4b, 0xa5, 0x36, 0x64, 0xfa, 0x48, 0x4d, 0x3d, 0xaf, 0xf3, 0xc6, 0x88, 0xdd, 0x2e, 0x46, 0x29, 0xe, 0x23, 0x1d, 0xda}}
 	return a, nil
 }
@@ -346,7 +345,7 @@ func dataexDictsSql_fuzz_unionTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_union.txt", size: 37242, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/sql_fuzz_union.txt", size: 37242, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x41, 0x59, 0xfe, 0xa9, 0x64, 0xcf, 0x9c, 0x12, 0xf8, 0x2c, 0x3b, 0x75, 0x27, 0xdb, 0x58, 0x13, 0x1a, 0x7b, 0xd6, 0x99, 0xb0, 0x2c, 0xd6, 0x19, 0xf0, 0x4, 0x96, 0x7f, 0x41, 0x31, 0xa6, 0xb7}}
 	return a, nil
 }
@@ -366,7 +365,7 @@ func dataexDictsSstiTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/ssti.txt", size: 3944, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/ssti.txt", size: 3944, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x41, 0x17, 0xf, 0x72, 0x34, 0xfe, 0xc5, 0x53, 0x59, 0x84, 0x96, 0x56, 0x15, 0xac, 0x53, 0xd6, 0x2e, 0x5d, 0x58, 0xe4, 0x1d, 0x48, 0xa4, 0x33, 0xf6, 0xeb, 0x7f, 0x2e, 0xbe, 0xee, 0x8c, 0xe7}}
 	return a, nil
 }
@@ -386,7 +385,7 @@ func dataexDictsUserTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/user.txt", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/user.txt", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc4, 0x12, 0x2b, 0x60, 0xb0, 0x78, 0xf2, 0xaf, 0xcb, 0x61, 0x48, 0x3a, 0x74, 0x4f, 0xd4, 0xcd, 0x1f, 0x5c, 0x19, 0x95, 0x7c, 0xd4, 0x89, 0xac, 0xd0, 0x5, 0xb7, 0xae, 0x88, 0x75, 0x90, 0xc9}}
 	return a, nil
 }
@@ -406,7 +405,7 @@ func dataexDictsUser_cnTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/user_cn.txt", size: 4471, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/user_cn.txt", size: 4471, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xac, 0xcd, 0x1b, 0x99, 0x3b, 0x28, 0xd1, 0x8e, 0x9d, 0x2a, 0x14, 0xdf, 0x91, 0x0, 0xc, 0x23, 0x91, 0x6a, 0xc0, 0x29, 0x3c, 0xc2, 0x32, 0xa3, 0xa3, 0x35, 0x57, 0xf9, 0xdb, 0x7f, 0x99, 0x4e}}
 	return a, nil
 }
@@ -426,7 +425,7 @@ func dataexDictsWeakpass100_cnTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/weakpass100_cn.txt", size: 1015, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/weakpass100_cn.txt", size: 1015, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa3, 0xa6, 0x3f, 0x80, 0x55, 0xab, 0xd9, 0x35, 0x1e, 0x27, 0x68, 0x82, 0xda, 0xe3, 0xdc, 0xa2, 0x1f, 0xdd, 0xf3, 0x24, 0xff, 0x85, 0x52, 0xbc, 0x15, 0x89, 0x2f, 0x21, 0xc1, 0xe4, 0x68, 0xe0}}
 	return a, nil
 }
@@ -446,7 +445,7 @@ func dataexDictsWeakpass100_vnTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/weakpass100_vn.txt", size: 806, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/weakpass100_vn.txt", size: 806, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcd, 0xf6, 0xc8, 0xe7, 0x2c, 0x7e, 0x5f, 0xd0, 0xaa, 0x86, 0x29, 0x70, 0x3, 0xf2, 0xb7, 0x7c, 0x6a, 0x28, 0xc2, 0xae, 0x8f, 0xfe, 0xf6, 0x54, 0x98, 0x53, 0x6a, 0x1f, 0x2c, 0xb3, 0x77, 0x5f}}
 	return a, nil
 }
@@ -466,7 +465,7 @@ func dataexDictsWeakpass100_vpsTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/weakpass100_vps.txt", size: 766, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/weakpass100_vps.txt", size: 766, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4, 0x13, 0x7, 0xfa, 0x1d, 0xa4, 0xd2, 0x7c, 0x19, 0x92, 0xca, 0xd1, 0xf0, 0x54, 0x2c, 0x68, 0xca, 0xea, 0x89, 0x54, 0x83, 0x8, 0x61, 0xcb, 0x71, 0xf8, 0x5c, 0x14, 0x5c, 0x85, 0x3e, 0x7b}}
 	return a, nil
 }
@@ -486,7 +485,7 @@ func dataexDictsWeakpass25Txt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/weakpass25.txt", size: 248, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/weakpass25.txt", size: 248, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x35, 0x49, 0xeb, 0x15, 0x8a, 0x50, 0xe2, 0x8, 0x12, 0x17, 0xa5, 0x42, 0xb2, 0xc3, 0x0, 0xaf, 0xc1, 0xe, 0xdd, 0x9f, 0x5c, 0xf9, 0xe8, 0x23, 0xd5, 0x9c, 0xeb, 0x2b, 0x5f, 0x96, 0xa9}}
 	return a, nil
 }
@@ -506,7 +505,7 @@ func dataexDictsXpathTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/xpath.txt", size: 329, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/xpath.txt", size: 329, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc7, 0x15, 0xb4, 0xa0, 0x64, 0x1e, 0x5a, 0x58, 0xe6, 0x7c, 0x7e, 0x95, 0xa9, 0xf2, 0x77, 0x59, 0x86, 0xc3, 0x55, 0x4e, 0xf8, 0xac, 0x1b, 0xf7, 0xd1, 0x82, 0xae, 0xb2, 0xd9, 0x5d, 0xb7, 0x75}}
 	return a, nil
 }
@@ -526,7 +525,7 @@ func dataexDictsXxe_attackTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/xxe_attack.txt", size: 7953, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/xxe_attack.txt", size: 7953, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x89, 0x87, 0x5, 0xa1, 0x91, 0x70, 0x84, 0x1b, 0x3c, 0xc4, 0x44, 0xe9, 0xc7, 0x36, 0xf4, 0xd0, 0x19, 0xc3, 0xbe, 0x3, 0x4c, 0x4d, 0x7a, 0x32, 0x3b, 0x0, 0xc0, 0x7c, 0x25, 0x23, 0xb2, 0x50}}
 	return a, nil
 }
@@ -546,7 +545,7 @@ func dataexDictsXxe_fuzzTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "dataex/dicts/xxe_fuzz.txt", size: 4491, mode: os.FileMode(0644), modTime: time.Unix(1682745856, 0)}
+	info := bindataFileInfo{name: "dataex/dicts/xxe_fuzz.txt", size: 4491, mode: os.FileMode(0644), modTime: time.Unix(1683268987, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa3, 0x6, 0x82, 0x6d, 0xab, 0x75, 0x57, 0x1c, 0x45, 0xac, 0xd0, 0xd8, 0xd1, 0xcf, 0x4f, 0x7f, 0x24, 0x29, 0xf3, 0x17, 0xde, 0xd2, 0x6b, 0xdd, 0x11, 0x8c, 0x6, 0x45, 0x9a, 0x2, 0x3c, 0xd}}
 	return a, nil
 }
@@ -756,7 +755,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
