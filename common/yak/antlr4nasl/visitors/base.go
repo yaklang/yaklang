@@ -10,6 +10,7 @@ import (
 )
 
 type Compiler struct {
+	debug                                 bool
 	position                              [4]int
 	errors                                []error
 	symbolTable                           *yakvm.SymbolTable
@@ -20,13 +21,17 @@ type Compiler struct {
 	TmpData                               *vmstack.Stack
 	needPop                               bool
 	extVarNames                           map[string]struct{}
-	visitHookHandles                      []func(compiler *Compiler, ctx antlr.ParserRuleContext)
+	extMethodNames                        map[string]struct{}
+	visitHookHandles                      map[string]func(compiler *Compiler, ctx antlr.ParserRuleContext)
 	visitHook                             func(compiler *Compiler, ctx antlr.ParserRuleContext)
 	checkId                               bool
 	naslLib                               map[string]interface{}
 	sourceCodePointer, sourceCodeFilePath *string
 }
 
+func (c *Compiler) Debug(b bool) {
+	c.debug = b
+}
 func (c *Compiler) SetSourceCode(s string) func() {
 	back := c.sourceCodePointer
 	c.sourceCodePointer = &s
@@ -54,10 +59,12 @@ func (c *Compiler) SetStopPosition(n1, n2 int) {
 }
 func NewCompilerWithSymbolTable(table *yakvm.SymbolTable) *Compiler {
 	compiler := &Compiler{
-		symbolTable:     table,
-		symbolTableSize: 0,
-		TmpData:         vmstack.New(),
-		extVarNames:     make(map[string]struct{}),
+		symbolTable:      table,
+		symbolTableSize:  0,
+		TmpData:          vmstack.New(),
+		extVarNames:      make(map[string]struct{}),
+		extMethodNames:   make(map[string]struct{}),
+		visitHookHandles: make(map[string]func(compiler *Compiler, ctx antlr.ParserRuleContext)),
 	}
 	compiler.visitHook = func(c *Compiler, ctx antlr.ParserRuleContext) {
 		for _, i2 := range c.visitHookHandles {
@@ -76,8 +83,13 @@ func (c *Compiler) GetExternalVariablesNamesMap() map[string]struct{} {
 	return c.extVarNames
 }
 
-func (c *Compiler) AddVisitHook(h func(compiler *Compiler, ctx antlr.ParserRuleContext)) {
-	c.visitHookHandles = append(c.visitHookHandles, h)
+func (c *Compiler) RegisterVisitHook(id string, h func(compiler *Compiler, ctx antlr.ParserRuleContext)) {
+	c.visitHookHandles[id] = h
+}
+func (c *Compiler) UnregisterVisitHook(id string) {
+	if _, ok := c.visitHookHandles[id]; ok {
+		delete(c.visitHookHandles, id)
+	}
 }
 
 func (c *Compiler) SetExternalVariableNames(names []string) {
@@ -89,11 +101,13 @@ func (c *Compiler) NeedPop(b bool) {
 	c.needPop = b
 }
 func (c *Compiler) Compile(code string) bool {
-	defer func() {
-		if e := recover(); e != nil {
-			c.AddError(utils.Error(e))
-		}
-	}()
+	if !c.debug {
+		defer func() {
+			if e := recover(); e != nil {
+				c.AddError(utils.Error(e))
+			}
+		}()
+	}
 	//if c.lexer == nil || c.parser == nil {
 	lexer := nasl.NewNaslLexer(antlr.NewInputStream(code))
 	//lexer.RemoveErrorListeners()

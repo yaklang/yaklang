@@ -9,7 +9,7 @@ func (v *Frame) peek() *Value {
 }
 
 func (v *Frame) peekN(n int) *Value {
-	return v.stack.Peek().(*Value)
+	return v.stack.PeekN(n).(*Value)
 }
 
 func (v *Frame) peekNextCode() *Code {

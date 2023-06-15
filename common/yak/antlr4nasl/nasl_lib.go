@@ -4,23 +4,49 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"math/rand"
 	"net"
+	"net/http"
 	"os"
-	"path"
+	"reflect"
 	"regexp"
+	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var empty = yakvm.NewValue("empty", nil, "empty")
 
+type IpPacket struct {
+	Data   string
+	Ip_hl  uint8
+	Ip_v   uint8
+	Ip_tos uint8
+	Ip_len uint16
+	Ip_id  uint16
+	Ip_off uint16
+	Ip_ttl uint8
+	Ip_p   uint8
+	Ip_sum uint16
+	Ip_src string
+	Ip_dst string
+}
 type NaslBuildInMethodParam struct {
 	mapParams  map[string]*yakvm.Value
 	listParams []*yakvm.Value
@@ -111,10 +137,10 @@ func init() {
 			return nil, nil
 		},
 		"script_dependencies": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			var deps *yakvm.Value
-			for i := 0; deps != nil && !deps.IsUndefined(); i++ {
-				deps = params.getParamByNumber(0)
+			deps := params.getParamByNumber(0)
+			for i := 1; deps != nil && !deps.IsUndefined(); i++ {
 				engine.scriptObj.Dependencies = append(engine.scriptObj.Dependencies, deps.AsString())
+				deps = params.getParamByNumber(i)
 			}
 			return nil, nil
 		},
@@ -170,9 +196,11 @@ func init() {
 		},
 		"script_add_preference": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			addPreference := func(s1, s2, s3 string) {
-				engine.scriptObj.Preferences["name"] = s1
-				engine.scriptObj.Preferences["type"] = s2
-				engine.scriptObj.Preferences["value"] = s3
+				preferences := map[string]interface{}{}
+				preferences["name"] = s1
+				preferences["type"] = s2
+				preferences["value"] = s3
+				engine.scriptObj.Preferences[s1] = preferences
 			}
 			name := params.getParamByName("name")
 			type_ := params.getParamByName("type")
@@ -189,16 +217,27 @@ func init() {
 				return nil, genNotMatchedArgumentTypeError("script_get_preference")
 			}
 			if v, ok := engine.scriptObj.Preferences[pref.AsString()]; ok {
-				return v, nil
+				return v.(map[string]interface{})["value"], nil
 			}
 			return nil, nil
 		},
 		"script_get_preference_file_content": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//ref := params.getParamByNumber(0).AsString()
-			//
-			panic(fmt.Sprintf("method `script_get_preference_file_content` is not implement"))
+			ref := params.getParamByNumber(0, "").String()
+			if ref == "" {
+				return nil, errors.New("Argument error in the function script_get_preference()\nFunction usage is : pref = script_get_preference_file_content(<name>)")
+			}
+			if v, ok := engine.scriptObj.Preferences[ref]; ok {
+				if v1, ok := v.(map[string]interface{}); ok {
+					if v1["type"] == "file" {
+						return v1["value"], nil
+					}
+				} else {
+					return nil, utils.Errorf("BUG: Invalid script preferences value type")
+				}
+			}
 			return nil, nil
 		},
+		// 新版加的函数，只有一个脚本使用
 		"script_get_preference_file_location": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `script_get_preference_file_location` is not implement"))
 			return nil, nil
@@ -249,8 +288,10 @@ func init() {
 			return preference, nil
 		},
 		"safe_checks": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `safe_checks` is not implement"))
-			return nil, nil
+			if v, ok := GlobalPrefs["safe_checks"]; ok {
+				return v == "yes", nil
+			}
+			return false, nil
 		},
 		"get_script_oid": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return engine.scriptObj.OID, nil
@@ -261,8 +302,7 @@ func init() {
 			if name.IsUndefined() || value.IsUndefined() {
 				return nil, utils.Errorf("<name> or <value> is empty")
 			}
-			engine.scriptObj.Kbs[name.String()] = value.Value
-			return nil, nil
+			return nil, engine.Kbs.SetKB(name.String(), value.Value)
 		},
 		"set_kb_item": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByName("name")
@@ -270,26 +310,20 @@ func init() {
 			if name.IsUndefined() || value.IsUndefined() {
 				return nil, utils.Errorf("<name> or <value> is empty")
 			}
-			engine.scriptObj.Kbs[name.String()] = value.Value
-			return nil, nil
+			return nil, engine.Kbs.SetKB(name.String(), value.Value)
 		},
 		"get_kb_item": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0)
-			if v, ok := engine.scriptObj.Kbs[name.String()]; ok {
-				return v, nil
-			}
-			return nil, nil
+			return engine.Kbs.GetKB(name.String()), nil
 		},
+		// 返回如果pattern包含*，则返回map，否则返回list
 		"get_kb_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			name := params.getParamByNumber(0)
-			res := map[string]interface{}{}
-			s := name.String()
-			for k, v := range engine.scriptObj.Kbs {
-				if utils.MatchAllOfGlob(k, s) {
-					res[k] = v
-				}
+			name := params.getParamByNumber(0).String()
+			if strings.Contains(name, "*") {
+				return engine.Kbs.GetKBByPattern(name), nil
+			} else {
+				return []interface{}{engine.Kbs.GetKB(name)}, nil
 			}
-			return res, nil
 		},
 		"security_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			protocol := params.getParamByName("protocol")
@@ -305,16 +339,9 @@ func init() {
 			return nil, nil
 		},
 		"log_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			protocol := params.getParamByName("protocol")
-			if protocol.IsUndefined() {
-				protocol = params.getParamByName("proto")
-			}
-			port := params.getParamByName("port", -1)
-			data := params.getParamByName("data").AsString()
-			if data == "" {
-				data = "Success"
-			}
-			commonLogger.Info(data, port.Int(), protocol.String())
+			//port := params.getParamByName("port", -1)
+			data := params.getParamByName("data").Value
+			log.Info(data)
 			return nil, nil
 		},
 		"error_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -331,22 +358,42 @@ func init() {
 			return nil, nil
 		},
 		"open_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
-			//transport := params.getParamByName("transport", -1).Int()
+			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout*2).Int()
+			if timeout <= 0 {
+				timeout = 5000
+			}
+			transport := params.getParamByName("transport", -1).Int()
+			if !params.getParamByName("priority").IsUndefined() {
+				return nil, utils.Errorf("priority is not support")
+			}
+			if params.getParamByName("bufsz", -1).Int() != -1 {
+				return nil, utils.Errorf("bufsz is not support")
+			}
+			port := params.getParamByNumber(0, 0).Int()
+			if port == 0 {
+				return nil, utils.Errorf("port is empty")
+			}
+			var conn net.Conn
 
-			//port := params.getParamByName("port", 0).Int()
-			//tcpAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%d", engine.host, port))
-			//if err != nil {
-			//	return nil, err
-			//}
-			//conn, err := net.DialTCP("tcp", nil, tcpAddr)
-			//return conn, nil
-			panic(fmt.Sprintf("method `open_sock_tcp` is not implement"))
-			return nil, nil
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
+			if err != nil {
+				return nil, err
+			}
+			if transport >= 0 {
+				conn = utils.NewDefaultTLSClient(conn)
+			}
+			return conn, nil
 		},
 		"open_sock_udp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `open_sock_udp` is not implement"))
-			return nil, nil
+			port := params.getParamByNumber(0, 0).Int()
+			if port == 0 {
+				return nil, utils.Errorf("port is empty")
+			}
+			conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", engine.host, port))
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
 		},
 		"open_priv_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `open_priv_sock_tcp` is not implement"))
@@ -356,6 +403,7 @@ func init() {
 			panic(fmt.Sprintf("method `open_priv_sock_udp` is not implement"))
 			return nil, nil
 		},
+		// 需要把net.Conn封装一下，携带error信息
 		"socket_get_error": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `socket_get_error` is not implement"))
 			return nil, nil
@@ -365,13 +413,28 @@ func init() {
 			//min := params.getParamByName("min", -1).Int()
 			iconn := params.getParamByName("socket", nil).Value
 			timeout := params.getParamByName("timeout", 2).Int()
+			length := params.getParamByName("length", -1).Int()
+			//min := params.getParamByName("min", -1).Int()
 			conn := iconn.(net.Conn)
-			res := utils.StableReader(conn, time.Second*time.Duration(timeout), 10240)
-			return res, nil
+			if length == -1 {
+				res := utils.StableReader(conn, time.Duration(timeout)*time.Second, 10240)
+				return res, nil
+			} else {
+				conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+				res := make([]byte, length)
+				n, err := conn.Read(res)
+				if err != nil {
+					return nil, err
+				}
+				return res[:n], nil
+			}
 		},
 		"recv_line": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			iconn := params.getParamByName("socket", nil).Value
-			//length := params.getParamByName("length", -1).Int()
+			length := params.getParamByName("length", -1).Int()
+			if length == -1 {
+				length = 4096
+			}
 			timeout := params.getParamByName("timeout", 5).Int()
 			conn := iconn.(net.Conn)
 			if err := conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout))); err != nil {
@@ -387,14 +450,14 @@ func init() {
 				if n == 0 {
 					break
 				}
+				buf.Write(byt[:n])
 				if byt[0] == '\n' {
 					break
 				}
-				buf.Write(byt[:n])
+				if buf.Len() >= length {
+					break
+				}
 			}
-			//if len(line) > length {
-			//	return line[:length], nil
-			//}
 			return buf.String(), nil
 		},
 		"send": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -402,6 +465,9 @@ func init() {
 			data := params.getParamByName("data").AsString()
 			option := params.getParamByName("option", 0)
 			length := params.getParamByName("length", 0)
+			if engine.debug {
+				log.Infof("send data: %s", data)
+			}
 			data_length := len(data)
 			_ = option
 			_ = length
@@ -443,8 +509,12 @@ func init() {
 			return nil, nil
 		},
 		"close": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `close` is not implement"))
-			return nil, nil
+			iconn := params.getParamByNumber(0, nil).Value
+			if iconn == nil {
+				return nil, nil
+			}
+			conn := iconn.(net.Conn)
+			return conn.Close(), nil
 		},
 		"join_multicast_group": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `join_multicast_group` is not implement"))
@@ -463,20 +533,26 @@ func init() {
 			return nil, nil
 		},
 		"cgibin": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `cgibin` is not implement"))
-			return nil, nil
+			if v, ok := engine.scriptObj.Preferences["cgi_path"]; ok {
+				return v, nil
+			} else {
+				return "/cgi-bin:/scripts", nil
+			}
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			port := params.getParamByName("port", 0).Int()
+			port := params.getParamByNumber(0, -1).Int()
+			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
 			var n int
-
+			if timeout == 0 {
+				timeout = 5000
+			}
 			if utils.IsTLSService(adderss) {
 				n = utils2.OPENVAS_ENCAPS_SSLv2
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			conn, err := net.DialTimeout("tcp", adderss, time.Second*5)
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -497,23 +573,70 @@ func init() {
 			return conn, nil
 		},
 		"http_head": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_head` is not implement"))
-			return nil, nil
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("HEAD").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 		},
 		"http_get": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			res := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
 			return res, nil
 		},
 		"http_post": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_post` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("POST").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_delete": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_delete` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("DELETE").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_put": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `http_put` is not implement"))
+			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
+			freq, err := mutate.NewFuzzHTTPRequest(getReq)
+			if err != nil {
+				return nil, err
+			}
+			results, err := freq.FuzzMethod("PUT").Results()
+			if err != nil {
+				return nil, err
+			}
+			if len(results) == 0 {
+				return nil, errors.New("http_head fuzz error")
+			}
+			return utils.HttpDumpWithBody(results[0], true)
 			return nil, nil
 		},
 		"http_close_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -527,7 +650,17 @@ func init() {
 			}
 		},
 		"add_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `add_host_name` is not implement"))
+			hostname := params.getParamByName("hostname", "").String()
+			source := params.getParamByName("source", "").String()
+			if source == "" {
+				source = "NASL"
+			}
+			engine.scriptObj.Vhosts = append(engine.scriptObj.Vhosts, &NaslVhost{
+				Hostname: hostname,
+				Source:   source,
+			})
+			engine.Kbs.AddKB("internal/vhosts", strings.ToLower(hostname))
+			engine.Kbs.AddKB(fmt.Sprintf("internal/source/%s", strings.ToLower(hostname)), source)
 			return nil, nil
 		},
 		"get_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -562,36 +695,38 @@ func init() {
 			return nil, nil
 		},
 		"TARGET_IS_IPV6": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `TARGET_IS_IPV6` is not implement"))
-			return nil, nil
+			return utils.IsIPv6(engine.host), nil
 		},
 		"get_host_open_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_host_open_port` is not implement"))
+			engine.CallNativeFunction("get_kb_item", nil, []interface{}{"Ports/tcp/*"})
 			return nil, nil
 		},
 		"get_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0).Int()
-			if v, ok := engine.scriptObj.Kbs["Host/scanned"]; ok {
-				if v2, ok := v.([]int); ok {
-					return utils.IntArrayContains(v2, port), nil
+			if v, ok := engine.Kbs.data[fmt.Sprintf("Ports/tcp/%d", port)]; ok {
+				if v2, ok := v.(int); ok {
+					return v2, nil
 				}
 			}
 			return false, nil
 		},
 		"get_tcp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_tcp_port_state` is not implement"))
-			return nil, nil
+			return utils.IsPortAvailable(engine.host, params.getParamByNumber(0, 0).Int()), nil
 		},
 		"get_udp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_udp_port_state` is not implement"))
-			return nil, nil
+			port := params.getParamByNumber(0, 0).Int()
+			return utils.IsPortAvailableWithUDP(engine.host, port), nil
 		},
 		"scanner_add_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `scanner_add_port` is not implement"))
+			port := params.getParamByName("port", -1).Int()
+			proto := params.getParamByName("proto", "tcp").String()
+			if port > 0 {
+				engine.Kbs.SetKB(fmt.Sprintf("Ports/%s/%d", proto, port), 1)
+			}
 			return nil, nil
 		},
 		"scanner_status": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `scanner_status` is not implement"))
+			/* Kept for backward compatibility. */
 			return nil, nil
 		},
 		"scanner_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -599,12 +734,14 @@ func init() {
 			return nil, nil
 		},
 		"islocalhost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `islocalhost` is not implement"))
-			return nil, nil
+			return utils.IsLoopback(engine.host), nil
 		},
+		"is_public_addr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return !utils.IsPrivateIP(net.ParseIP(engine.host)), nil
+		},
+
 		"islocalnet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `islocalnet` is not implement"))
-			return nil, nil
+			return utils.IsPrivateIP(net.ParseIP(engine.host)), nil
 		},
 		"get_port_transport": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0, -1).Int()
@@ -625,19 +762,20 @@ func init() {
 			return -1, nil
 		},
 		"this_host": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `this_host` is not implement"))
-			return nil, nil
+			return utils.GetLocalIPAddress(), nil
 		},
 		"this_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `this_host_name` is not implement"))
-			return nil, nil
+			return os.Hostname()
 		},
 		"string": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return params.getParamByNumber(0).String(), nil
+			s := ""
+			forEachParams(params, func(value *yakvm.Value) {
+				s += value.String()
+			})
+			return s, nil
 		},
 		"raw_string": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `raw_string` is not implement"))
-			return nil, nil
+			return string(params.getParamByNumber(0, 0x00).Bytes()), nil
 		},
 		"strcat": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := ""
@@ -655,16 +793,14 @@ func init() {
 			return nil, nil
 		},
 		"ord": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `ord` is not implement"))
-			return nil, nil
+			return int(params.getParamByNumber(0, 0).String()[0]), nil
 		},
 		"hex": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `hex` is not implement"))
 			return nil, nil
 		},
 		"hexstr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `hexstr` is not implement"))
-			return nil, nil
+			return codec.EncodeToHex(params.getParamByNumber(0).Value), nil
 		},
 		"strstr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `strstr` is not implement"))
@@ -716,17 +852,37 @@ func init() {
 			}
 			re, err := regexp.Compile(pattern)
 			if err != nil {
-				return "", err
+				return []string{}, err
 			}
 			return re.FindStringSubmatch(s), nil
 		},
 		"match": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `match` is not implement"))
-			return nil, nil
+			pattern := params.getParamByName("pattern").String()
+			s := params.getParamByName("string").String()
+			icase := params.getParamByName("icase").Bool()
+			if icase {
+				pattern = "(?i)" + pattern
+			}
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return false, err
+			}
+			return re.MatchString(s), nil
 		},
 		"substr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `substr` is not implement"))
-			return nil, nil
+			str := params.getParamByNumber(0, "").String()
+			start := params.getParamByNumber(1, 0).Int()
+			end := params.getParamByNumber(2, 0).Int()
+			if start < 0 {
+				start = 0
+			}
+			if end < 0 {
+				end = 0
+			}
+			if start > end {
+				start = end
+			}
+			return str[start:end], nil
 		},
 		"insstr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `insstr` is not implement"))
@@ -739,23 +895,48 @@ func init() {
 			return strings.ToUpper(params.getParamByNumber(0).String()), nil
 		},
 		"crap": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `crap` is not implement"))
-			return nil, nil
+			data := params.getParamByName("data").String()
+			length := params.getParamByName("length", -1).Int()
+			length2 := params.getParamByNumber(0, -1).Int()
+			if length == -1 {
+				length = length2
+			}
+			if length == -1 {
+				return nil, errors.New("crap length is invalid")
+			}
+			for i := 0; i < length; i++ {
+				data += data
+			}
+			return data, nil
 		},
 		"strlen": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return len(params.getParamByNumber(0).String()), nil
 		},
 		"split": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `split` is not implement"))
-			return nil, nil
+			str := params.getParamByNumber(0, "").String()
+			sep := params.getParamByName("sep", "").String()
+			keep := params.getParamByName("keep").Bool()
+			res := strings.Split(str, sep)
+			if keep {
+				newRes := make([]string, 0)
+				for i, v := range res {
+					if v != "" {
+						if i == len(res)-1 {
+							v = v + sep
+						}
+						newRes = append(newRes, v)
+					}
+				}
+				res = newRes
+			}
+			return res, nil
 		},
 		"chomp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `chomp` is not implement"))
-			return nil, nil
+			s := params.getParamByNumber(0, "").AsString()
+			return strings.TrimSpace(s), nil
 		},
 		"int": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `int` is not implement"))
-			return nil, nil
+			return strconv.Atoi(params.getParamByNumber(0, "0").String())
 		},
 		"stridx": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := params.getParamByNumber(0).String()
@@ -767,45 +948,126 @@ func init() {
 			return strings.Index(s, subs), nil
 		},
 		"str_replace": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `str_replace` is not implement"))
-			return nil, nil
+			a := params.getParamByName("string").String()
+			b := params.getParamByName("find").String()
+			r := params.getParamByName("replace").String()
+			count := params.getParamByName("count", 0).Int()
+			if count == 0 {
+				return strings.Replace(a, b, r, -1), nil
+			} else {
+				return strings.Replace(a, b, r, count), nil
+			}
 		},
 		"make_list": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			res := make([]interface{}, 0)
+			res := vm.NewEmptyNaslArray()
+			i := 0
 			forEachParams(params, func(value *yakvm.Value) {
-				res = append(res, value.Value)
+				defer func() { i++ }()
+				if value.Value == nil {
+					log.Errorf("nasl_make_list: undefined variable #%d skipped\n", i)
+					return
+				}
+				// 列表的每一个元素添加到新的列表中
+				switch ret := value.Value.(type) {
+				case *vm.NaslArray: // array类型
+					for _, v := range ret.Num_elt {
+						if res.AddEleToList(i, v) != nil {
+							i++
+						}
+					}
+					for _, v := range ret.Hash_elt {
+						if res.AddEleToList(i, v) != nil {
+							i++
+						}
+					}
+				default: // int, string, data类型
+					if res.AddEleToList(i, value.Value) != nil {
+						i++
+					}
+				}
 			})
 			return res, nil
 		},
 		"make_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			array := make(map[interface{}]interface{})
+			array := vm.NewEmptyNaslArray()
 			iskey := false
 			var v interface{}
+			v1 := 0
 			forEachParams(params, func(value *yakvm.Value) {
+				defer func() { v1++ }()
 				if !iskey {
 					v = value.Value
 				} else {
-					array[value.Value] = v
+					v2 := value.Value
+					switch ret := v2.(type) {
+					case []byte, string, int, *vm.NaslArray:
+						switch ret2 := v.(type) {
+						case int:
+							array.AddEleToList(ret2, ret)
+						case string, []byte:
+							array.AddEleToArray(utils.InterfaceToString(ret2), ret)
+						}
+					default:
+						err := utils.Errorf("make_array: bad value type %s for arg #%d\n", reflect.TypeOf(v2).Kind(), v1)
+						log.Error(err)
+					}
 				}
 				iskey = !iskey
 			})
 			return array, nil
 		},
 		"keys": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `keys` is not implement"))
-			return nil, nil
+			array := vm.NewEmptyNaslArray()
+			i := 0
+			p := params.getParamByNumber(0, nil)
+			if p == nil || p.Value == nil {
+				return array, nil
+			}
+			if v, ok := p.Value.(*vm.NaslArray); ok {
+				if len(v.Num_elt) > 0 {
+					for k := range v.Num_elt {
+						array.AddEleToList(i, k)
+						i++
+					}
+				}
+				if len(v.Hash_elt) > 0 {
+					for k := range v.Hash_elt {
+						array.AddEleToList(i, k)
+						i++
+					}
+				}
+				return array, nil
+			} else {
+				return nil, utils.Errorf("keys: bad value type %s for arg #%d\n", reflect.TypeOf(p.Value).Kind(), 0)
+			}
 		},
 		"max_index": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `max_index` is not implement"))
-			return nil, nil
+			i := params.getParamByNumber(0, nil).Value
+			if i == nil {
+				return -1, nil
+			}
+			switch ret := i.(type) {
+			case *vm.NaslArray:
+				return ret.GetMaxIdx(), nil
+			default:
+				return nil, utils.Errorf("max_index: bad value type %s for arg #%d\n", reflect.TypeOf(i).Kind(), 0)
+			}
 		},
 		"sort": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `sort` is not implement"))
-			return nil, nil
+			i := params.getParamByNumber(0, nil).Value
+			if i == nil {
+				return nil, nil
+			}
+			switch ret := i.(type) {
+			case *vm.NaslArray:
+				newArray := ret.Copy()
+				sort.Sort(vm.SortableArrayByString(newArray.Num_elt))
+				return newArray, nil
+			}
+			return i, nil
 		},
 		"unixtime": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `unixtime` is not implement"))
-			return nil, nil
+			return time.Now().Unix(), nil
 		},
 		"gettimeofday": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `gettimeofday` is not implement"))
@@ -848,19 +1110,25 @@ func init() {
 			return nil, nil
 		},
 		"typeof": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `typeof` is not implement"))
-			return nil, nil
+			v := params.getParamByNumber(0, "").Value
+			typeName := reflect.TypeOf(v).Kind().String()
+			switch typeName {
+			case "slice":
+				return "array", nil
+			}
+			return typeName, nil
 		},
 		"rand": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `rand` is not implement"))
-			return nil, nil
+			return rand.Int(), nil
 		},
 		"usleep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `usleep` is not implement"))
+			t := params.getParamByNumber(0, 0).Int()
+			time.Sleep(time.Duration(t) * time.Microsecond)
 			return nil, nil
 		},
 		"sleep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `sleep` is not implement"))
+			t := params.getParamByNumber(0, 0).Int()
+			time.Sleep(time.Duration(t) * time.Second)
 			return nil, nil
 		},
 		"isnull": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -871,8 +1139,33 @@ func init() {
 			return ok, nil
 		},
 		"forge_ip_packet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `forge_ip_packet` is not implement"))
-			return nil, nil
+			data := params.getParamByName("data").String()
+			ip_hl := params.getParamByName("ip_hl", 5).Int()
+			ip_v := params.getParamByName("ip_v", 4).Int()
+			ip_tos := params.getParamByName("ip_tos", 0).Int()
+			ip_id := params.getParamByName("ip_id", rand.Int()).Int()
+			ip_off := params.getParamByName("ip_off", 0).Int()
+			ip_ttl := params.getParamByName("ip_ttl", 64).Int()
+			ip_p := params.getParamByName("ip_p", 0).Int()
+			ip_sum := params.getParamByName("ip_sum", 0).Int()
+			ip_src := params.getParamByName("ip_src").String()
+			ip_dst := params.getParamByName("ip_dst").String()
+			ip_len := params.getParamByName("ip_len", 0).Int()
+			ipPacket := &IpPacket{
+				Data:   data,
+				Ip_hl:  uint8(ip_hl),
+				Ip_v:   uint8(ip_v),
+				Ip_tos: uint8(ip_tos),
+				Ip_id:  uint16(ip_id),
+				Ip_off: uint16(ip_off),
+				Ip_ttl: uint8(ip_ttl),
+				Ip_p:   uint8(ip_p),
+				Ip_sum: uint16(ip_sum),
+				Ip_src: ip_src,
+				Ip_dst: ip_dst,
+				Ip_len: uint16(ip_len),
+			}
+			return ipPacket, nil
 		},
 		"forge_ipv6_packet": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `forge_ipv6_packet` is not implement"))
@@ -1238,25 +1531,43 @@ func init() {
 			panic(fmt.Sprintf("method `DES` is not implement"))
 			return nil, nil
 		},
-
+		//源码里没找到
+		"pop3_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is invalid")
+			}
+			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, engine.proxies...)
+			if err != nil {
+				return nil, fmt.Errorf("connect pop3 server error：%s", err)
+			}
+			defer conn.Close()
+			// 读取服务器响应
+			buffer := make([]byte, 1024)
+			n, err := conn.Read(buffer)
+			if err != nil {
+				return nil, fmt.Errorf("read pop3 server error：%s", err)
+			}
+			// 打印服务器响应
+			response := string(buffer[:n])
+			return response, nil
+		},
+		"http_cgi_dirs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			cgiPath, ok := GlobalPrefs["cgi_path"]
+			if ok {
+				return []string{cgiPath}, nil
+			}
+			return []string{}, nil
+		},
 		"include": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			name := params.getParamByNumber(0, "").String()
 			//if lib, ok := libs[name]; ok {
 			//	vm.ExecYakCode("", lib)
 			//}
-			fPath := path.Join(engine.naslLibsPath, name)
-			recoverPath := engine.compiler.SetSourceCodeFilePath(fPath)
-			defer func() { recoverPath() }()
-			codes, err := os.ReadFile(fPath)
-			if err != nil {
-				return nil, err
+			if !strings.HasSuffix(name, ".inc") {
+				panic(fmt.Sprintf("include file name must end with .inc"))
 			}
-			err = engine.Eval(string(codes))
-
-			if err != nil {
-				return nil, err
-			}
-			return nil, nil
+			return nil, engine.EvalInclude(name)
 		},
 
 		"new_preference": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1282,6 +1593,322 @@ func init() {
 			}
 			return nil, nil
 		},
+		"wmi_versioninfo": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		"smb_versioninfo": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		"register_host_detail": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			name := params.getParamByName("name", "").String()
+			value := params.getParamByName("value", "").Value
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": "HostDetails", "value": name}, nil)
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": "HostDetails/NVT", "value": engine.GetScriptObject().OID}, nil)
+			engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": fmt.Sprintf("HostDetails/NVT/%s/%s", engine.GetScriptObject().OID, name), "value": value}, nil)
+			return nil, nil
+		},
+		"pingHost": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			result := pingutil.PingAuto(engine.host, "", time.Second*5, engine.proxies...)
+			return result.Ok, nil
+		},
+		"call_yak_method": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			var methodName string
+			var args []interface{}
+			first := true
+			forEachParams(params, func(value *yakvm.Value) {
+				if first {
+					methodName = value.String()
+					first = false
+				} else {
+					args = append(args, value.Value)
+				}
+			})
+			yakEngine := yaklang.New()
+			yakEngine.SetVar("params", args)
+			code := fmt.Sprintf("result = %s(params...)", methodName)
+			err := yakEngine.SafeEval(context.Background(), code)
+			if err != nil {
+				return nil, utils.Errorf("call yak method `%s` error: %v", methodName, err)
+			}
+			val, ok := yakEngine.GetVar("result")
+			if !ok {
+				return nil, nil
+			}
+			return val, nil
+		},
+		"plugin_run_find_service": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			//nasl_builitin_find_service.c 写了具体的指纹识别逻辑，和nmap的指纹不同，这里需要转换下
+			register_service := func(port int, service string) {
+				engine.CallNativeFunction("set_kb_item", map[string]interface{}{"name": fmt.Sprintf("Services/%s", service), "value": port}, nil)
+			}
+			iinfos := engine.Kbs.GetKB("Host/port_infos")
+			if iinfos != nil {
+				infos := iinfos.([]*fp.MatchResult)
+				for _, info := range infos {
+					if !info.IsOpen() {
+						continue
+					}
+					var ServiceName string
+					switch info.Fingerprint.ServiceName {
+					case "http", "https":
+						ServiceName = "www"
+					default:
+						ServiceName = info.Fingerprint.ServiceName
+					}
+					register_service(info.Port, ServiceName)
+				}
+			}
+			return nil, nil
+		},
+		"is_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			p := params.getParamByNumber(0)
+			if p == nil || p.Value == nil {
+				return false, nil
+			}
+			_, ok := p.Value.(*vm.NaslArray)
+			return ok, nil
+		},
+		"ssh_connect": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			p := params.getParamByNumber(0)
+			if p == nil || p.Value == nil {
+				return false, nil
+			}
+			_, ok := p.Value.(*vm.NaslArray)
+			return ok, nil
+		},
+		"http_get_remote_headers": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByNumber(0).Int()
+			host := engine.host
+			if port != 80 {
+				host = fmt.Sprintf("%s:%d", host, port)
+			}
+			url := fmt.Sprintf("http://%s/", host)
+			resp, err := http.Head(url)
+			if err != nil {
+				return nil, err
+			}
+			header, err := utils.HttpDumpWithBody(resp, false)
+			if err != nil {
+				return nil, err
+			}
+			return header, nil
+		},
+		"service_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			idefault_port_list := params.getParamByName("default_port_list", "").Value
+			default_port_array, ok := idefault_port_list.(*vm.NaslArray)
+			if !ok {
+				return nil, utils.Errorf("service_get_ports: default_port_list is not array")
+			}
+			default_port_list := []int{}
+			for i := 0; i < default_port_array.GetMaxIdx(); i++ {
+				iport := default_port_array.GetElementByNum(i)
+				port, ok := iport.(int)
+				if !ok {
+					continue
+				}
+				default_port_list = append(default_port_list, port)
+			}
+			nodefault := params.getParamByName("nodefault", 0).Bool()
+			service := params.getParamByName("proto", "").String()
+			ipproto := params.getParamByName("ipproto", "tcp").String()
+			var port = -1
+			if ipproto == "tcp" {
+				p := engine.Kbs.GetKB(fmt.Sprintf("Services/%s", service))
+				if p != nil {
+					if p1, ok := p.(int); ok {
+						port = p1
+					}
+				}
+			} else {
+				p := engine.Kbs.GetKB(fmt.Sprintf("Services/%s/%s", ipproto, service))
+				if p != nil {
+					if p1, ok := p.(int); ok {
+						port = p1
+					}
+				}
+			}
+			if port != -1 {
+				return []int{port}, nil
+			}
+			if nodefault {
+				return default_port_list, nil
+			} else {
+				return -1, nil
+			}
+		},
+		"service_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			res, err := engine.CallNativeFunction("service_get_ports", map[string]interface{}{
+				"proto":             params.getParamByName("proto", "").Value,
+				"ipproto":           params.getParamByName("ipproto", "").Value,
+				"default_port_list": []int{params.getParamByName("default", "").Int()},
+				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+			if err != nil {
+				return nil, err
+			}
+			ports, ok := res.([]int)
+			if !ok {
+				return -1, nil
+			}
+			if len(ports) == 0 {
+				return -1, nil
+			}
+			return ports[0], nil
+		},
+		"unknownservice_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("service_get_port", map[string]interface{}{
+				"proto":     "unknown",
+				"ipproto":   params.getParamByName("ipproto", "").Value,
+				"default":   params.getParamByName("default", 0).Int(),
+				"nodefault": params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+		},
+		"unknownservice_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("service_get_ports", map[string]interface{}{
+				"proto":             "unknown",
+				"ipproto":           params.getParamByName("ipproto", "").Value,
+				"default_port_list": params.getParamByName("default_port_list", "").Value,
+				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+			}, nil)
+		},
+		"report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return engine.CallNativeFunction("http_report_vuln_url", map[string]interface{}{
+				"port":     params.getParamByName("port", 0).Value,
+				"url":      params.getParamByName("url", "").Value,
+				"url_only": params.getParamByName("url_only", false).Value,
+			}, nil)
+		},
+		//http_report_vuln_url(port: port, url: url1, url_only: TRUE);
+		"http_report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			//port := params.getParamByName("port", "").Int()
+			url := params.getParamByName("url", "").String()
+			//url_only := params.getParamByName("url_only", false).Bool()
+			return fmt.Sprintf("detect vuln on url: %s", url), nil
+		},
+		//build_detection_report(app: "OpenMairie Open Foncier", version: version,
+		//install: install, cpe: cpe, concluded: vers[0],
+		//concludedUrl: concUrl),
+		"build_detection_report": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			scriptObj := engine.scriptObj
+			app := params.getParamByName("app", "").String()
+			version := params.getParamByName("version", "").String()
+			install := params.getParamByName("install", "").String()
+			cpe := params.getParamByName("cpe", "").String()
+			concluded := params.getParamByName("concluded", "").String()
+			riskType := ""
+			if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
+				riskType = v
+			} else {
+				riskType = scriptObj.Category
+			}
+			source := "[NaslScript] " + engine.scriptObj.ScriptName
+			concludedUrl := params.getParamByName("concludedUrl", "").String()
+			solution := utils.MapGetString(engine.scriptObj.Tags, "solution")
+			summary := utils.MapGetString(engine.scriptObj.Tags, "summary")
+			cve := strings.Join(scriptObj.CVE, ", ")
+			//xrefStr := ""
+			//for k, v := range engine.scriptObj.Xrefs {
+			//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
+			//}
+			title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
+			return fmt.Sprintf(`{"title":"%s","riskType":"%s","source":"%s","concluded":"%s","concludedUrl":"%s","solution":"%s","summary":"%s","cve":"%s","cpe":"%s","install":"%s"}`, title, riskType, source, concluded, concludedUrl, solution, summary, cve, cpe, install), nil
+		},
+		"ftp_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"telnet_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"smtp_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"imap_get_banner": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			port := params.getParamByName("port", -1).Int()
+			if port == -1 {
+				return nil, fmt.Errorf("port is not set")
+			}
+			banner, err := GetPortBannerByCache(engine, port)
+			if err != nil {
+				return nil, err
+			}
+			return banner, nil
+		},
+		"http_can_host_php": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			ok := false
+			rsp, _ := http.Get(fmt.Sprintf("http://%s:%d/index.php", engine.host, params.getParamByName("port", 80).Int()))
+			if rsp != nil && rsp.StatusCode == 200 {
+				ok = true
+			}
+			if !ok {
+				rsp, _ := http.Get(fmt.Sprintf("https://%s:%d/index.php", engine.host, params.getParamByName("port", 443).Int()))
+				if rsp != nil && rsp.StatusCode == 200 {
+					ok = true
+				}
+			}
+			return ok, nil
+		},
+		"http_can_host_asp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			ok := false
+			rsp, _ := http.Get(fmt.Sprintf("http://%s:%d/index.asp", engine.host, params.getParamByName("port", 80).Int()))
+			if rsp != nil && rsp.StatusCode == 200 {
+				ok = true
+			}
+			if !ok {
+				rsp, _ := http.Get(fmt.Sprintf("https://%s:%d/index.asp", engine.host, params.getParamByName("port", 443).Int()))
+				if rsp != nil && rsp.StatusCode == 200 {
+					ok = true
+				}
+			}
+			return ok, nil
+		},
+		"http_extract_body_from_response": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			res := params.getParamByName("data", "").String()
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(res))
+			return body, nil
+		},
+		"os_host_runs": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			if params.getParamByNumber(0, "").String() == runtime.GOOS {
+				return true, nil
+			}
+			return false, nil
+		},
+		"wmi_file_is_file_search_disabled": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return true, nil
+		},
+		"snmp_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		//需要把ssh相关插件重写
+		"ssh_session_id_from_sock": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			panic("not implement")
+		},
+		"ssh_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
 	}
 	for name, method := range naslLib {
 		NaslLib[name] = func(name string, m NaslBuildInMethod) func(engine *Engine, params *NaslBuildInMethodParam) interface{} {
@@ -1291,12 +1918,42 @@ func init() {
 				//		log.Errorf("call function `%s` panic error: %v", name, e)
 				//	}
 				//}()
-				res, err := m(engine, params)
+				var res interface{}
+				var err error
+				timeStart := time.Now()
+				if v, ok := engine.buildInMethodHook[name]; ok {
+					res, err = v(m, engine, params)
+				} else {
+					res, err = m(engine, params)
+				}
+				paramstr := fmt.Sprintf("%v", params)
 				if err != nil {
-					log.Errorf("call build in function `%s` error: %v", name, err)
+					log.Errorf("call build in function `%s(%s)` error: %v", name, paramstr, err)
 					return res
 				}
-				return res
+				du := time.Now().Sub(timeStart).Seconds()
+				if engine.IsDebug() && du > 3 {
+					log.Infof("call build in function `%s` cost: %f", name, du)
+				}
+				if res == nil {
+					return res
+				}
+				switch ret := res.(type) {
+				case []byte:
+					return string(ret)
+				default:
+					if reflect.TypeOf(res).Kind() == reflect.Slice || reflect.TypeOf(res).Kind() == reflect.Array {
+						if reflect.ValueOf(res).Len() == 0 {
+							return nil
+						}
+					}
+					array, err := vm.NewNaslArray(res)
+					if err == nil {
+						return array
+					} else {
+						return res
+					}
+				}
 			}
 		}(name, method)
 	}
@@ -1309,4 +1966,18 @@ func GetNaslLibKeys() map[string]interface{} {
 		}{}
 	}
 	return res
+}
+
+func GetPortBannerByCache(engine *Engine, port int) (string, error) {
+	iport_infos, err := engine.CallNativeFunction("get_kb_item", map[string]interface{}{"key": "Services/ftp"}, nil)
+	if err != nil {
+		return "", err
+	}
+	port_infos := iport_infos.([]*fp.MatchResult)
+	for _, port_info := range port_infos {
+		if port_info.Port == port {
+			return port_info.Fingerprint.Banner, nil
+		}
+	}
+	return "", nil
 }

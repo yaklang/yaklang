@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/umask"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	debugger "github.com/yaklang/yaklang/common/yak/interactive_debugger"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -126,6 +127,8 @@ func init() {
 			log.Warnf("initialize database failed: %s", err)
 		}
 	}
+	yak.SetNaslExports(antlr4nasl.Exports)
+	yak.InitYaklangLib()
 }
 
 var installSubCommand = cli.Command{

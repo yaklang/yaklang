@@ -4,18 +4,12 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"math"
 	"net"
-	"reflect"
 	"strings"
 	"time"
 )
-
-// 这里是与上下文无关的函数
-var preferences = map[string]interface{}{
-	"optimize_test": false,
-}
 
 //	libs := map[string][]*yakvm.Code{
 //		""
@@ -24,9 +18,53 @@ type ExitSignal struct {
 	Flag interface{}
 }
 
-var oid = codec.Md5("code")
-var kbs = map[string]interface{}{}
 var NaslBuildInNativeMethod = map[string]interface{}{
+	"get_array_elem": func(icaller interface{}, index interface{}) interface{} {
+		switch caller := icaller.(type) {
+		case *vm.NaslArray: // array类型
+			if caller == nil {
+				panic("iterableValue.Value is nil")
+			}
+			if index == nil {
+				panic("call get_array_elem error: index is nil")
+			}
+			i, ok := index.(int)
+			if ok {
+				return caller.GetElementByNum(i)
+			}
+			stringIndex, ok := index.(string)
+			if ok {
+				val, ok := caller.Hash_elt[stringIndex]
+				if ok {
+					return val
+				} else {
+					return nil
+				}
+			}
+			panic("arg must be int or string")
+		case string, []byte: // data类型
+			data := utils.InterfaceToBytes(caller)
+			if index == nil {
+				panic("index is nil")
+			}
+			i, ok := index.(int)
+			if ok {
+				if i >= len(data) {
+					return nil
+				}
+				if _, ok := icaller.(string); ok {
+					return string(data[i])
+				}
+				return data[i]
+			}
+			panic("arg must be int")
+		case nil:
+			return nil
+		default:
+			panic("not support caller type")
+		}
+
+	},
 	"sleep": func(n int) {
 		time.Sleep(time.Duration(n) * time.Second)
 	},
@@ -43,16 +81,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	"get_host_ip": func() string {
 		return ""
 	},
-
-	"get_kb_list": func(s string) map[string]interface{} {
-		res := map[string]interface{}{}
-		for k, v := range kbs {
-			if utils.MatchAllOfGlob(k, s) {
-				res[k] = v
-			}
-		}
-		return res
-	},
 	"string": func(i interface{}) string {
 		return utils.InterfaceToString(i)
 	},
@@ -67,29 +95,11 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	"isnull": func(i interface{}) bool {
 		return i == nil
 	},
-	"get_script_oid": func() string {
-		return oid
-	},
 	"__split": func(s string, sep string, keep bool) []string {
 		return strings.Split(s, sep)
 	},
-	"max_index": func(i interface{}) int {
-		refV := reflect.ValueOf(i)
-		if refV.Type().Kind() == reflect.Array || refV.Type().Kind() == reflect.Slice {
-			return refV.Len() - 1
-		}
-		return -1
-	},
-	"__set_kb_item": Set_kb_item,
-	"__get_kb_item": func(k string) interface{} {
-		if v, ok := kbs[k]; ok {
-			return v
-		}
-		return nil
-	},
-
-	"reEqual": func(s1, s2 string) bool { // 内置=~运算符号
-		return utils.MatchAllOfRegexp(s1, s2)
+	"reEqual": func(s1, s2 interface{}) bool { // 内置=~运算符号
+		return utils.MatchAllOfRegexp(utils.InterfaceToString(s1), utils.InterfaceToString(s2))
 	},
 	"strIn": func(s1, s2 string) bool { // 内置><运算符号
 		return strings.Contains(s1, s2)
@@ -106,10 +116,6 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 	},
 	"chomp": func(s string) string {
 		return strings.TrimRight(s, "\n")
-	},
-
-	"replace_kb_item": func(name string, v interface{}) {
-		kbs[name] = v
 	},
 	"close": func(conn net.Conn) {
 		if err := conn.Close(); err != nil {

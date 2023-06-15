@@ -50,13 +50,15 @@ import (
 var (
 	CRYPTO_KEY_SIZE    = 16
 	initYaklangLibOnce sync.Once
+	naslExports        interface{}
 )
 
-func init() {
-	InitYaklangLib()
+func SetNaslExports(lib map[string]interface{}) {
+	naslExports = lib
 }
-func Init() {
-	InitYaklangLib()
+
+func init() {
+	initYaklangLib()
 }
 func InitYaklangLib() {
 	initYaklangLibOnce.Do(func() {
@@ -165,6 +167,7 @@ func initYaklangLib() {
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
+	yaklang.Import("nasl", naslExports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)

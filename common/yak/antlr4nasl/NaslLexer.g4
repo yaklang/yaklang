@@ -47,6 +47,8 @@ ModulusAssign:                  '%=';
 PlusAssign:                     '+=';
 MinusAssign:                    '-=';
 X: 'x';
+RightShiftLogicalAssign:        '>>>=';
+RightShiftArithmeticAssign:     '>>=';
 
 Break:                          'break';
 LocalVar:                       'local_var';

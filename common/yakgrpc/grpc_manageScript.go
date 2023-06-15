@@ -188,7 +188,6 @@ func (s *Server) QueryYakScript(ctx context.Context, req *ypb.QueryYakScriptRequ
 			Data:       nil,
 		}, nil
 	}
-
 	p, data, err := yakit.QueryYakScript(s.GetProfileDatabase(), req)
 	if err != nil {
 		return nil, err

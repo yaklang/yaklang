@@ -55,6 +55,8 @@ const (
 	// func execNuclei(target)
 	HOOK_NucleiScanHandle = "execNuclei"
 
+	HOOK_NaslScanHandle = "execNasl"
+
 	/*
 		hijackSaveHTTPFlow = func(flow, forward, drop) {
 		    println(flow.Url)
@@ -111,6 +113,23 @@ var resetFilterLock = new(sync.Mutex)
 
 var loadTemplateLock = new(sync.Mutex)
 
+const naslCodeExecTemplate = `
+naslScriptName = MITM_PARAMS["NASL_SCRIPT_NAME"] // 用于初次加载插件时的预处理操作
+proxy = MITM_PARAMS["PROXY"] // 代理
+execNasl = (target)=>{
+    opts = [nasl.plugin(naslScriptName)]
+    if proxy != nil && proxy != ""{
+        opts.Append(nasl.proxy(proxy))
+    }
+	opts.Append(nasl.riskHandle((risk)=>{
+		log.info("found risk: %v", risk)
+	}))
+    kbs ,err = nasl.ScanTarget(target,opts...)
+    if err{
+        log.error("%v", err)
+    }
+}
+`
 const nucleiCodeExecTemplate = `
 // 这个脚本需要进行操作，设置 CURRENT_NUCLEI_PLUGIN_NAME 作为变量名
 nucleiPoCName = MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
@@ -273,6 +292,7 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 	return m.LoadPluginByName(context.Background(), scriptName, params)
 }
 
+// LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
 	//loadTemplateLock.Lock()
 	//defer loadTemplateLock.Unlock()
@@ -286,43 +306,64 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 	var forNuclei bool
 	var forPortScan bool
 	var forMitm bool
+	var forNasl bool
+
 	if code == "" {
 		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return utils.Error("no database conn is set / no code set")
-		}
-		ins, err := yakit.GetYakScriptByName(db, name)
-		if err != nil {
-			return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
-		}
-
-		if ins.Type == "port-scan" {
-			forPortScan = true
-		}
-
-		if ins.Type == "mitm" {
-			forMitm = true
-		}
-
-		if ins.Type == "nuclei" {
-			//var rawTemp templates.Template
-			//_ = json.Unmarshal([]byte(ins.Content), &rawTemp)
-			//if len(rawTemp.Workflow.Workflows) > 0 || len(rawTemp.Workflows) > 0 || rawTemp.CompiledWorkflow != nil {
-			//	return utils.Errorf("cannot load nuclei workflow[%v]: not supported", name)
+		// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
+		NaslTypePrefix := "__NaslScript__"
+		if strings.HasPrefix(name, NaslTypePrefix) {
+			forNasl = true
+			code = naslCodeExecTemplate
+			params = append(params, &ypb.ExecParamItem{
+				Key:   "NASL_SCRIPT_NAME",
+				Value: name[len(NaslTypePrefix):],
+			})
+			//params = append(params, &ypb.ExecParamItem{
+			//	Key:   "NASL_PROXY",
+			//	Value: proxy,
+			//})
+			//script, err := yakit.QueryNaslScriptByName(db, name[len(NaslTypePrefix):])
+			//if err == nil && script != nil && script.Hash != "" {
+			//	forNasl = true
+			//	naslScript = script
 			//}
-			_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(ins.Content)
+		}
+		if !forNasl {
+			if db == nil {
+				return utils.Error("no database conn is set / no code set")
+			}
+			ins, err := yakit.GetYakScriptByName(db, name)
 			if err != nil {
-				return err
+				return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
+			}
+			code = ins.Content
+			if ins.Type == "port-scan" {
+				forPortScan = true
 			}
 
-			forNuclei = true
-			params = append(params, &ypb.ExecParamItem{
-				Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
-				Value: ins.ScriptName,
-			})
-			code = nucleiCodeExecTemplate
-		} else {
-			code = ins.Content
+			if ins.Type == "mitm" {
+				forMitm = true
+			}
+
+			if ins.Type == "nuclei" {
+				//var rawTemp templates.Template
+				//_ = json.Unmarshal([]byte(ins.Content), &rawTemp)
+				//if len(rawTemp.Workflow.Workflows) > 0 || len(rawTemp.Workflows) > 0 || rawTemp.CompiledWorkflow != nil {
+				//	return utils.Errorf("cannot load nuclei workflow[%v]: not supported", name)
+				//}
+				_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(ins.Content)
+				if err != nil {
+					return err
+				}
+
+				forNuclei = true
+				params = append(params, &ypb.ExecParamItem{
+					Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
+					Value: ins.ScriptName,
+				})
+				code = nucleiCodeExecTemplate
+			}
 		}
 	}
 
@@ -334,7 +375,14 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 		}
 		return nil
 	}
-
+	if forNasl {
+		err := m.callers.AddForYakit(ctx, name, params, code, YakitCallerIf(m.feedbackHandler), HOOK_NaslScanHandle)
+		if err != nil {
+			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nasl Plugin[%v] Failed: %v", name, err))
+			return nil
+		}
+		return nil
+	}
 	var hooks []string
 	switch true {
 	case forMitm:
@@ -413,7 +461,7 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 		}
 	}()
 	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		defer func() {
@@ -431,6 +479,15 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 			}
 		}()
 		m.GetNativeCaller().CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
+	}()
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
+			}
+		}()
+		m.GetNativeCaller().CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
 	}()
 	wg.Wait()
 }
@@ -488,6 +545,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 			go func() {
 				defer m.swg.Done()
 				m.callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
+			}()
+			m.swg.Add()
+			go func() {
+				defer m.swg.Done()
+				m.callers.CallByName(HOOK_NaslScanHandle, urlObj.String())
 			}()
 		}
 
