@@ -223,7 +223,7 @@ func checkSqlInjection(pos /* int */, req /* []byte */, castDetected /* bool */,
     if closeType == -1 {
         for index, param := range CommonParams {
             if index == pos {
-                yakit_output("参数:%v未检测到闭合边界", param.Value()[0])
+                yakit_output("参数:%v未检测到闭合边界", param.Name())
                 return//check next not casted param
                 //check next not casted param
             }
@@ -717,8 +717,8 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
     _, TEMPLATE_BODY := str.SplitHTTPHeadersAndBodyFromPacket(TEMPLATE_PAGE_RSP)
 
     if err != nil {
-        panic(err)// 畸形响应包        // 畸形响应包        // 畸形响应包        // 畸形响应包        // 畸形响应包        // 畸形响应包        // 畸形响应包        // 畸形响应包
-    }
+        panic(err)// 畸形响应包
+     }
 
 
     ratios := make(map[int]float, 0)
@@ -782,7 +782,7 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                 ratio = str.CalcSimilarity(resultBody, TEMPLATE_BODY)
                 ratios[i - 1] = ratio
                 //yakit_output(parseStr(ratio))
-                time.Sleep(0.3)// 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差                // 避免过于频繁请求导致速率被限制进而导致结果偏差
+                time.Sleep(0.3)// 避免过于频繁请求导致速率被限制进而导致结果偏差
                 continue
             }
 
@@ -1175,7 +1175,7 @@ func checkType0(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] 单引号闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
     yakit_output(sprintf(
         "测试使用的positive payload为: %v 响应包为: %s",
@@ -1197,7 +1197,7 @@ func checkType0(param, originValue, originResponse, IsNumeric) {
         risk.titleVerbose(sprintf(
             "疑似SQL注入：【参数：%v[%v] 单引号闭合】",
             paramType,
-            originValue,
+            param.Name(),
         )),
         risk.type("sqlinjection"),
         risk.payload(negativePayload),
@@ -1291,7 +1291,7 @@ func checkType1(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] 双引号闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
     yakit_output(sprintf(
         "测试使用的positive payload为: %v 响应包为: %s",
@@ -1313,7 +1313,7 @@ func checkType1(param, originValue, originResponse, IsNumeric) {
         risk.titleVerbose(sprintf(
             "疑似SQL注入：【参数：%v[%v] 双引号闭合】",
             paramType,
-            originValue,
+            param.Name(),
         )),
         risk.type("sqlinjection"),
         risk.payload(negativePayload),
@@ -1406,7 +1406,7 @@ func checkType2(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] 无边界闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
 
     yakit_output(sprintf(
@@ -1428,7 +1428,7 @@ func checkType2(param, originValue, originResponse, IsNumeric) {
         risk.titleVerbose(sprintf(
             "疑似SQL注入：【参数：%v[%v] 无边界闭合】",
             paramType,
-            originValue,
+            param.Name(),
         )),
         risk.type("sqlinjection"),
         risk.payload(negativePayload),
@@ -1525,7 +1525,7 @@ func checkType3(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] 括号单引号闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
     yakit_output(sprintf(
         "测试使用的positive payload为: %v 响应包为: %s",
@@ -1548,7 +1548,7 @@ func checkType3(param, originValue, originResponse, IsNumeric) {
         risk.titleVerbose(sprintf(
             "疑似SQL注入：【参数：%v[%v] 括号单引号闭合】",
             paramType,
-            originValue,
+            param.Name(),
         )),
         risk.type("sqlinjection"),
         risk.payload(negativePayload),
@@ -1643,7 +1643,7 @@ func checkType4(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] 括号双引号闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
     yakit_output(sprintf(
         "测试使用的positive payload为: %v 响应包为: %s",
@@ -1665,7 +1665,7 @@ func checkType4(param, originValue, originResponse, IsNumeric) {
         risk.titleVerbose(sprintf(
             "疑似SQL注入：【参数：%v[%v] 括号双引号闭合】",
             paramType,
-            originValue,
+            param.Name(),
         )),
         risk.type("sqlinjection"),
         risk.payload(negativePayload),
@@ -1760,7 +1760,7 @@ func checkTypeOrderBy(param, originValue, originResponse, IsNumeric) {
     yakit_output(sprintf(
         "疑似SQL注入：【参数：%v型[%v] ORDER BY无边界闭合】",
         paramType,
-        originValue,
+        param.Name(),
     ))
     yakit_output(sprintf(
         "测试使用的positive payload为: %v 响应包为: %s",
