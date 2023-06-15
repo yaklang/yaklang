@@ -3,6 +3,7 @@ package yak
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -124,12 +125,19 @@ func EngineToLibDocuments(engine yaklang.YaklangEngine) []yakdocument.LibDoc {
 					if s != nil {
 						structDoc = yakdocument.StructHelperToDoc(s)
 					}
-					libDoc.Variables = append(libDoc.Variables, &yakdocument.VariableDoc{
+					varDoc := &yakdocument.VariableDoc{
 						Name:           fmt.Sprintf("%v.%v", libName, elementName),
 						TypeStr:        yakdocument.DumpReflectType(reflect.TypeOf(value)),
 						Description:    "//",
 						RelativeStruct: structDoc,
-					})
+					}
+					if utils.MatchAnyOfGlob(varDoc.TypeStr, "*int*") {
+						varDoc.ValueVerbose = fmt.Sprintf("0x%x", value)
+					} else if utils.MatchAnyOfSubString(varDoc.TypeStr, "*str*") {
+						varDoc.ValueVerbose = fmt.Sprintf("%q", value)
+					}
+
+					libDoc.Variables = append(libDoc.Variables, varDoc)
 					sort.SliceStable(libDoc.Variables, func(i, j int) bool {
 						return libDoc.Variables[i].Name < libDoc.Variables[j].Name
 					})
