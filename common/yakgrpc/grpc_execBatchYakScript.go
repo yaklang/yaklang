@@ -349,7 +349,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					return nil
 				})
 				engine.HookOsExit()
-				engine.RegisterEngineHooks(func(engine yaklang.YaklangEngine) error {
+				engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
 					switch ret := engine.(type) {
 					case *antlr4yak.Engine:
 						yaklib.SetEngineClient(ret, feedbackClient)

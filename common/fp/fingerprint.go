@@ -281,7 +281,7 @@ func SetMatchResultDatabaseCache(addr string, result *MatchResult) {
 	}
 	err = yakit.SetKeyWithTTL(db, addr, strconv.Quote(string(raw)), 600)
 	if err != nil {
-		log.Error("set key with ttl failed: %s", err)
+		log.Errorf("set key with ttl failed: %s", err)
 	}
 }
 

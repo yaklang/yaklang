@@ -476,7 +476,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// 处理结果，相似度
 			header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
 			if firstHeader == nil {
-				log.Infof("start to set first header[%v]...", result.Url)
+				log.Debugf("start to set first header[%v]...", result.Url)
 				firstHeader = []byte(header)
 				rsp.HeaderSimilarity = 1.0
 			} else {
@@ -484,7 +484,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if firstBody == nil {
-				log.Infof("start to set first body[%v]...", result.Url)
+				log.Debugf("start to set first body[%v]...", result.Url)
 				firstBody = body
 				rsp.BodySimilarity = 1.0
 			} else {
