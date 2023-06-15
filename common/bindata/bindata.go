@@ -107,7 +107,7 @@ func dataBaseYakPluginBasicSstiYak() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "data/base-yak-plugin/Basic SSTI.yak", size: 6080, mode: os.FileMode(0644), modTime: time.Unix(1686798128, 0)}
+	info := bindataFileInfo{name: "data/base-yak-plugin/Basic SSTI.yak", size: 6080, mode: os.FileMode(0644), modTime: time.Unix(1686815063, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x26, 0x6f, 0x2e, 0xf8, 0x9e, 0x93, 0x66, 0xa6, 0x3f, 0x6d, 0xf, 0x29, 0xcf, 0xb7, 0x1c, 0x25, 0x97, 0xf6, 0x21, 0x19, 0x59, 0x7f, 0x8c, 0x7b, 0xcb, 0xe2, 0x12, 0xec, 0x59, 0x5, 0xd0, 0xb1}}
 	return a, nil
 }
@@ -147,7 +147,7 @@ func dataBaseYakPluginSqlYak() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "data/base-yak-plugin/启发式SQL注入检测.yak", size: 65055, mode: os.FileMode(0644), modTime: time.Unix(1686736655, 0)}
+	info := bindataFileInfo{name: "data/base-yak-plugin/启发式SQL注入检测.yak", size: 65055, mode: os.FileMode(0644), modTime: time.Unix(1686815063, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf9, 0xd6, 0x9b, 0xff, 0x5f, 0xb8, 0x3f, 0x42, 0xad, 0x19, 0x97, 0x34, 0x57, 0x26, 0xc, 0x5d, 0x2b, 0xc1, 0xa1, 0xaf, 0x81, 0xfe, 0xa8, 0xe6, 0xef, 0xac, 0xf5, 0xc8, 0xee, 0x1f, 0x2, 0x76}}
 	return a, nil
 }
