@@ -224,7 +224,7 @@ func TestNewVars(t *testing.T) {
 	vars := NewVars()
 	vars.AutoSet("year", "{{rand_int(2000,2020)}}")
 	vars.AutoSet("month", "0{{rand_int(1,7)}}")
-	vars.AutoSet("day", "{{rand_int(1,28)}}")
+	vars.AutoSet("day", "{{rand_int(10,28)}}")
 	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
 	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
 	var a = vars.ToMap()

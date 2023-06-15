@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -100,11 +101,15 @@ func (s *YakScript) BeforeSave() error {
 
 func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 	var params []*ypb.YakScriptParam
-	r, _ := strconv.Unquote(s.Params)
-	err := json.Unmarshal([]byte(r), &params)
-	if err != nil {
-		log.Errorf("unmarshal params failed: %s", err)
+	if s.Params != "" && s.Params != `""` {
+		r, _ := strconv.Unquote(s.Params)
+		err := json.Unmarshal([]byte(r), &params)
+		if err != nil {
+			log.Errorf("unmarshal params failed: %s", err)
+			spew.Dump([]byte(r))
+		}
 	}
+
 	script := &ypb.YakScript{
 		Id:                   int64(s.ID),
 		Content:              s.Content,

@@ -142,3 +142,48 @@ aaacccaaabbb`))
 		panic("plugin is not executed")
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug3(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	var host, port = utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+Content-Length: 12
+
+aaacccaaabbb`))
+	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
+	rsp, err := http.Get("http://" + utils.HostPort(host, port))
+	if err != nil {
+		panic(err)
+	}
+	raw, _ := utils.HttpDumpWithBody(rsp, true)
+	println(string(raw))
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code:       "mirrorHTTPFlow = (https, url, req, rsp, body) => { yakit.Info(`MESSAGE:FETCH URL :` + url); }",
+		PluginType: "mitm",
+		Input:      "http://" + utils.HostPort(host, port) + "/abc?key=value",
+	})
+	if err != nil {
+		panic(err)
+	}
+	var checked = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			log.Warn(err)
+			break
+		}
+		spew.Dump(exec)
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), "MESSAGE:FETCH URL") ||
+				strings.Contains(string(exec.Message), "/abc?key=value") {
+				checked = true
+			}
+		}
+	}
+	if !checked {
+		panic("plugin is not executed")
+	}
+}
