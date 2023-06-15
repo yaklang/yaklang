@@ -2,15 +2,17 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
 	"testing"
 )
 
-func TestServer_GetYakitCompletionRaw(t *testing.T) {
+func TestGRPCMUSTPASS_GetYakitCompletionRaw(t *testing.T) {
 	test := assert.New(t)
 
 	c, err := NewLocalClient()
@@ -26,7 +28,16 @@ func TestServer_GetYakitCompletionRaw(t *testing.T) {
 	if len(rsp.RawJson) <= 0 {
 		test.FailNow("empty result")
 	}
-	spew.Dump(len(rsp.RawJson))
+
+	fmt.Println(string(rsp.RawJson))
+
+	if !utils.MatchAllOfSubString(
+		string(rsp.RawJson),
+		"QueryUrlsAll() chan string",
+		"O_RDWR: int = 0x2",
+	) {
+		panic("generate completion failed")
+	}
 }
 
 func TestServer_GetYakitCompletionRaw_Antlr4Yak(t *testing.T) {

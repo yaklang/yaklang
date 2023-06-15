@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"sort"
+	"strings"
 )
 
 type YakLibDocCompletion struct {
@@ -78,6 +79,11 @@ func LibDocsToCompletionJsonEx(all bool, libs ...LibDoc) ([]byte, error) {
 			LibName: l.Name,
 			Prefix:  fmt.Sprintf("%v.", l.Name),
 		}
+
+		if l.Name == "file" {
+			//log.Debugf("debug file lib compl: %v", l.Name)
+		}
+
 		for _, fIns := range l.Functions {
 			libComp.FunctionCompletion = append(libComp.FunctionCompletion, YakFunctionCompletion{
 				Function:         fIns.CompletionStr(),
@@ -85,6 +91,35 @@ func LibDocsToCompletionJsonEx(all bool, libs ...LibDoc) ([]byte, error) {
 				DefinitionStr:    fIns.DefinitionStr(),
 			})
 		}
+
+		for _, vIns := range l.Variables {
+			if utils.MatchAnyOfGlob(
+				vIns.TypeStr,
+				"builtin.ty",
+				"builtin.go",
+			) || utils.MatchAnyOfSubString(
+				vIns.Name,
+				"false", "true",
+			) {
+				continue
+			} else {
+				//log.Infof("%v: vIns variable: %v", l.Name, vIns.Name)
+			}
+			defIns := vIns.Name
+			if vIns.TypeStr != "" {
+				defIns += ": " + fmt.Sprint(vIns.TypeStr)
+			}
+			if vIns.ValueVerbose != "" {
+				defIns += " = " + vIns.ValueVerbose
+			}
+			varIns := YakFunctionCompletion{
+				Function:         strings.TrimPrefix(vIns.Name, l.Name+"."),
+				FunctionDocument: defIns,
+				DefinitionStr:    defIns,
+			}
+			libComp.FunctionCompletion = append(libComp.FunctionCompletion, varIns)
+		}
+
 		comps = append(comps, libComp)
 	}
 	yakComp.LibNames = libName
