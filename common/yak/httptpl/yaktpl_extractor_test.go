@@ -504,7 +504,7 @@ Content-Type: text/html; charset=utf-8
 		}
 		ret, _ := vars[key]
 		if toString(ret) != value {
-			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
+			log.Infof("INDEX: %v failed,expect: %v,get: %v", index, spew.Sdump(map[string]string{key: value}), spew.Sdump(vars))
 			panic("failed")
 		}
 		spew.Dump(vars)
