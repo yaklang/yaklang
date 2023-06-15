@@ -5,6 +5,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type dbm struct {
@@ -83,6 +84,20 @@ func (s *dbm) GetUserByUsernameUnsafe(i string) ([]*VulinUser, error) {
 	if db := db.Scan(&v); db.Error != nil {
 		return nil, db.Error
 	}
+	return v, nil
+}
+
+func (s *dbm) GetUserByUnsafe(i, p string) ([]*VulinUser, error) {
+	var v []*VulinUser
+	sql := `select * from vulin_users where username = '` + i + `' AND password = '` + p + `';`
+	db := s.db.Raw(sql).Debug()
+	if db := db.Scan(&v); db.Error != nil {
+		return nil, db.Error
+	}
+	if len(v) == 0 {
+		return nil, utils.Errorf("username or password incorrect")
+	}
+
 	return v, nil
 }
 
