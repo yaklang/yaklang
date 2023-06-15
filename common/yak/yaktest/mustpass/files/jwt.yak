@@ -1,0 +1,10 @@
+a = jwt.JWTGenerateEx(jwt.ALG_HS256, {
+    "kid": "admin"
+}, {"data": 111}, b"aa123456")
+dump(a)
+dump(jwt.RemoveAlg(a[0]))
+b, key = jwt.Parse(a[0], "aa123456")~
+dump(b)
+if string(key) != "aa123456" {
+    panic(111)
+}
