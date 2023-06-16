@@ -117,15 +117,3 @@ checkReq = (ishttps, req) => {
 mirrorNewWebsitePathParams = (isHttps, url, req, rsp, body) => {
     checkReq(ishttps, req)
 }
-
-// if YAK_MAIN {
-//     testurl = [
-//         "https://127.0.0.1:8787/expr/injection?b={%22a%22:%201}",
-//         `https://127.0.0.1:8787/expr/injection?a=1`,
-//         `https://127.0.0.1:8787/expr/injection?c=abc`,
-//     ]
-//     for u in testurl {
-//         https, bytes, _ = poc.ParseUrlToHTTPRequestRaw("GET", u)
-//         checkReq(https, bytes)
-//     }
-// }

@@ -17,10 +17,7 @@ func TestGRPCMUSTPASS_SSTI(t *testing.T) {
 		panic(err)
 	}
 
-	plug := PlugInfo{
-		PlugName:    "Basic SSTI检测插件",
-		BinDataPath: "data/base-yak-plugin/Basic SSTI.yak",
-	}
+	pluginName := "SSTI Expr 服务器模版表达式注入"
 	server := VulServerInfo{
 		VulServerAddr: vulAddr,
 		IsHttps:       true,
@@ -38,7 +35,7 @@ func TestGRPCMUSTPASS_SSTI(t *testing.T) {
 		ExpectedResult: map[string]int{"表达式注入成功检测：参数：Name:c": 3},
 	}
 
-	Must(TestMitmPlug(plug, server, vul1, client, t), "SSTI插件对于?a注入检测结果不符合预期")
-	Must(TestMitmPlug(plug, server, vul2, client, t), "SSTI插件对于?b注入检测结果不符合预期")
-	Must(TestMitmPlug(plug, server, vul3, client, t), "SSTI插件对于?c注入检测结果不符合预期c")
+	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), "SSTI插件对于?a注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul2, client, t), "SSTI插件对于?b注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul3, client, t), "SSTI插件对于?c注入检测结果不符合预期c")
 }
