@@ -114,42 +114,25 @@ EchoLog = func(result) {
     payload = result.payload
     reqRaw = result.reqRaw  
     respRaw = result.respRaw
-
-    posStr = param.Position()
-    if posStr == "path-append" || posStr == "path-block" {
-        return
-    }
-
     payloadString := sprintf("%s=%s", param.Name(), payload.value)
     report = {"message": "XSS echo", "payload": payloadString, "payload_type": payload.payloadType, "param_position": param.PositionVerbose()}
 
-    paramName := param.Name()
-    posVerbose = param.PositionVerbose()
-    pos = param.Position()
-    var paramDesc
-    if pos == `path-append` {
-        paramDesc = "[路径追加]"
-    } else {
-        paramDesc = f`[${posVerbose}-${paramName}]`
-    }
-
     risk.NewRisk(
         url,
-        risk.titleVerbose(f`页面有参数${paramDesc}回显: URL: ${url}`),
         risk.title(sprintf("Echo for: %v %s: %s", url, param.PositionVerbose(), param.Name())),
         risk.details(report),
         risk.type("xss-echo"),
         risk.payload(payloadString),
-        risk.request(reqRaw), 
+        risk.request(reqRaw),
         risk.response(respRaw),
-        risk.severity("info"),
+        risk.severity("low"),
     )
 }
 
 
 // fuzz并返回原始请求与原始响应
 Rawfuzz = func(param, fuzzPayload) {
-    freq = param.Fuzz(fuzzPayload) 
+    freq = param.Fuzz(fuzzPayload)
     httpReq, err = freq.GetFirstFuzzHTTPRequest()
     checkErr(err)
     rawReq, err = httpReq.GetOriginHTTPRequest()
@@ -162,7 +145,7 @@ Rawfuzz = func(param, fuzzPayload) {
     rsp = <-respChannel
     respBody, err = str.ExtractBodyFromHTTPResponseRaw(rsp.ResponseRaw)
     checkErr(err)
-    
+
     return rsp.Response, reqBody, respBody
 }
 
@@ -171,7 +154,7 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
 
     go func {
         defer swg.Done()
-        
+
         rsp, reqBody, newBody = Rawfuzz(param, payload.value)
 
         // 客户端/服务端错误则不验证
@@ -179,7 +162,7 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
             return
         }
 
-        existVuln = false 
+        existVuln = false
         maybeVuln = false
         extraMsg = ""
         payloadType = payload.payloadType
@@ -196,7 +179,7 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
                     maybeVuln = true
                     break
                 }
-               
+
 
                 for _,s = range result.StringLiteral{
                     if s == verifyRandStr {
@@ -213,7 +196,7 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
             }
         } else {
             if payloadType == "comment" { // comment类型的payload判断漏洞存在条件: 逃出注释
-                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr) 
+                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr)
                 for _, matchNode = range verifyMatchNodes {
                     if matchNode.IsText() && matchNode.MatchText == verifyRandStr {
                         existVuln = true
@@ -224,14 +207,14 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
                 existVuln = true
                 maybeVuln = true
             } else { // tag或attr类型的payload判断漏洞存在条件: 存在属性值为verifyRandStr的节点，证明标签逃逸或者属性逃逸
-                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr) 
+                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr)
                 for _, matchNode = range verifyMatchNodes {
                     if matchNode.IsAttr() && matchNode.Key == "id" && matchNode.Val == verifyRandStr {
                         existVuln = true
                         break
                     }
                 }
-            } 
+            }
         }
 
         if existVuln {
@@ -239,7 +222,7 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
             resultCh <- result
         } else {
             // 如果判断不存在漏洞，就将有回显的位置payload写入数据库中，防止误报
-            EchoLog(newResult(false, url, param, payload, reqBody, newBody))
+            // EchoLog(newResult(false, url, param, payload, reqBody, newBody))
         }
     }
 }
@@ -266,9 +249,9 @@ paramFuzzTask = func(threads, url, param) {
     for _, matchNode = range matchNodes {
 
         if matchNode.IsText() {
-            /* 
+            /*
             4. script标签内
-            例：<script>a = '<参数>';</script> 
+            例：<script>a = '<参数>';</script>
             */
             if matchNode.TagName == "script" {
                 // 引号判断
@@ -303,10 +286,10 @@ paramFuzzTask = func(threads, url, param) {
         } elif matchNode.IsAttr() {
             /*
             2.属性: 构造标签闭合或伪协议,如果是特殊属性可以直接使用javascript代码
-            例：<div id="<参数>"></div> <img src=1 onerror="<参数>"></div> 
+            例：<div id="<参数>"></div> <img src=1 onerror="<参数>"></div>
             */
             attrName = str.ToUpper(matchNode.Key)
-            
+
             // 特殊属性处理
             if specialAttr(attrName) {
                 payload = specialAttrPayload(attrName, verifyRandStr)
@@ -362,10 +345,10 @@ paramFuzzTask = func(threads, url, param) {
     // ! 五 根据filterChars判断能使用的payload进行Fuzz，找到xss
     swg = sync.NewSizedWaitGroup(threads)
     resultCh = make(chan map[string]var, len(payloads))
-    
+
 
     for _, payload = range payloads {
-        isFilter = false 
+        isFilter = false
 
         for _, filterChar = range filterChars {
             if str.Contains(payload.dangerousChars, filterChar) {
@@ -374,7 +357,7 @@ paramFuzzTask = func(threads, url, param) {
         }
         if isFilter {
             // 如果被过滤了，就将有回显的位置payload写入数据库中，防止误报
-            EchoLog(newResult(false, url, param, payload, reqBody, rawBody))
+            // EchoLog(newResult(false, url, param, payload, reqBody, rawBody))
             continue
         }
         log.debug(sprintf("Available payload: %s payloadType: %s dangerousChars: %s", payload.value, payload.payloadType, payload.dangerousChars))
