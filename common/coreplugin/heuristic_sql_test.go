@@ -17,10 +17,7 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 		panic(err)
 	}
 
-	plug := PlugInfo{
-		PlugName:    "启发式SQL注入检测插件",
-		BinDataPath: "data/base-yak-plugin/启发式SQL注入检测.yak",
-	}
+	pluginName := "启发式SQL注入检测"
 	server := VulServerInfo{
 		VulServerAddr: vulAddr,
 		IsHttps:       true,
@@ -38,7 +35,7 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 		ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] 单引号闭合】": 3, "存在基于UNION SQL 注入: [参数名:name 原值:admin]": 3},
 	}
 
-	Must(TestMitmPlug(plug, server, vul1, client, t), "SQL插件对于安全的SQL注入检测结果不符合预期")
-	Must(TestMitmPlug(plug, server, vul2, client, t), "SQL插件对于不安全的SQL注入(ID)检测结果不符合预期")
-	Must(TestMitmPlug(plug, server, vul3, client, t), "SQL插件对于不安全的SQL注入(NAME)检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), "SQL插件对于安全的SQL注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul2, client, t), "SQL插件对于不安全的SQL注入(ID)检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul3, client, t), "SQL插件对于不安全的SQL注入(NAME)检测结果不符合预期")
 }

@@ -69,3 +69,9 @@ jobs:
 
       - name: Test gRPC MUSTPASS-PLUGIN-SSTI
         run: go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
+
+#      - name: Test gRPC MUSTPASS-PLUGIN-XSS
+#        run: go test -timeout 1m -run TestGRPCMUSTPASS_XSS ./common/coreplugin -v
+
+      - name: Test gRPC MUSTPASS-PLUGIN-Shiro
+        run: go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
