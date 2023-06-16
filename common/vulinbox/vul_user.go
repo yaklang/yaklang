@@ -3,8 +3,10 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"text/template"
 )
 
@@ -37,6 +39,12 @@ func (s *VulinServer) registerUserRoute() {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		remake := strings.ToLower(user.Remake)
+		filterRemake := strings.ReplaceAll(remake, "<", "")
+		filterRemake = strings.ReplaceAll(filterRemake, ">", "")
+		filterRemake = strings.ReplaceAll(filterRemake, "script", "")
+		user.Remake = filterRemake
 
 		// 在这里执行用户注册逻辑，将用户信息存储到数据库
 		err = s.database.CreateUser(user)
@@ -133,7 +141,7 @@ func (s *VulinServer) registerUserRoute() {
 			Name:  "_cookie",
 			Value: session.Uuid,
 
-			HttpOnly: true,
+			//HttpOnly: true,
 		})
 		writer.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(writer).Encode(response)
@@ -201,14 +209,37 @@ func (s *VulinServer) registerUserRoute() {
 	})
 
 	router.HandleFunc("/user/update", func(writer http.ResponseWriter, request *http.Request) {
-		// 解析请求体中的 JSON 数据
-		var oldUser VulinUser
-		err := json.NewDecoder(request.Body).Decode(&oldUser)
+		// 读取请求体数据
+		body, err := ioutil.ReadAll(request.Body)
 		if err != nil {
 			writer.Write([]byte(err.Error()))
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		// 过滤请求体内容
+		lowerBody := strings.ToLower(string(body))
+		filteredBody := strings.ReplaceAll(lowerBody, "<", "")
+		filteredBody = strings.ReplaceAll(filteredBody, ">", "")
+		filteredBody = strings.ReplaceAll(filteredBody, "script", "")
+
+		// 解析过滤后的 JSON 数据
+		var oldUser VulinUser
+		err = json.Unmarshal([]byte(filteredBody), &oldUser)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// 正常逻辑先解析再过滤
+		//var oldUser VulinUser
+		//err := json.NewDecoder(request.Body).Decode(&oldUser)
+		//if err != nil {
+		//	writer.Write([]byte(err.Error()))
+		//	writer.WriteHeader(http.StatusBadRequest)
+		//	return
+		//}
 
 		userInfo, err := s.database.GetUserById(int(oldUser.ID))
 		if err != nil {
@@ -216,6 +247,12 @@ func (s *VulinServer) registerUserRoute() {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		//remake := strings.ToLower(oldUser.Remake)
+		//filterRemake := strings.ReplaceAll(remake, "<", "")
+		//filterRemake = strings.ReplaceAll(filterRemake, ">", "")
+		//filterRemake = strings.ReplaceAll(filterRemake, "script", "")
+		//userInfo.Remake = filterRemake
+
 		userInfo.Remake = oldUser.Remake
 		err = s.database.UpdateUser(userInfo)
 		if err != nil {
