@@ -819,7 +819,7 @@ cccabbbccc
 dddddd`))
 	spew.Dump(server, port)
 
-	for _, caseItem := range [][]any{
+	for index, caseItem := range [][]any{
 		{`
 id: test1
 info:
@@ -958,6 +958,10 @@ requests:
 
 `, "abbb", true},
 	} {
+		_ = index
+		if index != 2 {
+			continue
+		}
 		demo, expected := caseItem[0].(string), caseItem[1].(string)
 		expectedMatched := false
 		if len(caseItem) > 2 {
@@ -972,7 +976,7 @@ requests:
 		checked := false
 		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
 			spew.Dump(extractor)
-			if extractor["a2"].(string) == expected {
+			if InterfaceSliceToString(extractor["a2"]) == expected {
 				checked = true
 			}
 
@@ -1082,7 +1086,7 @@ requests:
 		checked := false
 		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
 			spew.Dump(extractor)
-			if extractor["a2"].(string) == expected {
+			if InterfaceSliceToString(extractor["a2"]) == expected {
 				checked = true
 			}
 

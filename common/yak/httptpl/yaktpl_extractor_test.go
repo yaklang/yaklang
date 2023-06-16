@@ -3,12 +3,13 @@ package httptpl
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
 
 func TestYakExtractor_Execute(t *testing.T) {
 	for index, extractor := range [][]any{
-		{
+		{ // extractor_test: 正则提取一条数据
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -22,7 +23,7 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"DOCTYPE html",
 		},
-		{
+		{ // extractor_test: 使用正则捕获提取一条数据
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -37,7 +38,7 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"html",
 		},
-		{
+		{ // extractor_test: 使用正则捕获，从header提取一条数据
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -53,7 +54,7 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"",
 		},
-		{
+		{ // extractor_test: 使用json提取器，从body提取一条数据
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -67,7 +68,7 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"12312312",
 		},
-		{
+		{ // extractor_test: 使用json提取器，从body提取一条数据(测试提取不同变量)
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -81,7 +82,7 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"123",
 		},
-		{
+		{ // extractor_test: 使用xpath提取器，从body提取元素属性
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -97,7 +98,25 @@ Content-Type: text/html; charset=utf-8
 			"k1",
 			"ABC",
 		},
-		{
+		{ // extractor_test: 使用xpath提取器，从body提取多条元素属性
+			`HTTP/1.1 200 Ok
+Content-Type: text/html; charset=utf-8
+
+<html>
+	<head><title>ABC</title></head>
+	<div>abc</div>
+	<div>def</div>
+</html>`,
+			&YakExtractor{
+				Name:   "k1",
+				Type:   "xpath",
+				Scope:  "body",
+				Groups: []string{`//div/text()`},
+			},
+			"k1",
+			"abc,def",
+		},
+		{ // extractor_test: 使用xpath提取器，使用更复杂的xpath语法从body提取元素属性
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -190,7 +209,7 @@ Content-Type: text/html; charset=utf-8
 			"cc",
 			"799.00",
 		},
-		{
+		{ // 使用nuclei-dsl提取并生成数据
 			`HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 
@@ -237,18 +256,21 @@ Content-Type: text/html; charset=utf-8
 			"abc",
 		},
 	} {
-		data, extractor, key, value := extractor[0].(string), extractor[1].(*YakExtractor), extractor[2].(string), extractor[3].(string)
-		vars, err := extractor.Execute([]byte(data))
+		data, extractor, name, value := extractor[0].(string), extractor[1].(*YakExtractor), extractor[2].(string), extractor[3].(string)
+		results, err := extractor.Execute([]byte(data))
 		if err != nil {
 			log.Infof("INDEX: %v failed: %v", index, err)
 			panic(err)
 		}
-		ret, _ := vars[key]
-		if toString(ret) != value {
-			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
-			panic("failed")
+		if v, ok := results[name]; ok {
+			resStr := InterfaceSliceToString(v)
+			if resStr != value {
+				panic(utils2.Errorf("INDEX: %v failed, expect: %v, got: %v", index, value, resStr))
+			}
+		} else {
+			panic(spew.Sprintf("INDEX: %v failed,not found key: %v", index, name))
 		}
-		spew.Dump(vars)
+		spew.Dump(results)
 	}
 }
 
@@ -291,41 +313,41 @@ Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 
 {
-    "store": {
-        "book": [
-            {
-                "category": "reference",
-                "author": "Nigel Rees",
-                "title": "Sayings of the Century",
-                "price": 8.95
-            },
-            {
-                "category": "fiction",
-                "author": "Evelyn Waugh",
-                "title": "Sword of Honour",
-                "price": 12.99
-            },
-            {
-                "category": "fiction",
-                "author": "Herman Melville",
-                "title": "Moby Dick",
-                "isbn": "0-553-21311-3",
-                "price": 8.99
-            },
-            {
-                "category": "fiction",
-                "author": "J. R. R. Tolkien",
-                "title": "The Lord of the Rings",
-                "isbn": "0-395-19395-8",
-                "price": 22.99
-            }
-        ],
-        "bicycle": {
-            "color": "red",
-            "price": 19.95
-        }
-    },
-    "expensive": 10,
+   "store": {
+       "book": [
+           {
+               "category": "reference",
+               "author": "Nigel Rees",
+               "title": "Sayings of the Century",
+               "price": 8.95
+           },
+           {
+               "category": "fiction",
+               "author": "Evelyn Waugh",
+               "title": "Sword of Honour",
+               "price": 12.99
+           },
+           {
+               "category": "fiction",
+               "author": "Herman Melville",
+               "title": "Moby Dick",
+               "isbn": "0-553-21311-3",
+               "price": 8.99
+           },
+           {
+               "category": "fiction",
+               "author": "J. R. R. Tolkien",
+               "title": "The Lord of the Rings",
+               "isbn": "0-395-19395-8",
+               "price": 22.99
+           }
+       ],
+       "bicycle": {
+           "color": "red",
+           "price": 19.95
+       }
+   },
+   "expensive": 10,
 	"cc1": 111
 }
 `,
@@ -338,41 +360,41 @@ Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 
 {
-    "store": {
-        "book": [
-            {
-                "category": "reference",
-                "author": "Nigel Rees",
-                "title": "Sayings of the Century",
-                "price": 8.95
-            },
-            {
-                "category": "fiction",
-                "author": "Evelyn Waugh",
-                "title": "Sword of Honour",
-                "price": 12.99
-            },
-            {
-                "category": "fiction",
-                "author": "Herman Melville",
-                "title": "Moby Dick",
-                "isbn": "0-553-21311-3",
-                "price": 8.99
-            },
-            {
-                "category": "fiction",
-                "author": "J. R. R. Tolkien",
-                "title": "The Lord of the Rings",
-                "isbn": "0-395-19395-8",
-                "price": 22.99
-            }
-        ],
-        "bicycle": {
-            "color": "red",
-            "price": 19.95
-        }
-    },
-    "expensive": 10,
+   "store": {
+       "book": [
+           {
+               "category": "reference",
+               "author": "Nigel Rees",
+               "title": "Sayings of the Century",
+               "price": 8.95
+           },
+           {
+               "category": "fiction",
+               "author": "Evelyn Waugh",
+               "title": "Sword of Honour",
+               "price": 12.99
+           },
+           {
+               "category": "fiction",
+               "author": "Herman Melville",
+               "title": "Moby Dick",
+               "isbn": "0-553-21311-3",
+               "price": 8.99
+           },
+           {
+               "category": "fiction",
+               "author": "J. R. R. Tolkien",
+               "title": "The Lord of the Rings",
+               "isbn": "0-395-19395-8",
+               "price": 22.99
+           }
+       ],
+       "bicycle": {
+           "color": "red",
+           "price": 19.95
+       }
+   },
+   "expensive": 10,
 	"cc1": 111
 }
 `,
@@ -419,8 +441,8 @@ as
 	} {
 		_ = index
 		results := ExtractKValFromResponse([]byte(extractor[0].(string)))
-		key, value := extractor[1].(string), extractor[2].(string)
-		if toString(results[key]) != toString(value) {
+		key, value := InterfaceSliceToString(extractor[1]), InterfaceSliceToString(extractor[2])
+		if InterfaceSliceToString(results[key]) != InterfaceSliceToString(value) {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(results))
 			t.FailNow()
 		}
@@ -452,7 +474,7 @@ Content-Type: text/html; charset=utf-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if toString(ret) != value {
+		if InterfaceSliceToString(ret) != value {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
 			panic("failed")
 		}
@@ -492,7 +514,7 @@ Content-Type: text/html; charset=utf-8
 				XPathAttribute: "value",
 				Groups:         []string{`//title`},
 			},
-			"data0",
+			"data",
 			"999",
 		},
 	} {
@@ -503,7 +525,7 @@ Content-Type: text/html; charset=utf-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if toString(ret) != value {
+		if InterfaceSliceToString(ret) != value {
 			log.Infof("INDEX: %v failed,expect: %v,get: %v", index, spew.Sdump(map[string]string{key: value}), spew.Sdump(vars))
 			panic("failed")
 		}
@@ -522,7 +544,7 @@ Content-Encoding: UTF-8
 <html><!doctype html>
 <html>
 <body>
-  <div id="result">%d</div>
+ <div id="result">%d</div>
 </body>
 </html></html>`,
 			&YakExtractor{
@@ -541,7 +563,7 @@ Content-Encoding: UTF-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if toString(ret) != value {
+		if InterfaceSliceToString(ret) != value {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
 			panic("failed")
 		}

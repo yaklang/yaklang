@@ -828,7 +828,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 			continue
 		}
 		for k, v := range p {
-			params[k] = v
+			params[k] = httptpl.InterfaceSliceToString(v)
 		}
 	}
 

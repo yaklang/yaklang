@@ -80,6 +80,9 @@ func nc_sort(origin ...interface{}) (ret []interface{}) {
 func toString(i interface{}) string {
 	return utils.InterfaceToString(i)
 }
+func InterfaceSliceToString(i interface{}) string {
+	return strings.Join(utils.InterfaceToStringSlice(i), ",")
+}
 
 var nucleiDSLFunctions = map[string]interface{}{
 	"dump":     spew.Dump,
