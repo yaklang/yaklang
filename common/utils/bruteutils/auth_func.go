@@ -46,10 +46,8 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"memcached": memcachedAuth,
 	"mongodb":   mongoAuth,
 	"smb":       smbAuth,
+	"telnet":    telnetAuth,
 	//"oracle": func(item *BruteItem) *BruteItemResult {
-	//
-	//},
-	//"telnet": func(item *BruteItem) *BruteItemResult {
 	//
 	//},
 }
