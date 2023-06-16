@@ -10,6 +10,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -390,7 +391,7 @@ var startGRPCServerCommand = cli.Command{
 		}
 
 		/* 覆写核心插件 */
-		//coreplugin.OverWriteCorePluginToLocal()
+		coreplugin.OverWriteCorePluginToLocal()
 
 		/* 初始化数据库后进行权限修复 */
 		base := consts.GetDefaultYakitBaseDir()

@@ -46,6 +46,19 @@
         <li><a target="_blank" href="/user/name?name=admin">不安全的 SQL 注入(NAME)</a></li>
     </ol>
 
+    <h1>XSS 注入 Case</h1>
+    <ol>
+        <li><a target="_blank" href="/xss/safe?name=admin">安全的实体转义</a></li>
+        <li><a target="_blank" href="/xss/echo?name=admin">无安全措施直接拼接导致XSS注入(NAME)</a></li>
+        <li><a target="_blank" href="/xss/replace/nocase?name=admin">不安全过滤导致XSS注入(NAME)</a></li>
+    </ol>
+
+    <h1>Shiro默认key</h1>
+    <ol>
+        <li><a target="_blank" href="/shiro/cbc">shiro低版本默认key(< 1.4.2)</a></li>
+        <li><a target="_blank" href="/shiro/gcm">shiro低版本默认key(>= 1.4.2)</a></li>
+    </ol>
+
     <h1>命令注入测试用例</h1>
     <ol>
         <li><a target="_blank" href='/ping/cmd/shlex?ip=127.0.0.1'>Shlex 解析的命令注入</a></li>
