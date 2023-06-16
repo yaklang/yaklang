@@ -305,7 +305,7 @@ func readHTTP200(c net.Conn) bool {
 	//rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rspBytes)), nil)
 	rsp, err := http.ReadResponse(bufio.NewReader(c), nil)
 	if err != nil {
-		log.Errorf("read response(readHTTP200) failed: %s", err)
+		log.Debugf("read response(readHTTP200) failed: %s", err)
 		return false
 	}
 	return rsp.StatusCode >= 200 && rsp.StatusCode < 400
