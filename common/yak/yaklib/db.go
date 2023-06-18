@@ -94,6 +94,9 @@ var DatabaseExports = map[string]interface{}{
 
 	"YieldYakScriptAll":     _yieldYakScript,
 	"DeleteYakScriptByName": _deleteYakScriptByName,
+
+	// CreateTemporaryYakScript
+	"CreateTemporaryYakScript": yakit.CreateTemporaryYakScript,
 }
 
 func _deleteYakScriptByName(i string) error {

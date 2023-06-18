@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "fuzzhttppath_case1.yak"
+	var debugName = "mixcaller2.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
