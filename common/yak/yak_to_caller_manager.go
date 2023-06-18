@@ -679,7 +679,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 
 		// 没有设置并发控制，就直接顺序执行
 		if y.swg == nil || forceSync {
-			log.Infof("Start Call Verbose: %v", verbose)
+			log.Infof("Start Call Plugin: %v", verbose)
 			call(iRaw)
 			continue
 		}
