@@ -88,7 +88,7 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				// just append result which in match group
 				for _, res := range r.FindAllStringSubmatch(material, -1) {
 					for _, i := range y.RegexpMatchGroup {
-						if len(res) > i {
+						if i < len(res) {
 							addResult(res[i])
 						}
 					}
