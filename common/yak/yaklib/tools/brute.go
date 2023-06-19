@@ -19,6 +19,7 @@ var BruterExports = map[string]interface{}{
 	"debug":              yakBruteOpt_Debug,
 	"userList":           yakBruteOpt_userlist,
 	"passList":           yakBruteOpt_passlist,
+	"autoDict":           yakBruteOpt_autoDict,
 	"concurrent":         yakBruteOpt_concurrent,
 	"minDelay":           yakBruteOpt_minDelay,
 	"maxDelay":           yakBruteOpt_maxDelay,
@@ -87,6 +88,13 @@ func yakBruteOpt_ConcurrentTarget(c int) yakBruteOpt {
 func yakBruteOpt_userlist(users ...string) yakBruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.userList = users
+	}
+}
+
+func yakBruteOpt_autoDict() yakBruteOpt {
+	return func(bruter *yakBruter) {
+		bruter.userList = bruteutils.GetUsernameListFromBruteType(bruter.bruteType)
+		bruter.passList = bruteutils.GetPasswordListFromBruteType(bruter.bruteType)
 	}
 }
 
