@@ -117,6 +117,9 @@ type BruteItemResult struct {
 	// 爆破的用户名与密码
 	Username string
 	Password string
+
+	// 爆破结果的 banner 依据，额外信息
+	ExtraInfo []byte
 }
 
 func (r *BruteItemResult) String() string {
