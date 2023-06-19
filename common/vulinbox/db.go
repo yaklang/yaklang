@@ -69,6 +69,13 @@ func (s *dbm) GetUserBySession(uuid string) (*Session, error) {
 	return &session, nil
 }
 
+func (s *dbm) DeleteSession(uuid string) error {
+	if db := s.db.Where("uuid = ?", uuid).Delete(&Session{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
 func (s *dbm) GetUserByIdUnsafe(i string) (*VulinUser, error) {
 	var v VulinUser
 	db := s.db.Raw(`select * from vulin_users where id = ` + i + ";").Debug()
