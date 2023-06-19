@@ -1,0 +1,2 @@
+
+assert(make([]string) == nil)

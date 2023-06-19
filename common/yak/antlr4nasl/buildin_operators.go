@@ -38,7 +38,7 @@ func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	return yakvm.NewBoolValue(_eq(value, value2).False())
 }
 
-func init() {
+func _init() {
 	yakvm.ImportUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		b := op.True()
 		return &yakvm.Value{
