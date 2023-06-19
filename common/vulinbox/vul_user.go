@@ -3,6 +3,7 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -155,6 +156,11 @@ func (s *VulinServer) registerUserRoute() {
 	})
 	// 用户信息
 	router.HandleFunc("/user/profile", func(writer http.ResponseWriter, request *http.Request) {
+		realUser, err := s.database.Authenticate(writer, request)
+		if err != nil {
+			return
+		}
+
 		// 通过 id 获取用户信息
 		var a = request.URL.Query().Get("id")
 		i, err := strconv.ParseInt(a, 10, 64)
@@ -170,32 +176,12 @@ func (s *VulinServer) registerUserRoute() {
 			return
 		}
 
-		// 通过 cookie 登录用户的信息
-		session, err := request.Cookie("_cookie")
-		if err != nil {
-			writer.WriteHeader(http.StatusUnauthorized)
-			writer.Write([]byte("Unauthorized"))
+		// 水平越权
+		if realUser.Role != "admin" && realUser.Role != userInfo.Role {
+			writer.Write([]byte("Not Enough Permissions"))
+			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
-		// 解析 Cookie 中的用户信息
-		auth := session.Value
-		_, err = s.database.GetUserBySession(auth)
-		if err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			writer.Write([]byte("Internal error session " + err.Error()))
-			return
-		}
-
-		// 在这里执行获取用户详细信息的逻辑
-		// 假设根据用户名查询用户信息
-		//users, err := s.database.GetUserByUsernameUnsafe(userInfo.Username)
-		//if err != nil {
-		//	writer.WriteHeader(http.StatusInternalServerError)
-		//	writer.Write([]byte("Internal error, cannot retrieve user information"))
-		//	return
-		//}
-		//user := users[0]
 
 		writer.Header().Set("Content-Type", "text/html")
 
@@ -209,6 +195,10 @@ func (s *VulinServer) registerUserRoute() {
 	})
 
 	router.HandleFunc("/user/update", func(writer http.ResponseWriter, request *http.Request) {
+		realUser, err := s.database.Authenticate(writer, request)
+		if err != nil {
+			return
+		}
 		// 读取请求体数据
 		body, err := ioutil.ReadAll(request.Body)
 		if err != nil {
@@ -254,6 +244,11 @@ func (s *VulinServer) registerUserRoute() {
 		//userInfo.Remake = filterRemake
 
 		userInfo.Remake = oldUser.Remake
+
+		if realUser.Role != "admin" && realUser.Role != userInfo.Role {
+			log.Warnf("user %s is trying to update user %s", realUser.Username, userInfo.Username)
+		}
+
 		err = s.database.UpdateUser(userInfo)
 		if err != nil {
 			writer.Write([]byte(err.Error()))

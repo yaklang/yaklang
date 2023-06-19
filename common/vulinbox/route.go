@@ -14,10 +14,6 @@ var routeSafeHtml []byte
 func (s *VulinServer) init() {
 	router := s.router
 
-	// 创建UserManager实例
-	userMgr := newUserManager(s.database.db)
-	s.userMgr = userMgr
-
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
 		if s.safeMode {
