@@ -266,4 +266,21 @@ func (s *VulinServer) registerUserRoute() {
 		}
 	})
 
+	router.HandleFunc("/user/logout", func(writer http.ResponseWriter, request *http.Request) {
+		cookie, err := request.Cookie("_cookie")
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		uuid := cookie.Value
+		err = s.database.DeleteSession(uuid)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(writer, request, "/login", 302)
+	})
+
 }
