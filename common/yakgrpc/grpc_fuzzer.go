@@ -141,7 +141,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		Extractors:   req.GetExtractors(),
 	})
 	var extractResults []*ypb.KVPair
-	if err != nil && extractHTTPResponseResult != nil && extractHTTPResponseResult.GetValues() != nil {
+	if err == nil && extractHTTPResponseResult != nil && extractHTTPResponseResult.GetValues() != nil {
 		for _, value := range extractHTTPResponseResult.GetValues() {
 			extractResults = append(extractResults, &ypb.KVPair{
 				Key:   value.GetKey(),
