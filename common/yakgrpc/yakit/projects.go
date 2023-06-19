@@ -345,12 +345,12 @@ func YieldProject(db *gorm.DB, ctx context.Context) chan *Project {
 }
 
 func SetCurrentProjectById(db *gorm.DB, id int64) error {
-	/*if db1 := db.Model(&Project{}).Where("true").Update(map[string]interface{}{
+	if db1 := db.Model(&Project{}).Where("is_current_project = true").Update(map[string]interface{}{
 		"is_current_project": false,
 	}); db1.Error != nil {
 		log.Errorf("unset all projects current status: %s", db1.Error)
 	}
-*/
+
 	if db := db.Model(&Project{}).Where("id = ?", id).Update(map[string]interface{}{
 		"is_current_project": true,
 	}); db.Error != nil {

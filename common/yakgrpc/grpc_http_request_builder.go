@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -127,13 +125,14 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return utils.Error("build http request failed: no results")
 	}
 
-	tempName := fmt.Sprintf("tmp-%v", ksuid.New().String())
-	err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), tempName, &yakit.YakScript{
-		ScriptName: tempName,
-		Type:       req.GetPluginType(),
-		Content:    req.GetCode(),
-		Ignored:    false,
-	})
+	//tempName := fmt.Sprintf("tmp-%v", ksuid.New().String())
+	//err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), tempName, &yakit.YakScript{
+	//	ScriptName: tempName,
+	//	Type:       req.GetPluginType(),
+	//	Content:    req.GetCode(),
+	//	Ignored:    true,
+	//})
+	tempName, err := yakit.CreateTemporaryYakScript(req.GetPluginType(), req.GetCode())
 	if err != nil {
 		return err
 	}

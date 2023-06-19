@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -230,6 +232,21 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}
 	}
 
 	return nil
+}
+
+func CreateTemporaryYakScript(t string, code string) (string, error) {
+	var name = fmt.Sprintf("tmp-%v", ksuid.New().String())
+	var err = CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, &YakScript{
+		ScriptName: name,
+		Type:       t,
+		Content:    code,
+		Author:     "temp",
+		Ignored:    true,
+	})
+	if err != nil {
+		return "", err
+	}
+	return name, nil
 }
 
 func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bool) error {
