@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
@@ -442,7 +443,7 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 }
 
 func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []byte) string {
-	freq, err := mutate.NewFuzzHTTPRequest(req)
+	freq, err := getFuzzHTTPRequestByCache(req)
 	if err != nil {
 		return ""
 	}
@@ -455,6 +456,51 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 	}
 	sort.Strings(params)
 	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "path-params")
+}
+
+func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {
+	freq, err := getFuzzHTTPRequestByCache(req)
+	if err != nil {
+		return ""
+	}
+	var params []string
+	params = append(params, utils.CalcMd5(freq.GetMethod(), freq.GetPath()))
+	var fuzzParams = freq.GetPathParams()
+	for _, r := range fuzzParams {
+		params = append(params, utils.CalcMd5(r.String()))
+	}
+	sort.Strings(params)
+	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "path")
+}
+
+var ttlHTTPRequestCache = ttlcache.NewCache()
+
+func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
+	hash := utils.CalcSha1(req)
+	data, ok := ttlHTTPRequestCache.Get(hash)
+	if ok && data != nil {
+		var reqIns, _ = data.(*mutate.FuzzHTTPRequest)
+		if reqIns != nil {
+			return reqIns, nil
+		}
+	}
+	reqIns, err := mutate.NewFuzzHTTPRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	ttlHTTPRequestCache.SetWithTTL(hash, reqIns, 30*time.Minute)
+	return reqIns, nil
+}
+
+func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) string {
+	freq, err := getFuzzHTTPRequestByCache(req)
+	if err != nil {
+		return ""
+	}
+	var params []string
+	params = append(params, utils.CalcMd5(freq.GetMethod()))
+	sort.Strings(params)
+	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "new-website")
 }
 
 func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
@@ -518,8 +564,8 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	}
 	if urlObj != nil {
 		host, port, _ := utils.ParseStringToHostPort(u)
-		websiteHash := utils.CalcSha1("website", urlObj.Scheme, host, port)
-		websitePathHash := utils.CalcSha1("path", urlObj.Scheme, host, port, urlObj.EscapedPath())
+		websiteHash := calcNewWebsiteHash(urlObj, host, port, req)
+		websitePathHash := calcWebsitePathHash(urlObj, host, port, req)
 		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
 		if !m.websiteFilter.Exist(websiteHash) {
 			m.websiteFilter.Insert(websiteHash)
