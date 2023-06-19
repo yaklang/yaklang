@@ -1,0 +1,70 @@
+name = db.CreateTemporaryYakScript("mitm", `
+
+for index in 4 {
+    db.SetKey(f"zaFOUFeiLA_${index+1}", 0)
+}
+
+l = sync.NewLock()
+
+yakit.AutoInitYakit();
+mirrorHTTPFlow = (isHttps, url, req, rsp, body) => {
+    l.Lock()
+    defer l.Unlock()
+    var key = "zaFOUFeiLA_1"
+    dump(url)
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsite = (https, url, req, rsp, body) => {
+l.Lock()
+    defer l.Unlock()
+    var key = "zaFOUFeiLA_2"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsitePath = (https, url, req, rsp, body) => {
+l.Lock()
+    defer l.Unlock()
+    var key = "zaFOUFeiLA_3"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsitePathParams = (https, url, req, rsp, body) => {
+l.Lock()
+    defer l.Unlock()
+    var key = "zaFOUFeiLA_4"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+`)~
+defer db.DeleteYakScriptByName(name)
+
+caller = hook.NewMixPluginCaller()~
+caller.SetDividedContext(true)
+caller.SetConcurrent(20)
+die(caller.LoadPlugin(name))
+
+for url in [
+    "https://example.com/abc/",
+    "https://example.com/abc/12",
+    "https://example.com/abc/13",
+    "https://example.com/abc/14",
+    "https://example.com/abc/14?a=1",
+    "https://example.com/abc/14?a=1",
+    "https://example.com/abc/14?a=2",
+    "https://example.com/abc/14?a=2&&c=1",
+    "https://example.com/abc/14?a=2&&c=1",
+    "https://examplecc.com/abc/14?a=2&&c=1",
+] {
+    isHttps, req = poc.ParseUrlToHTTPRequestRaw("GET", url)~
+    caller.MirrorHTTPFlowEx(false, isHttps, url, req, []byte(""), []byte(""))
+}
+
+
+caller.Wait()
+
+assert atoi(db.GetKey(f`zaFOUFeiLA_1`))~ == 10, f"mirrorHTTPFlow: ${atoi(db.GetKey(f`zaFOUFeiLA_1`))~}"
+assert atoi(db.GetKey(f`zaFOUFeiLA_2`))~ == 2, f"mirrorNewWebsite: ${atoi(db.GetKey(f`zaFOUFeiLA_2`))~}"
+assert atoi(db.GetKey(f`zaFOUFeiLA_3`))~ == 5, f"mirrorNewWebsitePath: ${atoi(db.GetKey(f`zaFOUFeiLA_3`))~}"
+v = atoi(db.GetKey(f`zaFOUFeiLA_4`))~
+dump(v)
+assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"
