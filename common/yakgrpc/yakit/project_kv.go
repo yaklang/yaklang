@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
@@ -27,6 +28,21 @@ type ProjectGeneralStorage struct {
 
 	// 描述变量所在的组是啥
 	Group string
+}
+
+func init() {
+	RegisterPostInitDatabaseFunction(func() error {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("get post init database function")
+			}
+		}()
+		if GetProjectKey(consts.GetGormProjectDatabase(), "fuzzer-list-cache") == "" {
+			SetProjectKey(consts.GetGormProjectDatabase(), `fuzzer-list-cache`, GetKey(consts.GetGormProfileDatabase(), "fuzzer-list-cache"))
+			DelKey(consts.GetGormProfileDatabase(), "fuzzer-list-cache")
+		}
+		return nil
+	})
 }
 
 func GetProjectKey(db *gorm.DB, key interface{}) string {
@@ -82,7 +98,6 @@ func GetProjectKeyModel(db *gorm.DB, key interface{}) (*ProjectGeneralStorage, e
 	}
 	return &kv, nil
 }
-
 
 func SetProjectKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, seconds int) error {
 	if db == nil {
