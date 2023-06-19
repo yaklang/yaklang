@@ -1,0 +1,75 @@
+for index in 5 {
+    db.SetKey(f"zaFOUFeiLA_${index+1}", 0)
+}
+
+yakit.AutoInitYakit();
+
+name = db.CreateTemporaryYakScript("mitm", `
+yakit.AutoInitYakit();
+mirrorHTTPFlow = (isHttps, url, req, rsp, body) => {
+    var key = "zaFOUFeiLA_1"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsite = (https, url, req, rsp, body) => {
+    var key = "zaFOUFeiLA_2"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsitePath = (https, url, req, rsp, body) => {
+    var key = "zaFOUFeiLA_3"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+
+mirrorNewWebsitePathParams = (https, url, req, rsp, body) => {
+    var key = "zaFOUFeiLA_4"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+}
+`)~
+defer db.DeleteYakScriptByName(name)
+
+
+name2 = db.CreateTemporaryYakScript("port-scan", `
+handle = (result) => {
+    var key = "zaFOUFeiLA_5"
+    db.SetKey(key, atoi(db.GetKey(key))~ + 1)
+    dump(result)
+}
+`)~
+defer db.DeleteYakScriptByName(name2)
+
+
+caller = hook.NewMixPluginCaller()~
+die(caller.LoadPlugin(name))
+die(caller.LoadPlugin(name2))
+
+host, port = str.ParseStringToHostPort(getParam("VULINBOX"))~
+addr = f"${host}:${port}"
+
+for url in [
+    f"https://${addr}/abc/",
+    f"https://${addr}/abc/12",
+    f"https://${addr}/abc/13",
+    f"https://${addr}/abc/14",
+    f"https://${addr}/abc/14?a=1",
+    f"https://${addr}/abc/14?a=1",
+    f"https://${addr}/abc/14?a=2",
+    f"https://${addr}/abc/14?a=2&&c=1",
+    f"https://${addr}/abc/14?a=2&&c=1",
+    f"https://localhost:${port}/abc/14?a=2&&c=1",
+] {
+    isHttps, req = poc.ParseUrlToHTTPRequestRaw("GET", url)~
+    caller.MirrorHTTPFlow(isHttps, url, req, []byte(""), []byte(""))
+}
+
+
+caller.Wait()
+
+assert atoi(db.GetKey(f`zaFOUFeiLA_1`))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`zaFOUFeiLA_1`))~}"
+assert atoi(db.GetKey(f`zaFOUFeiLA_2`))~ == 2,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`zaFOUFeiLA_2`))~}"
+assert atoi(db.GetKey(f`zaFOUFeiLA_3`))~ == 5
+v = atoi(db.GetKey(f`zaFOUFeiLA_4`))~
+dump(v)
+assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"
+assert atoi(db.GetKey(f`zaFOUFeiLA_5`))~ == 2, "portscan failed"
+
