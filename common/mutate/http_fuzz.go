@@ -273,6 +273,10 @@ func _fixHttpsPorts(r *http.Request) {
 			host = r.URL.Host
 		}
 
+		if host != "" && r.URL.Host == "" {
+			r.URL.Host = host
+		}
+
 		host, port, err := utils.ParseStringToHostPort(r.URL.String())
 		if err != nil {
 			return
