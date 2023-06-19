@@ -108,3 +108,26 @@ func (s *Server) DelKey(ctx context.Context, req *ypb.GetKeyRequest) (*ypb.Empty
 
 	return &ypb.Empty{}, nil
 }
+
+
+func (s *Server) GetProjectKey(ctx context.Context, req *ypb.GetKeyRequest) (*ypb.GetKeyResult, error) {
+	result := yakit.GetProjectKey(s.GetProjectDatabase(), req.GetKey())
+	return &ypb.GetKeyResult{
+		Value: utils.EscapeInvalidUTF8Byte([]byte(result)),
+	}, nil
+}
+
+func (s *Server) SetProjectKey(ctx context.Context, req *ypb.SetKeyRequest) (*ypb.Empty, error) {
+	if req.GetTTL() > 0 {
+		err := yakit.SetProjectKeyWithTTL(s.GetProjectDatabase(), req.GetKey(), req.GetValue(), int(req.GetTTL()))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := yakit.SetProjectKey(s.GetProjectDatabase(), req.GetKey(), req.GetValue())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &ypb.Empty{}, nil
+}
