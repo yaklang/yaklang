@@ -263,7 +263,7 @@ Content-Type: text/html; charset=utf-8
 			panic(err)
 		}
 		if v, ok := results[name]; ok {
-			resStr := InterfaceSliceToString(v)
+			resStr := ExtractResultToString(v)
 			if resStr != value {
 				panic(utils2.Errorf("INDEX: %v failed, expect: %v, got: %v", index, value, resStr))
 			}
@@ -441,8 +441,8 @@ as
 	} {
 		_ = index
 		results := ExtractKValFromResponse([]byte(extractor[0].(string)))
-		key, value := InterfaceSliceToString(extractor[1]), InterfaceSliceToString(extractor[2])
-		if InterfaceSliceToString(results[key]) != InterfaceSliceToString(value) {
+		key, value := ExtractResultToString(extractor[1]), ExtractResultToString(extractor[2])
+		if ExtractResultToString(results[key]) != ExtractResultToString(value) {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(results))
 			t.FailNow()
 		}
@@ -474,7 +474,7 @@ Content-Type: text/html; charset=utf-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if InterfaceSliceToString(ret) != value {
+		if ExtractResultToString(ret) != value {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
 			panic("failed")
 		}
@@ -525,7 +525,7 @@ Content-Type: text/html; charset=utf-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if InterfaceSliceToString(ret) != value {
+		if ExtractResultToString(ret) != value {
 			log.Infof("INDEX: %v failed,expect: %v,get: %v", index, spew.Sdump(map[string]string{key: value}), spew.Sdump(vars))
 			panic("failed")
 		}
@@ -563,7 +563,7 @@ Content-Encoding: UTF-8
 			panic(err)
 		}
 		ret, _ := vars[key]
-		if InterfaceSliceToString(ret) != value {
+		if ExtractResultToString(ret) != value {
 			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(vars))
 			panic("failed")
 		}

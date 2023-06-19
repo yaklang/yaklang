@@ -2710,10 +2710,6 @@ message MatchHTTPResponseResult {
   bool Matched = 1;
 }
 
-message ExtractorRule{
-  string Name = 1;
-  string Rule = 2;
-}
 message HTTPResponseExtractor {
   string Name = 1; // default for index
   string Type = 2; // regex / xpath / kval / json / nuclei-dsl
@@ -2721,8 +2717,8 @@ message HTTPResponseExtractor {
   repeated string Groups = 4;
   repeated int64 RegexpMatchGroup = 5;
   string XPathAttribute = 6;
-  repeated ExtractorRule RuleGroups = 7;
 }
+
 message ExtractHTTPResponseResult {
   repeated FuzzerParamItem Values = 1;
 }
@@ -2819,6 +2815,7 @@ message FuzzerRequest {
   repeated HTTPResponseExtractor Extractors = 32;
   repeated HTTPResponseMatcher Matchers = 33;
   string MatchersCondition = 34;
+  string HitColor = 36;
 }
 
 message KVPair {
@@ -2851,7 +2848,6 @@ message ExtractedUrl {
 }
 
 message FuzzerResponse {
-
   string Method = 1;
   int32  StatusCode = 2;
   string Host = 3;
@@ -2905,6 +2901,7 @@ message FuzzerResponse {
   // 如果设置了
   repeated KVPair ExtractedResults = 45;
   bool MatchedByMatcher = 46;
+  string HitColor = 47;
 }
 
 message Paging {

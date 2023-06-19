@@ -179,7 +179,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				_ = index
 				if varIns != nil {
 					for k, v := range varIns {
-						v := InterfaceSliceToString(v)
+						v := ExtractResultToString(v)
 						addToVars(k, v)
 						extracted[k] = v
 					}

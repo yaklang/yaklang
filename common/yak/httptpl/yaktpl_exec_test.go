@@ -976,7 +976,7 @@ requests:
 		checked := false
 		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
 			spew.Dump(extractor)
-			if InterfaceSliceToString(extractor["a2"]) == expected {
+			if ExtractResultToString(extractor["a2"]) == expected {
 				checked = true
 			}
 
@@ -1086,7 +1086,7 @@ requests:
 		checked := false
 		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
 			spew.Dump(extractor)
-			if InterfaceSliceToString(extractor["a2"]) == expected {
+			if ExtractResultToString(extractor["a2"]) == expected {
 				checked = true
 			}
 

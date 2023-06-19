@@ -408,7 +408,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					continue
 				}
 				for k, v := range vars {
-					extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: utils.InterfaceToString(v)})
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)})
 				}
 			}
 		}
@@ -462,6 +462,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			IsHTTPS:               strings.HasPrefix(strings.ToLower(result.Url), "https://"),
 			ExtractedResults:      extractorResults,
 			MatchedByMatcher:      httpTPLmatchersResult,
+			HitColor:              req.GetHitColor(),
 		}
 		// 处理额外时间
 		if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
@@ -828,7 +829,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 			continue
 		}
 		for k, v := range p {
-			params[k] = httptpl.InterfaceSliceToString(v)
+			params[k] = httptpl.ExtractResultToString(v)
 		}
 	}
 
@@ -836,7 +837,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 	for k, v := range params {
 		results = append(results, &ypb.FuzzerParamItem{
 			Key:   k,
-			Value: utils.InterfaceToString(v),
+			Value: httptpl.ExtractResultToString(v),
 		})
 	}
 	return &ypb.ExtractHTTPResponseResult{Values: results}, nil
