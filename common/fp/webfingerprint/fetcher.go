@@ -59,7 +59,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 			}{Url: urlRaw, Raw: rsp, Request: req, IsHttps: isHttps})
 		}
 		return true
-	}, false, false, utils.StringArrayFilterEmpty(proxy)...)
+	}, false, false, false, utils.StringArrayFilterEmpty(proxy)...)
 	if err != nil {
 		return isOpen, nil, utils.Errorf("send request failed: %s", err)
 	}

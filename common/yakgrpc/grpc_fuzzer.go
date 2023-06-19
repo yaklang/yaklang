@@ -128,12 +128,64 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
-	rspRaw, _, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirect(
+	rspRaw, _, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(
 		isHttps, host, port, resultRequest,
-		utils.FloatSecondDuration(req.GetPerRequestTimeoutSeconds()), 0,
+		utils.FloatSecondDuration(req.GetPerRequestTimeoutSeconds()), 0, req.GetIsGmTLS(),
 		utils.PrettifyListFromStringSplited(req.GetProxy(), ",")...)
 	if err != nil {
 		return nil, err
+	}
+	// 提取响应
+	extractHTTPResponseResult, err := s.ExtractHTTPResponse(ctx, &ypb.ExtractHTTPResponseParams{
+		HTTPResponse: string(rspRaw),
+		Extractors:   req.GetExtractors(),
+	})
+	var extractResults []*ypb.KVPair
+	if err != nil && extractHTTPResponseResult != nil && extractHTTPResponseResult.GetValues() != nil {
+		for _, value := range extractHTTPResponseResult.GetValues() {
+			extractResults = append(extractResults, &ypb.KVPair{
+				Key:   value.GetKey(),
+				Value: value.GetValue(),
+			})
+		}
+	}
+	// 匹配响应
+	var httpTPLmatchersResult bool
+	if len(req.GetMatchers()) != 0 {
+		httpTplMatcher := make([]*httptpl.YakMatcher, 0)
+		for _, matcher := range req.GetMatchers() {
+			httpTplMatcher = append(httpTplMatcher, httptpl.NewMatcherFromGRPCModel(matcher))
+		}
+		cond := "and"
+		switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
+		case "or", "and":
+			cond = ret
+		default:
+		}
+		ins := &httptpl.YakMatcher{
+			SubMatcherCondition: cond,
+			SubMatchers:         httpTplMatcher,
+		}
+		var mergedParams = make(map[string]interface{})
+		renderedParams, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
+			Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
+				return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
+			}).([]*ypb.KVPair),
+			IsHTTPS: req.GetIsHttps(),
+			IsGmTLS: req.GetIsGmTLS(),
+		})
+		if err != nil {
+			return nil, utils.Errorf("render variables failed: %v", err)
+		}
+		for _, kv := range renderedParams.GetResults() {
+			mergedParams[kv.GetKey()] = kv.GetValue()
+		}
+
+		matcherParams := utils.CopyMapInterface(mergedParams)
+		httpTPLmatchersResult, err = ins.Execute(&lowhttp.LowhttpResponse{RawPacket: rspRaw}, matcherParams)
+		if err != nil {
+			log.Errorf("httptpl.YakMatcher execute failed: %s", err)
+		}
 	}
 
 	var rsp = &ypb.FuzzerResponse{
@@ -141,6 +193,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
+		ExtractedResults:      extractResults,
+		MatchedByMatcher:      httpTPLmatchersResult,
+		HitColor:              req.GetHitColor(),
 	}
 	rsp.UUID = uuid.NewV4().String()
 	rsp.Timestamp = start.Unix()
@@ -177,7 +232,6 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 			}
 		}
 	}
-
 	return rsp, nil
 }
 

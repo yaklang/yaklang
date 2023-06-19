@@ -60,7 +60,7 @@ Host: %v
 `, utils.HostPort(host, port))),
 		3*time.Second, 4, false, func(isHttps bool, req []byte, rsp []byte) bool {
 			return true
-		}, false, false)
+		}, false, false, false)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ Host: %v
 `, utils.HostPort(host, port))),
 		3*time.Second, 4, false, func(isHttps bool, req []byte, rsp []byte) bool {
 			return true
-		}, false, false)
+		}, false, false,false)
 	if err != nil {
 		panic(err)
 	}
