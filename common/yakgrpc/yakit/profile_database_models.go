@@ -37,6 +37,7 @@ var ProjectTables = []interface{}{
 	&MarkdownDoc{}, &ExecResult{},
 	&Risk{}, &WebFuzzerTask{}, &WebFuzzerResponse{},
 	&ReportRecord{}, &ScreenRecorder{},
+	&ProjectGeneralStorage{},
 	// rss
 	&Briefing{}, &RssFeed{},
 	// &assets.SubscriptionSource{},
