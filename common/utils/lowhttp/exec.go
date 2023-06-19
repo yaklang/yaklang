@@ -294,15 +294,11 @@ func SendHTTPRequestRawQuick(https bool, r *http.Request) ([]byte, error) {
 	return SendHTTPRequestRawQuickWithTimeout(https, r, 5*time.Second)
 }
 
-func SendHTTPRequestWithRawPacketWithRedirect(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, proxy ...string) ([]byte, [][]byte, error) {
-	return SendHTTPRequestWithRawPacketWithRedirectEx(https, host, port, r, timeout, redirectTimes, nil, proxy...)
+func SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, gmTLS bool, proxy ...string) ([]byte, [][]byte, error) {
+	return SendHTTPRequestWithRawPacketWithRedirectFullEx(https, host, port, r, timeout, redirectTimes, false, nil, false, false, gmTLS, proxy...)
 }
-
-func SendHTTPRequestWithRawPacketWithRedirectEx(
-	https bool, host string, port int, r []byte, timeout time.Duration,
-	redirectTimes int, redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
-	proxy ...string) ([]byte, [][]byte, error) {
-	return SendHTTPRequestWithRawPacketWithRedirectFullEx(https, host, port, r, timeout, redirectTimes, false, redirectHandler, false, false, proxy...)
+func SendHTTPRequestWithRawPacketWithRedirect(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, proxy ...string) ([]byte, [][]byte, error) {
+	return SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(https, host, port, r, timeout, redirectTimes, false, proxy...)
 }
 
 var (
@@ -456,6 +452,7 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(
 	redirectTimes int, jsRedirect bool,
 	redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
 	noFixContentLength bool, forceHttp2 bool, // 这个参数很关键，一般有这个情况的话，很可能用户发了多个包。
+	gmTls bool,
 	proxy ...string) ([]byte, [][]byte, bool, error) {
 
 	response, err := SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
@@ -470,6 +467,7 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(
 		WithNoFixContentLength(noFixContentLength),
 		WithHttp2(forceHttp2),
 		WithProxy(proxy...),
+		WithGmTLS(gmTls),
 	)
 	return response.RawPacket, response.RedirectRawPackets, response.PortIsOpen, err
 }
@@ -507,11 +505,12 @@ func SendHTTPRequestWithRawPacketWithRedirectFullEx(
 	redirectTimes int, jsRedirect bool,
 	redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
 	noFixContentLength bool, forceHttp2 bool, // 这个参数很关键，一般有这个情况的话，很可能用户发了多个包。
+	gmTls bool,
 	proxy ...string) ([]byte, [][]byte, error) {
 	rsp, reqs, _, err := SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(
 		https, host, port, r, timeout,
 		redirectTimes, jsRedirect, redirectHandler,
-		noFixContentLength, forceHttp2, proxy...)
+		noFixContentLength, forceHttp2, gmTls, proxy...)
 	return rsp, reqs, err
 }
 
