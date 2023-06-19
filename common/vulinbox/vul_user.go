@@ -171,36 +171,36 @@ func (s *VulinServer) registerUserRoute() {
 		}
 
 		// 通过 cookie 登录用户的信息
-		//session, err := request.Cookie("_cookie")
-		//if err != nil {
-		//	writer.WriteHeader(http.StatusUnauthorized)
-		//	writer.Write([]byte("Unauthorized"))
-		//	return
-		//}
-		//
-		//// 解析 Cookie 中的用户信息
-		//auth := session.Value
-		//userInfo, err := s.database.GetUserBySession(auth)
-		//if err != nil {
-		//	writer.WriteHeader(http.StatusInternalServerError)
-		//	writer.Write([]byte("Internal error session " + err.Error()))
-		//	return
-		//}
+		session, err := request.Cookie("_cookie")
+		if err != nil {
+			writer.WriteHeader(http.StatusUnauthorized)
+			writer.Write([]byte("Unauthorized"))
+			return
+		}
+
+		// 解析 Cookie 中的用户信息
+		auth := session.Value
+		_, err = s.database.GetUserBySession(auth)
+		if err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			writer.Write([]byte("Internal error session " + err.Error()))
+			return
+		}
 
 		// 在这里执行获取用户详细信息的逻辑
 		// 假设根据用户名查询用户信息
-		users, err := s.database.GetUserByUsernameUnsafe(userInfo.Username)
-		if err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			writer.Write([]byte("Internal error, cannot retrieve user information"))
-			return
-		}
-		user := users[0]
+		//users, err := s.database.GetUserByUsernameUnsafe(userInfo.Username)
+		//if err != nil {
+		//	writer.WriteHeader(http.StatusInternalServerError)
+		//	writer.Write([]byte("Internal error, cannot retrieve user information"))
+		//	return
+		//}
+		//user := users[0]
 
 		writer.Header().Set("Content-Type", "text/html")
 
 		tmpl, err := template.New("profile").Parse(string(profilePage)) // 请将文件名替换为你保存的 HTML 文件名
-		err = tmpl.Execute(writer, user)
+		err = tmpl.Execute(writer, userInfo)
 		if err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			writer.Write([]byte("Internal error, cannot render user profile"))
