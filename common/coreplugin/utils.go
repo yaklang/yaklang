@@ -2,8 +2,8 @@ package coreplugin
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,6 +17,9 @@ import (
 	"testing"
 	"time"
 )
+
+//go:embed base-yak-plugin/*
+var basePlugin embed.FS
 
 type PlugInfo struct {
 	PlugName    string
@@ -127,45 +130,10 @@ func Must(condition bool, errMsg string) {
 }
 
 func GetCorePluginData(name string) []byte {
-	switch name {
-	case "启发式SQL注入检测":
-		{
-			codeBytes, err := bindata.Asset(fmt.Sprintf("data/base-yak-plugin/%v.yak", name))
-			if err != nil {
-				log.Errorf("无法从bindata获取%v插件", name)
-				return nil
-			}
-			return codeBytes
-		}
-	case "SSTI Expr 服务器模版表达式注入":
-		{
-			codeBytes, err := bindata.Asset(fmt.Sprintf("data/base-yak-plugin/%v.yak", name))
-			if err != nil {
-				log.Errorf("无法从bindata获取%v插件", name)
-				return nil
-			}
-			return codeBytes
-		}
-	case "Shiro 指纹识别 + 弱密码检测":
-		{
-			codeBytes, err := bindata.Asset(fmt.Sprintf("data/base-yak-plugin/%v.yak", name))
-			if err != nil {
-				log.Errorf("无法从bindata获取%v插件", name)
-				return nil
-			}
-			return codeBytes
-		}
-	case "基础 XSS 检测":
-		{
-			codeBytes, err := bindata.Asset(fmt.Sprintf("data/base-yak-plugin/%v.yak", name))
-			if err != nil {
-				log.Errorf("无法从bindata获取%v插件", name)
-				return nil
-			}
-			return codeBytes
-		}
-	default:
+	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("base-yak-plugin/%v.yak", name))
+	if err != nil {
 		log.Errorf("%v不是core plugin", name)
+		return nil
 	}
-	return nil
+	return codeBytes
 }

