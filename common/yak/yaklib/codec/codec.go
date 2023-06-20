@@ -286,6 +286,26 @@ func PKCS5UnPadding(origData []byte) []byte {
 	return origData[:(length - unpadding)]
 }
 
+func MustPKCS5UnPadding(origData []byte) ([]byte, error) {
+	length := len(origData)
+	if length == 0 {
+		return nil, errors.New("input data is empty")
+	}
+
+	unpadding := int(origData[length-1])
+	if unpadding > length {
+		return nil, errors.New("invalid padding")
+	}
+
+	for i := length - unpadding; i < length; i++ {
+		if int(origData[i]) != unpadding {
+			return nil, errors.New("invalid padding")
+		}
+	}
+
+	return origData[:(length - unpadding)], nil
+}
+
 func ZeroPadding(origin []byte, blockSize int) []byte {
 	originLen := len(origin)
 	if originLen%blockSize == 0 {

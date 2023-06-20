@@ -27,7 +27,9 @@ func (s *VulinServer) init() {
 		}
 	})
 	s.registerSQLinj()
+	s.registerXSS()
 	s.registerSSRF()
+	s.registerMockVulShiro()
 	s.registerExprInj()
 	s.registerWebsocket()
 	s.registerLoginRoute()
