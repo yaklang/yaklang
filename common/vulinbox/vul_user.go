@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 )
 
 //go:embed vul_user_register.html
@@ -141,6 +142,8 @@ func (s *VulinServer) registerUserRoute() {
 		http.SetCookie(writer, &http.Cookie{
 			Name:  "_cookie",
 			Value: session.Uuid,
+
+			Expires: time.Now().Add(15 * time.Minute),
 
 			//HttpOnly: true,
 		})
@@ -280,7 +283,8 @@ func (s *VulinServer) registerUserRoute() {
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(writer, request, "/login", 302)
+		writer.WriteHeader(http.StatusOK)
+		return
 	})
 
 }

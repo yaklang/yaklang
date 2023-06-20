@@ -67,8 +67,8 @@
             </tr>
         </table>
 
-        <button id="updateButton" type="submit" class="btn btn-primary mt-4">Update Profile</button>
-        <button id="logoutButton" type="submit" class="btn btn-primary mt-4">LogOut</button>
+        <button id="updateButton" class="btn btn-primary mt-4">Update Profile</button>
+        <button id="logoutButton" class="btn btn-danger mt-4">LogOut</button>
     </form>
     <div>
         <pre id="codeSnippet" style="display: none;"></pre>
@@ -77,7 +77,7 @@
 
 <script>
     // 添加表单提交事件监听器
-    document.getElementById("profileForm").addEventListener("submit", function (e) {
+    document.getElementById("updateButton").addEventListener("click", function (e) {
         e.preventDefault(); // 阻止表单默认提交行为
 
         // 获取要更新的年龄值
@@ -117,6 +117,30 @@
                 showNotification("Failed to update profile.", "danger");
             }
         };
+    });
+
+    // 处理登出按钮的单击事件
+    document.getElementById("logoutButton").addEventListener("click", function (e) {
+        e.preventDefault();
+        // 发送登出请求
+
+        // 清除浏览器中的Cookie
+        document.cookie = "_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/user/logout", true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    // 登出成功，重定向到登录页面
+                    window.location.href = "/user/login";
+                } else {
+                    // 登出失败，显示错误消息
+                    showNotification("Logout failed: " + xhr.responseText);
+                }
+            }
+        };
+        xhr.send();
     });
 
     // 显示提示框
