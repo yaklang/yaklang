@@ -25,61 +25,61 @@ type testStructed struct {
 }
 
 func init() {
-	yakvm.Import("libx", map[string]interface{}{
+	Import("libx", map[string]interface{}{
 		"abc": func() string {
 			return "called-abc"
 		},
 	})
-	yakvm.Import("testMap", map[string]interface{}{
+	Import("testMap", map[string]interface{}{
 		"Remove": func() bool {
 			return true
 		},
 	})
-	yakvm.Import("timeNow", time.Now()) // timeNow.Unix()
-	yakvm.Import("time", time.Now())
-	yakvm.Import("testIns", &testStructed{A: []int{1, 2, 3}})
-	yakvm.Import("dump", func(v ...interface{}) {
+	Import("timeNow", time.Now()) // timeNow.Unix()
+	Import("time", time.Now())
+	Import("testIns", &testStructed{A: []int{1, 2, 3}})
+	Import("dump", func(v ...interface{}) {
 		spew.Dump(v...)
 	})
-	yakvm.Import("print", func(v interface{}) {
+	Import("print", func(v interface{}) {
 		fmt.Println(v)
 	})
-	yakvm.Import("handlerTest", func(h func(b bool) string) {
+	Import("handlerTest", func(h func(b bool) string) {
 		fmt.Println(h(true))
 	})
-	yakvm.Import("assert", func(v bool) {
+	Import("assert", func(v bool) {
 		if !v {
 			panic("assert failed")
 		}
 	})
-	yakvm.Import("panic", func(v interface{}) {
+	Import("panic", func(v interface{}) {
 		panic(v)
 	})
-	yakvm.Import("sleep", func(i float64) {
+	Import("sleep", func(i float64) {
 		utils.Sleep(i)
 	})
-	yakvm.Import("sprint", func(i interface{}) string {
+	Import("sprint", func(i interface{}) string {
 		return fmt.Sprint(i)
 	})
-	yakvm.Import("len", func(i interface{}) int {
+	Import("len", func(i interface{}) int {
 		return reflect.ValueOf(i).Len()
 	})
-	yakvm.Import("typeof", func(i interface{}) reflect.Type {
+	Import("typeof", func(i interface{}) reflect.Type {
 		return reflect.TypeOf(i)
 	})
-	yakvm.Import("close", func(i interface{}) {
+	Import("close", func(i interface{}) {
 		rv := reflect.ValueOf(i)
 		if rv.Kind() == reflect.Chan {
 			rv.Close()
 		}
 	})
-	yakvm.Import("testTypeCast", func(i int) {
+	Import("testTypeCast", func(i int) {
 		rv := reflect.ValueOf(i)
 		if rv.Kind() == reflect.Chan {
 			rv.Close()
 		}
 	})
-	yakvm.Import("package", map[string]interface{}{
+	Import("package", map[string]interface{}{
 		"test": func(v ...interface{}) (string, error) {
 			return "test", errors.New("test error")
 		},
@@ -797,6 +797,7 @@ func _marshallerTest(i string) {
 	// cl.SetOpcodes(codes)
 
 	vm := yakvm.NewWithSymbolTable(symbolTable)
+	vm.ImportLibs(buildinLib)
 	err = vm.Exec(context.Background(), func(frame *yakvm.Frame) {
 		frame.NormalExec(codes)
 	})
@@ -1344,7 +1345,7 @@ func TestNewExecutor_Formatter3(t *testing.T) {
 }
 
 func TestNewExecutor_Formatter2(t *testing.T) {
-	yakvm.Import("p", func(v ...interface{}) {
+	Import("p", func(v ...interface{}) {
 		fmt.Println(v...)
 	})
 
@@ -1726,7 +1727,7 @@ assert b != 23
 }
 
 func TestNewExecutor_Array_MemberCall(t *testing.T) {
-	yakvm.Import("ptr", func(i interface{}) {
+	Import("ptr", func(i interface{}) {
 		fmt.Printf("%p", i)
 	})
 	code := `
@@ -3069,7 +3070,7 @@ func TestNewExecutor_MemberCall(t *testing.T) {
 		Sex:  "男",
 	}
 
-	yakvm.Import("getGoStruct", func() interface{} {
+	Import("getGoStruct", func() interface{} {
 		return u
 	})
 	code := `
@@ -3423,6 +3424,7 @@ func TestHijackVMFrameMapMemberCaller(t *testing.T) {
 	var hijackedFuncHooked = false
 	codes := compiler(`test.dump(111)`).GetOpcodes()
 	ins := yakvm.New()
+	ins.ImportLibs(buildinLib)
 	ins.RegisterMapMemberCallHandler("test", "dump", func(i interface{}) interface{} {
 		println("HOOKED!")
 		executedHook = true
@@ -3459,6 +3461,7 @@ sleep(0.5)
 print("end")
 `
 	engine := New()
+	engine.ImportLibs(buildinLib)
 	engine.ImportLibs(map[string]interface{}{
 		"sleep": func(n float64) {
 			time.Sleep(time.Duration(n * float64(time.Second)))
@@ -3489,6 +3492,7 @@ assert typeof([""]).String() == "[]string", "[\"1\"] type error"
 assert getStringSliceArgumentType([]) == "[]string", "auto convert [] to []string failed"
 `
 	engine := New()
+	engine.ImportLibs(buildinLib)
 	engine.ImportLibs(map[string]interface{}{
 		"getStringSliceArgumentType": func(s []string) string {
 			return reflect.TypeOf(s).String()

@@ -1,2 +1,208 @@
+/* 运算符测试 */
 
-assert(make([]string) == nil)
+// 测试等于运算符
+assert(make([]string)==nil)
+
+// 测试乘法运算符
+assert 2*3 == 6, "multiplication failed"
+
+// 测试除法运算符
+assert 7/4 == 1, "division failed" 
+
+// 测试取模运算符
+assert 7%4 == 3, "modulus failed" 
+
+// 测试左移位运算符
+assert 1<<2 == 4, "left shift failed" 
+
+// 测试小于运算符
+assert 1 < 2, "less than failed" 
+
+// 测试右移位运算符
+assert 8>>2 == 2, "right shift failed" 
+
+// 测试大于运算符
+assert 2 > 1, "greater than failed" 
+
+// 测试按位与运算符
+assert 5&3 == 1, "bitwise and failed"
+
+// 测试加法运算符
+assert 2+3 == 5, "addition failed" 
+
+// 测试减法运算符
+assert 5-2 == 3, "subtraction failed" 
+
+// 测试异或运算符
+assert 5^3 == 6, "bitwise xor failed" 
+
+// 测试按位或运算符
+assert 5|3 == 7, "bitwise or failed" 
+
+// 测试相等运算符
+assert 3 == 3, "equality failed" 
+
+// 测试小于等于运算符
+assert 3 <= 4, "less than or equal to failed" 
+
+// 测试大于等于运算符
+assert 4 >= 3, "greater than or equal to failed" 
+
+// 测试不等于运算符
+assert 3 != 2, "not equal to failed" 
+
+// 测试逻辑与运算符
+assert true && true == true, "logical and failed" 
+
+// 测试逻辑或运算符
+assert true || false == true, "logical or failed" 
+
+// 测试取反运算符
+assert !true == false, "not failed" 
+
+// 测试按位取反运算符
+assert ^5 == -6, "bitwise not failed"
+
+/* 测试箭头函数 */
+ a = a => a + 1
+assert a(1) == 2, "arrow function failed"
+
+/* 测试函数 */
+func add(a, b) {
+    return a + b
+}
+assert add(1, 2) == 3, "function failed"
+
+/* 测试闭包 */
+func adder(a) {
+    return func(b) {
+        return a + b
+    }
+}
+
+assert adder(1)(2) == 3, "closure failed"
+
+/* 测试可变参数 */
+func sum(a...) {
+    s = 0
+    for i in a {
+        s += i
+    }
+    return s
+}
+
+assert sum(1, 2, 3) == 6, "variadic function failed"
+
+/* 测试递归 */
+func factorial(n) {
+    if n == 0 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+assert factorial(5) == 120, "recursion failed"
+
+/* 测试条件语句 */
+if 1 == 1 {
+    assert true, "if failed"
+} else {
+    assert false, "if failed"
+}
+
+err = 1
+if err {}else{
+    die("if err failed")
+}
+
+/* 测试for循环 */
+i = 0
+for ; i < 10; i = i + 1 {
+    i+=1
+}
+assert i == 10, "for failed"
+
+i = 0
+for t in [1, 2, 3] {
+    i += t
+}
+
+assert i == 6, "for failed"
+
+/* 测试switch语句 */
+switch 1 {
+case 1:
+    assert true, "switch failed"
+default:
+    assert false, "switch failed"
+}
+
+/* 测试类型转换 */
+assert int(1) == 1, "type conversion failed"
+assert int(1.2) == 1, "type conversion failed"
+assert int("1") == 1, "type conversion failed"
+assert int(true) == 1, "type conversion failed"
+assert int(false) == 0, "type conversion failed"
+assert int(nil) == 0, "type conversion failed"
+
+assert float(1) == 1.0, "type conversion failed"
+assert float(1.2) == 1.2, "type conversion failed"
+assert float("1.2") == 1.2, "type conversion failed"
+assert float(true) == 1.0, "type conversion failed"
+assert float(false) == 0.0, "type conversion failed"
+assert float(nil) == 0.0, "type conversion failed"
+
+assert string(1) == "1", "type conversion failed"
+assert string(1.2) == "1.2", "type conversion failed"
+assert string(true) == "true", "type conversion failed"
+assert string(false) == "false", "type conversion failed"
+assert string(nil) == "", "type conversion failed"
+
+assert bool(1) == true, "type conversion failed"
+assert bool(1.2) == true, "type conversion failed"
+assert bool("1.2") == true, "type conversion failed"
+assert bool(true) == true, "type conversion failed"
+assert bool(false) == false, "type conversion failed"
+assert bool(nil) == false, "type conversion failed"
+
+/* 测试数组 */
+a = [1, 2, 3]
+assert a[0] == 1, "array failed"
+assert a[-1] == 3, "array failed"
+assert a[1:2] == [2], "array failed"
+assert a[1:] == [2, 3], "array failed"
+assert a[:2] == [1, 2], "array failed"
+assert a[::-1] == [3,2,1], "array failed"
+assert a[1:2:3] == [2], "array failed"
+b = (a,b,c) => c
+assert b(a...) == 3, "array failed"
+
+/* 测试字典 */
+a = {"a": 1, "b": 2, "c": a => a+1}
+assert a["a"] == 1, "dict failed"
+assert a["b"] == 2, "dict failed"
+assert a["c"](1) == 2, "dict failed"
+
+/* 测试异常捕获 */
+try {
+    panic("error")
+} catch e {
+    assert e == "error", "catch failed"
+}
+
+/* 测试作用域 */
+a = 1
+{
+    a = 2
+}
+assert a == 2, "scope failed"
+
+/* 测试break */
+t = 0
+for i = range 100{
+    t += 1
+    if i == 10 {
+        break
+    }
+}
+assert t == 11, "break failed"
