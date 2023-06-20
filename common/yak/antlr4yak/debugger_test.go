@@ -8,6 +8,7 @@ import (
 
 func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.Debugger)) {
 	engine := New()
+	engine.ImportLibs(buildinLib)
 	engine.SetDebugMode(true)
 	engine.SetDebugInit(debuggerInit)
 	engine.SetDebugCallback(debuggerCallBack)
