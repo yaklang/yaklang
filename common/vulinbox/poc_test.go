@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
-	"github.com/yaklang/yaklang/common/bindata"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
@@ -76,11 +76,12 @@ func (v *vulBoxTester) run() {
 		return nil
 	})
 	for fileName, _ := range v.plugins {
-		scriptBytes, err := bindata.Asset("data/base-yak-plugin/" + fileName)
+		var pluginName = strings.TrimSuffix(fileName, ".yak")
+		var scriptBytes = coreplugin.GetCorePluginData(pluginName)
+		var err = manager.LoadHotPatch(context.Background(), string(scriptBytes))
 		if err != nil {
-			panic(err)
+			panic(fmt.Sprintf("load plugin %v failed: %s", pluginName, err))
 		}
-		manager.LoadHotPatch(context.Background(), string(scriptBytes))
 	}
 
 	manager.SetDividedContext(true)
