@@ -7,11 +7,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
+var buildinLib = make(map[string]interface{})
+
 type FakeCompiler struct {
 	code   string
 	engine *Engine
 }
 
+func Import(name string, f interface{}) {
+	buildinLib[name] = f
+}
 func (f *FakeCompiler) GetErrors() yakast.YakMergeError {
 	return compiler(f.code).GetErrors()
 }
@@ -71,13 +76,15 @@ func compiler(code string) *yakast.YakCompiler {
 	return vt
 }
 func NewExecutor(i string) *Executor {
+	e := New()
+	e.ImportLibs(buildinLib)
 	return &Executor{
 		Compiler: &FakeCompiler{
 			code: i,
 		},
 		VM: &FakeVM{
 			code:   i,
-			engine: New(),
+			engine: e,
 		},
 	}
 }
