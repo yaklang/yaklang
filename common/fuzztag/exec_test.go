@@ -309,6 +309,7 @@ func TestExecuteWithNewLine(t *testing.T) {
 		panic("exec with new line error")
 	}
 }
+
 func TestExecuteBug1(t *testing.T) {
 	var m = map[string]func(string) []string{
 		"int": func(s string) []string {
@@ -323,5 +324,51 @@ func TestExecuteBug1(t *testing.T) {
 	}
 	if len(res) < 1 || res[0] != "1 1 1" {
 		panic("error")
+	}
+}
+
+func TestExecuteBug_Execute(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"int": func(s string) []string {
+			return []string{s}
+		},
+		"expr:a": func(s string) []string {
+			if s != "base64(111) " {
+				panic(1)
+			}
+			return []string{"ccc"}
+		},
+	}
+
+	res, err := ExecuteWithStringHandler(`{{expr:a(base64(111) )}}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if res[0] != "ccc" {
+		panic("PANIC!")
+	}
+}
+
+func TestExecuteBug_Execute2(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"int": func(s string) []string {
+			return []string{s}
+		},
+		"expr:a": func(s string) []string {
+			if s != "        ;ase64(111);  " {
+				panic(1)
+			}
+			return []string{"ccc"}
+		},
+	}
+
+	res, err := ExecuteWithStringHandler(`{{expr:a(        ;ase64(111);  )}}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if res[0] != "ccc" {
+		panic("PANIC!")
 	}
 }

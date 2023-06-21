@@ -1,6 +1,7 @@
 package fuzztag
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
@@ -128,6 +129,8 @@ func (f *FuzzTagAST) readTagNode(t []*token, index int) (fb []ExecutableNode, fb
 }
 
 func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb ExecutableNode, fbIndex int) {
+	var rawBuf bytes.Buffer
+
 	originIndex := index
 	now := func() *token {
 		if index >= len(t) {
@@ -154,6 +157,8 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 		}
 		return NewDataNode(tagName), index + 1
 	}
+
+	rawBuf.Write(tagName.Raw)
 	//if tagName.Type != TokenType_METHOND {
 	//	return NewDataNode( tagName), index + 1
 	//}
@@ -162,12 +167,16 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 	n := t[index]
 	switch n.Type {
 	case TokenType_TAG_CLOSE:
+		rawBuf.Write(n.Raw)
 		//return NewDataNode( t[originIndex:]...), index + 1
-		return f.NewMethodNode(methodName, &Nodes{
+		tag := f.NewMethodNode(methodName, &Nodes{
 			Nodes: []ExecutableNode{},
 			AST:   f,
-		}), index
+		})
+		tag.RawBytes = rawBuf.Bytes()
+		return tag, index
 	case TokenType_LEFT_PAREN:
+		rawBuf.Write(n.Raw)
 		index++
 		var nodes []ExecutableNode
 		var node ExecutableNode
@@ -175,6 +184,7 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 		for {
 			if now().Type == TokenType_RIGHT_PAREN {
 				// 读到节点了
+				rawBuf.Write(now().Raw)
 				index++
 				break
 			}
@@ -183,11 +193,15 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 				methodNodes, index = f.readTagNode(t, index)
 				if methodNodes != nil {
 					nodes = append(nodes, methodNodes...)
+					for _, node := range methodNodes {
+						rawBuf.Write(node.ToBytes())
+					}
 				}
 			} else {
 				node, index = f.readMethodNode(t, index, true)
 				if node != nil {
 					nodes = append(nodes, node)
+					rawBuf.Write(node.ToBytes())
 				}
 			}
 			if now() == nil {
@@ -195,10 +209,12 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 			}
 		}
 
-		return f.NewMethodNode(methodName, &Nodes{
+		tag := f.NewMethodNode(methodName, &Nodes{
 			Nodes: nodes,
 			AST:   f,
-		}), index
+		})
+		tag.RawBytes = rawBuf.Bytes()
+		return tag, index
 	case TokenType_TAG_OPEN:
 		return NewDataNode(tagName), index
 	default:
