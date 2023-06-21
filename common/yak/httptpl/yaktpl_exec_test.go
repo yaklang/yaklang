@@ -1197,3 +1197,121 @@ requests:
 		}
 	}
 }
+
+func TestMockTest_Extractor_BasicCase_Matcher_Raw(t *testing.T) {
+	/*
+
+
+		# Enhanced by mp on 2022/05/11
+
+	*/
+	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+<html>ClassCastException
+<head>
+<ccc abc="123">aaa</ccc>
+</head>
+<html>`))
+	spew.Dump(server, port)
+
+	for _, caseItem := range [][]any{
+		{`
+id: CVE-2017-12149
+
+info:
+  name: Jboss Application Server - Remote Code Execution
+  author: fopina,s0obi
+  severity: critical
+  description: Jboss Application Server as shipped with Red Hat Enterprise Application Platform 5.2 is susceptible to a remote code execution vulnerability because  the doFilter method in the ReadOnlyAccessFilter of the HTTP Invoker does not restrict classes for which it performs deserialization, thus allowing an attacker to execute arbitrary code via crafted serialized data.
+  reference:
+    - https://chowdera.com/2020/12/20201229190934023w.html
+    - https://github.com/vulhub/vulhub/tree/master/jboss/CVE-2017-12149
+    - https://nvd.nist.gov/vuln/detail/CVE-2017-12149
+    - https://bugzilla.redhat.com/show_bug.cgi?id=1486220
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 9.8
+    cve-id: CVE-2017-12149
+    cwe-id: CWE-502
+  tags: java,rce,deserialization,kev,vulhub,cve,cve2017,jboss
+
+requests:
+  - raw:
+      - |
+        POST /invoker/JMXInvokerServlet/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+
+        {{ base64_decode("rO0ABXNyABNqYXZhLnV0aWwuQXJyYXlMaXN0eIHSHZnHYZ0DAAFJAARzaXpleHAAAAACdwQAAAACdAAJZWxlbWVudCAxdAAJZWxlbWVudCAyeA==") }}
+
+      - |
+        POST /invoker/EJBInvokerServlet/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+
+        {{ base64_decode("rO0ABXNyABNqYXZhLnV0aWwuQXJyYXlMaXN0eIHSHZnHYZ0DAAFJAARzaXpleHAAAAACdwQAAAACdAAJZWxlbWVudCAxdAAJZWxlbWVudCAyeA==") }}
+
+      - |
+        POST /invoker/readonly HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+
+        {{ base64_decode("rO0ABXNyABNqYXZhLnV0aWwuQXJyYXlMaXN0eIHSHZnHYZ0DAAFJAARzaXpleHAAAAACdwQAAAACdAAJZWxlbWVudCAxdAAJZWxlbWVudCAyeA==") }}
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "ClassCastException"
+
+      - type: status
+        status:
+          - 200
+          - 500
+`, true},
+	} {
+		demo, expected := caseItem[0].(string), caseItem[1].(bool)
+		expectedMatched := expected
+		if len(caseItem) > 2 {
+			expectedMatched = caseItem[2].(bool)
+		}
+
+		ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+		if err != nil {
+			panic(err)
+		}
+
+		checked := false
+		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			if result != expectedMatched {
+				panic(1)
+			}
+
+			checked = true
+			if len(caseItem) == 3 {
+				log.Info("extract with matcher")
+			}
+
+			if len(caseItem) == 3 && result != expectedMatched {
+				checked = false
+				panic("not matched（matcher with extractor）")
+			}
+		}))
+		_, err = ytpl.Exec(
+			config, false,
+			[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+			lowhttp.WithHost(server), lowhttp.WithPort(port),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		if !checked {
+			t.Error("not checked")
+			println(demo)
+			t.FailNow()
+		}
+	}
+}
