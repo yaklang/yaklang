@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -18,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -402,48 +400,6 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 
 	}
 	return nil
-}
-
-func ConvertMultiYakScriptToExecBatchRequest(req *ypb.ExecRequest, script []*ypb.YakScript, batchMode bool) (*ypb.ExecRequest, []func(), error) {
-	if len(script) <= 0 {
-		return nil, nil, utils.Error("empty yakScripts")
-	}
-	var defers []func()
-
-	var plugins []string
-	script = funk.Filter(script, func(i *ypb.YakScript) bool {
-		result := utils.StringSliceContain([]string{
-			"mitm", "port-scan", "nuclei", "nasl",
-		}, i.Type)
-		if result {
-			plugins = append(plugins, i.ScriptName)
-		}
-		return result
-	}).([]*ypb.YakScript)
-
-	if len(plugins) <= 0 {
-		return nil, nil, utils.Error("no available plugins")
-	}
-
-	if len(plugins) == 1 {
-		var params = append(req.Params, &ypb.ExecParamItem{Key: "--plugin", Value: plugins[0]})
-		return &ypb.ExecRequest{
-			Params: params,
-			Script: generalBatchExecutor,
-		}, defers, nil
-	}
-
-	f, err := consts.TempFile("exec-batch-plugin-list-*.txt")
-	if err != nil {
-		return nil, nil, err
-	}
-	defers = append(defers, func() {
-		os.RemoveAll(f.Name())
-	})
-	f.WriteString(strings.Join(plugins, "|"))
-	f.Close()
-	var params = append(req.Params, &ypb.ExecParamItem{Key: "--yakit-plugin-file", Value: f.Name()})
-	return &ypb.ExecRequest{Params: params, Script: generalBatchExecutor}, defers, nil
 }
 
 func (s *Server) RecoverExecBatchYakScriptUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverExecBatchYakScriptUnfinishedTaskServer) error {

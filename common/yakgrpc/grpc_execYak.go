@@ -138,7 +138,11 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 		if scriptId == "" {
 			return utils.Errorf("fetch yak code failed: %s", "empty code and scriptId")
 		}
-		return utils.Errorf("cannot find script yak code by scriptId:[%s]", scriptId)
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptId)
+		if err != nil {
+			return utils.Errorf("cannot find script yak code by scriptId:[%s]", scriptId)
+		}
+		code = script.Content
 	}
 	f, err := ioutil.TempFile("", "yaki-code-*.yak")
 	if err != nil {
