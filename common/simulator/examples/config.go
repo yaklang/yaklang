@@ -17,6 +17,8 @@ type Config struct {
 	captchaSelector      string
 	captchaImgSelector   string
 	submitButtonSelector string
+
+	ch chan *BruteForceResult
 }
 
 type ConfigOpt func(*Config)
@@ -96,5 +98,11 @@ func WithCaptchaImgSelector(selector string) ConfigOpt {
 func WithSubmitButtonSelector(selector string) ConfigOpt {
 	return func(config *Config) {
 		config.submitButtonSelector = selector
+	}
+}
+
+func WithResultChannel(ch chan *BruteForceResult) ConfigOpt {
+	return func(config *Config) {
+		config.ch = ch
 	}
 }

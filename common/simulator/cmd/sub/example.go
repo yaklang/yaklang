@@ -29,7 +29,7 @@ var Example = cli.Command{
 		url := c.String("url")
 		if url == "" {
 			//url = "http://192.168.0.80/member.php?c=login"
-			url = "http://192.168.0.68/#/login"
+			url = "http://192.168.0.203/#/login"
 		}
 		usernameList := []string{"admin"}
 		passwordList := []string{"luckyadmin123"}
@@ -37,11 +37,11 @@ var Example = cli.Command{
 			//examples.BruteForceModule(url, usernameList, passwordList)
 			userOpt := examples.WithUserNameList(usernameList)
 			passOpt := examples.WithPassWordList(passwordList)
-			//scanMode := examples.WithCaptchaMode("common_arithmetic")
+			scanMode := examples.WithCaptchaMode("common_arithmetic")
 			//remoteWs := examples.WithWsAddress("http://192.168.0.115:7317/")
-			captchaUrl := examples.WithCaptchaUrl("http://192.168.0.115:9898/ocr/b64/json")
-			//captchaUrl := examples.WithCaptchaUrl("http://192.168.0.58:8008/runtime/text/invoke")
-			result, err := examples.BruteForceModuleV2(url, userOpt, passOpt, captchaUrl)
+			// captchaUrl := examples.WithCaptchaUrl("http://192.168.0.115:9898/ocr/b64/json")
+			captchaUrl := examples.WithCaptchaUrl("http://192.168.3.20:8008/runtime/text/invoke")
+			result, err := examples.BruteForceModuleV2(url, userOpt, passOpt, captchaUrl, scanMode)
 			log.Info(err)
 			log.Info(result.Username(), result.Password(), result.Log(), result.Cookie())
 		}

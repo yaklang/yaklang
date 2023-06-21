@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -10,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/simulator/config"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/context"
-	"time"
 )
 
 type GeneralPage struct {
@@ -72,13 +73,14 @@ func CreateElement(element *rod.Element, page *GeneralPage) *GeneralElement {
 
 func (generalElement *GeneralElement) String() string {
 	if generalElement.name == "" {
-		result, err := generalElement.element.Eval(GETNAME)
-		if err != nil {
-			log.Errorf("element doing eval find name error: %s", err)
-			generalElement.name = "unknown"
-		} else {
-			generalElement.name = result.Value.Str()
-		}
+		generalElement.name = generalElement.element.Object.Description
+		// result, err := generalElement.element.Eval(GETNAME)
+		// if err != nil {
+		// 	log.Errorf("element doing eval find name error: %s", err)
+		// 	generalElement.name = "unknown"
+		// } else {
+		// 	generalElement.name = result.Value.Str()
+		// }
 	}
 	return fmt.Sprintf("<element: %s>", generalElement.name)
 }

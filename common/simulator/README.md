@@ -1,6 +1,31 @@
+# 目录
+- [自动化爆破说明](#brute)
+- [simulator.simple](#simulator.simple)
+- [httpbrute 基于模拟点击的http自动化爆破使用说明](#httpbrute)
+  - [代码实例](#httpbrute_1)
+  - [数据接口](#httpbrute_2)
+    - [httpbrute.BruteResult](#BruteResult)
+  - [API](#httpbrute_3)
+    - [httpbrute.httpBruteForce](#httpBruteForce)
+    - [httpbrute.username](#username)
+    - [httpbrute.usernameList](#usernameList)
+    - [httpbrute.password](#password)
+    - [httpbrute.passwordList](#passwordList)
+    - [httpbrute.wsAddress](#wsAddress)
+    - [httpbrute.proxy](#proxy)
+    - [httpbrute.captchaUrl](#captchaUrl)
+    - [httpbrute.captchaMode](#captchaMode)
+    - [httpbrute.usernameSelector](#usernameSelector)
+    - [httpbrute.passwordSelector](#passwordSelector)
+    - [httpbrute.captchaInputSelector](#captchaInputSelector)
+    - [httpbrute.captchaImgSelector](#captchaImgSelector)
+    - [httpbrute.submitButtonSelector](#submitButtonSelector)
+    - [httpbrute.loginDetectMode](#loginDetectMode)
+
 # simulator模块使用说明：
 
-# 自动化爆破说明
+# <a id="brute">~~自动化爆破说明~~</a>
+下版本将会删除该自动化爆破，新的模拟点击http爆破见[下方](#httpbrute)
 
 ## 爆破输入
 
@@ -66,7 +91,7 @@ BruteForceResult包括如下输出：
     println(result.Log())
 
 
-# simulator.simple
+# <a id="simulator.simple">simulator.simple</a>
 
 新增simulator.simple接口
 
@@ -140,3 +165,369 @@ BruteForceResult包括如下输出：
     page.Input("#password", "123321")
     page.Click("#dijit_form_Button_0_label")
     time.Sleep(2)
+
+# <a id="httpbrute">httpbrute 基于模拟点击的http自动化爆破使用说明</a>
+
+## <a id="httpbrute_1">代码实例</a>
+
+    urlStr = "http://192.168.0.100/#/login"
+    captchaUrl = "http://192.168.0.200:9898/ocr/b64/json"
+    
+    opts = [
+        bruteforce.captchaUrl(captchaUrl),
+        bruteforce.username("admin"),
+        bruteforce.password("admin", "123321"),
+    ]
+    
+    ch, err = bruteforce.httpBruteForce(urlStr, opts...)
+    for item := range ch {
+    yakit.Info(`[bruteforce] %s:%s login %v with info: %s`, item.Username(), item.Password(), item.Status(), item.Info())
+
+## <a id="httpbrute_2">Data Struct</a>
+
+### <a id="BruteResult">httpbrute.BruteResult</a>
+
+爆破结果数据结构
+
+#### struct
+
+    type BruteResult interface {
+        PtrStructMethods(指针结构方法/函数):
+            func Username() return (string)
+            func Password() return (string)
+            func Status() return (bool)
+        
+            func Info() return (string)
+            func Base64() return (string)
+    }
+
+#### method
+
+`func (*BruteResult) Username() return (r0: string)` 爆破测试的用户名
+
+`func (*BruteResult) Password() return (r0: string)` 爆破测试的密码
+
+`func (*BruteResult) Status() return (r0: bool)` 本次爆破是否成功
+
+`func (*BruteResult) Info() return (r0: string)` 本次爆破过程的部分信息
+
+`func (*BruteResult) Base64() return (r0: string)` 爆破成功时浏览器页面截图的base64编码
+
+## <a id="httpbrute_3">API</a>
+
+### <a id="httpBruteForce">httpbrute.httpBruteForce</a>
+
+设置爆破参数 开始爆破任务
+
+#### 定义
+
+`httpbrute.httpBruteForce(url string, opts ...httpbrute.BruteConfigOpt) return (ch: chan httpbrute.BruteResult, err: error)`
+
+#### 参数
+
+| 参数名  | 参数类型                        | 参数解释 |
+|------|-----------------------------|------|
+| url  | string                      | 爆破目标 |
+| opts | ...httpbrute.BruteConfigOpt | 爆破参数 |
+
+#### 返回值
+
+| 返回值 | 返回值类型                      | 返回值解释         |
+|-----|----------------------------|---------------|
+| ch  | chan httpbrute.BruteResult | 爆破结果传递channel |
+| err | error                      | 错误信息          |
+
+### <a id="username">httpbrute.username</a>
+
+设置爆破的用户名
+
+#### 定义
+
+`httpbrute.username(username ...string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名      | 参数类型      | 参数解释    |
+|----------|-----------|---------|
+| username | ...string | 待爆破的用户名 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="usernameList">httpbrute.usernameList</a>
+
+设置爆破的用户名
+
+#### 定义
+
+`httpbrute.usernameList(usernameList []string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名          | 参数类型     | 参数解释      |
+|--------------|----------|-----------|
+| usernameList | []string | 待爆破的用户名切片 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="password">httpbrute.password</a>
+
+设置爆破的密码
+
+#### 定义
+
+`httpbrute.password(password ...string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名      | 参数类型      | 参数解释   |
+|----------|-----------|--------|
+| password | ...string | 待爆破的密码 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="passwordList">httpbrute.passwordList</a>
+
+设置爆破的密码
+
+#### 定义
+
+`httpbrute.passwordList(passwordList []string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名          | 参数类型     | 参数解释     |
+|--------------|----------|----------|
+| passwordList | []string | 待爆破的密码切片 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="wsAddress">httpbrute.wsAddress</a>
+
+设置浏览器的ws地址
+
+#### 定义
+
+`httpbrute.wsAddress(wsAddress string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名       | 参数类型   | 参数解释     |
+|-----------|--------|----------|
+| wsAddress | string | 浏览器的ws地址 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="proxy">httpbrute.proxy</a>
+
+设置浏览器代理
+
+#### 定义
+
+`httpbrute.proxy(proxy string, details ...string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名     | 参数类型      | 参数解释              |
+|---------|-----------|-------------------|
+| proxy   | string    | 浏览器代理地址           |
+| details | ...string | 代理的用户名和密码（如果有则填写） |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaUrl">httpbrute.captchaUrl</a>
+
+设置验证码图片识别链接
+
+#### 定义
+
+`httpbrute.captchaUrl(captchaUrl string) return (r0: httpbrute.BruteConfigOpt)`
+
+默认的验证码数据接口匹配使用ddddocr的ocr_api_server项目：[ocr_api_server](https://github.com/sml2h3/ocr_api_server)
+
+这里默认操作类型ocr，数据类型b64，返回类型json，所以使用该项目时默认接口为：http://{host}:{port}/ocr/b64/json
+
+#### 参数
+
+| 参数名        | 参数类型      | 参数解释    |
+|------------|-----------|---------|
+| captchaUrl | string    | 浏览器代理地址 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaMode">httpbrute.captchaMode</a>
+
+设置验证码图片识别模式（可选）
+
+<font size=5><b>一般情况下不会使用该接口</b></font>
+
+#### 定义
+
+`httpbrute.captchaMode(captchaMode string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名         | 参数类型      | 参数解释    |
+|-------------|-----------|---------|
+| captchaMode | string    | 验证码识别模式 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="usernameSelector">httpbrute.usernameSelector</a>
+
+设置输入用户名的element的selector
+
+#### 定义
+
+`httpbrute.usernameSelector(usernameSelector string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名              | 参数类型      | 参数解释                |
+|------------------|-----------|---------------------|
+| usernameSelector | string    | 用户名element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="passwordSelector">httpbrute.passwordSelector</a>
+
+设置输入密码的element的selector
+
+#### 定义
+
+`httpbrute.passwordSelector(passwordSelector string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名              | 参数类型      | 参数解释               |
+|------------------|-----------|--------------------|
+| passwordSelector | string    | 密码element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaInputSelector">httpbrute.captchaInputSelector</a>
+
+设置输入验证码的element的selector
+
+#### 定义
+
+`httpbrute.captchaInputSelector(captchaSelector string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名             | 参数类型   | 参数解释                |
+|-----------------|--------|---------------------|
+| captchaSelector | string | 验证码element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaImgSelector">httpbrute.captchaImgSelector</a>
+
+设置验证码图片的element的selector
+
+#### 定义
+
+`httpbrute.captchaImgSelector(captchaImgSelector string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名                | 参数类型   | 参数解释                  |
+|--------------------|--------|-----------------------|
+| captchaImgSelector | string | 验证码图片element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="submitButtonSelector">httpbrute.submitButtonSelector</a>
+
+设置提交请求按钮对应element的selector
+
+#### 定义
+
+`httpbrute.submitButtonSelector(buttonSelector string) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名             | 参数类型   | 参数解释                   |
+|-----------------|--------|------------------------|
+| buttonSelector  | string | 提交请求按钮element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
+
+### <a id="loginDetectMode">httpbrute.loginDetectMode</a>
+
+设置确认成功登陆的检测类型
+
+#### 定义
+
+`httpbrute.loginDetectMode(detectMode loginDetectMode, degree ...float64) return (r0: httpbrute.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名        | 参数类型            | 参数解释        |
+|------------|-----------------|-------------|
+| detectMode | loginDetectMode | 确认成功登陆的检测类型 |
+| degree     | ...float64      | 附加参数        |
+
+loginDetectMode包括三种：
+- `httpbrute.urlChangeMode` 通过url变化判断是否登陆成功
+- `httpbrute.htmlChangeMode` 通过html页面的变化程度判断是否登陆成功
+- `httpbrute.defaultChangeMode` 同时使用以上两种判断方法，两种方法都通过才确定登陆成功（默认）
+
+当使用了html页面变化程度进行判断时，可以通过degree设置判断相似程度的阈值，值越小表示尝试登陆后的页面相似程度越小，默认为0.6
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | httpbrute.BruteConfigOpt | 参数设置函数 |
