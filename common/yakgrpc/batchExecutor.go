@@ -182,7 +182,7 @@ manager.Wait()`
 
 var (
 	nucleiExecutor = `target := cli.String("target", cli.setRequired(true))
-pocFile := cli.String("pocFile", cli.setRequired(true))
+pocName := cli.String("pocName", cli.setRequired(true))
 isWorkflow = cli.Bool("isWorkflow")
 debug = cli.Bool("debug")
 proxy = cli.StringSlice("proxy")
@@ -214,11 +214,11 @@ if debug {
 }
 
 if !isWorkflow {
-    client.OutputLog("info", "当前执行模式为 PoC 模式：%v", pocFile)
-    opts = append(opts, nuclei.templates(pocFile))
+    client.OutputLog("info", "当前执行模式为 PoC 模式：%v", pocName)
+    opts = append(opts, nuclei.templates(pocName))
 }else{
-    client.OutputLog("info", "当前执行模式为 workflows 模式：%v", pocFile)
-    opts = append(opts, nuclei.workflows(pocFile))
+    client.OutputLog("info", "当前执行模式为 workflows 模式：%v", pocName)
+    opts = append(opts, nuclei.workflows(pocName))
 }
 
 client.OutputLog("info", "开始针对目标：%v，进行漏洞检测", target)

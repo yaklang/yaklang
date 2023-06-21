@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -322,26 +323,10 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript
 		if batchMode {
 			params = append(params, &ypb.ExecParamItem{Key: "--plugin", Value: script.ScriptName})
 		} else {
-			var pocFile string //= script.LocalPath
-			if pocFile == "" {
-				f, err := ioutil.TempFile("", "nuclei-yaml-poc-*.yaml")
-				if err != nil {
-					return nil, defers, utils.Errorf("generate template file for yaml poc failed: %s", err)
-				}
-				f.Write([]byte(script.Content))
-				f.Close()
-				defers = append(defers, func() {
-					os.RemoveAll(f.Name())
-				})
-
-				log.Infof("yaml file: %v", f.Name())
-				//log.Infof("content: \n%v", script.Content)
-				pocFile = f.Name()
-			}
-
+			var pocName = script.ScriptName //= script.LocalPath
 			params = append(params, &ypb.ExecParamItem{
-				Key:   "pocFile",
-				Value: pocFile,
+				Key:   "pocName",
+				Value: pocName,
 			})
 
 			_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
@@ -381,21 +366,27 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript
 }
 
 func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScriptServer) error {
-	script, err := yakit.GetYakScript(s.GetProfileDatabase(), req.GetYakScriptId())
-	if err != nil {
-		return utils.Errorf("cannot fetch yak script: %s", err.Error())
+	var (
+		script *yakit.YakScript
+		err    error
+	)
+	if req.GetYakScriptId() > 0 {
+		script, err = yakit.GetYakScript(s.GetProfileDatabase(), req.GetYakScriptId())
+		if err != nil {
+			return utils.Errorf("cannot fetch yak script(ExecYakScript): %s", err.Error())
+		}
+	} else if req.GetScriptId() != "" {
+		script, err = yakit.GetYakScriptByName(s.GetProfileDatabase(), req.GetScriptId())
+		if err != nil {
+			return utils.Errorf("cannot fetch yak script by name (ExecYakScript) failed: %s, (%v)", err, req.GetScriptId())
+		}
+	}
+
+	if script == nil {
+		return utils.Errorf("cannot fetch yak script (ExecYakScript) failed: %s", spew.Sdump(req))
 	}
 
 	switch strings.ToLower(script.Type) {
-	case "mitm":
-		//return execTestCaseMITMHooksCaller(
-		//	stream.Context(),
-		//	script, req.Params, s.GetProfileDatabase()
-		//	func(r *ypb.ExecResult) error {
-		//		return stream.Send(r)
-		//	},
-		//)
-		return s.generateMITMTask(script.ScriptName, stream, req.GetParams())
 	case "packet-hack":
 		log.Infof("execute script[packet-pack]...: %v", script.ScriptName)
 		var request string
@@ -432,27 +423,20 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 				return stream.Send(r)
 			},
 		)
-	case "port-scan":
-		params, code, err := s.generatePortScanParams(script.ScriptName, req.GetParams())
-		if err != nil {
-			return err
-		}
-		return s.Exec(&ypb.ExecRequest{Params: params, Script: code}, stream)
-	default:
+	case "port-scan", "mitm", "nuclei":
 		// yak / nuclei
 		log.Infof("start to exec yak script... : %v", script.ScriptName)
-		params, defers, err := ConvertYakScriptToExecRequest(req, script, false)
-		defer func() {
-			for _, d := range defers {
-				d()
+		var target string
+		for _, paramItem := range req.GetParams() {
+			if paramItem.Key == "target" {
+				target = paramItem.Value
 			}
-		}()
-
-		if err != nil {
-			return utils.Errorf("convert yak script failed: %s", err)
 		}
-
-		return s.Exec(params, stream)
+		return s.execScript(script.ScriptName, target, stream)
+	default:
+		req.ScriptId = script.ScriptName
+		req.YakScriptId = int64(script.ID)
+		return s.ExecWithContext(stream.Context(), req, stream)
 	}
 }
 
