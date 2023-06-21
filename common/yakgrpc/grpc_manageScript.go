@@ -687,12 +687,14 @@ func (s *Server) DeleteYakScriptExecResult(ctx context.Context, req *ypb.DeleteY
 }
 
 func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsAndTypeResponse, error) {
-	onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), "", "HAVING count > 1 ")
-	onlineType, _ := yakit.YakScriptType(s.GetProfileDatabase())
 	var tagsAndType ypb.GetYakScriptTagsAndTypeResponse
+	//onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), "", "HAVING count > 1 ")
+	onlineType, _ := yakit.YakScriptType(s.GetProfileDatabase())
+	db := consts.GetGormProfileDatabase()
+	onlineTags := s.QueryYakScriptTagsGroup(db)
 
 	if onlineTags == nil && onlineType == nil {
-		return nil, err
+		return nil, utils.Errorf("GetYakScriptTagsAndTypeResponse Empty")
 	}
 	for _, v := range onlineType {
 		tagsAndType.Type = append(tagsAndType.Type, &ypb.TagsAndType{
@@ -700,13 +702,14 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 			Total: int32(v.Count),
 		})
 	}
-	//db := consts.GetGormProfileDatabase()
-	//onlineTags := s.QueryYakScriptTagsGroup(db)
+
 	for _, v := range onlineTags {
-		tagsAndType.Tag = append(tagsAndType.Tag, &ypb.TagsAndType{
-			Value: v.Value,
-			Total: int32(v.Count),
-		})
+		if v.Total > 1 {
+			tagsAndType.Tag = append(tagsAndType.Tag, &ypb.TagsAndType{
+				Value: v.Value,
+				Total: int32(v.Total),
+			})
+		}
 	}
 
 	return &tagsAndType, nil
@@ -722,11 +725,11 @@ func (s *Server) DeleteYakScriptExec(ctx context.Context, req *ypb.Empty) (*ypb.
 }
 
 func (s *Server) GetYakScriptTags(c context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsResponse, error) {
+	var tags ypb.GetYakScriptTagsResponse
 	/*onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), " and type in ( 'port-scan', 'mitm')", "")
 	if onlineTags == nil {
 		return nil, err
 	}*/
-	var tags ypb.GetYakScriptTagsResponse
 	/*for _, v := range onlineTags {
 		tags.Tag = append(tags.Tag, &ypb.Tags{
 			Value: v.Value,
@@ -734,9 +737,11 @@ func (s *Server) GetYakScriptTags(c context.Context, req *ypb.Empty) (*ypb.GetYa
 		})
 	}*/
 	db := consts.GetGormProfileDatabase()
-	db = db.Where("type in ( 'port-scan', 'mitm') and tags != '' and tags != 'null'")
+	db = db.Where("type in ( 'port-scan', 'mitm') ")
 	tags.Tag = s.QueryYakScriptTagsGroup(db)
-
+	if tags.Tag == nil {
+		return nil, utils.Errorf("Response Empty")
+	}
 
 	return &tags, nil
 }
@@ -793,19 +798,16 @@ func (s *Server) QueryYakScriptLocalAll(c context.Context, req *ypb.Empty) (*ypb
 func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB)  []*ypb.Tags {
 	var tag []*ypb.Tags
 	tagData := make(map[string]int64)
-	yakScriptData := yakit.YieldYakScripts(db.Debug(), context.Background())
+	db = db.Where("tags <> '' and tags <> '\"\"' and tags <> 'null' and is_history = '0' and ignored = '0'  ")
+	yakScriptData := yakit.YieldYakScripts(db, context.Background())
 	for v := range yakScriptData {
-		fmt.Printf("v--------------%v", v.Tags)
 		var tags []string
-		//_ = json.Unmarshal([]byte(v.Tags), &tags)
 		tags = strings.Split(v.Tags, ",")
-		fmt.Printf("tags--------------%v", tags)
 		for _, tag := range utils.RemoveRepeatStringSlice(tags){
 			lowerTag := strings.ToLower(tag)
 			tagData[lowerTag]++
 		}
 	}
-	fmt.Printf("tagData---------------%v", tagData)
 	for k, v := range tagData {
 		tagName := k
 		tagCount := v
