@@ -27,6 +27,9 @@ func (q *CircularQueue) Push(x interface{}) {
 }
 
 func (q *CircularQueue) GetElements() []interface{} {
+	if q == nil {
+		return nil
+	}
 	elements := make([]interface{}, 0, q.size)
 
 	for i := 0; i < q.size; i++ {
