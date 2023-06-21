@@ -228,6 +228,7 @@ func initYaklangLib() {
 
 	// simulator
 	yaklang.Import("simulator", simulator.Exports)
+	yaklang.Import("bruteforce", simulator.BruteForceExports)
 
 	//crawlerX
 	yaklang.Import("crawlerx", crawlerx.CrawlerXExports)

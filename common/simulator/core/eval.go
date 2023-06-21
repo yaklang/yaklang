@@ -17,13 +17,12 @@ const getSelectorNew = `
 ()=>{
     let e = this;
     let domPath = Array();
-    if (e.id) {
+    if (e.getAttribute("id")) {
         domPath.unshift('#'+e.id);
-		domPath = domPath.toString();
     } else {
         while (e.nodeName.toLowerCase() !== "html") {
-            if(e.id){
-                domPath.unshift('#'+e.id);
+            if(e.getAttribute("id")){
+                domPath.unshift('#'+e.getAttribute("id"));
                 break;
             }else if(e.tagName.toLocaleLowerCase() == "body") {
                 domPath.unshift(e.tagName.toLocaleLowerCase());
@@ -36,8 +35,8 @@ const getSelectorNew = `
             }
             e = e.parentNode;
         }
-        domPath = domPath.toString().replaceAll(',', '>');
     }
+	domPath = domPath.toString().replaceAll(',', '>');
     return domPath
 }
 `
