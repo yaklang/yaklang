@@ -1111,3 +1111,89 @@ requests:
 		}
 	}
 }
+
+func TestMockTest_Extractor_BasicCase_Matcher_StatusCode(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+<html>
+<head>
+<ccc abc="123">aaa</ccc>
+</head>
+<html>`))
+	spew.Dump(server, port)
+
+	for _, caseItem := range [][]any{
+		{`
+id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+requests:
+  - raw:
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    
+    matchers:
+      - type: word
+        words:
+          - ">aaa</"
+      - type: status
+        status:	
+          - 200
+          - 500
+
+`, true},
+	} {
+		demo, expected := caseItem[0].(string), caseItem[1].(bool)
+		expectedMatched := expected
+		if len(caseItem) > 2 {
+			expectedMatched = caseItem[2].(bool)
+		}
+
+		ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+		if err != nil {
+			panic(err)
+		}
+
+		checked := false
+		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			if result != expectedMatched {
+				panic(1)
+			}
+
+			checked = true
+			if len(caseItem) == 3 {
+				log.Info("extract with matcher")
+			}
+
+			if len(caseItem) == 3 && result != expectedMatched {
+				checked = false
+				panic("not matched（matcher with extractor）")
+			}
+		}))
+		_, err = ytpl.Exec(
+			config, false,
+			[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+			lowhttp.WithHost(server), lowhttp.WithPort(port),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		if !checked {
+			t.Error("not checked")
+			println(demo)
+			t.FailNow()
+		}
+	}
+}
