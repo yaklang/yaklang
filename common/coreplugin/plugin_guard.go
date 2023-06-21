@@ -97,32 +97,34 @@ func OverWriteCorePluginToLocal() {
 }
 
 func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
+	log.Infof("start to override plugin: %v", name)
 	codeBytes := GetCorePluginData(name)
 	if codeBytes == nil {
-		log.Errorf("无法从bindata获取%v", name)
+		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
 	backendSha1 := utils.CalcSha1(string(codeBytes))
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
-		log.Infof("用户尚未安装%v, 尝试添加...", name)
+		log.Infof("no-existed plugin: %v, insert plugin instance", name)
 
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("create/update yak script[%v] failed: %s", name, err)
 		}
 		return
 	}
 	databasePlugin := databasePlugins[0]
 	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content) == backendSha1 {
+		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
-		log.Infof("%v插件本地数据和后端数据存在差异,后端数据覆写本地数据...", name)
 		databasePlugin.Content = string(codeBytes)
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, databasePlugin)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("override %v failed: %s", name, err)
 			return
 		}
+		log.Debugf("override buildin-plugin %v success", name)
 	}
 }
