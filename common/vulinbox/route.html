@@ -43,6 +43,8 @@
     <ol>
         <li><a target="_blank" href="/user/by-id-safe?id=1">安全的 SQL 注入</a></li>
         <li><a target="_blank" href="/user/id?id=1">不安全的 SQL 注入(ID)</a></li>
+        <li><a target="_blank" href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">不安全的 SQL 注入(JSON Field ID)</a></li>
+        <li><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">不安全的 SQL 注入(BASE64-JSON Field ID)</a></li>
         <li><a target="_blank" href="/user/name?name=admin">不安全的 SQL 注入(NAME)</a></li>
     </ol>
 
