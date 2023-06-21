@@ -434,7 +434,9 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 		}
 		return s.execScript(script.ScriptName, target, stream)
 	default:
-		return s.Exec(req, stream)
+		req.ScriptId = script.ScriptName
+		req.YakScriptId = int64(script.ID)
+		return s.ExecWithContext(stream.Context(), req, stream)
 	}
 }
 
