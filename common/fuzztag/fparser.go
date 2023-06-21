@@ -57,7 +57,7 @@ func (f *FuzzTagAST) parse() (root *Nodes) {
 	root = &Nodes{AST: f}
 	var nodes []ExecutableNode
 	for {
-		nodes, index = f.readTagNode(tokens, index)
+		nodes, index = f.readTagNode(tokens, index, 1)
 		if nodes != nil {
 			root.Nodes = append(root.Nodes, nodes...)
 		} else {
@@ -70,7 +70,7 @@ func (f *FuzzTagAST) parse() (root *Nodes) {
 	return root
 }
 
-func (f *FuzzTagAST) readTagNode(t []*token, index int) (fb []ExecutableNode, fbIndex int) {
+func (f *FuzzTagAST) readTagNode(t []*token, index int, deep int) (fb []ExecutableNode, fbIndex int) {
 	originIndex := index
 	skipSpace := func() {
 		for {
@@ -100,7 +100,7 @@ func (f *FuzzTagAST) readTagNode(t []*token, index int) (fb []ExecutableNode, fb
 	var n ExecutableNode
 	for {
 		skipSpace()
-		n, index = f.readMethodNode(t, index, false)
+		n, index = f.readMethodNode(t, index, false, deep)
 		if _, ok := n.(*DataNode); n == nil || ok {
 			panic(fmt.Sprintf("parse method error, unexpect node: %s", string(t[index].Raw)))
 		}
@@ -128,7 +128,7 @@ func (f *FuzzTagAST) readTagNode(t []*token, index int) (fb []ExecutableNode, fb
 
 }
 
-func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb ExecutableNode, fbIndex int) {
+func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool, deep int) (fb ExecutableNode, fbIndex int) {
 	var rawBuf bytes.Buffer
 
 	originIndex := index
@@ -162,7 +162,11 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 	//if tagName.Type != TokenType_METHOND {
 	//	return NewDataNode( tagName), index + 1
 	//}
-
+	var methodPrefix string
+	splits := strings.Split(methodName, ":")
+	if len(splits) > 0 {
+		methodPrefix = splits[0]
+	}
 	index++
 	n := t[index]
 	switch n.Type {
@@ -190,18 +194,47 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool) (fb Exe
 			}
 			var methodNodes []ExecutableNode
 			if now() != nil && now().Type == TokenType_TAG_OPEN {
-				methodNodes, index = f.readTagNode(t, index)
+				methodNodes, index = f.readTagNode(t, index, deep+1)
 				if methodNodes != nil {
 					nodes = append(nodes, methodNodes...)
 					for _, node := range methodNodes {
 						rawBuf.Write(node.ToBytes())
 					}
 				}
-			} else {
-				node, index = f.readMethodNode(t, index, true)
-				if node != nil {
-					nodes = append(nodes, node)
-					rawBuf.Write(node.ToBytes())
+			} else { // 解析函数嵌套
+				if v, ok := buildinMethodPrefix[methodPrefix]; ok && v <= deep { // 如果有定义函数prefix，则当解析层数大于预制层数时停止解析
+					rightParenthesisNumber := 0
+					start := false
+					for i := index; i < len(t); i++ { // 遍历token，匹配小括号
+						nowToken := t[i]
+						if nowToken.Type == TokenType_TAG_CLOSE { // 结束匹配
+							if rightParenthesisNumber >= v { // 闭合括号数符合条件
+								nodes = append(nodes, NewDataNode(t[index:i-deep]...))
+								index = i - deep
+								break
+							} else {
+								nodes = append(nodes, NewDataNode(t[index:i]...))
+								index = i + 1
+								break
+							}
+						}
+						if nowToken.Type == TokenType_RIGHT_PAREN {
+							if start {
+								rightParenthesisNumber++
+							} else {
+								start = true
+								rightParenthesisNumber = 1
+							}
+						} else {
+							start = false
+						}
+					}
+				} else {
+					node, index = f.readMethodNode(t, index, true, deep+1)
+					if node != nil {
+						nodes = append(nodes, node)
+						rawBuf.Write(node.ToBytes())
+					}
 				}
 			}
 			if now() == nil {
