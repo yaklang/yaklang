@@ -123,7 +123,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				}
 			}
 			reqs, err := mutate.FuzzTagExec(req.Raw, mutate.Fuzz_WithParams(params), mutate.Fuzz_WithExtraFuzzTagHandler(
-				"expr:nuclei-dsl", func(s string) []string {
+				"expr:nucleidsl", func(s string) []string {
 					data, err := NewNucleiDSLYakSandbox().Execute(s, params)
 					if err != nil {
 						return []string{""}

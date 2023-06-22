@@ -32,6 +32,13 @@ Hello World
 		{
 			&YakMatcher{
 				MatcherType: "status",
+				Group:       []string{"200,201,203"},
+			},
+			true,
+		},
+		{
+			&YakMatcher{
+				MatcherType: "status",
 				Condition:   "and",
 				Group:       []string{"200,201,203"},
 			},

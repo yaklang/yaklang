@@ -301,7 +301,7 @@ func nucleiFormatToFuzzTagMode(r string) string {
 			if strings.HasPrefix(s, "{{params") {
 				return s
 			}
-			return fmt.Sprintf("{{expr:nuclei-dsl(%v)}}", strings.Trim(s, "{}"))
+			return fmt.Sprintf("{{expr:nucleidsl(%v)}}", strings.Trim(s, "{}"))
 		})
 	}
 

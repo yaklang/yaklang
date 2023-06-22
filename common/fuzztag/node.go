@@ -378,10 +378,14 @@ type TagNode struct {
 	Label    string
 	AST      *FuzzTagAST
 	callback func([]byte, [][]byte) bool
+	RawBytes []byte
 }
 
 func (t *TagNode) ToBytes() []byte {
-	return nil
+	if t == nil {
+		return nil
+	}
+	return t.RawBytes
 }
 
 func (t *TagNode) IsExecutable() bool {
@@ -425,6 +429,14 @@ func (t *TagNode) Execute(m map[string]func([]byte) [][]byte) [][]byte {
 		v.InTag = true
 	}
 
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(t.Method)), "expr:") {
+		var params string
+		if t.Params != nil {
+			params = string(t.Params.ToBytes())
+		}
+		return f([]byte(params))
+	}
+	t.Params.ToBytes()
 	for _, n := range t.Params.Execute(m) {
 		r := f(n)
 		if t.callback != nil {
