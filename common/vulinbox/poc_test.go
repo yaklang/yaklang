@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -91,7 +92,7 @@ func (v *vulBoxTester) run() {
 
 	crawler, err := crawler.NewCrawler(v.serverAdderss, crawler.WithOnRequest(func(req *crawler.Req) {
 		ch <- req
-	}))
+	}), crawler.WithMaxDepth(1))
 	if err != nil {
 		panic(err)
 	}
@@ -102,8 +103,15 @@ func (v *vulBoxTester) run() {
 			log.Error(err)
 		}
 	}()
+	urlPathMap := make(map[string]bool)
 	for req := range ch {
-		manager.MirrorHTTPFlowEx(false, req.IsHttps(), req.Url(), req.RequestRaw(), req.ResponseRaw(), req.ResponseBody())
+		if _, ok := urlPathMap[req.Url()]; ok {
+			continue
+		} else {
+			manager.MirrorHTTPFlowEx(false, req.IsHttps(), req.Url(), req.RequestRaw(), req.ResponseRaw(), req.ResponseBody())
+			urlPathMap[req.Url()] = true
+		}
+
 	}
 	manager.Wait()
 	spew.Dump(v.risks)
@@ -117,7 +125,11 @@ func (v *vulBoxTester) run() {
 			tmp[url] = titles
 		}
 		for url, titles := range tmp {
-			if strings.Contains(risk.Url, url) {
+			riskUrl, err := utils2.ParseStringUrlToUrlInstance(risk.Url)
+			if err != nil {
+				v.t.Fatal(fmt.Sprintf("risk url illegal %v", risk.Url))
+			}
+			if riskUrl.Path == url {
 				foundUrl = true
 				ok := false
 				for i, title := range titles {
@@ -148,6 +160,10 @@ func TestSSRF(t *testing.T) {
 	tester.addTestCase("启发式SQL注入检测.yak", "/user/name", "Maybe SQL Injection: [param - type:str value:admin single-quote]")
 	tester.addTestCase("启发式SQL注入检测.yak", "/user/id", "Maybe SQL Injection: [param - type:str value:1 single-quote]")
 	tester.addTestCase("启发式SQL注入检测.yak", "/user/id", "Union-Based SQL Injection: [id:[1]]")
+	tester.addTestCase("启发式SQL注入检测.yak", "/user/id-json", "Maybe SQL Injection: [param - type:str value:1 single-quote]")
+	tester.addTestCase("启发式SQL注入检测.yak", "/user/id-json", "Union-Based SQL Injection: [id:[1]]")
+	tester.addTestCase("启发式SQL注入检测.yak", "/user/id-b64-json", "Maybe SQL Injection: [param - type:str value:1 single-quote]")
+	tester.addTestCase("启发式SQL注入检测.yak", "/user/id-b64-json", "Union-Based SQL Injection: [id:[1]]")
 	tester.addTestCase("启发式SQL注入检测.yak", "/user/name", "Union-Based SQL Injection: [name:[admin]]")
 	tester.addTestCase("启发式SQL注入检测.yak", "/user/by-id-safe")
 	tester.addIgnoreInfo("启发式SQL注入检测.yak", "/ping/cmd/shlex", "ORDER BY SQL Injection: [ip:[127.0.0.1]]")

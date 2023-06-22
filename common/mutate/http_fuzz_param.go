@@ -5,8 +5,10 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
 
@@ -137,6 +139,47 @@ func (p *FuzzHTTPRequestParam) PositionVerbose() string {
 }
 
 func (p *FuzzHTTPRequestParam) Value() interface{} {
+	switch p.typePosition {
+	case posGetQueryJson, posPostJson:
+		switch paramOriginValue := p.paramOriginValue.(type) {
+		case []string:
+			if len(paramOriginValue) > 0 {
+				return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue[0], p.jsonPath))
+			} else {
+				return utils.InterfaceToStringSlice("")
+			}
+		case string:
+			return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue, p.jsonPath))
+		default:
+			log.Error("unrecognized param value type")
+			return p.paramOriginValue
+		}
+
+	case posGetQueryBase64Json, posPostQueryBase64Json, posCookieBase64Json:
+		switch paramOriginValue := p.paramOriginValue.(type) {
+		case []string:
+			if len(paramOriginValue) > 0 {
+				jsonStr, err := codec.DecodeBase64Url(paramOriginValue[0])
+				if err != nil {
+					break
+				}
+				return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.jsonPath))
+			} else {
+				return utils.InterfaceToStringSlice("")
+			}
+		case string:
+			jsonStr, err := codec.DecodeBase64Url(paramOriginValue)
+			if err != nil {
+				break
+			}
+			return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.jsonPath))
+
+		default:
+			log.Error("unrecognized param value type")
+			return p.paramOriginValue
+		}
+
+	}
 	return p.paramOriginValue
 }
 
