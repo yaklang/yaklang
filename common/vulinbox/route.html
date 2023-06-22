@@ -3,112 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        /* Reset some default styles */
-        ol {
-            list-style: none;
-            padding: 0;
-        }
-
-        ol li {
-            position: relative;
-            padding-left: 1.5em;
-            margin-bottom: 1em;
-        }
-
-        ol li a {
-            color: #1a73e8;
-            text-decoration: none;
-        }
-
-        ol li a:hover {
-            text-decoration: underline;
-        }
-
-        /* Add custom bullet style */
-        ol li:before {
-            content: counter(list-item) ".";
-            position: absolute;
-            left: 0;
-            font-weight: bold;
-            color: #1a73e8;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
 </head>
 
 <body>
 
-<div style="margin-left: 20px">
-    <h1>SQL 注入 Case</h1>
-    <ol>
-        <li><a target="_blank" href="/user/by-id-safe?id=1">安全的 SQL 注入</a></li>
-        <li><a target="_blank" href="/user/id?id=1">不安全的 SQL 注入(ID)</a></li>
-        <li><a target="_blank" href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">不安全的 SQL 注入(JSON Field ID)</a></li>
-        <li><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">不安全的 SQL 注入(BASE64-JSON Field ID)</a></li>
-        <li><a target="_blank" href="/user/name?name=admin">不安全的 SQL 注入(NAME)</a></li>
-    </ol>
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">Vulinbox!</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="https://yaklang.com">Yaklang.IO</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="https://githib.com/yaklang">Yak Project 开源地址</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="https://github.com/yaklang/yaklang/tree/main/common/vulinbox">Vulinbox 靶场源码</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
 
-    <h1>XSS 注入 Case</h1>
-    <ol>
-        <li><a target="_blank" href="/xss/safe?name=admin">安全的实体转义</a></li>
-        <li><a target="_blank" href="/xss/echo?name=admin">无安全措施直接拼接导致XSS注入(NAME)</a></li>
-        <li><a target="_blank" href="/xss/replace/nocase?name=admin">不安全过滤导致XSS注入(NAME)</a></li>
-    </ol>
-
-    <h1>Shiro默认key</h1>
-    <ol>
-        <li><a target="_blank" href="/shiro/cbc">shiro低版本默认key(< 1.4.2)</a></li>
-        <li><a target="_blank" href="/shiro/gcm">shiro低版本默认key(>= 1.4.2)</a></li>
-    </ol>
-
-    <h1>命令注入测试用例</h1>
-    <ol>
-        <li><a target="_blank" href='/ping/cmd/shlex?ip=127.0.0.1'>Shlex 解析的命令注入</a></li>
-        <li><a target="_blank" href='/ping/cmd/bash?ip=127.0.0.1'>Bash 解析的命令注入</a></li>
-    </ol>
-
-
-    <h1>SSRF</h1>
-    <ol>
-        <li><a target="_blank" href='/ssrf-in-get?url=http://www.baidu.com/'>SSRF GET 中 URL 参数情况</a></li>
-        <li><a target="_blank" href='/ssrf-in-post'>SSRF POST 中 URL 参数情况</a></li>
-        <li><a target="_blank" href='/ssrf-in-post-multipart'>SSRF POST 中 URL 参数情况 - Multipart FormData</a></li>
-        <li><a target="_blank" href='/ssrf-in-json-body'>SSRF JSON Body 中 REF 为 URL</a></li>
-        <li><a target="_blank" href='/ssrf-json-in-post-param'>SSRF POST 中有个 JSON 参数，其中 REF 为 URL 的情况</a></li>
-        <li><a target="_blank" href='/ssrf-json-in-get?json={"abc":%20123,%20"ref":%20"http://www.baidu.com"}'>SSRF GET 中 JSON 参数情况</a></li>
-
-
-    </ol>
-
-    <h1>表达式注入</h1>
-    <ol>
-        <li><a target="_blank" href='/expr/injection?a=1'>表达式注入1</a></li>
-        <li><a target="_blank" href='/expr/injection?b={"a": 1}'>表达式注入2</a></li>
-        <li><a target="_blank" href='/expr/injection?c=abc'>表达式注入3</a></li>
-    </ol>
-
-
-    <h1>Websocket测试案例</h1>
-    <ol>
-        <li><a target="_blank" href='/websocket/'>Websocket</a></li>
-    </ol>
-
-    <h1>登陆 JWT</h1>
-    <ol>
-        <li><a href="/jwt/login" target="_blank">登陆（JWT）</a></li>
-    </ol>
-
-    <h1>Crypto JS/SM Playground</h1>
-    <ol>
-        <li><a href="/crypto/js/basic" target="_blank">AES-ECB CryptoJS 加密表单（附带密码）</a></li>
-        <li><a href="/crypto/js/rsa" target="_blank">RSA: CryptoJS 加密表单提交（附带公私钥）</a></li>
-        <li><a href="/crypto/js/rsa/fromserver" target="_blank">RSA: CryptoJS 加密表单（前置公私钥）</a></li>
-        <li><a href="/crypto/js/rsa/fromserver/response" target="_blank">RSA: CryptoJS 加密表单（响应加密 + 前置公私钥）</a></li>
-        <li><a href="/crypto/js/rsa/fromserver/response/aes-gcm" target="_blank">RSA+(AES-GCM): CryptoJS 加密表单（响应加密 + 前置公私钥）</a></li>
-<!--        <li><a href="/crypto/sm4" target="_blank">Crypto SM4 加密表单爆破练习(SM4)</a></li>-->
-    </ol>
+<!-- Your page content goes here -->
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    SQL注入漏洞案例（复杂度递增）
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/user/by-id-safe?id=1">不存在SQL注入的情况（数字严格校验）</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL 注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
+                        参数是 JSON，JSON 中字段 SQL 注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中存在注入</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL 注入</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    XSS 多场景
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/xss/safe?name=admin">安全实体转义</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/echo?name=admin">直接拼接导致XSS注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/replace/nocase?name=admin">不安全的过滤导致XSS</a></li>
+                    <li class="list-group-item"><a target="_blank" href="#">XSS: 存在于 JS 代码中</a></li>
+                    <li class="list-group-item"><a target="_blank" href="#">由于Content-Type设置，虽然回显，但无法触发的XSS（低危/中危）</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="#">输出存在于HTML结点on...属性中</a></li>
+                    <li class="list-group-item"><a target="_blank" href="#">输出存在于HTML结点属性中，但是不再on属性中</a></li>
+                    <li class="list-group-item"><a target="_blank" href="#">script标签的某些属性中</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    ShiroVuls Simulation
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/shiro/cbc">Shiro CBC 低版本KEY(<1.4.2)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/shiro/gcm">Shiro GCM 弱 KEY(>=1.4.2)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    命令注入测试案例
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/ping/cmd/shlex?ip=127.0.0.1">Shlex 解析的命令注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ping/cmd/bash?ip=127.0.0.1">Bash 解析的命令注入</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    SSRF 参数多种情况的测试
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-get?url=http://www.baidu.com/">SSRF GET 中 URL
+                        参数</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-post">SSRF POST 中 URL 参数</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-post-multipart">SSRF POST 中 URL 参数(Multipart)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-in-json-body">SSRF JSON Body SSRF</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/ssrf-json-in-post-param">SSRF
+                        POST参数是JSON（包含URL）的情况</a></li>
+                    <li class="list-group-item"><a  target="_blank"
+                            href='/ssrf-json-in-get?json={"abc":%20123,%20"ref":%20"http://www.baidu.com"}'>SSRF
+                        GET参数JSON包含URL</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    表达式注入或 SSTI 仿真
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href='/expr/injection?a=1'>表达式注入GET参数基础</a></li>
+                    <li class="list-group-item"><a target="_blank" href='/expr/injection?b={"a":1}'>表达式注入GET参数JSON</a></li>
+                    <li class="list-group-item"><a target="_blank" href='/expr/injection?c=abc'>表达式注入GET参数初始参数为abc</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Websocket 仿真测试
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/websocket/' target="_blank">Websocket基础案例</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    登陆 JWT
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/jwt/login' target="_blank">登陆(JWT)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    高级场景前端加密
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/crypto/js/basic' target="_blank">AES-ECB 加密表单（附密码）</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa' target="_blank">RSA：加密表单，附密钥</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver' target="_blank">RSA：加密表单 服务器传输密钥</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response' target="_blank">RSA：加密表单 服务器传输密钥+响应加密</a></li>
+                    <li class="list-group-item"><a href='/crypto/js/rsa/fromserver/response/aes-gcm' target="_blank">前端RSA加密AES密钥，服务器传输</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 
-
+<!-- 引入 Bootstrap JavaScript -->
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
 </body>
 </html>
