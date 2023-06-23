@@ -66,10 +66,11 @@
                     <li class="list-group-item"><a target="_blank" href="#">由于Content-Type设置，虽然回显，但无法触发的XSS（低危/中危）</a></li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/onclick?code=1-1">输出存在于HTML节点on...属性中</a></li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/alt?value=visitor-name">输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/attr/alt/json?json=%7B%22value%22%3A%22value%3Dvisitor-name%22%7D">进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/attr/alt/b64/json?b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9">进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)</a></li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/src?src=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)</a></li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/href?href=/static/logo.png">输出存在于HTML节点属性中，但是不再on属性中(HREF)</a></li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/onclick2?code=2-1">输出存在于HTML节点on...属性中的部分代码属性</a></li>
-
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/script?name=OrdinaryVisitor">script标签的某些属性中</a></li>
                 </ul>
             </div>
