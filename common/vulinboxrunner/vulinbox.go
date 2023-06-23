@@ -48,6 +48,9 @@ func main() {
 		cli.BoolFlag{
 			Name: "safe",
 		},
+		cli.BoolFlag{
+			Name: "nohttps",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -55,7 +58,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		servers, err := vulinbox.NewVulinServerEx(context.Background(), c.Bool("safe"), "0.0.0.0", c.Int("port"))
+		servers, err := vulinbox.NewVulinServerEx(context.Background(), c.Bool("nohttps"), c.Bool("safe"), "0.0.0.0", c.Int("port"))
 		if err != nil {
 			log.Errorf("new vulinbox server failed: %v", err)
 			return err

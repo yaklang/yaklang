@@ -24,7 +24,7 @@ func TestGRPCMUSTPASS_VULTEST(t *testing.T) {
 	var vulinboxPort = utils.GetRandomAvailableTCPPort()
 	var vulinboxAddr string
 	go func() {
-		v, err := vulinbox.NewVulinServerEx(context.Background(), false, "127.0.0.1", vulinboxPort)
+		v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
 		if err != nil {
 			t.Fatalf("start vulinbox server failed: %s", err)
 		}
