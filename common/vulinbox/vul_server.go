@@ -26,13 +26,13 @@ type VulinServer struct {
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {
-	return NewVulinServerEx(ctx, false, "127.0.0.1", port...)
+	return NewVulinServerEx(ctx, false, false, "127.0.0.1", port...)
 }
 
 //go:embed static/*
 var staticFS embed.FS
 
-func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...int) (string, error) {
+func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, ports ...int) (string, error) {
 	var router = mux.NewRouter()
 
 	fe := http.FileServer(http.FS(staticFS))
@@ -94,7 +94,7 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 	go func() {
 		crep.InitMITMCert()
 		ca, key, _ := crep.GetDefaultCaAndKey()
-		if ca == nil {
+		if ca == nil || noHttps {
 			dealTls <- false
 			log.Info("start to load no tls config")
 			err := http.Serve(lis, router)
@@ -104,7 +104,7 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 		} else {
 			dealTls <- true
 			log.Info("start to load tls config")
-			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "vulinbox", time.Now().Add(time.Hour*24*180), false)
+			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(time.Hour*24*180), false)
 			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
 			if err != nil {
 				log.Error(err)
