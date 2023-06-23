@@ -231,6 +231,93 @@ Hello %v
 		writer.Header().Set("Content-Type", "text/html")
 
 	})
+	router.HandleFunc("/xss/attr/alt/json", func(writer http.ResponseWriter, request *http.Request) {
+		// %27onmousemove=%27javascript:alert(1)
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Hello Visitor!
+	<br>
+	Here are photo for U! <br>
+	<img style='width: 100px' alt='{{.value}}' src="/static/logo.png" onclick='javascript:alert("Welcome CLICK ME!")'/>
+</div>
+</body>
+</html>`, map[string]any{
+			"value": LoadFromGetJSONParam(request, "json", "value"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	})
+	router.HandleFunc("/xss/attr/alt/b64/json", func(writer http.ResponseWriter, request *http.Request) {
+		// %27onmousemove=%27javascript:alert(1)
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Hello Visitor!
+	<br>
+	Here are photo for U! <br>
+	<img style='width: 100px' alt='{{.value}}' src="/static/logo.png" onclick='javascript:alert("Welcome CLICK ME!")'/>
+</div>
+</body>
+</html>`, map[string]any{
+			"value": LoadFromGetBase64JSONParam(request, "b64json", "value"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	})
+
 	router.HandleFunc("/xss/attr/src", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
