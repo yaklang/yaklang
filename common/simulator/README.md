@@ -103,11 +103,10 @@
 ## <a id="httpbrute_1">代码实例</a>
 
     urlStr = "http://192.168.0.203/#/login"
-    captchaUrl = "http://192.168.3.20:8008/runtime/text/invoke"
+    captchaUrl = "http://192.168.0.115:9898/ocr/b64/json"
     
     opts = [
         simulator.captchaUrl(captchaUrl),
-        simulator.captchaMode("common_arithmetic"),
         simulator.username("admin"),
         simulator.password("admin", "luckyadmin123"),
     ]
@@ -149,7 +148,7 @@
 
 ## <a id="httpbrute_3">API</a>
 
-### <a id="httpBruteForce">simulator.httpBruteForce</a>
+### <a id="httpBruteForce">simulator.HttpBruteForce</a>
 
 设置爆破参数 开始爆破任务
 
