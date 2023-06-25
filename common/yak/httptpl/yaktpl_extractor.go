@@ -282,11 +282,11 @@ var (
 
 func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 	results := make(map[string]interface{})
-	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx2(rsp, nil, func(proto string, code int, codeMsg string) error {
+	_, body := lowhttp.SplitHTTPPacket(rsp, nil, func(proto string, code int, codeMsg string) error {
 		results["proto"] = proto
 		results["status_code"] = code
 		return nil
-	}, func(line string) {
+	}, func(line string) string {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		originKey := k
 		k = strings.ReplaceAll(strings.ToLower(k), "-", "_")
@@ -296,7 +296,7 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 		if k == `content_type` {
 			ct, params, err := mime.ParseMediaType(v)
 			if err != nil {
-				return
+				return line
 			}
 			results[`content_type`] = ct
 			for k, v := range params {
@@ -313,7 +313,7 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 				return httphead.ControlContinue
 			})
 		}
-
+		return line
 	})
 	// 特殊处理 JSON
 	var skipJson = false

@@ -347,14 +347,33 @@ func MergeCookies(cookies ...*http.Cookie) string {
 }
 
 func SplitHTTPHeadersAndBodyFromPacketEx(raw []byte, mf func(method string, requestUri string, proto string) error, hook ...func(line string)) (string, []byte) {
-	return SplitHTTPHeadersAndBodyFromPacketEx2(raw, mf, nil, hook...)
+	if len(hook) > 0 {
+		return SplitHTTPPacket(raw, mf, nil, func(line string) (ret string) {
+			ret = line
+			defer func() {
+				if err := recover(); err != nil {
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+				ret = line
+			}()
+			for _, h := range hook {
+				h(line)
+			}
+			return ret
+		})
+	}
+	return SplitHTTPPacket(raw, mf, nil)
 }
 
-func SplitHTTPHeadersAndBodyFromPacketEx2(
+// SplitHTTPPacket split http packet to headers and body
+// reqFirstLine: method, requestUri, proto: error for empty result
+// rspFirstLine: proto, code, codeMsg: error for empty result
+// hook: hook func
+func SplitHTTPPacket(
 	raw []byte,
-	mf func(method string, requestUri string, proto string) error,
-	rspHeader func(proto string, code int, codeMsg string) error,
-	hook ...func(line string)) (string, []byte) {
+	reqFirstLine func(method string, requestUri string, proto string) error,
+	rspFirstLine func(proto string, code int, codeMsg string) error,
+	hook ...func(line string) string) (string, []byte) {
 	raw = TrimLeftHTTPPacket(raw)
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
 	var err error
@@ -368,9 +387,9 @@ func SplitHTTPHeadersAndBodyFromPacketEx2(
 	headers = append(headers, string(firstLineBytes))
 	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) {
 		// rsp
-		if rspHeader != nil {
+		if rspFirstLine != nil {
 			proto, code, codeMsg, _ := parseResponseLine(string(firstLineBytes))
-			err := rspHeader(proto, code, codeMsg)
+			err := rspFirstLine(proto, code, codeMsg)
 			if err != nil {
 				log.Errorf("rspHeader error: %s", err)
 				return "", nil
@@ -378,9 +397,9 @@ func SplitHTTPHeadersAndBodyFromPacketEx2(
 		}
 	} else {
 		// req
-		if mf != nil {
+		if reqFirstLine != nil {
 			method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
-			err := mf(method, requestURI, proto)
+			err := reqFirstLine(method, requestURI, proto)
 			if err != nil && err.Error() != "normal abort" {
 				log.Errorf("reqHeader error: %s", err)
 				return "", nil
@@ -398,8 +417,19 @@ func SplitHTTPHeadersAndBodyFromPacketEx2(
 			break
 		}
 
+		var skipHeader = false
 		for _, h := range hook {
-			h(string(lineBytes))
+			hooked := h(string(lineBytes))
+			if hooked == "" {
+				skipHeader = true
+			}
+			if skipHeader {
+				break
+			}
+			lineBytes = []byte(hooked)
+		}
+		if skipHeader {
+			continue
 		}
 
 		headers = append(headers, string(lineBytes))
