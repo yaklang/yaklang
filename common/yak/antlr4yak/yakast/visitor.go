@@ -3,6 +3,7 @@ package yakast
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -174,6 +175,9 @@ func (y *YakCompiler) Init(lexer *yak.YaklangLexer, parser *yak.YaklangParser) {
 }
 func (y *YakCompiler) ShowOpcodes() {
 	yakvm.ShowOpcodes(y.codes)
+}
+func (y *YakCompiler) ShowOpcodesWithSource(src string) {
+	yakvm.ShowOpcodesWithSouce(src, y.codes)
 }
 func (y *YakCompiler) CompileSourceCodeWithPath(code string, fPath *string) bool {
 	y.sourceCodeFilePathPointer = fPath
