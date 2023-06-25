@@ -6,22 +6,6 @@ import (
 	"sync"
 )
 
-var buildinBinaryOperatorHandler = make(map[OpcodeFlag]func(*Value, *Value) *Value)
-var buildinUnaryOperatorOperatorHandler = make(map[OpcodeFlag]func(*Value) *Value)
-var buildinGlobalVariables = make(map[string]interface{})
-
-func ImportBinaryOperator(flag OpcodeFlag, handler func(*Value, *Value) *Value) {
-	buildinBinaryOperatorHandler[flag] = handler
-}
-
-func Import(k string, v interface{}) {
-	buildinGlobalVariables[k] = v
-}
-
-func ImportUnaryOperator(flag OpcodeFlag, handler func(*Value) *Value) {
-	buildinUnaryOperatorOperatorHandler[flag] = handler
-}
-
 type Frame struct {
 	frameVerbose string
 	vm           *VirtualMachine
@@ -150,18 +134,17 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		debug:         false,
 		exitCode:      NoneExit,
 	}
-
-	for k, v := range buildinBinaryOperatorHandler {
-		frame.BinaryOperatorTable[k] = v
+	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
+		for k, v := range v1 {
+			frame.BinaryOperatorTable[k] = v
+		}
+	}
+	if v1, ok := buildinUnaryOperatorOperatorHandler[vm.config.vmMode]; ok {
+		for k, v := range v1 {
+			frame.UnaryOperatorTable[k] = v
+		}
 	}
 
-	for k, v := range buildinUnaryOperatorOperatorHandler {
-		frame.UnaryOperatorTable[k] = v
-	}
-
-	for k, v := range buildinGlobalVariables {
-		frame.GlobalVariables[k] = v
-	}
 	for k, v := range vm.globalVar {
 		frame.GlobalVariables[k] = v
 	}

@@ -39,7 +39,7 @@ func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 }
 
 func _init() {
-	yakvm.ImportUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		b := op.True()
 		return &yakvm.Value{
 			TypeVerbose: "bool",
@@ -48,7 +48,7 @@ func _init() {
 		}
 	})
 
-	yakvm.ImportUnaryOperator(yakvm.OpNeg, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslUnaryOperator(yakvm.OpNeg, func(op *yakvm.Value) *yakvm.Value {
 		if op.IsInt64() {
 			v := op.Int64()
 			return &yakvm.Value{
@@ -67,7 +67,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support - op1[%v]", op.TypeVerbose))
 	})
 
-	yakvm.ImportUnaryOperator(yakvm.OpPlus, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslUnaryOperator(yakvm.OpPlus, func(op *yakvm.Value) *yakvm.Value {
 		if op.IsInt64() {
 			v := +op.Int64()
 			return &yakvm.Value{
@@ -87,9 +87,9 @@ func _init() {
 	})
 
 	// binary
-	yakvm.ImportBinaryOperator(yakvm.OpEq, _eq)
-	yakvm.ImportBinaryOperator(yakvm.OpNotEq, _neq)
-	yakvm.ImportBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpEq, _eq)
+	yakvm.ImportNaslBinaryOperator(yakvm.OpNotEq, _neq)
+	yakvm.ImportNaslBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -122,7 +122,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] > op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -155,7 +155,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] >= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -188,7 +188,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] < op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -221,7 +221,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] <= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpAnd, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpAnd, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() & op2.Int64()
@@ -242,7 +242,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] & op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpAndNot, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpAndNot, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() &^ op2.Int64()
@@ -263,7 +263,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] &^ op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpOr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpOr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() | op2.Int64()
@@ -284,7 +284,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] | op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpXor, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpXor, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() ^ op2.Int64()
@@ -305,7 +305,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] & op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpShl, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpShl, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			resultInt64 := op1.Int64() << op2.Int64()
 			if resultInt64 > math.MaxInt {
@@ -325,7 +325,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] << op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpShr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpShr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			resultInt64 := op1.Int64() >> op2.Int64()
 			if resultInt64 > math.MaxInt {
@@ -345,7 +345,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] >> op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(
+	yakvm.ImportNaslBinaryOperator(
 		yakvm.OpAdd,
 		func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 			if op1.IsUndefined() {
@@ -433,7 +433,7 @@ func _init() {
 		},
 	)
 
-	yakvm.ImportBinaryOperator(
+	yakvm.ImportNaslBinaryOperator(
 		yakvm.OpSub,
 		func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 			if op1.IsInt64() && op2.IsInt64() {
@@ -471,7 +471,7 @@ func _init() {
 		},
 	)
 
-	yakvm.ImportBinaryOperator(yakvm.OpMul, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpMul, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		switch {
 		case op1.IsInt64():
 			switch {
@@ -530,7 +530,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] * op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpDiv, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpDiv, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() / op2.Int64()
 			if v > math.MaxInt {
@@ -565,7 +565,7 @@ func _init() {
 		panic(fmt.Sprintf("cannot support op1[%v] / op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpMod, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpMod, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() % op2.Int64()
 			if v > math.MaxInt {
