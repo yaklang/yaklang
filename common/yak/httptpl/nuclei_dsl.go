@@ -667,13 +667,14 @@ func LoadVarFromRawResponse(rsp []byte, duration float64, sufs ...string) map[st
 		statusCode    = 0
 	)
 
-	headerRaw, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx2(rsp, nil, func(proto string, code int, codeMsg string) error {
+	headerRaw, body := lowhttp.SplitHTTPPacket(rsp, nil, func(proto string, code int, codeMsg string) error {
 		statusCode = code
 		return nil
-	}, func(line string) {
+	}, func(line string) string {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		exportedKey := strings.ReplaceAll(strings.ToLower(k), "-", "_")
 		headers[exportedKey] = v
+		return line
 	})
 	contentLength = len(body)
 
