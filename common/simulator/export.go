@@ -1,30 +1,31 @@
 package simulator
 
 import (
-	"github.com/yaklang/yaklang/common/simulator/examples"
+	"github.com/yaklang/yaklang/common/simulator/httpbrute"
 	"github.com/yaklang/yaklang/common/simulator/simple"
 )
 
 var Exports = map[string]interface{}{
-	//"Page":    core.PageCreator,
-	//"Captcha": extend.CreateCaptcha,
+	"HttpBruteForce": httpbrute.HttpBruteForce,
 
-	"defaultBrute": examples.BruteForceModuleV2,
+	"username":             httpbrute.WithUsername,
+	"usernameList":         httpbrute.WithUsernames,
+	"password":             httpbrute.WithPassword,
+	"passwordList":         httpbrute.WithPasswords,
+	"wsAddress":            httpbrute.WithWsAddress,
+	"proxy":                httpbrute.WithProxy,
+	"captchaUrl":           httpbrute.WithCaptchaUrl,
+	"captchaMode":          httpbrute.WithCaptchaMode,
+	"usernameSelector":     httpbrute.WithUsernameSelector,
+	"passwordSelector":     httpbrute.WithPasswordSelector,
+	"captchaInputSelector": httpbrute.WithCaptchaSelector,
+	"captchaImgSelector":   httpbrute.WithCaptchaImgSelector,
+	"submitButtonSelector": httpbrute.WithButtonSelector,
+	"loginDetectMode":      httpbrute.WithLoginDetectMode,
 
-	"captchaUrl":   examples.WithCaptchaUrl,
-	"captchaMode":  examples.WithCaptchaMode,
-	"usernameList": examples.WithUserNameList,
-	"passwordList": examples.WithPassWordList,
-
-	"wsAddress":    examples.WithWsAddress,
-	"proxy":        examples.WithProxy,
-	"proxyDetails": examples.WithProxyDetails,
-
-	"usernameSelector":     examples.WithUsernameSelector,
-	"passwordSelector":     examples.WithPasswordSelector,
-	"captchaInputSelector": examples.WithCaptchaSelector,
-	"captchaImgSelector":   examples.WithCaptchaImgSelector,
-	"submitButtonSelector": examples.WithSubmitButtonSelector,
+	"urlChangeMode":     httpbrute.UrlChangeMode,
+	"htmlChangeMode":    httpbrute.HtmlChangeMode,
+	"defaultChangeMode": httpbrute.DefaultChangeMode,
 
 	"simple": SimpleExports,
 }
