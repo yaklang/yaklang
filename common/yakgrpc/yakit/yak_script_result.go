@@ -147,7 +147,7 @@ func YakScriptTags(db *gorm.DB, where string, havingWhere string) (req []*TagAnd
 }
 
 func YakScriptType(db *gorm.DB) (req []*TagAndTypeValue, err error) {
-	db = db.Raw(`SELECT count(*) as count, type as value FROM yak_scripts GROUP BY type order by count desc;`)
+	db = db.Raw(`SELECT count(*) as count, type as value FROM yak_scripts where is_history = '0' and ignored = '0'  GROUP BY type order by count desc;`)
 	db = db.Scan(&req)
 	if db.Error != nil {
 		return nil, utils.Errorf("type group rows failed: %s", db.Error)
