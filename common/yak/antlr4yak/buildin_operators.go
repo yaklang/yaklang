@@ -52,7 +52,7 @@ func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 func init() {
 
 	// unary
-	yakvm.ImportUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		b := op.True()
 		return &yakvm.Value{
 			TypeVerbose: "bool",
@@ -61,7 +61,7 @@ func init() {
 		}
 	})
 
-	yakvm.ImportUnaryOperator(yakvm.OpBitwiseNot, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakUnaryOperator(yakvm.OpBitwiseNot, func(op *yakvm.Value) *yakvm.Value {
 		if op.IsInt64() {
 			resultInt64 := ^op.Int64()
 			if resultInt64 > math.MaxInt {
@@ -81,7 +81,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support ^op[%v]", op.TypeVerbose))
 	})
 
-	yakvm.ImportUnaryOperator(yakvm.OpNeg, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakUnaryOperator(yakvm.OpNeg, func(op *yakvm.Value) *yakvm.Value {
 		if op.IsInt64() {
 			v := op.Int64()
 			return &yakvm.Value{
@@ -100,7 +100,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support - op1[%v]", op.TypeVerbose))
 	})
 
-	yakvm.ImportUnaryOperator(yakvm.OpPlus, func(op *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakUnaryOperator(yakvm.OpPlus, func(op *yakvm.Value) *yakvm.Value {
 		if op.IsInt64() {
 			v := +op.Int64()
 			return &yakvm.Value{
@@ -120,9 +120,9 @@ func init() {
 	})
 
 	// binary
-	yakvm.ImportBinaryOperator(yakvm.OpEq, _eq)
-	yakvm.ImportBinaryOperator(yakvm.OpNotEq, _neq)
-	yakvm.ImportBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpEq, _eq)
+	yakvm.ImportYakBinaryOperator(yakvm.OpNotEq, _neq)
+	yakvm.ImportYakBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() > op2.Int64()
 			return &yakvm.Value{
@@ -149,7 +149,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] > op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() >= op2.Int64()
 			return &yakvm.Value{
@@ -176,7 +176,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] >= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() < op2.Int64()
 			return &yakvm.Value{
@@ -203,7 +203,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] < op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() <= op2.Int64()
 			return &yakvm.Value{
@@ -230,7 +230,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] <= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpAnd, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpAnd, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() & op2.Int64()
@@ -251,7 +251,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] & op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpAndNot, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpAndNot, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() &^ op2.Int64()
@@ -272,7 +272,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] &^ op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpOr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpOr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() | op2.Int64()
@@ -293,7 +293,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] | op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpXor, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpXor, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() ^ op2.Int64()
@@ -314,7 +314,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] & op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpShl, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpShl, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() << op2.Int64()
@@ -335,7 +335,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] << op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpShr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpShr, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			// 都是整数相加相减
 			resultInt64 := op1.Int64() >> op2.Int64()
@@ -356,7 +356,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] >> op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(
+	yakvm.ImportYakBinaryOperator(
 		yakvm.OpAdd,
 		func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 			if op1.IsInt64() && op2.IsInt64() {
@@ -516,7 +516,7 @@ func init() {
 		},
 	)
 
-	yakvm.ImportBinaryOperator(
+	yakvm.ImportYakBinaryOperator(
 		yakvm.OpSub,
 		func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 			if op1.IsInt64() && op2.IsInt64() {
@@ -554,7 +554,7 @@ func init() {
 		},
 	)
 
-	yakvm.ImportBinaryOperator(yakvm.OpMul, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpMul, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		switch {
 		case op1.IsInt64():
 			switch {
@@ -628,7 +628,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] * op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpDiv, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpDiv, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() / op2.Int64()
 			if v > math.MaxInt {
@@ -663,7 +663,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] / op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpMod, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpMod, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {
 			v := op1.Int64() % op2.Int64()
 			if v > math.MaxInt {
@@ -725,7 +725,7 @@ func init() {
 		panic(fmt.Sprintf("cannot support op1[%v] %% op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpIn, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpIn, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		var result, valid bool
 		typA, typB := reflect.TypeOf(op1.Value), reflect.TypeOf(op2.Value)
 		a, b := op1.Value, op2.Value
@@ -859,7 +859,7 @@ func init() {
 		}
 	})
 
-	yakvm.ImportBinaryOperator(yakvm.OpSendChan, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportYakBinaryOperator(yakvm.OpSendChan, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsChannel() {
 			rv := reflect.ValueOf(op1.Value)
 			rv.Send(reflect.ValueOf(op2.Value))
