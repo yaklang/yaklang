@@ -10,12 +10,13 @@ import (
 	"google.golang.org/grpc"
 	grpcMetadata "google.golang.org/grpc/metadata"
 	"net"
+	"strings"
 
 	"time"
 )
 
 func GetTunnelServerExternalIP(addr string, secret string) (net.IP, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if secret != "" {
@@ -221,15 +222,27 @@ func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
 	}
 	defer conn.Close()
 
-	rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(5), &tpb.RequireDomainParams{})
-	if err != nil {
-		return "", "", err
+	var count = 0
+	for {
+		count++
+		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{})
+		if err != nil {
+			if count > 3 {
+				return "", "", utils.Errorf("require dns domain failed: %s", err)
+			}
+
+			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
+				continue
+			}
+			return "", "", err
+		}
+		return rsp.Domain, rsp.Token, nil
 	}
-	return rsp.Domain, rsp.Token, nil
+
 }
 
 func QueryExistedDNSLogEvents(addr string, token string) ([]*tpb.DNSLogEvent, error) {
-	return QueryExistedDNSLogEventsEx(addr, token, 5)
+	return QueryExistedDNSLogEventsEx(addr, token, 10)
 }
 
 func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
@@ -250,11 +263,23 @@ func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) (
 	}
 	defer conn.Close()
 
-	rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token})
-	if err != nil {
-		return nil, err
+	var count = 0
+	for {
+		count++
+		rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token})
+		if err != nil {
+			if count > 3 {
+				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())
+			}
+
+			reason := strings.ToLower(err.Error())
+			if strings.Contains(reason, "i/o timeout") || strings.Contains(reason, "context deadline exceeded") {
+				continue
+			}
+			return nil, err
+		}
+		return rsp.Events, nil
 	}
-	return rsp.Events, nil
 }
 
 func QueryExistedRandomPortTriggerEvents(token, addr, secret string, ctx context.Context) (*tpb.RandomPortTriggerEvent, error) {
