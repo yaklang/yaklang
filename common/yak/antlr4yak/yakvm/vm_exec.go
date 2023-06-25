@@ -216,7 +216,9 @@ func ShowOpcodesWithSource(src string, c []*Code) {
 	for i, code := range c {
 		if cur < 0 || code.StartLineNumber != cur {
 			cur = code.StartLineNumber
-			fmt.Printf("            ------\n%s\n", lines[cur-1])
+			fmt.Printf("------------------------------------------\n"+
+				"line:%3d %s\n"+
+				"------------------------------------------\n", cur-1, lines[cur-1])
 		}
 
 		fmt.Printf("%-13s %4d:%v\n", code.RangeVerbose(), i, code.String())
