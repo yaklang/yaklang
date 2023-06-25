@@ -2,14 +2,17 @@ package vulinbox
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -23,11 +26,42 @@ type VulinServer struct {
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {
-	return NewVulinServerEx(ctx, false, "127.0.0.1", port...)
+	return NewVulinServerEx(ctx, false, false, "127.0.0.1", port...)
 }
 
-func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...int) (string, error) {
+//go:embed static/*
+var staticFS embed.FS
+
+func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, ports ...int) (string, error) {
 	var router = mux.NewRouter()
+
+	fe := http.FileServer(http.FS(staticFS))
+	router.NotFoundHandler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if strings.HasPrefix(request.URL.Path, "/static") {
+			var u, _ = lowhttp.ExtractURLFromHTTPRequest(request, true)
+			if u != nil {
+				log.Infof("request static file: %v", u.Path)
+				// request.URL.Path = strings.TrimLeft(request.URL.Path, "/")
+			}
+			fe.ServeHTTP(writer, request)
+			return
+		}
+		log.Infof("404 for %s", request.URL.Path)
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.WriteHeader(404)
+			writer.Write([]byte("404 not found"))
+		}).ServeHTTP(writer, request)
+	})
+	router.Use(func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			log.Infof("VULINBOX: %s %s", request.Method, request.URL)
+			raw, _ := utils.HttpDumpWithBody(request, true)
+			if string(raw) != "" {
+				println(string(raw))
+			}
+			handler.ServeHTTP(writer, request)
+		})
+	})
 
 	var port int
 	if len(ports) > 0 {
@@ -60,7 +94,7 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 	go func() {
 		crep.InitMITMCert()
 		ca, key, _ := crep.GetDefaultCaAndKey()
-		if ca == nil {
+		if ca == nil || noHttps {
 			dealTls <- false
 			log.Info("start to load no tls config")
 			err := http.Serve(lis, router)
@@ -70,7 +104,7 @@ func NewVulinServerEx(ctx context.Context, safeMode bool, host string, ports ...
 		} else {
 			dealTls <- true
 			log.Info("start to load tls config")
-			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "vulinbox", time.Now().Add(time.Hour*24*180), false)
+			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(time.Hour*24*180), false)
 			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
 			if err != nil {
 				log.Error(err)

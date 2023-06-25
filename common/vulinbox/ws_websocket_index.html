@@ -6,7 +6,7 @@
     <script src="/websocket/jquery.min.js"></script>
     <script>
         $(function () {
-            var ws = new WebSocket('ws://' + window.location.host + '/websocket/ws');
+            var ws = new WebSocket((window.location.protocol.startsWith("https") ? "wss://" : "ws://") + window.location.host + '/websocket/ws');
             ws.onmessage = function (e) {
                 $('<li>').text(event.data).appendTo($ul);
                 ws.send('{"message":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
@@ -17,7 +17,7 @@
 </head>
 <body>
 <h1>This is websocket playground</h1>
-<br>
+<br>x
 <ul id="msg-list"></ul>
 </body>
 </html>
