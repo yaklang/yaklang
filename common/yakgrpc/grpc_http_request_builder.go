@@ -101,7 +101,7 @@ Host: example.com
 		freq = freq.FuzzCookie(p.GetKey(), p.GetValue())
 	}
 	for _, p := range req.GetHeaders() {
-		freq = freq.FuzzCookie(p.GetKey(), p.GetValue())
+		freq = freq.FuzzHTTPHeader(p.GetKey(), p.GetValue())
 	}
 	for _, p := range req.GetPostParams() {
 		freq = freq.FuzzPostParams(p.GetKey(), p.GetValue())
