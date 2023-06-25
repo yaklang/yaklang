@@ -938,8 +938,8 @@ func (s *Server) MatchHTTPResponse(ctx context.Context, req *ypb.MatchHTTPRespon
 	}).([]*httptpl.YakMatcher)
 
 	matcher := &httptpl.YakMatcher{
-		MatcherType: req.GetMatcherCondition(),
-		SubMatchers: matchers,
+		SubMatcherCondition: req.GetMatcherCondition(),
+		SubMatchers:         matchers,
 	}
 	if matcher.SubMatcherCondition == "" {
 		matcher.SubMatcherCondition = "and"
