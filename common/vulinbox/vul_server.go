@@ -21,8 +21,6 @@ type VulinServer struct {
 	router   *mux.Router
 
 	safeMode bool
-
-	userMgr *userManager
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {

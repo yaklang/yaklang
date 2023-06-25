@@ -14,10 +14,6 @@ var routeSafeHtml []byte
 func (s *VulinServer) init() {
 	router := s.router
 
-	// 创建UserManager实例
-	userMgr := newUserManager(s.database.db)
-	s.userMgr = userMgr
-
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
 		if s.safeMode {
@@ -26,6 +22,7 @@ func (s *VulinServer) init() {
 			writer.Write(routeHtml)
 		}
 	})
+	// 通用型
 	s.registerSQLinj()
 	s.registerXSS()
 	s.registerSSRF()
@@ -35,6 +32,9 @@ func (s *VulinServer) init() {
 	s.registerLoginRoute()
 	s.registerCryptoJS()
 	s.registerCryptoSM()
+
+	// 业务型
+	s.registerUserRoute()
 
 	// 靶场是否是安全的？
 	if !s.safeMode {

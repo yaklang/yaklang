@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+</head>
+<style>
+    #codeSnippet {
+        margin-top: 10px;
+        /*position: absolute;*/
+        /*top: 8px;*/
+        /*right: -130px;*/
+        border: 1px solid #1a73e8;
+    }
+</style>
+<body>
+<div class="container">
+    <h2 class="text-center mt-5" style="color: #007bff;">User Profile</h2>
+    <form id="profileForm" class="mt-4">
+        <table class="table table-bordered">
+            <tr>
+                <th>ID</th>
+                <td>{{.ID}}</td>
+            </tr>
+            <tr>
+                <th>CreatedAt</th>
+                <td>{{.CreatedAt}}</td>
+            </tr>
+            <tr>
+                <th>UpdatedAt</th>
+                <td>{{.UpdatedAt}}</td>
+            </tr>
+            <tr>
+                <th>DeletedAt</th>
+                <td>{{.DeletedAt}}</td>
+            </tr>
+            <tr>
+                <th>Username</th>
+                <td>{{.Username}}</td>
+            </tr>
+            <tr>
+                <th>Password</th>
+                <td>{{.Password}}</td>
+            </tr>
+            <tr>
+                <th>Age</th>
+                <td>
+                    {{.Age}}
+                </td>
+            </tr>
+            <tr>
+                <th>Role</th>
+                <td>{{.Role}}</td>
+            </tr>
+            <tr>
+                <th>备注
+                    <svg id="showCodeButton" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                         fill="currentColor" class="bi bi-question-circle-fill" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.496 6.033h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286a.237.237 0 0 0 .241.247zm2.325 6.443c.61 0 1.029-.394 1.029-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94 0 .533.425.927 1.01.927z"/>
+                    </svg>
+                </th>
+
+                <td><input id="remakeInput" value="{{.Remake}}"/></td>
+            </tr>
+        </table>
+
+        <button id="updateButton" class="btn btn-primary mt-4">Update Profile</button>
+        <button id="logoutButton" class="btn btn-danger mt-4">LogOut</button>
+    </form>
+    <div>
+        <pre id="codeSnippet" style="display: none;"></pre>
+    </div>
+</div>
+
+<script>
+    // 添加表单提交事件监听器
+    document.getElementById("updateButton").addEventListener("click", function (e) {
+        e.preventDefault(); // 阻止表单默认提交行为
+
+        // 获取要更新的年龄值
+        const remake = document.getElementById("remakeInput").value;
+
+        let id = "{{.ID}}"
+        id = parseInt(id, 10);
+        // 创建一个XMLHttpRequest对象
+        const xhr = new XMLHttpRequest();
+
+        // 设置POST请求的目标URL
+        const url = "/user/update";
+
+        // 设置请求方法为POST
+        xhr.open("POST", url, true);
+
+        // 设置请求头
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        // 设置请求体，仅包含要更新的年龄字段
+        var data = {
+            "ID": id,
+            "Remake": remake
+        };
+
+        // 发送请求
+        xhr.send(JSON.stringify(data));
+
+        // 处理请求的响应
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                // 请求成功，根据需要执行逻辑
+                showNotification("Profile updated successfully.", "success");
+                location.reload();
+            } else {
+                // 请求失败，根据需要执行逻辑
+                showNotification("Failed to update profile.", "danger");
+            }
+        };
+    });
+
+    // 处理登出按钮的单击事件
+    document.getElementById("logoutButton").addEventListener("click", function (e) {
+        e.preventDefault();
+        // 发送登出请求
+
+        // 清除浏览器中的Cookie
+        document.cookie = "_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/user/logout", true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    // 登出成功，重定向到登录页面
+                    window.location.href = "/user/login";
+                } else {
+                    // 登出失败，显示错误消息
+                    showNotification("Logout failed: " + xhr.responseText);
+                }
+            }
+        };
+        xhr.send();
+    });
+
+    // 显示提示框
+    function showNotification(message, type) {
+        var notification = document.createElement("div");
+        notification.className = "alert alert-" + type;
+        notification.textContent = message;
+
+        var container = document.querySelector(".container");
+        container.appendChild(notification);
+
+        // 设置一段时间后自动隐藏提示框
+        setTimeout(function () {
+            notification.style.display = "none";
+        }, 3000);
+    }
+
+    const codeSnippet = document.getElementById("codeSnippet");
+    const showCodeButton = document.getElementById("showCodeButton");
+
+    showCodeButton.addEventListener("click", function () {
+        if (codeSnippet.style.display === "block") {
+            codeSnippet.style.display = "none";
+        } else {
+            codeSnippet.style.display = "block";
+            codeSnippet.textContent = `后端代码:
+// 读取请求体数据
+body, err := ioutil.ReadAll(request.Body)
+if err != nil {
+    writer.Write([]byte(err.Error()))
+    writer.WriteHeader(http.StatusBadRequest)
+    return
+}
+
+// 过滤请求体内容
+lowerBody := strings.ToLower(string(body))
+filteredBody := strings.ReplaceAll(lowerBody, "<", "")
+filteredBody = strings.ReplaceAll(filteredBody, ">", "")
+filteredBody = strings.ReplaceAll(filteredBody, "script", "")
+
+// 解析过滤后的 JSON 数据
+var oldUser VulinUser
+err = json.Unmarshal([]byte(filteredBody), &oldUser)
+if err != nil {
+    writer.Write([]byte(err.Error()))
+    writer.WriteHeader(http.StatusBadRequest)
+    return
+}
+            `
+        }
+    });
+</script>
+
+</body>
+</html>
