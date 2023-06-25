@@ -80,8 +80,7 @@ func (s *OnlineClient) HttpFlowShare(ctx context.Context,
 	if utils.MapGetString(responseData, "reason") != "" {
 		return nil, utils.Errorf("httpFlow share failed: %s", utils.MapGetString(responseData, "reason") )
 	}
-	_container.Data.ShareId = utils.MapGetString(responseData, "share_id")
-	_container.Data.ExtractCode = utils.MapGetString(responseData, "extract_code")
+	err = json.Unmarshal(rawResponse, &_container.Data)
 	return _container.Data,  nil
 
 }
