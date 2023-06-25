@@ -5,6 +5,7 @@ import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -21,6 +22,15 @@ func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacad
 		host = "127.0.0.1"
 	}
 	addr := utils.HostPort(host, s.reverseServer.Port)
+
+	var handleResponse = func(raw []byte) []byte {
+		raw = lowhttp.ReplaceHTTPPacketFirstLine(raw, "HTTP/1.1 200 OK")
+		raw = lowhttp.DeleteHTTPPacketHeader(raw, "Location")
+		raw = lowhttp.DeleteHTTPPacketHeader(raw, "Cookie")
+		raw = lowhttp.DeleteHTTPPacketHeader(raw, "Set-Cookie")
+		raw = lowhttp.DeleteHTTPPacketHeader(raw, "set-cookie")
+		return raw
+	}
 
 	if req.GetHTTPFlowID() > 0 {
 		flow, err := yakit.GetHTTPFlow(s.GetProjectDatabase(), req.GetHTTPFlowID())
@@ -43,7 +53,7 @@ func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacad
 		}
 		urlIns.Scheme = "http"
 		pattern := urlIns.RequestURI()
-		s.reverseServer.SetRawResourceEx(pattern, flowGrpc.Response, true)
+		s.reverseServer.SetRawResourceEx(pattern, handleResponse(flowGrpc.Response), true)
 		go func() {
 			select {
 			case <-time.After(10 * time.Minute):
@@ -82,7 +92,7 @@ func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacad
 	urlIns.Scheme = "http"
 	urlIns.Host = addr
 	pattern := path
-	s.reverseServer.SetRawResourceEx(pattern, req.GetHTTPResponse(), true)
+	s.reverseServer.SetRawResourceEx(pattern, handleResponse(req.GetHTTPResponse()), true)
 	go func() {
 		select {
 		case <-time.After(10 * time.Minute):
