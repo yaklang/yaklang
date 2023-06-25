@@ -15,6 +15,8 @@ type VulinUser struct {
 
 	Role string // 添加角色字段
 
+	Remake string // 添加备注字段
+
 }
 
 // 生成指定数量的随机用户数据
@@ -41,6 +43,7 @@ func generateRandomUsers(count int) []VulinUser {
 			Password: password,
 			Age:      age,
 			Role:     "user",
+			Remake:   "我是用户",
 		}
 	}
 
