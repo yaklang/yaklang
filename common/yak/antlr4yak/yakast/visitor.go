@@ -177,7 +177,7 @@ func (y *YakCompiler) ShowOpcodes() {
 	yakvm.ShowOpcodes(y.codes)
 }
 func (y *YakCompiler) ShowOpcodesWithSource(src string) {
-	yakvm.ShowOpcodesWithSouce(src, y.codes)
+	yakvm.ShowOpcodesWithSource(src, y.codes)
 }
 func (y *YakCompiler) CompileSourceCodeWithPath(code string, fPath *string) bool {
 	y.sourceCodeFilePathPointer = fPath
