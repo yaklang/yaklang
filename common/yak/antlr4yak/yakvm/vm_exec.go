@@ -210,6 +210,26 @@ func ShowOpcodes(c []*Code) {
 	}
 }
 
+func ShowOpcodesWithSouce(src string, c []*Code) {
+	lines := strings.Split(src, "\n")
+	cur := -1
+	for i, code := range c {
+		if cur < 0 || code.StartLineNumber != cur {
+			cur = code.StartLineNumber
+			fmt.Printf("%s\n", lines[cur-1])
+		}
+
+		fmt.Printf("%-13s %4d:%v\n", code.RangeVerbose(), i, code.String())
+
+		if code.Opcode == OpPush {
+			v, ok := code.Op1.Value.(*Function)
+			if ok {
+				ShowOpcodesWithSouce(src, v.codes)
+			}
+		}
+	}
+}
+
 func OpcodesString(c []*Code) string {
 	var buf strings.Builder
 	for i, code := range c {
