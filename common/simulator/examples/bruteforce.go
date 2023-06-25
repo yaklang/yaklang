@@ -276,7 +276,7 @@ func inputClickTry(
 	log.Info("current page similarity degree: ", degree)
 	log.Infof("page element change info: \n%s\n", string(words))
 	if degree < 0.6 {
-		log.Infof("login success! with username: %s & passwprd: %s", username, password)
+		log.Infof("login success! with username: %s & password: %s", username, password)
 		pageB64, _ := page.ScreenShotResult()
 		return pageB64, nil
 	} else if degree > 0.8 {

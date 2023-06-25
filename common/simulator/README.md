@@ -1,72 +1,29 @@
+# 目录
+- [simulator.simple](#simulator.simple)
+- [httpbrute 基于模拟点击的http自动化爆破使用说明](#httpbrute)
+  - [代码实例](#httpbrute_1)
+  - [数据接口](#httpbrute_2)
+    - [simulator.BruteResult](#BruteResult)
+  - [API](#httpbrute_3)
+    - [simulator.HttpBruteForce](#httpBruteForce)
+    - [simulator.username](#username)
+    - [simulator.usernameList](#usernameList)
+    - [simulator.password](#password)
+    - [simulator.passwordList](#passwordList)
+    - [simulator.wsAddress](#wsAddress)
+    - [simulator.proxy](#proxy)
+    - [simulator.captchaUrl](#captchaUrl)
+    - [simulator.captchaMode](#captchaMode)
+    - [simulator.usernameSelector](#usernameSelector)
+    - [simulator.passwordSelector](#passwordSelector)
+    - [simulator.captchaInputSelector](#captchaInputSelector)
+    - [simulator.captchaImgSelector](#captchaImgSelector)
+    - [simulator.submitButtonSelector](#submitButtonSelector)
+    - [simulator.loginDetectMode](#loginDetectMode)
+
 # simulator模块使用说明：
 
-# 自动化爆破说明
-
-## 爆破输入
-
-`BruteForceResult, err = simulator.defaultBrute(targetUrl, ...ConfigOpt)`
-
-对目标url进行爆破 返回爆破结果和错误信息
-
-爆破模块相关参数通过ConfigOpt进行输入：
-
-- `configOpt = simulator.captchaUrl(captchaUrl string)` 设置验证码识别url
-
-默认的验证码数据接口匹配使用ddddocr的ocr_api_server项目：[ocr_api_server](https://github.com/sml2h3/ocr_api_server)
-
-- `configOpt = simulator.usernameList(usernameList []string)` 设置爆破的用户名列表
-
-- `configOpt = simulator.passwordList(passwordList []string)` 设置爆破的密码列表
-
-- `configOpt = simulator.wsAddress(wsAddress string)` 设置远端chrome浏览器的ws地址
-
-- `configOpt = simulator.proxy(proxy string)` 设置浏览器代理地址
-
-- `configOpt = simulator.proxyDetails(proxy, username, password string)` 设置浏览器代理地址和代理的用户名密码
-
-- `configOpt = simulator.usernameSelector(selector string)` 用户指定登陆名称输入框的selector
-
-- `configOpt = simulator.passwordSelector(selector string)` 用户指定登陆密码输入框的selector
-
-- `configOpt = simulator.captchaInputSelector(selector string)` 用户指定验证码输入框的selector
-
-- `configOpt = simulator.captchaImgSelector(selector string)` 用户指定验证码图片的selector
-
-- `configOpt = simulator.submitButtonSelector(selector string)` 用户指定登陆提交按钮的selector
-
-
-## 爆破输出
-
-BruteForceResult包括如下输出：
-
-- `string = BruteForceResult.Username()` 爆破成功的用户名，失败为空
-
-- `string = BruteForceResult.Password()` 爆破成功的密码，失败为空
-
-- `string = BruteForceResult.Cookie()` 爆破成功的cookie，失败为空
-
-- `string = BruteForceResult.LoginPngB64()` 爆破成功页面截图的base64编码，失败为空
-
-- `[]string = BruteForceResult.Log()` 爆破过程中的日志信息，字符串列表格式
-
-# 自动化爆破示例
-
-    url = "http://192.168.0.58/#/login"
-    userlist = ["admin"]
-    passlist = ["luckyadmin123"]
-    userOpt = simulator.usernameList(userlist)
-    passOpt = simulator.passwordList(passlist)
-    // captchaUrl = simulator.captchaUrl("http://192.168.0.115:9898/ocr/b64/json")
-    // chromeAddress = simulator.wsAddress("http://192.168.0.115:7317/")
-    result, err = simulator.defaultBrute(url, userOpt, passOpt, scanMode)
-    
-    println(result.Username())
-    println(result.Password())
-    println(result.Cookie())
-    println(result.Log())
-
-
-# simulator.simple
+# <a id="simulator.simple">simulator.simple</a>
 
 新增simulator.simple接口
 
@@ -140,3 +97,370 @@ BruteForceResult包括如下输出：
     page.Input("#password", "123321")
     page.Click("#dijit_form_Button_0_label")
     time.Sleep(2)
+
+# <a id="httpbrute">httpbrute 基于模拟点击的http自动化爆破使用说明</a>
+
+## <a id="httpbrute_1">代码实例</a>
+
+    urlStr = "http://192.168.0.203/#/login"
+    captchaUrl = "http://192.168.0.115:9898/ocr/b64/json"
+    
+    opts = [
+        simulator.captchaUrl(captchaUrl),
+        simulator.username("admin"),
+        simulator.password("admin", "luckyadmin123"),
+    ]
+    
+    ch, err = simulator.HttpBruteForce(urlStr, opts...)
+    for item := range ch {
+        yakit.Info(`[bruteforce] %s:%s login %v with info: %s`, item.Username(), item.Password(), item.Status(), item.Info())
+    }
+
+## <a id="httpbrute_2">Data Struct</a>
+
+### <a id="BruteResult">simulator.BruteResult</a>
+
+爆破结果数据结构
+
+#### struct
+
+    type BruteResult interface {
+        PtrStructMethods(指针结构方法/函数):
+            func Username() return (string)
+            func Password() return (string)
+            func Status() return (bool)
+        
+            func Info() return (string)
+            func Base64() return (string)
+    }
+
+#### method
+
+`func (*BruteResult) Username() return (r0: string)` 爆破测试的用户名
+
+`func (*BruteResult) Password() return (r0: string)` 爆破测试的密码
+
+`func (*BruteResult) Status() return (r0: bool)` 本次爆破是否成功
+
+`func (*BruteResult) Info() return (r0: string)` 本次爆破过程的部分信息
+
+`func (*BruteResult) Base64() return (r0: string)` 爆破成功时浏览器页面截图的base64编码
+
+## <a id="httpbrute_3">API</a>
+
+### <a id="httpBruteForce">simulator.HttpBruteForce</a>
+
+设置爆破参数 开始爆破任务
+
+#### 定义
+
+`simulator.HttpBruteForce(url string, opts ...simulator.BruteConfigOpt) return (ch: chan simulator.BruteResult, err: error)`
+
+#### 参数
+
+| 参数名  | 参数类型                        | 参数解释 |
+|------|-----------------------------|------|
+| url  | string                      | 爆破目标 |
+| opts | ...simulator.BruteConfigOpt | 爆破参数 |
+
+#### 返回值
+
+| 返回值 | 返回值类型                      | 返回值解释         |
+|-----|----------------------------|---------------|
+| ch  | chan simulator.BruteResult | 爆破结果传递channel |
+| err | error                      | 错误信息          |
+
+### <a id="username">simulator.username</a>
+
+设置爆破的用户名
+
+#### 定义
+
+`simulator.username(username ...string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名      | 参数类型      | 参数解释    |
+|----------|-----------|---------|
+| username | ...string | 待爆破的用户名 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="usernameList">simulator.usernameList</a>
+
+设置爆破的用户名
+
+#### 定义
+
+`simulator.usernameList(usernameList []string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名          | 参数类型     | 参数解释      |
+|--------------|----------|-----------|
+| usernameList | []string | 待爆破的用户名切片 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="password">simulator.password</a>
+
+设置爆破的密码
+
+#### 定义
+
+`simulator.password(password ...string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名      | 参数类型      | 参数解释   |
+|----------|-----------|--------|
+| password | ...string | 待爆破的密码 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="passwordList">simulator.passwordList</a>
+
+设置爆破的密码
+
+#### 定义
+
+`simulator.passwordList(passwordList []string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名          | 参数类型     | 参数解释     |
+|--------------|----------|----------|
+| passwordList | []string | 待爆破的密码切片 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="wsAddress">simulator.wsAddress</a>
+
+设置浏览器的ws地址
+
+#### 定义
+
+`simulator.wsAddress(wsAddress string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名       | 参数类型   | 参数解释     |
+|-----------|--------|----------|
+| wsAddress | string | 浏览器的ws地址 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="proxy">simulator.proxy</a>
+
+设置浏览器代理
+
+#### 定义
+
+`simulator.proxy(proxy string, details ...string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名     | 参数类型      | 参数解释              |
+|---------|-----------|-------------------|
+| proxy   | string    | 浏览器代理地址           |
+| details | ...string | 代理的用户名和密码（如果有则填写） |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaUrl">simulator.captchaUrl</a>
+
+设置验证码图片识别链接
+
+#### 定义
+
+`simulator.captchaUrl(captchaUrl string) return (r0: simulator.BruteConfigOpt)`
+
+默认的验证码数据接口匹配使用ddddocr的ocr_api_server项目：[ocr_api_server](https://github.com/sml2h3/ocr_api_server)
+
+这里默认操作类型ocr，数据类型b64，返回类型json，所以使用该项目时默认接口为：http://{host}:{port}/ocr/b64/json
+
+#### 参数
+
+| 参数名        | 参数类型      | 参数解释    |
+|------------|-----------|---------|
+| captchaUrl | string    | 浏览器代理地址 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaMode">simulator.captchaMode</a>
+
+设置验证码图片识别模式（可选）
+
+<font size=5><b>一般情况下不会使用该接口</b></font>
+
+#### 定义
+
+`simulator.captchaMode(captchaMode string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名         | 参数类型      | 参数解释    |
+|-------------|-----------|---------|
+| captchaMode | string    | 验证码识别模式 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="usernameSelector">simulator.usernameSelector</a>
+
+设置输入用户名的element的selector
+
+#### 定义
+
+`simulator.usernameSelector(usernameSelector string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名              | 参数类型      | 参数解释                |
+|------------------|-----------|---------------------|
+| usernameSelector | string    | 用户名element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="passwordSelector">simulator.passwordSelector</a>
+
+设置输入密码的element的selector
+
+#### 定义
+
+`simulator.passwordSelector(passwordSelector string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名              | 参数类型      | 参数解释               |
+|------------------|-----------|--------------------|
+| passwordSelector | string    | 密码element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaInputSelector">simulator.captchaInputSelector</a>
+
+设置输入验证码的element的selector
+
+#### 定义
+
+`simulator.captchaInputSelector(captchaSelector string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名             | 参数类型   | 参数解释                |
+|-----------------|--------|---------------------|
+| captchaSelector | string | 验证码element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="captchaImgSelector">simulator.captchaImgSelector</a>
+
+设置验证码图片的element的selector
+
+#### 定义
+
+`simulator.captchaImgSelector(captchaImgSelector string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名                | 参数类型   | 参数解释                  |
+|--------------------|--------|-----------------------|
+| captchaImgSelector | string | 验证码图片element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="submitButtonSelector">simulator.submitButtonSelector</a>
+
+设置提交请求按钮对应element的selector
+
+#### 定义
+
+`simulator.submitButtonSelector(buttonSelector string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名             | 参数类型   | 参数解释                   |
+|-----------------|--------|------------------------|
+| buttonSelector  | string | 提交请求按钮element的selector |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="loginDetectMode">simulator.loginDetectMode</a>
+
+设置确认成功登陆的检测类型
+
+#### 定义
+
+`simulator.loginDetectMode(detectMode loginDetectMode, degree ...float64) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名        | 参数类型            | 参数解释        |
+|------------|-----------------|-------------|
+| detectMode | loginDetectMode | 确认成功登陆的检测类型 |
+| degree     | ...float64      | 附加参数        |
+
+loginDetectMode包括三种：
+- `simulator.urlChangeMode` 通过url变化判断是否登陆成功
+- `simulator.htmlChangeMode` 通过html页面的变化程度判断是否登陆成功
+- `simulator.defaultChangeMode` 同时使用以上两种判断方法，两种方法都通过才确定登陆成功（默认）
+
+当使用了html页面变化程度进行判断时，可以通过degree设置判断相似程度的阈值，值越小表示尝试登陆后的页面相似程度越小，默认为0.6
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
