@@ -1,6 +1,7 @@
 package vulinbox
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yso"
 	"math/rand"
@@ -115,7 +116,9 @@ var randKey []byte
 
 func init() {
 	rand.NewSource(time.Now().UnixNano())
-	randKey, _ = codec.DecodeBase64(keyList[rand.Intn(len(keyList))])
+	key := keyList[rand.Intn(len(keyList))]
+	log.Infof("Use RandKey: %s", key)
+	randKey, _ = codec.DecodeBase64(key)
 }
 
 func (s *VulinServer) registerMockVulShiro() {
@@ -143,14 +146,16 @@ func (s *VulinServer) registerMockVulShiro() {
 			return
 		}
 		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
+		var iv []byte
 		if len(cookieVal) > len(randKey) {
-			cookieVal = cookieVal[len(randKey):]
+			iv = cookieVal[:16]
+			cookieVal = cookieVal[16:]
 		} else { // 第一次探测请求
 			failNow(writer, request)
 			return
 		}
 
-		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, nil)
+		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, iv)
 		if err != nil || payload == nil { // key不对返回deleteMe
 			failNow(writer, request)
 			return
