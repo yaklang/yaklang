@@ -36,6 +36,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		panic(err)
 	}
 	t.Logf("vulinbox server started: %s", vulinboxAddr)
+	vulinboxAddr = utils.HostPort("127.0.0.1", vulinboxPort)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
