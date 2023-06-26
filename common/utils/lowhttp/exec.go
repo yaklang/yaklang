@@ -1080,6 +1080,12 @@ func SendHTTPRequestRaw(https bool, host string, port int, r *http.Request, time
 }
 
 func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
+	var nextProtos []string
+	if enableHttp2 {
+		nextProtos = []string{http2.NextProtoTLS}
+	} else {
+		nextProtos = []string{"http/1.1"}
+	}
 	if isGM {
 		gmSupport := gmtls.NewGMSupport()
 		gmSupport.EnableMixMode()
@@ -1090,6 +1096,7 @@ func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, time
 			MaxVersion:         tls.VersionTLS13,
 			ServerName:         host,
 			GMSupport:          gmSupport,
+			NextProtos:         nextProtos,
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -1106,9 +1113,7 @@ func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, time
 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 		MaxVersion:         tls.VersionTLS13,
 		ServerName:         host,
-	}
-	if enableHttp2 {
-		config.NextProtos = []string{http2.NextProtoTLS}
+		NextProtos:         nextProtos,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

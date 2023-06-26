@@ -37,7 +37,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	}
 	t.Logf("vulinbox server started: %s", vulinboxAddr)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	stream, err := client.MITM(ctx)
@@ -50,6 +50,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		Host:             "127.0.0.1",
 		Port:             uint32(port),
 		Recover:          true,
+		EnableHttp2:      false,
 		SetAutoForward:   true,
 		AutoForwardValue: true,
 		InitPluginNames: []string{
@@ -118,6 +119,10 @@ Host: 111
 				_, err := yak.NewScriptEngine(10).ExecuteEx(`
 packet = getParam("packet")
 proxy = getParam("proxy")
+
+dump(packet)
+dump(proxy)
+
 rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.https(true))~
 println(string(rsp))
 sleep(1)
