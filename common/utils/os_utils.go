@@ -137,6 +137,49 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
 
+func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPExWithTimeout(time.Minute, handle)
+}
+
+func DebugMockHTTPExWithTimeout(du time.Duration, handle func([]byte) []byte) (string, int) {
+	addr := GetRandomLocalAddr()
+	time.Sleep(300 * time.Millisecond)
+	var host, port, _ = ParseStringToHostPort(addr)
+	go func() {
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			panic(err)
+		}
+		go func() {
+			time.Sleep(du)
+			lis.Close()
+		}()
+
+		for {
+			conn, err := lis.Accept()
+			if err != nil {
+				break
+			}
+			go func() {
+				ctx := TimeoutContextSeconds(10)
+				for {
+					select {
+					case <-ctx.Done():
+						conn.Close()
+					default:
+						conn.Write(handle(StableReaderEx(conn, 10*time.Second, 10240)))
+						time.Sleep(50 * time.Millisecond)
+						conn.Close()
+					}
+				}
+			}()
+		}
+		lis.Close()
+	}()
+	_ = WaitConnect(addr, 3.0)
+	return host, port
+}
+
 func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
@@ -164,6 +207,6 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 		}
 		lis.Close()
 	}()
-	time.Sleep(time.Millisecond * 3)
+	time.Sleep(time.Millisecond * 100)
 	return host, port
 }
