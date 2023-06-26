@@ -100,6 +100,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 			pluginStartLoading = true
 		}
 		if pluginStartLoading && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
+			pluginLoaded = true
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
@@ -173,7 +174,7 @@ risk.DeleteRiskByTarget(vulinboxAddr)
 	}
 
 	if !pluginLoaded {
-		panic("XSS PLUGIN LOADED")
+		panic("XSS PLUGIN NOT LOADED")
 	}
 
 	if !vulnFound {
