@@ -67,6 +67,9 @@ jobs:
       - name: Test gRPC MUSTPASS-PLUGIN-SQL
         run: go test -timeout 2m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
 
+      - name: Test gRPC MUSTPASS-PLUGIN-MITM
+        run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
+
       - name: Test gRPC MUSTPASS-PLUGIN-SSTI
         run: go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
 
