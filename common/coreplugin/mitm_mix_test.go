@@ -29,7 +29,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		if err != nil {
 			t.Fatalf("start vulinbox server failed: %s", err)
 		}
-		vulinboxAddr = v
+		_ = v
 	}()
 	err = utils.WaitConnect(vulinboxAddr, 5)
 	if err != nil {
