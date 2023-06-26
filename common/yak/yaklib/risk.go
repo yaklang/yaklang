@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
@@ -63,6 +64,15 @@ var (
 		},
 		"YieldRiskByCreateAt": func(timestamp int64) chan *yakit.Risk {
 			return yakit.YieldRisksByCreateAt(consts.GetGormProjectDatabase(), context.Background(), timestamp)
+		},
+		"DeleteRiskByTarget": func(addr string) {
+			yakit.DeleteRiskByTarget(consts.GetGormProjectDatabase(), addr)
+		},
+		"DeleteRiskByID": func(id any) {
+			var err = yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), int64(utils.Atoi(utils.InterfaceToString(id))))
+			if err != nil {
+				log.Errorf("delete risk by id error: %v", err)
+			}
 		},
 		"NewUnverifiedRisk":         yakit.NewUnverifiedRisk,
 		"NewPublicReverseRMIUrl":    yakit.NewPublicReverseProtoUrl("rmi"),

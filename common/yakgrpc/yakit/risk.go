@@ -292,10 +292,36 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 	return paging, ret, nil
 }
 
+func DeleteRiskByTarget(db *gorm.DB, target string) {
+	db = db.Model(&Risk{})
+	var host, port, _ = utils.ParseStringToHostPort(target)
+	if port > 0 {
+		db = db.Where("port = ?", port)
+		if host != "" {
+			db = db.Where("(host = ?) OR (ip = ?)", host, host)
+		}
+	} else {
+		db = db.Where("(ip = ?) OR (url LIKE ?) OR (host LIKE ?) OR (host = ?)", target, target, target, target)
+	}
+
+	if db := db.Unscoped().Delete(&Risk{}); db.Error != nil {
+		log.Errorf("delete risks failed: %s", db.Error)
+	}
+	log.Infof("delete risk by targets: %s finished", target)
+}
+
 func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *Risk {
 	outC := make(chan *Risk)
 	db = db.Model(&Risk{})
-	db = db.Where("(ip = ?) OR (url LIKE ?) OR (host LIKE ?)", target, target, target)
+	var host, port, _ = utils.ParseStringToHostPort(target)
+	if port > 0 {
+		db = db.Where("port = ?", port)
+		if host != "" {
+			db = db.Where("(host = ?) OR (ip = ?)", host, host)
+		}
+	} else {
+		db = db.Where("(ip = ?) OR (url LIKE ?) OR (host LIKE ?) OR (host = ?)", target, target, target, target)
+	}
 
 	go func() {
 		defer close(outC)
