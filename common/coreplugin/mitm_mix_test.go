@@ -65,9 +65,10 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	wg.Add(1)
 
 	var (
-		started      bool
-		pluginLoaded bool
-		vulnFound    bool
+		started            bool
+		pluginStartLoading bool
+		pluginLoaded       bool
+		vulnFound          bool
 	)
 
 	for {
@@ -94,13 +95,15 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 			}
 		}
 
-		if !pluginLoaded && started && strings.Contains(spew.Sdump(rsp), "Initializing MITM Plugin: 基础 XSS 检测") {
+		if !pluginStartLoading && started && strings.Contains(spew.Sdump(rsp), "Initializing MITM Plugin: 基础 XSS 检测") {
+			pluginStartLoading = true
+		}
+		if pluginStartLoading && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			fmt.Println("==============================================")
-			pluginLoaded = true
 			go func() {
 				defer func() {
 					cancel()
