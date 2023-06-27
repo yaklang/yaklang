@@ -105,7 +105,7 @@ If you just want to add functionality to the library, or fix some bugs in the li
 1. [z3](https://github.com/OrangeWatermelon)
 2. [Longlone](https://github.com/way29)
 3. [Go0p](https://github.com/Go0p)
-4. [zwh-china](https://github.com/Matrix-Cain)
+4. [Matrix-Cain](https://github.com/Matrix-Cain)
 5. [bcy2007](https://github.com/bcy2007)
 6. [naiquan](https://github.com/naiquann)
 7. [Rookie-is](https://github.com/Rookie-is)
