@@ -55,7 +55,7 @@ func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, 
 			log.Infof("VULINBOX: %s %s", request.Method, request.URL)
 			raw, _ := utils.HttpDumpWithBody(request, true)
 			if string(raw) != "" {
-				println(string(raw))
+				log.Println(string(raw))
 			}
 			handler.ServeHTTP(writer, request)
 		})

@@ -750,3 +750,99 @@ Content-Type: text/html; charset=utf-8
 		}
 	}
 }
+
+func TestGetHTTPRequestQueryParam(t *testing.T) {
+	for _, c := range [][]any{
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"a", "1"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"b", "2"}},
+		{[]byte(`GET /?a=1&b=2&a=3 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"a", "1"}},
+	} {
+		if GetHTTPRequestQueryParam(c[0].([]byte), c[1].([2]string)[0]) != c[1].([2]string)[1] {
+			panic(fmt.Sprintf("GetHTTPRequestQueryParam failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
+
+func TestGetHTTPRequestQueryParamFull(t *testing.T) {
+	for _, c := range [][]any{
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"a", "1"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"b", "2"}},
+		{[]byte(`GET /?a=1&b=2&a=3 HTTP/1.1
+Host: www.baidu.com
+`), [2]string{"a", "1,3"}},
+	} {
+		if strings.Join(GetHTTPRequestQueryParamFull(c[0].([]byte), c[1].([2]string)[0]), ",") != c[1].([2]string)[1] {
+			panic(fmt.Sprintf("GetHTTPRequestQueryParamFull failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
+
+func TestGetHTTPRequestPostParamFull(t *testing.T) {
+	for _, c := range [][]any{
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1
+`), [2]string{"a", ""}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1
+`), [2]string{"d", "1"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1`), [2]string{"e", "555"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1&e=111`), [2]string{"e", "555,111"}},
+	} {
+		vals := strings.Join(GetHTTPRequestPostParamFull(c[0].([]byte), c[1].([2]string)[0]), ",")
+		if vals != c[1].([2]string)[1] {
+			spew.Dump(vals)
+			spew.Dump(c)
+			panic(fmt.Sprintf("GetHTTPRequestQueryParamFull failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
+
+func TestGetHTTPRequestPostParam(t *testing.T) {
+	for _, c := range [][]any{
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1
+`), [2]string{"a", ""}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1
+`), [2]string{"d", "1"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1`), [2]string{"e", "555"}},
+		{[]byte(`GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+
+d=1&e=555&f=1&e=111`), [2]string{"e", "555"}},
+	} {
+		vals := strings.Join([]string{GetHTTPRequestPostParam(c[0].([]byte), c[1].([2]string)[0])}, ",")
+		if vals != c[1].([2]string)[1] {
+			spew.Dump(vals)
+			spew.Dump(c)
+			panic(fmt.Sprintf("GetHTTPRequestQueryParamFull failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
