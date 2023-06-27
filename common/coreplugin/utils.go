@@ -33,6 +33,7 @@ type VulServerInfo struct {
 
 type VulInfo struct {
 	Path           string
+	Headers        []*ypb.KVPair
 	ExpectedResult map[string]int
 }
 
@@ -89,6 +90,7 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 		Input:      utils.HostPort(host, port),
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
 			Path:    []string{vunInfo.Path},
+			Headers: vunInfo.Headers,
 			IsHttps: vulServer.IsHttps,
 		},
 	})

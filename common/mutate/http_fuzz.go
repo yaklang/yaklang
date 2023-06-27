@@ -553,7 +553,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 				params = append(params, &FuzzHTTPRequestParam{
 					typePosition:     posCookieJson,
 					param:            k.Name,
-					paramOriginValue: k.Value,
+					paramOriginValue: []string{k.Value},
 					jsonPath:         j,
 					origin:           f,
 				})
@@ -565,7 +565,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 				params = append(params, &FuzzHTTPRequestParam{
 					typePosition:     posCookieBase64Json,
 					param:            k.Name,
-					paramOriginValue: k.Value,
+					paramOriginValue: []string{k.Value},
 					jsonPath:         j,
 					origin:           f,
 				})
@@ -575,7 +575,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 		params = append(params, &FuzzHTTPRequestParam{
 			typePosition:     posCookie,
 			param:            k.Name,
-			paramOriginValue: k.Value,
+			paramOriginValue: []string{k.Value},
 			origin:           f,
 		})
 	}
