@@ -194,6 +194,7 @@ func QueryYakScriptByNames(db *gorm.DB, req []string) []*ypb.DownloadOnlinePlugi
 		YakPlugin = append(YakPlugin, &ypb.DownloadOnlinePluginByScriptName{
 			ScriptName: y.ScriptName,
 			Id:         int64(y.ID),
+			HeadImg:    y.HeadImg,
 		})
 	}
 	return YakPlugin
