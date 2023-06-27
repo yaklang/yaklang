@@ -359,7 +359,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 
 	clearPluginHTTPFlowCache := func() {
-		mitmPluginCaller.ResetFilter()
+		if mitmPluginCaller != nil {
+			mitmPluginCaller.ResetFilter()
+		}
 		stream.Send(&ypb.MITMResponse{
 			HaveNotification:    true,
 			NotificationContent: []byte("MITM 插件去重缓存已重置"),
@@ -393,6 +395,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IncludeUri:          filterManager.IncludeUri,
 					ExcludeUri:          filterManager.ExcludeUri,
 				})
+				clearPluginHTTPFlowCache()
 				continue
 			}
 
@@ -405,11 +408,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					replacer.SetRules()
 				}
 				recoverSend()
+				clearPluginHTTPFlowCache()
 				continue
 			}
 
 			// 自动加载所有 MITM 插件（基础插件）
 			if reqInstance.SetPluginMode {
+				clearPluginHTTPFlowCache()
 				if len(reqInstance.GetInitPluginNames()) > 0 {
 					var plugins []string
 					if len(reqInstance.GetInitPluginNames()) > 200 && false {
@@ -480,23 +485,25 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 清除 hook (会执行 clear 来清除垃圾)
 			if reqInstance.RemoveHook {
+				clearPluginHTTPFlowCache()
 				mitmPluginCaller.GetNativeCaller().Remove(reqInstance.GetRemoveHookParams())
 				_ = stream.Send(&ypb.MITMResponse{
 					GetCurrentHook: true,
 					Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 				})
-				clearPluginHTTPFlowCache()
 				continue
 			}
 
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
+				clearPluginHTTPFlowCache()
 				log.Infof("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
 				autoForward.SetTo(reqInstance.GetAutoForwardValue())
 			}
 
 			// 设置中间人插件
 			if reqInstance.SetYakScript {
+				clearPluginHTTPFlowCache()
 				script, _ := yakit.GetYakScript(s.GetProfileDatabase(), reqInstance.GetYakScriptID())
 				if script != nil && (script.Type == "mitm" || script.Type == "port-scan") {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
@@ -540,6 +547,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 更新过滤器
 			if reqInstance.UpdateFilter {
+				clearPluginHTTPFlowCache()
 				filterManager.IncludeSuffix = reqInstance.IncludeSuffix
 				filterManager.ExcludeSuffix = reqInstance.ExcludeSuffix
 				filterManager.IncludeHostnames = reqInstance.IncludeHostname
@@ -549,7 +557,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				filterManager.ExcludeUri = reqInstance.ExcludeUri
 				filterManager.IncludeUri = reqInstance.IncludeUri
 				filterManager.Save()
-
 				send(&ypb.MITMResponse{
 					JustFilter:          true,
 					IncludeHostname:     filterManager.IncludeHostnames,

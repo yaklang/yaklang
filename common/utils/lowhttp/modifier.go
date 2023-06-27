@@ -9,19 +9,39 @@ import (
 	"strings"
 )
 
+func IsChunkedHeaderLine(line string) bool {
+	line = strings.ToLower(line)
+	if strings.HasPrefix(line, "transfer-encoding: chunked") {
+		return true
+	}
+	if line == "chunked" {
+		return true
+	}
+	k, v := SplitHTTPHeader(line)
+	if k == "transfer-encoding" && v == "chunked" {
+		return true
+	}
+	return false
+}
+
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
+	var isChunked bool
 	var header = []string{firstLine}
 	_, body := SplitHTTPPacket(packet, nil, nil, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
 		header = append(header, line)
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, false)
+	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
 }
 
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
 	var handled bool
+	var isChunked = IsChunkedHeaderLine(headerKey + ": " + utils.InterfaceToString(headerValue))
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -33,6 +53,9 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		}
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
 		if k, _ := SplitHTTPHeader(line); k == headerKey {
 			handled = true
 			header = append(header, headerKey+": "+utils.InterfaceToString(headerValue))
@@ -48,12 +71,13 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
+	var isChunked bool
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -65,6 +89,9 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 		}
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
 		header = append(header, line)
 		return line
 	})
@@ -73,12 +100,13 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	var firstLine string
 	var header []string
+	var isChunked bool
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -90,6 +118,10 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 		}
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
+
 		if k, _ := SplitHTTPHeader(line); k == headerKey {
 			return ""
 		}
@@ -107,6 +139,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var isRsp bool
 	var handled = false
+	var isChunked bool
 	header, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		isReq = true
 		return nil
@@ -114,6 +147,10 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		isRsp = true
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
+
 		if !isReq && !isRsp {
 			return line
 		}
@@ -136,7 +173,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		}
 		return line
 	})
-	var data = ReplaceHTTPPacketBody([]byte(header), body, false)
+	var data = ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 	if handled {
 		return data
 	}
@@ -147,6 +184,7 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var added bool
 	var isRsp bool
+	var isChunked bool
 	header, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		isReq = true
 		return nil
@@ -154,6 +192,10 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		isRsp = true
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
+
 		if !isReq && !isRsp {
 			return line
 		}
@@ -185,12 +227,13 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 			})
 		}
 	}
-	return ReplaceHTTPPacketBody([]byte(header), body, false)
+	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
 func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 	var isReq bool
 	var isRsp bool
+	var isChunked bool
 	header, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		isReq = true
 		return nil
@@ -198,6 +241,9 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 		isRsp = true
 		return nil
 	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
 		if !isReq && !isRsp {
 			return line
 		}
@@ -215,7 +261,7 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(header), body, false)
+	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
 func GetHTTPPacketCookieValues(packet []byte, key string) []string {
@@ -364,5 +410,11 @@ func GetStatusCodeFromResponse(packet []byte) int {
 }
 
 func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
-	return ReplaceHTTPPacketBody(packet, body, false)
+	var isChunked bool
+	SplitHTTPHeadersAndBodyFromPacket(packet, func(line string) {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
+	})
+	return ReplaceHTTPPacketBody(packet, body, isChunked)
 }
