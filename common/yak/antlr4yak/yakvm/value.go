@@ -934,7 +934,12 @@ func (v *Value) LeftMemberAssignTo(vir *Frame, val *Value) {
 		if err != nil {
 			panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", val))
 		}
-		reflect.ValueOf(caller.Value).SetMapIndex(reflect.ValueOf(key.Value), refV.Convert(reflect.ValueOf(caller.Value).MapIndex(reflect.ValueOf(key.Value)).Type()))
+		callerRefV := reflect.ValueOf(caller.Value)
+		keyRefV := reflect.ValueOf(key.Value)
+		if callerRefV.MapIndex(keyRefV).IsValid() {
+			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())
+		}
+		callerRefV.SetMapIndex(keyRefV, refV)
 	case reflect.Struct:
 		log.Warnf("Cannot assign to struct field %s", key.AsString())
 	case reflect.Ptr:
