@@ -1,8 +1,14 @@
 package vulinbox
 
 import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso"
 	"math/rand"
 	"net/http"
@@ -112,12 +118,24 @@ var keyList = []string{
 	"SDKOLKn2J1j/2BHjeZwAoQ==",
 }
 
+var gadgetList = []string{
+	"CB183NoCC",
+	"CB192NoCC",
+	"CCK1",
+	"CCK2",
+}
+
 var randKey []byte
+
+var randGadget string
 
 func init() {
 	rand.NewSource(time.Now().UnixNano())
-	key := keyList[rand.Intn(len(keyList))]
-	log.Infof("Use RandKey: %s", key)
+	//key := keyList[rand.Intn(len(keyList))]
+	key := keyList[0]
+	//gadget := gadgetList[rand.Intn(len(gadgetList))]
+	randGadget = gadgetList[0]
+	log.Infof("Use RandKey: %s , Use GadGet :%s ", key, randGadget)
 	randKey, _ = codec.DecodeBase64(key)
 }
 
@@ -125,7 +143,7 @@ func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
 
 	router.HandleFunc("/shiro/cbc", func(writer http.ResponseWriter, request *http.Request) {
-		failNow := func(writer http.ResponseWriter, request *http.Request) {
+		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 			cookie := http.Cookie{
 				Name:     "rememberMe",
 				Value:    "deleteMe",                         // 设置 cookie 的值
@@ -134,15 +152,25 @@ func (s *VulinServer) registerMockVulShiro() {
 			}
 			http.SetCookie(writer, &cookie)
 			writer.WriteHeader(200)
+			if err != nil {
+				writer.Write([]byte(err.Error()))
+			}
 			return
 		}
 		successNow := func(writer http.ResponseWriter, request *http.Request) {
 			writer.WriteHeader(200)
 			return
 		}
+		echoNow := func(echo string, writer http.ResponseWriter, request *http.Request) {
+
+			writer.WriteHeader(200)
+			return
+		}
+
+		_ = echoNow
 		rememberMe, err := request.Cookie("rememberMe")
 		if err != nil { // 请求没有cookie 那就设置一个
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
@@ -151,32 +179,87 @@ func (s *VulinServer) registerMockVulShiro() {
 			iv = cookieVal[:16]
 			cookieVal = cookieVal[16:]
 		} else { // 第一次探测请求
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 
 		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, iv)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		payload, err = codec.MustPKCS5UnPadding(payload)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
-		javaObject, err := yso.GetJavaObjectFromBytes(payload)
-		if err != nil { // 反序列化出错返回
-			failNow(writer, request)
+
+		javaSerializables, err := yserx.ParseJavaSerialized(payload)
+		if err != nil {
+			failNow(writer, request, err)
 			return
 		}
-		if strings.Contains(string(javaObject.Marshal()), "org.apache.shiro.subject.SimplePrincipalCollection") {
+		raw, err := yserx.ToJson(javaSerializables)
+
+		var javaObjectMap []map[string]interface{}
+
+		err = json.Unmarshal(raw, &javaObjectMap)
+		if err != nil {
+			failNow(writer, request, err)
+		}
+
+		if strings.Contains(string(raw), "org.apache.shiro.subject.SimplePrincipalCollection") {
 			successNow(writer, request)
-		} else {
-			failNow(writer, request)
-			return
 		}
-		writer.WriteHeader(200)
+
+		switch randGadget {
+		case "CB183NoCC":
+			// Commons-beanutils:1.8.0 serialVersionUID -3490850999041592962
+			const serialVersionUID int64 = -3490850999041592962
+			for _, item := range javaObjectMap {
+				getUid := findSerialVersionUid(item, "org.apache.commons.beanutils.BeanComparator")
+				uid, err := codec.DecodeBase64(getUid)
+				if err != nil {
+					failNow(writer, request, err)
+					return
+				}
+				getserialVersionUID := int64(binary.BigEndian.Uint64(uid))
+				if getserialVersionUID != serialVersionUID {
+					err = utils.Errorf("serialVersionUID %d not match %d", getserialVersionUID, serialVersionUID)
+					failNow(writer, request, err)
+					return
+				}
+
+				javaClasss := findByteCodes(item)
+
+				for _, class := range javaClasss {
+					obj, err := javaclassparser.ParseFromBase64(class)
+					if err != nil {
+						failNow(writer, request, err)
+						return
+					}
+
+					log.Infof("class: %v", class)
+
+					log.Infof("obj %s", obj.GetClassName())
+
+					for _, c := range obj.ConstantPool {
+						log.Infof("c %v", c)
+					}
+
+				}
+
+			}
+
+		case "CB192NoCC":
+
+		case "CCK1":
+
+		case "CCK2":
+
+		}
+
+		failNow(writer, request, nil)
 		return
 	})
 	router.HandleFunc("/shiro/gcm", func(writer http.ResponseWriter, request *http.Request) {
@@ -226,4 +309,63 @@ func (s *VulinServer) registerMockVulShiro() {
 		writer.WriteHeader(200)
 		return
 	})
+}
+
+func findClassName(obj interface{}) {
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		for key, value := range concreteVal {
+			if key == "class_name" {
+				fmt.Println(value)
+			}
+			findClassName(value)
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			findClassName(item)
+		}
+	}
+}
+
+func findSerialVersionUid(obj interface{}, className string) string {
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		if concreteVal["class_name"] == className {
+			if serialVersion, ok := concreteVal["serial_version"].(string); ok {
+				return serialVersion
+			}
+		}
+		for _, value := range concreteVal {
+			if result := findSerialVersionUid(value, className); result != "" {
+				return result
+			}
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			if result := findSerialVersionUid(item, className); result != "" {
+				return result
+			}
+		}
+	}
+	return ""
+}
+
+func findByteCodes(obj interface{}) []string {
+	var bytesList []string
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		if bytesCode, ok := concreteVal["bytescode"].(bool); ok && bytesCode {
+			if bytes, ok := concreteVal["bytes"].(string); ok {
+				bytesList = append(bytesList, bytes)
+			}
+		}
+		for _, value := range concreteVal {
+			bytesList = append(bytesList, findByteCodes(value)...)
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			bytesList = append(bytesList, findByteCodes(item)...)
+		}
+	}
+	return bytesList
 }
