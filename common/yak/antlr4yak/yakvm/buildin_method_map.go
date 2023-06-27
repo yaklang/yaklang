@@ -84,7 +84,11 @@ func init() {
 					if err != nil {
 						panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", v))
 					}
-					reflect.ValueOf(caller.Value).SetMapIndex(reflect.ValueOf(k), refV)
+					callerRefV := reflect.ValueOf(caller.Value)
+					if callerRefV.MapIndex(reflect.ValueOf(k)).IsValid() {
+						refV = refV.Convert(callerRefV.MapIndex(reflect.ValueOf(k)).Type())
+					}
+					callerRefV.SetMapIndex(reflect.ValueOf(k), refV)
 					return true
 				}
 			}),
