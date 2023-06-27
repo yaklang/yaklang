@@ -795,6 +795,14 @@ func (s *Server) QueryYakScriptLocalAll(c context.Context, req *ypb.Empty) (*ypb
 	return rsp, nil
 }
 
+func (s *Server) QueryYakScriptByNames(ctx context.Context, req *ypb.QueryYakScriptByNamesRequest) (*ypb.QueryYakScriptByNamesResponse, error) {
+	ret := &ypb.QueryYakScriptByNamesResponse{}
+	for _, y := range yakit.QueryYakScriptByNames(s.GetProfileDatabase(), req.YakScriptName...) {
+		ret.Data = append(ret.Data, y.ToGRPCModel())
+	}
+	return ret, nil
+}
+
 func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB)  []*ypb.Tags {
 	var tag []*ypb.Tags
 	tagData := make(map[string]int64)

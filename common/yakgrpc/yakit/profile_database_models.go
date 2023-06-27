@@ -13,7 +13,8 @@ var initUserDataAndPluginOnce = new(sync.Once)
 var ProfileTables = []interface{}{
 	&YakScript{}, &Payload{}, &MenuItem{},
 	&GeneralStorage{}, &MarkdownDoc{},
-	&Project{}, &NaslScript{},
+	&Project{},
+	&NavigationBar{}, &NaslScript{},
 }
 
 func InitializeDefaultDatabase() {
