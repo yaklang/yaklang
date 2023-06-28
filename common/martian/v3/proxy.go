@@ -61,10 +61,10 @@ func isCloseable(err error) bool {
 	}
 
 	switch err {
-	case io.EOF, io.ErrClosedPipe, errClose:
+	case io.EOF, io.ErrClosedPipe, errClose, io.ErrUnexpectedEOF:
 		return true
 	default:
-		log.Warnf("Unhandled CONNECTION ERROR: %v", err.Error())
+		log.Debugf("Unhandled CONNECTION ERROR: %v", err.Error())
 		return true
 	}
 }
@@ -334,14 +334,17 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 	statusContext, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	go func() {
+		var lastCurrentConnCount int64
 		for {
 			select {
 			case <-statusContext.Done():
 				return
 			default:
-				if currentConnCount > 0 {
+				if currentConnCount > 0 && lastCurrentConnCount != currentConnCount {
 					log.Infof("active connections count: %v", currentConnCount)
+					lastCurrentConnCount = currentConnCount
 				}
 				time.Sleep(3 * time.Second)
 			}
@@ -544,13 +547,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	select {
 	case err := <-errc:
 		if isCloseable(err) {
-			log.Infof("martian: connection closed prematurely: %v", err)
+			log.Debugf("martian: connection closed prematurely: %v", err)
 			conn.Close()
 		} else {
 			log.Errorf("martian: failed to read request: %v", err)
 		}
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
-
 		return errClose
 	case req = <-reqc:
 	case <-p.closing:
