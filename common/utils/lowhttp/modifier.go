@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -398,6 +400,61 @@ func GetHTTPPacketHeader(packet []byte, key string) string {
 		return ""
 	}
 	return raw
+}
+
+func GetHTTPRequestQueryParam(packet []byte, key string) string {
+	vals := GetHTTPRequestQueryParamFull(packet, key)
+	if len(vals) > 0 {
+		return vals[0]
+	}
+	return ""
+}
+
+func GetHTTPPacketBody(packet []byte) []byte {
+	_, body := SplitHTTPHeadersAndBodyFromPacket(packet)
+	return body
+}
+
+func GetHTTPRequestPostParam(packet []byte, key string) string {
+	vals := GetHTTPRequestPostParamFull(packet, key)
+	if len(vals) > 0 {
+		return vals[0]
+	}
+	return ""
+}
+
+func GetHTTPPacketJSONValue(packet []byte, key string) any {
+	return jsonpath.Find(GetHTTPPacketBody(packet), "$."+key)
+}
+
+func GetHTTPPacketJSONPath(packet []byte, key string) any {
+	return jsonpath.Find(GetHTTPPacketBody(packet), key)
+}
+
+func GetHTTPRequestPostParamFull(packet []byte, key string) []string {
+	body := GetHTTPPacketBody(packet)
+	vals, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil
+	}
+	v, ok := vals[key]
+	if ok {
+		return v
+	}
+	return nil
+}
+
+func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
+	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
+	if err != nil {
+		return nil
+	}
+	val := u.Query()
+	vals, ok := val[key]
+	if ok {
+		return vals
+	}
+	return []string{}
 }
 
 func GetStatusCodeFromResponse(packet []byte) int {
