@@ -508,7 +508,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if script != nil && (script.Type == "mitm" || script.Type == "port-scan") {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
 					//appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
-					ctx, _ := context.WithTimeout(stream.Context(), 10*time.Second)
+					ctx := stream.Context()
 					err = mitmPluginCaller.LoadPluginByName(ctx, script.ScriptName, nil, script.Content)
 					if err != nil {
 						_ = stream.Send(&ypb.MITMResponse{
