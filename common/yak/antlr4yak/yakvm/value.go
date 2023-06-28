@@ -848,7 +848,7 @@ func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 	defer leftSliceAssignLock.Unlock()
 	switch reflect.TypeOf(caller.Value).Kind() {
 	case reflect.Slice:
-		reflect.ValueOf(caller.Value).Index(key.Int()).Set(reflect.ValueOf(val.Value))
+		reflect.ValueOf(caller.Value).Index(key.Int()).Set(reflect.ValueOf(val.Value).Convert(reflect.ValueOf(caller.Value).Index(key.Int()).Type()))
 	case reflect.String:
 		if !val.IsByte() {
 			panic("runtime error: cannot assign %v to string[index]")
@@ -859,7 +859,12 @@ func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 		if err != nil {
 			panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", val))
 		}
-		reflect.ValueOf(caller.Value).SetMapIndex(reflect.ValueOf(key.Value), refV)
+		callerRefV := reflect.ValueOf(caller.Value)
+		keyRefV := reflect.ValueOf(key.Value)
+		if callerRefV.MapIndex(keyRefV).IsValid() {
+			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())
+		}
+		callerRefV.SetMapIndex(keyRefV, refV)
 
 	default:
 		panic("*yakvm.Value.LeftSliceAssignTo not implemented")
@@ -929,17 +934,23 @@ func (v *Value) LeftMemberAssignTo(vir *Frame, val *Value) {
 		if err != nil {
 			panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", val))
 		}
-		reflect.ValueOf(caller.Value).SetMapIndex(reflect.ValueOf(key.Value), refV)
+		callerRefV := reflect.ValueOf(caller.Value)
+		keyRefV := reflect.ValueOf(key.Value)
+		if callerRefV.MapIndex(keyRefV).IsValid() {
+			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())
+		}
+		callerRefV.SetMapIndex(keyRefV, refV)
 	case reflect.Struct:
 		log.Warnf("Cannot assign to struct field %s", key.AsString())
 	case reflect.Ptr:
 		keyValue := key.AsString()
+		structRefv := reflect.ValueOf(callerValue).Elem().FieldByName(keyValue)
 		refV := reflect.ValueOf(val.Value)
 		err := vir.AutoConvertReflectValueByType(&refV, refV.Type())
 		if err != nil {
 			panic(fmt.Sprintf("not support type %v", refV.Type()))
 		}
-		reflect.ValueOf(callerValue).Elem().FieldByName(keyValue).Set(reflect.ValueOf(val.Value))
+		structRefv.Set(refV.Convert(structRefv.Type()))
 	default:
 		panic(fmt.Sprintf("not implemented for + %v[%v]", reflect.TypeOf(caller), reflect.TypeOf(caller)))
 	}
