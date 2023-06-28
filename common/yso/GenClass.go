@@ -487,6 +487,38 @@ func SetClassBytes(data []byte) GenClassOptionFun {
 		config.ClassBytes = data
 	}
 }
+
+func LoadClassFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	return GenerateClassObjectFromBytes(bytes, options...)
+}
+
+func LoadClassFromBase64(base64 string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	bytes, err := codec.DecodeBase64(base64)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return GenerateClassObjectFromBytes(bytes, options...)
+}
+
+func LoadClassFromBCEL(data string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	bytes, err := javaclassparser.Bcel2bytes(data)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return GenerateClassObjectFromBytes(bytes, options...)
+}
+
+func LoadClassFromJson(jsonData string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	bytes, err := codec.DecodeBase64(jsonData)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return GenerateClassObjectFromBytes(bytes, options...)
+}
+
 func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(append(options, SetClassBytes(bytes))...)
 	config.ClassType = BytesClass
