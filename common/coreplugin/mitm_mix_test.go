@@ -31,7 +31,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		}
 		_ = v
 	}()
-	err = utils.WaitConnect(vulinboxAddr, 15)
+	err = utils.WaitConnect(vulinboxAddr, 5)
 	if err != nil {
 		panic(err)
 	}
