@@ -48,6 +48,11 @@ var Exports = map[string]interface{}{
 	"GetGadgetNameByFun": GetGadgetNameByFun,
 	//用于Shiro检查
 	"GetSimplePrincipalCollectionJavaObject": GetSimplePrincipalCollectionJavaObject,
+	// 加载 java class
+	"LoadClassFromBytes":  LoadClassFromBytes,
+	"LoadClassFromBase64": LoadClassFromBase64,
+	"LoadClassFromBCEL":   LoadClassFromBCEL,
+
 	// 只生成恶意类的对象
 	"GenerateClassObjectFromBytes":                     GenerateClassObjectFromBytes,
 	"GenerateRuntimeExecEvilClassObject":               GenerateRuntimeExecEvilClassObject,

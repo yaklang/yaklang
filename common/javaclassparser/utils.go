@@ -82,7 +82,7 @@ func GetMap() ([]int, []int) {
 	MAP_CHAR[95] = j
 	return CHAR_MAP, MAP_CHAR
 }
-func bcel2bytes(becl string) ([]byte, error) {
+func Bcel2bytes(becl string) ([]byte, error) {
 	pre := "$$BCEL$$"
 	if !strings.HasPrefix(becl, pre) {
 		return nil, utils.Error("Invalid becl header(\"$$BCEL$$\")!")

@@ -173,7 +173,7 @@ func (this *ClassObject) getConstantInfo(index uint16) (ConstantInfo, error) {
 	return this.ConstantPool[index], nil
 }
 func ParseFromBCEL(data string) (cf *ClassObject, err error) {
-	bytes, err := bcel2bytes(data)
+	bytes, err := Bcel2bytes(data)
 	if err != nil {
 		return nil, err
 	}
