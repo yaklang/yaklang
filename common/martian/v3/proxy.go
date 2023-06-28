@@ -52,16 +52,21 @@ var errClose = errors.New("closing connection")
 var noop = Noop("martian")
 
 func isCloseable(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 		return true
 	}
 
 	switch err {
-	case io.EOF, io.ErrClosedPipe, errClose:
+	case io.EOF, io.ErrClosedPipe, errClose, io.ErrUnexpectedEOF:
+		return true
+	default:
+		log.Debugf("Unhandled CONNECTION ERROR: %v", err.Error())
 		return true
 	}
-
-	return false
 }
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
@@ -329,13 +334,17 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 	statusContext, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	go func() {
+		var lastCurrentConnCount int64
 		for {
 			select {
 			case <-statusContext.Done():
+				return
 			default:
-				if currentConnCount > 0 {
+				if currentConnCount > 0 && lastCurrentConnCount != currentConnCount {
 					log.Infof("active connections count: %v", currentConnCount)
+					lastCurrentConnCount = currentConnCount
 				}
 				time.Sleep(3 * time.Second)
 			}
@@ -506,8 +515,10 @@ func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
 		deadline := time.Now().Add(p.timeout)
 		conn.SetDeadline(deadline)
 
-		if err := p.handle(ctx, conn, brw); isCloseable(err) {
-			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
+		log.Debugf("waiting conn: %v", conn.RemoteAddr())
+		err := p.handle(ctx, conn, brw)
+		if err != nil && isCloseable(err) {
+			log.Debugf("closing conn: %v", conn.RemoteAddr())
 			return
 		}
 	}
@@ -537,12 +548,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	case err := <-errc:
 		if isCloseable(err) {
 			log.Debugf("martian: connection closed prematurely: %v", err)
+			conn.Close()
 		} else {
 			log.Errorf("martian: failed to read request: %v", err)
 		}
-
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
-
 		return errClose
 	case req = <-reqc:
 	case <-p.closing:
