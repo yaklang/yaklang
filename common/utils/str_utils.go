@@ -509,7 +509,7 @@ func InterfaceToQuotedString(i interface{}) string {
 }
 
 func Int64SliceToIntSlice(i []int64) []int {
-	var result = make([]int, len(i))
+	var result = make([]int, 0)
 	for _, v := range i {
 		result = append(result, int(v))
 	}

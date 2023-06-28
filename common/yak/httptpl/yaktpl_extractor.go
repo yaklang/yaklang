@@ -67,78 +67,47 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 	default:
 		material = string(rsp)
 	}
-
-	var results = make(map[string]interface{})
+	var results = []string{}
+	addResult := func(result interface{}) {
+		results = append(results, utils.InterfaceToString(result))
+	}
 	t := strings.TrimSpace(strings.ToLower(y.Type))
 	switch t {
 	case "regex":
-		for index, group := range y.Groups {
+		for _, group := range y.Groups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				r, err := regexp.Compile(group)
 				if err != nil {
 					log.Errorf("compile[%v] failed: %v", group, err)
 					continue
 				}
-				var count = 0
-				if len(y.RegexpMatchGroup) > 0 {
-					for _, i := range y.RegexpMatchGroup {
-						for _, res := range r.FindAllStringSubmatch(material, -1) {
-							if len(res) > i {
-								if count == 0 {
-									results[tag] = res[i]
-									count++
-									continue
-								}
-								results[fmt.Sprintf("%v_%v", tag, count)] = res[i]
-								count++
-							}
-						}
-					}
-					continue
+				// default match group 0
+				if len(y.RegexpMatchGroup) == 0 {
+					y.RegexpMatchGroup = []int{0}
 				}
-
+				// just append result which in match group
 				for _, res := range r.FindAllStringSubmatch(material, -1) {
-					if len(res) > 0 {
-						if count == 0 {
-							results[tag] = res[0]
-							count++
-							continue
+					for _, i := range y.RegexpMatchGroup {
+						if i < len(res) {
+							addResult(res[i])
 						}
-						results[tag] = res[0]
-						count++
 					}
 				}
 			}
 		}
 	case "kv", "key-value", "kval":
 		kvResult := ExtractKValFromResponse([]byte(material))
-		var tag string
-		for index, group := range y.Groups {
-			if y.Name == "" {
-				tag = fmt.Sprintf("data%v", index)
-			} else {
-				tag = y.Name
-			}
+		for _, group := range y.Groups {
 			if v, ok := kvResult[group]; ok {
-				results[tag] = v
-				results[group] = v
+				v1 := v.([]interface{})
+				for _, v2 := range v1 {
+					addResult(v2)
+				}
 			}
 		}
 	case "json", "jq":
-		for index, group := range y.Groups {
+		for _, group := range y.Groups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				query, err := gojq.Parse(group)
 				if err != nil {
 					log.Errorf("parse jq query[%v] failed: %s", group, err)
@@ -150,9 +119,7 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 					continue
 				}
 				iter := query.Run(obj)
-				count := 0
 				for {
-
 					v, ok := iter.Next()
 					if !ok {
 						break
@@ -161,12 +128,7 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 						log.Warnf("jq query[%v] failed: %s", group, err)
 						continue
 					}
-					if count != 0 {
-						results[fmt.Sprintf("%v_%v", tag, count)] = v
-					} else {
-						results[tag] = v
-					}
-					count++
+					addResult(v)
 				}
 			}
 		}
@@ -179,84 +141,56 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				log.Warnf("parse xml failed: %s", err)
 				return nil, utils.Errorf("xmlquery.Parse failed: %s", err)
 			}
-			for index, group := range y.Groups {
+			for _, group := range y.Groups {
 				if group != "" {
-					var tag string
-					if y.Name == "" {
-						tag = fmt.Sprintf("data%v", index)
-					} else {
-						tag = y.Name
-					}
 					nodes, err := xmlquery.QueryAll(doc, group)
 					if err != nil {
 						log.Errorf("xpath[%v] failed: %s", group, err)
 						continue
 					}
-					for index, node := range nodes {
-						if index != 0 {
-							results[fmt.Sprintf("%v_%v", tag, index)] = node.InnerText()
-						} else {
-							results[tag] = node.InnerText()
-						}
+					for _, node := range nodes {
+						addResult(node.InnerText())
 					}
 				}
 			}
 		} else {
+			isXml = true
 			doc, err := htmlquery.Parse(strings.NewReader(material))
 			if err != nil {
 				log.Warnf("parse html failed: %s", err)
 				return nil, utils.Errorf("htmlquery.Parse failed: %s", err)
 			}
-			count := 0
-			for index, group := range y.Groups {
+			for _, group := range y.Groups {
 				if group != "" {
-					var tag string
-					if y.Name == "" {
-						tag = fmt.Sprintf("data%v", index)
-					} else {
-						tag = y.Name
-					}
 					nodes, err := htmlquery.QueryAll(doc, group)
 					if err != nil {
 						log.Errorf("xpath[%v] failed: %s", group, err)
 						continue
 					}
-					for index, node := range nodes {
-						count++
-						var tagName string
-						if index != 0 {
-							tagName = fmt.Sprintf("%v_%v", tag, index)
-						} else {
-							tagName = tag
-						}
+					for _, node := range nodes {
 						if y.XPathAttribute != "" {
 							for _, attr := range node.Attr {
 								if attr.Key == y.XPathAttribute {
-									results[tagName] = attr.Val
+									addResult(attr.Val)
+									isXml = false
 								}
 							}
 						} else {
-							results[tagName] = htmlquery.InnerText(node)
+							addResult(htmlquery.InnerText(node))
+							isXml = false
 						}
 					}
 				}
 			}
-			if count <= 0 {
-				isXml = true
+			if isXml {
 				goto TRYXML
 			}
 		}
 	case "nuclei-dsl", "nuclei":
 		box := NewNucleiDSLYakSandbox()
 		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-		for index, group := range y.Groups {
+		for _, group := range y.Groups {
 			if group != "" {
-				var tag string
-				if y.Name == "" {
-					tag = fmt.Sprintf("data%v", index)
-				} else {
-					tag = y.Name
-				}
 				data, err := box.Execute(group, map[string]interface{}{
 					"body":     body,
 					"header":   header,
@@ -266,13 +200,17 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				if err != nil {
 					continue
 				}
-				results[tag] = data
+				addResult(data)
 			}
 		}
 	default:
 		return nil, utils.Errorf("unknown extractor type: %s", t)
 	}
-	return results, nil
+	tag := y.Name
+	if tag == "" {
+		tag = "data"
+	}
+	return map[string]interface{}{tag: results}, nil
 }
 
 var (
@@ -282,33 +220,38 @@ var (
 
 func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 	results := make(map[string]interface{})
+	addResult := func(k, v string) {
+		if _, ok := results[k]; !ok {
+			results[k] = make([]interface{}, 0)
+		}
+		results[k] = append(results[k].([]interface{}), v)
+	}
 	_, body := lowhttp.SplitHTTPPacket(rsp, nil, func(proto string, code int, codeMsg string) error {
-		results["proto"] = proto
-		results["status_code"] = code
+		addResult("proto", proto)
+		addResult("status_code", fmt.Sprintf("%d", code))
 		return nil
 	}, func(line string) string {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		originKey := k
 		k = strings.ReplaceAll(strings.ToLower(k), "-", "_")
-		results[k] = v
-		results[originKey] = v
-
+		addResult(k, v)
+		addResult(originKey, v)
 		if k == `content_type` {
 			ct, params, err := mime.ParseMediaType(v)
 			if err != nil {
 				return line
 			}
-			results[`content_type`] = ct
+			addResult(`content_type`, ct)
 			for k, v := range params {
-				results[k] = v
+				addResult(k, v)
 			}
 		} else {
 			httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, option, attribute, value []byte) httphead.Control {
 				decoded, err := url.QueryUnescape(string(value))
 				if err != nil {
-					results[string(attribute)] = string(value)
+					addResult(string(attribute), string(value))
 				} else {
-					results[string(attribute)] = decoded
+					addResult(string(attribute), decoded)
 				}
 				return httphead.ControlContinue
 			})
@@ -331,7 +274,7 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 						for k, v := range data {
 							switch v.(type) {
 							case string, int64, float64, []int8, []byte, bool, float32:
-								results[k] = v
+								addResult(k, fmt.Sprintf("%v", v))
 							default:
 							}
 						}
@@ -351,7 +294,7 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 				if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
 					value = value[1 : len(value)-1]
 				}
-				results[key] = value
+				addResult(key, value)
 			}
 		}
 	}
@@ -362,7 +305,7 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 			if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
 				value = value[1 : len(value)-1]
 			}
-			results[key] = value
+			addResult(key, value)
 		}
 	}
 
