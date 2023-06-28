@@ -378,6 +378,7 @@ var startGRPCServerCommand = cli.Command{
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
+			println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
 			go func() {
 				err := http.ListenAndServe(":18080", nil)
 				if err != nil {
