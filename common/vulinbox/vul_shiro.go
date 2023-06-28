@@ -1,8 +1,14 @@
 package vulinbox
 
 import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yso"
+	"github.com/yaklang/yaklang/common/yserx"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -111,18 +117,32 @@ var keyList = []string{
 	"SDKOLKn2J1j/2BHjeZwAoQ==",
 }
 
+var gadgetList = []string{
+	"CB183NoCC",
+	"CB192NoCC",
+	"CCK1",
+	"CCK2",
+}
+
 var randKey []byte
+
+var randGadget string
 
 func init() {
 	rand.NewSource(time.Now().UnixNano())
-	randKey, _ = codec.DecodeBase64(keyList[rand.Intn(len(keyList))])
+	//key := keyList[rand.Intn(len(keyList))]
+	key := keyList[0]
+	randGadget = gadgetList[rand.Intn(len(gadgetList))]
+	//randGadget = gadgetList[3]
+	log.Infof("Use RandKey: %s , Use GadGet :%s ", key, randGadget)
+	randKey, _ = codec.DecodeBase64(key)
 }
 
 func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
 
 	router.HandleFunc("/shiro/cbc", func(writer http.ResponseWriter, request *http.Request) {
-		failNow := func(writer http.ResponseWriter, request *http.Request) {
+		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 			cookie := http.Cookie{
 				Name:     "rememberMe",
 				Value:    "deleteMe",                         // 设置 cookie 的值
@@ -131,6 +151,9 @@ func (s *VulinServer) registerMockVulShiro() {
 			}
 			http.SetCookie(writer, &cookie)
 			writer.WriteHeader(200)
+			if err != nil {
+				writer.Write([]byte(err.Error()))
+			}
 			return
 		}
 		successNow := func(writer http.ResponseWriter, request *http.Request) {
@@ -139,43 +162,34 @@ func (s *VulinServer) registerMockVulShiro() {
 		}
 		rememberMe, err := request.Cookie("rememberMe")
 		if err != nil { // 请求没有cookie 那就设置一个
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
+		var iv []byte
 		if len(cookieVal) > len(randKey) {
-			cookieVal = cookieVal[len(randKey):]
+			iv = cookieVal[:16]
+			cookieVal = cookieVal[16:]
 		} else { // 第一次探测请求
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 
-		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, nil)
+		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, iv)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		payload, err = codec.MustPKCS5UnPadding(payload)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
-		javaObject, err := yso.GetJavaObjectFromBytes(payload)
-		if err != nil { // 反序列化出错返回
-			failNow(writer, request)
-			return
-		}
-		if strings.Contains(string(javaObject.Marshal()), "org.apache.shiro.subject.SimplePrincipalCollection") {
-			successNow(writer, request)
-		} else {
-			failNow(writer, request)
-			return
-		}
-		writer.WriteHeader(200)
+		checkGadget(payload, failNow, successNow, writer, request)
 		return
 	})
 	router.HandleFunc("/shiro/gcm", func(writer http.ResponseWriter, request *http.Request) {
-		failNow := func(writer http.ResponseWriter, request *http.Request) {
+		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 			cookie := http.Cookie{
 				Name:     "rememberMe",
 				Value:    "deleteMe",                         // 设置 cookie 的值
@@ -184,6 +198,9 @@ func (s *VulinServer) registerMockVulShiro() {
 			}
 			http.SetCookie(writer, &cookie)
 			writer.WriteHeader(200)
+			if err != nil {
+				writer.Write([]byte(err.Error()))
+			}
 			return
 		}
 		successNow := func(writer http.ResponseWriter, request *http.Request) {
@@ -192,33 +209,205 @@ func (s *VulinServer) registerMockVulShiro() {
 		}
 		rememberMe, err := request.Cookie("rememberMe")
 		if err != nil { // 请求没有cookie 那就设置一个
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
 
 		payload, err := codec.AESGCMDecrypt(randKey, cookieVal, nil)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
 		payload, err = codec.MustPKCS5UnPadding(payload)
 		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request)
+			failNow(writer, request, err)
 			return
 		}
-		javaObject, err := yso.GetJavaObjectFromBytes(payload)
-		if err != nil { // 反序列化出错返回
-			failNow(writer, request)
-			return
-		}
-		if strings.Contains(string(javaObject.Marshal()), "org.apache.shiro.subject.SimplePrincipalCollection") {
-			successNow(writer, request)
-		} else {
-			failNow(writer, request)
-			return
-		}
-		writer.WriteHeader(200)
+
+		checkGadget(payload, failNow, successNow, writer, request)
+
 		return
 	})
+}
+
+func checkGadget(payload []byte, failNow func(writer http.ResponseWriter, request *http.Request, err error), successNow func(writer http.ResponseWriter, request *http.Request), writer http.ResponseWriter, request *http.Request) {
+	javaSerializables, err := yserx.ParseJavaSerialized(payload)
+	if err != nil {
+		failNow(writer, request, err)
+		return
+	}
+	raw, err := yserx.ToJson(javaSerializables)
+
+	var javaObjectMap []map[string]interface{}
+
+	err = json.Unmarshal(raw, &javaObjectMap)
+	if err != nil {
+		failNow(writer, request, err)
+	}
+
+	if strings.Contains(string(raw), "org.apache.shiro.subject.SimplePrincipalCollection") {
+		successNow(writer, request)
+		return
+	}
+	var serialVersionUID int64
+	var expectedClassName string
+	switch randGadget {
+	case "CB183NoCC":
+		// Commons-beanutils:1.8.0 serialVersionUID -3490850999041592962
+		serialVersionUID = -3490850999041592962
+		expectedClassName = "org.apache.commons.beanutils.BeanComparator"
+
+	case "CB192NoCC":
+		serialVersionUID = -2044202215314119608
+		expectedClassName = "org.apache.commons.beanutils.BeanComparator"
+
+	case "CCK1":
+		// Commons-collections:3.1 serialVersionUID -8653385846894047688
+		serialVersionUID = -8453869361373831205
+		expectedClassName = "org.apache.commons.collections.keyvalue.TiedMapEntry"
+
+	case "CCK2":
+		serialVersionUID = -8453869361373831205
+
+		expectedClassName = "org.apache.commons.collections4.keyvalue.TiedMapEntry"
+	default:
+		// Handle unexpected gadget type.
+		failNow(writer, request, utils.Error("Unexpected gadget type"))
+		return
+	}
+
+	for _, item := range javaObjectMap {
+		getUid := findSerialVersionUid(item, expectedClassName)
+		if len(getUid) == 0 {
+			failNow(writer, request, utils.Errorf("not found %s", expectedClassName))
+			return
+		}
+		uid, err := codec.DecodeBase64(getUid)
+		if err != nil || len(uid) == 0 {
+			failNow(writer, request, err)
+			return
+		}
+		getserialVersionUID := int64(binary.BigEndian.Uint64(uid))
+		if getserialVersionUID != serialVersionUID {
+			err = utils.Errorf("serialVersionUID %d not match %d", getserialVersionUID, serialVersionUID)
+			failNow(writer, request, err)
+			return
+		}
+
+		javaClasss := findByteCodes(item)
+
+		for _, class := range javaClasss {
+			obj, err := javaclassparser.ParseFromBase64(class)
+			if err != nil {
+				failNow(writer, request, err)
+				return
+			}
+			flag := obj.FindConstStringFromPool("EchoHeader")
+
+			if flag == nil {
+				continue
+			}
+			javaJson, err := obj.Json()
+			if err != nil {
+				failNow(writer, request, err)
+				return
+			}
+			v := findSetHeaderValue(javaJson)
+			if len(v) == 0 {
+				failNow(writer, request, err)
+				return
+			}
+			if strings.Contains(v, "|") {
+				vs := strings.Split(v, "|")
+				writer.Header().Set(vs[0], vs[1])
+				writer.Header().Set("Gadget", randGadget)
+				failNow(writer, request, nil)
+				return
+			}
+
+		}
+	}
+}
+
+func findClassName(obj interface{}) {
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		for key, value := range concreteVal {
+			if key == "class_name" {
+				fmt.Println(value)
+			}
+			findClassName(value)
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			findClassName(item)
+		}
+	}
+}
+
+func findSerialVersionUid(obj interface{}, className string) string {
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		if concreteVal["class_name"] == className {
+			if serialVersion, ok := concreteVal["serial_version"].(string); ok {
+				return serialVersion
+			}
+		}
+		for _, value := range concreteVal {
+			if result := findSerialVersionUid(value, className); result != "" {
+				return result
+			}
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			if result := findSerialVersionUid(item, className); result != "" {
+				return result
+			}
+		}
+	}
+	return ""
+}
+
+func findByteCodes(obj interface{}) []string {
+	var bytesList []string
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		if bytesCode, ok := concreteVal["bytescode"].(bool); ok && bytesCode {
+			if bytes, ok := concreteVal["bytes"].(string); ok {
+				bytesList = append(bytesList, bytes)
+			}
+		}
+		for _, value := range concreteVal {
+			bytesList = append(bytesList, findByteCodes(value)...)
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			bytesList = append(bytesList, findByteCodes(item)...)
+		}
+	}
+	return bytesList
+}
+
+func findSetHeaderValue(j string) string {
+	var result map[string]interface{}
+	err := json.Unmarshal([]byte(j), &result)
+	if err != nil {
+		return ""
+	}
+
+	constantPool := result["ConstantPool"].([]interface{})
+
+	var targetString string
+
+	for i, v := range constantPool {
+		pool := v.(map[string]interface{})
+		if pool["NameAndTypeIndexVerbose"] == "setHeader" && i+1 < len(constantPool) {
+			nextPool := constantPool[i+1].(map[string]interface{})
+			targetString = nextPool["StringIndexVerbose"].(string)
+			return targetString
+		}
+	}
+
+	return ""
 }
