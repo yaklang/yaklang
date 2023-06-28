@@ -58,6 +58,7 @@ type YakClient interface {
 	QueryYakScriptLocalAndUser(ctx context.Context, in *QueryYakScriptLocalAndUserRequest, opts ...grpc.CallOption) (*QueryYakScriptLocalAndUserResponse, error)
 	QueryYakScriptByOnlineGroup(ctx context.Context, in *QueryYakScriptByOnlineGroupRequest, opts ...grpc.CallOption) (*QueryYakScriptLocalAndUserResponse, error)
 	QueryYakScriptLocalAll(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryYakScriptLocalAndUserResponse, error)
+	QueryYakScriptByNames(ctx context.Context, in *QueryYakScriptByNamesRequest, opts ...grpc.CallOption) (*QueryYakScriptByNamesResponse, error)
 	// HTTPFlow
 	GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFlowByHashRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
 	GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
@@ -151,6 +152,12 @@ type YakClient interface {
 	AddMenus(ctx context.Context, in *AddMenuRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAllMenuItem(ctx context.Context, in *QueryAllMenuItemRequest, opts ...grpc.CallOption) (*MenuByGroup, error)
 	DeleteAllMenu(ctx context.Context, in *QueryAllMenuItemRequest, opts ...grpc.CallOption) (*Empty, error)
+	// NewMenu
+	AddToNavigation(ctx context.Context, in *AddToNavigationRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetAllNavigationItem(ctx context.Context, in *GetAllNavigationRequest, opts ...grpc.CallOption) (*GetAllNavigationItemResponse, error)
+	DeleteAllNavigation(ctx context.Context, in *GetAllNavigationRequest, opts ...grpc.CallOption) (*Empty, error)
+	AddOneNavigation(ctx context.Context, in *AddOneNavigationRequest, opts ...grpc.CallOption) (*Empty, error)
+	QueryNavigationGroups(ctx context.Context, in *QueryNavigationGroupsRequest, opts ...grpc.CallOption) (*GroupNames, error)
 	// document
 	SaveMarkdownDocument(ctx context.Context, in *SaveMarkdownDocumentRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetMarkdownDocument(ctx context.Context, in *GetMarkdownDocumentRequest, opts ...grpc.CallOption) (*GetMarkdownDocumentResponse, error)
@@ -864,6 +871,15 @@ func (c *yakClient) QueryYakScriptByOnlineGroup(ctx context.Context, in *QueryYa
 func (c *yakClient) QueryYakScriptLocalAll(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryYakScriptLocalAndUserResponse, error) {
 	out := new(QueryYakScriptLocalAndUserResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryYakScriptLocalAll", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryYakScriptByNames(ctx context.Context, in *QueryYakScriptByNamesRequest, opts ...grpc.CallOption) (*QueryYakScriptByNamesResponse, error) {
+	out := new(QueryYakScriptByNamesResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryYakScriptByNames", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1716,6 +1732,51 @@ func (c *yakClient) QueryAllMenuItem(ctx context.Context, in *QueryAllMenuItemRe
 func (c *yakClient) DeleteAllMenu(ctx context.Context, in *QueryAllMenuItemRequest, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteAllMenu", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) AddToNavigation(ctx context.Context, in *AddToNavigationRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/AddToNavigation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllNavigationItem(ctx context.Context, in *GetAllNavigationRequest, opts ...grpc.CallOption) (*GetAllNavigationItemResponse, error) {
+	out := new(GetAllNavigationItemResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetAllNavigationItem", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAllNavigation(ctx context.Context, in *GetAllNavigationRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteAllNavigation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) AddOneNavigation(ctx context.Context, in *AddOneNavigationRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/AddOneNavigation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryNavigationGroups(ctx context.Context, in *QueryNavigationGroupsRequest, opts ...grpc.CallOption) (*GroupNames, error) {
+	out := new(GroupNames)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryNavigationGroups", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3380,6 +3441,7 @@ type YakServer interface {
 	QueryYakScriptLocalAndUser(context.Context, *QueryYakScriptLocalAndUserRequest) (*QueryYakScriptLocalAndUserResponse, error)
 	QueryYakScriptByOnlineGroup(context.Context, *QueryYakScriptByOnlineGroupRequest) (*QueryYakScriptLocalAndUserResponse, error)
 	QueryYakScriptLocalAll(context.Context, *Empty) (*QueryYakScriptLocalAndUserResponse, error)
+	QueryYakScriptByNames(context.Context, *QueryYakScriptByNamesRequest) (*QueryYakScriptByNamesResponse, error)
 	// HTTPFlow
 	GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error)
 	GetHTTPFlowById(context.Context, *GetHTTPFlowByIdRequest) (*HTTPFlow, error)
@@ -3473,6 +3535,12 @@ type YakServer interface {
 	AddMenus(context.Context, *AddMenuRequest) (*Empty, error)
 	QueryAllMenuItem(context.Context, *QueryAllMenuItemRequest) (*MenuByGroup, error)
 	DeleteAllMenu(context.Context, *QueryAllMenuItemRequest) (*Empty, error)
+	// NewMenu
+	AddToNavigation(context.Context, *AddToNavigationRequest) (*Empty, error)
+	GetAllNavigationItem(context.Context, *GetAllNavigationRequest) (*GetAllNavigationItemResponse, error)
+	DeleteAllNavigation(context.Context, *GetAllNavigationRequest) (*Empty, error)
+	AddOneNavigation(context.Context, *AddOneNavigationRequest) (*Empty, error)
+	QueryNavigationGroups(context.Context, *QueryNavigationGroupsRequest) (*GroupNames, error)
 	// document
 	SaveMarkdownDocument(context.Context, *SaveMarkdownDocumentRequest) (*Empty, error)
 	GetMarkdownDocument(context.Context, *GetMarkdownDocumentRequest) (*GetMarkdownDocumentResponse, error)
@@ -3757,6 +3825,9 @@ func (UnimplementedYakServer) QueryYakScriptByOnlineGroup(context.Context, *Quer
 func (UnimplementedYakServer) QueryYakScriptLocalAll(context.Context, *Empty) (*QueryYakScriptLocalAndUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryYakScriptLocalAll not implemented")
 }
+func (UnimplementedYakServer) QueryYakScriptByNames(context.Context, *QueryYakScriptByNamesRequest) (*QueryYakScriptByNamesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryYakScriptByNames not implemented")
+}
 func (UnimplementedYakServer) GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPFlowByHash not implemented")
 }
@@ -3987,6 +4058,21 @@ func (UnimplementedYakServer) QueryAllMenuItem(context.Context, *QueryAllMenuIte
 }
 func (UnimplementedYakServer) DeleteAllMenu(context.Context, *QueryAllMenuItemRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAllMenu not implemented")
+}
+func (UnimplementedYakServer) AddToNavigation(context.Context, *AddToNavigationRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddToNavigation not implemented")
+}
+func (UnimplementedYakServer) GetAllNavigationItem(context.Context, *GetAllNavigationRequest) (*GetAllNavigationItemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllNavigationItem not implemented")
+}
+func (UnimplementedYakServer) DeleteAllNavigation(context.Context, *GetAllNavigationRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAllNavigation not implemented")
+}
+func (UnimplementedYakServer) AddOneNavigation(context.Context, *AddOneNavigationRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddOneNavigation not implemented")
+}
+func (UnimplementedYakServer) QueryNavigationGroups(context.Context, *QueryNavigationGroupsRequest) (*GroupNames, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryNavigationGroups not implemented")
 }
 func (UnimplementedYakServer) SaveMarkdownDocument(context.Context, *SaveMarkdownDocumentRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveMarkdownDocument not implemented")
@@ -5042,6 +5128,24 @@ func _Yak_QueryYakScriptLocalAll_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).QueryYakScriptLocalAll(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryYakScriptByNames_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryYakScriptByNamesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryYakScriptByNames(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryYakScriptByNames",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryYakScriptByNames(ctx, req.(*QueryYakScriptByNamesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -6459,6 +6563,96 @@ func _Yak_DeleteAllMenu_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).DeleteAllMenu(ctx, req.(*QueryAllMenuItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_AddToNavigation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddToNavigationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).AddToNavigation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/AddToNavigation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).AddToNavigation(ctx, req.(*AddToNavigationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllNavigationItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllNavigationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllNavigationItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetAllNavigationItem",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllNavigationItem(ctx, req.(*GetAllNavigationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAllNavigation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllNavigationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAllNavigation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeleteAllNavigation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAllNavigation(ctx, req.(*GetAllNavigationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_AddOneNavigation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddOneNavigationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).AddOneNavigation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/AddOneNavigation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).AddOneNavigation(ctx, req.(*AddOneNavigationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryNavigationGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryNavigationGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryNavigationGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryNavigationGroups",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryNavigationGroups(ctx, req.(*QueryNavigationGroupsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -8992,6 +9186,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_QueryYakScriptLocalAll_Handler,
 		},
 		{
+			MethodName: "QueryYakScriptByNames",
+			Handler:    _Yak_QueryYakScriptByNames_Handler,
+		},
+		{
 			MethodName: "GetHTTPFlowByHash",
 			Handler:    _Yak_GetHTTPFlowByHash_Handler,
 		},
@@ -9270,6 +9468,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAllMenu",
 			Handler:    _Yak_DeleteAllMenu_Handler,
+		},
+		{
+			MethodName: "AddToNavigation",
+			Handler:    _Yak_AddToNavigation_Handler,
+		},
+		{
+			MethodName: "GetAllNavigationItem",
+			Handler:    _Yak_GetAllNavigationItem_Handler,
+		},
+		{
+			MethodName: "DeleteAllNavigation",
+			Handler:    _Yak_DeleteAllNavigation_Handler,
+		},
+		{
+			MethodName: "AddOneNavigation",
+			Handler:    _Yak_AddOneNavigation_Handler,
+		},
+		{
+			MethodName: "QueryNavigationGroups",
+			Handler:    _Yak_QueryNavigationGroups_Handler,
 		},
 		{
 			MethodName: "SaveMarkdownDocument",
