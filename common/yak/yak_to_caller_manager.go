@@ -37,9 +37,9 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 		return nil
 	})
 	engine.HookOsExit()
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer func() { cancel() }()
-	ins, err := engine.ExecuteExWithContext(timeoutCtx, code, map[string]interface{}{
+	//timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	//defer func() { cancel() }()
+	ins, err := engine.ExecuteExWithContext(ctx, code, map[string]interface{}{
 		"ROOT_CONTEXT": ctx,
 	})
 	if err != nil {
