@@ -185,6 +185,9 @@ func TestSSRF(t *testing.T) {
 		{"/user/id-json", "Union-Based SQL Injection: [id:[1]]"},
 		{"/user/id-b64-json", "Maybe SQL Injection: [param - type:str value:1 single-quote]"},
 		{"/user/id-b64-json", "Union-Based SQL Injection: [id:[1]]"},
+		{"/user/id-error", "ERROR-Based SQL Injection: [id:[1]] Guess DBMS: MySQL"},
+		{"/user/id-error", "Maybe SQL Injection: [param - type:str value:1 single-quote]"},
+		{"/user/id-error", "Union-Based SQL Injection: [id:[1]]"},
 		{"/user/name", "Union-Based SQL Injection: [name:[admin]]"},
 	}, func(url, title string) bool {
 		route := getRouteFromUrl(url)
