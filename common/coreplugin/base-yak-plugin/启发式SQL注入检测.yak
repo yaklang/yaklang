@@ -44,16 +44,7 @@ func preCheck(isHttps /* bool */, req, rsp /* []byte */) {
         return -1
     }
 
-
-    postParams := freq.GetPostJsonParams()
-    if len(postParams) <= 0 {
-        postParams = freq.GetPostParams()
-    }
-
-
-    ret := append(freq.GetGetQueryParams(), postParams...)
-
-    CommonParams := ret
+    CommonParams := freq.GetCommonParams()
 
     if len(CommonParams) == 0 {
         yakit_output("无可供注入参数")
@@ -143,15 +134,7 @@ func heuristicCheckIfInjectable(url /* string */, req /* []byte */, isHttps /* b
     randString = randstr(4)
     cast := false
 
-    postParams := freq.GetPostJsonParams()
-    if len(postParams) <= 0 {
-        postParams = freq.GetPostParams()
-    }
-
-
-    ret := append(freq.GetGetQueryParams(), postParams...)
-
-    CommonParams := ret
+    CommonParams := freq.GetCommonParams()
     yakit_output(str.f("总共测试参数共%v个", len(CommonParams)))
 
     for pos, param := range CommonParams {

@@ -46,8 +46,12 @@
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL 注入</a></li>
                     <li class="list-group-item"><a target="_blank" href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
-                        参数是 JSON，JSON 中字段 SQL 注入</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中存在注入</a>
+                        参数是 JSON，JSON中字段存在SQL注入</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中字段存在SQL注入</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-error?id=1">ID 为数字型的简单边界 SQL报错检测</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/user/cookie-id">Cookie-ID SQL注入</a>
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL 注入</a></li>
                 </ul>

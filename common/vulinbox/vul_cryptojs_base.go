@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -35,7 +36,21 @@ var cryptoRsaKeyAndAesHtml []byte
 func (v *VulinServer) registerCryptoJS() {
 	r := v.router
 
-	pri, pub, _ := tlsutils.GeneratePrivateAndPublicKeyPEMWithPrivateFormatter("pkcs8")
+	var (
+		pri, pub []byte
+	)
+
+	var initKey = func() {
+		log.Infof("start to GeneratePrivateAndPublicKeyPEMWithPrivateFormatter")
+		pri, pub, _ = tlsutils.GeneratePrivateAndPublicKeyPEMWithPrivateFormatter("pkcs8")
+	}
+	var onceGenerator = sync.Once{}
+
+	r.Use(func(handler http.Handler) http.Handler {
+		onceGenerator.Do(initKey)
+		return handler
+	})
+
 	r.HandleFunc("/crypto/js/basic", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
