@@ -84,6 +84,12 @@ func init() {
 			return "test", errors.New("test error")
 		},
 	})
+	Import("getUint16", func() uint16 {
+		return 1
+	})
+	Import("getUint16Wrapper", func() (*struct{ A uint16 }, map[string]uint16, []uint16) {
+		return &struct{ A uint16 }{A: 1}, map[string]uint16{"a": 1}, []uint16{1, 2, 3}
+	})
 }
 
 /*
@@ -2778,6 +2784,12 @@ b, c = a
 dump(b, c)
 assert b == 1
 assert c == 2
+a = getUint16()
+vStruct,vMap,vList = getUint16Wrapper()
+vStruct.A = 1
+vMap.a = 1
+vList[0] = 1
+vList.Append(1)
 `
 	_marshallerTest(code)
 	_formattest(code)

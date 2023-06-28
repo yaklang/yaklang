@@ -122,9 +122,9 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 			}
 		case ret.Kind() >= reflect.Uint && ret.Kind() <= reflect.Uintptr:
 			if ret.Uint() > math.MaxInt {
-				vals[i] = int64(ret.Uint())
+				vals[i] = int64(ret.Convert(literalReflectType_Uint).Uint())
 			} else {
-				vals[i] = int(ret.Int())
+				vals[i] = int(ret.Convert(literalReflectType_Int).Int())
 			}
 		case ret.Kind() == reflect.Float32:
 			vals[i] = ret.Float()
