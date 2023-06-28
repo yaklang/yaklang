@@ -2,6 +2,7 @@ package vulinbox
 
 import (
 	_ "embed"
+	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"net/http"
 )
 
@@ -35,6 +36,9 @@ func (s *VulinServer) init() {
 
 	// 业务型
 	s.registerUserRoute()
+
+	// 验证码
+	verificationcode.Register(router)
 
 	// 靶场是否是安全的？
 	if !s.safeMode {
