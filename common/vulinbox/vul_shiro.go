@@ -130,8 +130,8 @@ var randGadget string
 
 func init() {
 	rand.NewSource(time.Now().UnixNano())
-	//key := keyList[rand.Intn(len(keyList))]
-	key := keyList[0]
+	key := keyList[rand.Intn(len(keyList))]
+	//key := keyList[0]
 	randGadget = gadgetList[rand.Intn(len(gadgetList))]
 	//randGadget = gadgetList[3]
 	log.Infof("Use RandKey: %s , Use GadGet :%s ", key, randGadget)
@@ -180,11 +180,8 @@ func (s *VulinServer) registerMockVulShiro() {
 			failNow(writer, request, err)
 			return
 		}
-		payload, err = codec.MustPKCS5UnPadding(payload)
-		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request, err)
-			return
-		}
+		payload = codec.PKCS7UnPadding(payload)
+
 		checkGadget(payload, failNow, successNow, writer, request)
 		return
 	})
@@ -215,11 +212,6 @@ func (s *VulinServer) registerMockVulShiro() {
 		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
 
 		payload, err := codec.AESGCMDecrypt(randKey, cookieVal, nil)
-		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request, err)
-			return
-		}
-		payload, err = codec.MustPKCS5UnPadding(payload)
 		if err != nil || payload == nil { // key不对返回deleteMe
 			failNow(writer, request, err)
 			return
