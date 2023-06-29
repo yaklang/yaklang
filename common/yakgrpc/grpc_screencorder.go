@@ -9,15 +9,13 @@ import (
 	"github.com/yaklang/yaklang/common/screcorder"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
+	"google.golang.org/grpc"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 )
 
@@ -40,8 +38,8 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 				VideoName: i.VideoName,
 				Cover:     i.Cover,
 				Duration:  i.Duration,
-				Before: before,
-				After: after,
+				Before:    before,
+				After:     after,
 			}
 		}).([]*ypb.ScreenRecorder),
 		Total: int64(p.TotalRecord),
@@ -60,93 +58,27 @@ func (s *Server) IsScrecorderReady(ctx context.Context, req *ypb.IsScrecorderRea
 	}, nil
 }
 
+type DownloadStream interface {
+	Send(result *ypb.ExecResult) error
+	grpc.ServerStream
+}
+
 func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb.Yak_InstallScrecorderServer) error {
-	info := func(progress float64, s string, items ...interface{}) {
-		var msg string
-		if len(items) > 0 {
-			msg = fmt.Sprintf(s, items)
-		} else {
-			msg = s
+	return s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
+		var targetUrl string
+		var filename string
+		switch runtime.GOOS {
+		case "darwin":
+			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
+			filename = "ffmpeg"
+		case "windows":
+			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
+			filename = "ffmpeg.exe"
+		default:
+			return "", "", utils.Error("unsupported os: " + runtime.GOOS)
 		}
-		log.Info(msg)
-		progressInfo, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", progress), 64)
-		stream.Send(&ypb.ExecResult{
-			IsMessage: true,
-			Message:   []byte(msg),
-			Progress:  float32(progressInfo),
-		})
-	}
-
-	var targetUrl string
-	var filename string
-	switch runtime.GOOS {
-	case "darwin":
-		targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
-		filename = "ffmpeg"
-	case "windows":
-		targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
-		filename = "ffmpeg.exe"
-	default:
-		return utils.Error("unsupported os: " + runtime.GOOS)
-	}
-
-	info(0,"获取下载材料大小: Fetching Download Material Basic Info")
-	client := utils.NewDefaultHTTPClientWithProxy(req.GetProxy())
-	client.Timeout = time.Hour
-	rsp, err := client.Head(targetUrl)
-	if err != nil {
-		return err
-	}
-
-	i, err := strconv.Atoi(rsp.Header.Get("Content-Length"))
-	if err != nil {
-		return utils.Errorf("cannot fetch cl: %v", err)
-	}
-	info(0,"共需下载大小为：Download %v Total", utils.ByteSize(uint64(i)))
-	rsp, err = client.Get(targetUrl)
-	if err != nil {
-		return utils.Errorf("download ffmpeg failed: %s", err)
-	}
-
-	dirPath := filepath.Join(
-		consts.GetDefaultYakitProjectsDir(),
-		"libs",
-	)
-	err = os.MkdirAll(dirPath, 0755)
-	if err != nil {
-		return err
-	}
-	fPath := filepath.Join(dirPath, filename)
-	os.RemoveAll(fPath)
-	fp, err := os.OpenFile(fPath, os.O_CREATE|os.O_WRONLY, 0755)
-	if err != nil {
-		return err
-	}
-	prog := progresswriter.New(uint64(i))
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			select {
-			case <-stream.Context().Done():
-				return
-			default:
-				info(prog.GetPercent()*100, "")
-				if prog.GetPercent() >= 1 {
-					return
-				}
-			}
-		}
-	}()
-
-	_, err = io.Copy(fp, io.TeeReader(rsp.Body, prog))
-	if err != nil {
-		fp.Close()
-		info(0,"下载文件失败: Download Failed: %s", err)
-		return nil
-	}
-	fp.Close()
-	info(100, "下载文件成功：Download Finished")
-	return nil
+		return targetUrl, filename, nil
+	}, stream)
 }
 
 func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak_StartScrecorderServer) error {
@@ -197,11 +129,11 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 		duration := screcorder.VideoDuration(r)
 		base64Images, _ := screcorder.VideoCoverBase64(r)
 		record := &yakit.ScreenRecorder{
-			Filename: r,
-			Project:  proj.ProjectName,
-			Cover: base64Images,
-			VideoName:  filepath.Base(r),
-			Duration: duration,
+			Filename:  r,
+			Project:   proj.ProjectName,
+			Cover:     base64Images,
+			VideoName: filepath.Base(r),
+			Duration:  duration,
 		}
 		err = yakit.CreateOrUpdateScreenRecorder(consts.GetGormProjectDatabase(), record.CalcHash(), record)
 		if err != nil {
@@ -297,7 +229,7 @@ func (s *Server) UploadScreenRecorders(ctx context.Context, req *ypb.UploadScree
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScreenRecorderRequest) (*ypb.ScreenRecorder, error)  {
+func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScreenRecorderRequest) (*ypb.ScreenRecorder, error) {
 	data, err := yakit.GetOneScreenRecorder(s.GetProjectDatabase(), req)
 	if err != nil {
 		return nil, err
@@ -313,12 +245,12 @@ func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScree
 		UpdatedAt: data.UpdatedAt.Unix(),
 		VideoName: data.VideoName,
 		Cover:     data.Cover,
-		Before: before,
-		After: after,
+		Before:    before,
+		After:     after,
 	}, nil
 }
 
-func AfterAndBeforeIsExit(id int64) (before, after bool)  {
+func AfterAndBeforeIsExit(id int64) (before, after bool) {
 	// 下一条
 	beforeData, _ := yakit.IsExitScreenRecorder(consts.GetGormProjectDatabase(), id, "asc")
 	if beforeData != nil {
@@ -332,7 +264,7 @@ func AfterAndBeforeIsExit(id int64) (before, after bool)  {
 	return before, after
 }
 
-func (s *Server) UpdateScreenRecorders(ctx context.Context, req *ypb.UpdateScreenRecorderRequest) (*ypb.Empty, error)  {
+func (s *Server) UpdateScreenRecorders(ctx context.Context, req *ypb.UpdateScreenRecorderRequest) (*ypb.Empty, error) {
 	if req.GetId() == 0 {
 		return nil, utils.Error("request params is nil")
 	}
