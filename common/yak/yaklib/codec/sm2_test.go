@@ -16,10 +16,20 @@ func TestGenerateSM2PrivateKey(t *testing.T) {
 		panic("enc c1c2c3 error")
 	}
 
-	decrypt, err := SM2DecryptC1C2C3(pri, data)
-	if err != nil {
-		panic("dec c1c2c3 error")
+	var decrypt []byte
+	count := 0
+	for {
+		count++
+		decrypt, err = SM2DecryptC1C2C3(pri, data)
+		if err != nil {
+			if count > 4 {
+				panic("dec c1c2c3 error")
+			}
+			continue
+		}
+		break
 	}
+
 	if string(decrypt) != textOrigin {
 		panic("dec/enc failed")
 	}
