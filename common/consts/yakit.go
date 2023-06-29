@@ -307,6 +307,30 @@ func GetFfmpegPath() string {
 	return utils.GetFirstExistedFile(paths...)
 }
 
+func GetVulinboxPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "darwin" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox"))
+		paths = append(paths, filepath.Join(defaultPath, "vulinbox"))
+		paths = append(paths, "vulinbox")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "vulinbox"))
+		paths = append(paths, filepath.Join("/", "bin", "vulinbox"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "vulinbox"))
+	}
+
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "vulinbox.exe"))
+		paths = append(paths, "vulinbox.exe")
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
+
 func GetGormCVEDatabase() *gorm.DB {
 	if gormCVEDatabase == nil {
 		var err error

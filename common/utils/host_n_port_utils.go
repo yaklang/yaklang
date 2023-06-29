@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -346,6 +347,18 @@ func IsIPv4(raw string) bool {
 		return ip.To4() != nil
 	}
 	return false
+}
+
+func IsWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
+func IsLinux() bool {
+	return runtime.GOOS == "linux"
+}
+
+func IsMac() bool {
+	return runtime.GOOS == "darwin"
 }
 
 func IsHttp(raw string) bool {

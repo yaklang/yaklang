@@ -1,4 +1,4 @@
-name: Release
+name: Release Vulinbox
 
 on:
   push:
@@ -123,17 +123,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: vulinbox_linux_amd64
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          tag_name: Vulinbox-${{ github.ref }}
-          release_name: Release Vulinbox ${{ github.ref }}
-          draft: false
-          prerelease: false
       - name: Run
         run: ls
       - name: Update OSS latest file
@@ -156,33 +145,3 @@ jobs:
             vulinbox_linux_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_linux_amd64
             vulinbox_darwin_amd64:/vulinbox/latest/vulinbox_darwin_amd64
             vulinbox_darwin_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_darwin_amd64
-
-      - name: Upload Release Asset Linux VULINBOX
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./vulinbox_linux_amd64
-          asset_name: vulinbox_linux_amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset macOS
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./vulinbox_darwin_amd64
-          asset_name: vulinbox_darwin_amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Windows
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./vulinbox_windows_amd64.exe
-          asset_name: vulinbox_windows_amd64.exe
-          asset_content_type: application/octet-stream
