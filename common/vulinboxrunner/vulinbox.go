@@ -52,7 +52,7 @@ func main() {
 			Name: "nohttps",
 		},
 		cli.StringFlag{
-			Name:  "host,h",
+			Name:  "host,t",
 			Value: `127.0.0.1`,
 		},
 	}
