@@ -17,6 +17,8 @@ func (s *Server) StartVulinbox(req *ypb.StartVulinboxRequest, stream ypb.Yak_Sta
 		return utils.Error("vulinbox is not installed")
 	}
 
+	log.Infof("start vulinbox in path: %v", p)
+
 	var opts []string
 	if req.GetNoHttps() {
 		opts = append(opts, "--nohttps")
