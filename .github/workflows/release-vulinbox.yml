@@ -1,4 +1,4 @@
-name: Release Vulinbox
+name: Release Vulinbox(OSS Release)
 
 on:
   push:
