@@ -175,6 +175,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		onlyGMTLS              = firstReq.GetOnlyEnableGMTLS()
 		proxyUsername          = firstReq.GetProxyUsername()
 		proxyPassword          = firstReq.GetProxyPassword()
+		dnsServers             = firstReq.GetDnsServers()
 	)
 
 	if !firstReq.GetEnableProxyAuth() {
@@ -1390,6 +1391,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGM(enableGMTLS),
 		crep.MITM_SetGMPrefer(preferGMTLS),
 		crep.MITM_SetGMOnly(onlyGMTLS),
+		crep.MITM_SetDNSServers(dnsServers...),
 	)
 	if err != nil {
 		log.Error(err)

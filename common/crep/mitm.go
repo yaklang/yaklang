@@ -621,7 +621,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	// sync config with MITMServer
 	opts.EnableHTTP2 = server.http2
 	opts.EnableGMTLS = server.gmtls
-
+	opts.DnsServers = server.DNSServers
 	err := MITM_SetTransportByHTTPClientOptions(opts)(server)
 	if err != nil {
 		return nil, utils.Errorf("create http transport failed: %v", err)

@@ -3279,6 +3279,7 @@ message MITMRequest {
   bool enableProxyAuth = 51;
   string proxyUsername = 49;
   string proxyPassword = 50;
+  repeated string dnsServers = 52;
 }
 
 message Certificate {
