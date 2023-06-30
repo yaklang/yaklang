@@ -183,6 +183,7 @@ type HTTPClientOptions struct {
 	EnableHTTP2         bool         `json:"enable_http2" yaml:"enable_http2"`
 	EnableGMTLS         bool
 	PreferGM            bool
+	DnsServers          []string
 	// 下面的需要自己实现
 	//FailRetries     int               `json:"fail_retries" yaml:"fail_retries"`
 	//MaxRedirect     int               `json:"max_redirect" yaml:"max_redirect"`
@@ -192,6 +193,42 @@ type HTTPClientOptions struct {
 	//Cookies         map[string]string `json:"cookies" yaml:"cookies"`
 	//AllowMethods    []string          `json:"allow_methods" yaml:"allow_methods"`
 	//ExemptPathRegex string            `json:"exempt_path_regex" yaml:"exempt_path_regex"`
+}
+type Dialer struct {
+	dialer     *net.Dialer
+	dnsServers []string
+}
+
+func NewDialer(dialer *net.Dialer, nameservers ...string) *Dialer {
+	return &Dialer{
+		dialer:     dialer,
+		dnsServers: nameservers,
+		//resolver: &net.Resolver{
+		//	Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+		//		for _, nameserver := range nameservers {
+		//			conn, err := dialer.DialContext(ctx, "tcp", nameserver)
+		//			if err != nil {
+		//				log.Errorf("dial nameserver %s failed: %s", nameserver, err)
+		//				continue
+		//			}
+		//			return conn, nil
+		//		}
+		//		return nil, errors.New("no nameserver available")
+		//	},
+		//},
+	}
+}
+func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second, d.dnsServers...)
+	conn, err := d.dialer.DialContext(ctx, network, ip+":"+port)
+	if err == nil {
+		return conn, nil
+	}
+	return d.dialer.DialContext(ctx, network, address)
 }
 
 func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
@@ -216,9 +253,12 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
 
 	t := &http.Transport{
 		Proxy: proxyFunc,
-		DialContext: (&net.Dialer{
+		DialContext: NewDialer(&net.Dialer{
 			Timeout: time.Duration(opts.DialTimeout) * time.Second,
-		}).DialContext,
+		}, opts.DnsServers...).DialContext,
+		//DialContext: (&net.Dialer{
+		//	Timeout: time.Duration(opts.DialTimeout) * time.Second,
+		//}).DialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,
 		MaxIdleConns:          opts.MaxIdleConns,
