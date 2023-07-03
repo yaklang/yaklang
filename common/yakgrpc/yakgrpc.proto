@@ -192,6 +192,8 @@ service Yak {
   rpc IsMultipartFormDataRequest(FixUploadPacketRequest) returns (IsMultipartFormDataRequestResult);
   rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
+  rpc ImportHTTPFuzzerTaskFromYaml(ImportHTTPFuzzerTaskFromYamlRequest) returns (ImportHTTPFuzzerTaskFromYamlResponse);
+  rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (GeneralResponse);
 
   // HTTPFuzzerResponse
   // 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
@@ -3451,4 +3453,15 @@ message GetLicenseResponse {
 
 message CheckLicenseRequest {
   string LicenseActivation = 1;
+}
+message ImportHTTPFuzzerTaskFromYamlRequest {
+  string YamlPath = 1;
+}
+message ImportHTTPFuzzerTaskFromYamlResponse{
+  repeated FuzzerRequest FuzzerRequests = 1;
+}
+message ExportHTTPFuzzerTaskToYamlRequest{
+  repeated FuzzerRequest FuzzerRequests = 1;
+  string Type = 2;
+  string YamlPath = 3;
 }
