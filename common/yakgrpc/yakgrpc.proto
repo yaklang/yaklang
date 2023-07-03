@@ -2451,6 +2451,8 @@ message PortScanRequest {
   int64 SynConcurrent = 24;
 
   string TaskName = 25;
+
+  bool EnableBrute = 26;
 }
 
 message DeletePortsRequest {
