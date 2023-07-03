@@ -195,6 +195,8 @@ service Yak {
   rpc IsMultipartFormDataRequest(FixUploadPacketRequest) returns (IsMultipartFormDataRequestResult);
   rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
+  rpc ImportHTTPFuzzerTaskFromYaml(ImportHTTPFuzzerTaskFromYamlRequest) returns (ImportHTTPFuzzerTaskFromYamlResponse);
+  rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (GeneralResponse);
 
   rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
   rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
@@ -3788,4 +3790,15 @@ message HTTPFlowBareRequest {
 message HTTPFlowBareResponse {
   int64 Id = 1;
   bytes Data = 2;
+}
+message ImportHTTPFuzzerTaskFromYamlRequest {
+  string YamlPath = 1;
+}
+message ImportHTTPFuzzerTaskFromYamlResponse{
+  repeated FuzzerRequest FuzzerRequests = 1;
+}
+message ExportHTTPFuzzerTaskToYamlRequest{
+  repeated FuzzerRequest FuzzerRequests = 1;
+  string Type = 2;
+  string YamlPath = 3;
 }
