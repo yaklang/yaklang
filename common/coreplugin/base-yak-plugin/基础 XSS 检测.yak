@@ -1,4 +1,4 @@
-debug = true
+debug = false
 origin_yakit_output = yakit_output
 
 yakit_output = 1
