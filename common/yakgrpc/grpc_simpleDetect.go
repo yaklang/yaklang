@@ -73,8 +73,65 @@ protos = cli.String("proto", cli.setDefault("tcp"))
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
 scriptNameFile = cli.String("script-name-file", cli.setDefault(""))
 
+// brute 
+enableBrute = cli.Have("enable-brute")
+
+userList := cli.String("user-list-file")
+passList := cli.String("pass-list-file")
+bruteConcurrent := cli.Int("brute-concurrent")
+taskConcurrent := cli.Int("task-concurrent")
+minDelay, maxDelay := cli.Int("delay-min", cli.setDefault(3)), cli.Int("delay-max", cli.setDefault(5))
+okToStop := cli.Bool("ok-to-stop")
+replaceDefaultUsernameDict := cli.Bool("replace-default-username-dict")
+replaceDefaultPasswordDict := cli.Bool("replace-default-password-dict")
+finishingThreshold = cli.Int("finishing-threshold", cli.setDefault(1))
+
+
 cli.check()
 yakit.SetProgress(baseProgress+0.01)
+
+yakit.Info("用户自定义字典预处理")
+// 定义存储用户名与密码的字典
+userdefinedUsernameList = make([]string)
+userdefinedPasswordList = make([]string)
+
+// 获取用户列表
+userRaw, _ := file.ReadFile(userList)
+if len(userRaw) <= 0 {
+    yakit.Error("用户文件字典获取失败")
+}else{
+    userdefinedUsernameList = str.ParseStringToLines(string(userRaw))
+}
+
+// 获取用户密码
+passRaw, _ := file.ReadFile(passList)
+if len(passRaw) <= 0 {
+    yakit.Error("用户密码文件获取失败")
+}else{
+    userdefinedPasswordList = str.ParseStringToLines(string(passRaw))
+}
+
+bruteOpt = []
+
+if minDelay > 0 && maxDelay > 0 {
+    yakit.Info("单目标测试随机延迟：%v-%v/s", minDelay, maxDelay)
+    opt = append(bruteOpt, brute.minDelay(minDelay), brute.maxDelay(maxDelay))
+}
+
+if finishingThreshold > 0 {
+    opt = append(bruteOpt, brute.finishingThreshold(finishingThreshold))
+}
+
+if bruteConcurrent > 0 {
+    yakit.Info("设置最多同时爆破目标：%v", concurrent)
+    opt = append(bruteOpt, brute.concurrentTarget(bruteConcurrent))
+}
+
+if taskConcurrent > 0 {
+    yakit.Info("设置单目标爆破并发：%v", taskConcurrent)
+    opt = append(bruteOpt, brute.concurrent(taskConcurrent))
+}
+
 
 excludeHosts = cli.String("exclude-hosts")
 excludePorts = cli.String("exclude-ports")
@@ -321,8 +378,98 @@ updateProgress = func(delta) {
 }
 
 
+bruteScan = func(result){
+		bruteType = ""
+
+		for _, bt  := range brute.GetAvailableBruteTypes() {
+			if result.GetServiceName().Lower().Contains(bt){
+				bruteType = bt
+				break
+			}
+		}
+
+		if bruteType == "" {
+			return
+		}
+
+		uL = make([]string)
+		pL = make([]string)
+
+		if (!replaceDefaultUsernameDict) {
+			uL = append(uL, brute.GetUsernameListFromBruteType(bruteType)...)
+		}
+
+		if (!replaceDefaultPasswordDict) {
+			pL = append(pL, brute.GetPasswordListFromBruteType(bruteType)...)
+		}
+
+		addr := str.HostPort(result.Target, result.Port)
+		yakit.Info("Start Load Bruter for %s: %s",bruteType, addr)
+
+		instance, err := brute.New(
+			string(bruteType),
+			brute.userList(append(userdefinedUsernameList, uL...)...),
+			brute.passList(append(userdefinedPasswordList, pL...)...),
+			brute.debug(true),
+			brute.okToStop(okToStop),
+			bruteOpt...
+		)
+		if err != nil {
+			yakit.Error("构建弱口令与未授权扫描失败：%v", err)
+			return
+		}
+
+		res, err := instance.Start(addr)
+		if err != nil {
+			yakit.Error("输入目标失败：%v", err)
+			return
+		}
+
+		riskTarget = addr
+
+		for rt = range res {
+			yakit.Info("rt string %v ",rt.String())
+			if rt == nil {
+				continue
+			}
+
+			if !rt.Ok {
+				continue
+			}
+
+			risk.NewRisk(
+				riskTarget, 
+				risk.severity("high"), 
+				risk.type("weak-pass"), 
+				risk.typeVerbose("弱口令"), 
+				risk.description("网站管理、运营人员由于安全意识不足，为了方便、避免忘记密码等，使用了非常容易记住的密码，或者是直接采用了系统的默认密码等。攻击者利用此漏洞可直接进入应用系统或者管理系统，从而进行系统、网页、数据的篡改与删除，非法获取系统、用户的数据，甚至可能导致服务器沦陷。"),
+				risk.solution("用户层面 : 不要使用常见的弱口令作为密码,不要多个系统或者社交账号使用同一套密码,定期修改密码,建议使用包含随机值的或者随机生成的字符串作为系统密码"),
+				risk.title(sprintf(
+					"Weak Password[%v]：%v user(%v) pass(%v)", 
+					rt.Type, 
+					rt.Target, 
+					rt.Username, 
+					rt.Password, 
+				)), 
+				risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", rt.Type, rt.Target, rt.Username, 
+										  rt.Password)), 
+				risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}), 
+			)
+		}
+}
+
+bruteWg = sync.NewSizedWaitGroup(4)
+
 handleServiceScanResult = func(result) {
 	manager.HandleServiceScanResult(result)
+	if enableBrute {
+		bruteWg.Add()
+		go func {
+			defer bruteWg.Done()
+			bruteScan(result)
+		}
+		bruteWg.Wait()
+	}
 }
 
 /*
@@ -459,7 +606,6 @@ for fileReader.Next(){
         wg.Wait()
     }
 }
-
 
 
 synWg.Wait()
@@ -629,6 +775,13 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
 			Key:   "proxy",
 			Value: strings.Join(reqPortScan.GetProxy(), ","),
+		})
+	}
+
+	// 爆破设置
+	if reqPortScan.GetEnableBrute() {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key: "enable-brute",
 		})
 	}
 
