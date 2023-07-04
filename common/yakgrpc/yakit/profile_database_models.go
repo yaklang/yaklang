@@ -41,7 +41,7 @@ var ProjectTables = []interface{}{
 	&ReportRecord{}, &ScreenRecorder{},
 	&ProjectGeneralStorage{},
 	// rss
-	&Briefing{}, &RssFeed{},
+	&Briefing{}, &RssFeed{}, &WebShell{},
 	// &assets.SubscriptionSource{},
 	&AliveHost{},
 
