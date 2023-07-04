@@ -243,9 +243,16 @@
 <script>
     const inputForm = document.getElementById("search-input");
     const items = document.querySelectorAll(".list-group-item")
-    window.addEventListener("hashchange", function () {
+
+    function syncHash() {
         inputForm.value = decodeURIComponent(location.hash.substring(1));
         inputForm.dispatchEvent(new Event("input"))
+    }
+    window.addEventListener("load", function () {
+        syncHash()
+    })
+    window.addEventListener("hashchange", function () {
+        syncHash()
     })
     inputForm.addEventListener("input", function () {
         const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
