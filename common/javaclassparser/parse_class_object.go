@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
+	"strings"
 )
 
 type ClassObject struct {
@@ -104,7 +105,7 @@ func (this *ClassObject) FindMethods(v string) *MemberInfo {
 	return nil
 }
 
-// 修改
+// SetClassName 修改类名
 func (this *ClassObject) SetClassName(name string) error {
 	constantInfo, err := this.getConstantInfo(this.ThisClass)
 	if err != nil {
@@ -120,6 +121,50 @@ func (this *ClassObject) SetClassName(name string) error {
 		return utils.Errorf("index %d is not ConstantUtf8Info", this.ThisClass)
 	}
 	oldName.Value = name
+	return nil
+}
+
+// SetSourceFileName 设置文件名
+func (this *ClassObject) SetSourceFileName(name string) error {
+	if !strings.HasSuffix(name, ".java") {
+		name = name + ".java"
+	}
+	var index uint16
+	for _, v := range this.Attributes {
+		switch v.(type) {
+		case *SourceFileAttribute:
+			index = v.(*SourceFileAttribute).SourceFileIndex
+		}
+	}
+	oldSourceFileName, ok := this.ConstantPool[index-1].(*ConstantUtf8Info)
+	if !ok {
+		return utils.Errorf("index %d is not ConstantUtf8Info", index)
+	}
+	oldSourceFileName.Value = name
+	return nil
+}
+
+// SetMethodName 设置函数名
+func (this *ClassObject) SetMethodName(old, name string) error {
+	var index uint16
+	for _, v := range this.Methods {
+		constantInfo, err := this.getConstantInfo(v.NameIndex)
+		if err != nil {
+			return err
+		}
+		utf8Info, ok := constantInfo.(*ConstantUtf8Info)
+		if !ok {
+			return utils.Errorf("index %d is not ConstantUtf8Info", v.NameIndex)
+		}
+		if old == utf8Info.Value {
+			index = v.NameIndex
+		}
+	}
+	oldMethodName, ok := this.ConstantPool[index-1].(*ConstantUtf8Info)
+	if !ok {
+		return utils.Errorf("index %d is not ConstantUtf8Info", index)
+	}
+	oldMethodName.Value = name
 	return nil
 }
 
