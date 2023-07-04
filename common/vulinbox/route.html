@@ -34,6 +34,11 @@
     </nav>
 </header>
 
+<div class="container mt-3">
+    <input type="text" class="form-control" id="search-input"
+           placeholder="快速过滤筛选靶场信息">
+</div>
+
 <!-- Your page content goes here -->
 <div class="container mt-5">
     <div class="row">
@@ -46,12 +51,15 @@
                     <li class="list-group-item"><a target="_blank"
                                                    href="/user/by-id-safe?id=1">不存在SQL注入的情况（数字严格校验）</a>
                     </li>
-                    <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL 注入</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
+                    <li class="list-group-item"><a target="_blank" href="/user/id?id=1">ID 为数字型的简单边界 SQL
+                        注入</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D">GET
                         参数是 JSON，JSON中字段存在SQL注入</a></li>
                     <li class="list-group-item"><a target="_blank" href="/user/id-b64-json?id=eyJ1aWQiOjEsImlkIjoiMSJ9">GET参数是被编码的JSON，JSON中字段存在SQL注入</a>
                     </li>
-                    <li class="list-group-item"><a target="_blank" href="/user/id-error?id=1">ID 为数字型的简单边界 SQL报错检测</a>
+                    <li class="list-group-item"><a target="_blank" href="/user/id-error?id=1">ID 为数字型的简单边界
+                        SQL报错检测</a>
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/user/cookie-id">Cookie-ID SQL注入</a>
                     </li>
@@ -108,7 +116,7 @@
                 </ul>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-6" id="safestyle">
             <div class="card" style="margin-top: 12px">
                 <div class="card-header">
                     命令注入测试案例
@@ -217,7 +225,8 @@
                     </li>
                 </ul>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><a href='/verification/bad/op' target="_blank">有验证码拦截的表单提交（逻辑问题）</a>
+                    <li class="list-group-item"><a href='/verification/bad/op'
+                                                   target="_blank">有验证码拦截的表单提交（逻辑问题）</a>
                     </li>
                 </ul>
             </div>
@@ -229,6 +238,36 @@
 <br>
 <br>
 
+{{.safescript}}
+
+<script>
+    const inputForm = document.getElementById("search-input");
+    const items = document.querySelectorAll(".list-group-item")
+    window.addEventListener("hashchange", function () {
+        inputForm.value = decodeURIComponent(location.hash.substring(1));
+        inputForm.dispatchEvent(new Event("input"))
+    })
+    inputForm.addEventListener("input", function () {
+        const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
+        items.forEach(function (item) {
+            const alink = item.childNodes[0];
+            let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+            if (searchItem.indexOf(searchData) !== -1) {
+                item.style.display = "block";
+            } else {
+                item.style.display = "none";
+            }
+        })
+        document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
+            if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
+                cardWrapper.style.display = "none";
+            } else {
+                cardWrapper.style.display = "block";
+            }
+        })
+        location.hash = encodeURIComponent(searchData)
+    })
+</script>
 <!-- 引入 Bootstrap JavaScript -->
 <script src="/static/js/bootstrap_5.3/popper.min.js"></script>
 <script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
