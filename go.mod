@@ -31,7 +31,7 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 	github.com/disintegration/imaging v1.6.2
 	github.com/dlclark/regexp2 v1.2.0
-	github.com/docker/docker v1.13.1
+	github.com/docker/docker v24.0.2+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
@@ -142,6 +142,7 @@ require (
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-pg/zerochecker v0.2.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
@@ -178,6 +179,7 @@ require (
 	github.com/nsf/termbox-go v0.0.0-20191229070316-58d4fcbce2a7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
