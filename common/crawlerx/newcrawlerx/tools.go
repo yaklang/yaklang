@@ -8,18 +8,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
-	"time"
 )
 
 func getAttribute(element *rod.Element, attribute string) (string, error) {
 	attributeStr, err := element.Attribute(attribute)
 	if err != nil {
-		return "", utils.Errorf("element %s get attribute error: %s", element, err)
+		return "", utils.Errorf("element %s get attribute %s error: %s", element, attribute, err)
 	}
 	if attributeStr == nil {
 		return "", nil
 	}
 	return *attributeStr, nil
+}
+
+func getProperty(element *rod.Element, property string) (string, error) {
+	propertyObj, err := element.Property(property)
+	if err != nil {
+		return "", utils.Errorf("element %s get property %s error: %s", element, property, err)
+	}
+	return propertyObj.String(), nil
 }
 
 func getCurrentUrl(page *rod.Page) (string, error) {
@@ -74,29 +81,6 @@ func getElementsSelectors(elements rod.Elements) []string {
 	return selectors
 }
 
-func clickElementOnPageBySelector(page *rod.Page, selector string) {
-	status, element, err := page.Has(selector)
-	//element, err := page.Element(selector)
-	if err != nil {
-		log.Infof("on page element: %s", err)
-		return
-	}
-	if !status {
-		log.Infof("on page element: %s not found", selector)
-	}
-	if element == nil {
-		log.Errorf("on page %s element %s not found.", page.MustInfo().URL, selector)
-		return
-	}
-	if visible, _ := element.Visible(); !visible {
-		return
-	}
-	//element.Click(proto.InputMouseButtonLeft)
-	element.Eval(`this.click()`)
-	page.MustWaitLoad()
-	time.Sleep(500 * time.Millisecond)
-}
-
 func StringArrayContains(array []string, element string) bool {
 	for _, s := range array {
 		if element == s {
@@ -104,6 +88,18 @@ func StringArrayContains(array []string, element string) bool {
 		}
 	}
 	return false
+}
+
+func StringArrayCover(array []string, element string) (bool, string) {
+	for _, s := range array {
+		if s == "" {
+			continue
+		}
+		if strings.Contains(element, s) {
+			return true, s
+		}
+	}
+	return false, ""
 }
 
 func isSimilarSelector(s1, s2 string) bool {
