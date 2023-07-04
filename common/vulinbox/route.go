@@ -9,18 +9,27 @@ import (
 //go:embed route.html
 var routeHtml []byte
 
-//go:embed route_safe.html
-var routeSafeHtml []byte
-
 func (s *VulinServer) init() {
 	router := s.router
 
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
+		var renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
+		var bytes []byte
+		var err error
 		if s.safeMode {
-			writer.Write(routeSafeHtml)
+			bytes, err = unsafeTemplate(string(routeHtml), map[string]any{
+				"safescript": renderedData,
+			})
 		} else {
+			bytes, err = unsafeTemplate(string(routeHtml), map[string]any{
+				"safescript": "",
+			})
+		}
+		if err != nil {
 			writer.Write(routeHtml)
+		} else {
+			writer.Write(bytes)
 		}
 	})
 	// 通用型
