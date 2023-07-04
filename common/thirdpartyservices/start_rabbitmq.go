@@ -2,6 +2,10 @@ package thirdpartyservices
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -9,9 +13,6 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"os/exec"
-	"time"
 )
 
 var (
@@ -119,7 +120,7 @@ func StartRabbitMQ() error {
 						},
 					},
 				},
-			}, nil, RabbitMQContainerName,
+			}, nil, nil, RabbitMQContainerName,
 		)
 		if err != nil {
 			return utils.Errorf("create rabbitmq container failed: %s", err)
