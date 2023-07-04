@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/mixer"
+	"gopkg.in/yaml.v2"
 )
 
 type YakTemplate struct {
@@ -240,4 +241,20 @@ func createVarsFromHTTPRequest(isHttps bool, s []byte) (map[string]interface{}, 
 		"__schema__":              schema,
 	}
 	return vars, nil
+}
+
+func (y *YakTemplate) MarshalToYaml() ([]byte, error) {
+	var data = map[string]interface{}{}
+	data["id"] = y.Id
+	info := make(map[string]interface{})
+	data["info"] = info
+	info["name"] = y.Name
+	info["author"] = y.Author
+	info["severity"] = y.Severity
+	info["description"] = y.Description
+	info["reference"] = y.Reference
+	info["tags"] = strings.Join(y.Tags, ",")
+	info["classification"] = map[string]interface{}{"cve-id": y.CVE}
+	//data["requests"]
+	return yaml.Marshal(data)
 }
