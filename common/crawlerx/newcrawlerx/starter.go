@@ -43,6 +43,7 @@ type BrowserStarter struct {
 	scanLevel          scanRangeLevel
 	noParams           []string
 	extraFunctions     []func(string) bool
+	elementCheck       func(*rod.Element) bool
 
 	urlTree *UrlTree
 
@@ -187,7 +188,12 @@ func (starter *BrowserStarter) StartBrowser() error {
 		}
 		starter.browser = starter.browser.ControlURL(controlUrl)
 	}
-	starter.browser = starter.browser.Context(starter.ctx)
+	if starter.baseConfig.timeout != 0 {
+		ctx, _ := context.WithTimeout(starter.ctx, time.Second*time.Duration(starter.baseConfig.timeout))
+		starter.browser = starter.browser.Context(ctx)
+	} else {
+		starter.browser = starter.browser.Context(starter.ctx)
+	}
 	err := starter.browser.Connect()
 	if err != nil {
 		return utils.Errorf("browser connect error: %s", err)
@@ -261,6 +267,7 @@ func (starter *BrowserStarter) newDefaultPageActionGenerator() {
 	starter.getEventFunction = starter.getEventFunctionGenerator()
 	starter.doEventClickFunction = starter.doEventClickFunctionGenerator()
 	starter.doActionOnPage = starter.ActionOnPage()
+	starter.elementCheck = starter.elementCheckGenerate()
 }
 
 func (starter *BrowserStarter) newPageDetectEvent() {

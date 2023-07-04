@@ -177,6 +177,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 	blackList, _ := conf.GetValue("crawler", "blackList")
 	whiteList, _ := conf.GetValue("crawler", "whiteList")
 	vue, _ := conf.GetValue("crawler", "vue")
+	sensitiveWord, _ := conf.GetValue("crawler", "sensitiveWord")
 	vueBool := false
 	if vue == "true" || vue == "True" || vue == "TRUE" {
 		vueBool = true
@@ -190,6 +191,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
 		newcrawlerx.WithVueWeb(vueBool),
 		newcrawlerx.WithExtraWaitLoadTime(1000),
+		newcrawlerx.WithSensitiveWord(getSliceFromString(sensitiveWord)...),
 	)
 	return opts
 }

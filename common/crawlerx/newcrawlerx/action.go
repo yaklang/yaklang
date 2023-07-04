@@ -201,7 +201,10 @@ func (starter *BrowserStarter) doEventClickFunctionGenerator() func(*rod.Page, s
 		}
 		page.MustWaitLoad()
 		time.Sleep(time.Second)
-		clickElementOnPageBySelector(page, selector)
+		status := starter.clickElementOnPageBySelector(page, selector)
+		if !status {
+			return nil
+		}
 		currentUrl, _ := getCurrentUrl(page)
 		if currentUrl != "" && currentUrl != originUrl {
 			starter.doUrlsFunction(originUrl, currentUrl)
