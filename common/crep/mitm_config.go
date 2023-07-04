@@ -184,6 +184,7 @@ type HTTPClientOptions struct {
 	EnableGMTLS         bool
 	PreferGM            bool
 	DnsServers          []string
+	HostMapping         map[string]string
 	// 下面的需要自己实现
 	//FailRetries     int               `json:"fail_retries" yaml:"fail_retries"`
 	//MaxRedirect     int               `json:"max_redirect" yaml:"max_redirect"`
@@ -195,27 +196,14 @@ type HTTPClientOptions struct {
 	//ExemptPathRegex string            `json:"exempt_path_regex" yaml:"exempt_path_regex"`
 }
 type Dialer struct {
-	dialer     *net.Dialer
-	dnsServers []string
+	dialer         *net.Dialer
+	resolverHandle func(ctx context.Context, network, host string) (string, error)
 }
 
-func NewDialer(dialer *net.Dialer, nameservers ...string) *Dialer {
+func NewDialer(dialer *net.Dialer, h func(ctx context.Context, network, host string) (string, error)) *Dialer {
 	return &Dialer{
-		dialer:     dialer,
-		dnsServers: nameservers,
-		//resolver: &net.Resolver{
-		//	Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-		//		for _, nameserver := range nameservers {
-		//			conn, err := dialer.DialContext(ctx, "tcp", nameserver)
-		//			if err != nil {
-		//				log.Errorf("dial nameserver %s failed: %s", nameserver, err)
-		//				continue
-		//			}
-		//			return conn, nil
-		//		}
-		//		return nil, errors.New("no nameserver available")
-		//	},
-		//},
+		dialer:         dialer,
+		resolverHandle: h,
 	}
 }
 func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -223,7 +211,11 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 	if err != nil {
 		return nil, err
 	}
-	ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second, d.dnsServers...)
+	ip, err := d.resolverHandle(ctx, network, host)
+	if err != nil {
+		return nil, err
+	}
+	//ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second, d.dnsServers...)
 	conn, err := d.dialer.DialContext(ctx, network, ip+":"+port)
 	if err == nil {
 		return conn, nil
@@ -255,10 +247,14 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
 		Proxy: proxyFunc,
 		DialContext: NewDialer(&net.Dialer{
 			Timeout: time.Duration(opts.DialTimeout) * time.Second,
-		}, opts.DnsServers...).DialContext,
-		//DialContext: (&net.Dialer{
-		//	Timeout: time.Duration(opts.DialTimeout) * time.Second,
-		//}).DialContext,
+		}, func(ctx context.Context, network, host string) (string, error) {
+			if v, ok := opts.HostMapping[host]; ok {
+				return v, nil
+			} else if v, ok := lowhttp.GetSystemHostByName(host); ok {
+				return v, nil
+			}
+			return utils.GetFirstIPByDnsWithCache(host, 5*time.Second, opts.DnsServers...), nil
+		}).DialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,
 		MaxIdleConns:          opts.MaxIdleConns,
@@ -703,6 +699,12 @@ func MITM_SetTransparentMirrorHTTP(f MITMTransparentMirrorHTTPFunc) MITMConfig {
 func MITM_SetDNSServers(servers ...string) MITMConfig {
 	return func(server *MITMServer) error {
 		server.DNSServers = servers
+		return nil
+	}
+}
+func MITM_SetHostMapping(m map[string]string) MITMConfig {
+	return func(server *MITMServer) error {
+		server.HostMapping = m
 		return nil
 	}
 }
