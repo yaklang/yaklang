@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/user"
+	"sync"
 	"time"
 )
 
@@ -138,15 +140,58 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPExWithTimeout(time.Minute, handle)
+	return DebugMockHTTPExWithTimeout(time.Minute, false, handle)
 }
 
-func DebugMockHTTPExWithTimeout(du time.Duration, handle func([]byte) []byte) (string, int) {
+func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPExWithTimeout(time.Minute, true, handle)
+}
+
+var (
+	tlsTestConfig *tls.Config
+	tlsTestOnce   sync.Once
+)
+
+func RegisterDefaultTLSConfigGenerator(h func() *tls.Config) {
+	go tlsTestOnce.Do(func() {
+		tlsTestConfig = h()
+	})
+}
+
+func GetDefaultTLSConfig(i float64) *tls.Config {
+	expectedEnd := time.Now().Add(FloatSecondDuration(i))
+	for {
+		if tlsTestConfig != nil {
+			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+			return tlsTestConfig
+		}
+		time.Sleep(50 * time.Millisecond)
+		if !expectedEnd.After(time.Now()) {
+			break
+		}
+	}
+	log.Error("fetch default tls config failed")
+	return nil
+}
+
+func DebugMockHTTPExWithTimeout(du time.Duration, https bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
 	go func() {
-		lis, err := net.Listen("tcp", addr)
+		var (
+			lis net.Listener
+			err error
+		)
+		if https {
+			tlsConfig := GetDefaultTLSConfig(5)
+			if tlsConfig == nil {
+				panic(1)
+			}
+			lis, err = tls.Listen("tcp", addr, tlsConfig)
+		} else {
+			lis, err = net.Listen("tcp", addr)
+		}
 		if err != nil {
 			panic(err)
 		}
@@ -167,7 +212,8 @@ func DebugMockHTTPExWithTimeout(du time.Duration, handle func([]byte) []byte) (s
 					case <-ctx.Done():
 						conn.Close()
 					default:
-						conn.Write(handle(StableReaderEx(conn, 10*time.Second, 10240)))
+						data := StableReaderEx(conn, 10*time.Second, 10240)
+						conn.Write(handle(data))
 						time.Sleep(50 * time.Millisecond)
 						conn.Close()
 					}
