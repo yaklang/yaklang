@@ -2,6 +2,11 @@ package thirdpartyservices
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -9,10 +14,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
 
 	"github.com/docker/docker/client"
 )
@@ -177,7 +178,7 @@ func StartPostgres(pgdir string) error {
 					},
 				},
 				Mounts: mounts,
-			}, nil, PostgresContainerName,
+			}, nil, nil, PostgresContainerName,
 		)
 		if err != nil {
 			return utils.Errorf("create postgres container failed: %s", err)
