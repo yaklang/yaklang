@@ -147,6 +147,7 @@ type MITMServer struct {
 	clientCerts []*ClientCertificationPair
 
 	DNSServers               []string
+	HostMapping              map[string]string
 	via                      string
 	allowForwarded           bool
 	httpTransport            *http.Transport
@@ -602,6 +603,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		mirrorCache:              ttlcache.NewCache(),
 		DNSServers:               []string{"8.8.8.8", "114.114.114.114"},
 		dnsCache:                 new(sync.Map),
+		HostMapping:              make(map[string]string),
 		hijackedMaxContentLength: 10 * 1000 * 1000,
 		http2:                    false,
 	}
@@ -622,6 +624,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	opts.EnableHTTP2 = server.http2
 	opts.EnableGMTLS = server.gmtls
 	opts.DnsServers = server.DNSServers
+	opts.HostMapping = server.HostMapping
 	err := MITM_SetTransportByHTTPClientOptions(opts)(server)
 	if err != nil {
 		return nil, utils.Errorf("create http transport failed: %v", err)

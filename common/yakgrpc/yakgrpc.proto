@@ -3280,6 +3280,7 @@ message MITMRequest {
   string proxyUsername = 49;
   string proxyPassword = 50;
   repeated string dnsServers = 52;
+  repeated KVPair hosts = 53;
 }
 
 message Certificate {
