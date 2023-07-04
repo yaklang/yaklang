@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -870,7 +869,6 @@ RECONNECT:
 	if option.BeforeDoRequest != nil {
 		r = option.BeforeDoRequest(r)
 	}
-	spew.Dump(r)
 	_, err = conn.Write(r)
 	if err != nil {
 		return response, utils.Errorf("write request failed: %s", err)
