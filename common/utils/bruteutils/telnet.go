@@ -80,7 +80,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("telnet panic: %s", err)
+				log.Errorf("telnet panic: %s", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
@@ -98,7 +98,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 
 		var conn, err = utils.GetAutoProxyConnEx(target, nil, CommonTimeoutDuration)
 		if err != nil {
-			log.Error("get auto proxy conn ex failed: %s", err)
+			log.Errorf("get auto proxy conn ex failed: %s", err)
 			if utils.MatchAnyOfRegexp(err.Error(), `(?i)timeout`) {
 				return result
 			}
