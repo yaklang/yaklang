@@ -216,7 +216,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 		return nil, err
 	}
 	//ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second, d.dnsServers...)
-	conn, err := d.dialer.DialContext(ctx, network, ip+":"+port)
+	conn, err := d.dialer.DialContext(ctx, network, utils.HostPort(ip, port))
 	if err == nil {
 		return conn, nil
 	}
