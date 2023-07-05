@@ -37,7 +37,6 @@ require (
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
 	github.com/gilliek/go-opml v1.0.0
 	github.com/glaslos/ssdeep v0.3.1
-	github.com/glebarez/go-sqlite v1.20.3
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-ldap/ldap v3.0.3+incompatible
 	github.com/go-pg/pg/v10 v10.9.1
@@ -141,7 +140,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
@@ -202,7 +200,6 @@ require (
 	github.com/projectdiscovery/mapcidr v1.0.0 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.3-0.20220506110515-811d938bd26d // indirect
 	github.com/projectdiscovery/stringsutil v0.0.0-20220612082425-0037ce9f89f3 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -248,8 +245,4 @@ require (
 	gotest.tools/v3 v3.5.0 // indirect
 	honnef.co/go/js/dom v0.0.0-20210725211120-f030747120f2 // indirect
 	mellium.im/sasl v0.3.1 // indirect
-	modernc.org/libc v1.22.2 // indirect
-	modernc.org/mathutil v1.5.0 // indirect
-	modernc.org/memory v1.5.0 // indirect
-	modernc.org/sqlite v1.20.3 // indirect
 )
