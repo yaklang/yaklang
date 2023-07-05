@@ -1,14 +1,19 @@
 package analyzer
 
 import (
+	"database/sql"
 	"io/fs"
 
 	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
+	"github.com/mattn/go-sqlite3"
 
-	_ "github.com/glebarez/go-sqlite"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func init() {
+	sql.Register("sqlite", &sqlite3.SQLiteDriver{})
+}
 
 var (
 	requiredFiles = []string{
