@@ -31,7 +31,7 @@ func ReadBlock(r *bufio.Reader) ([]byte, error) {
 	for {
 		line, err := r.ReadString('\n')
 		if err != nil {
-			return nil, err
+			return block.Bytes(), err
 		}
 
 		if line == "\n" {
@@ -73,10 +73,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
 	br := bufio.NewReader(r)
 	for {
 		block, err := ReadBlock(br)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
+		if err != nil && err != io.EOF {
 			return nil, err
 		}
 		if block == nil {
