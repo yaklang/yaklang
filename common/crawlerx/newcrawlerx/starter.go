@@ -44,6 +44,7 @@ type BrowserStarter struct {
 	noParams           []string
 	extraFunctions     []func(string) bool
 	elementCheck       func(*rod.Element) bool
+	scanRangeCheck     func(string) bool
 
 	urlTree *UrlTree
 
@@ -206,8 +207,10 @@ func (starter *BrowserStarter) StartBrowser() error {
 }
 
 func (starter *BrowserStarter) generateDefaultPageAction() {
+	starter.scanRangeCheck = scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel)
 	starter.checkFunctions = append(starter.checkFunctions,
-		scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
+		//scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
+		starter.scanRangeCheck,
 		repeatCheckFunctionGenerate(starter.pageVisit),
 	)
 	starter.extraFunctions = append(starter.extraFunctions,
@@ -245,8 +248,10 @@ func (starter *BrowserStarter) testActionGenerator() {
 }
 
 func (starter *BrowserStarter) newDefaultPageActionGenerator() {
+	starter.scanRangeCheck = scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel)
 	starter.checkFunctions = append(starter.checkFunctions,
-		scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
+		//scanRangeFunctionGenerate(starter.baseUrl, starter.scanLevel),
+		starter.scanRangeCheck,
 		repeatCheckFunctionGenerate(starter.pageVisit),
 	)
 	starter.extraFunctions = append(starter.extraFunctions,
@@ -354,6 +359,9 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		if starter.stopSignal {
 			return
 		}
+		if !starter.scanRangeCheck(hijack.Request.URL().String()) {
+			return
+		}
 		var afterRepeatUrl string
 		if starter.requestAfterRepeat != nil {
 			afterRepeatUrl = starter.requestAfterRepeat(hijack.Request)
@@ -393,6 +401,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 					url:        jsUrl,
 					resultType: "js url",
 					method:     "JS GET",
+					from:       hijack.Request.URL().String(),
 				}
 				starter.ch <- &result
 			}
@@ -401,6 +410,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		result := RequestResult{}
 		result.request = hijack.Request
 		result.response = hijack.Response
+		result.from = pageUrl
 		starter.ch <- &result
 		if starter.maxUrl != 0 && starter.resultSent.Count() >= int64(starter.maxUrl) {
 			starter.stopSignal = true
