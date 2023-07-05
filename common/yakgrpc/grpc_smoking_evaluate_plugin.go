@@ -44,6 +44,10 @@ func NewFakeStream(ctx context.Context, handler func(result *ypb.ExecResult) err
 
 func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEvaluatePluginRequest) (*ypb.SmokingEvaluatePluginResponse, error) {
 	pluginName := req.GetPluginName()
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
 	var (
 		pluginType = req.GetPluginType()
 		pluginCode = req.GetCode()
@@ -70,7 +74,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		host, port = lowhttp.DebugEchoServer()
+		host, port = lowhttp.DebugEchoServerContext(ctx)
 	}()
 	wg.Wait()
 	if host == "" || port <= 0 {
