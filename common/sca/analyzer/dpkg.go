@@ -97,7 +97,15 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
 	return pkgs, nil
 }
 
-func (a dpkgAnalyzer) Analyze(path string, info fs.FileInfo, r io.Reader) ([]types.Package, error) {
+func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) bool {
+	if strings.HasPrefix(path, statusDir) || path == statusFile {
+		// handler status
+		return true
+	}
+	return false
+}
+
+func (a dpkgAnalyzer) Analyze(path string, r io.Reader) ([]types.Package, error) {
 	if strings.HasPrefix(path, statusDir) || path == statusFile {
 		// handler status
 		return a.analyzeStatus(r)
