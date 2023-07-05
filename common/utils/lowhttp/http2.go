@@ -111,11 +111,15 @@ func HTTPRequestToHTTP2(schema string, host string, conn net.Conn, raw []byte, n
 			value := strings.TrimLeft(result[1], " ")
 			switch key {
 			case "host": // :authority
-				for _, h := range requestHeaders {
+				var targetIndex = -1
+				for index, h := range requestHeaders {
 					if h.Name == ":authority" {
-						h.Value = value
+						targetIndex = index
 						break
 					}
+				}
+				if targetIndex >= 0 {
+					requestHeaders[targetIndex].Value = value
 				}
 			case "content-length":
 				// 需要自动修复

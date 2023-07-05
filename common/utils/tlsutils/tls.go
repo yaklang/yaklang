@@ -165,6 +165,15 @@ func GenerateSelfSignedCertKeyWithCommonName(commonName, host string, alternateI
 	return GenerateSelfSignedCertKeyWithCommonNameWithPrivateKey(commonName, host, alternateIPs, alternateDNS, nil)
 }
 
+func init() {
+	utils.RegisterDefaultTLSConfigGenerator(func() *tls.Config {
+		ca, key, _ := GenerateSelfSignedCertKeyWithCommonName("test", "127.0.0.1", nil, nil)
+		sCa, sKey, _ := SignServerCrtNKey(ca, key)
+		stls, _ := GetX509ServerTlsConfig(ca, sCa, sKey)
+		return stls
+	})
+}
+
 func GenerateSelfSignedCertKeyWithCommonNameWithPrivateKey(commonName, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey) ([]byte, []byte, error) {
 	return GenerateSelfSignedCertKeyWithCommonNameEx(commonName, host, alternateIPs, alternateDNS, priv, false)
 }
