@@ -1,24 +1,25 @@
 package analyzer
 
 import (
-	"context"
 	"io"
 	"io/fs"
 	"os"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Analyzer interface {
-	Analyze(string, io.Reader) ([]types.Package, error)
-	Match(string, fs.FileInfo) bool
+	Analyze(int, io.Reader) ([]types.Package, error)
+	Match(string, fs.FileInfo) int
 }
 
 type Task struct {
-	path string
-	f    *os.File
-	a    Analyzer
+	path      string
+	matchType int
+	f         *os.File
+	a         Analyzer
 }
 
 type AnalyzerGroup struct {
@@ -52,33 +53,24 @@ func (ag *AnalyzerGroup) Append(a Analyzer) {
 	ag.analyzers = append(ag.analyzers, a)
 }
 
-func (ag *AnalyzerGroup) Consume(ctx context.Context, cancel func()) {
+func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
+	wg.Add(ag.numWorkers)
+
 	for i := 0; i < ag.numWorkers; i++ {
 		go func() {
-			for {
-				select {
-				case task, ok := <-ag.ch:
-					// finish
-					if !ok {
-						cancel()
-						return
-					}
-					defer func() {
-						name := task.f.Name()
-						task.f.Close()
-						os.Remove(name)
-					}()
-					pkgs, err := task.a.Analyze(task.path, task.f)
-					if err != nil {
-						ag.err = err
-						cancel()
-						return
-					}
-					ag.pkgs = append(ag.pkgs, pkgs...)
-				case <-ctx.Done():
+			defer wg.Done()
+			for task := range ag.ch {
+				defer func() {
+					name := task.f.Name()
+					task.f.Close()
+					os.Remove(name)
+				}()
+				pkgs, err := task.a.Analyze(task.matchType, task.f)
+				if err != nil {
+					ag.err = err
 					return
 				}
-
+				ag.pkgs = append(ag.pkgs, pkgs...)
 			}
 		}()
 	}
@@ -91,8 +83,8 @@ func (ag *AnalyzerGroup) Close() {
 // write
 func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error {
 	for _, a := range ag.analyzers {
-		// match
-		if a.Match(path, fi) {
+		// match type > 0 mean matched and need to analyze
+		if matchType := a.Match(path, fi); matchType > 0 {
 			// save
 			f, err := os.CreateTemp("", "fanal-file-*")
 			if err != nil {
@@ -104,7 +96,7 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 			f.Seek(0, 0)
 
 			// send
-			task := Task{path: path, f: f, a: a}
+			task := Task{path: path, matchType: matchType, f: f, a: a}
 			ag.ch <- task
 		}
 	}

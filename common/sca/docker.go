@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -128,12 +129,12 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers)
 	ag.Append(analyzer.NewDpkgAnalyzer())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
 
 	// up consumer
-	ag.Consume(ctx, cancel)
+	ag.Consume(&wg)
 	// close
-	defer ag.Close()
 
 	// producter
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -142,10 +143,13 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 		}
 		return nil
 	})
+	ag.Close()
 
 	if err != nil {
 		return nil, err
 	}
+
+	wg.Wait()
 	if err = ag.Error(); err != nil {
 		return nil, err
 	}

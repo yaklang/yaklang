@@ -17,6 +17,8 @@ const (
 	statusDir  = "var/lib/dpkg/status.d/"
 	// availableFile = "var/lib/dpkg/available"
 	// infoDir       = "var/lib/dpkg/info/"
+
+	TypStatus int = 1
 )
 
 type dpkgAnalyzer struct {
@@ -36,7 +38,6 @@ func ReadBlock(r *bufio.Reader) ([]byte, error) {
 			break
 		}
 
-		// block.WriteString(line)
 		block.WriteString(line)
 	}
 
@@ -97,23 +98,19 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
 	return pkgs, nil
 }
 
-func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) bool {
+func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
 	if strings.HasPrefix(path, statusDir) || path == statusFile {
 		// handler status
-		return true
+		return TypStatus
 	}
-	return false
+	return 0
 }
 
-func (a dpkgAnalyzer) Analyze(path string, r io.Reader) ([]types.Package, error) {
-	if strings.HasPrefix(path, statusDir) || path == statusFile {
-		// handler status
+func (a dpkgAnalyzer) Analyze(matchType int, r io.Reader) ([]types.Package, error) {
+	switch matchType {
+	case TypStatus:
 		return a.analyzeStatus(r)
 	}
 
-	// if path == availableFile {
-	// 	// handler available file
-
-	// }
 	return nil, nil
 }
