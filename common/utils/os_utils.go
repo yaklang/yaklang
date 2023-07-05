@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/miekg/dns"
@@ -140,11 +141,15 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPExWithTimeout(time.Minute, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, handle)
+}
+
+func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(ctx, false, handle)
 }
 
 func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPExWithTimeout(time.Minute, true, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, handle)
 }
 
 var (
@@ -174,7 +179,7 @@ func GetDefaultTLSConfig(i float64) *tls.Config {
 	return nil
 }
 
-func DebugMockHTTPExWithTimeout(du time.Duration, https bool, handle func([]byte) []byte) (string, int) {
+func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
@@ -196,7 +201,9 @@ func DebugMockHTTPExWithTimeout(du time.Duration, https bool, handle func([]byte
 			panic(err)
 		}
 		go func() {
-			time.Sleep(du)
+			select {
+			case <-ctx.Done():
+			}
 			lis.Close()
 		}()
 
@@ -211,11 +218,13 @@ func DebugMockHTTPExWithTimeout(du time.Duration, https bool, handle func([]byte
 					select {
 					case <-ctx.Done():
 						conn.Close()
+						return
 					default:
 						data := StableReaderEx(conn, 10*time.Second, 10240)
 						conn.Write(handle(data))
 						time.Sleep(50 * time.Millisecond)
 						conn.Close()
+						return
 					}
 				}
 			}()
