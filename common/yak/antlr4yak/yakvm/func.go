@@ -9,6 +9,7 @@ import (
 )
 
 type Function struct {
+	sourceCode                string
 	id                        int
 	name                      string
 	codes                     []*Code
@@ -43,6 +44,9 @@ func (f *Function) SetName(name string) {
 }
 func (f *Function) SetSymbol(id int) {
 	f.id = id
+}
+func (f *Function) SetSourceCode(s string) {
+	f.sourceCode = s
 }
 func (f *Function) GetSymbolId() int {
 	return f.id

@@ -49,7 +49,15 @@ func NewVMPanic(i interface{}) *VMPanic {
 
 func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string {
 	var codeReview string
-	if sourceCode == nil || *sourceCode == "" && code != nil {
+	var codeOrigin string
+	if sourceCode != nil {
+		codeOrigin = *sourceCode
+	} else {
+		if v.originCode != "" {
+			codeOrigin = v.originCode
+		}
+	}
+	if codeOrigin == "" && code != nil {
 		return fmt.Sprintf("not found source code binding [start %v:%v   end %v:%v]", code.StartLineNumber, code.StartColumnNumber, code.EndLineNumber, code.EndColumnNumber)
 	}
 	defer func() {
@@ -62,7 +70,7 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 			}
 		}
 	}()
-	scanner := bufio.NewScanner(strings.NewReader(*sourceCode))
+	scanner := bufio.NewScanner(strings.NewReader(codeOrigin))
 	scanner.Split(bufio.ScanLines)
 	flag := 0
 	for nowLine := 1; scanner.Scan() && nowLine <= code.EndLineNumber; nowLine++ {

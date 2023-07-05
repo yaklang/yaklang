@@ -481,7 +481,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 
 	t.isRunning.Set()
 	if antlr4yak.IsYakc([]byte(code)) {
-		return engine, engine.SafeExecYakc(ctx, []byte(code), e.cryptoKey)
+		return engine, engine.SafeExecYakc(ctx, []byte(code), e.cryptoKey, code)
 	}
 
 	if cache && !engine.HaveEvaluatedCode() {

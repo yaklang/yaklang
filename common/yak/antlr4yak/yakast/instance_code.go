@@ -35,7 +35,9 @@ func (y *YakCompiler) VisitInstanceCode(raw yak.IInstanceCodeContext) interface{
 	recoverFunc()
 
 	yakFn = yakvm.NewFunction(funcCode, y.currentSymtbl)
-
+	if y.sourceCodePointer != nil {
+		yakFn.SetSourceCode(*y.sourceCodePointer)
+	}
 	if yakFn == nil {
 		y.panicCompilerError(compileError, "cannot create yak function from compiler")
 	}
