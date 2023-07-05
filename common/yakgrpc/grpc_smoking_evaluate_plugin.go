@@ -44,9 +44,18 @@ func NewFakeStream(ctx context.Context, handler func(result *ypb.ExecResult) err
 
 func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEvaluatePluginRequest) (*ypb.SmokingEvaluatePluginResponse, error) {
 	pluginName := req.GetPluginName()
-	ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
-	if err != nil {
-		return nil, err
+	var (
+		pluginType = req.GetPluginType()
+		pluginCode = req.GetCode()
+		err        error
+	)
+	if pluginCode == "" {
+		ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
+		if err != nil {
+			return nil, err
+		}
+		pluginCode = ins.Content
+		pluginType = ins.Type
 	}
 
 	var host string
@@ -82,7 +91,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	}
 
 	staticCheckingFailed := false
-	staticResults := yak.AnalyzeStaticYaklang(ins.Content)
+	staticResults := yak.AnalyzeStaticYaklang(pluginCode)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
 			staticCheckingFailed = true
@@ -101,7 +110,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	var score int
 	log.Info("start to echo debug script")
 	var fetchRisk bool
-	err = s.debugScript("http://"+utils.HostPort(host, port), ins.Type, ins.Content, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+	err = s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 		if result.IsMessage {
 			var m = make(map[string]any)
 			err := json.Unmarshal(result.Message, &m)
