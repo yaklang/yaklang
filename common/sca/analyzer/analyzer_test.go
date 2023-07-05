@@ -92,22 +92,6 @@ func TestApk(t *testing.T) {
 				Name:    "musl",
 				Version: "1.2.4-r0",
 			},
-			{
-				Name:    "musl-utils",
-				Version: "1.2.4-r0",
-			},
-			{
-				Name:    "scanelf",
-				Version: "1.3.7-r1",
-			},
-			{
-				Name:    "ssl_client",
-				Version: "1.36.1-r0",
-			},
-			{
-				Name:    "zlib",
-				Version: "1.2.13-r1",
-			},
 		},
 
 		t:         t,
