@@ -100,3 +100,56 @@ func TestApk(t *testing.T) {
 	}
 	Run(tc)
 }
+
+func TestDpkg(t *testing.T) {
+	tc := testcase{
+		filePath:  "./testdata/dpkg",
+		t:         t,
+		a:         NewDpkgAnalyzer(),
+		matchType: 1,
+		wantPkgs: []types.Package{
+			{
+				Name:    "adduser",
+				Version: "3.118ubuntu5",
+			},
+			{
+				Name:    "apt",
+				Version: "2.4.9",
+			},
+			{
+				Name:    "base-files",
+				Version: "12ubuntu4.3",
+			},
+			{
+				Name:    "base-passwd",
+				Version: "3.5.52build1",
+			},
+			{
+				Name:    "bash",
+				Version: "5.1-6ubuntu1",
+			},
+			{
+				Name:    "bsdutils",
+				Version: "1:2.37.2-4ubuntu3",
+			},
+			{
+				Name:    "ca-certificates",
+				Version: "20230311ubuntu0.22.04.1",
+			},
+			{
+				Name:    "coreutils",
+				Version: "8.32-4.1ubuntu1",
+			},
+			{
+				Name:    "curl",
+				Version: "7.81.0-1ubuntu1.10",
+			},
+			{
+				Name:    "dash",
+				Version: "0.5.11+git20210903+057cd650a4ed-3build1",
+			},
+		},
+	}
+	Run(tc)
+
+}
