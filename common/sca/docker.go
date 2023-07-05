@@ -22,10 +22,18 @@ const (
 )
 
 type dockerContextConfig struct {
-	endpoint string
+	endpoint   string
+	numWorkers int
 }
 
 type dockerContextOption func(*dockerContextConfig)
+
+func NewDockerContextConfig() *dockerContextConfig {
+	return &dockerContextConfig{
+		numWorkers: 5,
+		endpoint:   "",
+	}
+}
 
 func _withEndPoint(endpoint string) dockerContextOption {
 	return func(c *dockerContextConfig) {
@@ -116,29 +124,36 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 	return nil
 }
 
-func loadDockerImage(imageFile *os.File) ([]types.Package, error) {
-	pkgs := make([]types.Package, 0)
-	ag := analyzer.NewAnalyzerGroup()
+func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers)
 	ag.Append(analyzer.NewDpkgAnalyzer())
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// up consumer
+	ag.Consume(ctx, cancel)
+	// close
+	defer ag.Close()
+
+	// producter
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
-		ps, err := ag.Analyze(path, fi, r)
-		if err != nil {
+		if err := ag.Analyze(path, fi, r); err != nil {
 			return err
 		}
-		pkgs = append(pkgs, ps...)
 		return nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
-
-	return pkgs, nil
+	if err = ag.Error(); err != nil {
+		return nil, err
+	}
+	return ag.Packages(), nil
 }
 
 func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]types.Package, error) {
-	config := &dockerContextConfig{}
+	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -147,6 +162,11 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	if err != nil {
 		return nil, utils.Errorf("failed to create a temporary file")
 	}
+	defer func() {
+		name := f.Name()
+		f.Close()
+		os.Remove(name)
+	}()
 
 	if err = saveImageFromContext(config.endpoint, imageID, f); err != nil {
 		return nil, err
@@ -154,21 +174,21 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	}
 
 	// defer f.Close()
-	defer func() {
-		name := f.Name()
-		f.Close()
-		os.Remove(name)
-	}()
 
-	return loadDockerImage(f)
+	return loadDockerImage(f, *config)
 }
 
-func LoadDockerImageFromFile(path string) ([]types.Package, error) {
+func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]types.Package, error) {
+	config := NewDockerContextConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, utils.Errorf("unable to open file: %v", err)
 	}
 	defer f.Close()
 
-	return loadDockerImage(f)
+	return loadDockerImage(f, *config)
 }
