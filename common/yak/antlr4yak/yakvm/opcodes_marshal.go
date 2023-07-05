@@ -10,11 +10,16 @@ import (
 )
 
 type CodesMarshaller struct {
-	table map[int]*SymbolTable
+	sourceCode string
+	table      map[int]*SymbolTable
 }
 
 func NewCodesMarshaller() *CodesMarshaller {
-	return &CodesMarshaller{map[int]*SymbolTable{}}
+	return &CodesMarshaller{sourceCode: "", table: map[int]*SymbolTable{}}
+}
+
+func (c *CodesMarshaller) SetSourceCode(s string) {
+	c.sourceCode = s
 }
 
 func (c *CodesMarshaller) Unmarshal(buf []byte) (*SymbolTable, []*Code, error) {
@@ -218,6 +223,7 @@ func (c *CodesMarshaller) marshalSymbolTable(buf []byte, tbl *SymbolTable) ([]by
 
 func (c *CodesMarshaller) consumeFunc(buf []byte) (*Function, []byte, error) {
 	f := &Function{
+		sourceCode:          c.sourceCode,
 		id:                  0,
 		name:                "",
 		codes:               nil,

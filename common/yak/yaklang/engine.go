@@ -34,8 +34,8 @@ type YaklangEngine interface {
 	GetSymNames() []string
 	CopyVars() map[string]interface{}
 	Marshal(string, []byte) ([]byte, error)
-	ExecYakc(context.Context, []byte, []byte) error
-	SafeExecYakc(context.Context, []byte, []byte) error
+	ExecYakc(context.Context, []byte, []byte, string) error
+	SafeExecYakc(context.Context, []byte, []byte, string) error
 	ExecYakcWithCode(context.Context, []byte, []byte, string) error
 	SafeExecYakcWithCode(context.Context, []byte, []byte, string) error
 	SetDebugMode(bool)
