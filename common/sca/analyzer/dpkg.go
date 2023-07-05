@@ -106,10 +106,10 @@ func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
 	return 0
 }
 
-func (a dpkgAnalyzer) Analyze(matchType int, r io.Reader) ([]types.Package, error) {
-	switch matchType {
+func (a dpkgAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+	switch fi.matchType {
 	case TypStatus:
-		return a.analyzeStatus(r)
+		return a.analyzeStatus(fi.f)
 	}
 
 	return nil, nil

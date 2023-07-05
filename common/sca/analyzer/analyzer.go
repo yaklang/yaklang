@@ -11,15 +11,19 @@ import (
 )
 
 type Analyzer interface {
-	Analyze(int, io.Reader) ([]types.Package, error)
+	Analyze(AnalyzeFileInfo) ([]types.Package, error)
 	Match(string, fs.FileInfo) int
 }
 
-type Task struct {
+type AnalyzeFileInfo struct {
 	path      string
-	matchType int
 	f         *os.File
-	a         Analyzer
+	matchType int
+}
+
+type Task struct {
+	fileInfo AnalyzeFileInfo
+	a        Analyzer
 }
 
 type AnalyzerGroup struct {
@@ -61,11 +65,11 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 			defer wg.Done()
 			for task := range ag.ch {
 				defer func() {
-					name := task.f.Name()
-					task.f.Close()
+					name := task.fileInfo.f.Name()
+					task.fileInfo.f.Close()
 					os.Remove(name)
 				}()
-				pkgs, err := task.a.Analyze(task.matchType, task.f)
+				pkgs, err := task.a.Analyze(task.fileInfo)
 				if err != nil {
 					ag.err = err
 					return
@@ -96,7 +100,14 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 			f.Seek(0, 0)
 
 			// send
-			task := Task{path: path, matchType: matchType, f: f, a: a}
+			task := Task{
+				fileInfo: AnalyzeFileInfo{
+					path:      path,
+					f:         f,
+					matchType: matchType,
+				},
+				a: a,
+			}
 			ag.ch <- task
 		}
 	}
