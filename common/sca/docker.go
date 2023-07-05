@@ -127,8 +127,7 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 
 func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers)
-	ag.Append(analyzer.NewDpkgAnalyzer())
-	ag.Append(analyzer.NewApkAnalyzer())
+	ag.Append(analyzer.NewDpkgAnalyzer(), analyzer.NewApkAnalyzer())
 
 	// ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}

@@ -44,10 +44,6 @@ func ReadBlock(r *bufio.Reader) ([]byte, error) {
 	return block.Bytes(), nil
 }
 
-func NewDpkgAnalyzer() *dpkgAnalyzer {
-	return &dpkgAnalyzer{}
-}
-
 func (a dpkgAnalyzer) parseStatus(s string) bool {
 	for _, ss := range strings.Fields(s) {
 		if ss == "deinstall" || ss == "purge" {
@@ -96,6 +92,10 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
 	}
 
 	return pkgs, nil
+}
+
+func NewDpkgAnalyzer() *dpkgAnalyzer {
+	return &dpkgAnalyzer{}
 }
 
 func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
