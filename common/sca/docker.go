@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/xerrors"
 )
 
 const (
@@ -33,7 +33,7 @@ func _withEndPoint(endpoint string) dockerContextOption {
 	}
 }
 
-func initDockreClient(host string) (*client.Client, error) {
+func saveImageFromContext(host, imageID string, f io.Writer) error {
 	opts := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
@@ -44,30 +44,41 @@ func initDockreClient(host string) (*client.Client, error) {
 	}
 	c, err := client.NewClientWithOpts(opts...)
 	if err != nil {
-		return nil, utils.Errorf("failed to initialize a docker client: %v", err)
+		return utils.Errorf("failed to initialize a docker client: %v", err)
 	}
-	return c, nil
+	defer c.Close()
+
+	// Store the tarball in local filesystem and return a new reader into the bytes each time we need to access something.
+	ctx := context.Background()
+	rc, err := c.ImageSave(ctx, []string{imageID})
+	if err != nil {
+		return utils.Errorf("unable to export the image: %v", err)
+	}
+	defer rc.Close()
+
+	if _, err = io.Copy(f, rc); err != nil {
+		return utils.Errorf("failed to copy the image: %v", err)
+	}
+	return nil
 }
 
-func loadDockerImage(f *os.File) ([]types.Package, error) {
-	pkgs := make([]types.Package, 0)
-	img, err := tarball.ImageFromPath(f.Name(), nil)
+type walkFunc func(string, fs.FileInfo, io.Reader) error
+
+func walkImage(image *os.File, walkFunc walkFunc) error {
+	img, err := tarball.ImageFromPath(image.Name(), nil)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to initialize the struct from the temporary file: %v", err)
+		return utils.Errorf("failed to initialize the struct from the temporary file: %v", err)
 	}
 	layers, err := img.Layers()
 	if err != nil {
-		return nil, utils.Errorf("failed to get layers: %v", err)
+		return utils.Errorf("failed to get layers: %v", err)
 	}
-
-	ag := analyzer.NewAnalyzerGroup()
-	ag.Append(analyzer.NewDpkgAnalyzer())
 
 	for _, layer := range layers {
 		rc, err := layer.Uncompressed()
 		if err != nil {
 			// continue
-			return nil, utils.Errorf("unable to get  uncompressed layer: %v", err)
+			return utils.Errorf("unable to get  uncompressed layer: %v", err)
 		}
 		tr := tar.NewReader(rc)
 		for {
@@ -75,7 +86,7 @@ func loadDockerImage(f *os.File) ([]types.Package, error) {
 			if err == io.EOF {
 				break
 			} else if err != nil {
-				return nil, utils.Errorf("failed to extract the archive: %v", err)
+				return utils.Errorf("failed to extract the archive: %v", err)
 			}
 
 			// filepath.Clean cannot be used since tar file paths should be OS-agnostic.
@@ -96,15 +107,33 @@ func loadDockerImage(f *os.File) ([]types.Package, error) {
 				// whFiles = append(whFiles, fpath)
 				continue
 			}
-
-			ps, err := ag.Analyze(filePath, hdr.FileInfo(), tr)
-			if err != nil {
-				return nil, err
+			if err = walkFunc(filePath, hdr.FileInfo(), tr); err != nil {
+				return err
 			}
-			pkgs = append(pkgs, ps...)
-		}
 
+		}
 	}
+	return nil
+}
+
+func loadDockerImage(imageFile *os.File) ([]types.Package, error) {
+	pkgs := make([]types.Package, 0)
+	ag := analyzer.NewAnalyzerGroup()
+	ag.Append(analyzer.NewDpkgAnalyzer())
+
+	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
+		ps, err := ag.Analyze(path, fi, r)
+		if err != nil {
+			return err
+		}
+		pkgs = append(pkgs, ps...)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return pkgs, nil
 }
 
@@ -114,29 +143,22 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 		opt(config)
 	}
 
-	c, err := initDockreClient(config.endpoint)
-
-	if err != nil {
-		return nil, err
-	}
-
 	f, err := os.CreateTemp("", "fanal-*")
 	if err != nil {
 		return nil, utils.Errorf("failed to create a temporary file")
 	}
 
-	// Store the tarball in local filesystem and return a new reader into the bytes each time we need to access something.
-	ctx := context.Background()
-	rc, err := c.ImageSave(ctx, []string{imageID})
-	if err != nil {
-		return nil, utils.Errorf("unable to export the image: %v", err)
-	}
-	defer rc.Close()
+	if err = saveImageFromContext(config.endpoint, imageID, f); err != nil {
+		return nil, err
 
-	if _, err = io.Copy(f, rc); err != nil {
-		return nil, utils.Errorf("failed to copy the image: %v", err)
 	}
-	defer f.Close()
+
+	// defer f.Close()
+	defer func() {
+		name := f.Name()
+		f.Close()
+		os.Remove(name)
+	}()
 
 	return loadDockerImage(f)
 }
