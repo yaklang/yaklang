@@ -93,7 +93,7 @@ func do() {
 		exportFile := c.String("out")
 		if exportFile == "" {
 			for item := range channel {
-				fmt.Println(item.Method() + " " + item.Url())
+				fmt.Println(item.Method() + " " + item.Url() + " from " + item.From())
 			}
 			log.Info("output channel down.")
 		} else {
@@ -182,7 +182,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 	if vue == "true" || vue == "True" || vue == "TRUE" {
 		vueBool = true
 	}
-	log.Info(vueBool)
+	//log.Info(vueBool)
 	opts = append(opts,
 		newcrawlerx.WithNewBrowser(string(browserBytes)),
 		newcrawlerx.WithFormFill(getMapFromString(formFill)),

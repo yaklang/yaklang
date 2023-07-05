@@ -33,3 +33,30 @@ func getUrl(page *rod.Page) ([]string, error) {
 	//log.Info(urls)
 	return urls, nil
 }
+
+func (starter *BrowserStarter) getUrl(page *rod.Page) ([]string, error) {
+	urls := make([]string, 0)
+	html, err := page.HTML()
+	if err != nil {
+		return urls, err
+	}
+	htmlInfo, err := page.Info()
+	if err != nil {
+		return urls, err
+	}
+	originUrl := htmlInfo.URL
+	urlArr := analysisHtmlInfo(originUrl, html)
+	for _, urlStr := range urlArr {
+		if StringSuffixList(urlStr, invalidSuffix) {
+			continue
+		}
+		if StringArrayContains(invalidUrl, urlStr) {
+			continue
+		}
+		if !starter.scanRangeCheck(urlStr) {
+			continue
+		}
+		urls = append(urls, urlStr)
+	}
+	return urls, nil
+}
