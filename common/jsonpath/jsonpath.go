@@ -250,6 +250,8 @@ func (p *parser) parsePath() (err error) {
 				err = p.prepareWildcard()
 			case '.':
 				err = p.parseDeep()
+			case '[':
+				err = p.parseBracket()
 			default:
 				err = fmt.Errorf("expected JSON child identifier after '.' at %d", p.column())
 			}
