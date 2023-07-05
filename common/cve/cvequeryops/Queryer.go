@@ -29,6 +29,7 @@ type CVEQueryInfo struct {
 	Quantity     int
 	OrderBy      string
 	Desc         bool
+	Strict       bool
 }
 
 func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
@@ -68,23 +69,26 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 		return db, &CVEQueryInfo{}
 	}
 	cveQuery := &CVEQueryInfo{}
+	cveQuery.Strict = false
 	for _, opt := range opts {
 		opt(cveQuery)
 	}
 	if len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0 {
 		for i := 0; i < len(cveQuery.Products); i++ {
-			if cveresources.FixProductName(cveQuery.Products[i], db) == "" {
-				log.Error("Unknown product name")
+			name, err := cveresources.FixProductName(cveQuery.Products[i], db)
+			if err != nil {
+				log.Warningf("find product name failed: %s", err)
 			} else {
-				cveQuery.Products[i] = cveresources.FixProductName(cveQuery.Products[i], db)
+				cveQuery.Products[i] = name
 			}
 		}
 
 		for i := 0; i < len(cveQuery.CPE); i++ {
-			if cveresources.FixProductName(cveQuery.CPE[i].Product, db) == "" {
-				log.Error("Unknown product name")
+			name, err := cveresources.FixProductName(cveQuery.CPE[i].Product, db)
+			if err != nil {
+				log.Warningf("find product name failed: %s", err)
 			} else {
-				cveQuery.CPE[i].Product = cveresources.FixProductName(cveQuery.CPE[i].Product, db)
+				cveQuery.Products[i] = name
 			}
 		}
 	}
@@ -122,34 +126,36 @@ func Query(DbPath string, opts ...CVEOption) ([]cveresources.CVERes, int) {
 			log.Error(resDb.Error)
 		}
 	} else {
+		cveQuery.Strict = false
 		for _, opt := range opts {
 			opt(cveQuery)
 		}
 		if len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0 {
 			for i := 0; i < len(cveQuery.Products); i++ {
-				if cveresources.FixProductName(cveQuery.Products[i], M.DB) == "" {
-					log.Error("Unknown product name")
+				name, err := cveresources.FixProductName(cveQuery.Products[i], M.DB)
+				if err != nil {
+					log.Warningf("find product name failed: %s[%s]", err, cveQuery.Products[i])
 				} else {
-					cveQuery.Products[i] = cveresources.FixProductName(cveQuery.Products[i], M.DB)
+					cveQuery.Products[i] = name
 				}
 			}
 
 			for i := 0; i < len(cveQuery.CPE); i++ {
-				if cveresources.FixProductName(cveQuery.CPE[i].Product, M.DB) == "" {
-					log.Error("Unknown product name")
+				name, err := cveresources.FixProductName(cveQuery.CPE[i].Product, M.DB)
+				if err != nil {
+					log.Warningf("find product name failed: %s[%s]", err, cveQuery.CPE[i].Product)
 				} else {
-					cveQuery.CPE[i].Product = cveresources.FixProductName(cveQuery.CPE[i].Product, M.DB)
+					cveQuery.Products[i] = name
 				}
 			}
 		}
 		sqlSentence, param = MakeSqlSentence(cveQuery)
 
-		M.DB.Model(&CVEResFromDB).Where(sqlSentence, param...).Count(&count)
 		var resDb *gorm.DB
 		if cveQuery.Quantity != 0 {
 			if cveQuery.OrderBy != "" {
 				if cveQuery.Desc {
-					resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Order(cveQuery.OrderBy + " desc").Limit(cveQuery.Quantity).Find(&CVEResFromDB)
+					resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Order(cveQuery.OrderBy + "desc").Limit(cveQuery.Quantity).Find(&CVEResFromDB)
 				} else {
 					resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Order(cveQuery.OrderBy).Limit(cveQuery.Quantity).Find(&CVEResFromDB)
 				}
@@ -188,6 +194,7 @@ func Query(DbPath string, opts ...CVEOption) ([]cveresources.CVERes, int) {
 					CVE:             cveResItem,
 					ConfidenceLevel: level,
 				})
+				count++
 			}
 		}
 	} else {
@@ -196,6 +203,7 @@ func Query(DbPath string, opts ...CVEOption) ([]cveresources.CVERes, int) {
 				CVE:             cve,
 				ConfidenceLevel: 1.0,
 			})
+			count++
 		}
 	}
 	return cveRes, count
@@ -394,6 +402,12 @@ func OrderBy(name string) CVEOption {
 func Desc(flag bool) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.Desc = flag
+	}
+}
+
+func Strict(flag bool) CVEOption {
+	return func(info *CVEQueryInfo) {
+		info.Strict = flag
 	}
 }
 

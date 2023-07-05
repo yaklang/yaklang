@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"time"
 )
 
@@ -102,43 +100,6 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		manager.SaveCVERecord(&record)
 	}
 
-	return true, nil
-}
-
-func LoadCNNVD(fileDir, DbPath string) {
-	manager := cveresources.GetManager(DbPath)
-
-	for i := 2002; i < 2022; i++ {
-
-		fileName := path.Join(fileDir, strconv.Itoa(i)+".xml")
-		fmt.Println("LoadCNNVD begin :" + fileName)
-		finished, err := LoadCNNVDByFileName(fileName, manager)
-		if err != nil {
-			log.Error(err)
-		}
-
-		if !finished {
-			log.Error("loadCNNVD error")
-		}
-		fmt.Println("LoadCNNVD finish :" + fileName)
-	}
-}
-
-func LoadCNNVDByFileName(file string, manager *cveresources.SqliteManager) (shouldExit bool, err error) {
-	fp, err := os.Open(file)
-	if err != nil {
-		log.Error(err)
-	}
-	doc, err := xmlquery.Parse(fp)
-	if err != nil {
-		log.Error(err)
-	}
-
-	info := xmlquery.Find(doc, "//entry")
-
-	for _, node := range info {
-		manager.SaveCNNVDRecord(*node)
-	}
 	return true, nil
 }
 

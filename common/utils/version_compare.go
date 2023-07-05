@@ -104,6 +104,8 @@ func VersionLess(v1, v2 string) bool {
 
 // VersionCompare 泛用形的版本比较,传入(p1,p2 string), p1>p2返回1,nil, p1<p2返回-1,nil, p1==p2返回0,nil, 比较失败返回 -2,err
 func VersionCompare(v1, v2 string) (int, error) {
+	v1 = VersionClean(v1)
+	v2 = VersionClean(v2)
 	// 验证是否是复合标准的版本号,主要是要没有空格
 	flag1, err := versionCheck(v1)
 	if err != nil {
@@ -195,6 +197,19 @@ func VersionCompare(v1, v2 string) (int, error) {
 	}
 
 	return 0, nil
+}
+
+func VersionClean(v string) string {
+	rule, err := regexp.Compile(`^\d\\?:`)
+	if err != nil {
+		log.Errorf("regex string compile: %v", err)
+	}
+	if rule.MatchString(v) {
+		versions := strings.SplitAfter(v, ":")
+		cleanRule := strings.Replace(v, versions[0], "", 1)
+		return cleanRule
+	}
+	return v
 }
 
 func versionCheck(v string) (bool, error) {
