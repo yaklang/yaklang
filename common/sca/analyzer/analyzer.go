@@ -53,8 +53,8 @@ func (ag *AnalyzerGroup) Packages() []types.Package {
 	return ag.pkgs
 }
 
-func (ag *AnalyzerGroup) Append(a Analyzer) {
-	ag.analyzers = append(ag.analyzers, a)
+func (ag *AnalyzerGroup) Append(a ...Analyzer) {
+	ag.analyzers = append(ag.analyzers, a...)
 }
 
 func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
