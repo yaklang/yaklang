@@ -197,6 +197,7 @@ func TestFilterAnalyzer(t *testing.T) {
 	}
 	wantLangAnalyzerTypes := []string{
 		reflect.TypeOf(NewConanAnalyzer()).String(),
+		reflect.TypeOf(NewGoBinaryAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
