@@ -29,11 +29,36 @@ handle = result => {
 	if err != nil {
 		panic(err)
 	}
-	spew.Dump(rsp)
 	var checking = false
 	for _, r := range rsp.Results {
 		spew.Dump(r)
 		if strings.Contains(r.String(), "[Negative Alarm]") {
+			checking = true
+		}
+	}
+	if !checking {
+		panic("should have negative alarm")
+	}
+
+	name, err = yakit.CreateTemporaryYakScript("port-scan", `yakit.AutoInitYakit()
+handle = result => {
+	yakit.Info(bacd)
+	risk.NewRisk("http://baidu.com")
+}`)
+	if err != nil {
+		panic(err)
+	}
+	rsp, err = client.SmokingEvaluatePlugin(context.Background(), &ypb.SmokingEvaluatePluginRequest{
+		PluginName: name,
+	})
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(rsp)
+	checking = false
+	for _, r := range rsp.Results {
+		spew.Dump(r)
+		if strings.Contains(r.String(), "undefined variable") {
 			checking = true
 		}
 	}

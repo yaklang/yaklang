@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -33,9 +32,7 @@ var DistYakCommand = cli.Command{
 
 				engine := yak.NewScriptEngine(100)
 				engine.HookOsExit()
-				engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
-					var e = engine.(*antlr4yak.Engine)
-					_ = e
+				engine.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
 					return nil
 				})
 				err = engine.ExecuteMain(string(raw), absFile)

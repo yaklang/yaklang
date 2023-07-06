@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"strings"
 	"testing"
@@ -366,7 +365,7 @@ d=1234444&&qa=1
 	test := assert.New(t)
 	handle := func(data *BaseCase) {
 		ctx := context.Background()
-		engine := yaklang.New().(*antlr4yak.Engine)
+		engine := yaklang.New()
 		engine.SetVar("request", data.InputPacket)
 		engine.SetVar("keywords", data.ExpectKeywordInOutputPacket)
 		engine.SetVar("regexps", data.ExpectRegexpInOutputPacket)
