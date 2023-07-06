@@ -68,12 +68,12 @@ type optionInfo struct {
 func getAllGadgetInfo() []*yso.GadgetInfo {
 	res := []*yso.GadgetInfo{}
 	names := []string{}
-	for name, _ := range yso.GadgetInfoMap {
+	for name, _ := range yso.AllGadgets {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		res = append(res, yso.GadgetInfoMap[name])
+		res = append(res, yso.AllGadgets[name])
 	}
 	return res
 }
@@ -82,7 +82,7 @@ func checkGadgetIsTemplateSupported(gadget string) bool {
 	if gadget == "None" {
 		return true
 	}
-	info, ok := yso.GadgetInfoMap[gadget]
+	info, ok := yso.AllGadgets[gadget]
 	if !ok {
 		log.Error("gadget not found")
 		return false
