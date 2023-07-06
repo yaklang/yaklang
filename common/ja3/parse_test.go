@@ -14,6 +14,7 @@ func TestParseJA3(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(ja3)
+	spew.Dump(ja3.Calc())
 }
 
 // Cobalt Strike Centos https-ip team-server JA3S
@@ -23,6 +24,7 @@ func TestParseJA3S(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(ja3s)
+	spew.Dump(ja3s.Calc())
 }
 
 func TestCustomJA3HttpRequest(t *testing.T) {
@@ -61,7 +63,6 @@ func TestCustomJA3HttpRequest(t *testing.T) {
 }
 
 func TestIfJA3GetBanned(t *testing.T) {
-
 	req, err := http.NewRequest("GET", "https://www.howsmyssl.com/a/check", nil)
 	if err != nil {
 		panic(err)

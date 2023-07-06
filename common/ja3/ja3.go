@@ -98,6 +98,7 @@ func ParseJA3(ja3FullString string) (*JA3, error) {
 		return nil, errors.New("not a valid JA3 full string")
 	}
 	ja3 := &JA3{}
+	ja3.JA3FullStr = ja3FullString
 	for index, field := range fields {
 		if index == 0 { // TLS version field
 			ja3.TLSVersion = ParseTLSVersion(field)
@@ -129,6 +130,7 @@ func ParseJA3S(ja3sFullString string) (*JA3S, error) {
 		return nil, errors.New("not a valid JA3S full string")
 	}
 	ja3s := &JA3S{}
+	ja3s.JA3SFullStr = ja3sFullString
 	for index, field := range fields {
 		if index == 0 { // TLS version field
 			ja3s.TLSVersion = ParseTLSVersion(field)
