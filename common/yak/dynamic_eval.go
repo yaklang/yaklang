@@ -64,7 +64,7 @@ type yakVariable struct {
 	FilePath string
 	YakMod   string
 	Value    interface{}
-	Engine   yaklang.YaklangEngine
+	Engine   *antlr4yak.Engine
 }
 
 func (y *yakVariable) Callable() bool {
@@ -72,18 +72,8 @@ func (y *yakVariable) Callable() bool {
 }
 func ImportVarFromYakFile(path string, exportsName string) (interface{}, error) {
 	engine := yaklang.New()
-	if v, ok := engine.(*antlr4yak.Engine); ok {
-		if err := v.RunFile(context.Background(), path); err != nil {
-			return nil, utils.Errorf("load file \"%s\" failed: %s", path, err)
-		}
-	} else {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return nil, utils.Errorf("read file[%s] failed: %s", path, err)
-		}
-		if err := engine.LoadCode(context.Background(), string(raw), nil); err != nil {
-			return nil, utils.Errorf("load file \"%s\" failed: %s", path, err)
-		}
+	if err := engine.RunFile(context.Background(), path); err != nil {
+		return nil, utils.Errorf("load file \"%s\" failed: %s", path, err)
 	}
 	v, ok := engine.GetVar(exportsName)
 	if !ok {
@@ -91,7 +81,7 @@ func ImportVarFromYakFile(path string, exportsName string) (interface{}, error) 
 	}
 	return v, nil
 }
-func ImportVarFromScript(engine yaklang.YaklangEngine, script string, exportsName string) (interface{}, error) {
+func ImportVarFromScript(engine *antlr4yak.Engine, script string, exportsName string) (interface{}, error) {
 	if engine == nil {
 		return nil, utils.Error("empty engine")
 	}

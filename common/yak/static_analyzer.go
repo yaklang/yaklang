@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"regexp"
@@ -25,19 +24,14 @@ var (
 )
 
 func AnalyzeStaticYaklang(r interface{}) []*StaticAnalyzeResult {
+	_ = extractLineFromSyntax
 	return AnalyzeStaticYaklangEx(r, false)
 }
 
 func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResult {
 	code := utils.InterfaceToBytes(r)
-	engine := yaklang.New()
-
-	newEngine, ok := engine.(*antlr4yak.Engine)
+	newEngine := yaklang.New()
 	newEngine.SetStrictMode(strictMode)
-
-	if !ok {
-		return nil
-	}
 	opcodes, err := newEngine.Compile(string(code))
 	if err != nil {
 		switch ret := err.(type) {

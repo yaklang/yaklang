@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 	"net/http"
 	"net/http/httputil"
@@ -213,7 +213,7 @@ func (s *ScanNode) initScanRPC() {
 	s.node.GetRPCServer().RegisterServices(scanrpc.MethodList, scanHelper.Do)
 }
 
-func (s *ScanNode) _scriptEngineHook(engine yaklang.YaklangEngine) error {
+func (s *ScanNode) _scriptEngineHook(engine *antlr4yak.Engine) error {
 	return nil
 }
 

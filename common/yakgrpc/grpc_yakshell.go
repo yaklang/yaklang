@@ -215,7 +215,7 @@ func (s *Server) CreateYaklangShell(server ypb.Yak_CreateYaklangShellServer) err
 			startOutputAttachInfo.Set()
 			timer.Reset(10 * time.Second)
 			if engine == nil {
-				engine = yaklang.NewAntlrEngine().(*antlr4yak.Engine)
+				engine = yaklang.NewAntlrEngine()
 				yaklib.SetEngineClient(engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
 					switch ret := i.(type) {
 					case *yaklib.YakitLog:

@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 	"regexp"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 )
 
@@ -22,7 +22,7 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte) {
 	// 发送数据包之前的 hook
 	entry := NewScriptEngine(2)
 	entry.HookOsExit()
-	var engine yaklang.YaklangEngine
+	var engine *antlr4yak.Engine
 	var err error
 	engine, err = entry.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
