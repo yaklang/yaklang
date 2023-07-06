@@ -84,6 +84,24 @@ func TestApk(t *testing.T) {
 		matchType: 1,
 	}
 	Run(tc)
+
+	tc = testcase{
+		filePath: "./testdata/negative-apk",
+		wantPkgs: []types.Package{
+			{
+				Name:    "ssl_client",
+				Version: "1.36.1-r0",
+			},
+			{
+				Name:    "zlib",
+				Version: "1.2.13-r1",
+			},
+		},
+		t:         t,
+		a:         NewApkAnalyzer(),
+		matchType: 1,
+	}
+	Run(tc)
 }
 
 func TestDpkg(t *testing.T) {
