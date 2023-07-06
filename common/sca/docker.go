@@ -27,6 +27,7 @@ const (
 type dockerContextConfig struct {
 	endpoint   string
 	numWorkers int
+	scanMode   analyzer.ScanMode
 }
 
 type dockerContextOption func(*dockerContextConfig)
@@ -35,12 +36,19 @@ func NewDockerContextConfig() *dockerContextConfig {
 	return &dockerContextConfig{
 		numWorkers: 5,
 		endpoint:   "",
+		scanMode:   analyzer.AllMode,
 	}
 }
 
 func _withEndPoint(endpoint string) dockerContextOption {
 	return func(c *dockerContextConfig) {
 		c.endpoint = endpoint
+	}
+}
+
+func _withScanMode(mode analyzer.ScanMode) dockerContextOption {
+	return func(c *dockerContextConfig) {
+		c.scanMode |= mode
 	}
 }
 
@@ -130,7 +138,7 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 }
 
 func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
 	ag.Append(
 		analyzer.NewDpkgAnalyzer(),
 		analyzer.NewApkAnalyzer(),
