@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
@@ -176,4 +178,19 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 		ag.scannedFiles[path] = struct{}{}
 	}
 	return nil
+}
+
+func ParseLanguageConfiguration(fi AnalyzeFileInfo, parser godeptypes.Parser) ([]types.Package, error) {
+	parsedLibs, _, err := parser.Parse(fi.f)
+	if err != nil {
+		return nil, utils.Errorf("failed to parse %s: %v", fi.path, err)
+	}
+
+	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) types.Package {
+		return types.Package{
+			Name:    lib.Name,
+			Version: lib.Version,
+		}
+	})
+	return pkgs, nil
 }

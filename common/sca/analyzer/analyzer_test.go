@@ -63,6 +63,7 @@ func Run(tc testcase) {
 	}
 }
 
+// package
 func TestRPM(t *testing.T) {
 	tc := testcase{
 		filePath:  "./testdata/rpmdb.sqlite",
@@ -121,6 +122,27 @@ func TestDpkg(t *testing.T) {
 		a:         a,
 		matchType: 1,
 		wantPkgs:  []types.Package{},
+	}
+	Run(tc)
+}
+
+// language
+func TestConan(t *testing.T) {
+	tc := testcase{
+		filePath:  "./testdata/conan",
+		t:         t,
+		a:         NewConanAnalyzer(),
+		matchType: 1,
+		wantPkgs: []types.Package{
+			{
+				Name:    "openssl",
+				Version: "3.0.5",
+			},
+			{
+				Name:    "zlib",
+				Version: "1.2.12",
+			},
+		},
 	}
 	Run(tc)
 }
