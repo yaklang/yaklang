@@ -193,6 +193,10 @@ service Yak {
   rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
 
+  rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
+  rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
+  rpc DeleteFuzzerLabel(DeleteFuzzerLabelRequest) returns (Empty);
+
   // HTTPFuzzerResponse
   // 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
   rpc QueryHTTPFuzzerResponseByTaskId(QueryHTTPFuzzerResponseByTaskIdRequest) returns (QueryHTTPFuzzerResponseByTaskIdResponse) ;
@@ -1024,6 +1028,26 @@ message Bytes {
 message ExtractDataResponse {
   string Token = 1;
   bytes Extracted = 2;
+}
+
+message SaveFuzzerLabelRequest {
+  repeated FuzzerLabel Data = 1;
+}
+
+message QueryFuzzerLabelResponse {
+  repeated FuzzerLabel Data = 1;
+}
+
+message FuzzerLabel {
+  int64 Id = 1;
+  string Label = 2;
+  string Description = 3;
+  string DefaultDescription = 4;
+  string Hash = 5;
+}
+
+message DeleteFuzzerLabelRequest {
+  string Hash = 1;
 }
 
 message ExtractDataRequest {
@@ -3475,4 +3499,5 @@ message GetLicenseResponse {
 
 message CheckLicenseRequest {
   string LicenseActivation = 1;
+  string CompanyVersion = 2;
 }
