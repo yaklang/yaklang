@@ -87,15 +87,24 @@ func TestApk(t *testing.T) {
 }
 
 func TestDpkg(t *testing.T) {
+	a := NewDpkgAnalyzer()
 	tc := testcase{
 		filePath:  "./testdata/dpkg",
 		t:         t,
-		a:         NewDpkgAnalyzer(),
+		a:         a,
 		matchType: 1,
 		wantPkgs:  DpkgWantPkgs,
 	}
 	Run(tc)
 
+	tc = testcase{
+		filePath:  "./testdata/negative-dpkg",
+		t:         t,
+		a:         a,
+		matchType: 1,
+		wantPkgs:  []types.Package{},
+	}
+	Run(tc)
 }
 
 func TestFilterAnalyzer(t *testing.T) {

@@ -59,7 +59,11 @@ func (a dpkgAnalyzer) parseStatus(s string) bool {
 	return true
 }
 func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *types.Package {
-	if isInstalled := a.parseStatus(header.Get("Status")); !isInstalled {
+	status := header.Get("Status")
+	if status == "" {
+		return nil
+	}
+	if isInstalled := a.parseStatus(status); !isInstalled {
 		return nil
 	}
 
