@@ -37,7 +37,7 @@ func (a apkAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 		line := scanner.Text()
 
 		if len(line) < 2 {
-			if pkg.Name != "" {
+			if pkg.Name != "" && pkg.Version != "" {
 				pkgs = append(pkgs, pkg)
 			}
 			pkg = types.Package{}
@@ -52,7 +52,7 @@ func (a apkAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 			pkg.Version = version
 		}
 	}
-	if pkg.Name != "" {
+	if pkg.Name != "" && pkg.Version != "" {
 		pkgs = append(pkgs, pkg)
 	}
 
