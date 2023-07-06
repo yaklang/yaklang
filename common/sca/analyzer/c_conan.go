@@ -27,12 +27,16 @@ func NewConanAnalyzer() *conanAnalyzer {
 }
 
 func (a conanAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
-	p := conan.NewParser()
-	res, err := ParseLanguageConfiguration(fi, p)
-	if err != nil {
-		return nil, err
+	switch fi.matchStatus {
+	case statusConan:
+		p := conan.NewParser()
+		res, err := ParseLanguageConfiguration(fi, p)
+		if err != nil {
+			return nil, err
+		}
+		return res, nil
 	}
-	return res, nil
+	return nil, nil
 }
 
 func (a conanAnalyzer) Match(path string, fi fs.FileInfo) int {
