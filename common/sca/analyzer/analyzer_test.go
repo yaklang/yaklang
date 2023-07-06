@@ -128,6 +128,7 @@ func TestDpkg(t *testing.T) {
 
 // language
 func TestConan(t *testing.T) {
+	// happy test
 	tc := testcase{
 		filePath:  "./testdata/conan",
 		t:         t,
@@ -144,6 +145,11 @@ func TestConan(t *testing.T) {
 			},
 		},
 	}
+	Run(tc)
+
+	// empty
+	tc.filePath = "./testdata/negative-conan"
+	tc.wantPkgs = []types.Package{}
 	Run(tc)
 }
 
