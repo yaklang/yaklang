@@ -8,10 +8,16 @@ import (
 )
 
 const (
+	TypAPK TypAnalyzer = "apk-pkg"
+
 	installFile = "lib/apk/db/installed"
 
 	TypeInstallFile int = 1
 )
+
+func init() {
+	RegisterAnalyzer(TypAPK, NewApkAnalyzer())
+}
 
 type apkAnalyzer struct{}
 

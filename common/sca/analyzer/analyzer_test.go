@@ -2,8 +2,12 @@ package analyzer
 
 import (
 	"os"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/sca/types"
 )
 
@@ -30,6 +34,21 @@ func Run(tc testcase) {
 		t.Fatalf("analyzer error: %v", err)
 	}
 
+	sort.Slice(pkgs, func(i, j int) bool {
+		c := strings.Compare(pkgs[i].Name, pkgs[j].Name)
+		if c == 0 {
+			return strings.Compare(pkgs[i].Version, pkgs[j].Version) > 0
+		}
+		return c > 0
+	})
+	sort.Slice(tc.wantPkgs, func(i, j int) bool {
+		c := strings.Compare(tc.wantPkgs[i].Name, tc.wantPkgs[j].Name)
+		if c == 0 {
+			return strings.Compare(tc.wantPkgs[i].Version, tc.wantPkgs[j].Version) > 0
+		}
+		return c > 0
+	})
+
 	if len(pkgs) != len(tc.wantPkgs) {
 		t.Fatalf("pkgs length error: %d(got) != %d(want)", len(pkgs), len(tc.wantPkgs))
 	}
@@ -50,7 +69,7 @@ func TestRPM(t *testing.T) {
 		wantPkgs:  RpmWantPkgs,
 		t:         t,
 		a:         NewRPMAnalyzer(),
-		matchType: TypRPM,
+		matchType: TypAnalyzeRPM,
 	}
 	Run(tc)
 }
@@ -77,4 +96,62 @@ func TestDpkg(t *testing.T) {
 	}
 	Run(tc)
 
+}
+
+func TestFilterAnalyzer(t *testing.T) {
+	wantPkgAnalyzerTypes := []string{
+		reflect.TypeOf(NewRPMAnalyzer()).String(),
+		reflect.TypeOf(NewDpkgAnalyzer()).String(),
+		reflect.TypeOf(NewApkAnalyzer()).String(),
+	}
+	wantLangAnalyzerTypes := []string{}
+
+	wantAnalyzerTypes := []string{}
+	wantAnalyzerTypes = append(wantAnalyzerTypes, wantPkgAnalyzerTypes...)
+	wantAnalyzerTypes = append(wantAnalyzerTypes, wantLangAnalyzerTypes...)
+
+	testcases := []struct {
+		scanMode          ScanMode
+		wantAnalyzerTypes []string
+	}{
+		{
+			scanMode:          AllMode,
+			wantAnalyzerTypes: wantAnalyzerTypes,
+		},
+		{
+			scanMode:          AllMode | PkgMode, // mean PkgMode
+			wantAnalyzerTypes: wantPkgAnalyzerTypes,
+		},
+		{
+			scanMode:          PkgMode,
+			wantAnalyzerTypes: wantPkgAnalyzerTypes,
+		},
+		{
+			scanMode:          LanguageMode,
+			wantAnalyzerTypes: wantLangAnalyzerTypes,
+		},
+	}
+
+	for _, testcase := range testcases {
+		wantTypes := testcase.wantAnalyzerTypes
+		got := FilterAnalyzer(testcase.scanMode)
+		gotTypes := funk.Map(got, func(a Analyzer) string {
+			return reflect.TypeOf(a).String()
+		}).([]string)
+
+		sort.Slice(wantTypes, func(i, j int) bool {
+			return strings.Compare(wantTypes[i], wantTypes[j]) < 0
+		})
+
+		sort.Slice(gotTypes, func(i, j int) bool {
+			return strings.Compare(gotTypes[i], gotTypes[j]) < 0
+		})
+
+		if len(got) != len(wantTypes) {
+			t.Fatalf("analyzers length error: %d(got) != %d(want)", len(got), len(wantTypes))
+		}
+		if !reflect.DeepEqual(gotTypes, wantTypes) {
+			t.Fatalf("analyzers error: %v(got) != %v(want)", gotTypes, wantTypes)
+		}
+	}
 }

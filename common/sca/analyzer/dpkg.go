@@ -13,13 +13,19 @@ import (
 )
 
 const (
+	TypDPKG TypAnalyzer = "dpkg-pkg"
+
 	statusFile = "var/lib/dpkg/status"
 	statusDir  = "var/lib/dpkg/status.d/"
 	// availableFile = "var/lib/dpkg/available"
 	// infoDir       = "var/lib/dpkg/info/"
 
-	TypStatus int = 1
+	TypAnalyzeStatus int = 1
 )
+
+func init() {
+	RegisterAnalyzer(TypDPKG, NewDpkgAnalyzer())
+}
 
 type dpkgAnalyzer struct {
 }
@@ -98,14 +104,14 @@ func NewDpkgAnalyzer() *dpkgAnalyzer {
 func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
 	if strings.HasPrefix(path, statusDir) || path == statusFile {
 		// handler status
-		return TypStatus
+		return TypAnalyzeStatus
 	}
 	return 0
 }
 
 func (a dpkgAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 	switch fi.matchType {
-	case TypStatus:
+	case TypAnalyzeStatus:
 		return a.analyzeStatus(fi.f)
 	}
 
