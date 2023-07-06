@@ -79,6 +79,7 @@ type BaseConfig struct {
 	pageSizedWaitGroup *utils.SizedWaitGroup
 
 	sensitiveWords []string
+	proxies            []string
 }
 
 type ConfigOpt func(*Config)
@@ -110,6 +111,7 @@ func NewConfig() *Config {
 			extraWaitLoadTime: 0,
 
 			sensitiveWords: make([]string, 0),
+			ch:                make(chan ReqInfo),
 		},
 	}
 }
@@ -320,6 +322,11 @@ func WithUChan(uChan *UChan) ConfigOpt {
 func WithUrlTree(tree *UrlTree) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.urlTree = tree
+	}
+}
+func WithProxies(proxies ...string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.proxies = append(config.baseConfig.proxies, proxies...)
 	}
 }
 
