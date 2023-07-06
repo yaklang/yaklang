@@ -476,13 +476,13 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 			origin:           f,
 		})
 	}
-	param := &FuzzHTTPRequestParam{
-		typePosition:     posPostQuery,
-		param:            "[JSON]",
-		paramOriginValue: string(bytes.TrimSpace(bodyRaw)),
-		origin:           f,
-	}
-	fuzzParams = append(fuzzParams, param)
+	//param := &FuzzHTTPRequestParam{
+	//	typePosition:     posBody,
+	//	param:            "[JSON]",
+	//	paramOriginValue: string(bytes.TrimSpace(bodyRaw)),
+	//	origin:           f,
+	//}
+	//fuzzParams = append(fuzzParams, param)
 	return fuzzParams
 }
 
