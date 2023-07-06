@@ -1,8 +1,10 @@
 package yso
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
+	"reflect"
 )
 
 const (
@@ -36,8 +38,11 @@ const (
 
 type GadgetInfo struct {
 	Name            string
+	GeneratorName   string
+	Generator       any
 	NameVerbose     string
 	Help            string
+	YakFun          string
 	SupportTemplate bool
 }
 
@@ -54,32 +59,82 @@ func (g *GadgetInfo) IsSupportTemplate() bool {
 	return g.SupportTemplate
 }
 
-var GadgetInfoMap = map[string]*GadgetInfo{
-	BeanShell1GadgetName:              {Name: BeanShell1GadgetName, NameVerbose: "BeanShell1", Help: "", SupportTemplate: false},
-	Click1GadgetName:                  {Name: Click1GadgetName, NameVerbose: "Click1", Help: "", SupportTemplate: true},
-	CommonsBeanutils1GadgetName:       {Name: CommonsBeanutils1GadgetName, NameVerbose: "CommonsBeanutils1", Help: "", SupportTemplate: true},
-	CommonsBeanutils183NOCCGadgetName: {Name: CommonsBeanutils183NOCCGadgetName, NameVerbose: "CommonsBeanutils183NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
-	CommonsBeanutils192NOCCGadgetName: {Name: CommonsBeanutils192NOCCGadgetName, NameVerbose: "CommonsBeanutils192NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
-	CommonsCollections1GadgetName:     {Name: CommonsCollections1GadgetName, NameVerbose: "CommonsCollections1", Help: "", SupportTemplate: false},
-	CommonsCollections2GadgetName:     {Name: CommonsCollections2GadgetName, NameVerbose: "CommonsCollections2", Help: "", SupportTemplate: true},
-	CommonsCollections3GadgetName:     {Name: CommonsCollections3GadgetName, NameVerbose: "CommonsCollections3", Help: "", SupportTemplate: true},
-	CommonsCollections4GadgetName:     {Name: CommonsCollections4GadgetName, NameVerbose: "CommonsCollections4", Help: "", SupportTemplate: true},
-	CommonsCollections5GadgetName:     {Name: CommonsCollections5GadgetName, NameVerbose: "CommonsCollections5", Help: "", SupportTemplate: false},
-	CommonsCollections6GadgetName:     {Name: CommonsCollections6GadgetName, NameVerbose: "CommonsCollections6", Help: "", SupportTemplate: false},
-	CommonsCollections7GadgetName:     {Name: CommonsCollections7GadgetName, NameVerbose: "CommonsCollections7", Help: "", SupportTemplate: false},
-	CommonsCollections8GadgetName:     {Name: CommonsCollections8GadgetName, NameVerbose: "CommonsCollections8", Help: "", SupportTemplate: true},
-	CommonsCollectionsK1GadgetName:    {Name: CommonsCollectionsK1GadgetName, NameVerbose: "CommonsCollectionsK1", Help: "", SupportTemplate: true},
-	CommonsCollectionsK2GadgetName:    {Name: CommonsCollectionsK2GadgetName, NameVerbose: "CommonsCollectionsK2", Help: "", SupportTemplate: true},
-	CommonsCollectionsK3GadgetName:    {Name: CommonsCollectionsK3GadgetName, NameVerbose: "CommonsCollectionsK3", Help: "", SupportTemplate: false},
-	CommonsCollectionsK4GadgetName:    {Name: CommonsCollectionsK4GadgetName, NameVerbose: "CommonsCollectionsK4", Help: "", SupportTemplate: false},
-	Groovy1GadgetName:                 {Name: Groovy1GadgetName, NameVerbose: "Groovy1", Help: "", SupportTemplate: false},
-	JBossInterceptors1GadgetName:      {Name: JBossInterceptors1GadgetName, NameVerbose: "JBossInterceptors1", Help: "", SupportTemplate: true},
-	JSON1GadgetName:                   {Name: JSON1GadgetName, NameVerbose: "JSON1", Help: "", SupportTemplate: true},
-	JavassistWeld1GadgetName:          {Name: JavassistWeld1GadgetName, NameVerbose: "JavassistWeld1", Help: "", SupportTemplate: true},
-	Jdk7u21GadgetName:                 {Name: Jdk7u21GadgetName, NameVerbose: "Jdk7u21", Help: "", SupportTemplate: true},
-	Jdk8u20GadgetName:                 {Name: Jdk8u20GadgetName, NameVerbose: "Jdk8u20", Help: "", SupportTemplate: true},
-	URLDNS:                            {Name: URLDNS, NameVerbose: URLDNS, Help: "通过URL对象触发dnslog", SupportTemplate: false},
-	FindGadgetByDNS:                   {Name: FindGadgetByDNS, NameVerbose: FindGadgetByDNS, Help: "通过URLDNS这个gadget探测class,进而判断gadget", SupportTemplate: false},
+var AllGadgets = map[string]*GadgetInfo{
+	//BeanShell1GadgetName:              {Name: BeanShell1GadgetName, NameVerbose: "BeanShell1", Help: "", SupportTemplate: false},
+	//Click1GadgetName:                  {Name: Click1GadgetName, NameVerbose: "Click1", Help: "", SupportTemplate: true},
+	//CommonsBeanutils1GadgetName:       {Name: CommonsBeanutils1GadgetName, NameVerbose: "CommonsBeanutils1", Help: "", SupportTemplate: true},
+	//CommonsBeanutils183NOCCGadgetName: {Name: CommonsBeanutils183NOCCGadgetName, NameVerbose: "CommonsBeanutils183NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
+	//CommonsBeanutils192NOCCGadgetName: {Name: CommonsBeanutils192NOCCGadgetName, NameVerbose: "CommonsBeanutils192NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
+	//CommonsCollections1GadgetName:     {Name: CommonsCollections1GadgetName, NameVerbose: "CommonsCollections1", Help: "", SupportTemplate: false},
+	//CommonsCollections2GadgetName:     {Name: CommonsCollections2GadgetName, NameVerbose: "CommonsCollections2", Help: "", SupportTemplate: true},
+	//CommonsCollections3GadgetName:     {Name: CommonsCollections3GadgetName, NameVerbose: "CommonsCollections3", Help: "", SupportTemplate: true},
+	//CommonsCollections4GadgetName:     {Name: CommonsCollections4GadgetName, NameVerbose: "CommonsCollections4", Help: "", SupportTemplate: true},
+	//CommonsCollections5GadgetName:     {Name: CommonsCollections5GadgetName, NameVerbose: "CommonsCollections5", Help: "", SupportTemplate: false},
+	//CommonsCollections6GadgetName:     {Name: CommonsCollections6GadgetName, NameVerbose: "CommonsCollections6", Help: "", SupportTemplate: false},
+	//CommonsCollections7GadgetName:     {Name: CommonsCollections7GadgetName, NameVerbose: "CommonsCollections7", Help: "", SupportTemplate: false},
+	//CommonsCollections8GadgetName:     {Name: CommonsCollections8GadgetName, NameVerbose: "CommonsCollections8", Help: "", SupportTemplate: true},
+	//CommonsCollectionsK1GadgetName:    {Name: CommonsCollectionsK1GadgetName, NameVerbose: "CommonsCollectionsK1", Help: "", SupportTemplate: true},
+	//CommonsCollectionsK2GadgetName:    {Name: CommonsCollectionsK2GadgetName, NameVerbose: "CommonsCollectionsK2", Help: "", SupportTemplate: true},
+	//CommonsCollectionsK3GadgetName:    {Name: CommonsCollectionsK3GadgetName, NameVerbose: "CommonsCollectionsK3", Help: "", SupportTemplate: false},
+	//CommonsCollectionsK4GadgetName:    {Name: CommonsCollectionsK4GadgetName, NameVerbose: "CommonsCollectionsK4", Help: "", SupportTemplate: false},
+	//Groovy1GadgetName:                 {Name: Groovy1GadgetName, NameVerbose: "Groovy1", Help: "", SupportTemplate: false},
+	//JBossInterceptors1GadgetName:      {Name: JBossInterceptors1GadgetName, NameVerbose: "JBossInterceptors1", Help: "", SupportTemplate: true},
+	//JSON1GadgetName:                   {Name: JSON1GadgetName, NameVerbose: "JSON1", Help: "", SupportTemplate: true},
+	//JavassistWeld1GadgetName:          {Name: JavassistWeld1GadgetName, NameVerbose: "JavassistWeld1", Help: "", SupportTemplate: true},
+	//Jdk7u21GadgetName:                 {Name: Jdk7u21GadgetName, NameVerbose: "Jdk7u21", Help: "", SupportTemplate: true},
+	//Jdk8u20GadgetName:                 {Name: Jdk8u20GadgetName, NameVerbose: "Jdk8u20", Help: "", SupportTemplate: true},
+	//URLDNS:                            {Name: URLDNS, NameVerbose: URLDNS, Help: "通过URL对象触发dnslog", SupportTemplate: false},
+	//FindGadgetByDNS:                   {Name: FindGadgetByDNS, NameVerbose: FindGadgetByDNS, Help: "通过URLDNS这个gadget探测class,进而判断gadget", SupportTemplate: false},
+}
+
+func init() {
+	RegisterGadget(GetBeanShell1JavaObject, BeanShell1GadgetName, "BeanShell1", "")
+	RegisterGadget(GetClick1JavaObject, Click1GadgetName, "Click1", "")
+	RegisterGadget(GetCommonsBeanutils1JavaObject, CommonsBeanutils1GadgetName, "CommonsBeanutils1", "")
+	RegisterGadget(GetCommonsBeanutils183NOCCJavaObject, CommonsBeanutils183NOCCGadgetName, "CommonsBeanutils183NOCC", "")
+	RegisterGadget(GetCommonsBeanutils192NOCCJavaObject, CommonsBeanutils192NOCCGadgetName, "CommonsBeanutils192NOCC", "")
+	RegisterGadget(GetCommonsCollections1JavaObject, CommonsCollections1GadgetName, "CommonsCollections1", "")
+	RegisterGadget(GetCommonsCollections2JavaObject, CommonsCollections2GadgetName, "CommonsCollections2", "")
+	RegisterGadget(GetCommonsCollections3JavaObject, CommonsCollections3GadgetName, "CommonsCollections3", "")
+	RegisterGadget(GetCommonsCollections4JavaObject, CommonsCollections4GadgetName, "CommonsCollections4", "")
+	RegisterGadget(GetCommonsCollections5JavaObject, CommonsCollections5GadgetName, "CommonsCollections5", "")
+	RegisterGadget(GetCommonsCollections6JavaObject, CommonsCollections6GadgetName, "CommonsCollections6", "")
+	RegisterGadget(GetCommonsCollections7JavaObject, CommonsCollections7GadgetName, "CommonsCollections7", "")
+	RegisterGadget(GetCommonsCollections8JavaObject, CommonsCollections8GadgetName, "CommonsCollections8", "")
+	RegisterGadget(GetCommonsCollectionsK1JavaObject, CommonsCollectionsK1GadgetName, "CommonsCollectionsK1", "")
+	RegisterGadget(GetCommonsCollectionsK2JavaObject, CommonsCollectionsK2GadgetName, "CommonsCollectionsK2", "")
+	RegisterGadget(GetCommonsCollectionsK3JavaObject, CommonsCollectionsK3GadgetName, "CommonsCollectionsK3", "")
+	RegisterGadget(GetCommonsCollectionsK4JavaObject, CommonsCollectionsK4GadgetName, "CommonsCollectionsK4", "")
+	RegisterGadget(GetGroovy1JavaObject, Groovy1GadgetName, "Groovy1", "")
+	RegisterGadget(GetJBossInterceptors1JavaObject, JBossInterceptors1GadgetName, "JBossInterceptors1", "")
+	RegisterGadget(GetJSON1JavaObject, JSON1GadgetName, "JSON1", "")
+	RegisterGadget(GetJavassistWeld1JavaObject, JavassistWeld1GadgetName, "JavassistWeld1", "")
+	RegisterGadget(GetJdk7u21JavaObject, Jdk7u21GadgetName, "Jdk7u21", "")
+	RegisterGadget(GetJdk8u20JavaObject, Jdk8u20GadgetName, "Jdk8u20", "")
+	RegisterGadget(GetURLDNSJavaObject, URLDNS, URLDNS, "")
+	RegisterGadget(GetFindGadgetByDNSJavaObject, FindGadgetByDNS, FindGadgetByDNS, "")
+}
+func RegisterGadget(f any, name string, verbose string, help string) {
+	var supportTemplate = false
+	funType := reflect.TypeOf(f)
+	if funType.IsVariadic() && funType.NumIn() == 1 && funType.In(0).Kind() == reflect.Slice && funType.Kind() == reflect.Func {
+		supportTemplate = true
+	} else {
+		if funType.NumIn() > 0 && funType.In(0).Kind() == reflect.String && funType.Kind() == reflect.Func {
+			supportTemplate = false
+		} else {
+			panic("gadget function must be func(options ...GenClassOptionFun) (*JavaObject, error) or func(cmd string) (*JavaObject, error)")
+		}
+	}
+	AllGadgets[name] = &GadgetInfo{
+		Name:            name,
+		NameVerbose:     verbose,
+		Generator:       f,
+		GeneratorName:   name,
+		Help:            help,
+		SupportTemplate: supportTemplate,
+		YakFun:          fmt.Sprintf("Get%sJavaObject", name),
+	}
 }
 
 type JavaObject struct {
@@ -119,7 +174,7 @@ func ConfigJavaObject(templ []byte, name string, options ...GenClassOptionFun) (
 	if err != nil {
 		return nil, err
 	}
-	return verboseWrapper(obj, GadgetInfoMap[name]), nil
+	return verboseWrapper(obj, AllGadgets[name]), nil
 }
 func setCommandForRuntimeExecGadget(templ []byte, name string, cmd string) (*JavaObject, error) {
 	objs, err := yserx.ParseJavaSerialized(templ)
@@ -134,10 +189,8 @@ func setCommandForRuntimeExecGadget(templ []byte, name string, cmd string) (*Jav
 	if err != nil {
 		return nil, err
 	}
-	return verboseWrapper(obj, GadgetInfoMap[name]), nil
+	return verboseWrapper(obj, AllGadgets[name]), nil
 }
-
-var allGadgets = []interface{}{GetBeanShell1JavaObject, GetClick1JavaObject, GetCommonsBeanutils1JavaObject, GetCommonsBeanutils183NOCCJavaObject, GetCommonsBeanutils192NOCCJavaObject, GetCommonsCollections1JavaObject, GetCommonsCollections2JavaObject, GetCommonsCollections3JavaObject, GetCommonsCollections4JavaObject, GetCommonsCollections5JavaObject, GetCommonsCollections6JavaObject, GetCommonsCollections7JavaObject, GetCommonsCollections8JavaObject, GetCommonsCollectionsK1JavaObject, GetCommonsCollectionsK2JavaObject, GetCommonsCollectionsK3JavaObject, GetCommonsCollectionsK4JavaObject, GetGroovy1JavaObject, GetJBossInterceptors1JavaObject, GetJSON1JavaObject, GetJavassistWeld1JavaObject, GetJdk7u21JavaObject, GetJdk8u20JavaObject, GetURLDNSJavaObject, GetFindGadgetByDNSJavaObject}
 
 func GetJavaObjectFromBytes(byt []byte) (*JavaObject, error) {
 	objs, err := yserx.ParseJavaSerialized(byt)
@@ -167,7 +220,7 @@ func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
 	//if err != nil {
 	//	return nil, err
 	//}
-	return verboseWrapper(obj, GadgetInfoMap["BeanShell1"]), nil
+	return verboseWrapper(obj, AllGadgets["BeanShell1"]), nil
 }
 func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
 	return setCommandForRuntimeExecGadget(template_ser_CommonsCollections1, "CommonsCollections1", cmd)
@@ -232,7 +285,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 	//	return nil, err
 	//}
 	//obj := objs[0]
-	//return verboseWrapper(obj, GadgetInfoMap["JavassistWeld1"]), nil
+	//return verboseWrapper(obj, AllGadgets["JavassistWeld1"]), nil
 
 	return ConfigJavaObject(template_ser_JavassistWeld1, "JavassistWeld1", options...)
 }
@@ -307,24 +360,26 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 	}), nil
 }
 func GetAllGadget() []interface{} {
-	return allGadgets
+	alGadget := []any{}
+	for _, gadget := range AllGadgets {
+		alGadget = append(alGadget, gadget.Generator)
+	}
+	return alGadget
 }
 func GetAllTemplatesGadget() []TemplatesGadget {
 	alGadget := []TemplatesGadget{}
-	for _, igadget := range allGadgets {
-		fun, ok := igadget.(func(options ...GenClassOptionFun) (*JavaObject, error))
-		if ok {
-			alGadget = append(alGadget, fun)
+	for _, gadget := range AllGadgets {
+		if gadget.SupportTemplate {
+			alGadget = append(alGadget, gadget.Generator.(func(options ...GenClassOptionFun) (*JavaObject, error)))
 		}
 	}
 	return alGadget
 }
 func GetAllRuntimeExecGadget() []RuntimeExecGadget {
 	alGadget := []RuntimeExecGadget{}
-	for _, igadget := range allGadgets {
-		fun, ok := igadget.(func(cmd string) (*JavaObject, error))
-		if ok {
-			alGadget = append(alGadget, fun)
+	for _, gadget := range AllGadgets {
+		if !gadget.SupportTemplate {
+			alGadget = append(alGadget, gadget.Generator.(func(cmd string) (*JavaObject, error)))
 		}
 	}
 	return alGadget
