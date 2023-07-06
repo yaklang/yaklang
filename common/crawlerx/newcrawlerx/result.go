@@ -10,6 +10,7 @@ import (
 type RequestResult struct {
 	request  *rod.HijackRequest
 	response *rod.HijackResponse
+	from     string
 }
 
 func (result *RequestResult) Url() string {
@@ -58,12 +59,17 @@ func (result *RequestResult) Type() string {
 	return "hijack_result"
 }
 
+func (result *RequestResult) From() string {
+	return result.from
+}
+
 type SimpleResult struct {
 	url        string
 	screenshot string
 	resultType string
 	method     string
 	request    *rod.HijackRequest
+	from       string
 }
 
 func (simpleResult *SimpleResult) Url() string {
@@ -120,4 +126,8 @@ func (simpleResult *SimpleResult) Type() string {
 
 func (*SimpleResult) StatusCode() int {
 	return 0
+}
+
+func (simpleResult *SimpleResult) From() string {
+	return simpleResult.from
 }

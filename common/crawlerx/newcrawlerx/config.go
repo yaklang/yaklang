@@ -77,6 +77,8 @@ type BaseConfig struct {
 	urlTree    *UrlTree
 
 	pageSizedWaitGroup *utils.SizedWaitGroup
+
+	sensitiveWords []string
 }
 
 type ConfigOpt func(*Config)
@@ -106,6 +108,8 @@ func NewConfig() *Config {
 
 			concurrent:        2,
 			extraWaitLoadTime: 0,
+
+			sensitiveWords: make([]string, 0),
 		},
 	}
 }
@@ -340,5 +344,17 @@ func WithVueWeb(vue bool) ConfigOpt {
 func WithExtraWaitLoadTime(time int) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.extraWaitLoadTime = time
+	}
+}
+
+func WithSensitiveWord(words ...string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, words...)
+	}
+}
+
+func WithSensitiveWords(words []string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, words...)
 	}
 }
