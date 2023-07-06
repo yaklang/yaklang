@@ -20,7 +20,7 @@ const (
 	// availableFile = "var/lib/dpkg/available"
 	// infoDir       = "var/lib/dpkg/info/"
 
-	TypAnalyzeStatus int = 1
+	statusStatus int = 1
 )
 
 func init() {
@@ -110,14 +110,14 @@ func NewDpkgAnalyzer() *dpkgAnalyzer {
 func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
 	if strings.HasPrefix(path, statusDir) || path == statusFile {
 		// handler status
-		return TypAnalyzeStatus
+		return statusStatus
 	}
 	return 0
 }
 
 func (a dpkgAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
-	switch fi.matchType {
-	case TypAnalyzeStatus:
+	switch fi.matchStatus {
+	case statusStatus:
 		return a.analyzeStatus(fi.f)
 	}
 

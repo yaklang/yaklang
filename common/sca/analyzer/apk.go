@@ -10,9 +10,9 @@ import (
 const (
 	TypAPK TypAnalyzer = "apk-pkg"
 
-	installFile = "lib/apk/db/installed"
-
-	TypeInstallFile int = 1
+	// installed file
+	installFile           = "lib/apk/db/installed"
+	statusInstallFile int = 1
 )
 
 func init() {
@@ -26,42 +26,47 @@ func NewApkAnalyzer() *apkAnalyzer {
 }
 
 func (a apkAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
-	var (
-		pkgs    []types.Package
-		pkg     types.Package
-		version string
-	)
-	scanner := bufio.NewScanner(fi.f)
+	switch fi.matchStatus {
+	case statusInstallFile:
+		var (
+			pkgs    []types.Package
+			pkg     types.Package
+			version string
+		)
+		scanner := bufio.NewScanner(fi.f)
 
-	for scanner.Scan() {
-		line := scanner.Text()
+		for scanner.Scan() {
+			line := scanner.Text()
 
-		if len(line) < 2 {
-			if pkg.Name != "" && pkg.Version != "" {
-				pkgs = append(pkgs, pkg)
+			if len(line) < 2 {
+				if pkg.Name != "" && pkg.Version != "" {
+					pkgs = append(pkgs, pkg)
+				}
+				pkg = types.Package{}
+				continue
 			}
-			pkg = types.Package{}
-			continue
+			// ref. https://wiki.alpinelinux.org/wiki/Apk_spec
+			switch line[:2] {
+			case "P:":
+				pkg.Name = line[2:]
+			case "V:":
+				version = line[2:]
+				pkg.Version = version
+			}
 		}
-		// ref. https://wiki.alpinelinux.org/wiki/Apk_spec
-		switch line[:2] {
-		case "P:":
-			pkg.Name = line[2:]
-		case "V:":
-			version = line[2:]
-			pkg.Version = version
+		if pkg.Name != "" && pkg.Version != "" {
+			pkgs = append(pkgs, pkg)
 		}
-	}
-	if pkg.Name != "" && pkg.Version != "" {
-		pkgs = append(pkgs, pkg)
-	}
 
-	return pkgs, nil
+		return pkgs, nil
+
+	}
+	return nil, nil
 }
 
 func (a apkAnalyzer) Match(path string, fi fs.FileInfo) int {
 	if path == installFile {
-		return TypeInstallFile
+		return statusInstallFile
 	}
 	return 0
 }
