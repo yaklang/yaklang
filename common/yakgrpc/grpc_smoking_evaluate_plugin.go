@@ -95,7 +95,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	}
 
 	staticCheckingFailed := false
-	staticResults := yak.AnalyzeStaticYaklang(pluginCode)
+	staticResults := yak.AnalyzeStaticYaklangEx(pluginCode, true)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
 			staticCheckingFailed = true
