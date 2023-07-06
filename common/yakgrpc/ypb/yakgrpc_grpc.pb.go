@@ -337,6 +337,7 @@ type YakClient interface {
 	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error)
+	SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error)
 }
 
 type yakClient struct {
@@ -3474,6 +3475,15 @@ func (x *yakDebugPluginClient) Recv() (*ExecResult, error) {
 	return m, nil
 }
 
+func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error) {
+	out := new(SmokingEvaluatePluginResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SmokingEvaluatePlugin", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3797,6 +3807,7 @@ type YakServer interface {
 	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error
+	SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -4556,6 +4567,9 @@ func (UnimplementedYakServer) HTTPRequestBuilder(context.Context, *HTTPRequestBu
 }
 func (UnimplementedYakServer) DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error {
 	return status.Errorf(codes.Unimplemented, "method DebugPlugin not implemented")
+}
+func (UnimplementedYakServer) SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SmokingEvaluatePlugin not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -9232,6 +9246,24 @@ func (x *yakDebugPluginServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Yak_SmokingEvaluatePlugin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SmokingEvaluatePluginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SmokingEvaluatePlugin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SmokingEvaluatePlugin",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SmokingEvaluatePlugin(ctx, req.(*SmokingEvaluatePluginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -10090,6 +10122,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HTTPRequestBuilder",
 			Handler:    _Yak_HTTPRequestBuilder_Handler,
+		},
+		{
+			MethodName: "SmokingEvaluatePlugin",
+			Handler:    _Yak_SmokingEvaluatePlugin_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

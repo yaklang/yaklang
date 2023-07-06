@@ -18,6 +18,7 @@ type Position struct {
 type LuaTranslator struct {
 	lua.BaseLuaParserVisitor
 
+	sourceCode      string
 	codes           []*yakvm.Code
 	language        CompilerLanguage
 	rootSymtbl      *yakvm.SymbolTable
@@ -57,9 +58,13 @@ func NewLuaTranslator() *LuaTranslator {
 	}
 	return compiler
 }
-
 func NewLuaTranslatorWithTable(rootSymbol *yakvm.SymbolTable, rootLabel *infrastructure.LabelTable) *LuaTranslator {
+	return NewLuaTranslatorWithTableWithCode("", rootSymbol, rootLabel)
+}
+
+func NewLuaTranslatorWithTableWithCode(code string, rootSymbol *yakvm.SymbolTable, rootLabel *infrastructure.LabelTable) *LuaTranslator {
 	compiler := &LuaTranslator{
+		sourceCode:       code,
 		language:         "en",
 		rootSymtbl:       rootSymbol,
 		currentSymtbl:    rootSymbol,
