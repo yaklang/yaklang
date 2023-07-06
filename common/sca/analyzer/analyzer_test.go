@@ -26,9 +26,9 @@ func Run(tc testcase) {
 		t.Fatalf("con't open file: %v", err)
 	}
 	pkgs, err := tc.a.Analyze(AnalyzeFileInfo{
-		path:      "",
-		f:         f,
-		matchType: tc.matchType,
+		path:        "",
+		f:           f,
+		matchStatus: tc.matchType,
 	})
 	if err != nil {
 		t.Fatalf("analyzer error: %v", err)
@@ -70,7 +70,7 @@ func TestRPM(t *testing.T) {
 		wantPkgs:  RpmWantPkgs,
 		t:         t,
 		a:         NewRPMAnalyzer(),
-		matchType: TypAnalyzeRPM,
+		matchType: statusRPM,
 	}
 	Run(tc)
 }
@@ -153,7 +153,9 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(NewDpkgAnalyzer()).String(),
 		reflect.TypeOf(NewApkAnalyzer()).String(),
 	}
-	wantLangAnalyzerTypes := []string{}
+	wantLangAnalyzerTypes := []string{
+		reflect.TypeOf(NewConanAnalyzer()).String(),
+	}
 
 	wantAnalyzerTypes := []string{}
 	wantAnalyzerTypes = append(wantAnalyzerTypes, wantPkgAnalyzerTypes...)

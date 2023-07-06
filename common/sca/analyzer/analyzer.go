@@ -32,9 +32,9 @@ type Analyzer interface {
 }
 
 type AnalyzeFileInfo struct {
-	path      string
-	f         *os.File
-	matchType int
+	path        string
+	f           *os.File
+	matchStatus int
 }
 
 type Task struct {
@@ -147,8 +147,8 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 			continue
 		}
 
-		matchType := a.Match(path, fi)
-		if matchType == 0 {
+		matchStatus := a.Match(path, fi)
+		if matchStatus == 0 {
 			continue
 		}
 		// match type > 0 mean matched and need to analyze
@@ -166,9 +166,9 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 		// send
 		task := Task{
 			fileInfo: AnalyzeFileInfo{
-				path:      path,
-				f:         f,
-				matchType: matchType,
+				path:        path,
+				f:           f,
+				matchStatus: matchStatus,
 			},
 			a: a,
 		}

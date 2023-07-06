@@ -13,6 +13,8 @@ import (
 
 const (
 	TypRPM TypAnalyzer = "rpm-pkg"
+
+	statusRPM int = 1
 )
 
 func init() {
@@ -35,8 +37,6 @@ var (
 		"usr/lib/sysimage/rpm/rpmdb.sqlite",
 		"var/lib/rpm/rpmdb.sqlite",
 	}
-
-	TypAnalyzeRPM int = 1
 )
 
 type rpmAnalyzer struct {
@@ -47,8 +47,8 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 }
 
 func (a rpmAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
-	switch fi.matchType {
-	case TypAnalyzeRPM:
+	switch fi.matchStatus {
+	case statusRPM:
 		db, err := rpmdb.Open(fi.f.Name())
 		if err != nil {
 			return nil, utils.Errorf("failed to open RPM DB: %v", err)
@@ -72,7 +72,7 @@ func (a rpmAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 
 func (a rpmAnalyzer) Match(path string, info fs.FileInfo) int {
 	if utils.StringSliceContainsAll(requiredFiles, path) {
-		return TypAnalyzeRPM
+		return statusRPM
 	}
 	return 0
 }
