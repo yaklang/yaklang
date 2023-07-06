@@ -66,6 +66,7 @@ require (
 	github.com/icodeface/grdp v0.0.0-20200414055757-e0008b0b5cb2
 	github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5
 	github.com/itchyny/gojq v0.12.8
+	github.com/jhump/protoreflect v1.15.1
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 	github.com/jinzhu/gorm v1.9.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
@@ -111,7 +112,7 @@ require (
 	golang.org/x/sys v0.7.0
 	golang.org/x/text v0.7.0
 	google.golang.org/grpc v1.44.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.2-0.20230222093303-bc1253ad3743
 	gopkg.in/fatih/set.v0 v0.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
@@ -130,6 +131,7 @@ require (
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -226,6 +228,7 @@ require (
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
