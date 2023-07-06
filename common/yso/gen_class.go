@@ -8,21 +8,21 @@ import (
 	"strconv"
 )
 
-type ClassType string
+//type string string
 
 const (
-	RuntimeExecClass               ClassType = "RuntimeExecClass"
-	ProcessBuilderExecClass                  = "ProcessBuilderExecClass"
-	ProcessImplExecClass                     = "ProcessImplExecClass"
-	DnslogClass                              = "DnslogClass"
-	SpringEchoClass                          = "SpringEchoClass"
-	ModifyTomcatMaxHeaderSizeClass           = "ModifyTomcatMaxHeaderSizeClass"
-	EmptyClassInTemplate                     = "EmptyClassInTemplate"
-	TcpReverseClass                          = "TcpReverseClass"
-	TcpReverseShellClass                     = "TcpReverseShellClass"
-	TomcatEchoClass                          = "TomcatEchoClass"
-	BytesClass                               = "BytesClass"
-	MultiEchoClass                           = "MultiEchoClass"
+	RuntimeExecClass               = "RuntimeExecClass"
+	ProcessBuilderExecClass        = "ProcessBuilderExecClass"
+	ProcessImplExecClass           = "ProcessImplExecClass"
+	DNSlogClass                    = "DNSlogClass"
+	SpringEchoClass                = "SpringEchoClass"
+	ModifyTomcatMaxHeaderSizeClass = "ModifyTomcatMaxHeaderSizeClass"
+	EmptyClassInTemplate           = "EmptyClassInTemplate"
+	TcpReverseClass                = "TcpReverseClass"
+	TcpReverseShellClass           = "TcpReverseShellClass"
+	TomcatEchoClass                = "TomcatEchoClass"
+	BytesClass                     = "BytesClass"
+	MultiEchoClass                 = "MultiEchoClass"
 	//NoneClass                                = "NoneClass"
 )
 
@@ -32,14 +32,13 @@ type ClassPayload struct {
 	Generator func(*ClassConfig) (*javaclassparser.ClassObject, error)
 }
 
-var classMap = map[ClassType]*ClassPayload{}
+var AllClasses = map[string]*ClassPayload{}
 
-func GetAllClassGenerator() map[ClassType]*ClassPayload {
-	return classMap
+func GetAllClassGenerator() map[string]*ClassPayload {
+	return AllClasses
 }
-func setClass(t ClassType, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error)) {
-
-	classMap[t] = &ClassPayload{
+func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error)) {
+	AllClasses[t] = &ClassPayload{
 		ClassName: string(t),
 		Help:      help,
 		Generator: func(config *ClassConfig) (*javaclassparser.ClassObject, error) {
@@ -57,7 +56,7 @@ func setClass(t ClassType, help string, f func(*ClassConfig) (*javaclassparser.C
 
 type ClassConfig struct {
 	Errors     []error
-	ClassType  ClassType
+	ClassType  string
 	ClassBytes []byte
 	//ClassTemplate *javaclassparser.ClassObject
 	//公共参数
@@ -109,7 +108,7 @@ func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, 
 		}
 		return obj, nil
 	}
-	payload, ok := classMap[cf.ClassType]
+	payload, ok := AllClasses[cf.ClassType]
 	if !ok {
 		return nil, utils.Errorf("not found class type: %s", cf.ClassType)
 	}
@@ -201,7 +200,7 @@ func init() {
 		},
 	)
 	setClass(
-		DnslogClass,
+		DNSlogClass,
 		"dnslog检测",
 		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
 			obj, err := javaclassparser.Parse(template_class_dnslog)
@@ -484,6 +483,7 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 }
 func SetClassBytes(data []byte) GenClassOptionFun {
 	return func(config *ClassConfig) {
+		config.ClassType = BytesClass
 		config.ClassBytes = data
 	}
 }
@@ -589,7 +589,7 @@ func GenerateProcessImplExecEvilClassObject(cmd string, options ...GenClassOptio
 // dnslog参数
 func SetClassDnslogTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
-		config.ClassType = DnslogClass
+		config.ClassType = DNSlogClass
 	}
 }
 func SetDnslog(addr string) GenClassOptionFun {
@@ -599,7 +599,7 @@ func SetDnslog(addr string) GenClassOptionFun {
 }
 func SetDnslogEvilClass(addr string) GenClassOptionFun {
 	return func(config *ClassConfig) {
-		config.ClassType = DnslogClass
+		config.ClassType = DNSlogClass
 		config.Domain = addr
 	}
 }
