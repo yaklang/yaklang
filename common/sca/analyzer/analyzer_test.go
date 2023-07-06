@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/types"
 )
 
@@ -135,9 +135,9 @@ func TestFilterAnalyzer(t *testing.T) {
 	for _, testcase := range testcases {
 		wantTypes := testcase.wantAnalyzerTypes
 		got := FilterAnalyzer(testcase.scanMode)
-		gotTypes := funk.Map(got, func(a Analyzer) string {
+		gotTypes := lo.Map(got, func(a Analyzer, _ int) string {
 			return reflect.TypeOf(a).String()
-		}).([]string)
+		})
 
 		sort.Slice(wantTypes, func(i, j int) bool {
 			return strings.Compare(wantTypes[i], wantTypes[j]) < 0

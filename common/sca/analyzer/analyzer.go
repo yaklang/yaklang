@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -65,9 +65,9 @@ func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
 func FilterAnalyzer(mode ScanMode) []Analyzer {
 	ret := make([]Analyzer, 0, len(analyzers))
 	if mode == AllMode {
-		return funk.Map(analyzers, func(_ TypAnalyzer, a Analyzer) Analyzer {
+		return lo.MapToSlice(analyzers, func(_ TypAnalyzer, a Analyzer) Analyzer {
 			return a
-		}).([]Analyzer)
+		})
 	}
 
 	for analyzerName, a := range analyzers {
@@ -103,7 +103,7 @@ func (ag *AnalyzerGroup) Error() error {
 }
 
 func (ag *AnalyzerGroup) Packages() []types.Package {
-	return funk.Uniq(ag.pkgs).([]types.Package)
+	return lo.Uniq(ag.pkgs)
 }
 
 func (ag *AnalyzerGroup) Append(a ...Analyzer) {

@@ -11,9 +11,8 @@ import (
 	"sync"
 
 	"github.com/docker/docker/client"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
@@ -93,7 +92,7 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 		return utils.Errorf("failed to get layers: %v", err)
 	}
 
-	layers = funk.Reverse(layers).([]v1.Layer)
+	layers = lo.Reverse(layers)
 
 	for _, layer := range layers {
 		rc, err := layer.Uncompressed()

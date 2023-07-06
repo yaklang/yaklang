@@ -92,6 +92,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.13
 	github.com/rocket049/gocui v0.3.2
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
+	github.com/samber/lo v1.38.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v3 v3.23.4
