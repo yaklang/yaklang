@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -50,7 +51,7 @@ func (ag *AnalyzerGroup) Error() error {
 }
 
 func (ag *AnalyzerGroup) Packages() []types.Package {
-	return ag.pkgs
+	return funk.Uniq(ag.pkgs).([]types.Package)
 }
 
 func (ag *AnalyzerGroup) Append(a ...Analyzer) {
