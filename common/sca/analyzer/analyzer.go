@@ -37,12 +37,16 @@ type AnalyzerGroup struct {
 	// return
 	pkgs []types.Package
 	err  error
+
+	// scanned file
+	scannedFiles map[string]struct{}
 }
 
 func NewAnalyzerGroup(numWorkers int) *AnalyzerGroup {
 	return &AnalyzerGroup{
-		ch:         make(chan Task),
-		numWorkers: numWorkers,
+		ch:           make(chan Task),
+		numWorkers:   numWorkers,
+		scannedFiles: make(map[string]struct{}),
 	}
 }
 
@@ -88,29 +92,40 @@ func (ag *AnalyzerGroup) Close() {
 // write
 func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error {
 	for _, a := range ag.analyzers {
-		// match type > 0 mean matched and need to analyze
-		if matchType := a.Match(path, fi); matchType > 0 {
-			// save
-			f, err := os.CreateTemp("", "fanal-file-*")
-			if err != nil {
-				return utils.Errorf("failed to create a temporary file for analyzer")
-			}
-			if _, err := io.Copy(f, r); err != nil {
-				return utils.Errorf("failed to copy the file: %v", err)
-			}
-			f.Seek(0, 0)
-
-			// send
-			task := Task{
-				fileInfo: AnalyzeFileInfo{
-					path:      path,
-					f:         f,
-					matchType: matchType,
-				},
-				a: a,
-			}
-			ag.ch <- task
+		// if scanned, skip
+		if _, ok := ag.scannedFiles[path]; ok {
+			continue
 		}
+
+		matchType := a.Match(path, fi)
+		if matchType == 0 {
+			continue
+		}
+		// match type > 0 mean matched and need to analyze
+
+		// save
+		f, err := os.CreateTemp("", "fanal-file-*")
+		if err != nil {
+			return utils.Errorf("failed to create a temporary file for analyzer")
+		}
+		if _, err := io.Copy(f, r); err != nil {
+			return utils.Errorf("failed to copy the file: %v", err)
+		}
+		f.Seek(0, 0)
+
+		// send
+		task := Task{
+			fileInfo: AnalyzeFileInfo{
+				path:      path,
+				f:         f,
+				matchType: matchType,
+			},
+			a: a,
+		}
+		ag.ch <- task
+
+		// add to scanned files
+		ag.scannedFiles[path] = struct{}{}
 	}
 	return nil
 }
