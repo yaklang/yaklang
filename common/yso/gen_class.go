@@ -30,27 +30,6 @@ type ClassPayload struct {
 	ClassName string
 	Help      string
 	Generator func(*ClassConfig) (*javaclassparser.ClassObject, error)
-	YakFun    string
-	Params    []*ParamInfo
-}
-type ParamInfo struct {
-	Name        string
-	NameVerbose string
-	Help        string
-	YakFun      string
-	Optional    bool
-	Value       any
-}
-
-func NewParam(name string, v any, verbose, help string, YakFun string, optional ...bool) *ParamInfo {
-	return &ParamInfo{
-		Name:        name,
-		Value:       v,
-		NameVerbose: verbose,
-		Help:        help,
-		YakFun:      YakFun,
-		Optional:    len(optional) > 0 && optional[0],
-	}
 }
 
 var AllClasses = map[string]*ClassPayload{}
@@ -58,7 +37,7 @@ var AllClasses = map[string]*ClassPayload{}
 func GetAllClassGenerator() map[string]*ClassPayload {
 	return AllClasses
 }
-func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error), yakFun string, params ...*ParamInfo) {
+func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error)) {
 	AllClasses[t] = &ClassPayload{
 		ClassName: string(t),
 		Help:      help,
@@ -72,8 +51,6 @@ func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.Clas
 			}
 			return obj, nil
 		},
-		Params: params,
-		YakFun: yakFun,
 	}
 }
 
@@ -179,8 +156,6 @@ func init() {
 			constant.Value = config.Command
 			return obj, nil
 		},
-		"GenerateRuntimeExecEvilClassObject",
-		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
 		ProcessImplExecClass,
@@ -202,8 +177,6 @@ func init() {
 			constant.Value = cf.Command
 			return obj, nil
 		},
-		"GenerateProcessImplExecEvilClassObject",
-		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
 		ProcessBuilderExecClass,
@@ -225,8 +198,6 @@ func init() {
 			constant.Value = cf.Command
 			return obj, nil
 		},
-		"GenerateProcessBuilderExecEvilClassObject",
-		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
 		DNSlogClass,
@@ -248,8 +219,6 @@ func init() {
 			constant.Value = cf.Domain
 			return obj, nil
 		},
-		"GenerateDNSlogEvilClassObject",
-		NewParam("dnslog", "", "DNSLog域名", "填写DNSLog域名，不需要写协议", "dnslogDomain"),
 	)
 	setClass(
 		TcpReverseClass,
@@ -287,10 +256,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateTcpReverseEvilClassObject",
-		NewParam("Host", "", "Host", "反连Host", "tcpReverseHost"),
-		NewParam("Port", "", "Port", "反连Port", "tcpReversePort"),
-		NewParam("TcpReverseToken", "Hello", "Token", "Tcp反连后会写入这个Token，便于检测", "tcpReverseToken"),
 	)
 	setClass(
 		TcpReverseShellClass,
@@ -319,9 +284,6 @@ func init() {
 			constant.Value = strconv.Itoa(cf.Port)
 			return obj, nil
 		},
-		"GenerateTcpReverseShellEvilClassObject",
-		NewParam("Host", "", "Host", "反连Host", "tcpReverseHost"),
-		NewParam("Port", "", "Port", "反连Port", "tcpReversePort"),
 	)
 	setClass(
 		ModifyTomcatMaxHeaderSizeClass,
@@ -333,7 +295,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateModifyTomcatMaxHeaderSizeEvilClassObject",
 	)
 	setClass(
 		EmptyClassInTemplate,
@@ -346,7 +307,6 @@ func init() {
 
 			return obj, nil
 		},
-		"",
 	)
 	setClass(
 		BytesClass,
@@ -358,8 +318,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateClassObjectFromBytes",
-		NewParam("Bytes", "", "Bytes", "Base64格式的字节码", "useBase64BytesClass"),
 	)
 	setClass(
 		TomcatEchoClass,
@@ -390,12 +348,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateTomcatEchoClassObject",
-		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
-		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
-		NewParam("Command", "id", "Command", "执行的命令", "command"),
-		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
-		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 	setClass(
 		MultiEchoClass,
@@ -426,12 +378,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateMultiEchoClassObject",
-		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
-		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
-		NewParam("Command", "id", "Command", "执行的命令", "command"),
-		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
-		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 	setClass(
 		SpringEchoClass,
@@ -487,12 +433,6 @@ func init() {
 			}
 			return obj, nil
 		},
-		"GenerateSpringEchoEvilClassObject",
-		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
-		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
-		NewParam("Command", "id", "Command", "执行的命令", "command"),
-		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
-		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 
 }
