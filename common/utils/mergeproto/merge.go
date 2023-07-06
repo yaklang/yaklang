@@ -2,7 +2,6 @@ package mergeproto
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/yaklang/yaklang/common/log"
 	"google.golang.org/protobuf/proto"
@@ -26,7 +25,6 @@ const ServiceName = "Yak"
 
 var (
 	allMessageDescriptors = map[string]*descriptorpb.DescriptorProto{}
-	parentResolvedMap     = map[string]bool{}
 )
 
 type packageFileGroup struct {
@@ -144,20 +142,29 @@ func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 		if group.name != "" {
 			buf.Printf("%smessage %s {", strings.Repeat(" ", identLevel*4), group.name)
 		}
+		enumMap := make(map[string]*descriptorpb.EnumDescriptorProto)
+		messageMap := make(map[string]*descriptorpb.DescriptorProto)
 
 		for _, file := range group.files {
 			for _, enum := range file.EnumType {
-				generateEnum(buf, identLevel+1, enum)
-				buf.Printf("")
+				// 如果该枚举名称在 enumMap 中不存在
+				if _, ok := enumMap[*enum.Name]; !ok {
+					enumMap[*enum.Name] = enum
+					// 这里调用你的 generateEnum 函数，只有当枚举名称不重复时才会调用
+					generateEnum(buf, identLevel+1, enum)
+					buf.Printf("")
+				}
 			}
 
 			for _, message := range file.GetMessageType() {
-				resolveMessageExtends(message, false, pPackage)
-				if parentResolvedMap[message.GetName()] {
-					break
+
+				// 如果该消息类型在 messageMap 中不存在
+				if _, ok := messageMap[*message.Name]; !ok {
+					messageMap[*message.Name] = message
+					resolveMessageExtends(message, false, pPackage)
+					generateMessage(buf, identLevel+1, message)
+					buf.Printf("")
 				}
-				generateMessage(buf, identLevel+1, message)
-				buf.Printf("")
 			}
 
 			generateExtensions(buf, identLevel+1, nil, file.GetExtension())
@@ -178,13 +185,11 @@ func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 }
 
 func resolveMessageExtends(message *descriptorpb.DescriptorProto, optionsFlag bool, pPackage string) {
-	spew.Dump(parentResolvedMap)
 
 	for _, nested := range message.GetNestedType() {
 		resolveMessageExtends(nested, optionsFlag, pPackage)
 	}
 
-	parentResolvedMap[message.GetName()] = true
 	var options []*descriptorpb.UninterpretedOption
 	var keepOptions []*descriptorpb.UninterpretedOption
 	var fields []*descriptorpb.FieldDescriptorProto

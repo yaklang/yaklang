@@ -34,10 +34,20 @@ message HTTPRequestAnalysisMaterial {
   string TypePosition = 1;
 }
 
+enum ShellType {
+    Behinder = 0;
+    Godzilla = 1;
+}
+
 `,
 		"file2.proto": `syntax = "proto3";
 package ypb;
 option go_package = "/;ypb";
+
+enum ShellType {
+    Behinder = 0;
+    Godzilla = 1;
+}
 
 service T2 {
   // 分析一个 HTTP 请求详情
