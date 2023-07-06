@@ -1,6 +1,9 @@
 package sca
 
 import (
+	"compress/gzip"
+	"io"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -23,8 +26,35 @@ import (
 // 	}
 // }
 
+const (
+	gzipFile = "./analyzer/testdata/sca_dockertest.tar.gz"
+)
+
 func TestLoadDockerImageFromFile(t *testing.T) {
-	pkgs, err := LoadDockerImageFromFile("./sca_dockertest.tar")
+	f, err := os.Open(gzipFile)
+	if err != nil {
+		t.Fatalf("can't open gzip file: %v", err)
+	}
+	defer f.Close()
+
+	r, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("can't new gzip Reader: %v", err)
+	}
+	tmp, err := os.CreateTemp("", "docker_test_")
+	if err != nil {
+		t.Fatalf("can't open tmp file: %v", err)
+	}
+	if _, err := io.Copy(tmp, r); err != nil {
+		t.Fatalf("can't copy gzip data to tmpfile: %v", err)
+	}
+	defer func() {
+		name := tmp.Name()
+		tmp.Close()
+		os.Remove(name)
+	}()
+
+	pkgs, err := LoadDockerImageFromFile(tmp.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
