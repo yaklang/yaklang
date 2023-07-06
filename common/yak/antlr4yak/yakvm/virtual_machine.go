@@ -176,6 +176,9 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		name := f.GetActualName()
 		frame.SetVerbose(fmt.Sprintf("function: %s", name))
 		frame.SetFunction(f)
+		if f.sourceCode != "" {
+			frame.SetOriginCode(f.sourceCode)
+		}
 		//闭包继承父作用域
 		if v.config.GetClosureSupport() {
 			frame.scope = f.scope
@@ -225,6 +228,7 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 func (v *VirtualMachine) ExecYakCode(ctx context.Context, sourceCode string, codes []*Code, flags ...ExecFlag) error {
 	return v.Exec(ctx, func(frame *Frame) {
 		frame.SetVerbose("global code")
+		frame.SetOriginCode(sourceCode)
 		frame.Exec(codes)
 	}, flags...)
 }
