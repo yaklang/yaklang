@@ -25,10 +25,16 @@ var (
 )
 
 func AnalyzeStaticYaklang(r interface{}) []*StaticAnalyzeResult {
+	return AnalyzeStaticYaklangEx(r, false)
+}
+
+func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResult {
 	code := utils.InterfaceToBytes(r)
 	engine := yaklang.New()
 
 	newEngine, ok := engine.(*antlr4yak.Engine)
+	newEngine.SetStrictMode(strictMode)
+
 	if !ok {
 		return nil
 	}
