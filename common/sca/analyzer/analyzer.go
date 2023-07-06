@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -11,6 +12,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const (
+	AllMode ScanMode = 0
+	PkgMode          = 1 << (iota - 1)
+	LanguageMode
+)
+
+var (
+	analyzers = make(map[TypAnalyzer]Analyzer, 0)
+)
+
+type TypAnalyzer string
+type ScanMode int
 type Analyzer interface {
 	Analyze(AnalyzeFileInfo) ([]types.Package, error)
 	Match(string, fs.FileInfo) int
@@ -42,11 +55,46 @@ type AnalyzerGroup struct {
 	scannedFiles map[string]struct{}
 }
 
-func NewAnalyzerGroup(numWorkers int) *AnalyzerGroup {
+func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
+	if _, ok := analyzers[typ]; ok {
+		return
+	}
+	analyzers[typ] = a
+}
+
+func FilterAnalyzer(mode ScanMode) []Analyzer {
+	ret := make([]Analyzer, 0, len(analyzers))
+	if mode == AllMode {
+		return funk.Map(analyzers, func(_ TypAnalyzer, a Analyzer) Analyzer {
+			return a
+		}).([]Analyzer)
+	}
+
+	for analyzerName, a := range analyzers {
+		// filter by ScanMode
+		if mode&PkgMode == PkgMode {
+			if strings.HasSuffix(string(analyzerName), "-pkg") {
+				ret = append(ret, a)
+				continue
+			}
+		}
+		if mode&LanguageMode == LanguageMode {
+			if strings.HasSuffix(string(analyzerName), "-lang") {
+				ret = append(ret, a)
+				continue
+			}
+		}
+
+	}
+	return ret
+}
+
+func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	return &AnalyzerGroup{
 		ch:           make(chan Task),
 		numWorkers:   numWorkers,
 		scannedFiles: make(map[string]struct{}),
+		analyzers:    FilterAnalyzer(scanMode),
 	}
 }
 
