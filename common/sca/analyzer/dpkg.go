@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/fs"
 	"net/textproto"
 	"strings"
 
@@ -107,8 +106,8 @@ func NewDpkgAnalyzer() *dpkgAnalyzer {
 	return &dpkgAnalyzer{}
 }
 
-func (a dpkgAnalyzer) Match(path string, info fs.FileInfo) int {
-	if strings.HasPrefix(path, statusDir) || path == statusFile {
+func (a dpkgAnalyzer) Match(info MatchInfo) int {
+	if strings.HasPrefix(info.path, statusDir) || info.path == statusFile {
 		// handler status
 		return statusStatus
 	}

@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"bufio"
 	"io"
 	"io/fs"
 	"os"
@@ -15,6 +16,8 @@ import (
 )
 
 const (
+	headerSize = 4
+
 	AllMode ScanMode = 0
 	PkgMode          = 1 << (iota - 1)
 	LanguageMode
@@ -28,13 +31,19 @@ type TypAnalyzer string
 type ScanMode int
 type Analyzer interface {
 	Analyze(AnalyzeFileInfo) ([]types.Package, error)
-	Match(string, fs.FileInfo) int
+	Match(MatchInfo) int
 }
 
 type AnalyzeFileInfo struct {
 	path        string
 	f           *os.File
 	matchStatus int
+}
+
+type MatchInfo struct {
+	path   string
+	fi     fs.FileInfo
+	header []byte
 }
 
 type Task struct {
@@ -141,13 +150,31 @@ func (ag *AnalyzerGroup) Close() {
 
 // write
 func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error {
+	var (
+		header []byte
+		err    error
+	)
+	br := bufio.NewReader(r)
+
 	for _, a := range ag.analyzers {
 		// if scanned, skip
 		if _, ok := ag.scannedFiles[path]; ok {
 			continue
 		}
 
-		matchStatus := a.Match(path, fi)
+		if fi.Mode().IsRegular() {
+			header, err = br.Peek(headerSize)
+			if err != nil && err != io.EOF {
+				return utils.Errorf("read file header error: %v", err)
+			}
+		}
+
+		matchStatus := a.Match(MatchInfo{
+			path:   path,
+			fi:     fi,
+			header: header,
+		})
+
 		if matchStatus == 0 {
 			continue
 		}
@@ -158,7 +185,8 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 		if err != nil {
 			return utils.Errorf("failed to create a temporary file for analyzer")
 		}
-		if _, err := io.Copy(f, r); err != nil {
+
+		if _, err := io.Copy(f, br); err != nil {
 			return utils.Errorf("failed to copy the file: %v", err)
 		}
 		f.Seek(0, 0)
@@ -183,7 +211,7 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 func ParseLanguageConfiguration(fi AnalyzeFileInfo, parser godeptypes.Parser) ([]types.Package, error) {
 	parsedLibs, _, err := parser.Parse(fi.f)
 	if err != nil {
-		return nil, utils.Errorf("failed to parse %s: %v", fi.path, err)
+		return nil, err
 	}
 
 	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) types.Package {

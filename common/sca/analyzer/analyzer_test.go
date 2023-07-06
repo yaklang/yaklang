@@ -147,6 +147,48 @@ func TestConan(t *testing.T) {
 	Run(tc)
 }
 
+func TestGoBinary(t *testing.T) {
+	tc := testcase{
+		filePath:  "./testdata/gobinary",
+		t:         t,
+		a:         NewGoBinaryAnalyzer(),
+		matchType: 1,
+		wantPkgs: []types.Package{
+			{
+				Name:    "github.com/aquasecurity/go-pep440-version",
+				Version: "v0.0.0-20210121094942-22b2f8951d46",
+			},
+			{
+				Name:    "github.com/aquasecurity/go-version",
+				Version: "v0.0.0-20210121072130-637058cfe492",
+			},
+			{
+				Name:    "golang.org/x/xerrors",
+				Version: "v0.0.0-20200804184101-5ec99f83aff1",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		filePath:  "./testdata/negative-gobinary-broken_elf",
+		t:         t,
+		a:         NewGoBinaryAnalyzer(),
+		matchType: 1,
+		wantPkgs:  []types.Package{},
+	}
+	Run(tc)
+
+	tc = testcase{
+		filePath:  "./testdata/negative-gobinary-bash",
+		t:         t,
+		a:         NewGoBinaryAnalyzer(),
+		matchType: 1,
+		wantPkgs:  []types.Package{},
+	}
+	Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),

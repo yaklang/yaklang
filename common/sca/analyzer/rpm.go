@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"database/sql"
-	"io/fs"
 
 	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
 	"github.com/mattn/go-sqlite3"
@@ -70,8 +69,8 @@ func (a rpmAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 	return nil, nil
 }
 
-func (a rpmAnalyzer) Match(path string, info fs.FileInfo) int {
-	if utils.StringSliceContainsAll(requiredFiles, path) {
+func (a rpmAnalyzer) Match(info MatchInfo) int {
+	if utils.StringSliceContainsAll(requiredFiles, info.path) {
 		return statusRPM
 	}
 	return 0
