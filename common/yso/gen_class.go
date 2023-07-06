@@ -8,21 +8,21 @@ import (
 	"strconv"
 )
 
-type ClassType string
+//type string string
 
 const (
-	RuntimeExecClass               ClassType = "RuntimeExecClass"
-	ProcessBuilderExecClass                  = "ProcessBuilderExecClass"
-	ProcessImplExecClass                     = "ProcessImplExecClass"
-	DnslogClass                              = "DnslogClass"
-	SpringEchoClass                          = "SpringEchoClass"
-	ModifyTomcatMaxHeaderSizeClass           = "ModifyTomcatMaxHeaderSizeClass"
-	EmptyClassInTemplate                     = "EmptyClassInTemplate"
-	TcpReverseClass                          = "TcpReverseClass"
-	TcpReverseShellClass                     = "TcpReverseShellClass"
-	TomcatEchoClass                          = "TomcatEchoClass"
-	BytesClass                               = "BytesClass"
-	MultiEchoClass                           = "MultiEchoClass"
+	RuntimeExecClass               = "RuntimeExecClass"
+	ProcessBuilderExecClass        = "ProcessBuilderExecClass"
+	ProcessImplExecClass           = "ProcessImplExecClass"
+	DNSlogClass                    = "DNSlogClass"
+	SpringEchoClass                = "SpringEchoClass"
+	ModifyTomcatMaxHeaderSizeClass = "ModifyTomcatMaxHeaderSizeClass"
+	EmptyClassInTemplate           = "EmptyClassInTemplate"
+	TcpReverseClass                = "TcpReverseClass"
+	TcpReverseShellClass           = "TcpReverseShellClass"
+	TomcatEchoClass                = "TomcatEchoClass"
+	BytesClass                     = "BytesClass"
+	MultiEchoClass                 = "MultiEchoClass"
 	//NoneClass                                = "NoneClass"
 )
 
@@ -30,16 +30,36 @@ type ClassPayload struct {
 	ClassName string
 	Help      string
 	Generator func(*ClassConfig) (*javaclassparser.ClassObject, error)
+	YakFun    string
+	Params    []*ParamInfo
+}
+type ParamInfo struct {
+	Name        string
+	NameVerbose string
+	Help        string
+	YakFun      string
+	Optional    bool
+	Value       any
 }
 
-var classMap = map[ClassType]*ClassPayload{}
-
-func GetAllClassGenerator() map[ClassType]*ClassPayload {
-	return classMap
+func NewParam(name string, v any, verbose, help string, YakFun string, optional ...bool) *ParamInfo {
+	return &ParamInfo{
+		Name:        name,
+		Value:       v,
+		NameVerbose: verbose,
+		Help:        help,
+		YakFun:      YakFun,
+		Optional:    len(optional) > 0 && optional[0],
+	}
 }
-func setClass(t ClassType, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error)) {
 
-	classMap[t] = &ClassPayload{
+var AllClasses = map[string]*ClassPayload{}
+
+func GetAllClassGenerator() map[string]*ClassPayload {
+	return AllClasses
+}
+func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error), yakFun string, params ...*ParamInfo) {
+	AllClasses[t] = &ClassPayload{
 		ClassName: string(t),
 		Help:      help,
 		Generator: func(config *ClassConfig) (*javaclassparser.ClassObject, error) {
@@ -52,12 +72,14 @@ func setClass(t ClassType, help string, f func(*ClassConfig) (*javaclassparser.C
 			}
 			return obj, nil
 		},
+		Params: params,
+		YakFun: yakFun,
 	}
 }
 
 type ClassConfig struct {
 	Errors     []error
-	ClassType  ClassType
+	ClassType  string
 	ClassBytes []byte
 	//ClassTemplate *javaclassparser.ClassObject
 	//公共参数
@@ -109,7 +131,7 @@ func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, 
 		}
 		return obj, nil
 	}
-	payload, ok := classMap[cf.ClassType]
+	payload, ok := AllClasses[cf.ClassType]
 	if !ok {
 		return nil, utils.Errorf("not found class type: %s", cf.ClassType)
 	}
@@ -157,6 +179,8 @@ func init() {
 			constant.Value = config.Command
 			return obj, nil
 		},
+		"GenerateRuntimeExecEvilClassObject",
+		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
 		ProcessImplExecClass,
@@ -178,6 +202,8 @@ func init() {
 			constant.Value = cf.Command
 			return obj, nil
 		},
+		"GenerateProcessImplExecEvilClassObject",
+		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
 		ProcessBuilderExecClass,
@@ -199,9 +225,11 @@ func init() {
 			constant.Value = cf.Command
 			return obj, nil
 		},
+		"GenerateProcessBuilderExecEvilClassObject",
+		NewParam("command", "id", "命令", "执行的命令", "command"),
 	)
 	setClass(
-		DnslogClass,
+		DNSlogClass,
 		"dnslog检测",
 		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
 			obj, err := javaclassparser.Parse(template_class_dnslog)
@@ -220,6 +248,8 @@ func init() {
 			constant.Value = cf.Domain
 			return obj, nil
 		},
+		"GenerateDNSlogEvilClassObject",
+		NewParam("dnslog", "", "DNSLog域名", "填写DNSLog域名，不需要写协议", "dnslogDomain"),
 	)
 	setClass(
 		TcpReverseClass,
@@ -257,6 +287,10 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateTcpReverseEvilClassObject",
+		NewParam("Host", "", "Host", "反连Host", "tcpReverseHost"),
+		NewParam("Port", "", "Port", "反连Port", "tcpReversePort"),
+		NewParam("TcpReverseToken", "Hello", "Token", "Tcp反连后会写入这个Token，便于检测", "tcpReverseToken"),
 	)
 	setClass(
 		TcpReverseShellClass,
@@ -285,6 +319,9 @@ func init() {
 			constant.Value = strconv.Itoa(cf.Port)
 			return obj, nil
 		},
+		"GenerateTcpReverseShellEvilClassObject",
+		NewParam("Host", "", "Host", "反连Host", "tcpReverseHost"),
+		NewParam("Port", "", "Port", "反连Port", "tcpReversePort"),
 	)
 	setClass(
 		ModifyTomcatMaxHeaderSizeClass,
@@ -296,6 +333,7 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateModifyTomcatMaxHeaderSizeEvilClassObject",
 	)
 	setClass(
 		EmptyClassInTemplate,
@@ -308,6 +346,7 @@ func init() {
 
 			return obj, nil
 		},
+		"",
 	)
 	setClass(
 		BytesClass,
@@ -319,6 +358,8 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateClassObjectFromBytes",
+		NewParam("Bytes", "", "Bytes", "Base64格式的字节码", "useBase64BytesClass"),
 	)
 	setClass(
 		TomcatEchoClass,
@@ -349,6 +390,12 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateTomcatEchoClassObject",
+		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
+		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
+		NewParam("Command", "id", "Command", "执行的命令", "command"),
+		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
+		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 	setClass(
 		MultiEchoClass,
@@ -379,6 +426,12 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateMultiEchoClassObject",
+		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
+		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
+		NewParam("Command", "id", "Command", "执行的命令", "command"),
+		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
+		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 	setClass(
 		SpringEchoClass,
@@ -434,6 +487,12 @@ func init() {
 			}
 			return obj, nil
 		},
+		"GenerateSpringEchoEvilClassObject",
+		NewParam("HeaderKey", "Etag", "HeaderKey", "回显的HeaderKey", ""),
+		NewParam("HeaderValue", "1", "HeaderValue", "回显的HeaderValue", ""),
+		NewParam("Command", "id", "Command", "执行的命令", "command"),
+		NewParam("Execute", false, "Execute", "关闭则不执行命令直接回显", ""),
+		NewParam("EchoBody", false, "EchoBody", "在body回显或是在Header回显", ""),
 	)
 
 }
@@ -484,6 +543,7 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 }
 func SetClassBytes(data []byte) GenClassOptionFun {
 	return func(config *ClassConfig) {
+		config.ClassType = BytesClass
 		config.ClassBytes = data
 	}
 }
@@ -589,7 +649,7 @@ func GenerateProcessImplExecEvilClassObject(cmd string, options ...GenClassOptio
 // dnslog参数
 func SetClassDnslogTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
-		config.ClassType = DnslogClass
+		config.ClassType = DNSlogClass
 	}
 }
 func SetDnslog(addr string) GenClassOptionFun {
@@ -599,7 +659,7 @@ func SetDnslog(addr string) GenClassOptionFun {
 }
 func SetDnslogEvilClass(addr string) GenClassOptionFun {
 	return func(config *ClassConfig) {
-		config.ClassType = DnslogClass
+		config.ClassType = DNSlogClass
 		config.Domain = addr
 	}
 }
