@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -26,11 +25,11 @@ type YakFunctionCaller struct {
 	Handler func(args ...interface{})
 }
 
-func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id string, code string, hook func(e yaklang.YaklangEngine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	var fTable = map[string]*YakFunctionCaller{}
 
 	engine := NewScriptEngine(100)
-	engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
+	engine.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
 		if hook != nil {
 			return hook(engine)
 		}
@@ -58,25 +57,24 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 			continue
 		}
 
-		nIns, eOk := ins.(*antlr4yak.Engine)
-		if eOk {
-			fTable[funcName] = &YakFunctionCaller{
-				Handler: func(args ...interface{}) {
-					defer func() {
-						if err := recover(); err != nil {
-							log.Errorf("call [%v] yakvm native function failed: %s", funcName, err)
-							fmt.Println()
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}()
-
-					_, err = nIns.CallYakFunctionNative(ctx, f, args...)
-					if err != nil {
-						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+		nIns := ins
+		fTable[funcName] = &YakFunctionCaller{
+			Handler: func(args ...interface{}) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("call [%v] yakvm native function failed: %s", funcName, err)
+						fmt.Println()
+						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-				},
-			}
+				}()
+
+				_, err = nIns.CallYakFunctionNative(ctx, f, args...)
+				if err != nil {
+					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+				}
+			},
 		}
+
 	}
 	return fTable, nil
 
@@ -87,7 +85,7 @@ type Caller struct {
 	Hash    string
 	Id      string
 	Verbose string
-	Engine  yaklang.YaklangEngine
+	Engine  *antlr4yak.Engine
 	// NativeFunction *exec.Function
 }
 
@@ -190,38 +188,36 @@ func (y *YakToCallerManager) SetForYakit(
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()
-	return y.Set(ctx, code, func(engine yaklang.YaklangEngine) error {
-		antlr4engine, ok := engine.(*antlr4yak.Engine)
-		if ok {
-			yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
-				switch ret := i.(type) {
-				case *yaklib.YakitProgress:
-					raw, _ := yaklib.YakitMessageGenerator(ret)
+	return y.Set(ctx, code, func(engine *antlr4yak.Engine) error {
+		antlr4engine := engine
+		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
+			switch ret := i.(type) {
+			case *yaklib.YakitProgress:
+				raw, _ := yaklib.YakitMessageGenerator(ret)
+				if err := caller(&ypb.ExecResult{
+					Hash:       "",
+					OutputJson: "",
+					Raw:        nil,
+					IsMessage:  true,
+					Message:    raw,
+					Id:         0,
+					RuntimeID:  "",
+				}); err != nil {
+					return err
+				}
+			case *yaklib.YakitLog:
+				raw, _ := yaklib.YakitMessageGenerator(ret)
+				if raw != nil {
 					if err := caller(&ypb.ExecResult{
-						Hash:       "",
-						OutputJson: "",
-						Raw:        nil,
-						IsMessage:  true,
-						Message:    raw,
-						Id:         0,
-						RuntimeID:  "",
+						IsMessage: true,
+						Message:   raw,
 					}); err != nil {
 						return err
 					}
-				case *yaklib.YakitLog:
-					raw, _ := yaklib.YakitMessageGenerator(ret)
-					if raw != nil {
-						if err := caller(&ypb.ExecResult{
-							IsMessage: true,
-							Message:   raw,
-						}); err != nil {
-							return err
-						}
-					}
 				}
-				return nil
-			}))
-		}
+			}
+			return nil
+		}))
 
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
 		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
@@ -235,7 +231,7 @@ func (y *YakToCallerManager) SetForYakit(
 	}, hooks...)
 }
 
-func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine yaklang.YaklangEngine) error, funcName ...string) (retError error) {
+func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
@@ -244,10 +240,10 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 		}
 	}()
 
-	var engine yaklang.YaklangEngine
+	var engine *antlr4yak.Engine
 	var fetchFuncHandler = FetchFunctionFromSourceCode
 
-	cTable, err := fetchFuncHandler(ctx, y.timeout, "", code, func(e yaklang.YaklangEngine) error {
+	cTable, err := fetchFuncHandler(ctx, y.timeout, "", code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -494,7 +490,7 @@ func (y *YakToCallerManager) AddForYakit(
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()
-	return y.Add(ctx, id, params, code, func(engine yaklang.YaklangEngine) error {
+	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
 		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, id))
@@ -504,14 +500,12 @@ func (y *YakToCallerManager) AddForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
-		if nIns, ok := engine.(*antlr4yak.Engine); ok && id != "" {
-			bindYakitPluginToYakEngine(id, nIns)
-		}
+		bindYakitPluginToYakEngine(id, engine)
 		return nil
 	}, hooks...)
 }
 
-func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.ExecParamItem, code string, hook func(yaklang.YaklangEngine) error, funcName ...string) (retError error) {
+func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.ExecParamItem, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
@@ -520,14 +514,14 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 		}
 	}()
 
-	var engine yaklang.YaklangEngine
+	var engine *antlr4yak.Engine
 	var fetchFuncHandler = FetchFunctionFromSourceCode
 	//if y.dividedContext {
 	//	fetchFuncHandler = FetchFunctionFromCallerDividedContext
 	//} else {
 	//	fetchFuncHandler = FetchFunctionFromCaller
 	//}
-	cTable, err := fetchFuncHandler(ctx, y.timeout, id, code, func(e yaklang.YaklangEngine) error {
+	cTable, err := fetchFuncHandler(ctx, y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -759,11 +753,11 @@ func loadScriptByName(mng *YakToCallerManager, scriptName string, hookNames ...s
 
 var (
 	currentCoreEngineMutext  = new(sync.Mutex)
-	currentCoreEngine        yaklang.YaklangEngine
+	currentCoreEngine        *antlr4yak.Engine
 	haveSetCurrentCoreEngine bool
 )
 
-func setCurrentCoreEngine(e yaklang.YaklangEngine) {
+func setCurrentCoreEngine(e *antlr4yak.Engine) {
 	currentCoreEngineMutext.Lock()
 	defer currentCoreEngineMutext.Unlock()
 
@@ -774,7 +768,7 @@ func setCurrentCoreEngine(e yaklang.YaklangEngine) {
 	}
 }
 
-func unsetCurrentCoreEngine(e yaklang.YaklangEngine) {
+func unsetCurrentCoreEngine(e *antlr4yak.Engine) {
 	currentCoreEngineMutext.Lock()
 	defer currentCoreEngineMutext.Unlock()
 
@@ -897,7 +891,7 @@ func init() {
 		}
 
 		engineRoot := NewScriptEngine(1)
-		engineRoot.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
+		engineRoot.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
 			engine.SetVar("scriptName", script.ScriptName)
 			engine.SetVar("param", utils.InterfaceToString(s))
 			return nil

@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -347,11 +346,8 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					return nil
 				})
 				engine.HookOsExit()
-				engine.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
-					switch ret := engine.(type) {
-					case *antlr4yak.Engine:
-						yaklib.SetEngineClient(ret, feedbackClient)
-					}
+				engine.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
+					yaklib.SetEngineClient(engine, feedbackClient)
 					return nil
 				})
 				coreEngine, err := engine.ExecuteExWithContext(subCtx, string(batchExecScripts), map[string]interface{}{

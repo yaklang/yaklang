@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
 )
@@ -18,7 +19,7 @@ type TextHandlingScript struct {
 type TextParser struct {
 	Scripts map[string]*TextHandlingScript
 
-	engine yaklang.YaklangEngine
+	engine *antlr4yak.Engine
 }
 
 // NewTextParser 创建一个新的文本解析器
