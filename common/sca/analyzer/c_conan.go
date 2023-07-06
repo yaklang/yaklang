@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"io/fs"
 	"strings"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/c/conan"
@@ -39,8 +38,8 @@ func (a conanAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 	return nil, nil
 }
 
-func (a conanAnalyzer) Match(path string, fi fs.FileInfo) int {
-	if strings.HasSuffix(path, ConanLock) {
+func (a conanAnalyzer) Match(info MatchInfo) int {
+	if strings.HasSuffix(info.path, ConanLock) {
 		return statusConan
 	}
 	return 0

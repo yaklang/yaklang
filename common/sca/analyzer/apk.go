@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"bufio"
-	"io/fs"
 
 	"github.com/yaklang/yaklang/common/sca/types"
 )
@@ -64,8 +63,8 @@ func (a apkAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
 	return nil, nil
 }
 
-func (a apkAnalyzer) Match(path string, fi fs.FileInfo) int {
-	if path == installFile {
+func (a apkAnalyzer) Match(info MatchInfo) int {
+	if info.path == installFile {
 		return statusInstallFile
 	}
 	return 0
