@@ -91,7 +91,9 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
 			return nil, utils.Errorf("parse MIME header error: %v ", err)
 		}
 		pkg := a.parseDpkgPkg(header)
-		pkgs = append(pkgs, *pkg)
+		if pkg != nil {
+			pkgs = append(pkgs, *pkg)
+		}
 	}
 
 	return pkgs, nil
