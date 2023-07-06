@@ -36,6 +36,7 @@ type Analyzer interface {
 
 type AnalyzeFileInfo struct {
 	path        string
+	a           Analyzer
 	f           *os.File
 	matchStatus int
 }
@@ -46,16 +47,11 @@ type MatchInfo struct {
 	header []byte
 }
 
-type Task struct {
-	fileInfo AnalyzeFileInfo
-	a        Analyzer
-}
-
 type AnalyzerGroup struct {
 	analyzers []Analyzer
 
 	// consume
-	ch         chan Task
+	ch         chan AnalyzeFileInfo
 	numWorkers int
 
 	// return
@@ -63,7 +59,7 @@ type AnalyzerGroup struct {
 	err  error
 
 	// scanned file
-	scannedFiles map[string]struct{}
+	matchedFileInfos map[string]AnalyzeFileInfo
 }
 
 func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
@@ -102,10 +98,10 @@ func FilterAnalyzer(mode ScanMode) []Analyzer {
 
 func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	return &AnalyzerGroup{
-		ch:           make(chan Task),
-		numWorkers:   numWorkers,
-		scannedFiles: make(map[string]struct{}),
-		analyzers:    FilterAnalyzer(scanMode),
+		ch:               make(chan AnalyzeFileInfo),
+		numWorkers:       numWorkers,
+		matchedFileInfos: make(map[string]AnalyzeFileInfo),
+		analyzers:        FilterAnalyzer(scanMode),
 	}
 }
 
@@ -127,13 +123,8 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 	for i := 0; i < ag.numWorkers; i++ {
 		go func() {
 			defer wg.Done()
-			for task := range ag.ch {
-				defer func() {
-					name := task.fileInfo.f.Name()
-					task.fileInfo.f.Close()
-					os.Remove(name)
-				}()
-				pkgs, err := task.a.Analyze(task.fileInfo)
+			for fileInfo := range ag.ch {
+				pkgs, err := fileInfo.a.Analyze(fileInfo)
 				if err != nil {
 					ag.err = err
 					return
@@ -144,12 +135,15 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 	}
 }
 
-func (ag *AnalyzerGroup) Close() {
-	close(ag.ch)
+func (ag *AnalyzerGroup) Clear() {
+	for _, info := range ag.matchedFileInfos {
+		name := info.f.Name()
+		info.f.Close()
+		os.Remove(name)
+	}
 }
 
-// write
-func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error {
+func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 	var (
 		header []byte
 		err    error
@@ -158,7 +152,7 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 
 	for _, a := range ag.analyzers {
 		// if scanned, skip
-		if _, ok := ag.scannedFiles[path]; ok {
+		if _, ok := ag.matchedFileInfos[path]; ok {
 			continue
 		}
 
@@ -191,20 +185,22 @@ func (ag *AnalyzerGroup) Analyze(path string, fi fs.FileInfo, r io.Reader) error
 		}
 		f.Seek(0, 0)
 
-		// send
-		task := Task{
-			fileInfo: AnalyzeFileInfo{
-				path:        path,
-				f:           f,
-				matchStatus: matchStatus,
-			},
-			a: a,
-		}
-		ag.ch <- task
-
 		// add to scanned files
-		ag.scannedFiles[path] = struct{}{}
+		ag.matchedFileInfos[path] = AnalyzeFileInfo{
+			path:        path,
+			a:           a,
+			f:           f,
+			matchStatus: matchStatus,
+		}
 	}
+	return nil
+}
+
+func (ag *AnalyzerGroup) Analyze() error {
+	for _, info := range ag.matchedFileInfos {
+		ag.ch <- info
+	}
+	close(ag.ch)
 	return nil
 }
 

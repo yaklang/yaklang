@@ -144,27 +144,28 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 		analyzer.NewRPMAnalyzer(),
 	)
 
-	// ctx, cancel := context.WithCancel(context.Background())
-	wg := sync.WaitGroup{}
-
-	// up consumer
-	ag.Consume(&wg)
-	// close
-
-	// producter
+	// match file
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
-		if err := ag.Analyze(path, fi, r); err != nil {
+		if err := ag.Match(path, fi, r); err != nil {
 			return err
 		}
 		return nil
 	})
-	ag.Close()
-
 	if err != nil {
 		return nil, err
 	}
 
+	// ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
+
+	// analyzer-consumer
+	ag.Consume(&wg)
+
+	// analyzer-productor
+	ag.Analyze()
+
 	wg.Wait()
+	ag.Clear()
 	if err = ag.Error(); err != nil {
 		return nil, err
 	}
