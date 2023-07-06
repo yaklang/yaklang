@@ -16,4 +16,6 @@ type ReqInfo interface {
 	ResponseBody() string
 
 	Screenshot() string
+
+	From() string
 }

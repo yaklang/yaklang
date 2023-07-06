@@ -17,7 +17,7 @@ func (starter *BrowserStarter) vueClick(doGetUrl func(string, string) error) fun
 		//}
 		//page.MustWaitLoad()
 		time.Sleep(time.Second)
-		clickElementOnPageBySelector(page, selector)
+		starter.clickElementOnPageBySelector(page, selector)
 		currentUrl, err := getCurrentUrl(page)
 		if err != nil {
 			return utils.Error(err)

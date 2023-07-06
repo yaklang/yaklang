@@ -118,7 +118,10 @@ func (starter *BrowserStarter) EventClickFunctionGenerator(doClick func(*rod.Pag
 
 func (starter *BrowserStarter) DefaultDoClick() func(*rod.Page, string, string) error {
 	return func(page *rod.Page, originUrl string, selector string) error {
-		clickElementOnPageBySelector(page, selector)
+		status := starter.clickElementOnPageBySelector(page, selector)
+		if !status {
+			return nil
+		}
 		currentUrl, _ := getCurrentUrl(page)
 		if starter.getUrlFunction == nil {
 			return utils.Errorf("get url function null")
