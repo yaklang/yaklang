@@ -23,7 +23,7 @@ func init() {
 }
 
 var (
-	requiredFiles = []string{
+	rpmRequiredFiles = []string{
 		// Berkeley DB
 		"usr/lib/sysimage/rpm/Packages",
 		"var/lib/rpm/Packages",
@@ -71,7 +71,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 }
 
 func (a rpmAnalyzer) Match(info MatchInfo) int {
-	if utils.StringSliceContainsAll(requiredFiles, info.path) {
+	if utils.StringSliceContainsAll(rpmRequiredFiles, info.path) {
 		return statusRPM
 	}
 	return 0
