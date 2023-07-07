@@ -167,9 +167,6 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 
 	wg.Wait()
 	ag.Clear()
-	if err = ag.Error(); err != nil {
-		return nil, err
-	}
 	return ag.Packages(), nil
 }
 
