@@ -138,11 +138,6 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 
 func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
-	ag.Append(
-		analyzer.NewDpkgAnalyzer(),
-		analyzer.NewApkAnalyzer(),
-		analyzer.NewRPMAnalyzer(),
-	)
 
 	// match file
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
