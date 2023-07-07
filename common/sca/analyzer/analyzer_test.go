@@ -386,15 +386,21 @@ func TestPHPComposer(t *testing.T) {
 			},
 		},
 	}
-	tc.matchedFileMap = map[string]string{}
-	tc.name = "nojson"
 	Run(tc)
 
 	// lock error
-	// tc.wantPkgs = []types.Package{}
-	// tc.filePath = "./testdata/php_composer/wrong.json"
-	// tc.name = "wronglock"
-	// Run(tc)
+	tc = testcase{
+		name:           "wronglock",
+		filePath:       "./testdata/php_composer/wrong.json",
+		virtualPath:    "/test/composer.lock",
+		t:              t,
+		a:              NewPHPComposerAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+		wantError:      true,
+	}
+	Run(tc)
 }
 
 func TestPythonPackaging(t *testing.T) {
