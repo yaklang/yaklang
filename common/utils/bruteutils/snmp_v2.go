@@ -10,8 +10,8 @@ import (
 var snmp_v2Auth = &DefaultServiceAuthInfo{
 	ServiceName:      "snmp_v2",
 	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
+	DefaultUsernames: append([]string{"snmp"}),
+	DefaultPasswords: append([]string{"public"}, CommonPasswords...),
 	UnAuthVerify:     nil,
 	BrutePass: func(item *BruteItem) *BruteItemResult {
 		target := fixToTarget(item.Target, 161)
@@ -44,9 +44,14 @@ var snmp_v2Auth = &DefaultServiceAuthInfo{
 		}
 
 		oid := []string{"1.3.6.1.2.1.1.1.0"}
-		_, err = snmpConfig.Get(oid)
+		res, err := snmpConfig.Get(oid)
 		if err != nil {
 			log.Errorf("brute failed: %s", err)
+			return result
+		}
+
+		if res.Variables[0].Type != gosnmp.OctetString {
+			log.Errorf("brute failed")
 			return result
 		}
 		result.Ok = true
