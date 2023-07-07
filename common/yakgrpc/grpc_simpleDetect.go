@@ -721,7 +721,7 @@ func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPort
 	return nil, nil
 }
 
-func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverSimpleDetectUnfinishedTaskServer) error {
+func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.SimpleDetectYakScriptUnfinishedTaskByUidRequest, stream ypb.Yak_RecoverSimpleDetectUnfinishedTaskServer) error {
 	manager := NewProgressManager(s.GetProjectDatabase())
 	reqTask, err := manager.GetSimpleProgressByUid(req.GetUid(), true, false)
 	if err != nil {

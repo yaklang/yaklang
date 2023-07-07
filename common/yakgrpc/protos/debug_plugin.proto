@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package ypb;
+option go_package = "/;ypb";
+import "message_api.proto";
+
+service DebugPluginApi {
+  rpc HTTPRequestBuilder(HTTPRequestBuilderParams) returns (HTTPRequestBuilderResponse);
+  // rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
+  // rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
+  rpc DebugPlugin(DebugPluginRequest) returns (stream ExecResult);
+  rpc SmokingEvaluatePlugin(SmokingEvaluatePluginRequest) returns (SmokingEvaluatePluginResponse);
+
+}
+
+message HTTPRequestBuilderParams {
+  bool IsRawHTTPRequest = 1;
+  bool IsHttps = 2;
+  bytes RawHTTPRequest = 3;
+
+  // fields
+  string Method = 4;
+
+  // path 增强型
+  repeated string Path = 6;
+  repeated KVPair GetParams = 9;
+
+  repeated KVPair Headers = 7;
+  repeated KVPair Cookie = 8;
+
+  // body 增强
+  bytes Body = 10;
+  repeated KVPair PostParams = 11;
+  repeated KVPair MultipartParams = 12;
+  repeated KVPair MultipartFileParams = 13;
+}
+
+
+message SmokingEvaluatePluginRequest {
+  repeated HTTPRequestBuilderParams Requests = 1;
+
+  // 只支持插件名评估
+  string PluginName = 2;
+
+  string Code = 3;
+  string PluginType = 4;
+}
+
+message SmokingEvaluateResult {
+  string Item = 1;
+  string Suggestion = 2;
+  bytes ExtraInfo = 3;
+}
+
+message SmokingEvaluatePluginResponse {
+  int64 Score = 1;
+  repeated SmokingEvaluateResult Results = 2;
+}
+
+
+
+message DebugPluginRequest {
+  string Code = 1;
+  string PluginType = 2;
+
+  string Input = 3;
+  HTTPRequestBuilderParams HTTPRequestTemplate = 4;
+}
+
+message HTTPRequestBuilderResult {
+  bool IsHttps = 1;
+  string Url = 2;
+  bytes HTTPRequest = 3;
+}
+
+message HTTPRequestBuilderResponse {
+  repeated HTTPRequestBuilderResult Results = 1;
+  string Templates = 2;
+}
+

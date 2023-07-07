@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package ypb;
+option go_package = "/;ypb";
+import "message_api.proto";
+
+
+service MenuApi {
+  // Menu
+  rpc AddToMenu(AddToMenuRequest) returns (Empty);
+  rpc RemoveFromMenu(RemoveFromMenuRequest) returns (Empty);
+  rpc YakScriptIsInMenu(YakScriptIsInMenuRequest) returns (Empty);
+  rpc GetAllMenuItem(Empty) returns (MenuByGroup);
+  rpc DeleteAllMenuItem(Empty) returns (Empty);
+  rpc ImportMenuItem(ImportMenuItemRequest) returns (Empty);
+  rpc ExportMenuItem(Empty) returns (ExportMenuItemResult);
+  rpc GetMenuItemById(GetMenuItemByIdRequest) returns (MenuItem);
+  rpc QueryGroupsByYakScriptId(QueryGroupsByYakScriptIdRequest) returns (GroupNames);
+  rpc AddMenus(AddMenuRequest) returns (Empty);
+  rpc QueryAllMenuItem(QueryAllMenuItemRequest) returns (MenuByGroup);
+  rpc DeleteAllMenu(QueryAllMenuItemRequest) returns (Empty);
+
+  // NewMenu
+  rpc AddToNavigation(AddToNavigationRequest) returns (Empty);
+  rpc GetAllNavigationItem(GetAllNavigationRequest) returns (GetAllNavigationItemResponse);
+  rpc DeleteAllNavigation(GetAllNavigationRequest) returns (Empty);
+  rpc AddOneNavigation(AddOneNavigationRequest) returns (Empty);
+  rpc QueryNavigationGroups(QueryNavigationGroupsRequest) returns (GroupNames);
+}
+
+message AddToNavigationRequest {
+  repeated NavigationList Data = 1;
+}
+
+message NavigationList {
+  string Group = 1;
+  repeated NavigationItem Items = 2;
+  int64 GroupSort = 3;
+  string Mode = 4;
+  string GroupLabel = 5;
+}
+
+message NavigationItem {
+  int64 YakScriptId = 1;
+  string Group = 2;
+  string Mode = 3;
+  int64  VerboseSort = 4;
+  int64  GroupSort = 5;
+  string Route = 6;
+  string YakScriptName = 7;
+  string Verbose = 8;
+  string VerboseLabel = 9;
+  string GroupLabel = 10;
+  string HeadImg = 11;
+}
+
+message GetAllNavigationRequest {
+  string Mode = 1;
+  string Group = 2;
+  string YakScriptName = 3;
+}
+
+message GetAllNavigationItemResponse {
+  repeated NavigationList Data = 1;
+}
+
+message AddOneNavigationRequest {
+  string YakScriptName = 1;
+  string Group = 2;
+  string Verbose = 3;
+  string Mode = 4;
+  int64  VerboseSort = 5;
+  int64  GroupSort = 6;
+  string GroupLabel = 7;
+  string VerboseLabel = 8;
+  string Route = 9;
+}
+
+message QueryNavigationGroupsRequest {
+  string YakScriptName = 1;
+  string Mode = 2;
+}
+
+message GroupNames {
+  repeated string Groups = 1;
+}
+
+message QueryAllMenuItemRequest {
+  string Mode = 1;
+  string Group = 2;
+  string Verbose = 3;
+}
+
+message MenuItemGroup {
+  string Group = 1;
+  repeated MenuItem Items = 2;
+  int64 MenuSort = 3;
+  string Mode = 4;
+}
+
+
+message AddMenuRequest {
+  repeated MenuItemGroup  Data = 1;
+}
+
+
+message QueryGroupsByYakScriptIdRequest {
+  int64 YakScriptId = 1;
+  string Mode = 2;
+}
+
+// 这里的小写不要改动，兼容前端已有的格式
+message BatchExecutionPluginFilter {
+  string type = 1;
+  string tags = 2;
+  repeated string include = 3;
+  repeated string exclude = 4;
+}
+
+message MenuItem {
+  string Group = 1;
+  string Verbose = 2;
+  int64 YakScriptId = 3;
+  BatchExecutionPluginFilter Query = 4;
+  uint64 MenuItemId = 5;
+  int64 GroupSort = 6;
+  string YakScriptName = 7;
+}
+
+message GetMenuItemByIdRequest {
+  uint64 ID = 1;
+}
+
+message ExportMenuItemResult {
+  string RawJson = 1;
+}
+
+
+message ImportMenuItemRequest {
+  string RawJson = 1;
+  string JsonFileName = 2;
+}
+
+
+message MenuByGroup {
+  repeated MenuItemGroup Groups = 1;
+}
+
+message YakScriptIsInMenuRequest {
+  string Group = 1 ;
+  int64 YakScriptId = 2;
+}
+
+message RemoveFromMenuRequest {
+  int64 YakScriptId = 1;
+  string Group = 2;
+  string Mode = 3;
+}
+
+
+message AddToMenuRequest {
+  int64 YakScriptId = 1;
+  string Group = 2;
+  string Verbose = 3;
+  string Mode = 4;
+  int64  MenuSort = 5;
+  int64  GroupSort = 6;
+}
