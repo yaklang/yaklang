@@ -12,6 +12,7 @@ import (
 )
 
 type testcase struct {
+	name           string
 	filePath       string
 	virtualPath    string
 	wantPkgs       []types.Package
@@ -26,12 +27,12 @@ func Run(tc testcase) {
 	t := tc.t
 	f, err := os.Open(tc.filePath)
 	if err != nil {
-		t.Fatalf("con't open file: %v", err)
+		t.Fatalf("%s: con't open file: %v", err, tc.name)
 	}
 	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, fileInfo) {
 		f, err := os.Open(v)
 		if err != nil {
-			t.Fatalf("con't open file: %v", err)
+			t.Fatalf("%s: con't open file: %v", err, tc.name)
 		}
 		return k, fileInfo{
 			path:        k,
@@ -52,10 +53,10 @@ func Run(tc testcase) {
 	})
 
 	if tc.wantError && err == nil {
-		t.Fatal("want error but nil")
+		t.Fatalf("%s: want error but nil", tc.name)
 	}
 	if !tc.wantError && err != nil {
-		t.Fatalf("analyze error: %v", err)
+		t.Fatalf("%s: analyze error: %v", tc.name, err)
 	}
 
 	sort.Slice(pkgs, func(i, j int) bool {
@@ -74,18 +75,18 @@ func Run(tc testcase) {
 	})
 
 	if len(pkgs) != len(tc.wantPkgs) {
-		t.Fatalf("pkgs length error: %d(got) != %d(want)", len(pkgs), len(tc.wantPkgs))
+		t.Fatalf("%s: pkgs length error: %d(got) != %d(want)", tc.name, len(pkgs), len(tc.wantPkgs))
 	}
 
 	for i := 0; i < len(pkgs); i++ {
 		if pkgs[i].Name != tc.wantPkgs[i].Name {
-			t.Fatalf("pkgs %d name error: %s(got) != %s(want)", i, pkgs[i].Name, tc.wantPkgs[i].Name)
+			t.Fatalf("%s: pkgs %d name error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, tc.wantPkgs[i].Name)
 		}
 		if pkgs[i].Version != tc.wantPkgs[i].Version {
-			t.Fatalf("pkgs %d(%s) version error: %s(got) != %s(want)", i, pkgs[i].Name, pkgs[i].Version, tc.wantPkgs[i].Version)
+			t.Fatalf("%s: pkgs %d(%s) version error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, pkgs[i].Version, tc.wantPkgs[i].Version)
 		}
 		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
-			t.Fatalf("pkgs %d(%s) indirect error: %v(got) != %v(want)", i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
+			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
 		}
 	}
 }
@@ -94,6 +95,7 @@ func Run(tc testcase) {
 func TestRPM(t *testing.T) {
 	// positive
 	tc := testcase{
+		name:      "positive",
 		filePath:  "./testdata/rpm/rpmdb.sqlite",
 		wantPkgs:  RpmWantPkgs,
 		t:         t,
@@ -106,6 +108,7 @@ func TestRPM(t *testing.T) {
 func TestApk(t *testing.T) {
 	// positive
 	tc := testcase{
+		name:     "positive",
 		filePath: "./testdata/apk/apk",
 		wantPkgs: ApkWantPkgs,
 
@@ -117,6 +120,7 @@ func TestApk(t *testing.T) {
 
 	// negative
 	tc = testcase{
+		name:     "negative",
 		filePath: "./testdata/apk/negative-apk",
 		wantPkgs: []types.Package{
 			{
@@ -139,6 +143,7 @@ func TestDpkg(t *testing.T) {
 	// positive
 	a := NewDpkgAnalyzer()
 	tc := testcase{
+		name:      "positive",
 		filePath:  "./testdata/dpkg/dpkg",
 		t:         t,
 		a:         a,
@@ -149,6 +154,7 @@ func TestDpkg(t *testing.T) {
 
 	// negative
 	tc = testcase{
+		name:      "negative",
 		filePath:  "./testdata/dpkg/negative-dpkg",
 		t:         t,
 		a:         a,
@@ -162,6 +168,7 @@ func TestDpkg(t *testing.T) {
 func TestConan(t *testing.T) {
 	// positive
 	tc := testcase{
+		name:      "positive",
 		filePath:  "./testdata/conan/conan",
 		t:         t,
 		a:         NewConanAnalyzer(),
@@ -181,14 +188,21 @@ func TestConan(t *testing.T) {
 	Run(tc)
 
 	// negative
-	tc.filePath = "./testdata/conan/negative-conan"
-	tc.wantPkgs = []types.Package{}
+	tc = testcase{
+		name:      "negative",
+		filePath:  "./testdata/conan/negative-conan",
+		t:         t,
+		a:         NewConanAnalyzer(),
+		matchType: 1,
+		wantPkgs:  []types.Package{},
+	}
 	Run(tc)
 }
 
 func TestGoBinary(t *testing.T) {
 	// positive
 	tc := testcase{
+		name:      "positive",
 		filePath:  "./testdata/go_binary/go-binary",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
@@ -212,6 +226,7 @@ func TestGoBinary(t *testing.T) {
 
 	// negative broken elf
 	tc = testcase{
+		name:      "negative-broken-elf",
 		filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
@@ -222,6 +237,7 @@ func TestGoBinary(t *testing.T) {
 
 	// negative bash
 	tc = testcase{
+		name:      "negative-bash",
 		filePath:  "./testdata/go_binary/negative-go-binary-bash",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
@@ -234,6 +250,7 @@ func TestGoBinary(t *testing.T) {
 func TestGoMod(t *testing.T) {
 	// positive
 	tc := testcase{
+		name:        "positive",
 		filePath:    "./testdata/go_mod/positive/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
@@ -258,6 +275,7 @@ func TestGoMod(t *testing.T) {
 
 	// postivie less than golang 1.17, nedd parse go.sum
 	tc = testcase{
+		name:        "positive-less-than-117",
 		filePath:    "./testdata/go_mod/lessthan117/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
@@ -282,6 +300,7 @@ func TestGoMod(t *testing.T) {
 
 	// negative
 	tc = testcase{
+		name:        "negative-wrongmod",
 		filePath:    "./testdata/go_mod/negative/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
