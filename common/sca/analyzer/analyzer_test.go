@@ -497,6 +497,37 @@ func TestPythonPIP(t *testing.T) {
 	Run(tc)
 }
 
+func TestPythonPIPEnv(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/python_pipenv/Pipfile.lock",
+		t:              t,
+		a:              NewPythonPIPEnvAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "pytz",
+				Version: "2022.7.1",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-empty",
+		filePath:       "./testdata/python_pipenv/empty.lock",
+		t:              t,
+		a:              NewPythonPIPEnvAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+		wantError:      true,
+	}
+	Run(tc)
+}
+
 func TestJavaGradle(t *testing.T) {
 	// positive
 	tc := testcase{
