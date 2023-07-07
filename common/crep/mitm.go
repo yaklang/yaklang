@@ -461,7 +461,7 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 			return nil
 		}
 
-		p := fmt.Sprintf("%p", req)
+		p := fmt.Sprintf("%p", req.Context())
 		log.Debugf("request-id: [%v]", p)
 		m.mirrorCache.Set(p, &rawRequest{
 			IsHttps: isHttps,
@@ -547,6 +547,9 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 
 	// mirror response
 	group.AddResponseModifier(NewResponseModifier(func(res *http.Response) error {
+		//if strings.Contains(res.Request.URL.String(), "/xxx") {
+		//	log.Infof("Hit")
+		//}
 		// 过滤一下最大长度
 		haveBody := true
 		if largerThanMaxContentLength(res) {
@@ -554,7 +557,7 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		}
 
 		rspP := fmt.Sprintf("%p", res)
-		reqP := fmt.Sprintf("%p", res.Request)
+		reqP := fmt.Sprintf("%p", res.Request.Context())
 		log.Debugf("request-id: [%v]   -->   response-id: [%v] ", reqP, rspP)
 
 		if m.responseMirrorWithInstance != nil {
