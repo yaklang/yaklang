@@ -48,12 +48,12 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"smb":            smbAuth,
 	"telnet":         telnetAuth,
 	"snmpv2":         snmp_v2Auth,
-	"snmpv3_md5":     snmpV3Auth_MD5,
-	"snmpv3_sha":     snmpV3Auth_SHA,
-	"snmpv3_sha-224": snmpV3Auth_SHA_224,
-	"snmpv3_sha-256": snmpV3Auth_SHA_256,
-	"snmpv3_sha-384": snmpV3Auth_SHA_384,
-	"snmpv3_sha-512": snmpV3Auth_SHA_512,
+	"snmpv3_md5":     snmpV3BruteFactory("snmpv3_md5"),
+	"snmpv3_sha":     snmpV3BruteFactory("snmpv3_sha"),
+	"snmpv3_sha-224": snmpV3BruteFactory("snmpv3_sha-224"),
+	"snmpv3_sha-256": snmpV3BruteFactory("snmpv3_sha-256"),
+	"snmpv3_sha-384": snmpV3BruteFactory("snmpv3_sha-384"),
+	"snmpv3_sha-512": snmpV3BruteFactory("snmpv3_sha-512"),
 	//"oracle": func(item *BruteItem) *BruteItemResult {
 	//
 	//},

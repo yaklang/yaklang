@@ -8,70 +8,30 @@ import (
 	"time"
 )
 
-var snmpV3Auth_MD5 = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_MD5",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.MD5)
-	},
-}
-
-var snmpV3Auth_SHA = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_SHA",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.SHA)
-	},
-}
-
-var snmpV3Auth_SHA_512 = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_SHA-512",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.SHA512)
-	},
-}
-
-var snmpV3Auth_SHA_384 = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_SHA-384",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.SHA384)
-	},
-}
-
-var snmpV3Auth_SHA_256 = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_SHA-256",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.SHA256)
-	},
-}
-
-var snmpV3Auth_SHA_224 = &DefaultServiceAuthInfo{
-	ServiceName:      "snmp_v3_SHA-224",
-	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
-	UnAuthVerify:     nil,
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		return v3Brute(item, gosnmp.SHA224)
-	},
+func snmpV3BruteFactory(name string) *DefaultServiceAuthInfo {
+	alg := gosnmp.MD5
+	switch name {
+	case "snmpv3_sha":
+		alg = gosnmp.SHA
+	case "snmpv3_sha-224":
+		alg = gosnmp.SHA224
+	case "snmpv3_sha-256":
+		alg = gosnmp.SHA256
+	case "snmpv3_sha-384":
+		alg = gosnmp.SHA384
+	case "snmpv3_sha-512":
+		alg = gosnmp.SHA512
+	}
+	return &DefaultServiceAuthInfo{
+		ServiceName:      name,
+		DefaultPorts:     "161",
+		DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
+		DefaultPasswords: CommonPasswords,
+		UnAuthVerify:     nil,
+		BrutePass: func(item *BruteItem) *BruteItemResult {
+			return v3Brute(item, alg)
+		},
+	}
 }
 
 func v3Brute(item *BruteItem, alg gosnmp.SnmpV3AuthProtocol) *BruteItemResult {
