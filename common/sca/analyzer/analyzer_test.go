@@ -93,7 +93,7 @@ func Run(tc testcase) {
 // package
 func TestRPM(t *testing.T) {
 	tc := testcase{
-		filePath:  "./testdata/rpmdb.sqlite",
+		filePath:  "./testdata/rpm/rpmdb.sqlite",
 		wantPkgs:  RpmWantPkgs,
 		t:         t,
 		a:         NewRPMAnalyzer(),
@@ -104,7 +104,7 @@ func TestRPM(t *testing.T) {
 
 func TestApk(t *testing.T) {
 	tc := testcase{
-		filePath: "./testdata/apk",
+		filePath: "./testdata/apk/apk",
 		wantPkgs: ApkWantPkgs,
 
 		t:         t,
@@ -114,7 +114,7 @@ func TestApk(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath: "./testdata/negative-apk",
+		filePath: "./testdata/apk/negative-apk",
 		wantPkgs: []types.Package{
 			{
 				Name:    "ssl_client",
@@ -135,7 +135,7 @@ func TestApk(t *testing.T) {
 func TestDpkg(t *testing.T) {
 	a := NewDpkgAnalyzer()
 	tc := testcase{
-		filePath:  "./testdata/dpkg",
+		filePath:  "./testdata/dpkg/dpkg",
 		t:         t,
 		a:         a,
 		matchType: 1,
@@ -144,7 +144,7 @@ func TestDpkg(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath:  "./testdata/negative-dpkg",
+		filePath:  "./testdata/dpkg/negative-dpkg",
 		t:         t,
 		a:         a,
 		matchType: 1,
@@ -157,7 +157,7 @@ func TestDpkg(t *testing.T) {
 func TestConan(t *testing.T) {
 	// happy test
 	tc := testcase{
-		filePath:  "./testdata/conan",
+		filePath:  "./testdata/conan/conan",
 		t:         t,
 		a:         NewConanAnalyzer(),
 		matchType: 1,
@@ -167,22 +167,23 @@ func TestConan(t *testing.T) {
 				Version: "3.0.5",
 			},
 			{
-				Name:    "zlib",
-				Version: "1.2.12",
+				Name:     "zlib",
+				Version:  "1.2.12",
+				Indirect: true,
 			},
 		},
 	}
 	Run(tc)
 
 	// empty
-	tc.filePath = "./testdata/negative-conan"
+	tc.filePath = "./testdata/conan/negative-conan"
 	tc.wantPkgs = []types.Package{}
 	Run(tc)
 }
 
 func TestGoBinary(t *testing.T) {
 	tc := testcase{
-		filePath:  "./testdata/gobinary",
+		filePath:  "./testdata/go_binary/go-binary",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
 		matchType: 1,
@@ -204,7 +205,7 @@ func TestGoBinary(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath:  "./testdata/negative-gobinary-broken_elf",
+		filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
 		matchType: 1,
@@ -213,7 +214,7 @@ func TestGoBinary(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath:  "./testdata/negative-gobinary-bash",
+		filePath:  "./testdata/go_binary/negative-go-binary-bash",
 		t:         t,
 		a:         NewGoBinaryAnalyzer(),
 		matchType: 1,
@@ -224,13 +225,13 @@ func TestGoBinary(t *testing.T) {
 
 func TestGoMod(t *testing.T) {
 	tc := testcase{
-		filePath:    "./testdata/gomod/positive/mod",
+		filePath:    "./testdata/go_mod/positive/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
 		a:           NewGoModAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
-			"/test/go.sum": "./testdata/gomod/positive/sum",
+			"/test/go.sum": "./testdata/go_mod/positive/sum",
 		},
 		wantPkgs: []types.Package{
 			{
@@ -247,13 +248,13 @@ func TestGoMod(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath:    "./testdata/gomod/lessthan117/mod",
+		filePath:    "./testdata/go_mod/lessthan117/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
 		a:           NewGoModAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
-			"/test/go.sum": "./testdata/gomod/lessthan117/sum",
+			"/test/go.sum": "./testdata/go_mod/lessthan117/sum",
 		},
 		wantPkgs: []types.Package{
 			{
@@ -270,7 +271,7 @@ func TestGoMod(t *testing.T) {
 	Run(tc)
 
 	tc = testcase{
-		filePath:    "./testdata/gomod/negative/mod",
+		filePath:    "./testdata/go_mod/negative/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
 		a:           NewGoModAnalyzer(),
