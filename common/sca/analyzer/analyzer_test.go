@@ -315,13 +315,13 @@ func TestGoMod(t *testing.T) {
 func TestPHPComposer(t *testing.T) {
 	tc := testcase{
 		name:        "positive",
-		filePath:    "./testdata/php_composer/composer.lock",
+		filePath:    "./testdata/php_composer/positive/composer.lock",
 		virtualPath: "/test/composer.lock",
 		t:           t,
 		a:           NewPHPComposerAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
-			"/test/composer.json": "./testdata/php_composer/composer.json",
+			"/test/composer.json": "./testdata/php_composer/positive/composer.json",
 		},
 		wantPkgs: []types.Package{
 			{
@@ -341,7 +341,7 @@ func TestPHPComposer(t *testing.T) {
 	// json error
 	tc = testcase{
 		name:        "negative-wrongjson",
-		filePath:    "./testdata/php_composer/composer.lock",
+		filePath:    "./testdata/php_composer/negative/composer.lock",
 		virtualPath: "/test/composer.lock",
 		t:           t,
 		a:           NewPHPComposerAnalyzer(),
@@ -367,7 +367,7 @@ func TestPHPComposer(t *testing.T) {
 	// no json file
 	tc = testcase{
 		name:           "negative-nojson",
-		filePath:       "./testdata/php_composer/composer.lock",
+		filePath:       "./testdata/php_composer/negative/composer.lock",
 		virtualPath:    "/test/composer.lock",
 		t:              t,
 		a:              NewPHPComposerAnalyzer(),
