@@ -19,11 +19,11 @@ const (
 	phpJsonFile = "composer.json"
 
 	statusComposerLock int = 1
-	statusComposerJson int = 1
+	statusComposerJson int = 2
 )
 
 func init() {
-	RegisterAnalyzer(TypConan, NewConanAnalyzer())
+	RegisterAnalyzer(TypComposer, NewPHPComposerAnalyzer())
 }
 
 type composerAnalyzer struct{}
