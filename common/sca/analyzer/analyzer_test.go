@@ -528,6 +528,132 @@ func TestPythonPIPEnv(t *testing.T) {
 	Run(tc)
 }
 
+func TestPythonPoetry(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/python_poetry/positive/poetry.lock",
+		virtualPath: "/poetry.lock",
+		t:           t,
+		a:           NewPythonPoetryAnalyzer(),
+		matchType:   1,
+		matchedFileMap: map[string]string{
+			"/pyproject.toml": "./testdata/python_poetry/positive/pyproject.toml",
+		},
+		wantPkgs: []types.Package{
+			{
+				Name:     "certifi",
+				Version:  "2022.12.7",
+				Indirect: true,
+			},
+			{
+				Name:     "charset-normalizer",
+				Version:  "2.1.1",
+				Indirect: true,
+			},
+			{
+				Name:     "click",
+				Version:  "7.1.2",
+				Indirect: true,
+			},
+			{
+				Name:    "flask",
+				Version: "1.1.4",
+			},
+			{
+				Name:     "idna",
+				Version:  "3.4",
+				Indirect: true,
+			},
+			{
+				Name:     "itsdangerous",
+				Version:  "1.1.0",
+				Indirect: true,
+			},
+			{
+				Name:     "jinja2",
+				Version:  "2.11.3",
+				Indirect: true,
+			},
+			{
+				Name:     "markupsafe",
+				Version:  "2.1.2",
+				Indirect: true,
+			},
+			{
+				Name:    "requests",
+				Version: "2.28.1",
+			},
+			{
+				Name:     "urllib3",
+				Version:  "1.26.14",
+				Indirect: true,
+			},
+			{
+				Name:     "werkzeug",
+				Version:  "1.0.1",
+				Indirect: true,
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-nopyproject",
+		filePath:       "./testdata/python_poetry/positive-nopyproject/poetry.lock",
+		virtualPath:    "/poetry.lock",
+		t:              t,
+		a:              NewPythonPoetryAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "click",
+				Version: "8.1.3",
+			},
+			{
+				Name:    "colorama",
+				Version: "0.4.6",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "negative",
+		filePath:       "./testdata/python_poetry/negative/poetry.lock",
+		virtualPath:    "/poetry.lock",
+		t:              t,
+		a:              NewPythonPoetryAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+		wantError:      true,
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "negative-wrong-project",
+		filePath:       "./testdata/python_poetry/negative-wrong-project/poetry.lock",
+		virtualPath:    "/poetry.lock",
+		t:              t,
+		a:              NewPythonPoetryAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "click",
+				Version: "8.1.3",
+			},
+			{
+				Name:    "colorama",
+				Version: "0.4.6",
+			},
+		},
+	}
+	Run(tc)
+}
+
 func TestJavaGradle(t *testing.T) {
 	// positive
 	tc := testcase{
