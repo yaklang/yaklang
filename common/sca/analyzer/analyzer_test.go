@@ -12,11 +12,13 @@ import (
 )
 
 type testcase struct {
-	filePath  string
-	wantPkgs  []types.Package
-	t         *testing.T
-	a         Analyzer
-	matchType int
+	filePath       string
+	virtualPath    string
+	wantPkgs       []types.Package
+	t              *testing.T
+	a              Analyzer
+	matchType      int
+	matchedFileMap map[string]string
 }
 
 func Run(tc testcase) {
@@ -25,15 +27,29 @@ func Run(tc testcase) {
 	if err != nil {
 		t.Fatalf("con't open file: %v", err)
 	}
+	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, fileInfo) {
+		f, err := os.Open(v)
+		if err != nil {
+			t.Fatalf("con't open file: %v", err)
+		}
+		return k, fileInfo{
+			path:        k,
+			a:           tc.a,
+			f:           f,
+			matchStatus: tc.matchType,
+		}
+	})
+
 	pkgs, err := tc.a.Analyze(AnalyzeFileInfo{
 		self: fileInfo{
-			path:        "",
+			path:        tc.virtualPath,
 			a:           tc.a,
 			f:           f,
 			matchStatus: tc.matchType,
 		},
-		matchedFileInfos: map[string]fileInfo{},
+		matchedFileInfos: matchedFileInfos,
 	})
+
 	if err != nil {
 		t.Fatalf("analyzer error: %v", err)
 	}
@@ -63,6 +79,9 @@ func Run(tc testcase) {
 		}
 		if pkgs[i].Version != tc.wantPkgs[i].Version {
 			t.Fatalf("pkgs %d(%s) version error: %s(got) != %s(want)", i, pkgs[i].Name, pkgs[i].Version, tc.wantPkgs[i].Version)
+		}
+		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
+			t.Fatalf("pkgs %d(%s) indirect error: %v(got) != %v(want)", i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
 		}
 	}
 }
@@ -195,6 +214,54 @@ func TestGoBinary(t *testing.T) {
 		a:         NewGoBinaryAnalyzer(),
 		matchType: 1,
 		wantPkgs:  []types.Package{},
+	}
+	Run(tc)
+}
+
+func TestGoMod(t *testing.T) {
+	tc := testcase{
+		filePath:    "./testdata/gomod/positive/mod",
+		virtualPath: "/test/go.mod",
+		t:           t,
+		a:           NewGoModAnalyzer(),
+		matchType:   1,
+		matchedFileMap: map[string]string{
+			"/test/go.sum": "./testdata/gomod/positive/sum",
+		},
+		wantPkgs: []types.Package{
+			{
+				Name:    "github.com/aquasecurity/go-dep-parser",
+				Version: "0.0.0-20220406074731-71021a481237",
+			},
+			{
+				Name:     "golang.org/x/xerrors",
+				Version:  "0.0.0-20200804184101-5ec99f83aff1",
+				Indirect: true,
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		filePath:    "./testdata/gomod/lessthan117/mod",
+		virtualPath: "/test/go.mod",
+		t:           t,
+		a:           NewGoModAnalyzer(),
+		matchType:   1,
+		matchedFileMap: map[string]string{
+			"/test/go.sum": "./testdata/gomod/lessthan117/sum",
+		},
+		wantPkgs: []types.Package{
+			{
+				Name:    "github.com/aquasecurity/go-dep-parser",
+				Version: "0.0.0-20230219131432-590b1dfb6edd",
+			},
+			{
+				Name:     "github.com/BurntSushi/toml",
+				Version:  "0.3.1",
+				Indirect: true,
+			},
+		},
 	}
 	Run(tc)
 }

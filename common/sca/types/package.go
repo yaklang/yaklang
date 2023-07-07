@@ -1,6 +1,7 @@
 package types
 
 type Package struct {
-	Name    string
-	Version string
+	Name     string
+	Version  string
+	Indirect bool
 }
