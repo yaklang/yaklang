@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
 	"github.com/yaklang/yaklang/common/iiop"
+	"github.com/yaklang/yaklang/common/ja3"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openai"
@@ -243,6 +244,9 @@ func initYaklangLib() {
 	// suricata
 	yaklang.Import("suricata", chaosmaker.ChaosMakerExports)
 	yaklang.Import("pcapx", pcapx.Exports)
+
+	// ja3
+	yaklang.Import("ja3", ja3.Exports)
 }
 
 type ScriptEngine struct {
