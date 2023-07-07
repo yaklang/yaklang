@@ -51,6 +51,12 @@ func _withScanMode(mode analyzer.ScanMode) dockerContextOption {
 	}
 }
 
+func _withConcurrent(n int) dockerContextOption {
+	return func(c *dockerContextConfig) {
+		c.numWorkers |= n
+	}
+}
+
 func saveImageFromContext(host, imageID string, f io.Writer) error {
 	opts := []client.Opt{
 		client.FromEnv,
