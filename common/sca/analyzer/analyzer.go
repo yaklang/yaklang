@@ -221,8 +221,9 @@ func ParseLanguageConfiguration(fi fileInfo, parser godeptypes.Parser) ([]types.
 
 	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) types.Package {
 		return types.Package{
-			Name:    lib.Name,
-			Version: lib.Version,
+			Name:     lib.Name,
+			Version:  lib.Version,
+			Indirect: lib.Indirect,
 		}
 	})
 	return pkgs, nil
