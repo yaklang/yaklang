@@ -12,7 +12,16 @@ func generateService(buf *Buffer, indentLevel int, service *descriptorpb.Service
 	buf.Printf("%sservice %s {", indent, service.GetName())
 	generateHeadOptions(buf, indent, service.GetOptions().GetUninterpretedOption())
 	for _, method := range service.Method {
-		buf.Printf("%s    rpc %s(%s) returns (%s) {", indent, method.GetName(), method.GetInputType(), method.GetOutputType())
+		inputType := method.GetInputType()
+		outputType := method.GetOutputType()
+		if method.GetClientStreaming() {
+			inputType = "stream " + inputType
+		}
+		if method.GetServerStreaming() {
+			outputType = "stream " + outputType
+		}
+		buf.Printf("%s    rpc %s(%s) returns (%s) {", indent, method.GetName(), inputType, outputType)
+
 		for _, opt := range method.GetOptions().GetUninterpretedOption() {
 			buf.Printf("%s        option %s;", indent, StringifyUninterpretedOption(opt))
 		}

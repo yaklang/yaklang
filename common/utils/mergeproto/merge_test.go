@@ -52,7 +52,7 @@ enum ShellType {
 service T2 {
   // 分析一个 HTTP 请求详情
   rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
-
+  rpc MITM(stream MITMRequest) returns (stream MITMResponse);
 }
 
 message HTTPRequestAnalysisMaterial {

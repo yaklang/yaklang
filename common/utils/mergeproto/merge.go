@@ -2,6 +2,7 @@ package mergeproto
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/yaklang/yaklang/common/log"
 	"google.golang.org/protobuf/proto"
@@ -127,7 +128,7 @@ func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 				}
 			}
 		}
-
+		spew.Dump(newService)
 		// 生成新的服务
 		generateService(buf, 0, newService)
 
