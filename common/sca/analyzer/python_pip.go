@@ -16,7 +16,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypPythonPackaging, NewPythonPackagingAnalyzer())
+	RegisterAnalyzer(TypPythonPIP, NewPythonPIPAnalyzer())
 }
 
 type pythonPIPAnalyzer struct{}
