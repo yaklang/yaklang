@@ -312,6 +312,91 @@ func TestGoMod(t *testing.T) {
 	Run(tc)
 }
 
+func TestPHPComposer(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/php_composer/composer.lock",
+		virtualPath: "/test/composer.lock",
+		t:           t,
+		a:           NewPHPComposerAnalyzer(),
+		matchType:   1,
+		matchedFileMap: map[string]string{
+			"/test/composer.json": "./testdata/php_composer/composer.json",
+		},
+		wantPkgs: []types.Package{
+			{
+				Name:     "pear/log",
+				Version:  "1.13.3",
+				Indirect: false,
+			},
+			{
+				Name:     "pear/pear_exception",
+				Version:  "v1.0.2",
+				Indirect: true,
+			},
+		},
+	}
+	Run(tc)
+
+	// json error
+	tc = testcase{
+		name:        "negative-wrongjson",
+		filePath:    "./testdata/php_composer/composer.lock",
+		virtualPath: "/test/composer.lock",
+		t:           t,
+		a:           NewPHPComposerAnalyzer(),
+		matchType:   1,
+		matchedFileMap: map[string]string{
+			"/test/composer.json": "./testdata/php_composer/wrong.json",
+		},
+		wantPkgs: []types.Package{
+			{
+				Name:     "pear/log",
+				Version:  "1.13.3",
+				Indirect: false,
+			},
+			{
+				Name:     "pear/pear_exception",
+				Version:  "v1.0.2",
+				Indirect: false,
+			},
+		},
+	}
+	Run(tc)
+
+	// no json file
+	tc = testcase{
+		name:           "negative-nojson",
+		filePath:       "./testdata/php_composer/composer.lock",
+		virtualPath:    "/test/composer.lock",
+		t:              t,
+		a:              NewPHPComposerAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:     "pear/log",
+				Version:  "1.13.3",
+				Indirect: false,
+			},
+			{
+				Name:     "pear/pear_exception",
+				Version:  "v1.0.2",
+				Indirect: false,
+			},
+		},
+	}
+	tc.matchedFileMap = map[string]string{}
+	tc.name = "nojson"
+	Run(tc)
+
+	// lock error
+	// tc.wantPkgs = []types.Package{}
+	// tc.filePath = "./testdata/php_composer/wrong.json"
+	// tc.name = "wronglock"
+	// Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),
