@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/chaosmaker"
@@ -19,6 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/rpa"
+	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/simulator"
 	"github.com/yaklang/yaklang/common/systemd"
 	"github.com/yaklang/yaklang/common/t3"
@@ -36,9 +41,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso"
-	"path/filepath"
-	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -245,6 +247,9 @@ func initYaklangLib() {
 
 	// ja3
 	yaklang.Import("ja3", ja3.Exports)
+
+	// sca
+	yaklang.Import("sca", sca.Exports)
 }
 
 type ScriptEngine struct {
