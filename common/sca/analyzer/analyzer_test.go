@@ -447,7 +447,6 @@ func TestPythonPackaging(t *testing.T) {
 	}
 	Run(tc)
 
-	// negative
 	tc = testcase{
 		name:           "positive-no-required-files",
 		filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
