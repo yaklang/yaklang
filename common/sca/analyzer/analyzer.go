@@ -62,7 +62,6 @@ type AnalyzerGroup struct {
 
 	// return
 	pkgs []types.Package
-	err  error
 
 	// matched file
 	matchedFileInfos map[string]fileInfo
@@ -111,10 +110,6 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	}
 }
 
-func (ag *AnalyzerGroup) Error() error {
-	return ag.err
-}
-
 func (ag *AnalyzerGroup) Packages() []types.Package {
 	return lo.Uniq(ag.pkgs)
 }
@@ -131,11 +126,9 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 			defer wg.Done()
 			for fileInfo := range ag.ch {
 				pkgs, err := fileInfo.self.a.Analyze(fileInfo)
-				if err != nil {
-					ag.err = err
-					return
+				if err == nil {
+					ag.pkgs = append(ag.pkgs, pkgs...)
 				}
-				ag.pkgs = append(ag.pkgs, pkgs...)
 			}
 		}()
 	}
