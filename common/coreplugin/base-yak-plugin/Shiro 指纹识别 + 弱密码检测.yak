@@ -320,7 +320,7 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
                             "gadgets": "",
                         }
                         tokens,_ = risk.CheckDNSLogByToken(token)
-                        gadgets = []
+                        gadgets = make([]string)
                         for _,v := range tokens{
                             domain = str.ToLower(v.Domain)
                             if str.Contains(domain,"."+token) {
