@@ -689,6 +689,55 @@ func TestJavaGradle(t *testing.T) {
 	Run(tc)
 }
 
+func TestJavaPom(t *testing.T) {
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/java_pom/positive/pom.xml",
+		virtualPath:    "/test/pom.xml",
+		t:              t,
+		a:              NewJavaPomAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "com.example:example",
+				Version: "1.0.0",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-requirement",
+		filePath:       "./testdata/java_pom/requirements/pom.xml",
+		virtualPath:    "/test/pom.xml",
+		t:              t,
+		a:              NewJavaPomAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "com.example:example",
+				Version: "2.0.0",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "negative",
+		filePath:       "./testdata/java_pom/negative/pom.xml",
+		virtualPath:    "/test/pom.xml",
+		t:              t,
+		a:              NewJavaPomAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+		wantError:      true,
+	}
+	Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),
