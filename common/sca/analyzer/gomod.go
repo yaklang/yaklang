@@ -7,7 +7,6 @@ import (
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/sum"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/types"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -54,7 +53,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 		p := mod.NewParser(true)
 		pkgs, err := ParseLanguageConfiguration(fi, p)
 		if err != nil {
-			return nil, utils.Errorf("go mod parse error: %s", err)
+			return nil, err
 		}
 		// if golang version < 1.17, need to parse go.sum
 		if lessThanGo117(pkgs) {
@@ -63,7 +62,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 				sp := sum.NewParser()
 				sumPkgs, err := ParseLanguageConfiguration(sfi, sp)
 				if err != nil {
-					return nil, utils.Errorf("go sum parse error: %s", err)
+					return nil, err
 				}
 				_, subPkgs := lo.Difference(pkgs, sumPkgs)
 				subPkgs = lo.Map(subPkgs, func(item types.Package, index int) types.Package {
@@ -71,7 +70,6 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 					return item
 				})
 				pkgs = append(pkgs, subPkgs...)
-
 			}
 		}
 		return pkgs, nil
