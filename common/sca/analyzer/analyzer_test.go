@@ -449,7 +449,7 @@ func TestPythonPackaging(t *testing.T) {
 
 	// negative
 	tc = testcase{
-		name:           "positive-wheel",
+		name:           "positive-no-required-files",
 		filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
 		t:              t,
 		a:              NewPythonPackagingAnalyzer(),
