@@ -497,6 +497,35 @@ func TestPythonPIP(t *testing.T) {
 	Run(tc)
 }
 
+func TestJavaGradle(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/java_gradle/positive.lockfile",
+		virtualPath:    "/test/gradle.lockfile",
+		t:              t,
+		a:              NewJavaGradleAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{Name: "com.example:example",
+				Version: "0.0.1",
+			},
+		},
+	}
+	Run(tc)
+	tc = testcase{
+		name:        "negative",
+		filePath:    "./testdata/java_gradle/negative.lockfile",
+		virtualPath: "/test/gradle.lockfile",
+		t:           t,
+		a:           NewJavaGradleAnalyzer(),
+		matchType:   1,
+		wantPkgs:    []types.Package{},
+	}
+	Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),
