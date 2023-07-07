@@ -26,9 +26,13 @@ func Run(tc testcase) {
 		t.Fatalf("con't open file: %v", err)
 	}
 	pkgs, err := tc.a.Analyze(AnalyzeFileInfo{
-		path:        "",
-		f:           f,
-		matchStatus: tc.matchType,
+		self: fileInfo{
+			path:        "",
+			a:           tc.a,
+			f:           f,
+			matchStatus: tc.matchType,
+		},
+		matchedFileInfos: map[string]fileInfo{},
 	})
 	if err != nil {
 		t.Fatalf("analyzer error: %v", err)

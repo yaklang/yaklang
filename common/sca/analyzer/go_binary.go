@@ -31,7 +31,8 @@ func (a goBinaryAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a goBinaryAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+	fi := afi.self
 	switch fi.matchStatus {
 	case statusExecutable:
 		p := binary.NewParser()

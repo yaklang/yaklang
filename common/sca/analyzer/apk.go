@@ -24,7 +24,8 @@ func NewApkAnalyzer() *apkAnalyzer {
 	return &apkAnalyzer{}
 }
 
-func (a apkAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+	fi := afi.self
 	switch fi.matchStatus {
 	case statusInstallFile:
 		var (

@@ -45,7 +45,8 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 	return &rpmAnalyzer{}
 }
 
-func (a rpmAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+	fi := afi.self
 	switch fi.matchStatus {
 	case statusRPM:
 		db, err := rpmdb.Open(fi.f.Name())

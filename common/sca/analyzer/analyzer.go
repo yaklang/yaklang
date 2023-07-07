@@ -34,11 +34,17 @@ type Analyzer interface {
 	Match(MatchInfo) int
 }
 
-type AnalyzeFileInfo struct {
+type fileInfo struct {
 	path        string
 	a           Analyzer
 	f           *os.File
 	matchStatus int
+}
+
+type AnalyzeFileInfo struct {
+	self fileInfo
+	// matched file
+	matchedFileInfos map[string]fileInfo
 }
 
 type MatchInfo struct {
@@ -58,8 +64,8 @@ type AnalyzerGroup struct {
 	pkgs []types.Package
 	err  error
 
-	// scanned file
-	matchedFileInfos map[string]AnalyzeFileInfo
+	// matched file
+	matchedFileInfos map[string]fileInfo
 }
 
 func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
@@ -100,7 +106,7 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	return &AnalyzerGroup{
 		ch:               make(chan AnalyzeFileInfo),
 		numWorkers:       numWorkers,
-		matchedFileInfos: make(map[string]AnalyzeFileInfo),
+		matchedFileInfos: make(map[string]fileInfo),
 		analyzers:        FilterAnalyzer(scanMode),
 	}
 }
@@ -124,7 +130,7 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 		go func() {
 			defer wg.Done()
 			for fileInfo := range ag.ch {
-				pkgs, err := fileInfo.a.Analyze(fileInfo)
+				pkgs, err := fileInfo.self.a.Analyze(fileInfo)
 				if err != nil {
 					ag.err = err
 					return
@@ -186,7 +192,7 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		f.Seek(0, 0)
 
 		// add to scanned files
-		ag.matchedFileInfos[path] = AnalyzeFileInfo{
+		ag.matchedFileInfos[path] = fileInfo{
 			path:        path,
 			a:           a,
 			f:           f,
@@ -198,13 +204,16 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 
 func (ag *AnalyzerGroup) Analyze() error {
 	for _, info := range ag.matchedFileInfos {
-		ag.ch <- info
+		ag.ch <- AnalyzeFileInfo{
+			self:             info,
+			matchedFileInfos: ag.matchedFileInfos,
+		}
 	}
 	close(ag.ch)
 	return nil
 }
 
-func ParseLanguageConfiguration(fi AnalyzeFileInfo, parser godeptypes.Parser) ([]types.Package, error) {
+func ParseLanguageConfiguration(fi fileInfo, parser godeptypes.Parser) ([]types.Package, error) {
 	parsedLibs, _, err := parser.Parse(fi.f)
 	if err != nil {
 		return nil, err

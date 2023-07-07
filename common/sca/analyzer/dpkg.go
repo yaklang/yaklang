@@ -114,7 +114,8 @@ func (a dpkgAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a dpkgAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+	fi := afi.self
 	switch fi.matchStatus {
 	case statusStatus:
 		return a.analyzeStatus(fi.f)

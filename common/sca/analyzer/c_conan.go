@@ -25,7 +25,8 @@ func NewConanAnalyzer() *conanAnalyzer {
 	return &conanAnalyzer{}
 }
 
-func (a conanAnalyzer) Analyze(fi AnalyzeFileInfo) ([]types.Package, error) {
+func (a conanAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+	fi := afi.self
 	switch fi.matchStatus {
 	case statusConan:
 		p := conan.NewParser()
