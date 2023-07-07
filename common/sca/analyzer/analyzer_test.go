@@ -536,6 +536,10 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(NewConanAnalyzer()).String(),
 		reflect.TypeOf(NewGoBinaryAnalyzer()).String(),
 		reflect.TypeOf(NewGoModAnalyzer()).String(),
+		reflect.TypeOf(NewPHPComposerAnalyzer()).String(),
+		reflect.TypeOf(NewJavaGradleAnalyzer()).String(),
+		reflect.TypeOf(NewPythonPIPAnalyzer()).String(),
+		reflect.TypeOf(NewPythonPackagingAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
