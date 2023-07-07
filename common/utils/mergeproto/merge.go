@@ -37,7 +37,14 @@ type packageFileGroup struct {
 
 func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 	var entries []string
-	if err := fs.WalkDir(os.DirFS(path), ".", func(path string, d fs.DirEntry, err error) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return nil, err
+	}
+
+	fmt.Println("Current directory:", dir)
+	if err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".proto") {
 			return err
 		}

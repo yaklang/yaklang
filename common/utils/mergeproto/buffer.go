@@ -28,7 +28,7 @@ func (b *Buffer) String() string {
 }
 
 func (b *Buffer) WriteProtoFile() error {
-	err := os.WriteFile("common/yakgrpc", b.Bytes(), 0644)
+	err := os.WriteFile("../../yakgrpc/yakgrpc.proto", b.Bytes(), 0644)
 	if err != nil {
 		log.Fatalf("unable to write file: %v", err)
 		return err

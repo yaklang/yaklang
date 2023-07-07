@@ -53,7 +53,7 @@ func (s *Server) GetSimpleDetectUnfinishedTask(ctx context.Context, req *ypb.Emp
 	return &ypb.GetSimpleDetectUnfinishedTaskResponse{Tasks: tasks}, nil
 }
 
-func (s *Server) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
+func (s *Server) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
 	manager := NewProgressManager(s.GetProjectDatabase())
 	reqResult, err := manager.GetSimpleProgressByUid(req.GetUid(), false, false)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *Server) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *yp
 	return reqResult, nil
 }
 
-func (s *Server) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
+func (s *Server) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.SimpleDetectYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
 	manager := NewProgressManager(s.GetProjectDatabase())
 	reqResult, err := manager.GetSimpleProgressByUid(req.GetUid(), true, true)
 	if err != nil {

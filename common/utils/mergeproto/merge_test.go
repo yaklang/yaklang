@@ -90,3 +90,11 @@ message HTTPRequestAnalysisMaterial {
 	}
 	fmt.Println(buf.String())
 }
+
+func TestGenProtoBytes(t *testing.T) {
+	b, err := GenProtoBytes("../../yakgrpc/protos/", "ypb")
+	if err != nil {
+		t.Fatalf("Failed to generate proto files: %s", err)
+	}
+	b.WriteProtoFile()
+}
