@@ -111,13 +111,18 @@ func v3Brute(item *BruteItem, alg gosnmp.SnmpV3AuthProtocol) *BruteItemResult {
 	}
 
 	oid := []string{"1.3.6.1.2.1.1.1.0"}
-	_, err = snmpConfig.Get(oid)
+	res, err := snmpConfig.Get(oid)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown username") {
 			result.UserEliminated = true
 		}
 
 		log.Errorf("brute failed: %s", err)
+		return result
+	}
+
+	if res.Variables[0].Type != gosnmp.OctetString {
+		log.Errorf("brute failed")
 		return result
 	}
 
