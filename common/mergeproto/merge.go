@@ -2,13 +2,11 @@ package mergeproto
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/yaklang/yaklang/common/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -35,16 +33,9 @@ type packageFileGroup struct {
 	subPackages map[string]*packageFileGroup
 }
 
-func GenProtoBytes(path, pPackage string) (*Buffer, error) {
+func GenProtoBytes(root, pPackage string) (*Buffer, error) {
 	var entries []string
-	dir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return nil, err
-	}
-
-	fmt.Println("Current directory:", dir)
-	if err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".proto") {
 			return err
 		}
@@ -61,7 +52,7 @@ func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 
 	var filePaths []string
 	for _, entry := range entries {
-		filePaths = append(filePaths, filepath.Join(path, entry))
+		filePaths = append(filePaths, entry)
 	}
 
 	files, err := parser.ParseFilesButDoNotLink(filePaths...)
@@ -135,7 +126,6 @@ func GenProtoBytes(path, pPackage string) (*Buffer, error) {
 				}
 			}
 		}
-		spew.Dump(newService)
 		// 生成新的服务
 		generateService(buf, 0, newService)
 

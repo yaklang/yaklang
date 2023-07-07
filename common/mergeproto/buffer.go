@@ -27,8 +27,8 @@ func (b *Buffer) String() string {
 	return b.buf.String()
 }
 
-func (b *Buffer) WriteProtoFile() error {
-	err := os.WriteFile("../../yakgrpc/yakgrpc.proto", b.Bytes(), 0644)
+func (b *Buffer) WriteProtoFile(p string) error {
+	err := os.WriteFile(p, b.Bytes(), 0644)
 	if err != nil {
 		log.Fatalf("unable to write file: %v", err)
 		return err

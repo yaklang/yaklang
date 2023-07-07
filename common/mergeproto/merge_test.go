@@ -96,5 +96,8 @@ func TestGenProtoBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate proto files: %s", err)
 	}
-	b.WriteProtoFile()
+	err = b.WriteProtoFile("common/yakgrpc/yakgrpc.proto")
+	if err != nil {
+		t.Fatalf("Failed to generate proto files: %s", err)
+	}
 }
