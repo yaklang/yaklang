@@ -92,6 +92,7 @@ func Run(tc testcase) {
 
 // package
 func TestRPM(t *testing.T) {
+	// positive
 	tc := testcase{
 		filePath:  "./testdata/rpm/rpmdb.sqlite",
 		wantPkgs:  RpmWantPkgs,
@@ -103,6 +104,7 @@ func TestRPM(t *testing.T) {
 }
 
 func TestApk(t *testing.T) {
+	// positive
 	tc := testcase{
 		filePath: "./testdata/apk/apk",
 		wantPkgs: ApkWantPkgs,
@@ -113,6 +115,7 @@ func TestApk(t *testing.T) {
 	}
 	Run(tc)
 
+	// negative
 	tc = testcase{
 		filePath: "./testdata/apk/negative-apk",
 		wantPkgs: []types.Package{
@@ -133,6 +136,7 @@ func TestApk(t *testing.T) {
 }
 
 func TestDpkg(t *testing.T) {
+	// positive
 	a := NewDpkgAnalyzer()
 	tc := testcase{
 		filePath:  "./testdata/dpkg/dpkg",
@@ -143,6 +147,7 @@ func TestDpkg(t *testing.T) {
 	}
 	Run(tc)
 
+	// negative
 	tc = testcase{
 		filePath:  "./testdata/dpkg/negative-dpkg",
 		t:         t,
@@ -155,7 +160,7 @@ func TestDpkg(t *testing.T) {
 
 // language
 func TestConan(t *testing.T) {
-	// happy test
+	// positive
 	tc := testcase{
 		filePath:  "./testdata/conan/conan",
 		t:         t,
@@ -175,13 +180,14 @@ func TestConan(t *testing.T) {
 	}
 	Run(tc)
 
-	// empty
+	// negative
 	tc.filePath = "./testdata/conan/negative-conan"
 	tc.wantPkgs = []types.Package{}
 	Run(tc)
 }
 
 func TestGoBinary(t *testing.T) {
+	// positive
 	tc := testcase{
 		filePath:  "./testdata/go_binary/go-binary",
 		t:         t,
@@ -204,6 +210,7 @@ func TestGoBinary(t *testing.T) {
 	}
 	Run(tc)
 
+	// negative broken elf
 	tc = testcase{
 		filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
 		t:         t,
@@ -213,6 +220,7 @@ func TestGoBinary(t *testing.T) {
 	}
 	Run(tc)
 
+	// negative bash
 	tc = testcase{
 		filePath:  "./testdata/go_binary/negative-go-binary-bash",
 		t:         t,
@@ -224,6 +232,7 @@ func TestGoBinary(t *testing.T) {
 }
 
 func TestGoMod(t *testing.T) {
+	// positive
 	tc := testcase{
 		filePath:    "./testdata/go_mod/positive/mod",
 		virtualPath: "/test/go.mod",
@@ -247,6 +256,7 @@ func TestGoMod(t *testing.T) {
 	}
 	Run(tc)
 
+	// postivie less than golang 1.17, nedd parse go.sum
 	tc = testcase{
 		filePath:    "./testdata/go_mod/lessthan117/mod",
 		virtualPath: "/test/go.mod",
@@ -270,6 +280,7 @@ func TestGoMod(t *testing.T) {
 	}
 	Run(tc)
 
+	// negative
 	tc = testcase{
 		filePath:    "./testdata/go_mod/negative/mod",
 		virtualPath: "/test/go.mod",
