@@ -459,6 +459,44 @@ func TestPythonPackaging(t *testing.T) {
 	Run(tc)
 }
 
+func TestPythonPIP(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/python_pip/requirements.txt",
+		t:              t,
+		a:              NewPythonPIPAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "click",
+				Version: "8.0.0",
+			},
+			{
+				Name:    "Flask",
+				Version: "2.0.0",
+			},
+			{
+				Name:    "itsdangerous",
+				Version: "2.0.0",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-empty",
+		filePath:       "./testdata/python_pip/empty.txt",
+		t:              t,
+		a:              NewPythonPIPAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+	}
+	Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),
