@@ -15,6 +15,7 @@ type testcase struct {
 	filePath       string
 	virtualPath    string
 	wantPkgs       []types.Package
+	wantError      bool
 	t              *testing.T
 	a              Analyzer
 	matchType      int
@@ -50,8 +51,11 @@ func Run(tc testcase) {
 		matchedFileInfos: matchedFileInfos,
 	})
 
-	if err != nil {
-		t.Fatalf("analyzer error: %v", err)
+	if tc.wantError && err == nil {
+		t.Fatal("want error but nil")
+	}
+	if !tc.wantError && err != nil {
+		t.Fatalf("analyze error: %v", err)
 	}
 
 	sort.Slice(pkgs, func(i, j int) bool {
@@ -262,6 +266,17 @@ func TestGoMod(t *testing.T) {
 				Indirect: true,
 			},
 		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		filePath:    "./testdata/gomod/negative/mod",
+		virtualPath: "/test/go.mod",
+		t:           t,
+		a:           NewGoModAnalyzer(),
+		matchType:   1,
+		wantPkgs:    []types.Package{},
+		wantError:   true,
 	}
 	Run(tc)
 }
