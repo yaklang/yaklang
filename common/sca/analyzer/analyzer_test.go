@@ -750,8 +750,11 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(NewGoModAnalyzer()).String(),
 		reflect.TypeOf(NewPHPComposerAnalyzer()).String(),
 		reflect.TypeOf(NewJavaGradleAnalyzer()).String(),
+		reflect.TypeOf(NewJavaPomAnalyzer()).String(),
 		reflect.TypeOf(NewPythonPIPAnalyzer()).String(),
 		reflect.TypeOf(NewPythonPackagingAnalyzer()).String(),
+		reflect.TypeOf(NewPythonPIPEnvAnalyzer()).String(),
+		reflect.TypeOf(NewPythonPoetryAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
