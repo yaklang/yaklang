@@ -397,6 +397,69 @@ func TestPHPComposer(t *testing.T) {
 	// Run(tc)
 }
 
+func TestPythonPackaging(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:           "positive-egg-zip",
+		filePath:       "./testdata/python_packaging/egg/kitchen-1.2.6-py2.7.egg",
+		t:              t,
+		a:              NewPythonPackagingAnalyzer(),
+		matchType:      2,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "kitchen",
+				Version: "1.2.6",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-egg-info",
+		filePath:       "./testdata/python_packaging/egg-info/PKG-INFO",
+		t:              t,
+		a:              NewPythonPackagingAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "distlib",
+				Version: "0.3.1",
+			},
+		},
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-wheel",
+		filePath:       "./testdata/python_packaging/dist-info/METADATA",
+		t:              t,
+		a:              NewPythonPackagingAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs: []types.Package{
+			{
+				Name:    "distlib",
+				Version: "0.3.1",
+			},
+		},
+	}
+	Run(tc)
+
+	// negative
+	tc = testcase{
+		name:           "positive-wheel",
+		filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
+		t:              t,
+		a:              NewPythonPackagingAnalyzer(),
+		matchType:      2,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []types.Package{},
+	}
+	Run(tc)
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(NewRPMAnalyzer()).String(),
