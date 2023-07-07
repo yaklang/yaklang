@@ -50,9 +50,16 @@ enum ShellType {
 }
 
 service T2 {
-  // 分析一个 HTTP 请求详情
-  rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
-  rpc MITM(stream MITMRequest) returns (stream MITMResponse);
+	// 分析一个 HTTP 请求详情
+	rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
+	rpc MITM(stream MITMRequest) returns (stream MITMResponse);
+}
+
+message MapMessage {
+    map<string, int32> name_to_id = 1;
+	repeated string ExactKeywords = 1;
+  string old_field = 1 [deprecated=true];
+  string new_field = 2;
 }
 
 message HTTPRequestAnalysisMaterial {
