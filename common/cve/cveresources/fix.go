@@ -1,44 +1,47 @@
 package cveresources
 
 import (
+	"context"
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // 可能有的情况 lib5 -> lib 剔除不必要的数字以及其他符号
 // lib-2.1.1 -> lib 版本和产品混合
-func generalFix(ProductName string, Products []ProductsTable) (string, error) {
+func generalFix(wg *sync.WaitGroup, fixName chan string, ProductName string, Product ProductsTable) {
 	/*
 		1.简写 iis
 		2.语义切割后模糊匹配(提取出纯字符的名字,尝试把)  lib
 	*/
 
 	//提取单词
+	wg.Add(1)
 	ruleForFuzz, err := regexp.Compile(`[a-zA-Z]+`)
 	if err != nil {
-		return "", utils.Errorf("Regular pattern compile failed: %s", err)
+		log.Errorf("Regular pattern compile failed: %s", err)
 	}
 
 	ruleForAbbr, err := regexp.Compile("^([a-zA-Z\\d]+[_|-])+[a-zA-Z\\d]+$") //简写的正则
 	if err != nil {
-		return "", utils.Errorf("Regular pattern compile failed: %s", err)
+		log.Errorf("Regular pattern compile failed: %s", err)
 	}
 
-	for _, productItem := range Products {
-		inputParts := ruleForFuzz.FindAllString(ProductName, -1)
-		itemParts := ruleForFuzz.FindAllString(productItem.Product, -1)
-		if FuzzCheck(inputParts, itemParts) {
-			return productItem.Product, nil
-		}
-		if ruleForAbbr.MatchString(ProductName) && (AbbrCheck(ProductName, productItem, "-") || AbbrCheck(ProductName, productItem, "_")) {
-			return productItem.Product, nil
-		}
+	inputParts := ruleForFuzz.FindAllString(ProductName, -1)
+	itemParts := ruleForFuzz.FindAllString(Product.Product, -1)
+	if FuzzCheck(inputParts, itemParts) {
+		fixName <- Product.Product
+		return
 	}
-
-	return "", utils.Errorf("Unknown product name")
+	if ruleForAbbr.MatchString(ProductName) && (AbbrCheck(ProductName, Product, "-") || AbbrCheck(ProductName, Product, "_")) {
+		fixName <- Product.Product
+		return
+	}
+	wg.Done()
 }
 
 // FuzzCheck 模糊检查
@@ -98,16 +101,58 @@ func AbbrCheck(name string, info ProductsTable, symbol string) bool {
 
 func FixProductName(ProductName string, db *gorm.DB) (string, error) {
 	var Products []ProductsTable
-	resDb := db.Find(&Products)
+	resDb := db.Where("product = ?", ProductName).Find(&Products)
 	if resDb.Error != nil {
 		log.Errorf("query database failed: %s", resDb.Error)
 	}
-	for _, product := range Products {
-		if product.Product == ProductName {
-			return ProductName, nil
-		}
+	if len(Products) > 0 {
+		return ProductName, nil
 	}
 
-	return generalFix(ProductName, Products)
+	resDb = db.Find(&Products)
+	if resDb.Error != nil {
+		log.Errorf("query database failed: %s", resDb.Error)
+	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	ProductCh := make(chan ProductsTable, 5)
+	fixName := make(chan string)
+	wg := &sync.WaitGroup{}
+
+	go func(p []ProductsTable) {
+		for _, product := range Products {
+			select {
+			case ProductCh <- product:
+			case <-ctx.Done():
+				close(ProductCh)
+				return
+			}
+		}
+		wg.Wait()
+		close(ProductCh)
+		fixName <- ""
+	}(Products)
+
+	go func(Name string) {
+		for {
+			select {
+			case info := <-ProductCh:
+				go generalFix(wg, fixName, Name, info)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ProductName)
+
+	for {
+		select {
+		case result := <-fixName:
+			fmt.Print(result)
+			cancel()
+			if result == "" {
+				return result, utils.Errorf("fix name error: %s [%s]", "Unknown name", ProductName)
+			}
+			return result, nil
+		}
+	}
 }
