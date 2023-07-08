@@ -2,12 +2,12 @@ package analyzer
 
 import (
 	"archive/zip"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/packaging"
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -59,7 +59,7 @@ func (a pythonPackagingAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 
 	switch fi.matchStatus {
