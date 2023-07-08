@@ -1,12 +1,12 @@
 package analyzer
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path"
 	"strings"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/poetry"
 	"github.com/aquasecurity/go-dep-parser/pkg/python/pyproject"
-	"github.com/yaklang/yaklang/common/sca/types"
 )
 
 const (
@@ -35,7 +35,7 @@ func (a pythonPoetryAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 
 	switch fi.matchStatus {

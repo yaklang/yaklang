@@ -2,12 +2,12 @@ package analyzer
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/php/composer"
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
@@ -36,7 +36,7 @@ type composerJson struct {
 	Require map[string]string `json:"require"`
 }
 
-func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusComposerLock:

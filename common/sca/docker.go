@@ -3,10 +3,14 @@ package sca
 import (
 	"archive/tar"
 	"context"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	"io"
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -14,7 +18,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer"
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -88,6 +91,36 @@ func saveImageFromContext(host, imageID string, f io.Writer) error {
 
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
+func walkFS(pathStr string, handler walkFunc) error {
+	var startPath = pathStr
+	var err error
+	if !filepath.IsAbs(pathStr) {
+		startPath, err = filepath.Abs(pathStr)
+		if err != nil {
+			return utils.Errorf("cannot fetch the absolute path: %v", err)
+		}
+	}
+
+	return fs.WalkDir(os.DirFS(startPath), startPath, func(filePath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return utils.Errorf("failed to walk the directory: %v", err)
+		}
+		if d.IsDir() {
+			log.Debugf("skipping the directory: %s", filePath)
+			return nil
+		}
+
+		statsInfo, err := os.Stat(filePath)
+		if err != nil {
+			return err
+		}
+
+		f := lazyfile.LazyOpenStreamByFile(filePath, os.O_RDWR, os.ModePerm)
+		defer f.Close()
+		return handler(filePath, statsInfo, f)
+	})
+}
+
 func walkImage(image *os.File, walkFunc walkFunc) error {
 	img, err := tarball.ImageFromPath(image.Name(), nil)
 	if err != nil {
@@ -142,7 +175,7 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 	return nil
 }
 
-func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Package, error) {
+func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
 
 	// match file
@@ -157,10 +190,10 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 	}
 
 	// ctx, cancel := context.WithCancel(context.Background())
-	wg := sync.WaitGroup{}
+	var wg = new(sync.WaitGroup)
 
 	// analyzer-consumer
-	ag.Consume(&wg)
+	ag.Consume(wg)
 
 	// analyzer-productor
 	ag.Analyze()
@@ -170,12 +203,13 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]types.Pa
 	return ag.Packages(), nil
 }
 
-func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]types.Package, error) {
+func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 
+	log.Infof("create temporary file to store the image: %s", imageID)
 	f, err := os.CreateTemp("", "fanal-*")
 	if err != nil {
 		return nil, utils.Errorf("failed to create a temporary file")
@@ -186,6 +220,7 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 		os.Remove(name)
 	}()
 
+	log.Infof("start to save the image: %s", imageID)
 	if err = saveImageFromContext(config.endpoint, imageID, f); err != nil {
 		return nil, err
 
@@ -196,7 +231,7 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	return loadDockerImage(f, *config)
 }
 
-func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]types.Package, error) {
+func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)

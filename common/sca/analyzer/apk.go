@@ -2,8 +2,7 @@ package analyzer
 
 import (
 	"bufio"
-
-	"github.com/yaklang/yaklang/common/sca/types"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
 const (
@@ -24,13 +23,13 @@ func NewApkAnalyzer() *apkAnalyzer {
 	return &apkAnalyzer{}
 }
 
-func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusInstallFile:
 		var (
-			pkgs    []types.Package
-			pkg     types.Package
+			pkgs    []dxtypes.Package
+			pkg     dxtypes.Package
 			version string
 		)
 		scanner := bufio.NewScanner(fi.f)
@@ -42,7 +41,7 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 				if pkg.Name != "" && pkg.Version != "" {
 					pkgs = append(pkgs, pkg)
 				}
-				pkg = types.Package{}
+				pkg = dxtypes.Package{}
 				continue
 			}
 			// ref. https://wiki.alpinelinux.org/wiki/Apk_spec

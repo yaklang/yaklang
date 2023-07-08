@@ -1,8 +1,8 @@
 package analyzer
 
-import "github.com/yaklang/yaklang/common/sca/types"
+import "github.com/yaklang/yaklang/common/sca/dxtypes"
 
-var ApkWantPkgs = []types.Package{
+var ApkWantPkgs = []dxtypes.Package{
 	{
 		Name:    "alpine-baselayout",
 		Version: "3.4.3-r1",
@@ -93,7 +93,7 @@ var ApkWantPkgs = []types.Package{
 	},
 }
 
-var DpkgWantPkgs = []types.Package{
+var DpkgWantPkgs = []dxtypes.Package{
 	{
 		Name:    "adduser",
 		Version: "3.118ubuntu5",
@@ -136,7 +136,7 @@ var DpkgWantPkgs = []types.Package{
 	},
 }
 
-var RpmWantPkgs = []types.Package{
+var RpmWantPkgs = []dxtypes.Package{
 
 	{
 		Name:    "mariner-release",

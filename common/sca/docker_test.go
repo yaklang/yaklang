@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer"
-	"github.com/yaklang/yaklang/common/sca/types"
 )
 
 // func TestLoadDockerImageFromContext(t *testing.T) {
@@ -87,7 +86,7 @@ func TestLoadDockerImageFromFile(t *testing.T) {
 	}
 }
 
-var wantpkgs = []types.Package{}
+var wantpkgs = []dxtypes.Package{}
 
 func init() {
 	wantpkgs = append(wantpkgs, analyzer.ApkWantPkgs...)
