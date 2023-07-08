@@ -3,11 +3,11 @@ package analyzer
 import (
 	"bufio"
 	"bytes"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"net/textproto"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -57,7 +57,7 @@ func (a dpkgAnalyzer) parseStatus(s string) bool {
 	}
 	return true
 }
-func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *types.Package {
+func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package {
 	status := header.Get("Status")
 	if status == "" {
 		return nil
@@ -66,7 +66,7 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *types.Package {
 		return nil
 	}
 
-	pkg := &types.Package{
+	pkg := &dxtypes.Package{
 		Name:    header.Get("Package"),
 		Version: header.Get("Version"),
 	}
@@ -77,8 +77,8 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *types.Package {
 	return pkg
 }
 
-func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]types.Package, error) {
-	pkgs := make([]types.Package, 0)
+func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]dxtypes.Package, error) {
+	pkgs := make([]dxtypes.Package, 0)
 	br := bufio.NewReader(r)
 	for {
 		block, err := ReadBlock(br)
@@ -114,7 +114,7 @@ func (a dpkgAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusStatus:

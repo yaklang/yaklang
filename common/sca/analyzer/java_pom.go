@@ -1,10 +1,10 @@
 package analyzer
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path/filepath"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/java/pom"
-	"github.com/yaklang/yaklang/common/sca/types"
 )
 
 const (
@@ -25,7 +25,7 @@ func NewJavaPomAnalyzer() *pomAnalyzer {
 	return &pomAnalyzer{}
 }
 
-func (a pomAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a pomAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusPom:

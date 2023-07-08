@@ -1,10 +1,10 @@
 package analyzer
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"strings"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/c/conan"
-	"github.com/yaklang/yaklang/common/sca/types"
 )
 
 const (
@@ -25,7 +25,7 @@ func NewConanAnalyzer() *conanAnalyzer {
 	return &conanAnalyzer{}
 }
 
-func (a conanAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a conanAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusConan:
