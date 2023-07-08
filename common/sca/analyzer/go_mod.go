@@ -1,12 +1,12 @@
 package analyzer
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/mod"
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/sum"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/sca/types"
 )
 
 const (
@@ -46,7 +46,7 @@ func (a goModAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusGoMod:
@@ -64,8 +64,19 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 				if err != nil {
 					return nil, err
 				}
-				_, subPkgs := lo.Difference(pkgs, sumPkgs)
-				subPkgs = lo.Map(subPkgs, func(item types.Package, index int) types.Package {
+				var originalPkg = make(map[string]dxtypes.Package, len(pkgs))
+				for _, pkg := range pkgs {
+					originalPkg[pkg.Identifier()] = pkg
+				}
+				var subPkgs []dxtypes.Package
+				for _, sPkg := range sumPkgs {
+					_, ok := originalPkg[sPkg.Identifier()]
+					if ok {
+						continue
+					}
+					subPkgs = append(subPkgs, sPkg)
+				}
+				subPkgs = lo.Map(subPkgs, func(item dxtypes.Package, index int) dxtypes.Package {
 					item.Indirect = true
 					return item
 				})
@@ -77,7 +88,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 	return nil, nil
 }
 
-func lessThanGo117(pkgs []types.Package) bool {
+func lessThanGo117(pkgs []dxtypes.Package) bool {
 	for _, pkg := range pkgs {
 		// The indirect field is populated only in Go 1.17+
 		if pkg.Indirect {

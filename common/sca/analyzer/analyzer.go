@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bufio"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"io/fs"
 	"os"
@@ -11,7 +12,6 @@ import (
 	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -30,7 +30,7 @@ var (
 type TypAnalyzer string
 type ScanMode int
 type Analyzer interface {
-	Analyze(AnalyzeFileInfo) ([]types.Package, error)
+	Analyze(AnalyzeFileInfo) ([]dxtypes.Package, error)
 	Match(MatchInfo) int
 }
 
@@ -61,7 +61,7 @@ type AnalyzerGroup struct {
 	numWorkers int
 
 	// return
-	pkgs []types.Package
+	pkgs []dxtypes.Package
 
 	// matched file
 	matchedFileInfos map[string]fileInfo
@@ -110,8 +110,10 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	}
 }
 
-func (ag *AnalyzerGroup) Packages() []types.Package {
-	return lo.Uniq(ag.pkgs)
+func (ag *AnalyzerGroup) Packages() []dxtypes.Package {
+	return lo.UniqBy(ag.pkgs, func(item dxtypes.Package) string {
+		return item.Identifier()
+	})
 }
 
 func (ag *AnalyzerGroup) Append(a ...Analyzer) {
@@ -206,14 +208,14 @@ func (ag *AnalyzerGroup) Analyze() error {
 	return nil
 }
 
-func ParseLanguageConfiguration(fi fileInfo, parser godeptypes.Parser) ([]types.Package, error) {
+func ParseLanguageConfiguration(fi fileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
 	parsedLibs, _, err := parser.Parse(fi.f)
 	if err != nil {
 		return nil, err
 	}
 
-	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) types.Package {
-		return types.Package{
+	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) dxtypes.Package {
+		return dxtypes.Package{
 			Name:     lib.Name,
 			Version:  lib.Version,
 			Indirect: lib.Indirect,

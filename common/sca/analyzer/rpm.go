@@ -2,11 +2,11 @@ package analyzer
 
 import (
 	"database/sql"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
 	"github.com/mattn/go-sqlite3"
 
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -45,7 +45,7 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 	return &rpmAnalyzer{}
 }
 
-func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusRPM:
@@ -57,9 +57,9 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
 		if err != nil {
 			return nil, utils.Errorf("failed to list packages: %v", err)
 		}
-		pkgs := make([]types.Package, len(pkgList))
+		pkgs := make([]dxtypes.Package, len(pkgList))
 		for i, pkgInfo := range pkgList {
-			pkgs[i] = types.Package{
+			pkgs[i] = dxtypes.Package{
 				Name:    pkgInfo.Name,
 				Version: pkgInfo.Version,
 			}

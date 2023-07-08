@@ -2,9 +2,9 @@ package analyzer
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/binary"
-	"github.com/yaklang/yaklang/common/sca/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -31,7 +31,7 @@ func (a goBinaryAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]types.Package, error) {
+func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.self
 	switch fi.matchStatus {
 	case statusExecutable:
