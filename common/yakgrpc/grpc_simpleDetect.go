@@ -633,7 +633,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	}
 	reqRecord := req.LastRecord
 	reqPortScan := req.PortScanRequest
-
+	reqBrute := req.StartBruteParams
 	// 把文件写到本地。
 	tmpTargetFile, err := ioutil.TempFile("", "yakit-portscan-*.txt")
 	if err != nil {
@@ -674,6 +674,76 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 		Key:   "target-file",
 		Value: tmpTargetFile.Name(),
 	})
+	// 解析用户名
+	userListFile, err := utils.DumpFileWithTextAndFiles(
+		strings.Join(reqBrute.Usernames, "\n"), "\n", reqBrute.UsernameFile,
+	)
+
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(userListFile)
+
+	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		Key:   "user-list-file",
+		Value: userListFile,
+	})
+
+	// 解析密码
+	passListFile, err := utils.DumpFileWithTextAndFiles(
+		strings.Join(reqBrute.Passwords, "\n"), "\n", reqBrute.PasswordFile,
+	)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(passListFile)
+	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		Key:   "pass-list-file",
+		Value: passListFile,
+	})
+
+	if reqBrute.GetConcurrent() > 0 {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "brute-concurrent",
+			Value: fmt.Sprint(reqBrute.GetConcurrent()),
+		})
+	}
+
+	if reqBrute.GetTargetTaskConcurrent() > 0 {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "task-concurrent",
+			Value: fmt.Sprint(reqBrute.GetTargetTaskConcurrent()),
+		})
+	}
+
+	if reqBrute.GetDelayMin() > 0 && reqBrute.GetDelayMax() > 0 {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "delay-min",
+			Value: fmt.Sprint(reqBrute.GetDelayMin()),
+		})
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "delay-max",
+			Value: fmt.Sprint(reqBrute.GetDelayMax()),
+		})
+	}
+	// ok to stop
+	if reqBrute.GetOkToStop() {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "ok-to-stop",
+			Value: "",
+		})
+	}
+	// 是否使用默认字典？
+	if reqBrute.GetReplaceDefaultUsernameDict() {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key: "replace-default-username-dict",
+		})
+	}
+	if reqBrute.GetReplaceDefaultPasswordDict() {
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key: "replace-default-password-dict",
+		})
+	}
 
 	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
 		Key:   "task-name",
