@@ -2393,6 +2393,7 @@ message LastRecord {
 
 message RecordPortScanRequest {
   LastRecord LastRecord = 1;
+  StartBruteParams StartBruteParams = 3;
   PortScanRequest PortScanRequest = 2;
 }
 
