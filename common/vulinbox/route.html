@@ -65,6 +65,14 @@
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL
                         注入</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like?name=a">字符串注入点模糊查询</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a></li>
                 </ul>
             </div>
         </div>
