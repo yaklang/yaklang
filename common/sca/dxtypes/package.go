@@ -3,6 +3,7 @@ package dxtypes
 import "github.com/yaklang/yaklang/common/utils"
 
 type Package struct {
+	ID      string
 	Name    string
 	Version string
 
@@ -41,6 +42,8 @@ type PackageRelationShip struct {
 }
 
 func (p *Package) Identifier() string {
-
-	return utils.CalcSha1(p.Name, p.Version)
+	if p.ID == "" {
+		p.ID = utils.CalcSha1(p.Name, p.Version)
+	}
+	return p.ID
 }
