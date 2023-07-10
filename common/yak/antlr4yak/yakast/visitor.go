@@ -3,12 +3,12 @@ package yakast
 import (
 	"bytes"
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"reflect"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
@@ -48,12 +48,14 @@ type YakCompiler struct {
 	compilerErrors YakMergeError
 
 	// tokenStream
-	AntlrTokenStream antlr.TokenStream
-	lexer            *yak.YaklangLexer
-	parser           *yak.YaklangParser
-	strict           bool
-	extVars          []string
-	extVarsMap       map[string]struct{}
+	AntlrTokenStream          antlr.TokenStream
+	lexer                     *yak.YaklangLexer
+	parser                    *yak.YaklangParser
+	strict                    bool
+	indeterminateUndefinedVar [][2]any // [0] 为变量名 [1] 为错误信息
+	extVars                   []string
+	extVarsMap                map[string]struct{}
+	contextInfo               *vmstack.Stack
 }
 
 func (y *YakCompiler) SetStrictMode(b bool) {
@@ -116,6 +118,7 @@ func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...Com
 		tryDepthStack:    vmstack.New(),
 		language:         en,
 		extVarsMap:       make(map[string]struct{}),
+		contextInfo:      vmstack.New(),
 	}
 	for _, o := range options {
 		o(compiler)
@@ -202,6 +205,25 @@ func (y *YakCompiler) Compiler(code string) bool {
 		return false
 	}
 	y.VisitProgram(raw.(*yak.ProgramContext))
+
+	// 检查全局定义的变量，允许在非全局作用域内调用全局定义域内定义的变量
+	errorMap := make(map[any]*YakError)
+	for _, compilerError := range y.compilerErrors {
+		errorMap[reflect.ValueOf(compilerError).Pointer()] = compilerError
+	}
+	for _, variable := range y.indeterminateUndefinedVar {
+		name := variable[0].(string)
+		err := variable[1].(*YakError)
+		if _, ok := y.rootSymtbl.GetSymbolByVariableName(name); ok {
+			errorMap[reflect.ValueOf(err).Pointer()] = nil
+		}
+	}
+	for index, compilerError := range y.compilerErrors {
+		if v, ok := errorMap[reflect.ValueOf(compilerError).Pointer()]; !ok || v == nil {
+			y.compilerErrors = append(y.compilerErrors[:index], y.compilerErrors[index+1:]...)
+		}
+	}
+
 	lastToken := parser.BaseParser.GetCurrentToken()
 	if lastToken.GetTokenType() != yak.YaklangParserEOF {
 		startColumn := lastToken.GetColumn()
