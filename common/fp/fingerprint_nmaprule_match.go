@@ -65,8 +65,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 	var probeSwg = utils2.NewSizedWaitGroup(swgCon)
 	for _, block := range blocks {
 		block := block
-		log.Infof("%s - %v ", block.Probe.Name, block.Probe.Proto)
-		if block == nil || (block.Probe.Payload == "" && config.CanOnlyScanTCP()) {
+		if block == nil || block.Probe.Payload == "" {
 			continue
 		}
 
@@ -93,7 +92,6 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 				}
 			}
 			log.Debugf("try %s probe[%v] rarity[%v] %#v", utils2.HostPort(host, port), block.Probe.Index, block.Probe.Rarity, block.Probe.Payload)
-			log.Infof("%s", block.Probe.Name)
 			state, info, err := f.matchBlock(ctx, ip, port, block, config)
 			collectResultLock.Lock()
 			defer collectResultLock.Unlock()
