@@ -589,6 +589,7 @@ var (
 	defaultBuildinDomains = []string{
 		"download-mitm-ca.com",
 		"download-mitm-cert.yaklang.io",
+		"mitm",
 	}
 )
 

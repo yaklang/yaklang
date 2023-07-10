@@ -169,8 +169,13 @@ func (s *VulinServer) registerSQLinj() {
 				HttpOnly: false,                              // 仅限 HTTP 访问，不允许 JavaScript 访问
 			}
 			http.SetCookie(writer, &cookie)
-			writer.Write([]byte(`no cookie found`))
-			writer.WriteHeader(200)
+			writer.Header().Set("Location", "/user/cookie-id?skip=1")
+			if request.URL.Query().Get("skip") == "1" {
+				writer.WriteHeader(200)
+				writer.Write([]byte("Cookie set"))
+			} else {
+				writer.WriteHeader(302)
+			}
 			return
 		}
 		u, err := s.database.GetUserByIdUnsafe(a.Value)
