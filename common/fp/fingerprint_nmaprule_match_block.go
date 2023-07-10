@@ -222,6 +222,15 @@ func (c *Config) CanScanTCP() bool {
 	return false
 }
 
+func (c *Config) CanOnlyScanTCP() bool {
+	for _, i := range c.TransportProtos {
+		if i != TCP {
+			return false
+		}
+	}
+	return len(c.TransportProtos) > 0
+}
+
 func (c *Config) CanScanUDP() bool {
 	for _, i := range c.TransportProtos {
 		if i == UDP {
