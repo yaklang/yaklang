@@ -73,7 +73,11 @@ func GeneratePrivateAndPublicKeyPEM() (pri []byte, pub []byte, _ error) {
 }
 
 func GeneratePrivateAndPublicKeyPEMWithPrivateFormatter(t string) (pri []byte, pub []byte, _ error) {
-	pk, err := rsa.GenerateKey(cryptorand.Reader, 4096)
+	return GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t, 2048)
+}
+
+func GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t string, size int) (pri []byte, pub []byte, _ error) {
+	pk, err := rsa.GenerateKey(cryptorand.Reader, size)
 	if err != nil {
 		return
 	}
