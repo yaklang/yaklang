@@ -470,12 +470,19 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	for _, jsonPath := range jsonpath.RecursiveDeepJsonPath(params) {
 		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 			typePosition:     posPostJson,
-			param:            "",
-			paramOriginValue: nil,
+			param:            "[JSON]",
+			paramOriginValue: string(bytes.TrimSpace(bodyRaw)),
 			jsonPath:         jsonPath,
 			origin:           f,
 		})
 	}
+	//param := &FuzzHTTPRequestParam{
+	//	typePosition:     posBody,
+	//	param:            "[JSON]",
+	//	paramOriginValue: string(bytes.TrimSpace(bodyRaw)),
+	//	origin:           f,
+	//}
+	//fuzzParams = append(fuzzParams, param)
 	return fuzzParams
 }
 

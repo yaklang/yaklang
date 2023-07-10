@@ -2,18 +2,16 @@ package yak
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakdocument"
 	"reflect"
 	"sort"
 	"strings"
 )
 
-func EngineToDocumentHelperWithVerboseInfo(engine yaklang.YaklangEngine) *yakdoc.DocumentHelper {
+func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:      make(map[string]*yakdoc.ScriptLib),
 		Functions: make(map[string]*yakdoc.FuncDecl),
@@ -78,16 +76,11 @@ func EngineToDocumentHelperWithVerboseInfo(engine yaklang.YaklangEngine) *yakdoc
 	return helper
 }
 
-func EngineToLibDocuments(engine yaklang.YaklangEngine) []yakdocument.LibDoc {
+func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 	var libs []yakdocument.LibDoc
 
 	var globalDoc = yakdocument.LibDoc{
 		Name: fmt.Sprintf("%v", "__global__"),
-	}
-
-	switch engine.(type) {
-	case *antlr4yak.Engine:
-		log.Info("loading antlr4yak's completions")
 	}
 
 	fnTable := engine.GetFntable()

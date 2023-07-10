@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
 	"github.com/yaklang/yaklang/common/iiop"
+	"github.com/yaklang/yaklang/common/ja3"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openai"
@@ -243,6 +244,9 @@ func initYaklangLib() {
 	// suricata
 	yaklang.Import("suricata", chaosmaker.ChaosMakerExports)
 	yaklang.Import("pcapx", pcapx.Exports)
+
+	// ja3
+	yaklang.Import("ja3", ja3.Exports)
 }
 
 type ScriptEngine struct {
@@ -264,7 +268,7 @@ type ScriptEngine struct {
 	RegisterAlertHook        yaklib.RegisterOutputFuncType
 	UnregisterAlertHook      yaklib.UnregisterOutputFuncType
 
-	engineHooks []func(engine yaklang.YaklangEngine) error
+	engineHooks []func(engine *antlr4yak.Engine) error
 	// 存储yakc密钥
 	cryptoKey []byte
 	// debug
@@ -328,18 +332,12 @@ func (e *ScriptEngine) init() {
 	})
 }
 
-func (e *ScriptEngine) RegisterEngineHooksLegacy(f func(engine yaklang.YaklangEngine) error) {
+func (e *ScriptEngine) RegisterEngineHooksLegacy(f func(engine *antlr4yak.Engine) error) {
 	e.engineHooks = append(e.engineHooks, f)
 }
 
 func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) error) {
-	e.engineHooks = append(e.engineHooks, func(engine yaklang.YaklangEngine) error {
-		ins, ok := engine.(*antlr4yak.Engine)
-		if ok {
-			return f(ins)
-		}
-		return nil
-	})
+	e.engineHooks = append(e.engineHooks, f)
 }
 
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
@@ -368,8 +366,8 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 }
 
 func (e *ScriptEngine) HookOsExit() {
-	e.RegisterEngineHooksLegacy(func(engine yaklang.YaklangEngine) error {
-		val, ok := engine.(*antlr4yak.Engine).GetVar("os")
+	e.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
+		val, ok := engine.GetVar("os")
 		if !ok {
 			return nil
 		}
@@ -390,7 +388,7 @@ func (e *ScriptEngine) Compile(code string) ([]byte, error) {
 	return engine.Marshal(code, e.cryptoKey)
 }
 
-func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params map[string]interface{}, cache bool) (yaklang.YaklangEngine, error) {
+func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params map[string]interface{}, cache bool) (*antlr4yak.Engine, error) {
 	e.swg.Add()
 	defer e.swg.Done()
 
@@ -459,9 +457,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 
 	yakAbsFile, _ := params["YAK_FILENAME"]
 	if yakAbsFile != nil {
-		if v, ok := engine.(*antlr4yak.Engine); ok {
-			v.SetSourceFilePath(fmt.Sprint(yakAbsFile))
-		}
+		engine.SetSourceFilePath(fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_FILENAME", fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_DIR", filepath.Dir(fmt.Sprint(yakAbsFile)))
 	}
@@ -481,7 +477,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 
 	t.isRunning.Set()
 	if antlr4yak.IsYakc([]byte(code)) {
-		return engine, engine.SafeExecYakc(ctx, []byte(code), e.cryptoKey)
+		return engine, engine.SafeExecYakc(ctx, []byte(code), e.cryptoKey, code)
 	}
 
 	if cache && !engine.HaveEvaluatedCode() {
@@ -508,13 +504,13 @@ func (e *ScriptEngine) ExecuteWithTaskIDAndParams(ctx context.Context, taskId, c
 	_ = engine
 	return nil
 }
-func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interface{}) (yaklang.YaklangEngine, error) {
+func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
 	return e.exec(context.Background(), uuid.New().String(), code, params, false)
 }
-func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (yaklang.YaklangEngine, error) {
+func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
 	return e.exec(context.Background(), uuid.New().String(), code, params, true)
 }
-func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (_ yaklang.YaklangEngine, fErr error) {
+func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (_ *antlr4yak.Engine, fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("execute ex with context error: %v", err)

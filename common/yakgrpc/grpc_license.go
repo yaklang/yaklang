@@ -33,9 +33,15 @@ func (s *Server) CheckLicense(ctx context.Context, r *ypb.CheckLicenseRequest) (
 	}
 
 	lic := r.GetLicenseActivation()
-	_, err := xlic.Machine.VerifyLicense(lic)
+	rsp, err := xlic.Machine.VerifyLicense(lic)
 	if err != nil {
 		return nil, err
+	}
+	if r.CompanyVersion != "" && rsp != nil && rsp.Params != nil {
+		companyVersion := rsp.Params["company_version"]
+		if companyVersion != "" && companyVersion != r.CompanyVersion {
+			return nil, err
+		}
 	}
 	return &ypb.Empty{}, nil
 }

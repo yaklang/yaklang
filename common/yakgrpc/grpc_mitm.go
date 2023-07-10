@@ -165,7 +165,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return utils.Errorf("recv first req failed: %s", err)
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
-
+	hostMapping := make(map[string]string)
 	var (
 		host            string = "127.0.0.1"
 		port            int    = 8089
@@ -175,8 +175,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		onlyGMTLS              = firstReq.GetOnlyEnableGMTLS()
 		proxyUsername          = firstReq.GetProxyUsername()
 		proxyPassword          = firstReq.GetProxyPassword()
+		dnsServers             = firstReq.GetDnsServers()
 	)
-
+	for _, pair := range firstReq.Hosts {
+		hostMapping[pair.GetKey()] = pair.GetValue()
+	}
 	if !firstReq.GetEnableProxyAuth() {
 		// 如果用户名密码不启用，设置为空
 		proxyUsername = ""
@@ -1390,6 +1393,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGM(enableGMTLS),
 		crep.MITM_SetGMPrefer(preferGMTLS),
 		crep.MITM_SetGMOnly(onlyGMTLS),
+		crep.MITM_SetDNSServers(dnsServers...),
+		crep.MITM_SetHostMapping(hostMapping),
 	)
 	if err != nil {
 		log.Error(err)

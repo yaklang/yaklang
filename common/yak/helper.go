@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 	"sort"
 	"strings"
@@ -197,7 +197,7 @@ func anyTypeToPalmScriptLibInstance(libName, name string, methodType reflect.Typ
 	}
 }
 
-func EngineToHelper(engine yaklang.YaklangEngine) *PalmScriptEngineHelper {
+func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 	helper := &PalmScriptEngineHelper{
 		Libs:             make(map[string]*PalmScriptLib),
 		BuildInFunctions: make(map[string]*PalmScriptLibFunc),

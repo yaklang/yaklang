@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 func TestLowhttpResponse2(t *testing.T) {

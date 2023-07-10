@@ -31,7 +31,9 @@ var NewCrawlerXExports = map[string]interface{}{
 	"AllDomainScan": mainDomain,
 	"SubMenuScan":   subDomain,
 
-	"vueWebsite":    WithVueWeb,
-	"extraWaitLoad": WithExtraWaitLoadTime,
-	"maxDepth":      WithMaxDepth,
+	"vueWebsite":     WithVueWeb,
+	"extraWaitLoad":  WithExtraWaitLoadTime,
+	"maxDepth":       WithMaxDepth,
+	"sensitiveWord":  WithSensitiveWord,
+	"sensitiveWords": WithSensitiveWords,
 }
