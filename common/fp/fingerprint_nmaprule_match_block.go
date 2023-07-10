@@ -104,7 +104,7 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 		if block.Probe.Proto == TCP && config.CanScanTCP() {
 			conn, err := tcpConnectionMaker(host.String(), port, config.Proxies, timeout)
 			if err != nil {
-				return CLOSED, nil, err
+				return CLOSED, nil, utils2.Errorf("%s: %v", block.Probe.Name, err)
 			}
 			defer conn.Close()
 

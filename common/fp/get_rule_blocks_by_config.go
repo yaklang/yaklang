@@ -23,7 +23,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	for probe, matches := range config.FingerprintRules {
 
 		// 只有 TCP 才能匹配 TCP
-		if probe.Payload == "" && config.CanScanTCP() && !config.CanScanUDP() {
+		if probe.Payload == "" && config.CanScanTCP() {
 			if emptyBlock == nil {
 				emptyBlock = &RuleBlock{Probe: probe, Matched: matches}
 			} else {
@@ -85,7 +85,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		//})
 		//panic(strings.Join(result.([]string), "/"))
 		if config.ProbesMax > 0 && config.ProbesMax < len(bestBlocks) {
-			log.Infof("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(bestBlocks))
+			log.Infof("filter probe only[%v] by config ProbeMax, best total: %v", config.ProbesMax, len(bestBlocks))
 			return emptyBlock, bestBlocks[:config.ProbesMax], true
 		}
 		return emptyBlock, bestBlocks, true
@@ -108,7 +108,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	}).([]*RuleBlock)
 	if config.ProbesMax > 0 && config.ProbesMax < len(blocks) {
 		log.Infof("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(blocks))
-		return emptyBlock, blocks[:config.ProbesMax], true
+		return emptyBlock, blocks[:config.ProbesMax], false
 	}
 	return
 }
