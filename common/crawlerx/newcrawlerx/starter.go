@@ -81,6 +81,10 @@ type BrowserStarter struct {
 
 	extraWaitLoad int
 	checkHTML     bool
+
+	// new counter
+	c       *Counter
+	running bool
 }
 
 func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -119,6 +123,9 @@ func NewBrowserStarter(browserConfig *NewBrowserConfig, baseConfig *BaseConfig) 
 
 		extraWaitLoad: baseConfig.extraWaitLoadTime,
 		checkHTML:     true,
+
+		c:       NewCounter(baseConfig.concurrent),
+		running: false,
 	}
 	ctx, cancel := context.WithCancel(baseConfig.ctx)
 	starter.ctx = ctx
@@ -278,46 +285,53 @@ func (starter *BrowserStarter) newDefaultPageActionGenerator() {
 func (starter *BrowserStarter) newPageDetectEvent() {
 	go starter.browser.EachEvent(
 		func(e *proto.TargetTargetCreated) {
-			starter.subWaitGroup.Add()
-			defer starter.subWaitGroup.Done()
-			targetID := e.TargetInfo.TargetID
-			page, err := starter.browser.PageFromTarget(targetID)
-			if err != nil {
-				log.Errorf("targetID %s page get error: %s", targetID, err)
-			}
-			defer page.Close()
-			go page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
-				proto.PageHandleJavaScriptDialog{
-					Accept:     false,
-					PromptText: "",
-				}.Call(page)
-			})()
-			// wait for page navigate
-			time.Sleep(500 * time.Millisecond)
-			err = page.WaitLoad()
-			if err != nil {
-				log.Errorf("targetID %s wait load error: %s", targetID, err)
-				return
-			}
-			if starter.extraWaitLoad != 0 {
-				time.Sleep(time.Duration(starter.extraWaitLoad) * time.Millisecond)
-			}
-			if starter.checkHTML {
-				pageInfo, err := page.HTML()
-				if err == nil {
-					bodyInfo := matchBody(pageInfo)
-					if bodyInfo == `<body></body>` {
-						log.Errorf("blank info in page: %s", page)
-					}
-					starter.checkHTML = false
+			//starter.subWaitGroup.Add()
+			//log.Infof(`current concurrent %d`, starter.subWaitGroup.WaitingEventCount)
+			//defer starter.subWaitGroup.Done()
+			go func() {
+				log.Infof(`current concurrent %d`, starter.c.Number())
+				status := starter.c.Add()
+				log.Info("counter add status: ", status)
+				defer starter.c.Minus()
+				targetID := e.TargetInfo.TargetID
+				page, err := starter.browser.PageFromTarget(targetID)
+				if err != nil {
+					log.Errorf("targetID %s page get error: %s", targetID, err)
 				}
-			}
-			page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
-			//err = starter.PageScan(page)
-			err = starter.doActionOnPage(page)
-			if err != nil {
-				log.Errorf("targetID %s do page scan error: %s", targetID, err)
-			}
+				defer page.Close()
+				go page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
+					proto.PageHandleJavaScriptDialog{
+						Accept:     false,
+						PromptText: "",
+					}.Call(page)
+				})()
+				// wait for page navigate
+				time.Sleep(500 * time.Millisecond)
+				err = page.WaitLoad()
+				if err != nil {
+					log.Errorf("targetID %s wait load error: %s", targetID, err)
+					return
+				}
+				if starter.extraWaitLoad != 0 {
+					time.Sleep(time.Duration(starter.extraWaitLoad) * time.Millisecond)
+				}
+				if starter.checkHTML {
+					pageInfo, err := page.HTML()
+					if err == nil {
+						bodyInfo := matchBody(pageInfo)
+						if bodyInfo == `<body></body>` {
+							log.Errorf("blank info in page: %s", page)
+						}
+						starter.checkHTML = false
+					}
+				}
+				page = page.Timeout(time.Second * time.Duration(starter.baseConfig.pageTimeout))
+				//err = starter.PageScan(page)
+				err = starter.doActionOnPage(page)
+				if err != nil {
+					log.Errorf("targetID %s do page scan error: %s", targetID, err)
+				}
+			}()
 		},
 	)()
 }
@@ -347,7 +361,14 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
 		}
-		err := hijack.LoadResponse(&starter.client, true)
+		client := http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+			Transport: &starter.transport,
+		}
+		//err := hijack.LoadResponse(&starter.client, true)
+		err := hijack.LoadResponse(&client, true)
 		if err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				log.Errorf("load response error: %s", err)
@@ -369,6 +390,9 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		} else {
 			//log.Info("request after repeat generator function null.")
 			afterRepeatUrl = hijack.Request.URL().String()
+			if starter.urlAfterRepeat != nil {
+				afterRepeatUrl = starter.urlAfterRepeat(afterRepeatUrl)
+			}
 		}
 		if !starter.resultSentFunc(afterRepeatUrl) {
 			return
@@ -389,7 +413,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 			jsUrls := analysisJsInfo(hijack.Request.URL().String(), hijack.Response.Body())
 			for _, jsUrl := range jsUrls {
 				var jsAfterRepeatUrl string
-				if starter.requestAfterRepeat != nil {
+				if starter.urlAfterRepeat != nil {
 					jsAfterRepeatUrl = starter.urlAfterRepeat(jsUrl)
 				} else {
 					jsAfterRepeatUrl = jsUrl
@@ -523,6 +547,54 @@ func (starter *BrowserStarter) MultiRun() {
 					starter.mainWaitGroup.Done()
 					break next
 				}
+			}
+		}
+	}
+	log.Info("done!")
+}
+
+func (starter *BrowserStarter) NewEngine() {
+	err := starter.StartBrowser()
+	if err != nil {
+		log.Errorf("browser start error: %s", err)
+		return
+	}
+	headlessBrowser := starter.browser
+running:
+	for {
+		select {
+		case v, ok := <-starter.uChan.Out:
+			log.Infof(`current url chan len: %d`, starter.uChan.Len())
+			if !ok {
+				log.Info("break running.")
+				break running
+			}
+			if !starter.running {
+				log.Info(`start running.`)
+				starter.mainWaitGroup.Add()
+				starter.running = true
+			}
+			if starter.c.OverLoad() {
+				log.Infof(`overload, waiting for concurrent: %d`, starter.c.Number())
+				starter.c.Wait(starter.concurrent)
+				log.Infof(`overload done: %d`, starter.c.Number())
+			}
+			urlStr, _ := v.(string)
+			p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			if starter.baseConfig.hijack {
+				starter.createPageHijack(p)
+			}
+			err = p.Navigate(urlStr)
+			if err != nil {
+				log.Errorf("page navigate %s error: %s", urlStr, err)
+			}
+		default:
+			if starter.c.LayDown() && starter.running {
+				log.Info(`lay down. `)
+				starter.running = false
+				starter.mainWaitGroup.Done()
+			} else {
+				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}
