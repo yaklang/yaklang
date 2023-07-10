@@ -32,7 +32,7 @@ func NewSandbox(vars map[string]interface{}) *antlr4yak.Engine {
 
 func NewAntlrEngine() *antlr4yak.Engine {
 	engine := antlr4yak.New()
-	if os.Getenv("YVMMODE") == "strict" {
+	if os.Getenv("STATIC_CHECK") == "strict" {
 		engine.EnableStrictMode()
 	}
 	engine.ImportLibs(yaklangLibs)

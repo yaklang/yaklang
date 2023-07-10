@@ -3511,7 +3511,7 @@ assert getStringSliceArgumentType([]) == "[]string", "auto convert [] to []strin
 }
 
 /*
-变量检查的粗略实现
+变量检查的粗略实现，需要实现数据流分析后实现更精确的检查
 目标：通过静态代码分析检查出执行时可能会出现的错误，需要尽可能依据代码执行顺序检查
 
 1. 编译时检查使用未声明的变量，但对于全局定义的变量允许在非立即执行的函数内部使用
@@ -3549,6 +3549,13 @@ f()
 `, ""}, {`
 test = b=>a
 assert(test(1) == 1)
+`, "undefined variable: a"}, {`
+if true {
+	a = 1
+}else{
+	a = 2
+}
+assert(a == 1)
 `, "undefined variable: a"},
 	} {
 		engine := New()
@@ -3565,11 +3572,11 @@ assert(test(1) == 1)
 		engine.strictMode = true
 		err := engine.SafeEval(context.Background(), testCase[0])
 		if err == nil && testCase[1] != "" {
-			t.Fatal(utils2.Errorf("expect error `%s`, but get nil, index: %d", testCase[1], index))
+			t.Fatal(utils2.Errorf("expect error `%s`, but get `nil`, index: %d", testCase[1], index))
 		}
 		if err != nil {
 			if !strings.Contains(err.Error(), testCase[1]) {
-				t.Fatal(utils2.Errorf("expect error `%s`, but get %v, index: %d", testCase[1], err, index))
+				t.Fatal(utils2.Errorf("expect error `%s`, but get `%v`, index: %d", testCase[1], err, index))
 			}
 		}
 	}
