@@ -100,6 +100,7 @@ func AbbrCheck(name string, info ProductsTable, symbol string) bool {
 //}
 
 func FixProductName(ProductName string, db *gorm.DB) (string, error) {
+	ProductName = strings.ToLower(ProductName)
 	var Products []ProductsTable
 	resDb := db.Where("product = ?", ProductName).Find(&Products)
 	if resDb.Error != nil {
