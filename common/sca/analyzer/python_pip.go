@@ -33,9 +33,9 @@ func (a pythonPIPAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a pythonPIPAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
+	fi := afi.Self
 
-	switch fi.matchStatus {
+	switch fi.MatchStatus {
 	case statusPIP:
 		return ParseLanguageConfiguration(fi, pip.NewParser())
 	}

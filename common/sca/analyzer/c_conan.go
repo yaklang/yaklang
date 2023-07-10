@@ -26,8 +26,8 @@ func NewConanAnalyzer() *conanAnalyzer {
 }
 
 func (a conanAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusConan:
 		p := conan.NewParser()
 		res, err := ParseLanguageConfiguration(fi, p)

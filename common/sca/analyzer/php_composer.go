@@ -37,8 +37,8 @@ type composerJson struct {
 }
 
 func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusComposerLock:
 		// parse composer lock file
 		lockParser := composer.NewParser()
@@ -49,9 +49,9 @@ func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error
 
 		// parse composer json file
 		var p map[string]string
-		jsonPath := filepath.Join(filepath.Dir(fi.path), "composer.json")
-		if jsonFi, ok := afi.matchedFileInfos[jsonPath]; ok {
-			p, err = a.parseComposerJson(jsonFi.f)
+		jsonPath := filepath.Join(filepath.Dir(fi.Path), "composer.json")
+		if jsonFi, ok := afi.MatchedFileInfos[jsonPath]; ok {
+			p, err = a.parseComposerJson(jsonFi.File)
 			if err != nil {
 				p = nil
 			}

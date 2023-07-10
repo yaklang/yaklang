@@ -29,7 +29,7 @@ func init() {
 type dpkgAnalyzer struct {
 }
 
-// ReadBlock reads a data block from the underlying reader until a blank line is encountered.
+// ReadBlock reads Analyzer data block from the underlying reader until Analyzer blank line is encountered.
 func ReadBlock(r *bufio.Reader) ([]byte, error) {
 	var block bytes.Buffer
 
@@ -115,10 +115,10 @@ func (a dpkgAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusStatus:
-		return a.analyzeStatus(fi.f)
+		return a.analyzeStatus(fi.File)
 	}
 
 	return nil, nil

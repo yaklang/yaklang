@@ -34,17 +34,17 @@ type Analyzer interface {
 	Match(MatchInfo) int
 }
 
-type fileInfo struct {
-	path        string
-	a           Analyzer
-	f           *os.File
-	matchStatus int
+type FileInfo struct {
+	Path        string
+	Analyzer    Analyzer
+	File        *os.File
+	MatchStatus int
 }
 
 type AnalyzeFileInfo struct {
-	self fileInfo
+	Self FileInfo
 	// matched file
-	matchedFileInfos map[string]fileInfo
+	MatchedFileInfos map[string]FileInfo
 }
 
 type MatchInfo struct {
@@ -64,7 +64,7 @@ type AnalyzerGroup struct {
 	pkgs []dxtypes.Package
 
 	// matched file
-	matchedFileInfos map[string]fileInfo
+	matchedFileInfos map[string]FileInfo
 }
 
 func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
@@ -105,7 +105,7 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	return &AnalyzerGroup{
 		ch:               make(chan AnalyzeFileInfo),
 		numWorkers:       numWorkers,
-		matchedFileInfos: make(map[string]fileInfo),
+		matchedFileInfos: make(map[string]FileInfo),
 		analyzers:        FilterAnalyzer(scanMode),
 	}
 }
@@ -127,7 +127,7 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 		go func() {
 			defer wg.Done()
 			for fileInfo := range ag.ch {
-				pkgs, err := fileInfo.self.a.Analyze(fileInfo)
+				pkgs, err := fileInfo.Self.Analyzer.Analyze(fileInfo)
 				if err == nil {
 					ag.pkgs = append(ag.pkgs, pkgs...)
 				}
@@ -138,8 +138,8 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 
 func (ag *AnalyzerGroup) Clear() {
 	for _, info := range ag.matchedFileInfos {
-		name := info.f.Name()
-		info.f.Close()
+		name := info.File.Name()
+		info.File.Close()
 		os.Remove(name)
 	}
 }
@@ -178,7 +178,7 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		// save
 		f, err := os.CreateTemp("", "fanal-file-*")
 		if err != nil {
-			return utils.Errorf("failed to create a temporary file for analyzer")
+			return utils.Errorf("failed to create Analyzer temporary file for analyzer")
 		}
 
 		if _, err := io.Copy(f, br); err != nil {
@@ -187,11 +187,11 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		f.Seek(0, 0)
 
 		// add to scanned files
-		ag.matchedFileInfos[path] = fileInfo{
-			path:        path,
-			a:           a,
-			f:           f,
-			matchStatus: matchStatus,
+		ag.matchedFileInfos[path] = FileInfo{
+			Path:        path,
+			Analyzer:    a,
+			File:        f,
+			MatchStatus: matchStatus,
 		}
 	}
 	return nil
@@ -200,16 +200,16 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 func (ag *AnalyzerGroup) Analyze() error {
 	for _, info := range ag.matchedFileInfos {
 		ag.ch <- AnalyzeFileInfo{
-			self:             info,
-			matchedFileInfos: ag.matchedFileInfos,
+			Self:             info,
+			MatchedFileInfos: ag.matchedFileInfos,
 		}
 	}
 	close(ag.ch)
 	return nil
 }
 
-func ParseLanguageConfiguration(fi fileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
-	parsedLibs, _, err := parser.Parse(fi.f)
+func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
+	parsedLibs, _, err := parser.Parse(fi.File)
 	if err != nil {
 		return nil, err
 	}

@@ -8,25 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/sca/analyzer"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
-// func TestLoadDockerImageFromContext(t *testing.T) {
-// 	pkgs, err := LoadDockerImageFromContext("5d0da3dc9764")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	for _, pkg := range pkgs {
-// 		fmt.Printf(`{
-// Name: %#v,
-// Version: %#v,
-// },
-// `, pkg.Name, pkg.Version)
-// 	}
-// }
-
 const (
-	gzipFile = "./analyzer/testdata/sca_dockertest.tar.gz"
+	gzipFile = "./testdata/sca_dockertest.tar.gz"
 )
 
 func TestLoadDockerImageFromFile(t *testing.T) {
@@ -89,7 +75,7 @@ func TestLoadDockerImageFromFile(t *testing.T) {
 var wantpkgs = []dxtypes.Package{}
 
 func init() {
-	wantpkgs = append(wantpkgs, analyzer.ApkWantPkgs...)
-	wantpkgs = append(wantpkgs, analyzer.RpmWantPkgs...)
-	wantpkgs = append(wantpkgs, analyzer.DpkgWantPkgs...)
+	wantpkgs = append(wantpkgs, APKWantPkgs...)
+	wantpkgs = append(wantpkgs, RPMWantPkgs...)
+	wantpkgs = append(wantpkgs, DPKGWantPkgs...)
 }

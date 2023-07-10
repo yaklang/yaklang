@@ -26,10 +26,10 @@ func NewJavaPomAnalyzer() *pomAnalyzer {
 }
 
 func (a pomAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusPom:
-		p := pom.NewParser(fi.path, pom.WithOffline(false))
+		p := pom.NewParser(fi.Path, pom.WithOffline(false))
 		pkgs, err := ParseLanguageConfiguration(fi, p)
 		if err != nil {
 			return nil, err

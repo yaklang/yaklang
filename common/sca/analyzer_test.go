@@ -1,12 +1,14 @@
-package analyzer
+package sca
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/samber/lo"
 )
@@ -18,7 +20,7 @@ type testcase struct {
 	wantPkgs       []dxtypes.Package
 	wantError      bool
 	t              *testing.T
-	a              Analyzer
+	a              analyzer.Analyzer
 	matchType      int
 	matchedFileMap map[string]string
 }
@@ -29,27 +31,27 @@ func Run(tc testcase) {
 	if err != nil {
 		t.Fatalf("%s: con't open file: %v", err, tc.name)
 	}
-	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, fileInfo) {
+	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, analyzer.FileInfo) {
 		f, err := os.Open(v)
 		if err != nil {
 			t.Fatalf("%s: con't open file: %v", err, tc.name)
 		}
-		return k, fileInfo{
-			path:        k,
-			a:           tc.a,
-			f:           f,
-			matchStatus: tc.matchType,
+		return k, analyzer.FileInfo{
+			Path:        k,
+			Analyzer:    tc.a,
+			File:        f,
+			MatchStatus: tc.matchType,
 		}
 	})
 
-	pkgs, err := tc.a.Analyze(AnalyzeFileInfo{
-		self: fileInfo{
-			path:        tc.virtualPath,
-			a:           tc.a,
-			f:           f,
-			matchStatus: tc.matchType,
+	pkgs, err := tc.a.Analyze(analyzer.AnalyzeFileInfo{
+		Self: analyzer.FileInfo{
+			Path:        tc.virtualPath,
+			Analyzer:    tc.a,
+			File:        f,
+			MatchStatus: tc.matchType,
 		},
-		matchedFileInfos: matchedFileInfos,
+		MatchedFileInfos: matchedFileInfos,
 	})
 
 	if tc.wantError && err == nil {
@@ -97,10 +99,10 @@ func TestRPM(t *testing.T) {
 	tc := testcase{
 		name:      "positive",
 		filePath:  "./testdata/rpm/rpmdb.sqlite",
-		wantPkgs:  RpmWantPkgs,
+		wantPkgs:  RPMWantPkgs,
 		t:         t,
-		a:         NewRPMAnalyzer(),
-		matchType: statusRPM,
+		a:         analyzer.NewRPMAnalyzer(),
+		matchType: 1,
 	}
 	Run(tc)
 }
@@ -110,10 +112,10 @@ func TestApk(t *testing.T) {
 	tc := testcase{
 		name:     "positive",
 		filePath: "./testdata/apk/apk",
-		wantPkgs: ApkWantPkgs,
+		wantPkgs: APKWantPkgs,
 
 		t:         t,
-		a:         NewApkAnalyzer(),
+		a:         analyzer.NewApkAnalyzer(),
 		matchType: 1,
 	}
 	Run(tc)
@@ -133,7 +135,7 @@ func TestApk(t *testing.T) {
 			},
 		},
 		t:         t,
-		a:         NewApkAnalyzer(),
+		a:         analyzer.NewApkAnalyzer(),
 		matchType: 1,
 	}
 	Run(tc)
@@ -141,14 +143,14 @@ func TestApk(t *testing.T) {
 
 func TestDpkg(t *testing.T) {
 	// positive
-	a := NewDpkgAnalyzer()
+	a := analyzer.NewDpkgAnalyzer()
 	tc := testcase{
 		name:      "positive",
 		filePath:  "./testdata/dpkg/dpkg",
 		t:         t,
 		a:         a,
 		matchType: 1,
-		wantPkgs:  DpkgWantPkgs,
+		wantPkgs:  DPKGWantPkgs,
 	}
 	Run(tc)
 
@@ -171,7 +173,7 @@ func TestConan(t *testing.T) {
 		name:      "positive",
 		filePath:  "./testdata/conan/conan",
 		t:         t,
-		a:         NewConanAnalyzer(),
+		a:         analyzer.NewConanAnalyzer(),
 		matchType: 1,
 		wantPkgs: []dxtypes.Package{
 			{
@@ -192,7 +194,7 @@ func TestConan(t *testing.T) {
 		name:      "negative",
 		filePath:  "./testdata/conan/negative-conan",
 		t:         t,
-		a:         NewConanAnalyzer(),
+		a:         analyzer.NewConanAnalyzer(),
 		matchType: 1,
 		wantPkgs:  []dxtypes.Package{},
 	}
@@ -205,7 +207,7 @@ func TestGoBinary(t *testing.T) {
 		name:      "positive",
 		filePath:  "./testdata/go_binary/go-binary",
 		t:         t,
-		a:         NewGoBinaryAnalyzer(),
+		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
 		wantPkgs: []dxtypes.Package{
 			{
@@ -229,7 +231,7 @@ func TestGoBinary(t *testing.T) {
 		name:      "negative-broken-elf",
 		filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
 		t:         t,
-		a:         NewGoBinaryAnalyzer(),
+		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
 		wantPkgs:  []dxtypes.Package{},
 	}
@@ -240,7 +242,7 @@ func TestGoBinary(t *testing.T) {
 		name:      "negative-bash",
 		filePath:  "./testdata/go_binary/negative-go-binary-bash",
 		t:         t,
-		a:         NewGoBinaryAnalyzer(),
+		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
 		wantPkgs:  []dxtypes.Package{},
 	}
@@ -254,7 +256,7 @@ func TestGoMod(t *testing.T) {
 		filePath:    "./testdata/go_mod/positive/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
-		a:           NewGoModAnalyzer(),
+		a:           analyzer.NewGoModAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
 			"/test/go.sum": "./testdata/go_mod/positive/sum",
@@ -279,7 +281,7 @@ func TestGoMod(t *testing.T) {
 		filePath:    "./testdata/go_mod/lessthan117/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
-		a:           NewGoModAnalyzer(),
+		a:           analyzer.NewGoModAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
 			"/test/go.sum": "./testdata/go_mod/lessthan117/sum",
@@ -304,7 +306,7 @@ func TestGoMod(t *testing.T) {
 		filePath:    "./testdata/go_mod/negative/mod",
 		virtualPath: "/test/go.mod",
 		t:           t,
-		a:           NewGoModAnalyzer(),
+		a:           analyzer.NewGoModAnalyzer(),
 		matchType:   1,
 		wantPkgs:    []dxtypes.Package{},
 		wantError:   true,
@@ -318,7 +320,7 @@ func TestPHPComposer(t *testing.T) {
 		filePath:    "./testdata/php_composer/positive/composer.lock",
 		virtualPath: "/test/composer.lock",
 		t:           t,
-		a:           NewPHPComposerAnalyzer(),
+		a:           analyzer.NewPHPComposerAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
 			"/test/composer.json": "./testdata/php_composer/positive/composer.json",
@@ -344,7 +346,7 @@ func TestPHPComposer(t *testing.T) {
 		filePath:    "./testdata/php_composer/negative/composer.lock",
 		virtualPath: "/test/composer.lock",
 		t:           t,
-		a:           NewPHPComposerAnalyzer(),
+		a:           analyzer.NewPHPComposerAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
 			"/test/composer.json": "./testdata/php_composer/wrong.json",
@@ -370,7 +372,7 @@ func TestPHPComposer(t *testing.T) {
 		filePath:       "./testdata/php_composer/negative/composer.lock",
 		virtualPath:    "/test/composer.lock",
 		t:              t,
-		a:              NewPHPComposerAnalyzer(),
+		a:              analyzer.NewPHPComposerAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -394,7 +396,7 @@ func TestPHPComposer(t *testing.T) {
 		filePath:       "./testdata/php_composer/wrong.json",
 		virtualPath:    "/test/composer.lock",
 		t:              t,
-		a:              NewPHPComposerAnalyzer(),
+		a:              analyzer.NewPHPComposerAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -409,7 +411,7 @@ func TestPythonPackaging(t *testing.T) {
 		name:           "positive-egg-zip",
 		filePath:       "./testdata/python_packaging/egg/kitchen-1.2.6-py2.7.egg",
 		t:              t,
-		a:              NewPythonPackagingAnalyzer(),
+		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      2,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -425,7 +427,7 @@ func TestPythonPackaging(t *testing.T) {
 		name:           "positive-egg-info",
 		filePath:       "./testdata/python_packaging/egg-info/PKG-INFO",
 		t:              t,
-		a:              NewPythonPackagingAnalyzer(),
+		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -441,7 +443,7 @@ func TestPythonPackaging(t *testing.T) {
 		name:           "positive-wheel",
 		filePath:       "./testdata/python_packaging/dist-info/METADATA",
 		t:              t,
-		a:              NewPythonPackagingAnalyzer(),
+		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -457,7 +459,7 @@ func TestPythonPackaging(t *testing.T) {
 		name:           "positive-no-required-files",
 		filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
 		t:              t,
-		a:              NewPythonPackagingAnalyzer(),
+		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      2,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -471,7 +473,7 @@ func TestPythonPIP(t *testing.T) {
 		name:           "positive",
 		filePath:       "./testdata/python_pip/requirements.txt",
 		t:              t,
-		a:              NewPythonPIPAnalyzer(),
+		a:              analyzer.NewPythonPIPAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -495,7 +497,7 @@ func TestPythonPIP(t *testing.T) {
 		name:           "positive-empty",
 		filePath:       "./testdata/python_pip/empty.txt",
 		t:              t,
-		a:              NewPythonPIPAnalyzer(),
+		a:              analyzer.NewPythonPIPAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -509,7 +511,7 @@ func TestPythonPIPEnv(t *testing.T) {
 		name:           "positive",
 		filePath:       "./testdata/python_pipenv/Pipfile.lock",
 		t:              t,
-		a:              NewPythonPIPEnvAnalyzer(),
+		a:              analyzer.NewPythonPIPEnvAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -525,7 +527,7 @@ func TestPythonPIPEnv(t *testing.T) {
 		name:           "positive-empty",
 		filePath:       "./testdata/python_pipenv/empty.lock",
 		t:              t,
-		a:              NewPythonPIPEnvAnalyzer(),
+		a:              analyzer.NewPythonPIPEnvAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -541,7 +543,7 @@ func TestPythonPoetry(t *testing.T) {
 		filePath:    "./testdata/python_poetry/positive/poetry.lock",
 		virtualPath: "/poetry.lock",
 		t:           t,
-		a:           NewPythonPoetryAnalyzer(),
+		a:           analyzer.NewPythonPoetryAnalyzer(),
 		matchType:   1,
 		matchedFileMap: map[string]string{
 			"/pyproject.toml": "./testdata/python_poetry/positive/pyproject.toml",
@@ -609,7 +611,7 @@ func TestPythonPoetry(t *testing.T) {
 		filePath:       "./testdata/python_poetry/positive-nopyproject/poetry.lock",
 		virtualPath:    "/poetry.lock",
 		t:              t,
-		a:              NewPythonPoetryAnalyzer(),
+		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -630,7 +632,7 @@ func TestPythonPoetry(t *testing.T) {
 		filePath:       "./testdata/python_poetry/negative/poetry.lock",
 		virtualPath:    "/poetry.lock",
 		t:              t,
-		a:              NewPythonPoetryAnalyzer(),
+		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -643,7 +645,7 @@ func TestPythonPoetry(t *testing.T) {
 		filePath:       "./testdata/python_poetry/negative-wrong-project/poetry.lock",
 		virtualPath:    "/poetry.lock",
 		t:              t,
-		a:              NewPythonPoetryAnalyzer(),
+		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -667,7 +669,7 @@ func TestJavaGradle(t *testing.T) {
 		filePath:       "./testdata/java_gradle/positive.lockfile",
 		virtualPath:    "/test/gradle.lockfile",
 		t:              t,
-		a:              NewJavaGradleAnalyzer(),
+		a:              analyzer.NewJavaGradleAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -682,7 +684,7 @@ func TestJavaGradle(t *testing.T) {
 		filePath:    "./testdata/java_gradle/negative.lockfile",
 		virtualPath: "/test/gradle.lockfile",
 		t:           t,
-		a:           NewJavaGradleAnalyzer(),
+		a:           analyzer.NewJavaGradleAnalyzer(),
 		matchType:   1,
 		wantPkgs:    []dxtypes.Package{},
 	}
@@ -695,7 +697,7 @@ func TestJavaPom(t *testing.T) {
 		filePath:       "./testdata/java_pom/positive/pom.xml",
 		virtualPath:    "/test/pom.xml",
 		t:              t,
-		a:              NewJavaPomAnalyzer(),
+		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -712,7 +714,7 @@ func TestJavaPom(t *testing.T) {
 		filePath:       "./testdata/java_pom/requirements/pom.xml",
 		virtualPath:    "/test/pom.xml",
 		t:              t,
-		a:              NewJavaPomAnalyzer(),
+		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs: []dxtypes.Package{
@@ -729,7 +731,7 @@ func TestJavaPom(t *testing.T) {
 		filePath:       "./testdata/java_pom/negative/pom.xml",
 		virtualPath:    "/test/pom.xml",
 		t:              t,
-		a:              NewJavaPomAnalyzer(),
+		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
 		wantPkgs:       []dxtypes.Package{},
@@ -740,21 +742,21 @@ func TestJavaPom(t *testing.T) {
 
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
-		reflect.TypeOf(NewRPMAnalyzer()).String(),
-		reflect.TypeOf(NewDpkgAnalyzer()).String(),
-		reflect.TypeOf(NewApkAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewRPMAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewDpkgAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewApkAnalyzer()).String(),
 	}
 	wantLangAnalyzerTypes := []string{
-		reflect.TypeOf(NewConanAnalyzer()).String(),
-		reflect.TypeOf(NewGoBinaryAnalyzer()).String(),
-		reflect.TypeOf(NewGoModAnalyzer()).String(),
-		reflect.TypeOf(NewPHPComposerAnalyzer()).String(),
-		reflect.TypeOf(NewJavaGradleAnalyzer()).String(),
-		reflect.TypeOf(NewJavaPomAnalyzer()).String(),
-		reflect.TypeOf(NewPythonPIPAnalyzer()).String(),
-		reflect.TypeOf(NewPythonPackagingAnalyzer()).String(),
-		reflect.TypeOf(NewPythonPIPEnvAnalyzer()).String(),
-		reflect.TypeOf(NewPythonPoetryAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewConanAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewGoBinaryAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewGoModAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewPHPComposerAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewJavaGradleAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewJavaPomAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewPythonPIPAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewPythonPackagingAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewPythonPIPEnvAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
@@ -762,31 +764,31 @@ func TestFilterAnalyzer(t *testing.T) {
 	wantAnalyzerTypes = append(wantAnalyzerTypes, wantLangAnalyzerTypes...)
 
 	testcases := []struct {
-		scanMode          ScanMode
+		scanMode          analyzer.ScanMode
 		wantAnalyzerTypes []string
 	}{
 		{
-			scanMode:          AllMode,
+			scanMode:          analyzer.AllMode,
 			wantAnalyzerTypes: wantAnalyzerTypes,
 		},
 		{
-			scanMode:          AllMode | PkgMode, // mean PkgMode
+			scanMode:          analyzer.AllMode | analyzer.PkgMode, // mean PkgMode
 			wantAnalyzerTypes: wantPkgAnalyzerTypes,
 		},
 		{
-			scanMode:          PkgMode,
+			scanMode:          analyzer.PkgMode,
 			wantAnalyzerTypes: wantPkgAnalyzerTypes,
 		},
 		{
-			scanMode:          LanguageMode,
+			scanMode:          analyzer.LanguageMode,
 			wantAnalyzerTypes: wantLangAnalyzerTypes,
 		},
 	}
 
 	for _, testcase := range testcases {
 		wantTypes := testcase.wantAnalyzerTypes
-		got := FilterAnalyzer(testcase.scanMode)
-		gotTypes := lo.Map(got, func(a Analyzer, _ int) string {
+		got := analyzer.FilterAnalyzer(testcase.scanMode)
+		gotTypes := lo.Map(got, func(a analyzer.Analyzer, _ int) string {
 			return reflect.TypeOf(a).String()
 		})
 

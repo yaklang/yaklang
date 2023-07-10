@@ -36,9 +36,9 @@ func (a pythonPoetryAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
+	fi := afi.Self
 
-	switch fi.matchStatus {
+	switch fi.MatchStatus {
 	case statusPoetry:
 		pkgs, err := ParseLanguageConfiguration(fi, poetry.NewParser())
 		if err != nil {
@@ -49,10 +49,10 @@ func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, e
 		}
 
 		// Parse pyproject.toml to identify the direct dependencies
-		pyprojectPath := path.Join(path.Dir(fi.path), PyProjectFile)
-		if pyprojectFi, ok := afi.matchedFileInfos[pyprojectPath]; ok {
+		pyprojectPath := path.Join(path.Dir(fi.Path), PyProjectFile)
+		if pyprojectFi, ok := afi.MatchedFileInfos[pyprojectPath]; ok {
 			pyProjectParser := pyproject.NewParser()
-			parsed, err := pyProjectParser.Parse(pyprojectFi.f)
+			parsed, err := pyProjectParser.Parse(pyprojectFi.File)
 			if err != nil {
 				return nil, err
 			}
