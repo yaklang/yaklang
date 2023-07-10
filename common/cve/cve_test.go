@@ -1,9 +1,10 @@
 package cve
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"strings"
 	"testing"
 	"time"
@@ -99,8 +100,7 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestQueryCVEFixName(t *testing.T) {
-	baseInfoString := `adduser 3.118ubuntu5
-apt 2.4.9
+	baseInfoString := `apt 2.4.9
 base-files 12ubuntu4.3
 base-passwd 3.5.52build1
 bash 5.1-6ubuntu1
@@ -330,7 +330,7 @@ zlib1g 1:1.2.11.dfsg-2ubuntu9.2`
 		fmt.Printf("product: [%s]:[%s] find cve %d\n", item.name, item.version, num)
 		if num > 0 {
 			for _, cve := range cveRes {
-				fmt.Println(cve.CVE)
+				fmt.Println(cve.CVE.CVE)
 			}
 		}
 	}
@@ -342,5 +342,11 @@ type productWithVersion struct {
 }
 
 func TestClean(t *testing.T) {
-	fmt.Println(utils.VersionClean("1\\:8.0-0ubuntu1"))
+	cpeObject := cveresources.Configurations{}
+	jsonSTR := `{"CVE_data_version":"4.0","nodes":[{"operator":"OR","cpe_match":[{"vulnerable":true,"cpe23Uri":"cpe:2.3:o:redhat:linux:*:*:*:*:*:*:*:*","versionStartExcluding":"","versionEndExcluding":"","versionStartIncluding":"","versionEndIncluding":""},{"vulnerable":true,"cpe23Uri":"cpe:2.3:o:freebsd:freebsd:6.2:stable:*:*:*:*:*:*","versionStartExcluding":"","versionEndExcluding":"","versionStartIncluding":"","versionEndIncluding":""}],"children":[]}]}`
+	err := json.Unmarshal([]byte(jsonSTR), &cpeObject)
+	if err != nil {
+		return
+	}
+
 }
