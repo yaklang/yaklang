@@ -30,18 +30,22 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 	if len(blocks) <= 0 && firstBlock == nil {
 		return nil, errors.New("empty rules is not allowed")
 	}
+	_ = bestMode
+	if firstBlock != nil {
+		if config.CanScanUDP() {
+			blocks = append(blocks, firstBlock)
+		} else if config.CanScanTCP() {
+			log.Infof("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
 
-	if firstBlock != nil && !bestMode {
-		log.Infof("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
-
-		state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
-		result.State = state
-		result.Fingerprint = info
-		if err != nil {
-			result.Reason = err.Error()
-		}
-		if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
-			return specialCase(result, config), nil
+			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
+			result.State = state
+			result.Fingerprint = info
+			if err != nil {
+				result.Reason = err.Error()
+			}
+			if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
+				return specialCase(result, config), nil
+			}
 		}
 	}
 
@@ -62,7 +66,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 	for _, block := range blocks {
 		block := block
 		log.Infof("%s - %v ", block.Probe.Name, block.Probe.Proto)
-		if block == nil || block.Probe.Payload == "" {
+		if block == nil || (block.Probe.Payload == "" && config.CanOnlyScanTCP()) {
 			continue
 		}
 
