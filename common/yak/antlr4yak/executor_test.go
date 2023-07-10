@@ -92,15 +92,6 @@ func init() {
 	})
 }
 
-/*
-badcase
-1. f"bac\$": 模版字符串的转义有问题，需要更多测试
-2.
-d = {1:23, "bbb": a}
-e = 1
-assert d.$e == 23
-3.
-*/
 func TestBuildinMethod(t *testing.T) {
 	code := `
 assert "abc".StartsWith("a"),"StartsWith error"
@@ -165,8 +156,12 @@ continue
 func TestNewExecutor_MemberCallInTemplateString(t *testing.T) {
 	NewExecutor(`
 a = {"a":1}
-
+assert f"bac\$" == "bac$"
 assert f"${a.a}" == "1"
+d = {1:23, "bbb": a}
+e = 1
+assert d.$e == 23
+assert f"${d.$e}" == "23"
 `).VM.Exec()
 }
 func TestNewExecutor_MultiQuote(t *testing.T) {
@@ -3513,4 +3508,69 @@ assert getStringSliceArgumentType([]) == "[]string", "auto convert [] to []strin
 		t.Fatal(err)
 	}
 
+}
+
+/*
+变量检查的粗略实现
+目标：通过静态代码分析检查出执行时可能会出现的错误，需要尽可能依据代码执行顺序检查
+
+1. 编译时检查使用未声明的变量，但对于全局定义的变量允许在非立即执行的函数内部使用
+*/
+func TestExecWithStrictMode(t *testing.T) {
+	for index, testCase := range [][]string{
+		{`
+test = b=>a(b)
+a = a=>a
+assert(test(1) == 1)
+`, ""}, {`
+test = b=>a
+a = 1
+assert(test(1) == 1)
+`, ""}, {`
+fn{
+	assert(a == 1)	
+}
+a = 1
+`, "undefined variable: a"}, {`
+fn{
+	fn{
+		assert(a == 1)	
+	}
+}
+a = 1
+`, "undefined variable: a"}, {`
+f(){
+	fn{
+		assert(a == 1)	
+	}
+}
+a = 1
+f()
+`, ""}, {`
+test = b=>a
+assert(test(1) == 1)
+`, "undefined variable: a"},
+	} {
+		engine := New()
+		engine.ImportLibs(map[string]interface{}{
+			"print": func(v interface{}) {
+				fmt.Println(v)
+			},
+			"assert": func(b bool) {
+				if !b {
+					panic("assert failed")
+				}
+			},
+		})
+		engine.strictMode = true
+		err := engine.SafeEval(context.Background(), testCase[0])
+		if err == nil && testCase[1] != "" {
+			t.Fatal(utils2.Errorf("expect error `%s`, but get nil, index: %d", testCase[1], index))
+		}
+		if err != nil {
+			if !strings.Contains(err.Error(), testCase[1]) {
+				t.Fatal(utils2.Errorf("expect error `%s`, but get %v, index: %d", testCase[1], err, index))
+			}
+		}
+	}
 }
