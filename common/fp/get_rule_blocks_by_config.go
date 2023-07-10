@@ -23,7 +23,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	for probe, matches := range config.FingerprintRules {
 
 		// 只有 TCP 才能匹配 TCP
-		if probe.Payload == "" && config.CanScanTCP() && !config.CanScanUDP() {
+		if probe.Payload == "" && config.CanScanTCP() {
 			if emptyBlock == nil {
 				emptyBlock = &RuleBlock{Probe: probe, Matched: matches}
 			} else {
