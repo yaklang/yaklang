@@ -4,9 +4,73 @@ package newcrawlerx
 
 import (
 	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+	"time"
 )
+
+func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, selector string) bool {
+	status, element, err := page.Has(selector)
+	//element, err := page.Element(selector)
+	if err != nil {
+		log.Infof("on page element: %s", err)
+		return false
+	}
+	if !status {
+		log.Infof("on page element: %s not found", selector)
+	}
+	if element == nil {
+		info := page.MustInfo()
+		var url string
+		if info != nil {
+			url = info.URL
+		}
+		log.Errorf("on page %s element %s not found.", url, selector)
+		return false
+	}
+	if visible, _ := element.Visible(); !visible {
+		return false
+	}
+	if starter.elementCheck != nil && !starter.elementCheck(element) {
+		return false
+	}
+	//element.Click(proto.InputMouseButtonLeft)
+	element.Eval(`this.click()`)
+	page.MustWaitLoad()
+	time.Sleep(500 * time.Millisecond)
+	return true
+}
+
+func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
+	if len(starter.baseConfig.sensitiveWords) == 0 {
+		return nil
+	}
+	var propertyList = []string{"innerHTML", "value"}
+	return func(element *rod.Element) bool {
+		var resultStr string
+		for _, property := range propertyList {
+			subStr, _ := getProperty(element, property)
+			if subStr != "" {
+				resultStr += ";" + subStr
+			}
+		}
+		result, word := StringArrayCover(starter.baseConfig.sensitiveWords, resultStr)
+		if result {
+			var url string
+			page := element.Page()
+			if page != nil {
+				info := page.MustInfo()
+				if info != nil {
+					url = info.URL
+				}
+			}
+			log.Infof(`In url %s element %s do not click because of sensitive word: %s`, url, element.Object.Description, word)
+			return false
+		}
+		return true
+	}
+}
 
 func getInputSubmitElementSelectors(page *rod.Page) []string {
 	searchInfo := map[string]map[string][]string{

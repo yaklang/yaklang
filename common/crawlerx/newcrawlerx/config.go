@@ -77,6 +77,9 @@ type BaseConfig struct {
 	urlTree    *UrlTree
 
 	pageSizedWaitGroup *utils.SizedWaitGroup
+
+	sensitiveWords []string
+	proxies            []string
 }
 
 type ConfigOpt func(*Config)
@@ -106,6 +109,9 @@ func NewConfig() *Config {
 
 			concurrent:        2,
 			extraWaitLoadTime: 0,
+
+			sensitiveWords: make([]string, 0),
+			ch:                make(chan ReqInfo),
 		},
 	}
 }
@@ -318,6 +324,11 @@ func WithUrlTree(tree *UrlTree) ConfigOpt {
 		config.baseConfig.urlTree = tree
 	}
 }
+func WithProxies(proxies ...string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.proxies = append(config.baseConfig.proxies, proxies...)
+	}
+}
 
 func WithPageSizedWaitGroup(pageSizedWaitGroup *utils.SizedWaitGroup) ConfigOpt {
 	return func(config *Config) {
@@ -340,5 +351,17 @@ func WithVueWeb(vue bool) ConfigOpt {
 func WithExtraWaitLoadTime(time int) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.extraWaitLoadTime = time
+	}
+}
+
+func WithSensitiveWord(words ...string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, words...)
+	}
+}
+
+func WithSensitiveWords(words []string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, words...)
 	}
 }

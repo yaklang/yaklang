@@ -80,6 +80,9 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 
 		// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
 		fun = yakvm.NewFunction(y.codes, y.currentSymtbl)
+		if y.sourceCodePointer != nil {
+			fun.SetSourceCode(*y.sourceCodePointer)
+		}
 	} else {
 		// 创建符号
 		if fn := i.Func(); fn != nil {
@@ -98,6 +101,9 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		funcCode := y.codes
 		// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
 		fun = yakvm.NewFunction(funcCode, y.currentSymtbl)
+		if y.sourceCodePointer != nil {
+			fun.SetSourceCode(*y.sourceCodePointer)
+		}
 	}
 	fun.GetSymbolId()
 	if funcName != "" {
@@ -222,60 +228,3 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 
 	return symbols, ellipsis != nil
 }
-
-//func (y *YakCompiler) VisitFunctionDeclareStmt(raw yak.IFunctionDeclareStmtContext) interface{} {
-//	if y == nil || raw == nil {
-//		return nil
-//	}
-//	if y.currentSymtbl != nil && y.currentSymtbl.GetParentSymbolTable() != y.rootSymtbl {
-//		panic("global functions can only be declared in the root scope")
-//	}
-//	i, _ := raw.(*yak.FunctionDeclareStmtContext)
-//	if i == nil {
-//		return nil
-//	}
-//	recoverRange := y.SetRange(i.BaseParserRuleContext)
-//  defer recoverRange()
-//
-//	funcNameDecl := i.FunctionNameDecl()
-//	if funcNameDecl == nil {
-//		panic("BUG: function name decl is nil")
-//	}
-//	funcName := funcNameDecl.GetText()
-//	if fn := i.Func(); fn != nil {
-//		y.writeString(fn.GetText() + " ")
-//	}
-//	y.writeString(funcName)
-//
-//	// 切换符号表和代码栈
-//	recoverSymbolTable := y.SwitchSymbolTable("function", uuid.NewV4().String())
-//	recoverCodeStack := y.SwitchCodes()
-//	var paramsSymbol []int
-//	var fun *yakvm.Function
-//	var isVariable bool
-//	//id, err := y.rootSymtbl.NewSymbolWithReturn(funcName)
-//	//if err != nil {
-//	//	panic(fmt.Sprintf("cannot create symbol for function decl: %v", err))
-//	//}
-//	y.writeString("(")
-//	paramsSymbol, isVariable = y.VisitFunctionParamDecl(i.FunctionParamDecl())
-//	y.writeString(") ")
-//	// visit代码块
-//	y.VisitBlock(i.Block())
-//	y.pushOperator(yakvm.OpReturn)
-//	funcCode := y.codes
-//	// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
-//	fun = yakvm.NewFunction(funcCode, y.currentSymtbl)
-//	fun.SetParamSymbols(paramsSymbol)
-//	fun.SetName(funcName)
-//	fun.SetIsVariableParameter(isVariable)
-//	funcVal := &yakvm.Value{
-//		TypeVerbose: "named-function",
-//		Value:       fun,
-//	}
-//
-//	recoverSymbolTable()
-//	recoverCodeStack()
-//	y.pushAheadGlobalFunc(funcVal)
-//	return nil
-//}

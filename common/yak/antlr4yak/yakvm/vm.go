@@ -7,6 +7,8 @@ import (
 )
 
 type Frame struct {
+	originCode string
+
 	frameVerbose string
 	vm           *VirtualMachine
 	parent       *Frame
@@ -48,6 +50,10 @@ type Frame struct {
 	// hijacks map[sha1(libName, memberName)]func(any)any
 	hijackMapMemberCallHandlers sync.Map
 	ctx                         context.Context
+}
+
+func (v *Frame) SetOriginCode(s string) {
+	v.originCode = s
 }
 
 func (v *Frame) EnableDebuggerEval() {
@@ -96,6 +102,7 @@ func (v *Frame) GetContext() context.Context {
 func NewSubFrame(parent *Frame) *Frame {
 
 	frame := &Frame{
+		originCode:          parent.originCode,
 		vm:                  parent.vm,
 		parent:              parent,
 		codePointer:         0,

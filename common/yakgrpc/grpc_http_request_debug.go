@@ -20,10 +20,7 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScript(scriptName string, input string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
-	var (
-		targetInput = input
-	)
+func (s *Server) execScript(scriptName string, targetInput string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
 	if targetInput == "" {
 		return utils.Error("input is empty")
 	}
@@ -59,6 +56,7 @@ func (s *Server) execScript(scriptName string, input string, stream sender, para
 	case "port-scan":
 		fallthrough
 	case "nuclei":
+		break
 	default:
 		return utils.Error("unsupported plugin type: " + debugType)
 	}
@@ -191,7 +189,7 @@ func (s *Server) execScript(scriptName string, input string, stream sender, para
 }
 
 func (s *Server) debugScript(
-	input string,
+	inputScanTarget string,
 	debugType string,
 	debugCode string,
 	stream sender,
@@ -200,5 +198,5 @@ func (s *Server) debugScript(
 	if err != nil {
 		return err
 	}
-	return s.execScript(tempName, input, stream, params...)
+	return s.execScript(tempName, inputScanTarget, stream, params...)
 }

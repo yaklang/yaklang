@@ -193,6 +193,10 @@ service Yak {
   rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
 
+  rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
+  rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
+  rpc DeleteFuzzerLabel(DeleteFuzzerLabelRequest) returns (Empty);
+
   // HTTPFuzzerResponse
   // 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
   rpc QueryHTTPFuzzerResponseByTaskId(QueryHTTPFuzzerResponseByTaskIdRequest) returns (QueryHTTPFuzzerResponseByTaskIdResponse) ;
@@ -497,6 +501,28 @@ service Yak {
   // rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
   // rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
   rpc DebugPlugin(DebugPluginRequest) returns (stream ExecResult);
+  rpc SmokingEvaluatePlugin(SmokingEvaluatePluginRequest) returns (SmokingEvaluatePluginResponse);
+}
+
+message SmokingEvaluatePluginRequest {
+  repeated HTTPRequestBuilderParams Requests = 1;
+
+  // 只支持插件名评估
+  string PluginName = 2;
+
+  string Code = 3;
+  string PluginType = 4;
+}
+
+message SmokingEvaluateResult {
+  string Item = 1;
+  string Suggestion = 2;
+  bytes ExtraInfo = 3;
+}
+
+message SmokingEvaluatePluginResponse {
+  int64 Score = 1;
+  repeated SmokingEvaluateResult Results = 2;
 }
 
 message IsVulinboxReadyRequest {
@@ -1002,6 +1028,26 @@ message Bytes {
 message ExtractDataResponse {
   string Token = 1;
   bytes Extracted = 2;
+}
+
+message SaveFuzzerLabelRequest {
+  repeated FuzzerLabel Data = 1;
+}
+
+message QueryFuzzerLabelResponse {
+  repeated FuzzerLabel Data = 1;
+}
+
+message FuzzerLabel {
+  int64 Id = 1;
+  string Label = 2;
+  string Description = 3;
+  string DefaultDescription = 4;
+  string Hash = 5;
+}
+
+message DeleteFuzzerLabelRequest {
+  string Hash = 1;
 }
 
 message ExtractDataRequest {
@@ -3257,6 +3303,8 @@ message MITMRequest {
   bool enableProxyAuth = 51;
   string proxyUsername = 49;
   string proxyPassword = 50;
+  repeated string dnsServers = 52;
+  repeated KVPair hosts = 53;
 }
 
 message Certificate {
@@ -3451,4 +3499,5 @@ message GetLicenseResponse {
 
 message CheckLicenseRequest {
   string LicenseActivation = 1;
+  string CompanyVersion = 2;
 }

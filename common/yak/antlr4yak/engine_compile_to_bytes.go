@@ -176,7 +176,7 @@ func (n *Engine) Marshal(code string, key []byte) ([]byte, error) {
 	return n._marshal(cl.GetRootSymbolTable(), cl.GetOpcodes(), key)
 }
 
-func (n *Engine) UnMarshal(b []byte, key []byte) (*yakvm.SymbolTable, []*yakvm.Code, error) {
+func (n *Engine) UnMarshal(b []byte, key []byte, code string) (*yakvm.SymbolTable, []*yakvm.Code, error) {
 	var err error
 	hasKey, isCrypto := len(key) > 0, IsCryptoYakc(b)
 
@@ -214,20 +214,21 @@ func (n *Engine) UnMarshal(b []byte, key []byte) (*yakvm.SymbolTable, []*yakvm.C
 	}
 
 	m := yakvm.NewCodesMarshaller()
+	m.SetSourceCode(code)
 	return m.Unmarshal(b)
 }
 
-func (n *Engine) SafeExecYakc(ctx context.Context, b []byte, key []byte) (fErr error) {
+func (n *Engine) SafeExecYakc(ctx context.Context, b []byte, key []byte, code string) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = fmt.Errorf("exec yakc failed: %s", err)
 		}
 	}()
-	return n.ExecYakc(ctx, b, key)
+	return n.ExecYakc(ctx, b, key, code)
 }
 
-func (n *Engine) ExecYakc(ctx context.Context, b []byte, key []byte) error {
-	symbolTable, codes, err := n.UnMarshal(b, key)
+func (n *Engine) ExecYakc(ctx context.Context, b []byte, key []byte, code string) error {
+	symbolTable, codes, err := n.UnMarshal(b, key, code)
 	if err != nil {
 		return err
 	}
@@ -243,14 +244,14 @@ func (n *Engine) ExecYakc(ctx context.Context, b []byte, key []byte) error {
 func (n *Engine) SafeExecYakcWithCode(ctx context.Context, b []byte, key []byte, code string) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
-			fErr = fmt.Errorf("exec yakc failed: %s", err)
+			fErr = fmt.Errorf("exec yakc with code failed: %s", err)
 		}
 	}()
 	return n.ExecYakcWithCode(ctx, b, key, code)
 }
 
 func (n *Engine) ExecYakcWithCode(ctx context.Context, b []byte, key []byte, code string) error {
-	symtbl, codes, err := n.UnMarshal(b, key)
+	symtbl, codes, err := n.UnMarshal(b, key, code)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ var ProfileTables = []interface{}{
 	&GeneralStorage{}, &MarkdownDoc{},
 	&Project{},
 	&NavigationBar{}, &NaslScript{},
+	&WebFuzzerLabel{},
 }
 
 func InitializeDefaultDatabase() {

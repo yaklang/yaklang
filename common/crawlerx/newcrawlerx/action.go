@@ -80,7 +80,7 @@ func (starter *BrowserStarter) ActionOnPage() func(*rod.Page) error {
 			starter.doInputFunction(inputElement)
 		}
 		if len(urls) == 0 && len(tempElement) == 0 {
-			//log.Info("vue status.")
+			//log.Infof("vue status on %s.", currentUrl)
 			eventSelectors, err := starter.getEventFunction(page)
 			if err != nil {
 				return utils.Errorf("get page event error: %s", err)
@@ -131,7 +131,7 @@ func (starter *BrowserStarter) ActionOnJS() func(*rod.Page) error {
 
 func (starter *BrowserStarter) getUrlsFunctionGenerator() func(*rod.Page) ([]string, error) {
 	return func(page *rod.Page) ([]string, error) {
-		urls, err := getUrl(page)
+		urls, err := starter.getUrl(page)
 		if err != nil {
 			return urls, utils.Errorf("page %s get url error: %s", page.TargetID, err)
 		}
@@ -201,9 +201,19 @@ func (starter *BrowserStarter) doEventClickFunctionGenerator() func(*rod.Page, s
 		}
 		page.MustWaitLoad()
 		time.Sleep(time.Second)
-		clickElementOnPageBySelector(page, selector)
+		status := starter.clickElementOnPageBySelector(page, selector)
+		if !status {
+			return nil
+		}
 		currentUrl, _ := getCurrentUrl(page)
 		if currentUrl != "" && currentUrl != originUrl {
+			result := SimpleResult{
+				url:        currentUrl,
+				resultType: "event url",
+				method:     "EVENT GET",
+				from:       originUrl,
+			}
+			starter.ch <- &result
 			starter.doUrlsFunction(originUrl, currentUrl)
 		}
 		return nil

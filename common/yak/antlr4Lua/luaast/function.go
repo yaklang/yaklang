@@ -72,6 +72,7 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
 	function.SetSymbol(funcSymbolId)
+	function.SetSourceCode(l.sourceCode)
 
 	//恢复code stack
 	recoverCodeStack()
@@ -184,6 +185,8 @@ func (l *LuaTranslator) VisitLocalFuncNameAndBody(name string, body lua.IFuncbod
 	}
 
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
+	function.SetSourceCode(l.sourceCode)
+
 	function.GetSymbolId()
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
@@ -256,6 +259,8 @@ func (l *LuaTranslator) VisitFunctionDef(def lua.IFunctiondefContext) interface{
 	}
 
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
+	function.SetSourceCode(l.sourceCode)
+
 	function.GetSymbolId()
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)

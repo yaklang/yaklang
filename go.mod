@@ -89,6 +89,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/projectdiscovery/retryabledns v1.0.13
+	github.com/refraction-networking/utls v1.3.2
 	github.com/rocket049/gocui v0.3.2
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/satori/go.uuid v1.2.0
@@ -106,10 +107,10 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
 	github.com/xiecat/wsm v0.1.3
-	golang.org/x/crypto v0.1.0
-	golang.org/x/net v0.2.0
+	golang.org/x/crypto v0.5.0
+	golang.org/x/net v0.7.0
 	golang.org/x/sys v0.7.0
-	golang.org/x/text v0.4.0
+	golang.org/x/text v0.7.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/fatih/set.v0 v0.2.1
@@ -138,6 +139,7 @@ require (
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
+	github.com/gaukas/godicttls v0.0.3 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 // indirect
@@ -164,6 +166,7 @@ require (
 	github.com/jinzhu/now v1.0.0 // indirect
 	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
+	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lestrrat/go-envload v0.0.0-20180220120943-6ed08b54a570 // indirect

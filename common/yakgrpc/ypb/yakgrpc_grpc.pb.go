@@ -89,6 +89,9 @@ type YakClient interface {
 	IsMultipartFormDataRequest(ctx context.Context, in *FixUploadPacketRequest, opts ...grpc.CallOption) (*IsMultipartFormDataRequestResult, error)
 	GenerateExtractRule(ctx context.Context, in *GenerateExtractRuleRequest, opts ...grpc.CallOption) (*GenerateExtractRuleResponse, error)
 	ExtractData(ctx context.Context, opts ...grpc.CallOption) (Yak_ExtractDataClient, error)
+	SaveFuzzerLabel(ctx context.Context, in *SaveFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error)
+	QueryFuzzerLabel(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryFuzzerLabelResponse, error)
+	DeleteFuzzerLabel(ctx context.Context, in *DeleteFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error)
 	// HTTPFuzzerResponse
 	// 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
 	QueryHTTPFuzzerResponseByTaskId(ctx context.Context, in *QueryHTTPFuzzerResponseByTaskIdRequest, opts ...grpc.CallOption) (*QueryHTTPFuzzerResponseByTaskIdResponse, error)
@@ -337,6 +340,7 @@ type YakClient interface {
 	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error)
+	SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error)
 }
 
 type yakClient struct {
@@ -1176,6 +1180,33 @@ func (x *yakExtractDataClient) Recv() (*ExtractDataResponse, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *yakClient) SaveFuzzerLabel(ctx context.Context, in *SaveFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SaveFuzzerLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryFuzzerLabel(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryFuzzerLabelResponse, error) {
+	out := new(QueryFuzzerLabelResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryFuzzerLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteFuzzerLabel(ctx context.Context, in *DeleteFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteFuzzerLabel", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *yakClient) QueryHTTPFuzzerResponseByTaskId(ctx context.Context, in *QueryHTTPFuzzerResponseByTaskIdRequest, opts ...grpc.CallOption) (*QueryHTTPFuzzerResponseByTaskIdResponse, error) {
@@ -3474,6 +3505,15 @@ func (x *yakDebugPluginClient) Recv() (*ExecResult, error) {
 	return m, nil
 }
 
+func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error) {
+	out := new(SmokingEvaluatePluginResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SmokingEvaluatePlugin", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3549,6 +3589,9 @@ type YakServer interface {
 	IsMultipartFormDataRequest(context.Context, *FixUploadPacketRequest) (*IsMultipartFormDataRequestResult, error)
 	GenerateExtractRule(context.Context, *GenerateExtractRuleRequest) (*GenerateExtractRuleResponse, error)
 	ExtractData(Yak_ExtractDataServer) error
+	SaveFuzzerLabel(context.Context, *SaveFuzzerLabelRequest) (*Empty, error)
+	QueryFuzzerLabel(context.Context, *Empty) (*QueryFuzzerLabelResponse, error)
+	DeleteFuzzerLabel(context.Context, *DeleteFuzzerLabelRequest) (*Empty, error)
 	// HTTPFuzzerResponse
 	// 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
 	QueryHTTPFuzzerResponseByTaskId(context.Context, *QueryHTTPFuzzerResponseByTaskIdRequest) (*QueryHTTPFuzzerResponseByTaskIdResponse, error)
@@ -3797,6 +3840,7 @@ type YakServer interface {
 	// rpc QueryHTTPRequestBuilder(QueryHTTPRequestBuilderRequest) returns (QueryHTTPRequestBuilderResponse);
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error
+	SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -3989,6 +4033,15 @@ func (UnimplementedYakServer) GenerateExtractRule(context.Context, *GenerateExtr
 }
 func (UnimplementedYakServer) ExtractData(Yak_ExtractDataServer) error {
 	return status.Errorf(codes.Unimplemented, "method ExtractData not implemented")
+}
+func (UnimplementedYakServer) SaveFuzzerLabel(context.Context, *SaveFuzzerLabelRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveFuzzerLabel not implemented")
+}
+func (UnimplementedYakServer) QueryFuzzerLabel(context.Context, *Empty) (*QueryFuzzerLabelResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryFuzzerLabel not implemented")
+}
+func (UnimplementedYakServer) DeleteFuzzerLabel(context.Context, *DeleteFuzzerLabelRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteFuzzerLabel not implemented")
 }
 func (UnimplementedYakServer) QueryHTTPFuzzerResponseByTaskId(context.Context, *QueryHTTPFuzzerResponseByTaskIdRequest) (*QueryHTTPFuzzerResponseByTaskIdResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHTTPFuzzerResponseByTaskId not implemented")
@@ -4556,6 +4609,9 @@ func (UnimplementedYakServer) HTTPRequestBuilder(context.Context, *HTTPRequestBu
 }
 func (UnimplementedYakServer) DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error {
 	return status.Errorf(codes.Unimplemented, "method DebugPlugin not implemented")
+}
+func (UnimplementedYakServer) SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SmokingEvaluatePlugin not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -5735,6 +5791,60 @@ func (x *yakExtractDataServer) Recv() (*ExtractDataRequest, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func _Yak_SaveFuzzerLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveFuzzerLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveFuzzerLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SaveFuzzerLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveFuzzerLabel(ctx, req.(*SaveFuzzerLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryFuzzerLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryFuzzerLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryFuzzerLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryFuzzerLabel(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteFuzzerLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFuzzerLabelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteFuzzerLabel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeleteFuzzerLabel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteFuzzerLabel(ctx, req.(*DeleteFuzzerLabelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Yak_QueryHTTPFuzzerResponseByTaskId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -9232,6 +9342,24 @@ func (x *yakDebugPluginServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Yak_SmokingEvaluatePlugin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SmokingEvaluatePluginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SmokingEvaluatePlugin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SmokingEvaluatePlugin",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SmokingEvaluatePlugin(ctx, req.(*SmokingEvaluatePluginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -9438,6 +9566,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateExtractRule",
 			Handler:    _Yak_GenerateExtractRule_Handler,
+		},
+		{
+			MethodName: "SaveFuzzerLabel",
+			Handler:    _Yak_SaveFuzzerLabel_Handler,
+		},
+		{
+			MethodName: "QueryFuzzerLabel",
+			Handler:    _Yak_QueryFuzzerLabel_Handler,
+		},
+		{
+			MethodName: "DeleteFuzzerLabel",
+			Handler:    _Yak_DeleteFuzzerLabel_Handler,
 		},
 		{
 			MethodName: "QueryHTTPFuzzerResponseByTaskId",
@@ -10090,6 +10230,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HTTPRequestBuilder",
 			Handler:    _Yak_HTTPRequestBuilder_Handler,
+		},
+		{
+			MethodName: "SmokingEvaluatePlugin",
+			Handler:    _Yak_SmokingEvaluatePlugin_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

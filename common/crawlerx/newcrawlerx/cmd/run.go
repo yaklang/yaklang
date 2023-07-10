@@ -93,7 +93,7 @@ func do() {
 		exportFile := c.String("out")
 		if exportFile == "" {
 			for item := range channel {
-				fmt.Println(item.Method() + " " + item.Url())
+				fmt.Println(item.Method() + " " + item.Url() + " from " + item.From())
 			}
 			log.Info("output channel down.")
 		} else {
@@ -177,11 +177,12 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 	blackList, _ := conf.GetValue("crawler", "blackList")
 	whiteList, _ := conf.GetValue("crawler", "whiteList")
 	vue, _ := conf.GetValue("crawler", "vue")
+	sensitiveWord, _ := conf.GetValue("crawler", "sensitiveWord")
 	vueBool := false
 	if vue == "true" || vue == "True" || vue == "TRUE" {
 		vueBool = true
 	}
-	log.Info(vueBool)
+	//log.Info(vueBool)
 	opts = append(opts,
 		newcrawlerx.WithNewBrowser(string(browserBytes)),
 		newcrawlerx.WithFormFill(getMapFromString(formFill)),
@@ -190,6 +191,7 @@ func loadFromFile(filePath string) []newcrawlerx.ConfigOpt {
 		newcrawlerx.WithWhiteList(getSliceFromString(whiteList)...),
 		newcrawlerx.WithVueWeb(vueBool),
 		newcrawlerx.WithExtraWaitLoadTime(1000),
+		newcrawlerx.WithSensitiveWord(getSliceFromString(sensitiveWord)...),
 	)
 	return opts
 }

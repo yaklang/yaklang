@@ -28,6 +28,13 @@ type Engine struct {
 	debugInit     func(*yakvm.Debugger)
 }
 
+func (e *Engine) SetStrictMode(b bool) {
+	if e == nil {
+		return
+	}
+	e.strictMode = b
+}
+
 func New() *Engine {
 	table := yakvm.NewSymbolTable()
 	vm := yakvm.NewWithSymbolTable(table)

@@ -3,13 +3,14 @@
 package newcrawlerx
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 	"regexp"
 	"strings"
 )
 
-//var linkCompilerStr = `href="([^\s]*?)"|src="([^\s]*?)"`
+// var linkCompilerStr = `href="([^\s]*?)"|src="([^\s]*?)"`
 var linkCompilerStr = `((?:[a-zA-Z]{1,10}://|//)[a-zA-Z0-9\-\_]{1,}\.[a-zA-Z]{2,}[^'"\s]{0,})|(\"(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\")|(\'(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\')|href="([a-zA-Z0-9\.\/][^'"\s]*?)"|src="([a-zA-Z0-9\.\/][^'"\s]*?)"`
 
 var tempJsLinkCompilers = []string{
@@ -27,13 +28,15 @@ type jsLinkFinder struct {
 	After  int
 }
 
+var urlChar = `a-zA-Z0-9\.\/\?\_\-\=\&\%\#`
+
 var jsLinkCompilers = []*jsLinkFinder{
-	&jsLinkFinder{`\.post\(\s*(\'[^\s]*?\'|\"[^\s]*?\")`, 7, 1},
-	&jsLinkFinder{`$\.get\(\s*(\'[^\s]*?\'|\"[^\s]*?\")`, 7, 1},
-	&jsLinkFinder{`(?i:url:\s*(\"[^\s]*?\"|\'[^\s]*?\'))`, 5, 1},
-	&jsLinkFinder{`(?i:url\((\'[^\s]*?\'|\"[^\s]*?\")\))`, 5, 2},
+	&jsLinkFinder{fmt.Sprintf(`$\.post\(\s*(\'[%s]+?\'|\"[%s]+?\")\,`, urlChar, urlChar), 8, 2},
+	&jsLinkFinder{fmt.Sprintf(`$\.get\(\s*(\'[%s]+?\'|\"[%s]+?\")\,`, urlChar, urlChar), 7, 2},
+	&jsLinkFinder{fmt.Sprintf(`(?i:url:\s*(\"[%s]+?\"|\'[%s]+?\'))`, urlChar, urlChar), 5, 1},
+	&jsLinkFinder{fmt.Sprintf(`(?i:url\((\'[%s]+?\'|\"[%s]+?\")\,)`, urlChar, urlChar), 5, 2},
 	//&jsLinkFinder{`(?i:url\([^\'\"\s]*?\))`, 4, 1},
-	&jsLinkFinder{`(?i:url\s*\=\s*(\'[^\s]*?\'|\"[^\s]*?\"))`, 5, 1},
+	&jsLinkFinder{fmt.Sprintf(`(?i:url\s*\=\s*(\'[%s]+?\'|\"[%s]+?\"))`, urlChar, urlChar), 5, 1},
 }
 
 func analysisHtmlInfo(urlStr, textStr string) []string {
