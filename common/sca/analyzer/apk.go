@@ -24,15 +24,15 @@ func NewApkAnalyzer() *apkAnalyzer {
 }
 
 func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusInstallFile:
 		var (
 			pkgs    []dxtypes.Package
 			pkg     dxtypes.Package
 			version string
 		)
-		scanner := bufio.NewScanner(fi.f)
+		scanner := bufio.NewScanner(fi.File)
 
 		for scanner.Scan() {
 			line := scanner.Text()
