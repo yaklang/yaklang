@@ -58,6 +58,7 @@ require (
 	github.com/googollee/go-socket.io v1.6.1
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
+	github.com/gosnmp/gosnmp v1.35.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-version v1.6.0
