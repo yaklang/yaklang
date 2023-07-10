@@ -18,11 +18,10 @@ type Package struct {
 	UpStreamPackages   []*Package
 	DownStreamPackages []*Package
 
-	//
-	DependsOn []string
-	Provides  []string
+	DependsOn PackageRelationShip
 
-	Indirect bool
+	Indirect  bool
+	Potential bool
 
 	// 订正 CPE 和 强制关联 CVE
 	AmendedCPE    []string
@@ -36,6 +35,12 @@ type Package struct {
 	ExtraInfo []InfoPair
 }
 
+type PackageRelationShip struct {
+	And []string
+	Or  [][]string
+}
+
 func (p *Package) Identifier() string {
+
 	return utils.CalcSha1(p.Name, p.Version)
 }
