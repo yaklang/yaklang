@@ -32,8 +32,8 @@ func (a goBinaryAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusExecutable:
 		p := binary.NewParser()
 		pkgs, err := ParseLanguageConfiguration(fi, p)

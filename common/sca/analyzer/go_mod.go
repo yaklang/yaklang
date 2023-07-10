@@ -47,8 +47,8 @@ func (a goModAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusGoMod:
 		p := mod.NewParser(true)
 		pkgs, err := ParseLanguageConfiguration(fi, p)
@@ -57,8 +57,8 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 		}
 		// if golang version < 1.17, need to parse go.sum
 		if lessThanGo117(pkgs) {
-			sumPath := path.Join(path.Dir(fi.path), goSumFile)
-			if sfi, ok := afi.matchedFileInfos[sumPath]; ok {
+			sumPath := path.Join(path.Dir(fi.Path), goSumFile)
+			if sfi, ok := afi.MatchedFileInfos[sumPath]; ok {
 				sp := sum.NewParser()
 				sumPkgs, err := ParseLanguageConfiguration(sfi, sp)
 				if err != nil {
