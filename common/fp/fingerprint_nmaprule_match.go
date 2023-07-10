@@ -30,9 +30,10 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 	if len(blocks) <= 0 && firstBlock == nil {
 		return nil, errors.New("empty rules is not allowed")
 	}
-	_ = bestMode
 
-	if firstBlock != nil {
+	if firstBlock != nil && !bestMode {
+		log.Infof("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
+
 		state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
 		result.State = state
 		result.Fingerprint = info
@@ -60,6 +61,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 	var probeSwg = utils2.NewSizedWaitGroup(swgCon)
 	for _, block := range blocks {
 		block := block
+		log.Infof("%s - %v ", block.Probe.Name, block.Probe.Proto)
 		if block == nil || block.Probe.Payload == "" {
 			continue
 		}
@@ -87,6 +89,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 				}
 			}
 			log.Debugf("try %s probe[%v] rarity[%v] %#v", utils2.HostPort(host, port), block.Probe.Index, block.Probe.Rarity, block.Probe.Payload)
+			log.Infof("%s", block.Probe.Name)
 			state, info, err := f.matchBlock(ctx, ip, port, block, config)
 			collectResultLock.Lock()
 			defer collectResultLock.Unlock()
