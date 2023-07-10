@@ -46,10 +46,10 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 }
 
 func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusRPM:
-		db, err := rpmdb.Open(fi.f.Name())
+		db, err := rpmdb.Open(fi.File.Name())
 		if err != nil {
 			return nil, utils.Errorf("failed to open RPM DB: %v", err)
 		}

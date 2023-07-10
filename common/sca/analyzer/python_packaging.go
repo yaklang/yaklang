@@ -27,7 +27,7 @@ var (
 
 		"EGG-INFO/PKG-INFO",
 
-		// .egg-info format: .egg-info can be a file or directory
+		// .egg-info format: .egg-info can be Analyzer file or directory
 		// https://setuptools.readthedocs.io/en/latest/deprecated/python_eggs.html#eggs-and-their-formats
 		".egg-info",
 		".egg-info/PKG-INFO",
@@ -60,15 +60,15 @@ func (a pythonPackagingAnalyzer) Match(info MatchInfo) int {
 }
 
 func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
+	fi := afi.Self
 
-	switch fi.matchStatus {
+	switch fi.MatchStatus {
 	case statusEgg:
-		realFileInfo, err := fi.f.Stat()
+		realFileInfo, err := fi.File.Stat()
 		if err != nil {
 			return nil, utils.Errorf("failed to get file info: %s", err)
 		}
-		zr, err := zip.NewReader(fi.f, realFileInfo.Size())
+		zr, err := zip.NewReader(fi.File, realFileInfo.Size())
 		for _, vf := range zr.File {
 			matched := a.Match(MatchInfo{
 				path: vf.Name,
@@ -101,8 +101,8 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package
 			// reset file offset to read
 			f.Seek(0, 0)
 
-			return ParseLanguageConfiguration(fileInfo{
-				f: f,
+			return ParseLanguageConfiguration(FileInfo{
+				File: f,
 			}, packaging.NewParser())
 		}
 	case statusPythonPackaging:

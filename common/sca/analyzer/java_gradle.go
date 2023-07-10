@@ -26,8 +26,8 @@ func NewJavaGradleAnalyzer() *gradleAnalyzer {
 }
 
 func (a gradleAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
-	fi := afi.self
-	switch fi.matchStatus {
+	fi := afi.Self
+	switch fi.MatchStatus {
 	case statusGradle:
 		p := lockfile.NewParser()
 		pkgs, err := ParseLanguageConfiguration(fi, p)
