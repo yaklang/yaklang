@@ -97,6 +97,9 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 			y.pushIdentifierName(s.GetText())
 			if y.strict {
 				id := s.GetText()
+				if id == "checkTimeBasedBlind" {
+					print()
+				}
 				if _, ok := y.extVarsMap[id]; !ok {
 					y.currentStartPosition.ColumnNumber += 1
 					y.currentEndPosition.ColumnNumber += 2

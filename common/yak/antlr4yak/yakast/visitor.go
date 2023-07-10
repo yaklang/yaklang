@@ -218,9 +218,10 @@ func (y *YakCompiler) Compiler(code string) bool {
 			errorMap[reflect.ValueOf(err).Pointer()] = nil
 		}
 	}
-	for index, compilerError := range y.compilerErrors {
-		if v, ok := errorMap[reflect.ValueOf(compilerError).Pointer()]; !ok || v == nil {
-			y.compilerErrors = append(y.compilerErrors[:index], y.compilerErrors[index+1:]...)
+	for i := 0; i < len(y.compilerErrors); i++ {
+		if v, ok := errorMap[reflect.ValueOf(y.compilerErrors[i]).Pointer()]; ok && v == nil {
+			y.compilerErrors = append(y.compilerErrors[:i], y.compilerErrors[i+1:]...)
+			i--
 		}
 	}
 
