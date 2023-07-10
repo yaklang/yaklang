@@ -15,8 +15,12 @@ type Package struct {
 	License []string // Maybe...
 
 	// Related
-	UpStreamDependencies   []Package
-	DownStreamDependencies []Package
+	UpStreamPackages   []*Package
+	DownStreamPackages []*Package
+
+	//
+	DependsOn []string
+	Provides  []string
 
 	Indirect bool
 
