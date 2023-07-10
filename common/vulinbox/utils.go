@@ -3,6 +3,7 @@ package vulinbox
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -167,4 +168,17 @@ func LoadFromBodyJsonParams(req *http.Request, name string) string {
 		return utils.MapGetString(i, name)
 	}
 	return ""
+}
+
+func Failed(writer http.ResponseWriter, r *http.Request, msg string, items ...any) {
+	if items != nil {
+		msg = fmt.Sprintf(msg, items...)
+	}
+	writer.Header().Set("Content-Type", "text/plain")
+	var raw, _ = utils.HttpDumpWithBody(r, true)
+	writer.Write(raw)
+	writer.Write([]byte{'\r', '\n', '\r', '\n', '\r', '\n'})
+	writer.Write([]byte("-----------------------------------------------------\n Failed: "))
+	_, _ = writer.Write([]byte(msg))
+	writer.WriteHeader(500)
 }
