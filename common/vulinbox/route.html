@@ -65,6 +65,14 @@
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/user/name?name=admin">字符串为注入点的 SQL
                         注入</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like?name=a">字符串注入点模糊查询</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a></li>
                 </ul>
             </div>
         </div>
@@ -79,7 +87,12 @@
                     </li>
                     <li class="list-group-item"><a target="_blank"
                                                    href="/xss/replace/nocase?name=admin">不安全的过滤导致XSS</a></li>
-                    <li class="list-group-item"><a target="_blank" href="#">XSS: 存在于 JS 代码中</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str">XSS: 存在于 JS
+                        代码中(字符串中)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str2">XSS: 存在于 JS 代码中(字符串中
+                        2)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/js/in-str-temp">XSS: 存在于 JS
+                        代码中(字符串模版中)</a></li>
                     <li class="list-group-item"><a target="_blank"
                                                    href="#">由于Content-Type设置，虽然回显，但无法触发的XSS（低危/中危）</a>
                     </li>
@@ -102,6 +115,11 @@
                     </li>
                     <li class="list-group-item"><a target="_blank" href="/xss/attr/script?name=OrdinaryVisitor">script标签的某些属性中</a>
                     </li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/name">Cookie 中的 XSS</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/name">Cookie 中的
+                        XSS（Base64）</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/xss/cookie/b64/json/name">Cookie 中的
+                        XSS（Base64-JSON）</a></li>
                 </ul>
             </div>
         </div>
@@ -248,6 +266,7 @@
         inputForm.value = decodeURIComponent(location.hash.substring(1));
         inputForm.dispatchEvent(new Event("input"))
     }
+
     window.addEventListener("load", function () {
         syncHash()
     })

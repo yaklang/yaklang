@@ -2,7 +2,11 @@ package vulinbox
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"html/template"
 	"net/http"
 	"net/http/httputil"
@@ -488,6 +492,299 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
+	})
+	router.HandleFunc("/xss/js/in-str", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>console.info("Hello" + '{{ .name }}')</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	})
+	router.HandleFunc("/xss/js/in-str2", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>const name = "{{ .name }}";
+
+console.info("Hello" + `+"`${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	})
+	router.HandleFunc("/xss/js/in-str-temp", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>const name = "Admin";
+
+console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	})
+	router.HandleFunc("/xss/cookie/name", func(writer http.ResponseWriter, request *http.Request) {
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCname")
+		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+			http.SetCookie(writer, &http.Cookie{
+				Name:  "xCname",
+				Value: "UserAdmin",
+			})
+			writer.Header().Set("Location", "/xss/cookie/name?skip=1")
+			writer.WriteHeader(302)
+			return
+		}
+
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<img style='width: 100px' src="/static/logo.png" onclick='{{ .code }}'/>	
+	<script>const name = "Admin";
+
+console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": xCname,
+		})
+		writer.Header().Set("Content-Type", "text/html")
+	})
+	router.HandleFunc("/xss/cookie/b64/name", func(writer http.ResponseWriter, request *http.Request) {
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
+		xCnameRaw, _ := codec.DecodeBase64(xCname)
+		xCname = string(xCnameRaw)
+		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+			http.SetCookie(writer, &http.Cookie{
+				Name:  "xCnameB64",
+				Value: codec.EncodeBase64("OrdinaryUser"),
+			})
+			writer.Header().Set("Location", "/xss/cookie/b64/name?skip=1")
+			writer.WriteHeader(302)
+			return
+		}
+
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<img style='width: 100px' src="/static/logo.png" onclick='{{ .name }}'/>	
+	<script>const name = "Admin";
+
+console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": xCname,
+		})
+		writer.Header().Set("Content-Type", "text/html")
+	})
+	router.HandleFunc("/xss/cookie/b64/json/name", func(writer http.ResponseWriter, request *http.Request) {
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64J")
+		xCnameRaw, _ := codec.DecodeBase64(xCname)
+		xCname = string(xCnameRaw)
+		var MC = make(map[string]any)
+		_ = json.Unmarshal(xCnameRaw, &MC)
+		xCname = utils.MapGetString(MC, "name")
+		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+			http.SetCookie(writer, &http.Cookie{
+				Name:  "xCnameB64J",
+				Value: codec.EncodeBase64(utils.Jsonify(map[string]any{"name": "xCnameB64J-OrdinaryUser"})),
+			})
+			writer.Header().Set("Location", "/xss/cookie/b64/json/name?skip=1")
+			writer.WriteHeader(302)
+			return
+		}
+
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<img style='width: 100px' src="/static/logo.png" onclick='{{ .name }}'/>	
+	<script>const name = "Admin";
+
+console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": xCname,
+		})
+		writer.Header().Set("Content-Type", "text/html")
 	})
 
 }
