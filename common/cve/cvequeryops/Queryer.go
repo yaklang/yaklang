@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -74,7 +73,8 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 	for _, opt := range opts {
 		opt(cveQuery)
 	}
-	if len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0 {
+
+	if (len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0) && cveQuery.Strict {
 		cveQuery = FixCVEProduct(cveQuery, db)
 	}
 	var sqlSentence string
@@ -84,7 +84,7 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 	if cveQuery.Quantity != 0 {
 		if cveQuery.OrderBy != "" {
 			if cveQuery.Desc {
-				db = db.Offset(cveQuery.Start).Order(cveQuery.OrderBy + " desc").Limit(cveQuery.Quantity)
+				db = db.Offset(cveQuery.Start).Order(cveQuery.OrderBy + "desc").Limit(cveQuery.Quantity)
 			} else {
 				db = db.Offset(cveQuery.Start).Order(cveQuery.OrderBy).Limit(cveQuery.Quantity)
 			}
@@ -95,122 +95,26 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 	return db, cveQuery
 }
 
-// Query 查询CVE
-func Query(DbPath string, opts ...CVEOption) ([]cveresources.CVERes, int) {
-	var CVEResFromDB []cveresources.CVE
-
-	M := cveresources.GetManager(DbPath)
-	cveQuery := &CVEQueryInfo{}
-	var count int
-	var sqlSentence string
-	var param []interface{}
-
-	if len(opts) <= 0 {
-		resDb := M.DB.Find(&CVEResFromDB)
-		if resDb.Error != nil {
-			log.Error(resDb.Error)
-		}
-	} else {
-		cveQuery.Strict = false
-		for _, opt := range opts {
-			opt(cveQuery)
-		}
-		if len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0 {
-			cveQuery = FixCVEProduct(cveQuery, M.DB)
-		}
-		sqlSentence, param = MakeSqlSentence(cveQuery)
-
-		var resDb *gorm.DB
-		if cveQuery.Quantity != 0 {
-			if cveQuery.OrderBy != "" {
-				if cveQuery.Desc {
-					resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Order(cveQuery.OrderBy + "desc").Limit(cveQuery.Quantity).Find(&CVEResFromDB)
-				} else {
-					resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Order(cveQuery.OrderBy).Limit(cveQuery.Quantity).Find(&CVEResFromDB)
-				}
-			} else {
-				resDb = M.DB.Where(sqlSentence, param...).Offset(cveQuery.Start).Limit(cveQuery.Quantity).Find(&CVEResFromDB)
-			}
-		} else {
-			resDb = M.DB.Where(sqlSentence, param...).Find(&CVEResFromDB)
-		}
-
-		if resDb.Error != nil {
-			log.Error(resDb.Error)
-		}
-	}
-
-	var cveRes []cveresources.CVERes
-	var wg sync.WaitGroup
-	cveCh := make(chan cveresources.CVERes, 5)
-	flag := make(chan int)
-
-	if len(cveQuery.CPE) > 0 {
-		go func(CVERes []cveresources.CVE) {
-			for _, Item := range CVERes {
-				go func(cveResItem cveresources.CVE) {
-					var config cveresources.Configurations
-					wg.Add(1)
-					var level = 0.0
-					err := json.Unmarshal(cveResItem.CPEConfigurations, &config)
-					if err != nil {
-						log.Warningf("cpe format error : %s", err)
-						return
-					}
-
-					for _, node := range config.Nodes {
-						if level < node.Result(cveQuery.CPE) {
-							level = node.Result(cveQuery.CPE)
-						}
-					}
-
-					if level > 0 {
-						select {
-						case cveCh <- cveresources.CVERes{
-							CVE:             cveResItem,
-							ConfidenceLevel: level,
-						}:
-						}
-					}
-					wg.Done()
-				}(Item)
-			}
-			wg.Wait()
-			flag <- 1
-		}(CVEResFromDB)
-	} else {
-		for _, cve := range CVEResFromDB {
-			cveRes = append(cveRes, cveresources.CVERes{
-				CVE:             cve,
-				ConfidenceLevel: 1.0,
-			})
-			count++
-		}
-		return cveRes, count
-	}
-
-	for {
-		select {
-		case res := <-cveCh:
-			cveRes = append(cveRes, res)
-			count++
-		case <-flag:
-			close(cveCh)
-			close(flag)
-			return cveRes, count
-		}
-	}
-
-}
-
 func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 	var fixName []string
 	for i := 0; i < len(cveQuery.Products); i++ {
-		fixRes, err := cveresources.FixProductName(cveQuery.Products[i], db)
+		if info, ok := cveresources.CommonFix[cveQuery.Products[i]]; ok { //查询基础修复里有没有对应的畸形名
+			if info.Vendor != "" {
+				cveQuery.CPE = append(cveQuery.CPE, cveresources.CPE{
+					Part:    "*",
+					Vendor:  info.Vendor,
+					Product: info.ProductName,
+					Version: "*",
+					Edition: "*",
+				})
+			}
+			fixName = append(fixName, cveresources.CommonFix[cveQuery.Products[i]].ProductName)
+			continue
+		}
+		fixRes, err := cveresources.FixProductName(cveQuery.Products[i], db) //尝试通用方法修复
 		if err != nil {
 			log.Warningf("find product name failed: %s[%s]", err, cveQuery.Products[i])
-		} else {
-			//修复好的所有产品名放入查询条件里
+		} else { //修复好的所有产品名放入查询条件里
 			fixRes = fixRes[:len(fixRes)-1]
 			fixName = append(fixName, fixRes...)
 		}
@@ -222,6 +126,16 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 	var fixCPE []cveresources.CPE
 
 	for i := 0; i < len(cveQuery.CPE); i++ {
+		if info, ok := cveresources.CommonFix[cveQuery.CPE[i].Product]; ok { //查询基础修复里有没有对应的畸形名
+			cveQuery.CPE = append(cveQuery.CPE, cveresources.CPE{
+				Part:    cveQuery.CPE[i].Part,
+				Vendor:  cveQuery.CPE[i].Vendor,
+				Product: info.ProductName,
+				Version: cveQuery.CPE[i].Version,
+				Edition: cveQuery.CPE[i].Edition,
+			})
+			continue
+		}
 		fixRes, err := cveresources.FixProductName(cveQuery.CPE[i].Product, db)
 		if err != nil {
 			log.Warningf("find product name failed: %s[%s]", err, cveQuery.CPE[i].Product)
@@ -230,7 +144,7 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 			fixRes = fixRes[:len(fixRes)-1]
 			for _, name := range fixRes {
 				cpeItem := cveresources.CPE{
-					Part:    cveQuery.CPE[i].Product,
+					Part:    cveQuery.CPE[i].Part,
 					Vendor:  cveQuery.CPE[i].Vendor,
 					Product: name,
 					Version: cveQuery.CPE[i].Version,
@@ -243,7 +157,6 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 	if fixCPE != nil {
 		cveQuery.CPE = fixCPE
 	}
-
 	return cveQuery
 }
 

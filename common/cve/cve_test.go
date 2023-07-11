@@ -1,99 +1,13 @@
 package cve
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
+	"sort"
 	"strings"
 	"testing"
-	"time"
 )
-
-func TestQueryCWE(t *testing.T) {
-	err := TranslatingCWE("/Users/v1ll4n/yakit-projects/openai-key.txt", 1, "")
-	if err != nil {
-		panic(err)
-	}
-	//escdb := consts.GetGormCVEDescriptionDatabase()
-	//descdb.AutoMigrate(&cveresources.CWE{})
-	//for cwe := range cveresources.YieldCWEs(consts.GetGormCVEDatabase().Model(&cveresources.CWE{}), context.Background()) {
-	//	cwe := cwe
-	//
-	//	cwe, err := MakeOpenAITranslateCWE(cwe, getKey(), `http://127.0.0.1:7890`)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	err = cveresources.CreateOrUpdateCWE(descdb, cwe.IdStr, cwe)
-	//	if err != nil {
-	//		log.Error(err)
-	//	}
-	//}
-}
-
-func TestQuery(t *testing.T) {
-	_, num := cvequeryops.Query("./date.db", cvequeryops.CVE("CVE-2017-0144"))
-	if num != 1 {
-		fmt.Println("option cve Fail")
-	}
-
-	resCve, num := cvequeryops.Query("./date.db", cvequeryops.CWE("CWE-89"))
-	for _, cve := range resCve {
-		if !cve.CWE("CWE-89") {
-			fmt.Println("option CWE Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Product("php"))
-	fmt.Println(len(resCve))
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Product("iis"))
-	for _, cve := range resCve {
-		if !strings.Contains(cve.Product, "internet_information_server") {
-			fmt.Println("option product Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Vendor("apple"))
-	for _, cve := range resCve {
-		if !strings.Contains(cve.Vendor, "apple") {
-			fmt.Println("option vendor Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Before(2022, 1, 3))
-	for _, cve := range resCve {
-		formatTime := "2022-01-03 00:00:00"
-		testTime, err := time.Parse("2006-01-02 15:04:05", formatTime)
-		if err != nil {
-			panic("parse time error")
-		}
-		if !cve.PublishedDate.Before(testTime) {
-			fmt.Println("option before Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.After(2022, 1, 3))
-	for _, cve := range resCve {
-		formatTime := "2022-01-03 00:00:00"
-		testTime, err := time.Parse("2006-01-02 15:04:05", formatTime)
-		if err != nil {
-			panic("parse time error")
-		}
-		if !cve.PublishedDate.After(testTime) {
-			fmt.Println("option after Fail ")
-			break
-		}
-	}
-}
-
-func TestFunc(t *testing.T) {
-	cvequeryops.MakeCtScript("php", "./date.db", "php", "./")
-}
 
 func TestMigrate(t *testing.T) {
 	_migrateTable()
@@ -325,15 +239,15 @@ zlib1g 1:1.2.11.dfsg-2ubuntu9.2`
 			version: temp[1],
 		})
 	}
-	for _, item := range productTest {
-		cveRes, num := cvequeryops.Query("C:/Users/27970/yakit-projects/default-cve.db", cvequeryops.ProductWithVersion(item.name, item.version))
-		fmt.Printf("product: [%s]:[%s] find cve %d\n", item.name, item.version, num)
-		if num > 0 {
-			for _, cve := range cveRes {
-				fmt.Println(cve.CVE.CVE)
-			}
-		}
-	}
+	//for _, item := range productTest {
+	//	cveRes, num := cvequeryops.QueryCVEYields("C:/Users/27970/yakit-projects/default-cve.db", cvequeryops.ProductWithVersion(item.name, item.version))
+	//	fmt.Printf("product: [%s]:[%s] find cve %d\n", item.name, item.version, num)
+	//	if num > 0 {
+	//		for _, cve := range cveRes {
+	//			fmt.Println(cve.CVE.CVE)
+	//		}
+	//	}
+	//}
 }
 
 type productWithVersion struct {
@@ -341,12 +255,74 @@ type productWithVersion struct {
 	version string
 }
 
+type productWordCount struct {
+	word  string
+	count int
+}
+
+// 提取出现频次过高的单词
+type info []productWordCount
+
+func (arr info) Len() int {
+	return len(arr)
+}
+
+func (arr info) Less(i, j int) bool {
+	return arr[i].count >= arr[j].count
+}
+
+func (arr info) Swap(i, j int) {
+	arr[i], arr[j] = arr[j], arr[i]
+}
+
 func TestClean(t *testing.T) {
-	cpeObject := cveresources.Configurations{}
-	jsonSTR := `{"CVE_data_version":"4.0","nodes":[{"operator":"OR","cpe_match":[{"vulnerable":true,"cpe23Uri":"cpe:2.3:o:redhat:linux:*:*:*:*:*:*:*:*","versionStartExcluding":"","versionEndExcluding":"","versionStartIncluding":"","versionEndIncluding":""},{"vulnerable":true,"cpe23Uri":"cpe:2.3:o:freebsd:freebsd:6.2:stable:*:*:*:*:*:*","versionStartExcluding":"","versionEndExcluding":"","versionStartIncluding":"","versionEndIncluding":""}],"children":[]}]}`
-	err := json.Unmarshal([]byte(jsonSTR), &cpeObject)
-	if err != nil {
-		return
+	var dbRes []cveresources.CVE
+	M := cveresources.GetManager("C:/Users/27970/yakit-projects/default-cve.db")
+	resDb := M.DB.Select("product").Find(&dbRes)
+	if resDb.Error != nil {
+		log.Errorf("query database failed: %s", resDb.Error)
 	}
 
+	//rule, err := regexp.Compile("[a-zA-Z]{4,}") //简写的正则
+	//if err != nil {
+	//	log.Errorf("Regular pattern compile failed: %s", err)
+	//}
+
+	strMap := make(map[string]int)
+
+	for _, item := range dbRes {
+		words := strings.Split(item.Product, ",")
+		for _, word := range words {
+			strMap[word] = strMap[word] + 1
+		}
+	}
+
+	var allInfo info
+
+	for word, count := range strMap {
+		allInfo = append(allInfo, productWordCount{
+			word:  word,
+			count: count,
+		})
+
+	}
+
+	sort.Sort(allInfo)
+	//for i, info := range allInfo {
+	//	if info.count < 50 {
+	//		break
+	//	}
+	//}
+	for i := 0; i < 100; i++ {
+		fmt.Printf("%v\n", allInfo[i])
+	}
+
+}
+
+func TestFuncxxx(t *testing.T) {
+	i := map[string]string{
+		"a": "b",
+	}
+	println(i["a"])
+	println(i["b"])
 }
