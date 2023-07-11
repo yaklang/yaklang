@@ -2,10 +2,12 @@ package analyzer
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/php/composer"
 	"github.com/yaklang/yaklang/common/utils"
@@ -49,7 +51,7 @@ func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error
 
 		// parse composer json file
 		var p map[string]string
-		jsonPath := filepath.Join(filepath.Dir(fi.Path), "composer.json")
+		jsonPath := path.Join(path.Dir(fi.Path), "composer.json")
 		if jsonFi, ok := afi.MatchedFileInfos[jsonPath]; ok {
 			p, err = a.parseComposerJson(jsonFi.File)
 			if err != nil {
