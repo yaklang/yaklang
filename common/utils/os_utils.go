@@ -7,8 +7,10 @@ import (
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/net/http2"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
 	"sync"
@@ -142,15 +144,19 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, false, handle)
 }
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, false, handle)
+	return DebugMockHTTPServerWithContext(ctx, false, false, handle)
+}
+
+func DebugMockHTTP2(ctx context.Context, handler func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(ctx, true, true, handler)
 }
 
 func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, handle)
 }
 
 var (
@@ -180,7 +186,7 @@ func GetDefaultTLSConfig(i float64) *tls.Config {
 	return nil
 }
 
-func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func([]byte) []byte) (string, int) {
+func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
@@ -189,12 +195,17 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func
 			lis net.Listener
 			err error
 		)
-		if https {
+		if https && !h2 {
 			tlsConfig := GetDefaultTLSConfig(5)
 			if tlsConfig == nil {
 				panic(1)
 			}
 			lis, err = tls.Listen("tcp", addr, tlsConfig)
+		} else if h2 {
+			origin := GetDefaultTLSConfig(5)
+			var copied = *origin
+			copied.NextProtos = []string{"h2"}
+			lis, err = tls.Listen("tcp", addr, &copied)
 		} else {
 			lis, err = net.Listen("tcp", addr)
 		}
@@ -207,6 +218,37 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func
 			}
 			lis.Close()
 		}()
+
+		if h2 {
+			if !https {
+				log.Error("h2 only support https")
+			}
+
+			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				r, err := HttpDumpWithBody(request, true)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				fmt.Println(string(r))
+				if handle != nil {
+					raw := handle(r)
+					writer.Write(raw)
+					return
+				}
+				writer.Write([]byte("HELLO HTTP2"))
+			})}
+			var err = http2.ConfigureServer(srv, &http2.Server{})
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			go func() {
+				log.Infof("START TO SERVE HTTP2")
+				srv.Serve(lis)
+			}()
+			return
+		}
 
 		for {
 			conn, err := lis.Accept()
