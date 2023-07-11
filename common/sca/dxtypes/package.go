@@ -9,11 +9,13 @@ import (
 )
 
 type Package struct {
-	id   string // name + version
-	from string // analyzer name
+	id string // name + version
 
 	Name    string
 	Version string
+
+	fromFile     []string
+	fromAnalyzer []string
 
 	// Optional
 
@@ -26,8 +28,8 @@ type Package struct {
 	License []string
 
 	// Related
-	UpStreamPackages   []*Package
-	DownStreamPackages []*Package
+	UpStreamPackages   map[string]*Package
+	DownStreamPackages map[string]*Package
 
 	DependsOn PackageRelationShip
 
@@ -58,15 +60,18 @@ func (p Package) String() string {
 	// }
 	ret += "\n\tupstream: "
 	ret += strings.Join(
-		lo.Map(p.UpStreamPackages, func(pkg *Package, _ int) string {
-			return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+		// lo.Map(p.UpStreamPackages, func(pkg *Package, _ int) string {
+		// 	return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+		// }),
+		lo.MapToSlice(p.UpStreamPackages, func(name string, pkg *Package) string {
+			return fmt.Sprintf("%s-%s", name, pkg.Version)
 		}),
 		",",
 	)
 	ret += "\n\tdownstream: "
 	ret += strings.Join(
-		lo.Map(p.DownStreamPackages, func(pkg *Package, _ int) string {
-			return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+		lo.MapToSlice(p.DownStreamPackages, func(name string, pkg *Package) string {
+			return fmt.Sprintf("%s-%s", name, pkg.Version)
 		}),
 		",",
 	)
