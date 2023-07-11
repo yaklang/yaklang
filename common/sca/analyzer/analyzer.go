@@ -229,7 +229,11 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtype
 				return licenses.Normalize(license)
 			})
 		}
-		pkgIDMap[lib.ID] = &p
+		id := lib.ID
+		if id == "" {
+			id = p.Identifier()
+		}
+		pkgIDMap[id] = &p
 	}
 
 	// parse deps
