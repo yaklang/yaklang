@@ -19,7 +19,7 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 			pkg.UpStreamPackages = make([]*dxtypes.Package, 0)
 		}
 		// and
-		for _, andDepPkgName := range pkg.DependsOn.And {
+		for andDepPkgName := range pkg.DependsOn.And {
 			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
 				pkg.UpStreamPackages = append(pkg.UpStreamPackages, andDepPkg)
 
@@ -40,9 +40,9 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 			}
 		}
 		// or
-		for _, orDepPkgs := range pkg.DependsOn.Or {
+		for _, orDepPkgMap := range pkg.DependsOn.Or {
 			exist := false
-			for _, orDepPkgName := range orDepPkgs {
+			for orDepPkgName := range orDepPkgMap {
 				if orDepPkg, ok := pkgMap[orDepPkgName]; ok {
 					pkg.UpStreamPackages = append(pkg.UpStreamPackages, orDepPkg)
 
@@ -58,7 +58,11 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 			if !exist {
 				// if not found, make a potential package
 				pkg.UpStreamPackages = append(pkg.UpStreamPackages, &dxtypes.Package{
-					Name:    strings.Join(orDepPkgs, "|"), // potential package name, splited by "|"
+					Name: strings.Join(
+						lo.MapToSlice(orDepPkgMap, func(name string, _ string) string {
+							return name
+						}),
+						"|"), // potential package name, splited by "|"
 					Version: "*",
 					DownStreamPackages: []*dxtypes.Package{
 						pkg,
