@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <title>ALL USERS Here!</title>
+</head>
+<body>
+
+<div class="container mt-5">
+
+    <script>
+        function inDebug() {
+            let url = new URL(window.location.href)
+            let params = url.searchParams;
+            return params.has("debug");
+        }
+        function appendDebug() {
+            let url = new URL(window.location.href)
+            let params = url.searchParams;
+            if (!params.has("debug")) {
+                params.set(`debug`, `1`);
+                window.location.href = url.href;
+            }else{
+                params.delete(`debug`);
+                window.location.href = url.href;
+            }
+        }
+    </script>
+    <button {{ .debugstyle }} id="debug" type="button" class="btn" onclick="appendDebug()">
+        Debug
+    </button>
+    {{.extra}}
+    <script>
+        if (inDebug()) {
+            document.getElementById("debug").className = "btn btn-primary"
+        }else{
+            document.getElementById("debug").className = "btn btn-outline-primary"
+        }
+    </script>
+    <table class="table table-striped table-hover table-bordered">
+        <thead>
+        <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Username</th>
+            <th scope="col">Age</th>
+            <th scope="col">Role</th>
+            <th scope="col">Remake</th>
+            <th scope="col">CreatedAt</th>
+            <th scope="col">UpdatedAt</th>
+        </tr>
+
+        </thead>
+        <tbody id="users"></tbody>
+    </table>
+</div>
+
+
+<script>
+    const usersTable = document.getElementById('users');
+    JSON.parse(`{{ .userjson }}`).map(i => {
+        const row = document.createElement('tr');
+        let td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.ID))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.Username))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.Age))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.Role))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.Remake))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.CreatedAt))
+        row.appendChild(td)
+
+        td = document.createElement('td');
+        td.appendChild(document.createTextNode(i.UpdatedAt))
+        row.appendChild(td)
+
+        usersTable.appendChild(row)
+    })
+</script>
+
+
+<!-- 引入 Bootstrap JavaScript -->
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+</body>
+</html>
