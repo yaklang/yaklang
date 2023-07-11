@@ -1,12 +1,14 @@
 package sca
 
 import (
-	"github.com/yaklang/yaklang/common/sca/analyzer"
+	"fmt"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/analyzer"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
@@ -27,6 +29,8 @@ type testcase struct {
 
 func Run(tc testcase) {
 	t := tc.t
+	fmt.Printf("TestCase: %s\n===============================\n", tc.name)
+
 	f, err := os.Open(tc.filePath)
 	if err != nil {
 		t.Fatalf("%s: con't open file: %v", err, tc.name)
@@ -53,6 +57,9 @@ func Run(tc testcase) {
 		},
 		MatchedFileInfos: matchedFileInfos,
 	})
+	// for _, pkg := range pkgs {
+	// 	fmt.Printf("%s\n", pkg)
+	// }
 
 	if tc.wantError && err == nil {
 		t.Fatalf("%s: want error but nil", tc.name)
@@ -90,7 +97,14 @@ func Run(tc testcase) {
 		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
 			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
 		}
+		if !reflect.DeepEqual(pkgs[i].License, tc.wantPkgs[i].License) {
+			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].License, tc.wantPkgs[i].License)
+		}
+		if pkgs[i].Verification != tc.wantPkgs[i].Verification {
+			t.Fatalf("%s: pkgs %d(%s) verfication error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Verification, tc.wantPkgs[i].Verification)
+		}
 	}
+	fmt.Println("===============================")
 }
 
 // package
