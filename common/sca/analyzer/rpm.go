@@ -2,6 +2,9 @@ package analyzer
 
 import (
 	"database/sql"
+	"fmt"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
@@ -49,6 +52,8 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusRPM:
+		provides := make(map[string]*dxtypes.Package)
+
 		db, err := rpmdb.Open(fi.File.Name())
 		if err != nil {
 			return nil, utils.Errorf("failed to open RPM DB: %v", err)
@@ -60,10 +65,22 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 		pkgs := make([]dxtypes.Package, len(pkgList))
 		for i, pkgInfo := range pkgList {
 			pkgs[i] = dxtypes.Package{
-				Name:    pkgInfo.Name,
-				Version: pkgInfo.Version,
+				Name:         pkgInfo.Name,
+				Version:      pkgInfo.Version,
+				Verification: fmt.Sprintf("md5:%s", pkgInfo.SigMD5),
+				DependsOn: dxtypes.PackageRelationShip{
+					And: lo.SliceToMap(pkgInfo.Requires, func(depName string) (string, string) {
+						return depName, "*" // version is not available
+					}),
+				},
+				License: []string{pkgInfo.License},
+			}
+			for _, provide := range pkgInfo.Provides {
+				provides[provide] = &pkgs[i]
 			}
 		}
+		handleDependsOn(pkgs, provides)
+		linkUpSteamAndDownStream(pkgs)
 
 		return pkgs, nil
 	}
