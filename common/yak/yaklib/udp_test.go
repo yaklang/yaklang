@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"testing"
@@ -27,4 +28,18 @@ func TestUdpConn_Send(t *testing.T) {
 		log.Errorf("send error: %v", err)
 	}
 	time.Sleep(1 * time.Minute)
+}
+
+func TestDebugMockUDPProtocol(t *testing.T) {
+	//matcher, err := fp.NewFingerprintMatcher(nil, nil)
+	//if err != nil {
+	//	t.Errorf("failed to create matcher: %s", err)
+	//	t.FailNow()
+	//}
+	//_ = matcher
+	server, port := DebugMockUDPProtocol("snmp")
+
+	fmt.Println(server, port)
+
+	select {}
 }

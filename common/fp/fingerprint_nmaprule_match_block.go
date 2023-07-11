@@ -187,6 +187,7 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			banner := stableReader(udpConn, config.ProbeTimeout, config.FingerprintDataSize)
 			if banner != nil {
 				resultFingerprintInfo.Banner = bannerToString(banner)
+				log.Infof("%s udp banner: %v", block.Probe.Name, resultFingerprintInfo.Banner)
 				bannerRunesForMatchingRules := utils2.AsciiBytesToRegexpMatchedRunes(banner)
 				for _, rule := range block.Matched {
 					if rootCtx.Err() != nil {
