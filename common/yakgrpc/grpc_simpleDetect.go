@@ -466,6 +466,8 @@ handleServiceScanResult = func(result) {
 		bruteWg.Add()
 		go func {
 			defer bruteWg.Done()
+			serviceName = result.GetServiceName()
+			yakit.Info("Start Brute for %s-%s:%d",serviceName, result.Target, result.Port)
 			bruteScan(result)
 		}
 		bruteWg.Wait()
