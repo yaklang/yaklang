@@ -19,7 +19,7 @@ func fastVersionCompare(old, new string) bool {
 	return false
 }
 
-func consolidateDependencies(pkgs []dxtypes.Package) {
+func linkUpSteamAndDownStream(pkgs []dxtypes.Package) {
 	potentialPkgs := make([]dxtypes.Package, 0)
 
 	pkgMap := lo.SliceToMap(pkgs, func(item dxtypes.Package) (string, *dxtypes.Package) {
