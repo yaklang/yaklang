@@ -10,5 +10,4 @@ type Service struct {
 	ServiceType    string
 	ServiceName    string
 	ServiceContent string
-	ExtraInfo      []*InfoPair
 }
