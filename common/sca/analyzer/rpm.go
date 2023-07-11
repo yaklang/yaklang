@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	licenses "github.com/yaklang/yaklang/common/sca/license"
 
 	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
 	"github.com/mattn/go-sqlite3"
@@ -73,7 +74,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 						return depName, "*" // version is not available
 					}),
 				},
-				License: []string{pkgInfo.License},
+				License: []string{licenses.Normalize(pkgInfo.License)},
 			}
 			for _, provide := range pkgInfo.Provides {
 				provides[provide] = &pkgs[i]
