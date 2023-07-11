@@ -3,93 +3,159 @@ package sca
 import "github.com/yaklang/yaklang/common/sca/dxtypes"
 
 var APKWantPkgs = []dxtypes.Package{
+
 	{
-		Name:    "alpine-baselayout",
-		Version: "3.4.3-r1",
+		Name:         "alpine-baselayout",
+		Version:      "3.4.3-r1",
+		Verification: "sha1:cf0bca32762cd5be9974f4c127467b0f93f78f20",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "alpine-baselayout-data",
-		Version: "3.4.3-r1",
+		Name:         "alpine-baselayout-data",
+		Version:      "3.4.3-r1",
+		Verification: "sha1:602007ee374ed96f35e9bf39b1487d67c6afe027",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "alpine-keys",
-		Version: "2.4-r1",
+		Name:         "alpine-keys",
+		Version:      "2.4-r1",
+		Verification: "sha1:ec3a3d5ef4c7a168d09516097bb3219ca77c1534",
+		License:      []string{"MIT"},
 	},
+
 	{
-		Name:    "apk-tools",
-		Version: "2.14.0-r2",
+		Name:         "apk-tools",
+		Version:      "2.14.0-r2",
+		Verification: "sha1:8cde25f239ebf691cd135a3954e5193c1ac2ae13",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "brotli-libs",
-		Version: "1.0.9-r14",
+		Name:         "brotli-libs",
+		Version:      "1.0.9-r14",
+		Verification: "sha1:48b2006d35cdde849a18f7cadbfaf17c9273130f",
+		License:      []string{"MIT"},
 	},
+
 	{
-		Name:    "busybox",
-		Version: "1.36.1-r0",
+		Name:         "busybox",
+		Version:      "1.36.1-r0",
+		Verification: "sha1:53bff6ed72a869ce4555a2e0af6750eebea002fc",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "busybox-binsh",
-		Version: "1.36.1-r0",
+		Name:         "busybox-binsh",
+		Version:      "1.36.1-r0",
+		Verification: "sha1:1819eefdc85da3f9baa0277b10d24062d53f0f84",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "ca-certificates",
-		Version: "20230506-r0",
+		Name:         "ca-certificates",
+		Version:      "20230506-r0",
+		Verification: "sha1:146f0cfbbc3e7648d5f55cb49861565b6b78f83a",
+		License:      []string{"MPL-2.0", "MIT"},
 	},
+
 	{
-		Name:    "ca-certificates-bundle",
-		Version: "20230506-r0",
+		Name:         "ca-certificates-bundle",
+		Version:      "20230506-r0",
+		Verification: "sha1:47f485d08670a9eb21ebf10e70ae65dc43ab6c3d",
+		License:      []string{"MPL-2.0", "MIT"},
 	},
+
 	{
-		Name:    "curl",
-		Version: "8.1.2-r0",
+		Name:         "curl",
+		Version:      "8.1.2-r0",
+		Verification: "sha1:8bed52a52a72a65aa7f73b4576ce913fb788bfc5",
+		License:      []string{"curl"},
 	},
+
 	{
-		Name:    "libc-utils",
-		Version: "0.7.2-r5",
+		Name:         "libc-utils",
+		Version:      "0.7.2-r5",
+		Verification: "sha1:2e59dafeb8bca0786540846c686f121ae8348a42",
+		License:      []string{"BSD-2-Clause", "BSD-3-Clause"},
 	},
+
 	{
-		Name:    "libcrypto3",
-		Version: "3.1.1-r1",
+		Name:         "libcrypto3",
+		Version:      "3.1.1-r1",
+		Verification: "sha1:c81bb336f4e54404b0469c02c2e81a23b24652be",
+		License:      []string{"Apache-2.0"},
 	},
+
 	{
-		Name:    "libcurl",
-		Version: "8.1.2-r0",
+		Name:         "libcurl",
+		Version:      "8.1.2-r0",
+		Verification: "sha1:d91300aff047a12cc19b4ab4f2c738970da71855",
+		License:      []string{"curl"},
 	},
+
 	{
-		Name:    "libidn2",
-		Version: "2.3.4-r1",
+		Name:         "libidn2",
+		Version:      "2.3.4-r1",
+		Verification: "sha1:7bc3cd824a388677844c8e6e75ccf5344cf42f6f",
+		License:      []string{"GPL-2.0", "LGPL-3.0-or-later"},
 	},
+
 	{
-		Name:    "libssl3",
-		Version: "3.1.1-r1",
+		Name:         "libssl3",
+		Version:      "3.1.1-r1",
+		Verification: "sha1:f867d5ec872470b96cf651da758a53e6a1187c2a",
+		License:      []string{"Apache-2.0"},
 	},
+
 	{
-		Name:    "libunistring",
-		Version: "1.1-r1",
+		Name:         "libunistring",
+		Version:      "1.1-r1",
+		Verification: "sha1:14ce8b4b122fdd33acb11cc7f106aa0561c219a1",
+		License:      []string{"GPL-2.0", "LGPL-3.0-or-later"},
 	},
+
 	{
-		Name:    "musl",
-		Version: "1.2.4-r0",
+		Name:         "musl",
+		Version:      "1.2.4-r0",
+		Verification: "sha1:e779b680e85539adb9dc4c6c48e6f7dd75e1df6b",
+		License:      []string{"MIT"},
 	},
+
 	{
-		Name:    "musl-utils",
-		Version: "1.2.4-r0",
+		Name:         "musl-utils",
+		Version:      "1.2.4-r0",
+		Verification: "sha1:e96f86ad77fb1d0c3e93b26e63b6402235ab8189",
+		License:      []string{"MIT", "BSD-2-Clause", "GPL-2.0"},
 	},
+
 	{
-		Name:    "nghttp2-libs",
-		Version: "1.53.0-r0",
+		Name:         "nghttp2-libs",
+		Version:      "1.53.0-r0",
+		Verification: "sha1:577c7f2ee19642ee1c2a2755a10a818fcdf51979",
+		License:      []string{"MIT"},
 	},
+
 	{
-		Name:    "scanelf",
-		Version: "1.3.7-r1",
+		Name:         "scanelf",
+		Version:      "1.3.7-r1",
+		Verification: "sha1:e27abda38faea3635a2db4d50d007751ea280b43",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "ssl_client",
-		Version: "1.36.1-r0",
+		Name:         "ssl_client",
+		Version:      "1.36.1-r0",
+		Verification: "sha1:8722023d7e6cde7b861a7c076481000d05f0272e",
+		License:      []string{"GPL-2.0"},
 	},
+
 	{
-		Name:    "zlib",
-		Version: "1.2.13-r1",
+		Name:         "zlib",
+		Version:      "1.2.13-r1",
+		Verification: "sha1:2656e848992b378aa40dca24af8cde9e97161174",
+		License:      []string{"Zlib"},
 	},
 }
 
