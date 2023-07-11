@@ -18,29 +18,31 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 		pkg := &pkgs[i]
 
 		if pkg.UpStreamPackages == nil {
-			pkg.UpStreamPackages = make([]*dxtypes.Package, 0)
+			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
 		}
 		// and
 		for andDepPkgName := range pkg.DependsOn.And {
 			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
-				pkg.UpStreamPackages = append(pkg.UpStreamPackages, andDepPkg)
+				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, andDepPkg)
+				pkg.UpStreamPackages[andDepPkgName] = andDepPkg
 
 				if andDepPkg.DownStreamPackages == nil {
-					andDepPkg.DownStreamPackages = make([]*dxtypes.Package, 0)
+					andDepPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
 				}
-				andDepPkg.DownStreamPackages = append(andDepPkg.DownStreamPackages, pkg)
+				// andDepPkg.DownStreamPackages = append(andDepPkg.DownStreamPackages, pkg)
+				andDepPkg.DownStreamPackages[pkg.Name] = pkg
 			} else {
 				// if not found, make a potential package
 				potentialPkg := &dxtypes.Package{
 					Name:    andDepPkgName,
 					Version: "*",
-					DownStreamPackages: []*dxtypes.Package{
-						pkg,
+					DownStreamPackages: map[string]*dxtypes.Package{
+						pkg.Name: pkg,
 					},
 					Potential: true,
 				}
 				potentialPkgs = append(potentialPkgs, *potentialPkg)
-				pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
+				pkg.UpStreamPackages[andDepPkgName] = potentialPkg
 			}
 		}
 		// or
@@ -48,12 +50,14 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 			exist := false
 			for orDepPkgName := range orDepPkgMap {
 				if orDepPkg, ok := pkgMap[orDepPkgName]; ok {
-					pkg.UpStreamPackages = append(pkg.UpStreamPackages, orDepPkg)
+					// pkg.UpStreamPackages = append(pkg.UpStreamPackages, orDepPkg)
+					pkg.UpStreamPackages[orDepPkgName] = orDepPkg
 
 					if orDepPkg.DownStreamPackages == nil {
-						orDepPkg.DownStreamPackages = make([]*dxtypes.Package, 0)
+						orDepPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
 					}
-					orDepPkg.DownStreamPackages = append(orDepPkg.DownStreamPackages, pkg)
+					// orDepPkg.DownStreamPackages = append(orDepPkg.DownStreamPackages, pkg)
+					orDepPkg.DownStreamPackages[pkg.Name] = pkg
 					exist = true
 					break
 				}
@@ -68,13 +72,14 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 						}),
 						"|"), // potential package name, splited by "|"
 					Version: "*",
-					DownStreamPackages: []*dxtypes.Package{
-						pkg,
+					DownStreamPackages: map[string]*dxtypes.Package{
+						pkg.Name: pkg,
 					},
 					Potential: true,
 				}
 				potentialPkgs = append(potentialPkgs, *potentialPkg)
-				pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
+				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
+				pkg.UpStreamPackages[potentialPkg.Name] = potentialPkg
 			}
 		}
 	}
