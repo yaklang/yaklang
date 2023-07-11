@@ -19,6 +19,27 @@ func fastVersionCompare(old, new string) bool {
 	return false
 }
 
+func handleDependsOn(pkgs []dxtypes.Package, provides map[string]*dxtypes.Package) {
+	for i := range pkgs {
+		// e.g. "libc.so.6()(64bit)" => "glibc-2.12-1.212.el6.x86_64"
+		pkg := &pkgs[i]
+		newAnd := make(map[string]string)
+		for depName, depVersion := range pkg.DependsOn.And {
+			if p, ok := provides[depName]; ok {
+				newAnd[p.Name] = p.Version
+			} else if oldVersion, ok := newAnd[depName]; !ok || fastVersionCompare(oldVersion, depVersion) {
+				newAnd[depName] = depVersion
+			}
+		}
+
+		pkg.DependsOn.And = newAnd
+
+		if len(pkg.DependsOn.And) == 0 {
+			pkg.DependsOn.And = nil
+		}
+	}
+}
+
 func linkUpSteamAndDownStream(pkgs []dxtypes.Package) {
 	potentialPkgs := make([]dxtypes.Package, 0)
 
