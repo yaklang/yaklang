@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer"
+	"golang.org/x/exp/slices"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
@@ -97,7 +98,7 @@ func Run(tc testcase) {
 		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
 			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
 		}
-		if !reflect.DeepEqual(pkgs[i].License, tc.wantPkgs[i].License) {
+		if slices.CompareFunc(pkgs[i].License, tc.wantPkgs[i].License, strings.Compare) != 0 {
 			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].License, tc.wantPkgs[i].License)
 		}
 		if pkgs[i].Verification != tc.wantPkgs[i].Verification {
