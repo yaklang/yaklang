@@ -3,10 +3,11 @@ package analyzer
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"net/textproto"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -57,6 +58,50 @@ func (a dpkgAnalyzer) parseStatus(s string) bool {
 	}
 	return true
 }
+
+func (a dpkgAnalyzer) parseDepends(s string) dxtypes.PackageRelationShip {
+	// e.g. passwd, debconf (>= 0.5) | debconf-2.0
+	// var dependencies []string
+
+	depends := strings.Split(s, ",")
+	var packageRelationShip = dxtypes.PackageRelationShip{
+		And: make(map[string]string, len(depends)),
+		Or:  make([]map[string]string, 0),
+	}
+	for _, depName := range depends {
+		// e.g. gpgv | gpgv2 | gpgv1
+		// Store only package names
+		if strings.Contains(depName, "|") {
+			depNameVersionMap := make(map[string]string)
+			for _, d := range strings.Split(depName, "|") {
+				dep, version := a.getPackageNameAndVersion(d)
+				depNameVersionMap[strings.TrimSpace(dep)] = version
+			}
+			packageRelationShip.Or = append(packageRelationShip.Or, depNameVersionMap)
+		} else {
+			dep, version := a.getPackageNameAndVersion(depName)
+			packageRelationShip.And[strings.TrimSpace(dep)] = version
+		}
+	}
+	return packageRelationShip
+}
+
+func (a dpkgAnalyzer) getPackageNameAndVersion(pkgName string) (string, string) {
+	// e.g.
+	//	libapt-pkg6.0 (>= 2.2.4) => libapt-pkg6.0, >= 2.2.4
+	//	adduser => adduser
+	version := "*"
+	if strings.Contains(pkgName, "(") {
+		version = strings.TrimSuffix(
+			pkgName[strings.Index(pkgName, "(")+1:],
+			")",
+		)
+		pkgName = pkgName[:strings.Index(pkgName, "(")]
+	}
+
+	return pkgName, version
+}
+
 func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package {
 	status := header.Get("Status")
 	if status == "" {
@@ -67,8 +112,9 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package
 	}
 
 	pkg := &dxtypes.Package{
-		Name:    header.Get("Package"),
-		Version: header.Get("Version"),
+		Name:      header.Get("Package"),
+		Version:   header.Get("Version"),
+		DependsOn: a.parseDepends(header.Get("Depends")),
 	}
 	if pkg.Name == "" || pkg.Version == "" {
 		return nil
@@ -98,6 +144,8 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]dxtypes.Package, error) {
 			pkgs = append(pkgs, *pkg)
 		}
 	}
+
+	consolidateDependencies(pkgs)
 
 	return pkgs, nil
 }
