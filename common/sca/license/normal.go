@@ -81,7 +81,7 @@ var mapping = map[string]string{
 }
 
 func Normalize(name string) string {
-	if l, ok := mapping[strings.ToUpper(name)]; ok {
+	if l, ok := mapping[strings.ToUpper(strings.TrimSpace(name))]; ok {
 		return l
 	}
 	return name
