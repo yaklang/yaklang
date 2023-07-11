@@ -41,7 +41,7 @@ func (s *Scanner) sendService() {
 			counter++
 
 			if err != nil {
-				log.Errorf("loopback handler write failed: %s", err)
+				//log.Errorf("loopback handler write failed: %s", err)
 			}
 		case packets, ok := <-s.handlerWriteChan:
 			if !ok {
