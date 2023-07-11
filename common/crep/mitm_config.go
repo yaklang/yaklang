@@ -281,7 +281,8 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
 		return t, nil
 	} else {
 		gmtr := &http.Transport{
-			Proxy: proxyFunc,
+			Proxy:                  proxyFunc,
+			OnProxyConnectResponse: nil,
 			DialContext: (&net.Dialer{
 				Timeout: time.Duration(opts.DialTimeout) * time.Second,
 			}).DialContext,
@@ -297,19 +298,20 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
 				}
 				return conn, nil
 			},
-			DisableCompression:    true,
-			DisableKeepAlives:     false,
-			MaxIdleConns:          opts.MaxIdleConns,
-			MaxConnsPerHost:       opts.MaxConnsPerHost,
-			IdleConnTimeout:       time.Duration(opts.IdleConnTimeout) * time.Second,
-			TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
-			ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: opts.TLSSkipVerify,
 				MinVersion:         opts.TLSMinVersion,
 				MaxVersion:         opts.TLSMaxVersion,
 				Certificates:       certificates,
 			},
+			TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
+			DisableCompression:    true,
+			MaxIdleConns:          opts.MaxIdleConns,
+			MaxConnsPerHost:       opts.MaxConnsPerHost,
+			IdleConnTimeout:       time.Duration(opts.IdleConnTimeout) * time.Second,
+			ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
+			TLSNextProto:          make(map[string]func(authority string, conn *tls.Conn) http.RoundTripper),
+			ForceAttemptHTTP2:     false,
 		}
 		return t, gmtr
 	}
