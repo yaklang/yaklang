@@ -112,3 +112,22 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	}
 	return
 }
+
+func GetRuleBlockByServiceName(serviceName string, config *Config) (blocks []*RuleBlock) {
+	// 遍历所有指纹规则
+	for probe, matches := range config.FingerprintRules {
+		// 在每个规则块中查找符合条件的服务名
+		for _, match := range matches {
+			// 如果服务名包含指定的 serviceName
+			if match.ServiceName == serviceName {
+				// 将匹配的规则块添加到 blocks 列表中
+				blocks = append(blocks, &RuleBlock{
+					Probe:   probe,
+					Matched: []*NmapMatch{match},
+				})
+				// 由于一个规则块可能有多个匹配项，所以这里不要 break，继续搜索
+			}
+		}
+	}
+	return
+}

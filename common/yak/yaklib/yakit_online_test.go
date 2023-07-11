@@ -19,7 +19,7 @@ func TestNewOnlineClient(t *testing.T) {
 		//spew.Dump(result)
 	}
 
-	plugin, err := client.DownloadYakitPluginById("91bdb83b-ddad-4828-b408-b0c9d0f8c13b")
+	plugin, err := client.DownloadYakitPluginById("", "91bdb83b-ddad-4828-b408-b0c9d0f8c13b")
 	if err != nil {
 		panic(err)
 	}

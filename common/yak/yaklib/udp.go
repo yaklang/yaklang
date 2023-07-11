@@ -2,8 +2,11 @@ package yaklib
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
 	"net"
@@ -240,6 +243,7 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 }
 
 var UDPExport = map[string]interface{}{
+	"MockServer":      DebugMockUDPProtocol,
 	"Connect":         connectUdp,
 	"clientTimeout":   clientTimeout,
 	"clientLocalAddr": clientLocalAddr,
@@ -260,4 +264,64 @@ var UDPExport = map[string]interface{}{
 			config.callback = cb
 		}
 	},
+}
+
+func DebugMockUDP(rsp []byte) (string, int) {
+	return DebugMockUDPWithTimeout(60*time.Minute, rsp)
+}
+
+func DebugMockUDPProtocol(name string) (string, int) {
+	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
+	blocks := fp.GetRuleBlockByServiceName(name, cfg)
+	var generates []string
+	var err error
+	for _, block := range blocks {
+		for _, match := range block.Matched {
+			spew.Dump(block)
+			spew.Dump(match)
+			r := match.MatchRule.String()
+			log.Infof("match rule: %v", r)
+			generates, err = regen.GenerateOne(r)
+			if err == nil {
+				break
+			}
+		}
+		break
+	}
+	_ = generates
+	gg := "08\\x02\\x01\\x00\\x04\\x06public\\xef\\xbf\\xbd+\\x02\\x04L3\\xef\\xbf\\xbd\\x02\\x01\\x00\\x02\\x01\\x000\\x1d0\\x1b\\x06\\x08+\\x06\\x01\\x02\\x01\\x01\\x05\\x00\\x04\\x0fH8 Nas-4_Static"
+	//rsp := []byte(generates[0])
+	rsp := []byte(gg)
+	log.Infof("generate %q", rsp)
+	return DebugMockUDP(rsp)
+}
+
+func DebugMockUDPWithTimeout(du time.Duration, rsp []byte) (string, int) {
+	addr := utils.GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	go func() {
+		conn, err := net.ListenPacket("udp", addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		go func() {
+			time.Sleep(du)
+			conn.Close()
+		}()
+
+		buffer := make([]byte, 1024)
+		for {
+			_, addr, err := conn.ReadFrom(buffer)
+			if err != nil {
+				return
+			}
+
+			conn.WriteTo(rsp, addr)
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
+	time.Sleep(time.Millisecond * 100)
+	return host, port
 }
