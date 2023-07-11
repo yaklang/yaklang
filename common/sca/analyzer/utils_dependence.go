@@ -7,6 +7,18 @@ import (
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
+func fastVersionCompare(old, new string) bool {
+	if old == "*" {
+		return true
+	}
+	if strings.ContainsAny(old, "><") && !strings.Contains(new, "><") {
+		// old is version range, new is definite version
+		return true
+	}
+
+	return false
+}
+
 func consolidateDependencies(pkgs []dxtypes.Package) {
 	potentialPkgs := make([]dxtypes.Package, 0)
 
