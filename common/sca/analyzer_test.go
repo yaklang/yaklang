@@ -141,12 +141,16 @@ func TestApk(t *testing.T) {
 		filePath: "./testdata/apk/negative-apk",
 		wantPkgs: []dxtypes.Package{
 			{
-				Name:    "ssl_client",
-				Version: "1.36.1-r0",
+				Name:         "ssl_client",
+				Version:      "1.36.1-r0",
+				Verification: "sha1:8722023d7e6cde7b861a7c076481000d05f0272e",
+				License:      []string{"GPL-2.0"},
 			},
 			{
-				Name:    "zlib",
-				Version: "1.2.13-r1",
+				Name:         "zlib",
+				Version:      "1.2.13-r1",
+				Verification: "sha1:2656e848992b378aa40dca24af8cde9e97161174",
+				License:      []string{"Zlib"},
 			},
 		},
 		t:         t,
