@@ -3,17 +3,21 @@ package dxtypes
 import "github.com/yaklang/yaklang/common/utils"
 
 type Package struct {
-	ID      string
+	id   string // name + version
+	from string // analyzer name
+
 	Name    string
 	Version string
 
-	// sha1://abc
-	// md5://abc
-	// sha256://abc
-	// so...on
+	// Optional
+
+	// sha1:abc
+	// md5:abc
+	// sha256:abc
+	// ...
 	Verification string
 
-	License []string // Maybe...
+	License []string
 
 	// Related
 	UpStreamPackages   []*Package
@@ -27,23 +31,16 @@ type Package struct {
 	// 订正 CPE 和 强制关联 CVE
 	AmendedCPE    []string
 	AssociatedCVE []string
-
-	/*
-		// more go.mod or dependency batch files.
-		// which times is the package used?
-		Count int
-	*/
-	ExtraInfo []InfoPair
 }
 
 type PackageRelationShip struct {
-	And []string
-	Or  [][]string
+	And map[string]string   // key: package name, value: version range
+	Or  []map[string]string // key: package name, value: version range
 }
 
 func (p *Package) Identifier() string {
-	if p.ID == "" {
-		p.ID = utils.CalcSha1(p.Name, p.Version)
+	if p.id == "" {
+		p.id = utils.CalcSha1(p.Name, p.Version)
 	}
-	return p.ID
+	return p.id
 }
