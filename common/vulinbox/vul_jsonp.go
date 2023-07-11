@@ -1,8 +1,8 @@
 package vulinbox
 
 import (
+	_ "embed"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/regen"
 	"net/http"
 )
 
@@ -24,28 +24,38 @@ func ForceEnsureCookie(writer http.ResponseWriter, r *http.Request, key, val str
 	return false
 }
 
+//go:embed vul_jsonp.html
+var vulJSONPHTML []byte
+
 func (s *VulinServer) registerJSONP() {
 	r := s.router
 	r.HandleFunc("/jsonp/center", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
-			regen.GenerateOne()
 			return
 		}
 
-
-		request.URL.Query().Get("callback")
+		callbackName := request.URL.Query().Get("callback")
 		writer.Header().Set("Content-Type", "application/javascript")
-		writer.Write([]byte(`(function(){
+		switch callbackName {
+		case "exec_checkpoint":
+			writer.Write([]byte(`(function(){
+	setTimeout(function(){
+		document.getElementById("abc").innerText = "This Message is FROM /jsonp/center~, checkpoint is set~"
+	}, 1500)
 	return "This Message is FROM /jsonp/center~, checkpoint is set~"
 })()`))
+		default:
+			writer.Write([]byte(`(function(){
+	alert("NO CHECKING POINT")
+	return "no checkpoint cookie"
+})()`))
+		}
+
 	})
 	r.HandleFunc("/jsonp/basic", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 			return
 		}
-		writer.Header().Set("Content-Type", "application/javascript")
-		writer.Write([]byte(`(function(){
-	return "This Message is FROM /jsonp/center~, checkpoint is set~"
-})()`))
+		writer.Write(vulJSONPHTML)
 	})
 }
