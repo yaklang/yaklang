@@ -68,7 +68,7 @@ if proxies == "no" {
 active = cli.Bool("active")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
 synConcurrent = cli.Int("syn-concurrent", cli.setDefault(800))
-protos = cli.String("proto", cli.setDefault("tcp"))
+protos = cli.String("proto", cli.setDefault("tcp,udp"))
 
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
 scriptNameFile = cli.String("script-name-file", cli.setDefault(""))
@@ -382,7 +382,7 @@ bruteScan = func(result){
 		bruteType = ""
 
 		for _, bt  := range brute.GetAvailableBruteTypes() {
-			if result.GetServiceName().Lower().Contains(bt){
+			if result.GetServiceName().Lower().Contains(bt) || bt.Contains(result.GetServiceName().Lower()) {
 				bruteType = bt
 				break
 			}
