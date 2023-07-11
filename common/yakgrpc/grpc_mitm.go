@@ -1258,6 +1258,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
+		//if strings.Contains(req.URL.String(), "/xxx")  {
+		//	log.Infof("Hit")
+		//}
 		addCounter()
 
 		// 不符合劫持条件就不劫持

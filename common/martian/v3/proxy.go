@@ -1132,6 +1132,9 @@ func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, proxyToSe
 }
 
 func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	//if strings.Contains(req.URL.String(), "/xxx") {
+	//	log.Infof("Hit")
+	//}
 	if err := h.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)

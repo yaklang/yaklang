@@ -461,7 +461,13 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 			return nil
 		}
 
-		p := fmt.Sprintf("%p", req)
+		var p string
+		if req.ProtoMajor == 2 {
+			p = fmt.Sprintf("%p", req.Context())
+		} else {
+			p = fmt.Sprintf("%p", req)
+		}
+
 		log.Debugf("request-id: [%v]", p)
 		m.mirrorCache.Set(p, &rawRequest{
 			IsHttps: isHttps,
@@ -547,6 +553,9 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 
 	// mirror response
 	group.AddResponseModifier(NewResponseModifier(func(res *http.Response) error {
+		//if strings.Contains(res.Request.URL.String(), "/xxx") {
+		//	log.Infof("Hit")
+		//}
 		// 过滤一下最大长度
 		haveBody := true
 		if largerThanMaxContentLength(res) {
@@ -554,7 +563,13 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		}
 
 		rspP := fmt.Sprintf("%p", res)
-		reqP := fmt.Sprintf("%p", res.Request)
+		var reqP string
+		if res.Request.ProtoMajor == 2 {
+			reqP = fmt.Sprintf("%p", res.Request.Context()) // 临时修复 http2记录因ttl无法获取而缺失
+		} else {
+			reqP = fmt.Sprintf("%p", res.Request)
+		}
+
 		log.Debugf("request-id: [%v]   -->   response-id: [%v] ", reqP, rspP)
 
 		if m.responseMirrorWithInstance != nil {
