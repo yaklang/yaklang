@@ -2,12 +2,14 @@ package analyzer
 
 import (
 	"bufio"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"io/fs"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	licenses "github.com/yaklang/yaklang/common/sca/license"
 
 	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
 
@@ -209,17 +211,56 @@ func (ag *AnalyzerGroup) Analyze() error {
 }
 
 func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
-	parsedLibs, _, err := parser.Parse(fi.File)
+	parsedLibs, parsedDeps, err := parser.Parse(fi.File)
 	if err != nil {
 		return nil, err
 	}
 
-	pkgs := lo.Map(parsedLibs, func(lib godeptypes.Library, index int) dxtypes.Package {
-		return dxtypes.Package{
+	pkgIDMap := make(map[string]*dxtypes.Package)
+
+	for _, lib := range parsedLibs {
+		p := dxtypes.Package{
 			Name:     lib.Name,
 			Version:  lib.Version,
 			Indirect: lib.Indirect,
 		}
-	})
-	return pkgs, nil
+		if lib.License != "" {
+			p.License = lo.Map(strings.Split(lib.License, ","), func(license string, _ int) string {
+				return licenses.Normalize(license)
+			})
+		}
+		pkgIDMap[lib.ID] = &p
+	}
+
+	// parse deps
+	for _, dep := range parsedDeps {
+		id := dep.ID
+		upStreamIDs := dep.DependsOn
+
+		pkg, ok := pkgIDMap[id]
+		if !ok {
+			continue
+		}
+
+		if pkg.UpStreamPackages == nil {
+			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
+		}
+
+		for _, uid := range upStreamIDs {
+			upPkg, ok := pkgIDMap[uid]
+			if !ok {
+				continue
+			}
+			pkg.UpStreamPackages[uid] = upPkg
+
+			if upPkg.DownStreamPackages == nil {
+				upPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
+			}
+			upPkg.DownStreamPackages[id] = pkg
+		}
+	}
+
+	return lo.MapToSlice(pkgIDMap, func(_ string, pkg *dxtypes.Package) dxtypes.Package {
+		return *pkg
+	}), nil
 }
