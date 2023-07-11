@@ -166,11 +166,12 @@ func GenerateSelfSignedCertKeyWithCommonName(commonName, host string, alternateI
 }
 
 func init() {
-	utils.RegisterDefaultTLSConfigGenerator(func() *tls.Config {
+	utils.RegisterDefaultTLSConfigGenerator(func() (*tls.Config, *gmtls.Config) {
 		ca, key, _ := GenerateSelfSignedCertKeyWithCommonName("test", "127.0.0.1", nil, nil)
 		sCa, sKey, _ := SignServerCrtNKey(ca, key)
 		stls, _ := GetX509ServerTlsConfig(ca, sCa, sKey)
-		return stls
+		gmtlsConfig, _ := GetX509GMServerTlsConfigWithAuth(ca, sCa, sKey, false)
+		return stls, gmtlsConfig
 	})
 }
 
