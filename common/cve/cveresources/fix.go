@@ -9,6 +9,21 @@ import (
 	"sync"
 )
 
+type ProductId struct {
+	ProductName string
+	Vendor      string
+}
+
+var CommonFix map[string]ProductId = map[string]ProductId{
+	"httpd": {
+		ProductName: "http_server",
+		Vendor:      "apache",
+	},
+	"iis": {
+		ProductName: "internet_information_server",
+	},
+}
+
 func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 	ProductName = strings.ToLower(ProductName)
 	var Products []ProductsTable
@@ -64,9 +79,9 @@ func generalFix(wg *sync.WaitGroup, fixName chan string, ProductName string, Pro
 		2.语义切割后模糊匹配(提取出纯字符的名字,尝试把)  lib
 	*/
 
-	//提取单词
+	//提取单词的规则
 	wg.Add(1)
-	ruleForFuzz, err := regexp.Compile(`[a-zA-Z]+`)
+	ruleForFuzz, err := regexp.Compile(`[a-zA-Z]{3,}`)
 	if err != nil {
 		log.Errorf("Regular pattern compile failed: %s", err)
 	}
