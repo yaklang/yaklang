@@ -83,3 +83,18 @@ func (p Package) String() string {
 	// ret += fmt.Sprintf("\n\tindirect: %v", p.Potential)
 	return ret
 }
+
+// merge p1 to p1
+func PackageMerge(p1 *Package, p2 *Package) *Package {
+	p1.fromAnalyzer = append(p1.fromAnalyzer, p2.fromAnalyzer...)
+	p1.fromFile = append(p1.fromFile, p2.fromFile...)
+	for _, p := range p2.UpStreamPackages {
+		p1.UpStreamPackages[p.Name] = p
+		p.DownStreamPackages[p1.Name] = p1
+	}
+	for _, p := range p2.DownStreamPackages {
+		p1.DownStreamPackages[p.Name] = p
+		p.UpStreamPackages[p1.Name] = p1
+	}
+	return p1
+}
