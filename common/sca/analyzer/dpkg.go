@@ -40,7 +40,7 @@ func ReadBlock(r *bufio.Reader) ([]byte, error) {
 			return block.Bytes(), err
 		}
 
-		if line == "\n" {
+		if line == "\n" || line == "\r\n" {
 			break
 		}
 
