@@ -30,7 +30,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
-	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -73,7 +72,7 @@ func isCloseable(err error) bool {
 type Proxy struct {
 	roundTripper      http.RoundTripper
 	roundTripperForGM http.RoundTripper
-	dial              func(string, string) (net.Conn, error)
+	dial              func(context.Context, string, string) (net.Conn, error)
 	timeout           time.Duration
 	mitm              *mitm.Config
 	proxyURL          *url.URL
@@ -157,11 +156,20 @@ func NewProxy() *Proxy {
 		ctxCache:         ttlcache.NewCache(),
 	}
 	proxy.ctxCache.SetTTL(5 * time.Minute)
-	proxy.SetDial((&net.Dialer{
+	proxy.SetDialContext((&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
-	}).Dial)
+	}).DialContext)
 	return proxy
+}
+
+// SetHTTPTransport sets the http.RoundTripper of the proxy.
+func (p *Proxy) SetHTTPTransport(rt *http.Transport) {
+	p.roundTripper = rt
+	tr := rt
+	tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+	tr.Proxy = http.ProxyURL(p.proxyURL)
+	tr.DialContext = p.dial
 }
 
 // SetRoundTripper sets the http.RoundTripper of the proxy.
@@ -171,18 +179,18 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = http.ProxyURL(p.proxyURL)
-		tr.Dial = p.dial
+		tr.DialContext = p.dial
 	}
 }
 
 // SetRoundTripperForGM sets the http.RoundTripperForGM of the proxy.
-func (p *Proxy) SetRoundTripperForGM(rt http.RoundTripper) {
+func (p *Proxy) SetRoundTripperForGM(rt *http.Transport) {
 	p.roundTripperForGM = rt
 
 	if tr, ok := p.roundTripperForGM.(*http.Transport); ok {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = http.ProxyURL(p.proxyURL)
-		tr.Dial = p.dial
+		tr.DialContext = p.dial
 		tr.RegisterProtocol("https", gmtls.NewSimpleRoundTripperWithProxy(&gmtls.Config{
 			GMSupport:          &gmtls.GMSupport{},
 			InsecureSkipVerify: true,
@@ -237,15 +245,15 @@ func (p *Proxy) SetGMOnly(enable bool) {
 }
 
 // SetDial sets the dial func used to establish a connection.
-func (p *Proxy) SetDial(dial func(string, string) (net.Conn, error)) {
-	p.dial = func(a, b string) (net.Conn, error) {
-		c, e := dial(a, b)
+func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.Conn, error)) {
+	p.dial = func(ctx context.Context, a, b string) (net.Conn, error) {
+		c, e := dial(ctx, a, b)
 		nosigpipe.IgnoreSIGPIPE(c)
 		return c, e
 	}
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.Dial = p.dial
+		tr.DialContext = p.dial
 	}
 }
 
@@ -961,7 +969,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if p.proxyURL != nil {
 		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
 
-		conn, err := p.dial("tcp", p.proxyURL.Host)
+		conn, err := p.dial(context.Background(), "tcp", p.proxyURL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -981,7 +989,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-	conn, err := p.dial("tcp", req.URL.Host)
+	conn, err := p.dial(req.Context(), "tcp", req.URL.Host)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1087,19 +1095,34 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		log.Infof("\u001b[1;35mProxying %v with HTTP/2\u001b[0m", url)
 	}
 
-	tr := &http.Transport{TLSClientConfig: &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
-		NextProtos:         []string{"h2"},
-	},
+	go func() {
+		select {
+		case <-closing:
+		}
+		cc.Close()
+	}()
+
+	var tr http.RoundTripper
+	if p.gmTLS {
+		tr = p.roundTripperForGM
+	} else {
+		tr = p.roundTripper
+	}
+	if tr == nil {
+		newTr := &http.Transport{TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
+			NextProtos:         []string{"h2"},
+		}}
+		if p.proxyURL != nil {
+			newTr.Proxy = http.ProxyURL(p.proxyURL)
+		}
+		tr = newTr
 	}
 
-	if p.proxyURL != nil {
-		tr.Proxy = http.ProxyURL(p.proxyURL)
-	}
-
-	err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
+	err := lowhttp2.ConfigureTransport(tr)
+	//err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
 	if err != nil {
 		return errors.New(fmt.Sprintf("Fatal Cannot switch to HTTP2: %v", err))
 	}

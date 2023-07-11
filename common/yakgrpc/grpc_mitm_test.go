@@ -4,16 +4,37 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+func TestH2Hijack(t *testing.T) {
+	h2Host, h2Port := utils.DebugMockHTTP2(context.Background(), func(req []byte) []byte {
+		return req
+	})
+	h2Addr := utils.HostPort(h2Host, h2Port)
+	_, err := yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+dump(rsp)
+dump(req)
+`, map[string]any{
+		"packet": `GET / HTTP/2.0
+User-Agent: 111
+Host: ` + h2Addr,
+	})
+	if err != nil {
+		panic(err)
+	}
+}
 
 func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	client, err := NewLocalClient()
@@ -27,6 +48,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		echoTested        bool
 		gzipAutoDecode    bool
 		chunkDecode       bool
+		h2Test            bool
 	)
 
 	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
@@ -52,10 +74,29 @@ Content-Length: 3
 	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
 	_ = proxy
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() {
 		cancel()
 	}()
+
+	/* H2 */
+	h2Host, h2Port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+		return req
+	})
+	h2Addr := utils.HostPort(h2Host, h2Port)
+	_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+dump(rsp)
+dump(req)
+`, map[string]any{
+		"packet": `GET / HTTP/2.0
+User-Agent: 111
+Host: ` + h2Addr,
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	stream, err := client.MITM(ctx)
 	if err != nil {
 		panic(err)
@@ -67,6 +108,7 @@ Content-Length: 3
 		Forward:          true,
 		SetAutoForward:   true,
 		AutoForwardValue: true,
+		EnableHttp2:      true,
 	})
 
 	var wg sync.WaitGroup
@@ -173,6 +215,48 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 				chunkDecode = true
+
+				tokenRaw = []byte(token)
+				params["h2packet"] = lowhttp.ReplaceHTTPPacketBody([]byte(`GET /mitm/test/h2/token/`+token+` HTTP/2.0
+Host: `+h2Addr+`
+D: 1
+`), tokenRaw, false)
+				params["h2host"] = h2Host
+				params["h2port"] = h2Port
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("Start to send packet echo")
+packet := getParam("h2packet")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+dump(packet)
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.http2(true), poc.https(true))~
+dump(rsp)
+if rsp.Contains(getParam("token")) {
+		println("h2 auto decode success")	
+}else{
+	dump(rsp)
+	die("not pass!")
+}
+`, params)
+				if err != nil {
+					panic(err)
+				}
+
+				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+					SearchURL: "/mitm/test/h2/token/" + token,
+				})
+				if err != nil {
+					panic(err)
+				}
+				spew.Dump(flows)
+				if len(flows) > 0 {
+					h2Test = true
+				}
 			}()
 		}
 		spew.Dump(rsp)
@@ -196,5 +280,9 @@ if rsp.Contains(getParam("token")) {
 
 	if !chunkDecode {
 		panic("CHUNK DECODE FAILED")
+	}
+
+	if !h2Test {
+		panic("H2 TEST FAILED")
 	}
 }
