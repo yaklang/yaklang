@@ -8,6 +8,8 @@ import (
 )
 
 func consolidateDependencies(pkgs []dxtypes.Package) {
+	potentialPkgs := make([]dxtypes.Package, 0)
+
 	pkgMap := lo.SliceToMap(pkgs, func(item dxtypes.Package) (string, *dxtypes.Package) {
 		return item.Name, &item
 	})
@@ -29,14 +31,16 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 				andDepPkg.DownStreamPackages = append(andDepPkg.DownStreamPackages, pkg)
 			} else {
 				// if not found, make a potential package
-				pkg.UpStreamPackages = append(pkg.UpStreamPackages, &dxtypes.Package{
+				potentialPkg := &dxtypes.Package{
 					Name:    andDepPkgName,
 					Version: "*",
 					DownStreamPackages: []*dxtypes.Package{
 						pkg,
 					},
 					Potential: true,
-				})
+				}
+				potentialPkgs = append(potentialPkgs, *potentialPkg)
+				pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
 			}
 		}
 		// or
@@ -57,7 +61,7 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 
 			if !exist {
 				// if not found, make a potential package
-				pkg.UpStreamPackages = append(pkg.UpStreamPackages, &dxtypes.Package{
+				potentialPkg := &dxtypes.Package{
 					Name: strings.Join(
 						lo.MapToSlice(orDepPkgMap, func(name string, _ string) string {
 							return name
@@ -68,8 +72,13 @@ func consolidateDependencies(pkgs []dxtypes.Package) {
 						pkg,
 					},
 					Potential: true,
-				})
+				}
+				potentialPkgs = append(potentialPkgs, *potentialPkg)
+				pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
 			}
 		}
 	}
+
+	// append potential packages
+	pkgs = append(pkgs, potentialPkgs...)
 }
