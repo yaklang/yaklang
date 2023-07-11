@@ -75,7 +75,6 @@ func match(rule *NmapMatch, data []rune, port int, host net.IP, safeBanner strin
 	if err != nil {
 		return nil
 	}
-
 	if matchResult != nil {
 		info := ToFingerprintInfo(rule, matchResult)
 		info.Banner = safeBanner

@@ -16,7 +16,7 @@ func Test_scanFingerprint(t *testing.T) {
 
 	//port := "3307"
 	//port := "21"
-	port := "161"
+	port := "59380"
 
 	//protoList := []interface{}{"tcp", "udp"}
 	//protoList := []interface{}{"tcp"}

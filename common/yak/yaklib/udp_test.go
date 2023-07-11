@@ -37,6 +37,14 @@ func TestDebugMockUDPProtocol(t *testing.T) {
 	//	t.FailNow()
 	//}
 	//_ = matcher
+	//banner := []byte("0a\x02\x01\x00\x04\x06public\xa2a\x06\x08+\x06\x01\x02\x01\x01\x05\x00\x04a")
+	//r, _ := regexp2.Compile("0.*\\x02\\x01\\x00\\x04\\x06public\\xa2.*\\x06\\x08\\+\\x06\\x01\\x02\\x01\\x01\\x05\\x00\\x04[^\\x00]([^\\x00]+)", 0)
+	//a, err := r.FindRunesMatch(utils2.AsciiBytesToRegexpMatchedRunes(banner))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(a)
+	fmt.Println("\x08")
 	server, port := DebugMockUDPProtocol("snmp")
 
 	fmt.Println(server, port)

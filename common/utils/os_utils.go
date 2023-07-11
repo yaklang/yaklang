@@ -89,8 +89,8 @@ func IsPortAvailableWithUDP(host string, p int) bool {
 }
 
 func GetRandomLocalAddr() string {
-	//return HostPort("127.0.0.1", GetRandomAvailableTCPPort())
-	return HostPort("127.0.0.1", 161)
+	return HostPort("127.0.0.1", GetRandomAvailableTCPPort())
+	//return HostPort("127.0.0.1", 161)
 }
 
 func GetSystemNameServerList() ([]string, error) {

@@ -2,13 +2,13 @@ package yaklib
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"reflect"
 	"strconv"
@@ -275,25 +275,69 @@ func DebugMockUDPProtocol(name string) (string, int) {
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)
 	var generates []string
 	var err error
+	responses := make(map[string][][]byte)
 	for _, block := range blocks {
+		payload := block.Probe.Payload
 		for _, match := range block.Matched {
-			spew.Dump(block)
-			spew.Dump(match)
 			r := match.MatchRule.String()
 			log.Infof("match rule: %v", r)
 			generates, err = regen.GenerateOne(r)
-			if err == nil {
-				break
+			if err != nil {
+				continue
+			}
+			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
+		}
+	}
+	return DebugMockUDPFromScan(60*time.Minute, responses)
+}
+
+func DebugMockUDPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
+	addr := utils.GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	go func() {
+		conn, err := net.ListenPacket("udp", addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		go func() {
+			time.Sleep(du)
+			conn.Close()
+		}()
+
+		buffer := make([]byte, 1024)
+		for {
+			n, addr, err := conn.ReadFrom(buffer)
+			if err != nil {
+				return
+			}
+
+			requestPayload := string(buffer[:n])
+			log.Infof("recv: %#v from: %v", requestPayload, addr.String())
+			if responses, ok := responses[requestPayload]; ok {
+				rand.NewSource(time.Now().UnixNano())
+				response := responses[rand.Intn(len(responses))]
+				log.Infof("send: %#v to: %v", string(response), addr.String())
+				conn.WriteTo(response, addr)
+				time.Sleep(50 * time.Millisecond)
 			}
 		}
-		break
+	}()
+	time.Sleep(time.Millisecond * 100)
+	return host, port
+}
+
+func convertToBytes(s string) []byte {
+	var result []byte
+	for _, r := range s {
+		if r > 127 || r < 32 || (r >= 0x7F && r <= 0xA0) { // ASCII 范围之外的字符
+			result = append(result, byte(r))
+		} else {
+			result = append(result, byte(r))
+		}
 	}
-	_ = generates
-	gg := "08\\x02\\x01\\x00\\x04\\x06public\\xef\\xbf\\xbd+\\x02\\x04L3\\xef\\xbf\\xbd\\x02\\x01\\x00\\x02\\x01\\x000\\x1d0\\x1b\\x06\\x08+\\x06\\x01\\x02\\x01\\x01\\x05\\x00\\x04\\x0fH8 Nas-4_Static"
-	//rsp := []byte(generates[0])
-	rsp := []byte(gg)
-	log.Infof("generate %q", rsp)
-	return DebugMockUDP(rsp)
+	return result
 }
 
 func DebugMockUDPWithTimeout(du time.Duration, rsp []byte) (string, int) {
