@@ -145,7 +145,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]dxtypes.Package, error) {
 		}
 	}
 
-	consolidateDependencies(pkgs)
+	linkUpSteamAndDownStream(pkgs)
 
 	return pkgs, nil
 }
