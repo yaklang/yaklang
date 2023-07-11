@@ -228,7 +228,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "filesystem",
 		Version:      "1.1",
 		Verification: "md5:4aa036ed5ef7ddb03687f7f05eaf7c4e",
-		License:      []string{"GPLv3"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "glibc",
@@ -240,7 +240,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "zlib",
 		Version:      "1.2.11",
 		Verification: "md5:26b5ae370d09fa0f57d2f4ba1452c5c3",
-		License:      []string{"zlib"},
+		License:      []string{"Zlib"},
 	},
 	{
 		Name:         "openssl-libs",
@@ -255,8 +255,10 @@ var RPMWantPkgs = []dxtypes.Package{
 		License:      []string{"GPLv2+ and GPLv3+ and LGPLv2+"},
 	},
 	{
-		Name:    "bzip2-libs",
-		Version: "1.0.8",
+		Name:         "bzip2-libs",
+		Version:      "1.0.8",
+		Verification: "md5:dd11ab0fe74f3ac60d333e507c3042a3",
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "zstd-libs",
@@ -268,7 +270,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "sqlite-libs",
 		Version:      "3.34.1",
 		Verification: "md5:db6df0437714d8cc12669fe5358b70eb",
-		License:      []string{"Public Domain"},
+		License:      []string{"Unlicense"},
 	},
 	{
 		Name:         "elfutils-libelf",
@@ -286,7 +288,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libgcc",
 		Version:      "11.2.0",
 		Verification: "md5:17272f16ad5c3b7430d0d83d3114aa1f",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "openssl",
@@ -298,7 +300,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libcap",
 		Version:      "2.26",
 		Verification: "md5:bb7a06aae691f09c5717a92f7a86ffac",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "lua-libs",
@@ -310,7 +312,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "pcre-libs",
 		Version:      "8.44",
 		Verification: "md5:65b24462e903d64b58e487c04b6be6b3",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "expat-libs",
@@ -322,7 +324,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libstdc++",
 		Version:      "11.2.0",
 		Verification: "md5:42f2cde1419ab48a0528a873affd5898",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "ncurses-libs",
@@ -334,7 +336,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "readline",
 		Version:      "8.1",
 		Verification: "md5:f3d3a3bb05347f5bea78703a7ea9a99d",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "libffi",
@@ -358,37 +360,37 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "p11-kit",
 		Version:      "0.23.22",
 		Verification: "md5:9c9ee2bb0c24dc159515bcc44fbb692d",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "pcre",
 		Version:      "8.44",
 		Verification: "md5:0fa8f6f26296829efcb486d5da014da0",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "libselinux",
 		Version:      "3.2",
 		Verification: "md5:9573fd90eb7ff806c51490984b64a0be",
-		License:      []string{"Public Domain"},
+		License:      []string{"Unlicense"},
 	},
 	{
 		Name:         "coreutils",
 		Version:      "8.32",
 		Verification: "md5:9e431e0adc7a379e18415da52abff435",
-		License:      []string{"GPLv3"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "grep",
 		Version:      "3.7",
 		Verification: "md5:1861a4f6be5ecf733bcd0c7c7b60ca1e",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "bash",
 		Version:      "5.1.8",
 		Verification: "md5:8f5f6e54a8c0e4c0c9accf0ec7388905",
-		License:      []string{"GPLv3"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "libsepol",
@@ -400,7 +402,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libgpg-error",
 		Version:      "1.43",
 		Verification: "md5:ce492fb031015af7e8248f40cbcc5d1b",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "xz",
@@ -460,13 +462,13 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "gzip",
 		Version:      "1.11",
 		Verification: "md5:42285a4d25ffa824e97c5026f7230eae",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "bzip2",
 		Version:      "1.0.8",
 		Verification: "md5:a74384d3884f27146018caf6e48613d0",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "slang",
@@ -490,7 +492,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libssh2",
 		Version:      "1.9.0",
 		Verification: "md5:69e0a449811fdb86958beb22c50e058c",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "curl-libs",
@@ -508,7 +510,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "file-libs",
 		Version:      "5.40",
 		Verification: "md5:3e3714a2381c074c7752e294995b9241",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "libcap-ng",
@@ -520,7 +522,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "tar",
 		Version:      "1.34",
 		Verification: "md5:0aa396e03f4dca36f316a762c23dbf71",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "lz4",
@@ -538,13 +540,13 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "chkconfig",
 		Version:      "1.20",
 		Verification: "md5:d87f0f95e810abf39ea84d88ed750da6",
-		License:      []string{"GPLv2"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "libsolv",
 		Version:      "0.7.19",
 		Verification: "md5:e601712773ae56e8c0fbfb7648855d86",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "nss-libs",
@@ -556,7 +558,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "pinentry",
 		Version:      "1.2.0",
 		Verification: "md5:0560d426f3d258841576f873f8ffe976",
-		License:      []string{"GPLv2"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "kmod",
@@ -580,7 +582,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "unzip",
 		Version:      "6.0",
 		Verification: "md5:480c4b180e699cc7a0b0cef115c7717e",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "npth",
@@ -610,31 +612,31 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libtool",
 		Version:      "2.4.6",
 		Verification: "md5:999ad391ed5ab6d2c449625bd63195e9",
-		License:      []string{"GPLv2"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "findutils",
 		Version:      "4.8.0",
 		Verification: "md5:6e78e7560afb386fadfbaae750a31ab3",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "mpfr",
 		Version:      "4.1.0",
 		Verification: "md5:3a63ab9f5ce8bb364d5235b2896fcb78",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "gawk",
 		Version:      "5.1.0",
 		Verification: "md5:702313964991c3a92bcacdc110dc82d3",
-		License:      []string{"GPLv3"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "gdbm",
 		Version:      "1.21",
 		Verification: "md5:6a30cff90bab80d49fd1342a4a900b8b",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "lua",
@@ -664,13 +666,13 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libgomp",
 		Version:      "11.2.0",
 		Verification: "md5:4600af8787654a186c3876a20706ae32",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "cpio",
 		Version:      "2.13",
 		Verification: "md5:b9ad8230a6de91cada8446ef5264e26d",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "libtasn1",
@@ -682,7 +684,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "p11-kit-trust",
 		Version:      "0.23.22",
 		Verification: "md5:7d97b7919bff33e0f685b7e295616449",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "ca-certificates-tools",
@@ -730,13 +732,13 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "sed",
 		Version:      "4.8",
 		Verification: "md5:d4d6aa23e89e601fba25bb372652e7d8",
-		License:      []string{"GPLv3"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "net-tools",
 		Version:      "1.60",
 		Verification: "md5:a7b9895648a38e43df3535fce4c6ab2e",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "ca-certificates-shared",
@@ -778,7 +780,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "zlib-devel",
 		Version:      "1.2.11",
 		Verification: "md5:260594dcd232af5bb07cf5854d187393",
-		License:      []string{"zlib"},
+		License:      []string{"Zlib"},
 	},
 	{
 		Name:         "xz-devel",
@@ -790,7 +792,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "pcre-devel",
 		Version:      "8.44",
 		Verification: "md5:d05756d20fefc5399bb837bc0fcd1d02",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "libsepol-devel",
@@ -802,19 +804,19 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "libselinux-devel",
 		Version:      "3.2",
 		Verification: "md5:38abe447e4de74c517f9195a9a4bda38",
-		License:      []string{"Public Domain"},
+		License:      []string{"Unlicense"},
 	},
 	{
 		Name:         "util-linux",
 		Version:      "2.37.2",
 		Verification: "md5:a2a93d998f4427bd3d886403ffcf9872",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "util-linux-devel",
 		Version:      "2.37.2",
 		Verification: "md5:bdd34b2e7bee180786ad8828a29fc57d",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "python3",
@@ -838,7 +840,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "wget",
 		Version:      "1.20.3",
 		Verification: "md5:772c6e8acc19ea2b060fc1db93baa097",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "e2fsprogs",
@@ -898,7 +900,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "debugedit",
 		Version:      "5.0",
 		Verification: "md5:679555eefa8ee14986b2f9167b83b172",
-		License:      []string{"GPLv3+"},
+		License:      []string{"GPL-3.0"},
 	},
 	{
 		Name:         "rpm",
@@ -958,7 +960,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "audit",
 		Version:      "3.0.6",
 		Verification: "md5:0303b906ae3240f6bb451a89e82b2039",
-		License:      []string{"GPLv2+"},
+		License:      []string{"GPL-2.0"},
 	},
 	{
 		Name:         "libsemanage",
@@ -970,7 +972,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "shadow-utils",
 		Version:      "4.9",
 		Verification: "md5:e7b3cbf6478e186ef0269c465b5daedf",
-		License:      []string{"BSD"},
+		License:      []string{"BSD-3-Clause"},
 	},
 	{
 		Name:         "sudo",
@@ -988,7 +990,7 @@ var RPMWantPkgs = []dxtypes.Package{
 		Name:         "sqlite",
 		Version:      "3.34.1",
 		Verification: "md5:48da82892b7b8e46a1c64445d9df1389",
-		License:      []string{"Public Domain"},
+		License:      []string{"Unlicense"},
 	},
 }
 
