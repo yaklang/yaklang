@@ -137,22 +137,9 @@ func TestApk(t *testing.T) {
 
 	// negative
 	tc = testcase{
-		name:     "negative",
-		filePath: "./testdata/apk/negative-apk",
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:         "ssl_client",
-				Version:      "1.36.1-r0",
-				Verification: "sha1:8722023d7e6cde7b861a7c076481000d05f0272e",
-				License:      []string{"GPL-2.0"},
-			},
-			{
-				Name:         "zlib",
-				Version:      "1.2.13-r1",
-				Verification: "sha1:2656e848992b378aa40dca24af8cde9e97161174",
-				License:      []string{"Zlib"},
-			},
-		},
+		name:      "negative",
+		filePath:  "./testdata/apk/negative-apk",
+		wantPkgs:  APKNegativePkgs,
 		t:         t,
 		a:         analyzer.NewApkAnalyzer(),
 		matchType: 1,
@@ -194,17 +181,7 @@ func TestConan(t *testing.T) {
 		t:         t,
 		a:         analyzer.NewConanAnalyzer(),
 		matchType: 1,
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "openssl",
-				Version: "3.0.5",
-			},
-			{
-				Name:     "zlib",
-				Version:  "1.2.12",
-				Indirect: true,
-			},
-		},
+		wantPkgs:  ConanWantPkgs,
 	}
 	Run(tc)
 
@@ -228,20 +205,7 @@ func TestGoBinary(t *testing.T) {
 		t:         t,
 		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "github.com/aquasecurity/go-pep440-version",
-				Version: "v0.0.0-20210121094942-22b2f8951d46",
-			},
-			{
-				Name:    "github.com/aquasecurity/go-version",
-				Version: "v0.0.0-20210121072130-637058cfe492",
-			},
-			{
-				Name:    "golang.org/x/xerrors",
-				Version: "v0.0.0-20200804184101-5ec99f83aff1",
-			},
-		},
+		wantPkgs:  GOBianryWantPkgs,
 	}
 	Run(tc)
 
@@ -280,17 +244,7 @@ func TestGoMod(t *testing.T) {
 		matchedFileMap: map[string]string{
 			"/test/go.sum": "./testdata/go_mod/positive/sum",
 		},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "github.com/aquasecurity/go-dep-parser",
-				Version: "0.0.0-20220406074731-71021a481237",
-			},
-			{
-				Name:     "golang.org/x/xerrors",
-				Version:  "0.0.0-20200804184101-5ec99f83aff1",
-				Indirect: true,
-			},
-		},
+		wantPkgs: GoModWantPkgs,
 	}
 	Run(tc)
 
@@ -305,17 +259,7 @@ func TestGoMod(t *testing.T) {
 		matchedFileMap: map[string]string{
 			"/test/go.sum": "./testdata/go_mod/lessthan117/sum",
 		},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "github.com/aquasecurity/go-dep-parser",
-				Version: "0.0.0-20230219131432-590b1dfb6edd",
-			},
-			{
-				Name:     "github.com/BurntSushi/toml",
-				Version:  "0.3.1",
-				Indirect: true,
-			},
-		},
+		wantPkgs: GoModLess117Pkgs,
 	}
 	Run(tc)
 
@@ -344,18 +288,7 @@ func TestPHPComposer(t *testing.T) {
 		matchedFileMap: map[string]string{
 			"/test/composer.json": "./testdata/php_composer/positive/composer.json",
 		},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:     "pear/log",
-				Version:  "1.13.3",
-				Indirect: false,
-			},
-			{
-				Name:     "pear/pear_exception",
-				Version:  "v1.0.2",
-				Indirect: true,
-			},
-		},
+		wantPkgs: PHPComposerPkgs,
 	}
 	Run(tc)
 
@@ -370,18 +303,7 @@ func TestPHPComposer(t *testing.T) {
 		matchedFileMap: map[string]string{
 			"/test/composer.json": "./testdata/php_composer/wrong.json",
 		},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:     "pear/log",
-				Version:  "1.13.3",
-				Indirect: false,
-			},
-			{
-				Name:     "pear/pear_exception",
-				Version:  "v1.0.2",
-				Indirect: false,
-			},
-		},
+		wantPkgs: PHPComposerWrongJsonPkgs,
 	}
 	Run(tc)
 
@@ -394,18 +316,7 @@ func TestPHPComposer(t *testing.T) {
 		a:              analyzer.NewPHPComposerAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:     "pear/log",
-				Version:  "1.13.3",
-				Indirect: false,
-			},
-			{
-				Name:     "pear/pear_exception",
-				Version:  "v1.0.2",
-				Indirect: false,
-			},
-		},
+		wantPkgs:       PHPComposerNoJsonPkgs,
 	}
 	Run(tc)
 
@@ -433,12 +344,7 @@ func TestPythonPackaging(t *testing.T) {
 		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      2,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "kitchen",
-				Version: "1.2.6",
-			},
-		},
+		wantPkgs:       PythonPackagingPkgs,
 	}
 	Run(tc)
 
@@ -449,12 +355,7 @@ func TestPythonPackaging(t *testing.T) {
 		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "distlib",
-				Version: "0.3.1",
-			},
-		},
+		wantPkgs:       PythonPackagingEggPkg,
 	}
 	Run(tc)
 
@@ -465,12 +366,7 @@ func TestPythonPackaging(t *testing.T) {
 		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "distlib",
-				Version: "0.3.1",
-			},
-		},
+		wantPkgs:       PythonPackagingWheel,
 	}
 	Run(tc)
 
@@ -495,20 +391,7 @@ func TestPythonPIP(t *testing.T) {
 		a:              analyzer.NewPythonPIPAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "click",
-				Version: "8.0.0",
-			},
-			{
-				Name:    "Flask",
-				Version: "2.0.0",
-			},
-			{
-				Name:    "itsdangerous",
-				Version: "2.0.0",
-			},
-		},
+		wantPkgs:       PythonPIPPkgs,
 	}
 	Run(tc)
 
@@ -533,12 +416,7 @@ func TestPythonPIPEnv(t *testing.T) {
 		a:              analyzer.NewPythonPIPEnvAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "pytz",
-				Version: "2022.7.1",
-			},
-		},
+		wantPkgs:       PythonPIPEnvPkgs,
 	}
 	Run(tc)
 
@@ -567,61 +445,7 @@ func TestPythonPoetry(t *testing.T) {
 		matchedFileMap: map[string]string{
 			"/pyproject.toml": "./testdata/python_poetry/positive/pyproject.toml",
 		},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:     "certifi",
-				Version:  "2022.12.7",
-				Indirect: true,
-			},
-			{
-				Name:     "charset-normalizer",
-				Version:  "2.1.1",
-				Indirect: true,
-			},
-			{
-				Name:     "click",
-				Version:  "7.1.2",
-				Indirect: true,
-			},
-			{
-				Name:    "flask",
-				Version: "1.1.4",
-			},
-			{
-				Name:     "idna",
-				Version:  "3.4",
-				Indirect: true,
-			},
-			{
-				Name:     "itsdangerous",
-				Version:  "1.1.0",
-				Indirect: true,
-			},
-			{
-				Name:     "jinja2",
-				Version:  "2.11.3",
-				Indirect: true,
-			},
-			{
-				Name:     "markupsafe",
-				Version:  "2.1.2",
-				Indirect: true,
-			},
-			{
-				Name:    "requests",
-				Version: "2.28.1",
-			},
-			{
-				Name:     "urllib3",
-				Version:  "1.26.14",
-				Indirect: true,
-			},
-			{
-				Name:     "werkzeug",
-				Version:  "1.0.1",
-				Indirect: true,
-			},
-		},
+		wantPkgs: PythonPoetryPkgs,
 	}
 	Run(tc)
 
@@ -633,16 +457,7 @@ func TestPythonPoetry(t *testing.T) {
 		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "click",
-				Version: "8.1.3",
-			},
-			{
-				Name:    "colorama",
-				Version: "0.4.6",
-			},
-		},
+		wantPkgs:       PythonPoetryNoProjectPkgs,
 	}
 	Run(tc)
 
@@ -667,16 +482,7 @@ func TestPythonPoetry(t *testing.T) {
 		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "click",
-				Version: "8.1.3",
-			},
-			{
-				Name:    "colorama",
-				Version: "0.4.6",
-			},
-		},
+		wantPkgs:       PythonPoetryWrongProjectPkgs,
 	}
 	Run(tc)
 }
@@ -691,11 +497,7 @@ func TestJavaGradle(t *testing.T) {
 		a:              analyzer.NewJavaGradleAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{Name: "com.example:example",
-				Version: "0.0.1",
-			},
-		},
+		wantPkgs:       JavaGradlePkgs,
 	}
 	Run(tc)
 	tc = testcase{
@@ -719,12 +521,7 @@ func TestJavaPom(t *testing.T) {
 		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "com.example:example",
-				Version: "1.0.0",
-			},
-		},
+		wantPkgs:       JavaPomPkgs,
 	}
 	Run(tc)
 
@@ -736,12 +533,7 @@ func TestJavaPom(t *testing.T) {
 		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs: []dxtypes.Package{
-			{
-				Name:    "com.example:example",
-				Version: "2.0.0",
-			},
-		},
+		wantPkgs:       JavaPomRequirementPkgs,
 	}
 	Run(tc)
 

@@ -159,6 +159,21 @@ var APKWantPkgs = []dxtypes.Package{
 	},
 }
 
+var APKNegativePkgs = []dxtypes.Package{
+	{
+		Name:         "ssl_client",
+		Version:      "1.36.1-r0",
+		Verification: "sha1:8722023d7e6cde7b861a7c076481000d05f0272e",
+		License:      []string{"GPL-2.0"},
+	},
+	{
+		Name:         "zlib",
+		Version:      "1.2.13-r1",
+		Verification: "sha1:2656e848992b378aa40dca24af8cde9e97161174",
+		License:      []string{"Zlib"},
+	},
+}
+
 var DPKGWantPkgs = []dxtypes.Package{
 	{
 		Name:    "adduser",
@@ -974,5 +989,229 @@ var RPMWantPkgs = []dxtypes.Package{
 		Version:      "3.34.1",
 		Verification: "md5:48da82892b7b8e46a1c64445d9df1389",
 		License:      []string{"Public Domain"},
+	},
+}
+
+var ConanWantPkgs = []dxtypes.Package{
+	{
+		Name:    "openssl",
+		Version: "3.0.5",
+	},
+	{
+		Name:     "zlib",
+		Version:  "1.2.12",
+		Indirect: true,
+	},
+}
+var GOBianryWantPkgs = []dxtypes.Package{
+	{
+		Name:    "github.com/aquasecurity/go-pep440-version",
+		Version: "v0.0.0-20210121094942-22b2f8951d46",
+	},
+	{
+		Name:    "github.com/aquasecurity/go-version",
+		Version: "v0.0.0-20210121072130-637058cfe492",
+	},
+	{
+		Name:    "golang.org/x/xerrors",
+		Version: "v0.0.0-20200804184101-5ec99f83aff1",
+	},
+}
+
+var GoModWantPkgs = []dxtypes.Package{
+	{
+		Name:    "github.com/aquasecurity/go-dep-parser",
+		Version: "0.0.0-20220406074731-71021a481237",
+	},
+	{
+		Name:     "golang.org/x/xerrors",
+		Version:  "0.0.0-20200804184101-5ec99f83aff1",
+		Indirect: true,
+	},
+}
+var GoModLess117Pkgs = []dxtypes.Package{
+	{
+		Name:    "github.com/aquasecurity/go-dep-parser",
+		Version: "0.0.0-20230219131432-590b1dfb6edd",
+	},
+	{
+		Name:     "github.com/BurntSushi/toml",
+		Version:  "0.3.1",
+		Indirect: true,
+	},
+}
+
+var PHPComposerPkgs = []dxtypes.Package{
+	{
+		Name:     "pear/log",
+		Version:  "1.13.3",
+		Indirect: false,
+	},
+	{
+		Name:     "pear/pear_exception",
+		Version:  "v1.0.2",
+		Indirect: true,
+	},
+}
+
+var PHPComposerWrongJsonPkgs = []dxtypes.Package{
+	{
+		Name:     "pear/log",
+		Version:  "1.13.3",
+		Indirect: false,
+	},
+	{
+		Name:     "pear/pear_exception",
+		Version:  "v1.0.2",
+		Indirect: false,
+	},
+}
+var PHPComposerNoJsonPkgs = []dxtypes.Package{
+	{
+		Name:     "pear/log",
+		Version:  "1.13.3",
+		Indirect: false,
+	},
+	{
+		Name:     "pear/pear_exception",
+		Version:  "v1.0.2",
+		Indirect: false,
+	},
+}
+
+var PythonPackagingPkgs = []dxtypes.Package{
+	{
+		Name:    "kitchen",
+		Version: "1.2.6",
+	},
+}
+
+var PythonPackagingEggPkg = []dxtypes.Package{
+	{
+		Name:    "distlib",
+		Version: "0.3.1",
+	},
+}
+var PythonPackagingWheel = []dxtypes.Package{
+	{
+		Name:    "distlib",
+		Version: "0.3.1",
+	},
+}
+
+var PythonPIPPkgs = []dxtypes.Package{
+	{
+		Name:    "click",
+		Version: "8.0.0",
+	},
+	{
+		Name:    "Flask",
+		Version: "2.0.0",
+	},
+	{
+		Name:    "itsdangerous",
+		Version: "2.0.0",
+	},
+}
+
+var PythonPIPEnvPkgs = []dxtypes.Package{
+	{
+		Name:    "pytz",
+		Version: "2022.7.1",
+	},
+}
+
+var PythonPoetryPkgs = []dxtypes.Package{
+	{
+		Name:     "certifi",
+		Version:  "2022.12.7",
+		Indirect: true,
+	},
+	{
+		Name:     "charset-normalizer",
+		Version:  "2.1.1",
+		Indirect: true,
+	},
+	{
+		Name:     "click",
+		Version:  "7.1.2",
+		Indirect: true,
+	},
+	{
+		Name:    "flask",
+		Version: "1.1.4",
+	},
+	{
+		Name:     "idna",
+		Version:  "3.4",
+		Indirect: true,
+	},
+	{
+		Name:     "itsdangerous",
+		Version:  "1.1.0",
+		Indirect: true,
+	},
+	{
+		Name:     "jinja2",
+		Version:  "2.11.3",
+		Indirect: true,
+	},
+	{
+		Name:     "markupsafe",
+		Version:  "2.1.2",
+		Indirect: true,
+	},
+	{
+		Name:    "requests",
+		Version: "2.28.1",
+	},
+	{
+		Name:     "urllib3",
+		Version:  "1.26.14",
+		Indirect: true,
+	},
+	{
+		Name:     "werkzeug",
+		Version:  "1.0.1",
+		Indirect: true,
+	},
+}
+var PythonPoetryNoProjectPkgs = []dxtypes.Package{
+	{
+		Name:    "click",
+		Version: "8.1.3",
+	},
+	{
+		Name:    "colorama",
+		Version: "0.4.6",
+	},
+}
+
+var PythonPoetryWrongProjectPkgs = []dxtypes.Package{
+	{
+		Name:    "click",
+		Version: "8.1.3",
+	},
+	{
+		Name:    "colorama",
+		Version: "0.4.6",
+	},
+}
+
+var JavaGradlePkgs = []dxtypes.Package{
+	{Name: "com.example:example",
+		Version: "0.0.1",
+	},
+}
+var JavaPomPkgs = []dxtypes.Package{
+	{
+		Name:    "com.example:example",
+		Version: "1.0.0",
+	},
+}
+var JavaPomRequirementPkgs = []dxtypes.Package{
+	{
+		Name:    "com.example:example",
+		Version: "2.0.0",
 	},
 }
