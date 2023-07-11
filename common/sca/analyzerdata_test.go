@@ -1045,59 +1045,80 @@ var GoModLess117Pkgs = []dxtypes.Package{
 
 var PHPComposerPkgs = []dxtypes.Package{
 	{
-		Name:     "pear/log",
-		Version:  "1.13.3",
-		Indirect: false,
+		Name:         "pear/log",
+		Version:      "1.13.3",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"MIT"},
 	},
 	{
-		Name:     "pear/pear_exception",
-		Version:  "v1.0.2",
-		Indirect: true,
+		Name:         "pear/pear_exception",
+		Version:      "v1.0.2",
+		Verification: "",
+		Indirect:     true,
+		License:      []string{"BSD-2-Clause"},
 	},
 }
 
 var PHPComposerWrongJsonPkgs = []dxtypes.Package{
 	{
-		Name:     "pear/log",
-		Version:  "1.13.3",
-		Indirect: false,
+		Name:         "pear/log",
+		Version:      "1.13.3",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"MIT"},
 	},
 	{
-		Name:     "pear/pear_exception",
-		Version:  "v1.0.2",
-		Indirect: false,
+		Name:         "pear/pear_exception",
+		Version:      "v1.0.2",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"BSD-2-Clause"},
 	},
 }
 var PHPComposerNoJsonPkgs = []dxtypes.Package{
 	{
-		Name:     "pear/log",
-		Version:  "1.13.3",
-		Indirect: false,
+		Name:         "pear/log",
+		Version:      "1.13.3",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"MIT"},
 	},
 	{
-		Name:     "pear/pear_exception",
-		Version:  "v1.0.2",
-		Indirect: false,
+		Name:         "pear/pear_exception",
+		Version:      "v1.0.2",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"BSD-2-Clause"},
 	},
 }
 
 var PythonPackagingPkgs = []dxtypes.Package{
 	{
-		Name:    "kitchen",
-		Version: "1.2.6",
+		Name:         "kitchen",
+		Version:      "1.2.6",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"LGPLv2+"},
 	},
 }
 
 var PythonPackagingEggPkg = []dxtypes.Package{
 	{
-		Name:    "distlib",
-		Version: "0.3.1",
+		Name:         "distlib",
+		Version:      "0.3.1",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"Python license"},
 	},
 }
 var PythonPackagingWheel = []dxtypes.Package{
 	{
-		Name:    "distlib",
-		Version: "0.3.1",
+		Name:         "distlib",
+		Version:      "0.3.1",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"Python license"},
 	},
 }
 
@@ -1207,13 +1228,19 @@ var JavaGradlePkgs = []dxtypes.Package{
 }
 var JavaPomPkgs = []dxtypes.Package{
 	{
-		Name:    "com.example:example",
-		Version: "1.0.0",
+		Name:         "com.example:example",
+		Version:      "1.0.0",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"Apache-2.0"},
 	},
 }
 var JavaPomRequirementPkgs = []dxtypes.Package{
 	{
-		Name:    "com.example:example",
-		Version: "2.0.0",
+		Name:         "com.example:example",
+		Version:      "2.0.0",
+		Verification: "",
+		Indirect:     false,
+		License:      []string{"Apache-2.0"},
 	},
 }
