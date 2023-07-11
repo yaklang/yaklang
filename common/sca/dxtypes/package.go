@@ -1,6 +1,12 @@
 package dxtypes
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type Package struct {
 	id   string // name + version
@@ -43,4 +49,32 @@ func (p *Package) Identifier() string {
 		p.id = utils.CalcSha1(p.Name, p.Version)
 	}
 	return p.id
+}
+
+func (p Package) String() string {
+	ret := fmt.Sprintf("%s-%s", p.Name, p.Version)
+	// for _, pkg:=p.UpStreamPackages{
+	// 	ret += fmt.Sprintf("%s-%s,",)
+	// }
+	ret += "\n\tupstream: "
+	ret += strings.Join(
+		lo.Map(p.UpStreamPackages, func(pkg *Package, _ int) string {
+			return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+		}),
+		",",
+	)
+	ret += "\n\tdownstream: "
+	ret += strings.Join(
+		lo.Map(p.DownStreamPackages, func(pkg *Package, _ int) string {
+			return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
+		}),
+		",",
+	)
+	ret += "\n\tverfication: " + p.Verification
+	ret += "\n\tlicense: " + strings.Join(p.License, ",")
+	ret += fmt.Sprintf("\n\tindirect: %v", p.Indirect)
+
+	ret += fmt.Sprintf("\n\tdependson: %v", p.DependsOn)
+	// ret += fmt.Sprintf("\n\tindirect: %v", p.Potential)
+	return ret
 }
