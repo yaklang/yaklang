@@ -152,7 +152,7 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 
 		handleDependsOn(pkgs, provides)
 
-		return linkUpSteamAndDownStream(pkgs), nil
+		return linkPackages(pkgs), nil
 	}
 	return nil, nil
 }

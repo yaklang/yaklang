@@ -40,7 +40,18 @@ func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Packa
 	}
 }
 
-func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
+func linkStream(down, up *dxtypes.Package) {
+	if up.DownStreamPackages == nil {
+		up.DownStreamPackages = make(map[string]*dxtypes.Package)
+	}
+	up.DownStreamPackages[down.Identifier()] = down
+	if down.UpStreamPackages == nil {
+		down.UpStreamPackages = make(map[string]*dxtypes.Package)
+	}
+	down.UpStreamPackages[up.Identifier()] = up
+}
+
+func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	potentialPkgs := make([]*dxtypes.Package, 0)
 
 	pkgMap := lo.SliceToMap(pkgs, func(item *dxtypes.Package) (string, *dxtypes.Package) {
@@ -49,34 +60,21 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 
 	for _, pkg := range pkgs {
 
-		if pkg.UpStreamPackages == nil {
-			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
-		}
 		// and
 		for andDepPkgName, andDepVersion := range pkg.DependsOn.And {
 			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
-				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, andDepPkg)
-				pkg.UpStreamPackages[andDepPkgName] = andDepPkg
-
-				if andDepPkg.DownStreamPackages == nil {
-					andDepPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
-				}
-				// andDepPkg.DownStreamPackages = append(andDepPkg.DownStreamPackages, pkg)
-				andDepPkg.DownStreamPackages[pkg.Name] = pkg
+				linkStream(pkg, andDepPkg)
 			} else {
 				// if not found, make a potential package
 				potentialPkg := &dxtypes.Package{
 					Name:           andDepPkgName,
 					Version:        andDepVersion,
 					IsVersionRange: true,
-					DownStreamPackages: map[string]*dxtypes.Package{
-						pkg.Name: pkg,
-					},
-					Potential: true,
+					Potential:      true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
 				pkgMap[potentialPkg.Name] = potentialPkg
-				pkg.UpStreamPackages[andDepPkgName] = potentialPkg
+				linkStream(pkg, potentialPkg)
 			}
 		}
 		// or
@@ -84,14 +82,7 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			exist := false
 			for orDepPkgName := range orDepPkgMap {
 				if orDepPkg, ok := pkgMap[orDepPkgName]; ok {
-					// pkg.UpStreamPackages = append(pkg.UpStreamPackages, orDepPkg)
-					pkg.UpStreamPackages[orDepPkgName] = orDepPkg
-
-					if orDepPkg.DownStreamPackages == nil {
-						orDepPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
-					}
-					// orDepPkg.DownStreamPackages = append(orDepPkg.DownStreamPackages, pkg)
-					orDepPkg.DownStreamPackages[pkg.Name] = pkg
+					linkStream(pkg, orDepPkg)
 					exist = true
 					break
 				}
@@ -112,15 +103,11 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 					Name:           orDepName,    // potential package name, splited by "|";
 					Version:        orDepVersion, // potential package version, splited by "|",
 					IsVersionRange: true,
-					DownStreamPackages: map[string]*dxtypes.Package{
-						pkg.Name: pkg,
-					},
-					Potential: true,
+					Potential:      true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
 				pkgMap[potentialPkg.Name] = potentialPkg
-				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
-				pkg.UpStreamPackages[potentialPkg.Name] = potentialPkg
+				linkStream(pkg, potentialPkg)
 			}
 		}
 	}
