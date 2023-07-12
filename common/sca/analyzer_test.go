@@ -90,12 +90,29 @@ func Run(tc testcase) {
 	}
 
 	for i := 0; i < len(pkgs); i++ {
-		if pkgs[i].Name != tc.wantPkgs[i].Name {
+		if strings.Contains(pkgs[i].Name, "|") {
+			pkgNames := strings.Split(pkgs[i].Name, "|")
+			wantPkgNames := strings.Split(tc.wantPkgs[i].Name, "|")
+			sort.Strings(pkgNames)
+			sort.Strings(wantPkgNames)
+			if slices.CompareFunc(pkgNames, wantPkgNames, strings.Compare) != 0 {
+				t.Fatalf("%s: pkgs %d name error: %#v(got) != %#v(want)", tc.name, i, pkgNames, wantPkgNames)
+			}
+		} else if pkgs[i].Name != tc.wantPkgs[i].Name {
 			t.Fatalf("%s: pkgs %d name error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, tc.wantPkgs[i].Name)
 		}
-		if pkgs[i].Version != tc.wantPkgs[i].Version {
+		if strings.Contains(pkgs[i].Version, "|") {
+			pkgVersions := strings.Split(pkgs[i].Version, "|")
+			wantPkgVersions := strings.Split(tc.wantPkgs[i].Version, "|")
+			sort.Strings(pkgVersions)
+			sort.Strings(wantPkgVersions)
+			if slices.CompareFunc(pkgVersions, wantPkgVersions, strings.Compare) != 0 {
+				t.Fatalf("%s: pkgs %d version error: %#v(got) != %#v(want)", tc.name, i, pkgVersions, wantPkgVersions)
+			}
+		} else if pkgs[i].Version != tc.wantPkgs[i].Version {
 			t.Fatalf("%s: pkgs %d(%s) version error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, pkgs[i].Version, tc.wantPkgs[i].Version)
 		}
+
 		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
 			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
 		}
