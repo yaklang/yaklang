@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"os"
 	"regexp"
 )
 
@@ -25,7 +26,7 @@ var (
 
 func AnalyzeStaticYaklang(r interface{}) []*StaticAnalyzeResult {
 	_ = extractLineFromSyntax
-	return AnalyzeStaticYaklangEx(r, false)
+	return AnalyzeStaticYaklangEx(r, os.Getenv("STATIC_CHECK") == "strict")
 }
 
 func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResult {
