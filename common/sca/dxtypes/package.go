@@ -78,9 +78,9 @@ func (p Package) String() string {
 	ret += "\n\tverfication: " + p.Verification
 	ret += "\n\tlicense: " + strings.Join(p.License, ",")
 	ret += fmt.Sprintf("\n\tindirect: %v", p.Indirect)
+	ret += fmt.Sprintf("\n\tpotential: %v", p.Potential)
 
 	ret += fmt.Sprintf("\n\tdependson: %v", p.DependsOn)
-	// ret += fmt.Sprintf("\n\tindirect: %v", p.Potential)
 	return ret
 }
 
