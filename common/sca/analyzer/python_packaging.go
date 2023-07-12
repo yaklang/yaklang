@@ -61,7 +61,7 @@ func (a pythonPackagingAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 
 	switch fi.MatchStatus {
