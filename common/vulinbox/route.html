@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <style>
+        .list-group-item:hover {
+            background-color: rgba(0, 0, 0, 0.1); /* Change the color as per your preference */
+            cursor: pointer;
+        }
+    </style>
 </head>
 
 <body>
@@ -68,11 +74,28 @@
                     <li class="list-group-item"><a target="_blank"
                                                    href="/user/name/like?name=a">字符串注入点模糊查询</a></li>
                     <li class="list-group-item"><a target="_blank"
-                                                   href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a></li>
+                                                   href="/user/name/like/2?name=a">字符串注入点模糊查询(括号边界)</a>
+                    </li>
                     <li class="list-group-item"><a target="_blank"
-                                                   href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a></li>
+                                                   href="/user/name/like/b64?nameb64=%59%51%3d%3d">参数编码字符串注入点模糊查询(括号边界)</a>
+                    </li>
                     <li class="list-group-item"><a target="_blank"
-                                                   href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a></li>
+                                                   href="/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D">Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/user/limit/int?limit=3">LIMIT（语句结尾）注入案例</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/order1?order=desc">ORDER
+                        注入：单个条件排序位于 LIMIT 之前</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/order2?order=desc">ORDER
+                        注入：多条件排序位于 LIMIT 之前</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/order3?order=desc">ORDER
+                        注入：多条件排序位（无LIMIT）</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby?orderby=username">ORDER
+                        BY 注入：多字段</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby1?orderby=id">ORDER BY
+                        注入：反引号+排序</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/user/limit/4/orderby2?orderby=id">ORDER BY
+                        注入：反引号+多字段</a></li>
                 </ul>
             </div>
         </div>
@@ -150,6 +173,51 @@
         <div class="col-md-6">
             <div class="card" style="margin-top: 12px">
                 <div class="card-header">
+                    CSRF 案例
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">CSRF基础案例</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    文件上传与特定文件格式漏洞
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">基础文件上传</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">通过文件名与后缀绕过上传限制</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">通过 MIME 类型绕过限制</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">通过文件头的检查绕过上传限制</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Pipeline 仿真请求走私
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私访问中间件不应该转发访问的 /admin </a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">使用请求走私绕过一个WAF进行SQL注入 </a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    Dedicated & Shared Worker 案例
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a target="_blank" href="/csrf">在当前页面中使用的 Worker</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/csrf">可以跨页面调用服务的 SharedWorker</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
                     SSRF 参数多种情况的测试
                 </div>
                 <ul class="list-group list-group-flush">
@@ -202,6 +270,18 @@
                 </div>
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item"><a href='/jwt/login' target="_blank">登陆(JWT)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    JSONP 通信与 iframe postMessage 通信案例
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><a href='/jsonp/basic' target="_blank">JSONP 的最基础案例</a></li>
+                    <li class="list-group-item"><a href='/iframe/post/message/basic' target="_blank">postMessage
+                        基础案例</a></li>
                 </ul>
             </div>
         </div>
@@ -297,5 +377,20 @@
 <!-- 引入 Bootstrap JavaScript -->
 <script src="/static/js/bootstrap_5.3/popper.min.js"></script>
 <script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const listItems = document.querySelectorAll('.list-group-item');
+
+        listItems.forEach(function (listItem) {
+            const anchor = listItem.querySelector('a');
+
+            if (anchor) {
+                listItem.addEventListener('click', function () {
+                    anchor.click()
+                });
+            }
+        });
+    });
+</script>
 </body>
 </html>
