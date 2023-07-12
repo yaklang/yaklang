@@ -52,7 +52,7 @@ func init() {
 		syntax.OpCharClass:      opCharClassOne,
 		syntax.OpConcat:         opConcatOne,
 		syntax.OpAlternate:      opAlternateOne,
-		syntax.OpCapture:        opCapture,
+		syntax.OpCapture:        opCaptureOne,
 		syntax.OpBeginLine:      noop,
 		syntax.OpEndLine:        noop,
 		syntax.OpBeginText:      noop,

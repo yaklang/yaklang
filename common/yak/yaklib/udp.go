@@ -2,10 +2,13 @@ package yaklib
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"reflect"
 	"strconv"
@@ -240,6 +243,7 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 }
 
 var UDPExport = map[string]interface{}{
+	"MockUDPProtocol": DebugMockUDPProtocol,
 	"Connect":         connectUdp,
 	"clientTimeout":   clientTimeout,
 	"clientLocalAddr": clientLocalAddr,
@@ -260,4 +264,109 @@ var UDPExport = map[string]interface{}{
 			config.callback = cb
 		}
 	},
+}
+
+func DebugMockUDP(rsp []byte) (string, int) {
+	return DebugMockUDPWithTimeout(1*time.Minute, rsp)
+}
+
+func DebugMockUDPProtocol(name string) (string, int) {
+	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
+	blocks := fp.GetRuleBlockByServiceName(name, cfg)
+	var generates []string
+	var err error
+	responses := make(map[string][][]byte)
+	for _, block := range blocks {
+		payload := block.Probe.Payload
+		for _, match := range block.Matched {
+			r := match.MatchRule.String()
+			log.Infof("ServiceName: [%s] , ProductVerbose: [%s]", match.ServiceName, match.ProductVerbose)
+			log.Infof("MatchRule: [%s]", r)
+			generates, err = regen.GenerateOne(r)
+			if err != nil {
+				continue
+			}
+			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
+		}
+	}
+	return DebugMockUDPFromScan(1*time.Minute, responses)
+}
+
+func DebugMockUDPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
+	addr := utils.GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	go func() {
+		conn, err := net.ListenPacket("udp", addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		go func() {
+			time.Sleep(du)
+			conn.Close()
+		}()
+
+		buffer := make([]byte, 1024)
+		for {
+			n, addr, err := conn.ReadFrom(buffer)
+			if err != nil {
+				return
+			}
+
+			requestPayload := string(buffer[:n])
+			log.Infof("recv: %#v from: %v", requestPayload, addr.String())
+			if responses, ok := responses[requestPayload]; ok {
+				rand.NewSource(time.Now().UnixNano())
+				response := responses[rand.Intn(len(responses))]
+				log.Infof("send: %#v to: %v", string(response), addr.String())
+				conn.WriteTo(response, addr)
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+	}()
+	time.Sleep(time.Millisecond * 100)
+	return host, port
+}
+
+func convertToBytes(s string) []byte {
+	var result []byte
+	for _, r := range s {
+		if r > 127 || r < 32 || (r >= 0x7F && r <= 0xA0) { // ASCII 范围之外的字符
+			result = append(result, byte(r))
+		} else {
+			result = append(result, byte(r))
+		}
+	}
+	return result
+}
+
+func DebugMockUDPWithTimeout(du time.Duration, rsp []byte) (string, int) {
+	addr := utils.GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	go func() {
+		conn, err := net.ListenPacket("udp", addr)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		go func() {
+			time.Sleep(du)
+			conn.Close()
+		}()
+
+		buffer := make([]byte, 1024)
+		for {
+			_, addr, err := conn.ReadFrom(buffer)
+			if err != nil {
+				return
+			}
+
+			conn.WriteTo(rsp, addr)
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
+	time.Sleep(time.Millisecond * 100)
+	return host, port
 }

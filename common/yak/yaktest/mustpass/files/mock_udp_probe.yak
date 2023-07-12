@@ -1,0 +1,12 @@
+host , port = udp.MockUDPProtocol("snmp")
+
+checked = false
+
+for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...))~{
+    dump(result)
+    if result.GetServiceName() == "snmp" {
+        checked = true
+    }
+}
+
+if !checked { die("ERROR for nuclei smoking test!")}
