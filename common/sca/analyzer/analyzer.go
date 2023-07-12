@@ -27,7 +27,8 @@ const (
 )
 
 var (
-	analyzers = make(map[TypAnalyzer]Analyzer, 0)
+	analyzers   = make(map[TypAnalyzer]Analyzer, 0)
+	analyzerTyp = make(map[Analyzer]TypAnalyzer, 0)
 )
 
 type TypAnalyzer string
@@ -75,6 +76,7 @@ func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
 		return
 	}
 	analyzers[typ] = a
+	analyzerTyp[a] = typ
 }
 
 func FilterAnalyzer(mode ScanMode) []Analyzer {
@@ -132,6 +134,9 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 			for fileInfo := range ag.ch {
 				pkgs, err := fileInfo.Self.Analyzer.Analyze(fileInfo)
 				if err == nil {
+					for _, pkg := range pkgs {
+						pkg.SetFrom(string(analyzerTyp[fileInfo.Self.Analyzer]), fileInfo.Self.Path)
+					}
 					ag.pkgs = append(ag.pkgs, pkgs...)
 				}
 			}
