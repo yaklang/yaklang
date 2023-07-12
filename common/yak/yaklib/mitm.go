@@ -148,7 +148,7 @@ func startBridge(
 		if !config.useDefaultMitmCert {
 			return utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
 		}
-		log.Warningf("mitm proxy use the default cert and key")
+		log.Infof("mitm proxy use the default cert and key")
 	}
 
 	if config.isTransparent && downstreamProxy != "" {
