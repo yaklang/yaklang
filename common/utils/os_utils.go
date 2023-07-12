@@ -244,7 +244,7 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 			lis.Close()
 		}()
 
-		if h2 && gmtlsFlag {
+		if h2  {
 			if !https {
 				log.Error("h2 only support https")
 			}
@@ -270,6 +270,33 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 			}
 			go func() {
 				log.Infof("START TO SERVE HTTP2")
+				srv.Serve(lis)
+			}()
+			return
+		}
+
+		if gmtlsFlag {
+			if !https {
+				log.Error("gmtls only support https")
+			}
+
+			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				r, err := HttpDumpWithBody(request, true)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				fmt.Println(string(r))
+				if handle != nil {
+					raw := handle(r)
+					writer.Write(raw)
+					return
+				}
+				writer.Write([]byte("HELLO GMTLS"))
+			})}
+
+			go func() {
+				log.Infof("START TO SERVE GMTLS HTTP SERVER")
 				srv.Serve(lis)
 			}()
 			return
