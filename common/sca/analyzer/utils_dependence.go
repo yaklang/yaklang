@@ -39,7 +39,7 @@ func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Packa
 	}
 }
 
-func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) {
+func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	potentialPkgs := make([]*dxtypes.Package, 0)
 
 	pkgMap := lo.SliceToMap(pkgs, func(item *dxtypes.Package) (string, *dxtypes.Package) {
@@ -73,6 +73,7 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) {
 					Potential: true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
+				pkgMap[potentialPkg.Name] = potentialPkg
 				pkg.UpStreamPackages[andDepPkgName] = potentialPkg
 			}
 		}
@@ -109,6 +110,7 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) {
 					Potential: true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
+				pkgMap[potentialPkg.Name] = potentialPkg
 				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
 				pkg.UpStreamPackages[potentialPkg.Name] = potentialPkg
 			}
@@ -116,5 +118,5 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) {
 	}
 
 	// append potential packages
-	pkgs = append(pkgs, potentialPkgs...)
+	return append(pkgs, potentialPkgs...)
 }

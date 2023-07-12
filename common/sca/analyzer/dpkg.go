@@ -145,9 +145,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
 		}
 	}
 
-	linkUpSteamAndDownStream(pkgs)
-
-	return pkgs, nil
+	return linkUpSteamAndDownStream(pkgs), nil
 }
 
 func NewDpkgAnalyzer() *dpkgAnalyzer {
