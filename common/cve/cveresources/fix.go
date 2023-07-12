@@ -33,6 +33,18 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 	}
 	if len(Products) > 0 {
 		return []string{ProductName}, nil
+	} else {
+		rule, _ := regexp.Compile(`[a-zA-Z]+(-[a-zA-Z]+)*`)
+		ProductNameWords := rule.FindAllString(ProductName, -1)
+		if len(ProductNameWords) <= 1 {
+			resDb = db.Where("product = ?", ProductNameWords[0]).Find(&Products)
+			if resDb.Error != nil {
+				log.Errorf("query database failed: %s", resDb.Error)
+			}
+			if len(Products) > 0 {
+				return []string{ProductNameWords[0]}, nil
+			}
+		}
 	}
 
 	resDb = db.Find(&Products)
@@ -46,6 +58,7 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 	go func(p []ProductsTable) {
 		//下发修复产品任务
 		for _, product := range Products {
+			wg.Add(1)
 			go generalFix(wg, fixName, ProductName, product)
 		}
 		wg.Wait()
@@ -80,23 +93,22 @@ func generalFix(wg *sync.WaitGroup, fixName chan string, ProductName string, Pro
 	*/
 
 	//提取单词的规则
-	wg.Add(1)
-	ruleForFuzz, err := regexp.Compile(`[a-zA-Z]{3,}`)
-	if err != nil {
-		log.Errorf("Regular pattern compile failed: %s", err)
-	}
+	//ruleForFuzz, err := regexp.Compile(`[a-zA-Z]{3,}`)
+	//if err != nil {
+	//	log.Errorf("Regular pattern compile failed: %s", err)
+	//}
 
 	ruleForAbbr, err := regexp.Compile("^([a-zA-Z\\d]+[_|-])+[a-zA-Z\\d]+$") //简写的正则
 	if err != nil {
 		log.Errorf("Regular pattern compile failed: %s", err)
 	}
 
-	inputParts := ruleForFuzz.FindAllString(ProductName, -1)
-	itemParts := ruleForFuzz.FindAllString(Product.Product, -1)
-	if FuzzCheck(inputParts, itemParts) {
-		fixName <- Product.Product
-		return
-	}
+	//inputParts := ruleForFuzz.FindAllString(ProductName, -1)
+	//itemParts := ruleForFuzz.FindAllString(Product.Product, -1)
+	//if FuzzCheck(inputParts, itemParts) {
+	//	fixName <- Product.Product
+	//	return
+	//}
 	if ruleForAbbr.MatchString(ProductName) && (AbbrCheck(ProductName, Product, "-") || AbbrCheck(ProductName, Product, "_")) {
 		fixName <- Product.Product
 		return

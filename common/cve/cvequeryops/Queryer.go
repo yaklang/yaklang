@@ -44,7 +44,6 @@ func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
 
 				err := json.Unmarshal(c.CPEConfigurations, &config)
 				if err != nil {
-					ch <- c
 					continue
 				}
 

@@ -2,9 +2,8 @@ package cve
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -239,90 +238,25 @@ zlib1g 1:1.2.11.dfsg-2ubuntu9.2`
 			version: temp[1],
 		})
 	}
-	//for _, item := range productTest {
-	//	cveRes, num := cvequeryops.QueryCVEYields("C:/Users/27970/yakit-projects/default-cve.db", cvequeryops.ProductWithVersion(item.name, item.version))
-	//	fmt.Printf("product: [%s]:[%s] find cve %d\n", item.name, item.version, num)
-	//	if num > 0 {
-	//		for _, cve := range cveRes {
-	//			fmt.Println(cve.CVE.CVE)
-	//		}
-	//	}
-	//}
+	var opts []cvequeryops.CVEOption
+	for _, item := range productTest {
+		opts = append(opts, cvequeryops.ProductWithVersion(item.name, item.version))
+	}
+	fmt.Print(len(productTest))
+	M := cveresources.GetManager("C:/Users/27970/yakit-projects/default-cve.db")
+	cve := cvequeryops.QueryCVEYields(M.DB, opts...)
+	for {
+		select {
+		case res, ok := <-cve:
+			if !ok {
+				return
+			}
+			fmt.Printf("find cve :%v\n", res.CVE)
+		}
+	}
 }
 
 type productWithVersion struct {
 	name    string
 	version string
-}
-
-type productWordCount struct {
-	word  string
-	count int
-}
-
-// 提取出现频次过高的单词
-type info []productWordCount
-
-func (arr info) Len() int {
-	return len(arr)
-}
-
-func (arr info) Less(i, j int) bool {
-	return arr[i].count >= arr[j].count
-}
-
-func (arr info) Swap(i, j int) {
-	arr[i], arr[j] = arr[j], arr[i]
-}
-
-func TestClean(t *testing.T) {
-	var dbRes []cveresources.CVE
-	M := cveresources.GetManager("C:/Users/27970/yakit-projects/default-cve.db")
-	resDb := M.DB.Select("product").Find(&dbRes)
-	if resDb.Error != nil {
-		log.Errorf("query database failed: %s", resDb.Error)
-	}
-
-	//rule, err := regexp.Compile("[a-zA-Z]{4,}") //简写的正则
-	//if err != nil {
-	//	log.Errorf("Regular pattern compile failed: %s", err)
-	//}
-
-	strMap := make(map[string]int)
-
-	for _, item := range dbRes {
-		words := strings.Split(item.Product, ",")
-		for _, word := range words {
-			strMap[word] = strMap[word] + 1
-		}
-	}
-
-	var allInfo info
-
-	for word, count := range strMap {
-		allInfo = append(allInfo, productWordCount{
-			word:  word,
-			count: count,
-		})
-
-	}
-
-	sort.Sort(allInfo)
-	//for i, info := range allInfo {
-	//	if info.count < 50 {
-	//		break
-	//	}
-	//}
-	for i := 0; i < 100; i++ {
-		fmt.Printf("%v\n", allInfo[i])
-	}
-
-}
-
-func TestFuncxxx(t *testing.T) {
-	i := map[string]string{
-		"a": "b",
-	}
-	println(i["a"])
-	println(i["b"])
 }
