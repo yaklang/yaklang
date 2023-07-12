@@ -18,14 +18,14 @@ import (
 
 type ScreenRecordersUploadToOnlineRequest struct {
 	//Filename 	string	 `json:"filename"`
-	NoteInfo 	string   `json:"note_info"`
-	Project  	string   `json:"project"`
-	Hash 	 	string   `json:"hash"`
-	VideoName 	string   `json:"video_name"`
-	Cover     	string   `json:"cover"`
-	Token       string   `json:"token"`
-	VideoFile    os.File  `json:"video_file"`
-	ScreenRecordersCreatedAt int64 `json:"screen_recorders_created_at"`
+	NoteInfo                 string  `json:"note_info"`
+	Project                  string  `json:"project"`
+	Hash                     string  `json:"hash"`
+	VideoName                string  `json:"video_name"`
+	Cover                    string  `json:"cover"`
+	Token                    string  `json:"token"`
+	VideoFile                os.File `json:"video_file"`
+	ScreenRecordersCreatedAt int64   `json:"screen_recorders_created_at"`
 }
 
 func (s *OnlineClient) UploadScreenRecordersWithToken(ctx context.Context, token string, file os.File, screenRecorders *yakit.ScreenRecorder) error {
@@ -59,20 +59,20 @@ func (s *OnlineClient) UploadScreenRecordersToOnline(ctx context.Context,
 
 	files, err := os.Open(filePath)
 	if err != nil {
-		return utils.Errorf("Error opening file:", err)
+		return utils.Errorf("Error opening file: %v", err)
 	}
 	defer file.Close()
 
 	// 创建一个文件字段
 	fileInfo, err := writer.CreateFormFile("video_file", filepath.Base(filePath))
 	if err != nil {
-		return utils.Errorf("Error creating form file:", err)
+		return utils.Errorf("Error creating form file: %v", err)
 	}
 
 	// 将文件内容复制到文件字段中
 	_, err = io.Copy(fileInfo, files)
 	if err != nil {
-		return utils.Errorf("Error copying file data:", err)
+		return utils.Errorf("Error copying file data: %v", err)
 	}
 	valueStr := strconv.FormatInt(screenRecordersCreatedAt, 10)
 	writer.WriteField("screen_recorders_created_at", valueStr)
