@@ -85,7 +85,7 @@ func (p Package) String() string {
 }
 
 // merge p1 to p1
-func PackageMerge(p1 *Package, p2 *Package) *Package {
+func (p1 *Package) PackageMerge(p2 *Package) *Package {
 	p1.fromAnalyzer = append(p1.fromAnalyzer, p2.fromAnalyzer...)
 	p1.fromFile = append(p1.fromFile, p2.fromFile...)
 	for _, p := range p2.UpStreamPackages {
