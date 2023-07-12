@@ -12,10 +12,10 @@ func TestPackageMerge(t *testing.T) {
 	pa := Package{
 		Name:    "pa",
 		Version: "0.0.1",
-		fromFile: []string{
+		FromFile: []string{
 			"/path/pa/file",
 		},
-		fromAnalyzer: []string{
+		FromAnalyzer: []string{
 			"pa-analyzer",
 		},
 		Verification:       "",
@@ -27,10 +27,10 @@ func TestPackageMerge(t *testing.T) {
 	pa_down := Package{
 		Name:    "pa-down",
 		Version: "0.0.2",
-		fromFile: []string{
+		FromFile: []string{
 			"/path/padown/file",
 		},
-		fromAnalyzer: []string{
+		FromAnalyzer: []string{
 			"pa-analyzer",
 		},
 		Verification:       "",
@@ -44,10 +44,10 @@ func TestPackageMerge(t *testing.T) {
 	pb := Package{
 		Name:    "pa",
 		Version: "0.0.1",
-		fromFile: []string{
+		FromFile: []string{
 			"/path/pb/file",
 		},
-		fromAnalyzer: []string{
+		FromAnalyzer: []string{
 			"pb-analyzer",
 		},
 		Verification:       "",
@@ -58,10 +58,10 @@ func TestPackageMerge(t *testing.T) {
 	pb_down := Package{
 		Name:    "pb-down",
 		Version: "0.0.3",
-		fromFile: []string{
+		FromFile: []string{
 			"/path/pbdown/file",
 		},
-		fromAnalyzer: []string{
+		FromAnalyzer: []string{
 			"pb-analyzer",
 		},
 		Verification:       "",
@@ -75,17 +75,17 @@ func TestPackageMerge(t *testing.T) {
 	// PackageMerge(&pa, &pb)
 	pa.PackageMerge(&pb)
 	// fmt.Printf("%s", pa)
-	if len(pa.fromAnalyzer) != 2 {
-		t.Fatal("fromAnalyzer len error")
+	if len(pa.FromAnalyzer) != 2 {
+		t.Fatalf("fromAnalyzer len error: %v", pa.FromAnalyzer)
 	}
-	if slices.CompareFunc(pa.fromAnalyzer, []string{"pa-analyzer", "pb-analyzer"}, strings.Compare) != 0 {
-		t.Fatalf("fromAnalyzer error: %v", pa.fromAnalyzer)
+	if slices.CompareFunc(pa.FromAnalyzer, []string{"pa-analyzer", "pb-analyzer"}, strings.Compare) != 0 {
+		t.Fatalf("fromAnalyzer error: %v", pa.FromAnalyzer)
 	}
-	if len(pa.fromFile) != 2 {
+	if len(pa.FromFile) != 2 {
 		t.Fatal("fromFile len error")
 	}
-	if slices.CompareFunc(pa.fromFile, []string{"/path/pa/file", "/path/pb/file"}, strings.Compare) != 0 {
-		t.Fatalf("fromFile error: %v", pa.fromFile)
+	if slices.CompareFunc(pa.FromFile, []string{"/path/pa/file", "/path/pb/file"}, strings.Compare) != 0 {
+		t.Fatalf("fromFile error: %v", pa.FromFile)
 	}
 
 	pkgname := []string{}

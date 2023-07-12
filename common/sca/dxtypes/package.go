@@ -15,8 +15,8 @@ type Package struct {
 	Version        string
 	IsVersionRange bool // Version is a version range
 
-	fromFile     []string
-	fromAnalyzer []string
+	FromFile     []string
+	FromAnalyzer []string
 
 	// Optional
 
@@ -89,10 +89,27 @@ func (p Package) String() string {
 	ret += "\n\tlicense: " + strings.Join(p.License, ",")
 	ret += fmt.Sprintf("\n\tindirect: %v", p.Indirect)
 	ret += fmt.Sprintf("\n\tpotential: %v", p.Potential)
-
 	ret += fmt.Sprintf("\n\tdependson: %v", p.DependsOn)
+	ret += fmt.Sprintf("\n\tfromAnalyzer: %v", p.FromAnalyzer)
+	ret += fmt.Sprintf("\n\tfromFile: %v", p.FromFile)
 	return ret
 }
+
+func (p *Package) SetFrom(analyzer, file string) {
+	if p.FromAnalyzer == nil {
+		p.FromAnalyzer = make([]string, 0)
+	}
+	p.FromAnalyzer = append(p.FromAnalyzer, analyzer)
+	if p.FromFile == nil {
+		p.FromFile = make([]string, 0)
+	}
+	p.FromFile = append(p.FromFile, file)
+}
+
+func (p *Package) From() ([]string, []string) {
+	return p.FromAnalyzer, p.FromFile
+}
+
 
 // merge p1 to p1
 func (p1 *Package) PackageMerge(p2 *Package) *Package {
