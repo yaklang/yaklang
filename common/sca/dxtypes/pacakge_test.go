@@ -72,7 +72,8 @@ func TestPackageMerge(t *testing.T) {
 	pb.DownStreamPackages[pb_down.Name] = &pb_down
 	pb_down.UpStreamPackages[pb.Name] = &pb
 
-	PackageMerge(&pa, &pb)
+	// PackageMerge(&pa, &pb)
+	pa.PackageMerge(&pb)
 	// fmt.Printf("%s", pa)
 	if len(pa.fromAnalyzer) != 2 {
 		t.Fatal("fromAnalyzer len error")
