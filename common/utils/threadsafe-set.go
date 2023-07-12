@@ -9,7 +9,7 @@ type Set struct {
 	sync.RWMutex
 }
 
-func New() *Set {
+func NewSet() *Set {
 	return &Set{
 		m: make(map[string]bool),
 	}

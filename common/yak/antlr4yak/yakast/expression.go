@@ -102,6 +102,12 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 					y.currentEndPosition.ColumnNumber += 2
 					err := y.newError(y.GetConstError(notFoundVariable), id)
 					y.compilerErrors.Push(err)
+					if y.currentSymtbl != y.rootSymtbl {
+						info := y.contextInfo.Peek()
+						if v, ok := info.(string); !ok || v != "InstanceCode" {
+							y.indeterminateUndefinedVar = append(y.indeterminateUndefinedVar, [2]any{id, err})
+						}
+					}
 				}
 			}
 			return nil
@@ -254,8 +260,23 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		y.VisitExpression(i.Expression(2))
 		jmpEnd.Unary = y.GetNextCodeIndex()
 	} else if instanceCode := i.InstanceCode(); instanceCode != nil {
+		//判断当前代码块是否可以立即执行，当处于全局代码块或者InstanceCode函数中时，可以立即执行
+		inGlobal := false
+		if y.currentSymtbl == y.rootSymtbl {
+			inGlobal = true
+		}
+		info := y.contextInfo.Peek()
+		if v, ok := info.(string); !ok || v != "InstanceCode" {
+			inGlobal = true
+		}
+		if inGlobal {
+			y.contextInfo.Push("InstanceCode")
+		}
 		// 匿名函数，instance code
 		y.VisitInstanceCode(instanceCode)
+		if inGlobal {
+			y.contextInfo.Pop()
+		}
 	} else if op := i.MemberCall(); op != nil {
 		y.VisitExpression(i.Expression(0))
 		y.VisitMemberCall(op)
