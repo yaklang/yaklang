@@ -53,7 +53,7 @@ func GetDefaultTCPServiceName(port int) string {
 }
 
 func GetDefaultUDPServiceName(port int) string {
-	results, ok := TCPDefault[port]
+	results, ok := UDPDefault[port]
 	if !ok {
 		return ""
 	} else {
