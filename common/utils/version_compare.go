@@ -20,6 +20,11 @@ var (
 		"sp":     6,
 		"update": 6,
 	}
+	separatorMap = map[string]int{
+		".": 2,
+		"-": 1,
+		"+": 1,
+	}
 )
 
 type versionPart struct {
@@ -354,10 +359,12 @@ func compareNumber(p1 versionPart, p2 versionPart) (int, error) {
 }
 
 func compareSeparator(p1 versionPart, p2 versionPart) (int, error) {
-	if p1.value == p2.value {
+	if separatorMap[p1.value] == separatorMap[p2.value] {
 		return 0, nil
+	} else if separatorMap[p1.value] > separatorMap[p2.value] {
+		return 1, nil
 	} else {
-		return -2, errors.Errorf("compare separator mark error: %v", "Unable to compare")
+		return -1, nil
 	}
 }
 
