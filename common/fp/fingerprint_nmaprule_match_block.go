@@ -148,10 +148,9 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 					break
 				}
 				if info := match(
-					rule,
-					bannerRunesForMatchingRules,
-					port, host,
-					resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
+					rule, bannerRunesForMatchingRules, port, host,
+					resultFingerprintInfo.Banner, block.Probe.Proto,
+				); info != nil {
 					resultFingerprintInfo = info
 					break
 				}
@@ -193,10 +192,9 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 						break
 					}
 					if info := match(
-						rule,
-						bannerRunesForMatchingRules,
-						port, host,
-						resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
+						rule, bannerRunesForMatchingRules, port, host,
+						resultFingerprintInfo.Banner, block.Probe.Proto,
+					); info != nil {
 						resultFingerprintInfo = info
 						break
 					}
