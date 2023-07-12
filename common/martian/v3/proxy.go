@@ -70,21 +70,20 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	roundTripper      http.RoundTripper
-	roundTripperForGM http.RoundTripper
-	dial              func(context.Context, string, string) (net.Conn, error)
-	timeout           time.Duration
-	mitm              *mitm.Config
-	proxyURL          *url.URL
-	conns             sync.WaitGroup
-	connsMu           sync.Mutex // protects conns.Add/Wait from concurrent access
-	closing           chan bool
-	http2             bool
-	gmTLS             bool
-	gmPrefer          bool
-	gmTLSOnly         bool
-	reqmod            RequestModifier
-	resmod            ResponseModifier
+	roundTripper http.RoundTripper
+	dial         func(context.Context, string, string) (net.Conn, error)
+	timeout      time.Duration
+	mitm         *mitm.Config
+	proxyURL     *url.URL
+	conns        sync.WaitGroup
+	connsMu      sync.Mutex // protects conns.Add/Wait from concurrent access
+	closing      chan bool
+	http2        bool
+	gmTLS        bool
+	gmPrefer     bool
+	gmTLSOnly    bool
+	reqmod       RequestModifier
+	resmod       ResponseModifier
 
 	// context cache
 	ctxCacheLock     *sync.Mutex
@@ -180,21 +179,6 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = http.ProxyURL(p.proxyURL)
 		tr.DialContext = p.dial
-	}
-}
-
-// SetRoundTripperForGM sets the http.RoundTripperForGM of the proxy.
-func (p *Proxy) SetRoundTripperForGM(rt *http.Transport) {
-	p.roundTripperForGM = rt
-
-	if tr, ok := p.roundTripperForGM.(*http.Transport); ok {
-		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-		tr.Proxy = http.ProxyURL(p.proxyURL)
-		tr.DialContext = p.dial
-		tr.RegisterProtocol("https", gmtls.NewSimpleRoundTripperWithProxy(&gmtls.Config{
-			GMSupport:          &gmtls.GMSupport{},
-			InsecureSkipVerify: true,
-		}, tr.Proxy))
 	}
 }
 
@@ -943,26 +927,7 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 		log.Debugf("martian: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil
 	}
-	if !p.gmTLS { // vanilla transport
-		return p.roundTripper.RoundTrip(req)
-	} else if p.gmTLS && p.gmTLSOnly {
-		return p.roundTripperForGM.RoundTrip(req)
-	} else if p.gmTLS && !p.gmPrefer { // enable GM support but try vanilla style TLS first
-		rsp, err := p.roundTripper.RoundTrip(req)
-		if err != nil {
-			log.Debug("Try using GM TLS")
-			return p.roundTripperForGM.RoundTrip(req)
-		}
-		return rsp, nil
-	} else { // enable GM support and use GM first
-		rsp, err := p.roundTripperForGM.RoundTrip(req)
-		if err != nil {
-			log.Debug("Fallback using Vanilla TLS")
-			return p.roundTripper.RoundTrip(req)
-		}
-		return rsp, nil
-
-	}
+	return p.roundTripper.RoundTrip(req)
 }
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
@@ -1103,12 +1068,11 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 	}()
 
 	var tr http.RoundTripper
-	if p.gmTLS {
-		tr = p.roundTripperForGM
-	} else {
-		tr = p.roundTripper
-	}
+
+	tr = p.roundTripper
+
 	if tr == nil {
+		// 永远不应该执行到这里
 		newTr := &http.Transport{TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
@@ -1119,12 +1083,6 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 			newTr.Proxy = http.ProxyURL(p.proxyURL)
 		}
 		tr = newTr
-	}
-
-	err := lowhttp2.ConfigureTransport(tr)
-	//err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
-	if err != nil {
-		return errors.New(fmt.Sprintf("Fatal Cannot switch to HTTP2: %v", err))
 	}
 
 	proxyClient := lowhttp2.Server{
@@ -1157,6 +1115,8 @@ func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, proxyToSe
 func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	//if strings.Contains(req.URL.String(), "/xxx") {
 	//	log.Infof("Hit")
+	//	reqRaw, _ := utils.HttpDumpWithBody(req, true)
+	//	println(string(reqRaw))
 	//}
 	if err := h.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying request: %v", err)

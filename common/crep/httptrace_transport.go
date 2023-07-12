@@ -1,6 +1,7 @@
 package crep
 
 import (
+	"context"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,6 +29,7 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 			}
 		},
 	}))
+	*req = *req.WithContext(context.WithValue(req.Context(), "request-id", fmt.Sprintf("%p", req)))
 	rsp, err := t.Transport.RoundTrip(req)
 	return rsp, err
 }

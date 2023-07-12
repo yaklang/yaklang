@@ -5,13 +5,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/martian/v3"
 	"github.com/yaklang/yaklang/common/martian/v3/fifo"
@@ -151,7 +148,6 @@ type MITMServer struct {
 	via                      string
 	allowForwarded           bool
 	httpTransport            *http.Transport
-	httpTransportForGM       *http.Transport
 	proxyUrl                 *url.URL
 	hijackedMaxContentLength int
 
@@ -213,14 +209,7 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 		return utils.Errorf("mitm transport empty")
 	}
 
-	originCtx := ctx
-	m.httpTransport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
-	}
 	originHttpTransport := m.httpTransport
-	originHttpTransportForGM := m.httpTransportForGM
 
 	m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
@@ -231,49 +220,13 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	m.remoteAddrCache = ttlcache.NewCache()
 	m.remoteAddrCache.SetTTL(10 * time.Second)
 
-	/*
-		为 httpTransport 设置 TLS 证书
-	*/
-	pool := x509.NewCertPool()
-	for _, certs := range m.clientCerts {
-		for _, ca := range certs.CaPem {
-			pool.AppendCertsFromPEM(ca)
-		}
-		pair, _, err := tlsutils.ParseCertAndPriKeyAndPool(certs.CrtPem, certs.KeyPem)
-		if err != nil {
-			return utils.Errorf("initial tls with client cert error (mTLS error): %s", err)
-		}
-		m.httpTransport.TLSClientConfig.Certificates = append(m.httpTransport.TLSClientConfig.Certificates, pair)
-
-		pairGM, _, err := tlsutils.ParseCertAndPriKeyAndPoolForGM(certs.CrtPem, certs.KeyPem)
-		if err != nil {
-			return utils.Errorf("initial tls with client cert error (mTLS error) for GM: %s", err)
-		}
-		m.httpTransportForGM.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			dialer := &net.Dialer{}
-			conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-				GMSupport:          &gmtls.GMSupport{},
-				Certificates:       []gmtls.Certificate{pairGM},
-				InsecureSkipVerify: true,
-			})
-			if err != nil {
-				return nil, err
-			}
-			ctx, _ = context.WithTimeout(originCtx, 30*time.Second)
-			return ctxio.NewConn(ctx, conn), nil
-		}
-	}
-
 	m.proxy.SetRoundTripper(&httpTraceTransport{
 		Transport: originHttpTransport, cache: m.remoteAddrCache,
 	})
 
-	if m.httpTransportForGM != nil {
-		m.proxy.SetRoundTripperForGM(originHttpTransportForGM)
-		m.proxy.SetGMTLS(m.gmtls)
-		m.proxy.SetGMPrefer(m.gmPrefer)
-		m.proxy.SetGMOnly(m.gmOnly)
-	}
+	m.proxy.SetGMTLS(m.gmtls)
+	m.proxy.SetGMPrefer(m.gmPrefer)
+	m.proxy.SetGMOnly(m.gmOnly)
 
 	m.proxy.SetMITM(m.mitmConfig)
 
@@ -461,12 +414,7 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 			return nil
 		}
 
-		var p string
-		if req.ProtoMajor == 2 {
-			p = fmt.Sprintf("%p", req.Context())
-		} else {
-			p = fmt.Sprintf("%p", req)
-		}
+		p := fmt.Sprintf("%p", req)
 
 		log.Debugf("request-id: [%v]", p)
 		m.mirrorCache.Set(p, &rawRequest{
@@ -563,12 +511,7 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		}
 
 		rspP := fmt.Sprintf("%p", res)
-		var reqP string
-		if res.Request.ProtoMajor == 2 {
-			reqP = fmt.Sprintf("%p", res.Request.Context()) // 临时修复 http2记录因ttl无法获取而缺失
-		} else {
-			reqP = fmt.Sprintf("%p", res.Request)
-		}
+		reqP := utils.InterfaceToString(res.Request.Context().Value("request-id"))
 
 		log.Debugf("request-id: [%v]   -->   response-id: [%v] ", reqP, rspP)
 
@@ -639,9 +582,18 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	// sync config with MITMServer
 	opts.EnableHTTP2 = server.http2
 	opts.EnableGMTLS = server.gmtls
+	opts.OnlyGM = server.gmOnly
+	opts.PreferGM = server.gmPrefer
 	opts.DnsServers = server.DNSServers
 	opts.HostMapping = server.HostMapping
-	err := MITM_SetTransportByHTTPClientOptions(opts)(server)
+	opts.ClientCerts = server.clientCerts
+	// Do custom transport configuration here
+	// 按理说在这之后transport就不应该被改动了 除了最后传给martian做roundTripper时套了个Trace
+	loadTransport, err := MITM_SetTransportByHTTPClientOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	err = loadTransport(server)
 	if err != nil {
 		return nil, utils.Errorf("create http transport failed: %v", err)
 	}
@@ -661,11 +613,6 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		log.Infof("server go proxy: %v", server.proxyUrl.String())
 		if server.httpTransport != nil {
 			server.httpTransport.Proxy = func(request *http.Request) (*url.URL, error) {
-				return server.proxyUrl, nil
-			}
-		}
-		if server.httpTransportForGM != nil {
-			server.httpTransportForGM.Proxy = func(request *http.Request) (*url.URL, error) {
 				return server.proxyUrl, nil
 			}
 		}
