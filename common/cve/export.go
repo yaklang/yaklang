@@ -71,6 +71,7 @@ var CVEExports = map[string]interface{}{
 	"Download":      cvequeryops.DownLoad,
 	"LoadCVE":       cvequeryops.LoadCVE,
 	"QueryEx":       queryEx,
+	"Query":         cvequeryops.QueryCVEYields,
 	"GetCVE":        getCVE,
 	"NewStatistics": NewStatistics,
 
