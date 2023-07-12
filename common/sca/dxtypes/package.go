@@ -55,15 +55,24 @@ func (p *Package) Identifier() string {
 }
 
 func (p Package) String() string {
+	// 	license := "nil"
+	// 	if len(p.License) > 0 {
+	// 		license = fmt.Sprintf(`[]string{"%s"}`, strings.Join(p.License, `", "`))
+	// 	}
+	// 	return fmt.Sprintf(`{
+	// 	Name:         "%s",
+	// 	Version:      "%s",
+	// 	Verification: "%s",
+	// 	License:      %s,
+	// 	Indirect:     %v,
+	// 	Potential:    %v,
+	// },`, p.Name, p.Version, p.Verification, license, p.Indirect, p.Potential)
 	ret := fmt.Sprintf("%s-%s", p.Name, p.Version)
 	// for _, pkg:=p.UpStreamPackages{
 	// 	ret += fmt.Sprintf("%s-%s,",)
 	// }
 	ret += "\n\tupstream: "
 	ret += strings.Join(
-		// lo.Map(p.UpStreamPackages, func(pkg *Package, _ int) string {
-		// 	return fmt.Sprintf("%s-%s", pkg.Name, pkg.Version)
-		// }),
 		lo.MapToSlice(p.UpStreamPackages, func(name string, pkg *Package) string {
 			return fmt.Sprintf("%s-%s", name, pkg.Version)
 		}),
