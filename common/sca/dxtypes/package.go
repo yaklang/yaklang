@@ -29,6 +29,7 @@ type Package struct {
 	License []string
 
 	// Related
+	// id -> package
 	UpStreamPackages   map[string]*Package
 	DownStreamPackages map[string]*Package
 
@@ -48,10 +49,11 @@ type PackageRelationShip struct {
 }
 
 func (p *Package) Identifier() string {
-	if p.id == "" {
-		p.id = utils.CalcSha1(p.Name, p.Version)
-	}
-	return p.id
+	//if p.id == "" {
+	//	p.id = utils.CalcSha1(p.Name, p.Version)
+	//}
+	//return p.id
+	return utils.CalcSha1(p.Name, p.Version)
 }
 
 func (p Package) String() string {
@@ -68,9 +70,6 @@ func (p Package) String() string {
 	// 	Potential:    %v,
 	// },`, p.Name, p.Version, p.Verification, license, p.Indirect, p.Potential)
 	ret := fmt.Sprintf("%s-%s", p.Name, p.Version)
-	// for _, pkg:=p.UpStreamPackages{
-	// 	ret += fmt.Sprintf("%s-%s,",)
-	// }
 	ret += "\n\tupstream: "
 	ret += strings.Join(
 		lo.MapToSlice(p.UpStreamPackages, func(name string, pkg *Package) string {
@@ -111,17 +110,68 @@ func (p *Package) From() ([]string, []string) {
 }
 
 
+
 // merge p1 to p1
-func (p1 *Package) PackageMerge(p2 *Package) *Package {
-	p1.fromAnalyzer = append(p1.fromAnalyzer, p2.fromAnalyzer...)
-	p1.fromFile = append(p1.fromFile, p2.fromFile...)
-	for _, p := range p2.UpStreamPackages {
-		p1.UpStreamPackages[p.Name] = p
-		p.DownStreamPackages[p1.Name] = p1
+func (p *Package) Merge(p2 *Package) *Package {
+	if p.FromAnalyzer == nil {
+		p.FromAnalyzer = make([]string, 0)
 	}
-	for _, p := range p2.DownStreamPackages {
-		p1.DownStreamPackages[p.Name] = p
-		p.UpStreamPackages[p1.Name] = p1
+	p.FromAnalyzer = append(p.FromAnalyzer, p2.FromAnalyzer...)
+	if p.FromFile == nil {
+		p.FromFile = make([]string, 0)
 	}
-	return p1
+	p.FromFile = append(p.FromFile, p2.FromFile...)
+
+	for _, p2up := range p2.UpStreamPackages {
+		p.UpStreamPackages[p2up.Identifier()] = p2up
+		p2up.DownStreamPackages[p.Identifier()] = p
+		if p.Identifier() != p2.Identifier() {
+			delete(p2up.DownStreamPackages, p2.Identifier())
+		}
+	}
+	for _, p2down := range p2.DownStreamPackages {
+		p.DownStreamPackages[p2down.Identifier()] = p2down
+		p2down.UpStreamPackages[p.Identifier()] = p
+		if p.Identifier() != p2.Identifier() {
+			delete(p2down.UpStreamPackages, p2.Identifier())
+		}
+	}
+	return p
+}
+func (p *Package) CanMerge(p2 *Package) bool {
+	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
+		return false
+	}
+	// version
+	if p2.IsVersionRange {
+		if p2.Version == "*" {
+			// pass
+		} else {
+			index := strings.IndexFunc(p2.Version, func(r rune) bool {
+				return r >= '0' && r <= '9'
+			})
+			if index == -1 {
+				return false
+			}
+			op := p2.Version[:index]
+			version := p2.Version[index:]
+			ret, err := utils.VersionCompare(p.Version, version)
+			if err != nil {
+				return false
+			}
+			if strings.Contains(op, "=") && ret == 0 {
+				return true
+			}
+			if strings.Contains(op, ">") && ret > 0 {
+				return true
+			}
+			if strings.Contains(op, "<") && ret < 0 {
+				return true
+			}
+		}
+	} else if p.Version != p2.Version {
+		return false
+	}
+
+	return false
 }

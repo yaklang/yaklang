@@ -115,3 +115,77 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	// append potential packages
 	return append(pkgs, potentialPkgs...)
 }
+
+func mergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
+	pkgMaps := make(map[string][]*dxtypes.Package) // name -> []packages
+	orPkgs := make([]*dxtypes.Package, 0)
+	for _, pkg := range pkgs {
+		if strings.Contains(pkg.Name, "|") {
+			orPkgs = append(orPkgs, pkg)
+			continue
+		}
+		plist, ok := pkgMaps[pkg.Name]
+		if !ok {
+			plist = make([]*dxtypes.Package, 0)
+		}
+		plist = append(plist, pkg)
+		pkgMaps[pkg.Name] = plist
+	}
+	//将orpkg切分为多个普通包
+	for _, pkg := range orPkgs {
+		names := strings.Split(pkg.Name, "|")
+		versions := strings.Split(pkg.Version, "|")
+		for i, name := range names {
+			version := versions[i]
+			// 通过pkgMaps判断orPkgs中存在的包
+			plist, ok := pkgMaps[name]
+			if !ok {
+				continue
+			}
+			p := &dxtypes.Package{
+				Name:           name,
+				Version:        version,
+				IsVersionRange: strings.ContainsAny(version, "><*"),
+				FromFile:       pkg.FromFile,
+				FromAnalyzer:   pkg.FromAnalyzer,
+				Potential:      true,
+			}
+			//修正上下游关系
+			for _, downp := range pkg.DownStreamPackages {
+				linkStream(downp, p)
+			}
+			//加入同名pkg的数组中
+			plist = append(plist, p)
+			pkgMaps[name] = plist
+		}
+		//修正上下游关系
+		for _, downp := range pkg.DownStreamPackages {
+			delete(downp.UpStreamPackages, pkg.Identifier())
+			delete(pkg.UpStreamPackages, downp.Identifier())
+		}
+	}
+
+	ret := make([]*dxtypes.Package, 0, len(pkgs))
+	// handler pkg list of same name, merge package that can be merged.
+	for _, list := range pkgMaps {
+		if len(list) == 1 {
+			ret = append(ret, list[0])
+			continue
+		}
+
+		p := list[0]
+		for _, p2 := range list {
+			if p2 == p {
+				continue
+			}
+			// match
+			if p.CanMerge(p2) {
+				p.Merge(p2)
+			} else {
+				ret = append(ret, p2)
+			}
+		}
+		ret = append(ret, p)
+	}
+	return ret
+}
