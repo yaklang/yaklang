@@ -52,7 +52,7 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
 		}
 		// and
-		for andDepPkgName := range pkg.DependsOn.And {
+		for andDepPkgName, andDepVersion := range pkg.DependsOn.And {
 			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
 				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, andDepPkg)
 				pkg.UpStreamPackages[andDepPkgName] = andDepPkg
@@ -65,8 +65,9 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			} else {
 				// if not found, make a potential package
 				potentialPkg := &dxtypes.Package{
-					Name:    andDepPkgName,
-					Version: "*",
+					Name:           andDepPkgName,
+					Version:        andDepVersion,
+					IsVersionRange: true,
 					DownStreamPackages: map[string]*dxtypes.Package{
 						pkg.Name: pkg,
 					},
@@ -103,7 +104,12 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 							return name
 						}),
 						"|"), // potential package name, splited by "|"
-					Version: "*",
+					Version: strings.Join(
+						lo.MapToSlice(orDepPkgMap, func(_ string, version string) string {
+							return version
+						}),
+						"|"), // potential package version, splited by "|",
+					IsVersionRange: true,
 					DownStreamPackages: map[string]*dxtypes.Package{
 						pkg.Name: pkg,
 					},
