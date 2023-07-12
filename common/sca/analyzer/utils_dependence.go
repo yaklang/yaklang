@@ -19,10 +19,9 @@ func fastVersionCompare(old, new string) bool {
 	return false
 }
 
-func handleDependsOn(pkgs []dxtypes.Package, provides map[string]*dxtypes.Package) {
-	for i := range pkgs {
+func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Package) {
+	for _, pkg := range pkgs {
 		// e.g. "libc.so.6()(64bit)" => "glibc-2.12-1.212.el6.x86_64"
-		pkg := &pkgs[i]
 		newAnd := make(map[string]string)
 		for depName, depVersion := range pkg.DependsOn.And {
 			if p, ok := provides[depName]; ok {
@@ -40,15 +39,14 @@ func handleDependsOn(pkgs []dxtypes.Package, provides map[string]*dxtypes.Packag
 	}
 }
 
-func linkUpSteamAndDownStream(pkgs []dxtypes.Package) {
-	potentialPkgs := make([]dxtypes.Package, 0)
+func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) {
+	potentialPkgs := make([]*dxtypes.Package, 0)
 
-	pkgMap := lo.SliceToMap(pkgs, func(item dxtypes.Package) (string, *dxtypes.Package) {
-		return item.Name, &item
+	pkgMap := lo.SliceToMap(pkgs, func(item *dxtypes.Package) (string, *dxtypes.Package) {
+		return item.Name, item
 	})
 
-	for i := range pkgs {
-		pkg := &pkgs[i]
+	for _, pkg := range pkgs {
 
 		if pkg.UpStreamPackages == nil {
 			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
@@ -74,7 +72,7 @@ func linkUpSteamAndDownStream(pkgs []dxtypes.Package) {
 					},
 					Potential: true,
 				}
-				potentialPkgs = append(potentialPkgs, *potentialPkg)
+				potentialPkgs = append(potentialPkgs, potentialPkg)
 				pkg.UpStreamPackages[andDepPkgName] = potentialPkg
 			}
 		}
@@ -110,7 +108,7 @@ func linkUpSteamAndDownStream(pkgs []dxtypes.Package) {
 					},
 					Potential: true,
 				}
-				potentialPkgs = append(potentialPkgs, *potentialPkg)
+				potentialPkgs = append(potentialPkgs, potentialPkg)
 				// pkg.UpStreamPackages = append(pkg.UpStreamPackages, potentialPkg)
 				pkg.UpStreamPackages[potentialPkg.Name] = potentialPkg
 			}

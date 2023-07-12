@@ -176,7 +176,7 @@ func walkImage(image *os.File, handler walkFunc) error {
 	return nil
 }
 
-func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]dxtypes.Package, error) {
+func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
 
 	// match file
@@ -204,7 +204,7 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]dxtypes.
 	return ag.Packages(), nil
 }
 
-func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]dxtypes.Package, error) {
+func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -232,7 +232,7 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	return loadDockerImage(f, *config)
 }
 
-func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]dxtypes.Package, error) {
+func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
