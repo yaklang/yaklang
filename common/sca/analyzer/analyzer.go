@@ -251,22 +251,12 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtyp
 		if !ok {
 			continue
 		}
-
-		if pkg.UpStreamPackages == nil {
-			pkg.UpStreamPackages = make(map[string]*dxtypes.Package)
-		}
-
 		for _, uid := range upStreamIDs {
 			upPkg, ok := pkgIDMap[uid]
 			if !ok {
 				continue
 			}
-			pkg.UpStreamPackages[uid] = upPkg
-
-			if upPkg.DownStreamPackages == nil {
-				upPkg.DownStreamPackages = make(map[string]*dxtypes.Package)
-			}
-			upPkg.DownStreamPackages[id] = pkg
+			linkStream(pkg, upPkg)
 		}
 	}
 
