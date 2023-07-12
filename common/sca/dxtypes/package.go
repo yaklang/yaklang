@@ -109,8 +109,6 @@ func (p *Package) From() ([]string, []string) {
 	return p.FromAnalyzer, p.FromFile
 }
 
-
-
 // merge p1 to p1
 func (p *Package) Merge(p2 *Package) *Package {
 	if p.FromAnalyzer == nil {
@@ -169,8 +167,8 @@ func (p *Package) CanMerge(p2 *Package) bool {
 				return true
 			}
 		}
-	} else if p.Version != p2.Version {
-		return false
+	} else if p.Version == p2.Version {
+		return true
 	}
 
 	return false
