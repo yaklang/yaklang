@@ -254,4 +254,124 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
+	router.HandleFunc("/user/limit/int", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var limit = LoadFromGetParams(request, "limit")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') LIMIT ` + limit + `;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+
+	router.HandleFunc("/user/limit/4/order1", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "order")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + ` LIMIT 5;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+	router.HandleFunc("/user/limit/4/order2", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "order")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + `, created_at LIMIT 5;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+	router.HandleFunc("/user/order3", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "order")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY created_at desc, username ` + data + `;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+	router.HandleFunc("/user/limit/4/orderby", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "orderby")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + data + ` desc LIMIT 5;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+	router.HandleFunc("/user/limit/4/orderby1", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "orderby")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "` desc" + ` LIMIT 5;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
+	router.HandleFunc("/user/limit/4/orderby2", func(writer http.ResponseWriter, request *http.Request) {
+		db := s.database.db
+		var data = LoadFromGetParams(request, "orderby")
+		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "`,created_at" + ` LIMIT 5;`
+		db = db.Raw(rowStr)
+		if db.Error != nil {
+			Failed(writer, request, db.Error.Error())
+			return
+		}
+		var users []*VulinUser
+		err := db.Scan(&users).Error
+		if err != nil {
+			Failed(writer, request, err.Error())
+			return
+		}
+		sqliWriterEx(true, writer, request, users, rowStr)
+	})
 }

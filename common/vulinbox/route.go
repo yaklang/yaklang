@@ -49,6 +49,9 @@ func (s *VulinServer) init() {
 	// 验证码
 	verificationcode.Register(router)
 
+	s.registerJSONP()
+	s.registerPostMessageIframeCase()
+
 	// 靶场是否是安全的？
 	if !s.safeMode {
 		s.registerPingCMDI()

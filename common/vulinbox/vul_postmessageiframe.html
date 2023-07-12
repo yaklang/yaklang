@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>JSONP：CASE</title>
+    <style type="text/css">
+        body {
+            background-color: #f0f0f2;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+        }
+
+        div {
+            width: 600px;
+            margin: 5em auto;
+            padding: 2em;
+            background-color: #fdfdff;
+            border-radius: 0.5em;
+            box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
+        }
+
+        #frame1 {
+            border: 2px solid #333;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            background-color: white;
+            width: 600px;
+            height: 200px;
+        }
+
+        #output {
+            width: 600px;
+            height: 400px;
+            overflow: scroll;
+            background-color: #f0f0f2;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+<div>
+    <h2>window.postMessage CASE</h2>
+    <iframe src="/iframe/post/message/basic/frame" id="frame1" frameborder="0"></iframe>
+    <pre id="output">
+
+    </pre>
+    <script>
+        function recv(event) {
+            document.getElementById("output").appendChild(document.createTextNode("MESSAGE FROM IFRAME: " + event.data + "\n"))
+        }
+
+        window.addEventListener("message", recv, false)
+        setInterval(function () {
+            var iframeWindow = document.getElementById("frame1").contentWindow
+            console.info(iframeWindow)
+            iframeWindow.postMessage("This Message Is From Parent Window (/iframe/post/message/basic) now: " + Date.now().toString())
+        }, 1000)
+    </script>
+</div>
+
+</body>
+</html>
