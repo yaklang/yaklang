@@ -38,7 +38,7 @@ type composerJson struct {
 	Require map[string]string `json:"require"`
 }
 
-func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusComposerLock:
