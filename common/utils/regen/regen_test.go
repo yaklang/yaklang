@@ -14,8 +14,7 @@ func Test_ExampleGenerate(t *testing.T) {
 }
 
 func Test_GenerateOne(t *testing.T) {
-	//pattern := `session=[a-zA-Z0-9+/]{20,300}([a-zA-Z0-9+/]{1}[a-zA-Z0-9+/=]{1}|==)`
-	pattern := `^0.*\x02\x01\x00\x04\x06public\xa2.*\x06\x08\+\x06\x01\x02\x01\x01\x05\x00\x04[^\x00]([^\x00]+)`
+	pattern := `session=[a-zA-Z0-9+/]{20,300}([a-zA-Z0-9+/]{1}[a-zA-Z0-9+/=]{1}|==)`
 	results, _ := GenerateOne(pattern)
 	spew.Dump(results)
 }
