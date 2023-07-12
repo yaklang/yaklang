@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
 
 	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
@@ -39,7 +40,7 @@ type Analyzer interface {
 type FileInfo struct {
 	Path        string
 	Analyzer    Analyzer
-	File        *os.File
+	LazyFile    *lazyfile.LazyFile
 	MatchStatus int
 }
 
@@ -140,8 +141,8 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 
 func (ag *AnalyzerGroup) Clear() {
 	for _, info := range ag.matchedFileInfos {
-		name := info.File.Name()
-		info.File.Close()
+		name := info.LazyFile.Name()
+		info.LazyFile.Close()
 		os.Remove(name)
 	}
 }
@@ -180,19 +181,19 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		// save
 		f, err := os.CreateTemp("", "fanal-file-*")
 		if err != nil {
-			return utils.Errorf("failed to create Analyzer temporary file for analyzer")
+			return utils.Errorf("failed to create analyzer temporary file")
 		}
+		defer f.Close()
 
 		if _, err := io.Copy(f, br); err != nil {
 			return utils.Errorf("failed to copy the file: %v", err)
 		}
-		f.Seek(0, 0)
 
 		// add to scanned files
 		ag.matchedFileInfos[path] = FileInfo{
 			Path:        path,
 			Analyzer:    a,
-			File:        f,
+			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
 			MatchStatus: matchStatus,
 		}
 	}
@@ -211,12 +212,12 @@ func (ag *AnalyzerGroup) Analyze() error {
 }
 
 func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
-	parsedLibs, parsedDeps, err := parser.Parse(fi.File)
+	parsedLibs, parsedDeps, err := parser.Parse(fi.LazyFile)
 	if err != nil {
 		return nil, err
 	}
 
-	pkgIDMap := make(map[string]*dxtypes.Package)
+	pkgIDMap := make(map[string]*dxtypes.Package, len(parsedLibs))
 
 	for _, lib := range parsedLibs {
 		p := dxtypes.Package{
