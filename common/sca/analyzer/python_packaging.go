@@ -2,10 +2,12 @@ package analyzer
 
 import (
 	"archive/zip"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/sca/lazyfile"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/packaging"
 	"github.com/yaklang/yaklang/common/utils"
@@ -64,11 +66,11 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package
 
 	switch fi.MatchStatus {
 	case statusEgg:
-		realFileInfo, err := fi.File.Stat()
+		realFileInfo, err := fi.LazyFile.Stat()
 		if err != nil {
 			return nil, utils.Errorf("failed to get file info: %s", err)
 		}
-		zr, err := zip.NewReader(fi.File, realFileInfo.Size())
+		zr, err := zip.NewReader(fi.LazyFile, realFileInfo.Size())
 		for _, vf := range zr.File {
 			matched := a.Match(MatchInfo{
 				path: vf.Name,
@@ -87,8 +89,10 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package
 
 			f, err := os.CreateTemp("", "python-egg-file-*")
 			if err != nil {
-				return nil, err
+				return nil, utils.Errorf("failed to create analyzer temporary file for python packaging")
 			}
+			defer f.Close()
+
 			defer func() {
 				name := f.Name()
 				f.Close()
@@ -102,7 +106,7 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package
 			f.Seek(0, 0)
 
 			return ParseLanguageConfiguration(FileInfo{
-				File: f,
+				LazyFile: lazyfile.LazyOpenStreamByFile(f),
 			}, packaging.NewParser())
 		}
 	case statusPythonPackaging:

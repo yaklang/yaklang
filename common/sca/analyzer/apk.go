@@ -115,7 +115,7 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 
 		provides := make(map[string]*dxtypes.Package)
 
-		scanner := bufio.NewScanner(fi.File)
+		scanner := bufio.NewScanner(fi.LazyFile)
 		for scanner.Scan() {
 			line := scanner.Text()
 

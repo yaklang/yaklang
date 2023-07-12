@@ -55,7 +55,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	case statusRPM:
 		provides := make(map[string]*dxtypes.Package)
 
-		db, err := rpmdb.Open(fi.File.Name())
+		db, err := rpmdb.Open(fi.LazyFile.Name())
 		if err != nil {
 			return nil, utils.Errorf("failed to open RPM DB: %v", err)
 		}

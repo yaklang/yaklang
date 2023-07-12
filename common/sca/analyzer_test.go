@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer"
+	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	"golang.org/x/exp/slices"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -44,7 +45,7 @@ func Run(tc testcase) {
 		return k, analyzer.FileInfo{
 			Path:        k,
 			Analyzer:    tc.a,
-			File:        f,
+			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
 			MatchStatus: tc.matchType,
 		}
 	})
@@ -53,7 +54,7 @@ func Run(tc testcase) {
 		Self: analyzer.FileInfo{
 			Path:        tc.virtualPath,
 			Analyzer:    tc.a,
-			File:        f,
+			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
 			MatchStatus: tc.matchType,
 		},
 		MatchedFileInfos: matchedFileInfos,

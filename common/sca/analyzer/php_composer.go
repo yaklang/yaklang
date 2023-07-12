@@ -53,7 +53,7 @@ func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error
 		var p map[string]string
 		jsonPath := path.Join(path.Dir(fi.Path), "composer.json")
 		if jsonFi, ok := afi.MatchedFileInfos[jsonPath]; ok {
-			p, err = a.parseComposerJson(jsonFi.File)
+			p, err = a.parseComposerJson(jsonFi.LazyFile)
 			if err != nil {
 				p = nil
 			}
