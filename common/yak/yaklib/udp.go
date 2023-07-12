@@ -243,7 +243,7 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 }
 
 var UDPExport = map[string]interface{}{
-	"MockServer":      DebugMockUDPProtocol,
+	"MockUDPProtocol": DebugMockUDPProtocol,
 	"Connect":         connectUdp,
 	"clientTimeout":   clientTimeout,
 	"clientLocalAddr": clientLocalAddr,
@@ -267,7 +267,7 @@ var UDPExport = map[string]interface{}{
 }
 
 func DebugMockUDP(rsp []byte) (string, int) {
-	return DebugMockUDPWithTimeout(60*time.Minute, rsp)
+	return DebugMockUDPWithTimeout(1*time.Minute, rsp)
 }
 
 func DebugMockUDPProtocol(name string) (string, int) {
@@ -280,7 +280,8 @@ func DebugMockUDPProtocol(name string) (string, int) {
 		payload := block.Probe.Payload
 		for _, match := range block.Matched {
 			r := match.MatchRule.String()
-			log.Infof("match rule: %v", r)
+			log.Infof("ServiceName: [%s] , ProductVerbose: [%s]", match.ServiceName, match.ProductVerbose)
+			log.Infof("MatchRule: [%s]", r)
 			generates, err = regen.GenerateOne(r)
 			if err != nil {
 				continue
@@ -288,7 +289,7 @@ func DebugMockUDPProtocol(name string) (string, int) {
 			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
 		}
 	}
-	return DebugMockUDPFromScan(60*time.Minute, responses)
+	return DebugMockUDPFromScan(1*time.Minute, responses)
 }
 
 func DebugMockUDPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
