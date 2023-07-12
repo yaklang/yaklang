@@ -90,6 +90,7 @@ func (a dpkgAnalyzer) getPackageNameAndVersion(pkgName string) (string, string) 
 	// e.g.
 	//	libapt-pkg6.0 (>= 2.2.4) => libapt-pkg6.0, >= 2.2.4
 	//	adduser => adduser
+	pkgName = strings.TrimSpace(pkgName)
 	version := "*"
 	if strings.Contains(pkgName, "(") {
 		version = strings.TrimSuffix(
