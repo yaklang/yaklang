@@ -13,15 +13,16 @@ import (
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
-
-	"golang.org/x/net/http2"
 )
 
 // round trip
@@ -183,8 +184,10 @@ type HTTPClientOptions struct {
 	EnableHTTP2         bool         `json:"enable_http2" yaml:"enable_http2"`
 	EnableGMTLS         bool
 	PreferGM            bool
+	OnlyGM              bool
 	DnsServers          []string
 	HostMapping         map[string]string
+	ClientCerts         []*ClientCertificationPair
 	// 下面的需要自己实现
 	//FailRetries     int               `json:"fail_retries" yaml:"fail_retries"`
 	//MaxRedirect     int               `json:"max_redirect" yaml:"max_redirect"`
@@ -223,7 +226,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 	return d.dialer.DialContext(ctx, network, address)
 }
 
-func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
+func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 	proxyFunc := http.ProxyFromEnvironment
 	if opts.Proxy != "" {
 		parsedURL, err := url.Parse(opts.Proxy)
@@ -263,59 +266,125 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, *http.Transport) {
 		TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
 		ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: opts.TLSSkipVerify,
-			MinVersion:         opts.TLSMinVersion,
-			MaxVersion:         opts.TLSMaxVersion,
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
 			Certificates:       certificates,
 		},
 	}
+
 	if opts.EnableHTTP2 {
-		err := http2.ConfigureTransport(t)
+		err := lowhttp2.ConfigureTransport(t)
 		if err != nil {
 			log.Errorf("http2 config failed: %s", err)
 		} else {
 			log.Info("http2 config success")
+			return t, nil
 		}
-	}
-	if !opts.EnableGMTLS {
-		return t, nil
-	} else {
-		gmtr := &http.Transport{
-			Proxy:                  proxyFunc,
-			OnProxyConnectResponse: nil,
-			DialContext: (&net.Dialer{
-				Timeout: time.Duration(opts.DialTimeout) * time.Second,
-			}).DialContext,
-			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) { /* this field may be re-set
-				if mTLS in yakit enabled */
-				dialer := &net.Dialer{}
-				conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-					GMSupport:          &gmtls.GMSupport{},
-					InsecureSkipVerify: true,
-				})
-				if err != nil {
-					return nil, err
-				}
-				return conn, nil
-			},
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: opts.TLSSkipVerify,
-				MinVersion:         opts.TLSMinVersion,
-				MaxVersion:         opts.TLSMaxVersion,
-				Certificates:       certificates,
-			},
-			TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
-			DisableCompression:    true,
-			MaxIdleConns:          opts.MaxIdleConns,
-			MaxConnsPerHost:       opts.MaxConnsPerHost,
-			IdleConnTimeout:       time.Duration(opts.IdleConnTimeout) * time.Second,
-			ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
-			TLSNextProto:          make(map[string]func(authority string, conn *tls.Conn) http.RoundTripper),
-			ForceAttemptHTTP2:     false,
-		}
-		return t, gmtr
 	}
 
+	/*
+		为 httpTransport 设置 TLS 证书
+	*/
+	var gmCerts []gmtls.Certificate
+
+	pool := x509.NewCertPool()
+	for _, certs := range opts.ClientCerts {
+		for _, ca := range certs.CaPem {
+			pool.AppendCertsFromPEM(ca)
+		}
+		pair, _, err := tlsutils.ParseCertAndPriKeyAndPool(certs.CrtPem, certs.KeyPem)
+		if err != nil {
+			return nil, utils.Errorf("initial tls with client cert error (mTLS error): %s", err)
+		}
+		t.TLSClientConfig.Certificates = append(t.TLSClientConfig.Certificates, pair)
+		if opts.EnableGMTLS {
+			pairGM, _, err := tlsutils.ParseCertAndPriKeyAndPoolForGM(certs.CrtPem, certs.KeyPem)
+			if err != nil {
+				return nil, utils.Errorf("initial tls with client cert error (mTLS error) for GM: %s", err)
+			}
+			gmCerts = append(gmCerts, pairGM)
+		}
+	}
+
+	if opts.EnableGMTLS {
+		DialTLSContextForGMOnly := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dialer := &net.Dialer{}
+			conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
+				GMSupport:          &gmtls.GMSupport{},
+				InsecureSkipVerify: true,
+				Certificates:       gmCerts,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
+		}
+		DialTLSContextForGMPrefer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dialer := &net.Dialer{}
+			var conn net.Conn
+			var err error
+			conn, err = gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
+				GMSupport:          &gmtls.GMSupport{},
+				InsecureSkipVerify: true,
+				Certificates:       gmCerts,
+			})
+			if err == nil {
+				return conn, nil
+			}
+			if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+				return nil, err
+			}
+			conn, err = tls.DialWithDialer(dialer, network, addr, &tls.Config{
+				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+				MaxVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: true,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
+		}
+		DialTLSContextForGMDefault := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dialer := &net.Dialer{}
+			var conn net.Conn
+			var err error
+			conn, err = tls.DialWithDialer(dialer, network, addr, &tls.Config{
+				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+				MaxVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: true,
+			})
+			if err == nil {
+				return conn, nil
+			}
+			if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+				return nil, err
+			}
+			conn, err = gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
+				GMSupport:          &gmtls.GMSupport{},
+				InsecureSkipVerify: true,
+				Certificates:       gmCerts,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
+		}
+
+		for true {
+			if opts.PreferGM {
+				t.DialTLSContext = DialTLSContextForGMPrefer
+				break
+			}
+			if opts.OnlyGM {
+				t.DialTLSContext = DialTLSContextForGMOnly
+				break
+			}
+			t.DialTLSContext = DialTLSContextForGMDefault
+			break
+		}
+	}
+	return t, nil
 }
 
 func ParsePKCS12FromFile(c PKCS12Config) (*tls.Certificate, error) {
@@ -375,16 +444,19 @@ func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 	}
 }
 
-func MITM_SetTransport(tr *http.Transport, gmtr *http.Transport) MITMConfig {
+func MITM_SetTransport(tr *http.Transport) MITMConfig {
 	return func(server *MITMServer) error {
 		server.httpTransport = tr
-		server.httpTransportForGM = gmtr
 		return nil
 	}
 }
 
-func MITM_SetTransportByHTTPClientOptions(client *HTTPClientOptions) MITMConfig {
-	return MITM_SetTransport(NewTransport(client))
+func MITM_SetTransportByHTTPClientOptions(client *HTTPClientOptions) (MITMConfig, error) {
+	tr, err := NewTransport(client)
+	if err != nil {
+		return nil, err
+	}
+	return MITM_SetTransport(tr), nil
 }
 
 func MITM_SetDownstreamProxy(s string) MITMConfig {
