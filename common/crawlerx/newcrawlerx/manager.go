@@ -28,15 +28,19 @@ func (manager *BrowserManager) CreateBrowserStarters() {
 }
 
 func (manager *BrowserManager) Run() {
-	if manager.config.baseConfig.vue {
-		for _, starter := range manager.browsers {
-			//log.Info("vue mode run.")
-			go starter.Run()
-		}
-	} else {
-		for _, starter := range manager.browsers {
-			//log.Info("normal mode run.")
-			go starter.MultiRun()
-		}
+	//if manager.config.baseConfig.vue {
+	//	for _, starter := range manager.browsers {
+	//		//log.Info("vue mode run.")
+	//		go starter.Run()
+	//	}
+	//} else {
+	//	for _, starter := range manager.browsers {
+	//		//log.Info("normal mode run.")
+	//		go starter.MultiRun()
+	//	}
+	//}
+	for _, starter := range manager.browsers {
+		go starter.NewEngine()
+		//go starter.MultiRun()
 	}
 }

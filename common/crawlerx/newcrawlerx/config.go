@@ -79,7 +79,7 @@ type BaseConfig struct {
 	pageSizedWaitGroup *utils.SizedWaitGroup
 
 	sensitiveWords []string
-	proxies            []string
+	proxies        []string
 }
 
 type ConfigOpt func(*Config)
@@ -111,7 +111,7 @@ func NewConfig() *Config {
 			extraWaitLoadTime: 0,
 
 			sensitiveWords: make([]string, 0),
-			ch:                make(chan ReqInfo),
+			ch:             make(chan ReqInfo),
 		},
 	}
 }

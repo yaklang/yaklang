@@ -52,6 +52,7 @@ func (starter *BrowserStarter) actionOnPage() func(*rod.Page) error {
 func (starter *BrowserStarter) ActionOnPage() func(*rod.Page) error {
 	return func(page *rod.Page) error {
 		currentUrl, _ := getCurrentUrl(page)
+		log.Infof(`[action] do action on page %s`, currentUrl)
 		urls, err := starter.getUrlsFunction(page)
 		if err != nil {
 			return utils.Errorf("get page %s urls error: %s", page.TargetID, err)
@@ -207,6 +208,13 @@ func (starter *BrowserStarter) doEventClickFunctionGenerator() func(*rod.Page, s
 		}
 		currentUrl, _ := getCurrentUrl(page)
 		if currentUrl != "" && currentUrl != originUrl {
+			checkUrl := currentUrl
+			if starter.urlAfterRepeat != nil {
+				checkUrl = starter.urlAfterRepeat(checkUrl)
+			}
+			if !starter.resultSentFunc(checkUrl) {
+				return nil
+			}
 			result := SimpleResult{
 				url:        currentUrl,
 				resultType: "event url",
