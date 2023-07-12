@@ -49,7 +49,7 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 	return &rpmAnalyzer{}
 }
 
-func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusRPM:
@@ -63,9 +63,9 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 		if err != nil {
 			return nil, utils.Errorf("failed to list packages: %v", err)
 		}
-		pkgs := make([]dxtypes.Package, len(pkgList))
+		pkgs := make([]*dxtypes.Package, len(pkgList))
 		for i, pkgInfo := range pkgList {
-			pkgs[i] = dxtypes.Package{
+			pkgs[i] = &dxtypes.Package{
 				Name:         pkgInfo.Name,
 				Version:      pkgInfo.Version,
 				Verification: fmt.Sprintf("md5:%s", pkgInfo.SigMD5),
@@ -77,7 +77,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 				License: []string{licenses.Normalize(pkgInfo.License)},
 			}
 			for _, provide := range pkgInfo.Provides {
-				provides[provide] = &pkgs[i]
+				provides[provide] = pkgs[i]
 			}
 		}
 		handleDependsOn(pkgs, provides)

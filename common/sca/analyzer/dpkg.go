@@ -123,8 +123,8 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package
 	return pkg
 }
 
-func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]dxtypes.Package, error) {
-	pkgs := make([]dxtypes.Package, 0)
+func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
+	pkgs := make([]*dxtypes.Package, 0)
 	br := bufio.NewReader(r)
 	for {
 		block, err := ReadBlock(br)
@@ -141,7 +141,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]dxtypes.Package, error) {
 		}
 		pkg := a.parseDpkgPkg(header)
 		if pkg != nil {
-			pkgs = append(pkgs, *pkg)
+			pkgs = append(pkgs, pkg)
 		}
 	}
 
@@ -162,7 +162,7 @@ func (a dpkgAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusStatus:

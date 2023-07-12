@@ -1,8 +1,9 @@
 package analyzer
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/pip"
 )
@@ -32,7 +33,7 @@ func (a pythonPIPAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a pythonPIPAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a pythonPIPAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 
 	switch fi.MatchStatus {

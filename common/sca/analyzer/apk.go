@@ -103,17 +103,18 @@ func (a apkAnalyzer) handleDependsOn(pkgs []dxtypes.Package, provides map[string
 	}
 }
 
-func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusInstallFile:
 		var (
-			pkgs    []dxtypes.Package
-			pkg     dxtypes.Package
+			pkgs    []*dxtypes.Package
+			pkg     *dxtypes.Package
 			version string
 		)
 
 		provides := make(map[string]*dxtypes.Package)
+		pkg = new(dxtypes.Package)
 
 		scanner := bufio.NewScanner(fi.LazyFile)
 		for scanner.Scan() {
@@ -123,7 +124,9 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 				if pkg.Name != "" && pkg.Version != "" {
 					pkgs = append(pkgs, pkg)
 				}
-				pkg = dxtypes.Package{}
+				// new
+				// pkg = &dxtypes.Package{}
+				pkg = new(dxtypes.Package)
 				continue
 			}
 			// ref. https://wiki.alpinelinux.org/wiki/Apk_spec
@@ -136,7 +139,7 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 			case "L:":
 				pkg.License = a.parseLicense(line)
 			case "p:":
-				a.parseProvides(line, &pkg, provides)
+				a.parseProvides(line, pkg, provides)
 			case "D:": // dependencies (corresponds to depend in PKGINFO, concatenated by spaces into a single line)
 				pkg.DependsOn.And = a.parseDependencies(line)
 			case "C:":

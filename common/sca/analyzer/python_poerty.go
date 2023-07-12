@@ -36,7 +36,7 @@ func (a pythonPoetryAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
-func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
+func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 
 	switch fi.MatchStatus {

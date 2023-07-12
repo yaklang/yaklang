@@ -33,7 +33,7 @@ var (
 type TypAnalyzer string
 type ScanMode int
 type Analyzer interface {
-	Analyze(AnalyzeFileInfo) ([]dxtypes.Package, error)
+	Analyze(AnalyzeFileInfo) ([]*dxtypes.Package, error)
 	Match(MatchInfo) int
 }
 
@@ -64,7 +64,7 @@ type AnalyzerGroup struct {
 	numWorkers int
 
 	// return
-	pkgs []dxtypes.Package
+	pkgs []*dxtypes.Package
 
 	// matched file
 	matchedFileInfos map[string]FileInfo
@@ -113,8 +113,8 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 	}
 }
 
-func (ag *AnalyzerGroup) Packages() []dxtypes.Package {
-	return lo.UniqBy(ag.pkgs, func(item dxtypes.Package) string {
+func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
+	return lo.UniqBy(ag.pkgs, func(item *dxtypes.Package) string {
 		return item.Identifier()
 	})
 }
@@ -211,7 +211,7 @@ func (ag *AnalyzerGroup) Analyze() error {
 	return nil
 }
 
-func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtypes.Package, error) {
+func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtypes.Package, error) {
 	parsedLibs, parsedDeps, err := parser.Parse(fi.LazyFile)
 	if err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]dxtype
 		}
 	}
 
-	return lo.MapToSlice(pkgIDMap, func(_ string, pkg *dxtypes.Package) dxtypes.Package {
-		return *pkg
+	return lo.MapToSlice(pkgIDMap, func(_ string, pkg *dxtypes.Package) *dxtypes.Package {
+		return pkg
 	}), nil
 }
