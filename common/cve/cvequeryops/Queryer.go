@@ -73,7 +73,7 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 		opt(cveQuery)
 	}
 
-	if (len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0) && cveQuery.Strict {
+	if (len(cveQuery.Products) > 0 || len(cveQuery.CPE) > 0) && !cveQuery.Strict {
 		cveQuery = FixCVEProduct(cveQuery, db)
 	}
 	var sqlSentence string
@@ -96,10 +96,11 @@ func Filter(db *gorm.DB, opts ...CVEOption) (*gorm.DB, *CVEQueryInfo) {
 
 func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 	var fixName []string
+	var fixCPE []cveresources.CPE
 	for i := 0; i < len(cveQuery.Products); i++ {
 		if info, ok := cveresources.CommonFix[cveQuery.Products[i]]; ok { //查询基础修复里有没有对应的畸形名
 			if info.Vendor != "" {
-				cveQuery.CPE = append(cveQuery.CPE, cveresources.CPE{
+				fixCPE = append(fixCPE, cveresources.CPE{
 					Part:    "*",
 					Vendor:  info.Vendor,
 					Product: info.ProductName,
@@ -114,7 +115,6 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 		if err != nil {
 			log.Warningf("find product name failed: %s[%s]", err, cveQuery.Products[i])
 		} else { //修复好的所有产品名放入查询条件里
-			fixRes = fixRes[:len(fixRes)-1]
 			fixName = append(fixName, fixRes...)
 		}
 	}
@@ -122,13 +122,15 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 		cveQuery.Products = fixName
 	}
 
-	var fixCPE []cveresources.CPE
-
 	for i := 0; i < len(cveQuery.CPE); i++ {
 		if info, ok := cveresources.CommonFix[cveQuery.CPE[i].Product]; ok { //查询基础修复里有没有对应的畸形名
-			cveQuery.CPE = append(cveQuery.CPE, cveresources.CPE{
+			vendorStr := cveQuery.CPE[i].Vendor
+			if info.Vendor != "" {
+				vendorStr = info.Vendor
+			}
+			fixCPE = append(fixCPE, cveresources.CPE{
 				Part:    cveQuery.CPE[i].Part,
-				Vendor:  cveQuery.CPE[i].Vendor,
+				Vendor:  vendorStr,
 				Product: info.ProductName,
 				Version: cveQuery.CPE[i].Version,
 				Edition: cveQuery.CPE[i].Edition,
@@ -140,7 +142,6 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 			log.Warningf("find product name failed: %s[%s]", err, cveQuery.CPE[i].Product)
 		} else {
 			//修复后所有可能的产品名放入CPE中
-			fixRes = fixRes[:len(fixRes)-1]
 			for _, name := range fixRes {
 				cpeItem := cveresources.CPE{
 					Part:    cveQuery.CPE[i].Part,

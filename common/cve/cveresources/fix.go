@@ -34,9 +34,9 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 	if len(Products) > 0 {
 		return []string{ProductName}, nil
 	} else {
-		rule, _ := regexp.Compile(`[a-zA-Z]+(-[a-zA-Z]+)*`)
+		rule, _ := regexp.Compile(`[a-zA-Z]{3,}(-[a-zA-Z]{3,})*`)
 		ProductNameWords := rule.FindAllString(ProductName, -1)
-		if len(ProductNameWords) <= 1 {
+		if len(ProductNameWords) > 0 {
 			resDb = db.Where("product = ?", ProductNameWords[0]).Find(&Products)
 			if resDb.Error != nil {
 				log.Errorf("query database failed: %s", resDb.Error)
