@@ -3,9 +3,6 @@ package sca
 import (
 	"archive/tar"
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
-	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	"io"
 	"io/fs"
 	"os"
@@ -13,6 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/sca/lazyfile"
 
 	"github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -115,13 +116,13 @@ func walkFS(pathStr string, handler walkFunc) error {
 			return err
 		}
 
-		f := lazyfile.LazyOpenStreamByFile(filePath, os.O_RDWR, os.ModePerm)
+		f := lazyfile.LazyOpenStreamByFilePath(filePath)
 		defer f.Close()
 		return handler(filePath, statsInfo, f)
 	})
 }
 
-func walkImage(image *os.File, walkFunc walkFunc) error {
+func walkImage(image *os.File, handler walkFunc) error {
 	img, err := tarball.ImageFromPath(image.Name(), nil)
 	if err != nil {
 		return utils.Errorf("failed to initialize the struct from the temporary file: %v", err)
@@ -166,7 +167,7 @@ func walkImage(image *os.File, walkFunc walkFunc) error {
 				// whFiles = append(whFiles, fpath)
 				continue
 			}
-			if err = walkFunc(filePath, hdr.FileInfo(), tr); err != nil {
+			if err = handler(filePath, hdr.FileInfo(), tr); err != nil {
 				return err
 			}
 
