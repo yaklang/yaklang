@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/samber/lo"
@@ -98,17 +99,18 @@ func linkUpSteamAndDownStream(pkgs []*dxtypes.Package) []*dxtypes.Package {
 
 			if !exist {
 				// if not found, make a potential package
+				orDepName := ""
+				orDepVersion := ""
+				for name, version := range orDepPkgMap {
+					orDepName += fmt.Sprintf("%s|", name)
+					orDepVersion += fmt.Sprintf("%s|", version)
+				}
+				orDepName = strings.TrimSuffix(orDepName, "|")
+				orDepVersion = strings.TrimSuffix(orDepVersion, "|")
+
 				potentialPkg := &dxtypes.Package{
-					Name: strings.Join(
-						lo.MapToSlice(orDepPkgMap, func(name string, _ string) string {
-							return name
-						}),
-						"|"), // potential package name, splited by "|"
-					Version: strings.Join(
-						lo.MapToSlice(orDepPkgMap, func(_ string, version string) string {
-							return version
-						}),
-						"|"), // potential package version, splited by "|",
+					Name:           orDepName,    // potential package name, splited by "|";
+					Version:        orDepVersion, // potential package version, splited by "|",
 					IsVersionRange: true,
 					DownStreamPackages: map[string]*dxtypes.Package{
 						pkg.Name: pkg,
