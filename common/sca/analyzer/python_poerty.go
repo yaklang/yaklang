@@ -1,9 +1,10 @@
 package analyzer
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/poetry"
 	"github.com/aquasecurity/go-dep-parser/pkg/python/pyproject"
@@ -52,7 +53,7 @@ func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, e
 		pyprojectPath := path.Join(path.Dir(fi.Path), PyProjectFile)
 		if pyprojectFi, ok := afi.MatchedFileInfos[pyprojectPath]; ok {
 			pyProjectParser := pyproject.NewParser()
-			parsed, err := pyProjectParser.Parse(pyprojectFi.File)
+			parsed, err := pyProjectParser.Parse(pyprojectFi.LazyFile)
 			if err != nil {
 				return nil, err
 			}

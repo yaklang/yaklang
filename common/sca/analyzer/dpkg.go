@@ -166,7 +166,7 @@ func (a dpkgAnalyzer) Analyze(afi AnalyzeFileInfo) ([]dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusStatus:
-		return a.analyzeStatus(fi.File)
+		return a.analyzeStatus(fi.LazyFile)
 	}
 
 	return nil, nil
