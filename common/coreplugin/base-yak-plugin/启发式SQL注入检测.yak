@@ -280,10 +280,11 @@ func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, C
         for index, param := range CommonParams {
             if index == pos {
                 paramName = param.Name()
+                var payload
                 if str.MatchAllOfRegexp(parseStr(param.Value()[0]), `^[0-9]+$`) {
-                    payload := randstr(4) + getErrorBasedPreCheckPayload()
+                    payload = randstr(4) + getErrorBasedPreCheckPayload()
                 } else {
-                    payload := parseStr(randn(99999, 9999999)) + getErrorBasedPreCheckPayload()
+                    payload = parseStr(randn(99999, 9999999)) + getErrorBasedPreCheckPayload()
                 }
 
 
@@ -1850,9 +1851,9 @@ __test__ = func() {
     // }
 
 
-    isHttps, url, reqRaw, rspRaw, body = results
+    //isHttps, url, reqRaw, rspRaw, body = results
 
-    mirrorFilteredHTTPFlow(results...)
-    yakit_output("测试完成！")
+    //mirrorFilteredHTTPFlow(results...)
+    //yakit_output("测试完成！")
 }
 //__test__()

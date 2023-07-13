@@ -5,6 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
@@ -149,10 +150,11 @@ func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug3(t *testing.T) {
 		panic(err)
 	}
 
-	var host, port = utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Content-Length: 12
 
 aaacccaaabbb`))
+	var host, port = utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
