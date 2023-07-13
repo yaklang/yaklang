@@ -38,7 +38,7 @@ func TestLoadDockerImageFromFile(t *testing.T) {
 		os.Remove(name)
 	}()
 
-	pkgs, err := LoadDockerImageFromFile(tmp.Name())
+	pkgs, err := ScanDockerImageFromFile(tmp.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
