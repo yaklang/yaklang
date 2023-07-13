@@ -141,10 +141,10 @@ Host: ` + h2Addr,
 				}()
 				var token = utils.RandStringBytes(100)
 				var params = map[string]any{
-					"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+					"packet": lowhttp.FixHTTPRequestOut(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
 Host: www.example.com
 
-`+token), "Host", utils.HostPort(mockHost, mockPort)),
+`+token), "Host", utils.HostPort(mockHost, mockPort))),
 					"host":  mockHost,
 					"port":  mockPort,
 					"proxy": proxy,
@@ -250,16 +250,34 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 
-				time.Sleep(time.Second * 1)
-				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/mitm/test/h2/token/" + token,
-				})
-				if err != nil {
-					panic(err)
-				}
-				spew.Dump(flows)
-				if len(flows) > 0 {
-					h2Test = true
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				// 使用协程进行并发查询
+				done := make(chan struct{})
+
+				select {
+				case <-ctx.Done():
+					log.Warn("flow history not fully found")
+					close(done)
+					break
+				case <-done:
+					log.Infof("flow history all found")
+					break
+				default:
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/mitm/test/h2/token/" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+					spew.Dump(flows)
+					if len(flows) > 0 {
+						h2Test = true
+					}
+					if h2Test {
+						close(done)
+					}
 				}
 			}()
 		}
@@ -441,17 +459,6 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 				gmPassthroughTested = true
-				time.Sleep(time.Second * 1)
-				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/GMTLS" + token,
-				})
-				if err != nil {
-					panic(err)
-				}
-				spew.Dump(flows)
-				if len(flows) > 0 {
-					gmTest = true
-				}
 
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTPS`+token+` HTTP/1.1
 Host: www.example.com
@@ -478,17 +485,6 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 				httpsPassthroughTested = true
-				time.Sleep(time.Second * 1)
-				_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/HTTPS" + token,
-				})
-				if err != nil {
-					panic(err)
-				}
-				spew.Dump(flows)
-				if len(flows) > 0 {
-					httpsTest = true
-				}
 
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTP`+token+` HTTP/1.1
 Host: www.example.com
@@ -516,17 +512,59 @@ if rsp.Contains(getParam("token")) {
 				}
 				httpsPassthroughTested = true
 
-				time.Sleep(time.Second * 1)
-				_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/HTTP" + token,
-				})
-				if err != nil {
-					panic(err)
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				// 使用协程进行并发查询
+				done := make(chan struct{})
+
+				select {
+				case <-ctx.Done():
+					log.Warn("flow history not fully found")
+					close(done)
+					break
+				case <-done:
+					log.Infof("flow history all found")
+					break
+				default:
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/GMTLS" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+
+					if len(flows) > 0 {
+						gmTest = true
+					}
+
+					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/HTTPS" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+
+					if len(flows) > 0 {
+						httpsTest = true
+					}
+
+					// 执行查询操作
+					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/HTTP" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+
+					if len(flows) > 0 {
+						httpTest = true
+					}
+					if gmTest && httpsTest && httpTest {
+						close(done)
+					}
 				}
-				spew.Dump(flows)
-				if len(flows) > 0 {
-					httpTest = true
-				}
+
 			}()
 
 		}

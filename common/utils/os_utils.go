@@ -165,14 +165,18 @@ func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
 }
 
 var (
-	tlsTestConfig   *tls.Config
-	tlsTestOnce     sync.Once
-	gmtlsTestConfig *gmtls.Config
+	tlsTestConfig    *tls.Config
+	mtlsTestConfig   *tls.Config
+	tlsTestOnce      sync.Once
+	gmtlsTestConfig  *gmtls.Config
+	mgmtlsTestConfig *gmtls.Config
+	clientCrt        []byte
+	clientKey        []byte
 )
 
-func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config)) {
+func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)) {
 	go tlsTestOnce.Do(func() {
-		tlsTestConfig, gmtlsTestConfig = h()
+		tlsTestConfig, gmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = h()
 	})
 }
 
@@ -244,7 +248,7 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 			lis.Close()
 		}()
 
-		if h2  {
+		if h2 {
 			if !https {
 				log.Error("h2 only support https")
 			}
