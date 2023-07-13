@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/net/http2"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
 	"sync"
@@ -142,25 +145,38 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, false, false, handle)
 }
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, false, handle)
+	return DebugMockHTTPServerWithContext(ctx, false, false, false, handle)
+}
+
+func DebugMockHTTP2(ctx context.Context, handler func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(ctx, true, true, false, handler)
+}
+
+func DebugMockGMHTTP(ctx context.Context, handler func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(ctx, true, false, false, handler)
 }
 
 func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, handle)
 }
 
 var (
-	tlsTestConfig *tls.Config
-	tlsTestOnce   sync.Once
+	tlsTestConfig    *tls.Config
+	mtlsTestConfig   *tls.Config
+	tlsTestOnce      sync.Once
+	gmtlsTestConfig  *gmtls.Config
+	mgmtlsTestConfig *gmtls.Config
+	clientCrt        []byte
+	clientKey        []byte
 )
 
-func RegisterDefaultTLSConfigGenerator(h func() *tls.Config) {
+func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)) {
 	go tlsTestOnce.Do(func() {
-		tlsTestConfig = h()
+		tlsTestConfig, gmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = h()
 	})
 }
 
@@ -180,7 +196,23 @@ func GetDefaultTLSConfig(i float64) *tls.Config {
 	return nil
 }
 
-func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func([]byte) []byte) (string, int) {
+func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
+	expectedEnd := time.Now().Add(FloatSecondDuration(i))
+	for {
+		if tlsTestConfig != nil {
+			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+			return gmtlsTestConfig
+		}
+		time.Sleep(50 * time.Millisecond)
+		if !expectedEnd.After(time.Now()) {
+			break
+		}
+	}
+	log.Error("fetch default tls config failed")
+	return nil
+}
+
+func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gmtlsFlag bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
@@ -189,12 +221,20 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func
 			lis net.Listener
 			err error
 		)
-		if https {
+		if https && !h2 && !gmtlsFlag {
 			tlsConfig := GetDefaultTLSConfig(5)
 			if tlsConfig == nil {
 				panic(1)
 			}
 			lis, err = tls.Listen("tcp", addr, tlsConfig)
+		} else if h2 {
+			origin := GetDefaultTLSConfig(5)
+			var copied = *origin
+			copied.NextProtos = []string{"h2"}
+			lis, err = tls.Listen("tcp", addr, &copied)
+		} else if gmtlsFlag {
+			log.Infof("gmtlsFlag: %v", gmtlsFlag)
+			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
 		} else {
 			lis, err = net.Listen("tcp", addr)
 		}
@@ -208,9 +248,69 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, handle func
 			lis.Close()
 		}()
 
+		if h2 {
+			if !https {
+				log.Error("h2 only support https")
+			}
+
+			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				r, err := HttpDumpWithBody(request, true)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				fmt.Println(string(r))
+				if handle != nil {
+					raw := handle(r)
+					writer.Write(raw)
+					return
+				}
+				writer.Write([]byte("HELLO HTTP2"))
+			})}
+			var err = http2.ConfigureServer(srv, &http2.Server{})
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			go func() {
+				log.Infof("START TO SERVE HTTP2")
+				srv.Serve(lis)
+			}()
+			return
+		}
+
+		if gmtlsFlag {
+			if !https {
+				log.Error("gmtls only support https")
+			}
+
+			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				r, err := HttpDumpWithBody(request, true)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				fmt.Println(string(r))
+				if handle != nil {
+					raw := handle(r)
+					writer.Write(raw)
+					return
+				}
+				writer.Write([]byte("HELLO GMTLS"))
+			})}
+
+			go func() {
+				log.Infof("START TO SERVE GMTLS HTTP SERVER")
+				srv.Serve(lis)
+			}()
+			return
+		}
+
+		// http / tls
 		for {
 			conn, err := lis.Accept()
 			if err != nil {
+				log.Error(err)
 				break
 			}
 			go func() {
