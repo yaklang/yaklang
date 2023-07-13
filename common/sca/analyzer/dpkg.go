@@ -63,11 +63,15 @@ func (a dpkgAnalyzer) parseDepends(s string) dxtypes.PackageRelationShip {
 	// e.g. passwd, debconf (>= 0.5) | debconf-2.0
 	// var dependencies []string
 
-	depends := strings.Split(s, ",")
-	var packageRelationShip = dxtypes.PackageRelationShip{
-		And: make(map[string]string, len(depends)),
-		Or:  make([]map[string]string, 0),
+	var packageRelationShip = dxtypes.PackageRelationShip{}
+	if s == "" {
+		return packageRelationShip
 	}
+	depends := strings.Split(s, ",")
+	// init packageRelationShip
+	packageRelationShip.And = make(map[string]string, len(depends))
+	packageRelationShip.Or = make([]map[string]string, 0)
+
 	for _, depName := range depends {
 		// e.g. gpgv | gpgv2 | gpgv1
 		// Store only package names
@@ -86,13 +90,13 @@ func (a dpkgAnalyzer) parseDepends(s string) dxtypes.PackageRelationShip {
 	return packageRelationShip
 }
 
-func (a dpkgAnalyzer) getPackageNameAndVersion(pkgName string) (string, string) {
+func (a dpkgAnalyzer) getPackageNameAndVersion(raw string) (string, string) {
 	// e.g.
 	//	libapt-pkg6.0 (>= 2.2.4) => libapt-pkg6.0, >= 2.2.4
 	//	adduser => adduser
-	pkgName = strings.TrimSpace(pkgName)
+	pkgName := strings.TrimSpace(raw)
 	version := "*"
-	if strings.Contains(pkgName, "(") {
+	if strings.Contains(raw, "(") {
 		version = strings.TrimSuffix(
 			pkgName[strings.Index(pkgName, "(")+1:],
 			")",
