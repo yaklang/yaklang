@@ -292,7 +292,7 @@ var DPKGWantPkgs = []dxtypes.Package{
 		Potential:    true,
 	},
 	{
-		Name:         "debconf-2.0|debconf",
+		Name:         "debconf|debconf-2.0",
 		Version:      ">= 0.5|*",
 		Verification: "",
 		License:      nil,
@@ -364,7 +364,7 @@ var DPKGWantPkgs = []dxtypes.Package{
 		Potential:    true,
 	},
 	{
-		Name:         "gpgv|gpgv2|gpgv1",
+		Name:         "gpgv|gpgv1|gpgv2",
 		Version:      "*|*|*",
 		Verification: "",
 		License:      nil,
@@ -390,14 +390,6 @@ var DPKGWantPkgs = []dxtypes.Package{
 	{
 		Name:         "debianutils",
 		Version:      ">= 2.15",
-		Verification: "",
-		License:      nil,
-		Indirect:     false,
-		Potential:    true,
-	},
-	{
-		Name:         "",
-		Version:      "*",
 		Verification: "",
 		License:      nil,
 		Indirect:     false,
