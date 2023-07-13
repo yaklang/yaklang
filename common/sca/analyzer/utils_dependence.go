@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/samber/lo"
@@ -90,18 +90,18 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 
 			if !exist {
 				// if not found, make a potential package
-				orDepName := ""
-				orDepVersion := ""
-				for name, version := range orDepPkgMap {
-					orDepName += fmt.Sprintf("%s|", name)
-					orDepVersion += fmt.Sprintf("%s|", version)
+				orDepName := make([]string, 0, len(orDepPkgMap))
+				for name := range orDepPkgMap {
+					orDepName = append(orDepName, name)
 				}
-				orDepName = strings.TrimSuffix(orDepName, "|")
-				orDepVersion = strings.TrimSuffix(orDepVersion, "|")
+				sort.Strings(orDepName)
+				orDepVersion := lo.Map(orDepName, func(name string, index int) string {
+					return orDepPkgMap[name]
+				})
 
 				potentialPkg := &dxtypes.Package{
-					Name:           orDepName,    // potential package name, splited by "|";
-					Version:        orDepVersion, // potential package version, splited by "|",
+					Name:           strings.Join(orDepName, "|"),    // potential package name, splited by "|";
+					Version:        strings.Join(orDepVersion, "|"), // potential package version, splited by "|",
 					IsVersionRange: true,
 					Potential:      true,
 				}
