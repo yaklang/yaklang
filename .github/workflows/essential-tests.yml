@@ -82,3 +82,6 @@ jobs:
 
       - name: Test gRPC MUSTPASS-PLUGIN-Shiro
         run: go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
+
+      - name: Test CVEQuery
+        run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
