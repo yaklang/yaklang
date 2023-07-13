@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	utils2 "github.com/yaklang/yaklang/common/utils"
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	utils2 "github.com/yaklang/yaklang/common/utils"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
@@ -3579,5 +3580,20 @@ assert(a == 1)
 				t.Fatal(utils2.Errorf("expect error `%s`, but get `%v`, index: %d", testCase[1], err, index))
 			}
 		}
+	}
+}
+
+func TestNewExecutor_ArgNumberCheck(t *testing.T) {
+	code := `
+test()
+`
+	engine := New()
+	engine.ImportLibs(map[string]interface{}{
+		"test": func(i int) {
+		},
+	})
+	err := engine.SafeEval(context.Background(), code)
+	if err == nil {
+		t.Fatal(utils2.Errorf("expect error `native func arg number error`, but get `nil`"))
 	}
 }
