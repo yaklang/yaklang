@@ -68,7 +68,7 @@ func saveImageFromContext(host, imageID string, f io.Writer) error {
 	}
 	if host != "" {
 		// adding host parameter to the last assuming it will pick up more preference
-		opts = append(opts, client.WithHost(host))
+		opts = append(opts, client.WithHost(host), client.WithAPIVersionNegotiation())
 	}
 	c, err := client.NewClientWithOpts(opts...)
 	if err != nil {
