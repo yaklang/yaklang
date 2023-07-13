@@ -42,6 +42,21 @@ func NewCoolDown(d time.Duration) *CoolDown {
 	return NewCoolDownContext(d, context.Background())
 }
 
+func Spinlock(t float64, h func() bool) error {
+	ctx := TimeoutContextSeconds(t)
+	for {
+		select {
+		case <-ctx.Done():
+			return Error("Spinlock timeout")
+		default:
+			if h() {
+				return nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
 func (c *CoolDown) Reset(d time.Duration) {
 	c.du = d
 }

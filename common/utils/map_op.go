@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"reflect"
+	"strings"
 )
 
 func MapGetStringOr(m map[string]interface{}, key string, value string) string {
@@ -94,6 +95,26 @@ func MapGetRawOr(m map[string]interface{}, key string, value interface{}) interf
 
 func MapGetString(m map[string]interface{}, key string) string {
 	return MapGetStringOr(m, key, "")
+}
+
+func ExtractMapValueString(m any, key string) string {
+	return MapGetString(ParseStringToGeneralMap(m), key)
+}
+
+func ExtractMapValueInt(m any, key string) int {
+	return MapGetInt(ParseStringToGeneralMap(m), key)
+}
+
+func ExtractMapValueBool(m any, key string) bool {
+	return MapGetBool(ParseStringToGeneralMap(m), key)
+}
+
+func ExtractMapValueGeneralMap(m any, key string) map[string]any {
+	return MapGetMapRaw(ParseStringToGeneralMap(m), key)
+}
+
+func ExtractMapValueRaw(m any, key string) any {
+	return MapGetRaw(ParseStringToGeneralMap(m), key)
 }
 
 func InterfaceToMapInterface(i interface{}) map[string]interface{} {
@@ -341,8 +362,8 @@ func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface
 	return p
 }
 
-func ToMapParams(params interface{}) (map[string]interface{}, error) {
-	var p = map[string]interface{}{}
+func ToMapParams(params any) (map[string]any, error) {
+	var p = map[string]any{}
 	raw, err := json.Marshal(params)
 	if err != nil {
 		return nil, Errorf("marshal params failed: %s", err)
@@ -354,6 +375,18 @@ func ToMapParams(params interface{}) (map[string]interface{}, error) {
 	}
 
 	return p, nil
+}
+
+func ParseStringToGeneralMap(i any) map[string]any {
+	data := InterfaceToString(i)
+	data = strings.TrimSpace(data)
+	var target any
+	err := json.Unmarshal([]byte(data), &target)
+	if err != nil {
+		log.Warnf("parse `%v` to map[string]any failed: %s", data, err)
+		return make(map[string]any)
+	}
+	return InterfaceToGeneralMap(target)
 }
 
 func MergeStringMap(ms ...map[string]string) map[string]string {
