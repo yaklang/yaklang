@@ -116,9 +116,7 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 }
 
 func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
-	return lo.UniqBy(ag.pkgs, func(item *dxtypes.Package) string {
-		return item.Identifier()
-	})
+	return ag.pkgs
 }
 
 func (ag *AnalyzerGroup) Append(a ...Analyzer) {
