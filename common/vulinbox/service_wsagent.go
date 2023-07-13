@@ -1,29 +1,18 @@
 package vulinbox
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
+	"sync"
 	"time"
 )
 
 func (r *VulinServer) registerWSAgent() {
 	router := r.router
-	var agentFeedbackHandler func([]byte) error
-	router.Use(func(handler http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			reqRaw, _ := utils.HttpDumpWithBody(request, true)
-			if len(reqRaw) > 0 {
-				if agentFeedbackHandler != nil {
-					err := agentFeedbackHandler(reqRaw)
-					if err != nil {
-						agentFeedbackHandler = nil
-					}
-				}
-			}
-			handler.ServeHTTP(writer, request)
-		})
-	})
+	var agentFeedbackHandler = r.agentFeedbackChan
 	// wsAgent
 	var upgrader = websocket.Upgrader{}
 	router.HandleFunc("/_/ws", func(writer http.ResponseWriter, request *http.Request) {
@@ -78,6 +67,8 @@ User-Agent: FeedbackStreamer/1.0
 			"host": request.Host,
 		})
 	})
+	var wsAgentMux = new(sync.Mutex)
+
 	router.HandleFunc("/_/ws/agent", func(writer http.ResponseWriter, request *http.Request) {
 		/*
 			GET /_/ws/agent HTTP/1.1
@@ -90,33 +81,58 @@ User-Agent: FeedbackStreamer/1.0
 			Upgrade: websocket
 			User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36
 		*/
-		if agentFeedbackHandler != nil {
+
+		if !wsAgentMux.TryLock() {
 			writer.Write([]byte(`agent is connected by other user`))
 			writer.WriteHeader(502)
 			return
+		} else {
+			log.Info("start to enter ws agent lock")
 		}
 
+		defer wsAgentMux.Unlock()
+		defer func() {
+			if err := recover(); err != nil {
+				spew.Dump(err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+
+		log.Infof("start to upgrade to ws agent: %s", request.RemoteAddr)
 		responseHeader := make(http.Header)
 		conn, err := upgrader.Upgrade(writer, request, responseHeader)
 		if err != nil {
+			log.Error(err)
 			return
 		}
-		agentFeedbackHandler = func(bytes []byte) error {
-			err := conn.WriteJSON(map[string]any{
-				"type":              "request",
-				"request":           string(bytes),
-				"timestamp":         time.Now().Second(),
-				"timestamp_verbose": time.Now().String(),
-			})
-			if err != nil {
-				conn.Close()
-				return err
+		defer func() {
+			conn.Close()
+		}()
+		var wr sync.Mutex
+		go func() {
+			for {
+				wr.Lock()
+				err := conn.WriteJSON(map[string]any{"type": "ping"})
+				wr.Unlock()
+				if err != nil {
+					return
+				}
+				time.Sleep(time.Second)
 			}
-			return nil
-		}
+		}()
 		for {
-			conn.WriteJSON(map[string]any{"type": "ping"})
-			time.Sleep(time.Second)
+			select {
+			case bytes := <-agentFeedbackHandler:
+				wr.Lock()
+				err := conn.WriteJSON(map[string]any{
+					"type":    "request",
+					"request": string(bytes),
+				})
+				wr.Unlock()
+				if err != nil {
+					return
+				}
+			}
 		}
 	})
 }

@@ -568,6 +568,27 @@ func NewYakitVirtualClientScriptEngine(client *yaklib.YakitClient) *ScriptEngine
 	return e
 }
 
+func Execute(code string, params ...map[string]any) (*antlr4yak.Engine, error) {
+	var mergedParams = make(map[string]any)
+	if len(params) > 0 {
+		for _, param := range params {
+			for k, v := range param {
+				mergedParams[k] = v
+			}
+		}
+	}
+	engine := NewScriptEngine(1)
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		if mergedParams != nil {
+			for k, v := range mergedParams {
+				engine.SetVar(k, v)
+			}
+		}
+		return nil
+	})
+	return engine.ExecuteEx(code, mergedParams)
+}
+
 func NewScriptEngine(maxConcurrent int) *ScriptEngine {
 	engine := &ScriptEngine{
 		swg: utils.NewSizedWaitGroup(maxConcurrent),
