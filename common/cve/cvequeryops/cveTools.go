@@ -1,17 +1,5 @@
 package cvequeryops
 
-import (
-	"encoding/json"
-	"fmt"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
-	"os"
-	"path"
-	"regexp"
-	"strconv"
-	"strings"
-)
-
 const scriptFormat = `
 # port scan plugin
 yakit.AutoInitYakit()
@@ -127,63 +115,63 @@ func VersionRuleCompare(version, BoundaryVerison, Op){
 `
 
 // MakeCtScript 生成合规插件脚本，要求输入产品名，数据库路径，服务名(扫描获取的服务名)，脚本输出路径
-func MakeCtScript(product, dbName, serverName, scriptPath string) {
-	//! 设置合规脚本目标产品
-
-	var addRuleStrs []string
-	formatString := "addCVE(\"%s\", %s, \"%.2f\", \"%s\", \"%s\", %s)\n"
-	CVEs, _ := Query(dbName, Product(product))
-	for _, cve := range CVEs {
-		//// todo 漏洞中文名暂时不用cnnvd，
-		//cnnvd, _ := cve.CNNVD(dbName)
-		var config cveresources.Configurations
-		err := json.Unmarshal(cve.CPEConfigurations, &config)
-		if err != nil {
-			log.Errorf("config json error:%#v", err)
-			return
-		}
-		var version []map[string]string
-		for _, node := range config.Nodes {
-			version = append(version, node.GetProductVersion(product)...)
-		}
-
-		if len(version) == 0 {
-			continue
-		}
-
-		mapFormatStr := `"%s":"%s"`
-		var versionRuleStr string
-		var ruleListStrs []string
-		for _, m := range version {
-
-			var insideMapStrs []string
-			for k, v := range m {
-				insideMapStrs = append(insideMapStrs, fmt.Sprintf(mapFormatStr, k, v))
-			}
-			ruleListStrs = append(ruleListStrs, "{"+strings.Join(insideMapStrs, ",")+"}")
-		}
-		versionRuleStr = "[" + strings.Join(ruleListStrs, ",") + "]"
-
-		addRuleStrs = append(addRuleStrs, fmt.Sprintf(formatString, cve.CVE.CVE, versionRuleStr, cve.BaseCVSSv2Score, cve.Severity, GetAKA(cve.DescriptionMain), strconv.Quote(cve.DescriptionMain)))
-	}
-	addRule := strings.Join(addRuleStrs, "\n")
-	script := fmt.Sprintf(scriptFormat, addRule, serverName, product, product)
-	outputPath := path.Join(scriptPath, product+".yak")
-	err := os.WriteFile(outputPath, []byte(script), 0666)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func GetAKA(descriptions string) string {
-	if !strings.Contains(descriptions, "aka") {
-		return ""
-	} else {
-		compileRegex := regexp.MustCompile("aka \"(.*?)\"")
-		matchAka := compileRegex.FindStringSubmatch(descriptions)
-		if len(matchAka) > 0 {
-			return matchAka[len(matchAka)-1]
-		}
-		return ""
-	}
-}
+//func MakeCtScript(product, dbName, serverName, scriptPath string) {
+//	//! 设置合规脚本目标产品
+//
+//	var addRuleStrs []string
+//	formatString := "addCVE(\"%s\", %s, \"%.2f\", \"%s\", \"%s\", %s)\n"
+//	CVEs, _ := Query(dbName, Product(product))
+//	for _, cve := range CVEs {
+//		//// todo 漏洞中文名暂时不用cnnvd，
+//		//cnnvd, _ := cve.CNNVD(dbName)
+//		var config cveresources.Configurations
+//		err := json.Unmarshal(cve.CPEConfigurations, &config)
+//		if err != nil {
+//			log.Errorf("config json error:%#v", err)
+//			return
+//		}
+//		var version []map[string]string
+//		for _, node := range config.Nodes {
+//			version = append(version, node.GetProductVersion(product)...)
+//		}
+//
+//		if len(version) == 0 {
+//			continue
+//		}
+//
+//		mapFormatStr := `"%s":"%s"`
+//		var versionRuleStr string
+//		var ruleListStrs []string
+//		for _, m := range version {
+//
+//			var insideMapStrs []string
+//			for k, v := range m {
+//				insideMapStrs = append(insideMapStrs, fmt.Sprintf(mapFormatStr, k, v))
+//			}
+//			ruleListStrs = append(ruleListStrs, "{"+strings.Join(insideMapStrs, ",")+"}")
+//		}
+//		versionRuleStr = "[" + strings.Join(ruleListStrs, ",") + "]"
+//
+//		addRuleStrs = append(addRuleStrs, fmt.Sprintf(formatString, cve.CVE.CVE, versionRuleStr, cve.BaseCVSSv2Score, cve.Severity, GetAKA(cve.DescriptionMain), strconv.Quote(cve.DescriptionMain)))
+//	}
+//	addRule := strings.Join(addRuleStrs, "\n")
+//	script := fmt.Sprintf(scriptFormat, addRule, serverName, product, product)
+//	outputPath := path.Join(scriptPath, product+".yak")
+//	err := os.WriteFile(outputPath, []byte(script), 0666)
+//	if err != nil {
+//		panic(err)
+//	}
+//}
+//
+//func GetAKA(descriptions string) string {
+//	if !strings.Contains(descriptions, "aka") {
+//		return ""
+//	} else {
+//		compileRegex := regexp.MustCompile("aka \"(.*?)\"")
+//		matchAka := compileRegex.FindStringSubmatch(descriptions)
+//		if len(matchAka) > 0 {
+//			return matchAka[len(matchAka)-1]
+//		}
+//		return ""
+//	}
+//}
