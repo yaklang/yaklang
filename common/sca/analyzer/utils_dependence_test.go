@@ -2,35 +2,16 @@ package analyzer
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"golang.org/x/exp/slices"
 )
 
-var (
-	pkgMaps = make(map[string][]*dxtypes.Package)
-	pa1     = newPackage("pa1", "0.0.3", "pa")
-	pa22    = newPackage("pa22", "0.0.3", "pa")
-	pa21    = newPackage("pa21", "0.0.3", "pa")
-	pa3     = newPackage("pa3", "0.0.3", "pa")
-	pa3b    = newPackage("pb3", "0.0.2", "pa")
-
-	pb1 = newPackage("pb1", "0.0.3", "pb")
-	pb2 = newPackage("pb2", "0.0.3", "pb")
-	pb3 = newPackage("pb3", "0.0.3", "pb")
-
-	pc1  = newPackage("pc1", "0.0.3", "pc")
-	pc2  = newPackage("pc2", "0.0.3", "pc")
-	pc3  = newPackage("pc3", "0.0.3", "pc")
-	pcor = newPackage("pa1|pb1|pb2", "0.0.3|0.0.3|0.0.3", "pc")
-
-	pd1  = newPackage("pd1", "0.0.3", "pd")
-	pd2  = newPackage("pd2", "0.0.5", "pd")
-	pd3  = newPackage("pd3", "0.0.3", "pd")
-	pdor = newPackage("pa1|pb1|pb2", ">0.0.2|>=0.0.3|<0.0.4", "pd")
-	//pdor = newPackage("pa1|pb1|pb2", "0.0.2|0.0.3|0.0.4", "pd")
-)
+var pkgMaps = make(map[string][]*dxtypes.Package)
 
 func newPackage(name, version, prefix string) *dxtypes.Package {
 	p := &dxtypes.Package{
@@ -54,59 +35,151 @@ func newPackage(name, version, prefix string) *dxtypes.Package {
 	return p
 }
 
-//	func DrawPackagesDOT(pkgs []*dxtypes.Package, name string) {
-//		g := dot.NewGraph(dot.Directed)
-//		nodes := make(map[string]dot.Node, len(pkgs))
-//		for _, pkg := range pkgs {
-//			label := fmt.Sprintf("%s-%s", pkg.Name, html.EscapeString(pkg.Version))
-//			label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">License: %s</FONT>`, strings.Join(pkg.License, ", "))
-//			label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Verification: %s</FONT>`, pkg.Verification)
-//			label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Indirect: %v</FONT>`, pkg.Indirect)
-//			label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Potential: %v</FONT>`, pkg.Potential)
-//			node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label))
-//			nodes[pkg.Identifier()] = node
-//		}
-//		edgeExistMap := make(map[string]struct{})
-//		for _, pkg := range pkgs {
-//			for _, upStreamPkg := range pkg.UpStreamPackages {
-//				if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())]; ok {
-//					continue
-//				}
-//				g.Edge(nodes[pkg.Identifier()], nodes[upStreamPkg.Identifier()])
-//				edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())] = struct{}{}
-//			}
-//			for _, downStreamPkg := range pkg.DownStreamPackages {
-//				if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())]; ok {
-//					continue
-//				}
-//				g.Edge(nodes[downStreamPkg.Identifier()], nodes[pkg.Identifier()])
-//				edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())] = struct{}{}
-//			}
-//		}
-//		f, err := os.CreateTemp("", "temp-dot")
-//		defer f.Close()
-//		if err != nil {
-//			return
-//		}
-//		_, err = io.Copy(f, strings.NewReader(g.String()))
-//		if err != nil {
-//			return
-//		}
-//		pngPath := filepath.Join(os.TempDir(), name)
-//		cmd := exec.Command("C:\\Users\\ad\\scoop\\shims\\dot.exe", "-T", "png", fmt.Sprintf("-o%s", pngPath), f.Name())
-//		err = cmd.Run()
-//		if err != nil {
-//			log.Errorf("dot: %v", err)
-//			return
-//		}
-//		cmd = exec.Command("explorer.exe", pngPath)
-//		err = cmd.Run()
-//		if err != nil {
-//			log.Errorf("explorer: %v", err)
-//			return
-//		}
-//	}
-func init() {
+// func DrawPackagesDOT(pkgs []*dxtypes.Package, name string) {
+// 	g := dot.NewGraph(dot.Directed)
+// 	nodes := make(map[string]dot.Node, len(pkgs))
+// 	for _, pkg := range pkgs {
+// 		label := fmt.Sprintf("%s-%s", pkg.Name, html.EscapeString(pkg.Version))
+// 		label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">License: %s</FONT>`, strings.Join(pkg.License, ", "))
+// 		label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Verification: %s</FONT>`, pkg.Verification)
+// 		label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Indirect: %v</FONT>`, pkg.Indirect)
+// 		label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Potential: %v</FONT>`, pkg.Potential)
+// 		node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label))
+// 		nodes[pkg.Identifier()] = node
+// 	}
+// 	edgeExistMap := make(map[string]struct{})
+// 	for _, pkg := range pkgs {
+// 		for _, upStreamPkg := range pkg.UpStreamPackages {
+// 			if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())]; ok {
+// 				continue
+// 			}
+// 			g.Edge(nodes[pkg.Identifier()], nodes[upStreamPkg.Identifier()])
+// 			edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())] = struct{}{}
+// 		}
+// 		for _, downStreamPkg := range pkg.DownStreamPackages {
+// 			if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())]; ok {
+// 				continue
+// 			}
+// 			g.Edge(nodes[downStreamPkg.Identifier()], nodes[pkg.Identifier()])
+// 			edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())] = struct{}{}
+// 		}
+// 	}
+// 	f, err := os.CreateTemp("", "temp-dot")
+// 	defer f.Close()
+// 	if err != nil {
+// 		return
+// 	}
+// 	_, err = io.Copy(f, strings.NewReader(g.String()))
+// 	if err != nil {
+// 		return
+// 	}
+// 	pngPath := filepath.Join(os.TempDir(), name)
+// 	cmd := exec.Command("C:\\Users\\ad\\scoop\\shims\\dot.exe", "-T", "png", fmt.Sprintf("-o%s", pngPath), f.Name())
+// 	err = cmd.Run()
+// 	if err != nil {
+// 		log.Errorf("dot: %v", err)
+// 		return
+// 	}
+// 	cmd = exec.Command("C:\\Windows\\explorer.exe", pngPath)
+// 	err = cmd.Run()
+// 	if err != nil {
+// 		log.Errorf("explorer: %v", err)
+// 		return
+// 	}
+// }
+
+// func ShowDot(pkgs []*dxtypes.Package) {
+// 	sort.SliceStable(pkgs, func(i, j int) bool {
+// 		return pkgs[i].Name+pkgs[i].Version < pkgs[j].Name+pkgs[j].Version
+// 	})
+// 	for _, pkg := range pkgs {
+// 		upstream := lo.MapToSlice(pkg.UpStreamPackages, func(_ string, p *dxtypes.Package) string {
+// 			return p.Name + "-" + p.Version
+// 		})
+// 		sort.Strings(upstream)
+// 		downstream := lo.MapToSlice(pkg.DownStreamPackages, func(_ string, p *dxtypes.Package) string {
+// 			return p.Name + "-" + p.Version
+// 		})
+// 		sort.Strings(downstream)
+// 		fmt.Printf(`
+// 		{
+// 	 		ID: "%s-%s",
+// 	 		UpStream: %#v,
+// 	 		DownStream: %#v,
+// 	 	},
+// 		`, pkg.Name, pkg.Version, upstream, downstream,
+// 		)
+// 	}
+// }
+
+type testPackage struct {
+	ID         string
+	DownStream []string // name + version
+	UpStream   []string // name + version
+}
+
+func Check(t *testing.T, packages []*dxtypes.Package, want []*testPackage) {
+	pkgs := CoverPackageToPkg(packages)
+	if len(pkgs) != len(want) {
+		t.Fatalf("%s: pkgs length error: %d(got) != %d(want)", t.Name(), len(pkgs), len(want))
+	}
+	for i := 0; i < len(pkgs); i++ {
+
+		if pkgs[i].ID != want[i].ID {
+			t.Fatalf("%s: pkgs %d(%s) ID error: %s(got) != %s(want)", t.Name(), i, pkgs[i].ID, pkgs[i].ID, want[i].ID)
+		}
+
+		if slices.Compare(pkgs[i].DownStream, want[i].DownStream) != 0 {
+			t.Fatalf("%s: pkgs %d(%s) DownStream error: %#v(got) != %#v(want)", t.Name(), i, pkgs[i].ID, pkgs[i].DownStream, want[i].DownStream)
+		}
+		if slices.Compare(pkgs[i].UpStream, want[i].UpStream) != 0 {
+			t.Fatalf("%s: pkgs %d(%s) UpStream error: %#v(got) != %#v(want)", t.Name(), i, pkgs[i].ID, pkgs[i].UpStream, want[i].UpStream)
+		}
+	}
+
+}
+
+func CoverPackageToPkg(packages []*dxtypes.Package) []*testPackage {
+	pkgs := make([]*testPackage, 0)
+	sort.SliceStable(packages, func(i, j int) bool {
+		return packages[i].Name+packages[i].Version < packages[j].Name+packages[j].Version
+	})
+	for _, pkg := range packages {
+		upstream := lo.MapToSlice(pkg.UpStreamPackages, func(_ string, p *dxtypes.Package) string {
+			return p.Name + "-" + p.Version
+		})
+		sort.Strings(upstream)
+		downstream := lo.MapToSlice(pkg.DownStreamPackages, func(_ string, p *dxtypes.Package) string {
+			return p.Name + "-" + p.Version
+		})
+		sort.Strings(downstream)
+		p := &testPackage{
+			ID:         pkg.Name + "-" + pkg.Version,
+			DownStream: downstream,
+			UpStream:   upstream,
+		}
+		pkgs = append(pkgs, p)
+	}
+	return pkgs
+}
+
+func TestMergePackagesNormal(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	// DrawPackagesDOT(pkgs, "org.png")
+	pkgMaps = make(map[string][]*dxtypes.Package)
+
+	pa1 := newPackage("pa1", "0.0.3", "pa")
+	pa22 := newPackage("pa22", "0.0.3", "pa")
+	pa21 := newPackage("pa21", "0.0.3", "pa")
+	pa3 := newPackage("pa3", "0.0.3", "pa")
+	pa3b := newPackage("pb3", "0.0.2", "pa")
+	pb1 := newPackage("pb1", "0.0.3", "pb")
+	pb2 := newPackage("pa22", "0.0.3", "pb")
+	pb3 := newPackage("pb3", "0.0.3", "pb")
+	pkgs = append(pkgs, pkgMaps["pa"]...)
+	pkgs = append(pkgs, pkgMaps["pb"]...)
+	// DrawPackagesDOT(pkgs, "org.png")
+
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
 	linkStream(pa1, pa22)
@@ -114,7 +187,161 @@ func init() {
 	linkStream(pa22, pa3)
 	linkStream(pa22, pa3b)
 
-	// pb1 -> pb2 -> pb3
+	// pb1 -> pb2(pa22) -> pb3
+	linkStream(pb1, pb2)
+	linkStream(pb2, pb3)
+
+	ret := mergePackages(pkgs)
+	wantPkg := []*testPackage{
+
+		{
+			ID:         "pa1-0.0.3",
+			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pa21-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa1-0.0.3"},
+		},
+
+		{
+			ID:         "pa22-0.0.3",
+			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
+			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
+		},
+
+		{
+			ID:         "pa3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb1-0.0.3",
+			UpStream:   []string{"pa22-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pb3-0.0.2",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+	}
+	// DrawPackagesDOT(ret, "ret.png")
+	// ShowDot(ret)
+	Check(t, ret, wantPkg)
+}
+
+func TestMergePackagesVersionRange(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	pkgMaps = make(map[string][]*dxtypes.Package)
+	pa1 := newPackage("pa1", "0.0.3", "pa")
+	pa22 := newPackage("pa22", "0.0.3", "pa")
+	pa21 := newPackage("pa21", "0.0.3", "pa")
+	pa3 := newPackage("pa3", "0.0.3", "pa")
+	pa3b := newPackage("pb3", "0.0.2", "pa")
+	pe1 := newPackage("pe1", "0.0.3", "pe")
+	pe2 := newPackage("pa22", "<0.0.5", "pe")
+	pe3 := newPackage("pa3", ">0.0.3", "pe")
+	pkgs = append(pkgs, pkgMaps["pa"]...)
+	pkgs = append(pkgs, pkgMaps["pe"]...)
+
+	// pa1 -> pa22 -> pa3
+	//     -> pa21
+	linkStream(pa1, pa22)
+	linkStream(pa1, pa21)
+	linkStream(pa22, pa3)
+	linkStream(pa22, pa3b)
+	// pe1 -> pe2(pa2<0.0.5) -> pe3
+	linkStream(pe1, pe2)
+	linkStream(pe2, pe3)
+
+	// DrawPackagesDOT(pkgs, "org.png")
+	ret := mergePackages(pkgs)
+	wantPkg := []*testPackage{
+
+		{
+			ID:         "pa1-0.0.3",
+			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pa21-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa1-0.0.3"},
+		},
+
+		{
+			ID:         "pa22-0.0.3",
+			UpStream:   []string{"pa3-0.0.3", "pa3->0.0.3", "pb3-0.0.2"},
+			DownStream: []string{"pa1-0.0.3", "pe1-0.0.3"},
+		},
+
+		{
+			ID:         "pa3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pa3->0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.2",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pe1-0.0.3",
+			UpStream:   []string{"pa22-0.0.3"},
+			DownStream: []string{},
+		},
+	}
+	// ShowDot(ret)
+	Check(t, ret, wantPkg)
+}
+
+func TestMergePackagesOrPackage(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	pkgMaps = make(map[string][]*dxtypes.Package)
+	pa1 := newPackage("pa1", "0.0.3", "pa")
+	pa22 := newPackage("pa22", "0.0.3", "pa")
+	pa21 := newPackage("pa21", "0.0.3", "pa")
+	pa3 := newPackage("pa3", "0.0.3", "pa")
+	pa3b := newPackage("pb3", "0.0.2", "pa")
+	pb1 := newPackage("pb1", "0.0.3", "pb")
+	pb2 := newPackage("pa22", "0.0.3", "pb")
+	pb3 := newPackage("pb3", "0.0.3", "pb")
+	pc1 := newPackage("pc1", "0.0.3", "pc")
+	pc2 := newPackage("pc2", "0.0.3", "pc")
+	pc3 := newPackage("pc3", "0.0.3", "pc")
+	pcor := newPackage("pa1|pb1|pb2", "0.0.3|0.0.3|0.0.3", "pc")
+	pkgs = append(pkgs, pkgMaps["pa"]...)
+	pkgs = append(pkgs, pkgMaps["pb"]...)
+	pkgs = append(pkgs, pkgMaps["pc"]...)
+
+	// pa1 -> pa22 -> pa3
+	//     -> pa21
+	linkStream(pa1, pa22)
+	linkStream(pa1, pa21)
+	linkStream(pa22, pa3)
+	linkStream(pa22, pa3b)
+
+	// pb1 -> pb2(pa22) -> pb3
 	linkStream(pb1, pb2)
 	linkStream(pb2, pb3)
 
@@ -123,50 +350,173 @@ func init() {
 	linkStream(pc1, pc2)
 	linkStream(pc2, pc3)
 	linkStream(pc1, pcor)
+	// DrawPackagesDOT(pkgs, "org.png")
+	ret := mergePackages(pkgs)
+	// _ = ret
+	// DrawPackagesDOT(ret, "ret.png")
+	wantPkg := []*testPackage{
+		{
+			ID:         "pa1-0.0.3",
+			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
+			DownStream: []string{"pc1-0.0.3"},
+		},
+
+		{
+			ID:         "pa21-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa1-0.0.3"},
+		},
+
+		{
+			ID:         "pa22-0.0.3",
+			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
+			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
+		},
+
+		{
+			ID:         "pa3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb1-0.0.3",
+			UpStream:   []string{"pa22-0.0.3"},
+			DownStream: []string{"pc1-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.2",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pc1-0.0.3",
+			UpStream:   []string{"pa1-0.0.3", "pb1-0.0.3", "pc2-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pc2-0.0.3",
+			UpStream:   []string{"pc3-0.0.3"},
+			DownStream: []string{"pc1-0.0.3"},
+		},
+
+		{
+			ID:         "pc3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pc2-0.0.3"},
+		},
+	}
+	// ShowDot(ret)
+	Check(t, ret, wantPkg)
+}
+
+func TestMergePackagesOrPackageVersionRange(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	pkgMaps = make(map[string][]*dxtypes.Package)
+	pa1 := newPackage("pa1", "0.0.3", "pa")
+	pa22 := newPackage("pa22", "0.0.3", "pa")
+	pa21 := newPackage("pa21", "0.0.3", "pa")
+	pa3 := newPackage("pa3", "0.0.3", "pa")
+	pa3b := newPackage("pb3", "0.0.2", "pa")
+	pb1 := newPackage("pb1", "0.0.3", "pb")
+	pb2 := newPackage("pa22", "0.0.3", "pb")
+	pb3 := newPackage("pb3", "0.0.3", "pb")
+	pd1 := newPackage("pd1", "0.0.3", "pd")
+	pd2 := newPackage("pd2", "0.0.5", "pd")
+	pd3 := newPackage("pd3", "0.0.3", "pd")
+	pdor := newPackage("pa1|pb1|pb2", ">0.0.2|>=0.0.3|<0.0.4", "pd")
+	pkgs = append(pkgs, pkgMaps["pa"]...)
+	pkgs = append(pkgs, pkgMaps["pb"]...)
+	pkgs = append(pkgs, pkgMaps["pd"]...)
+	// pa1 -> pa22 -> pa3
+	//     -> pa21
+	linkStream(pa1, pa22)
+	linkStream(pa1, pa21)
+	linkStream(pa22, pa3)
+	linkStream(pa22, pa3b)
+
+	// pb1 -> pb2(pa22) -> pb3
+	linkStream(pb1, pb2)
+	linkStream(pb2, pb3)
 
 	// pd1 -> pd2 -> pd3
 	//     -> pa1|pb1|pb2
 	linkStream(pd1, pd2)
 	linkStream(pd2, pd3)
 	linkStream(pd1, pdor)
-}
-
-func TestMergePackagesNormal(t *testing.T) {
-	pkgs := make([]*dxtypes.Package, 0)
-	pkgs = append(pkgs, pkgMaps["pa"]...)
-	pkgs = append(pkgs, pkgMaps["pb"]...)
-	// DrawPackagesDOT(pkgs, "org.png")
-
-	// pb2 == pa22
-	pb2.Name = pa22.Name
-	ret := mergePackages(pkgs)
-	// DrawPackagesDOT(ret, "ret.png")
-	_ = ret
-}
-
-// TODO:
-func TestMergePackagesVErsionRange(t *testing.T) {
-
-}
-
-func TestMergePackagesOrPackage(t *testing.T) {
-	pkgs := make([]*dxtypes.Package, 0)
-	pkgs = append(pkgs, pkgMaps["pa"]...)
-	pkgs = append(pkgs, pkgMaps["pb"]...)
-	pkgs = append(pkgs, pkgMaps["pc"]...)
-	// DrawPackagesDOT(pkgs, "org.png")
-	ret := mergePackages(pkgs)
-	_ = ret
-	// DrawPackagesDOT(ret, "ret.png")
-}
-
-func TestMergePackagesOrPackageVersionRange(t *testing.T) {
-	pkgs := make([]*dxtypes.Package, 0)
-	pkgs = append(pkgs, pkgMaps["pa"]...)
-	pkgs = append(pkgs, pkgMaps["pb"]...)
-	pkgs = append(pkgs, pkgMaps["pd"]...)
 	// DrawPackagesDOT(pkgs, "org.png")
 	ret := mergePackages(pkgs)
 	// DrawPackagesDOT(ret, "ret.png")
-	_ = ret
+	// ShowDot(ret)
+	wantPkg := []*testPackage{
+		{
+			ID:         "pa1-0.0.3",
+			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
+			DownStream: []string{"pd1-0.0.3"},
+		},
+
+		{
+			ID:         "pa21-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa1-0.0.3"},
+		},
+
+		{
+			ID:         "pa22-0.0.3",
+			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
+			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
+		},
+
+		{
+			ID:         "pa3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb1-0.0.3",
+			UpStream:   []string{"pa22-0.0.3"},
+			DownStream: []string{"pd1-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.2",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pd1-0.0.3",
+			UpStream:   []string{"pa1-0.0.3", "pb1-0.0.3", "pd2-0.0.5"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pd2-0.0.5",
+			UpStream:   []string{"pd3-0.0.3"},
+			DownStream: []string{"pd1-0.0.3"},
+		},
+
+		{
+			ID:         "pd3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pd2-0.0.5"},
+		},
+	}
+	Check(t, ret, wantPkg)
 }
