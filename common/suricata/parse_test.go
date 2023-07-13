@@ -1,7 +1,9 @@
 package suricata
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
 
@@ -84,4 +86,90 @@ func TestParse2(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(rules)
+}
+
+func TestParse_PortSyntaxAndMatch(t *testing.T) {
+	for _, i := range [][]any{
+		// rule, include, exclude
+		{`alert tcp any [111,222] <> any any (msg: "abc")`, []int{111, 222}, []int{22}},
+		{`alert tcp any any <> any any (msg: "abc")`, []int{111, 222}, []int{}},
+		{`alert tcp any [79:222,!80] <> any any (msg: "abc")`, []int{79, 81, 86, 200}, []int{80, 999}},
+		{`alert tcp any ![222,!80] <> any any (msg: "abc")`, []int{80}, []int{222}},
+		{`alert tcp any !22 <> any any (msg: "abc")`, []int{11}, []int{22}},
+		{`alert tcp any [1,![23,41]] <> any any (msg: "abc")`, []int{1}, []int{23, 41, 222}},
+	} {
+		r, err := Parse(utils.InterfaceToString(i[0]))
+		if err != nil {
+			panic(err)
+		}
+
+		if len(r) <= 0 {
+			panic("NO RULE")
+		}
+
+		var whitePorts = i[1].([]int)
+		var blackPorts = i[2].([]int)
+
+		for _, subRule := range r {
+			for _, wp := range whitePorts {
+				if !subRule.SourcePort.Match(wp) {
+					msg := fmt.Sprintf("rule: %v not match: %v", i[0], wp)
+					panic(msg)
+				}
+			}
+
+			for _, bp := range blackPorts {
+				if subRule.SourcePort.Match(bp) {
+					msg := fmt.Sprintf("rule: %v match blacklist ports: %v", i[0], bp)
+					panic(msg)
+				}
+			}
+
+			spew.Dump(subRule.SourcePort)
+		}
+	}
+}
+
+func TestParse_AddrSyntaxAndMatch(t *testing.T) {
+	var envs = []string{"HOME=2.3.4.5", "HOME2=1.2.3.4"}
+	for _, i := range [][]any{
+		// rule, include, exclude
+		{`alert tcp any any <> any any (msg: "abc")`, []string{"8.8.8.8", "4.4.4.4"}, []string{}},
+		{`alert tcp $HOME any <> any any (msg: "abc")`, []string{"2.3.4.5"}, []string{"8.8.8.8"}},
+		{`alert tcp !$HOME2 any <> any any (msg: "abc")`, []string{"2.3.4.5", "8.8.8.8"}, []string{"1.2.3.4"}},
+		{`alert tcp [$HOME2,$HOME] any <> any any (msg: "abc")`, []string{"2.3.4.5", "1.2.3.4"}, []string{"3.3.3.3"}},
+		{`alert tcp [$HOME2,$HOME,3.3.3.3/24] any <> any any (msg: "abc")`, []string{"2.3.4.5", "1.2.3.4", "3.3.3.1"}, []string{"3.3.2.3"}},
+		{`alert tcp [$HOME2,$HOME,!3.3.3.3/24] any <> any any (msg: "abc")`, []string{"2.3.4.5", "1.2.3.4"}, []string{"3.3.2.3", "3.3.3.1"}},
+		{`alert tcp ![$HOME2,$HOME] any <> any any (msg: "abc")`, []string{"3.3.2.3", "3.3.3.1"}, []string{"2.3.4.5", "1.2.3.4"}},
+		{`alert tcp 127.0.0.1/24 any <> any any (msg: "abc")`, []string{"127.0.0.2"}, []string{"2.3.4.5", "1.2.3.4"}},
+		{`alert tcp !127.0.0.1/24 any <> any any (msg: "abc")`, []string{"1.0.0.2"}, []string{"127.0.0.1", "127.0.0.2"}},
+	} {
+		r, err := Parse(utils.InterfaceToString(i[0]), envs...)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(r) <= 0 {
+			panic("NO RULE")
+		}
+
+		var whitePorts = i[1].([]string)
+		var blackPorts = i[2].([]string)
+
+		for _, subRule := range r {
+			for _, wp := range whitePorts {
+				if !subRule.SourceAddress.Match(wp) {
+					msg := fmt.Sprintf("rule: %v not match: %v\nenv: %v", i[0], wp, envs)
+					panic(msg)
+				}
+			}
+
+			for _, bp := range blackPorts {
+				if subRule.SourceAddress.Match(bp) {
+					msg := fmt.Sprintf("rule: %v match blacklist addr: %v\nenv: %v", i[0], bp, envs)
+					panic(msg)
+				}
+			}
+		}
+	}
 }
