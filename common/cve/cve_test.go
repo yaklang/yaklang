@@ -23,7 +23,7 @@ type productWithVersion struct {
 	target  string
 }
 
-func TestQueryCVEFixName(t *testing.T) {
+func TestQueryCVEWithFixName(t *testing.T) {
 	data := []productWithVersion{
 		{
 			name:    "httpd", //硬编码修复测试
