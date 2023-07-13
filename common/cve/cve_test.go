@@ -1,98 +1,96 @@
 package cve
 
 import (
-	"fmt"
+	"embed"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
-	"strings"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
+	"io"
+	"os"
 	"testing"
-	"time"
 )
 
-func TestQueryCWE(t *testing.T) {
-	err := TranslatingCWE("/Users/v1ll4n/yakit-projects/openai-key.txt", 1, "")
-	if err != nil {
-		panic(err)
-	}
-	//escdb := consts.GetGormCVEDescriptionDatabase()
-	//descdb.AutoMigrate(&cveresources.CWE{})
-	//for cwe := range cveresources.YieldCWEs(consts.GetGormCVEDatabase().Model(&cveresources.CWE{}), context.Background()) {
-	//	cwe := cwe
-	//
-	//	cwe, err := MakeOpenAITranslateCWE(cwe, getKey(), `http://127.0.0.1:7890`)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	err = cveresources.CreateOrUpdateCWE(descdb, cwe.IdStr, cwe)
-	//	if err != nil {
-	//		log.Error(err)
-	//	}
-	//}
-}
-
-func TestQuery(t *testing.T) {
-	_, num := cvequeryops.Query("./date.db", cvequeryops.CVE("CVE-2017-0144"))
-	if num != 1 {
-		fmt.Println("option cve Fail")
-	}
-
-	resCve, num := cvequeryops.Query("./date.db", cvequeryops.CWE("CWE-89"))
-	for _, cve := range resCve {
-		if !cve.CWE("CWE-89") {
-			fmt.Println("option CWE Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Product("php"))
-	fmt.Println(len(resCve))
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Product("iis"))
-	for _, cve := range resCve {
-		if !strings.Contains(cve.Product, "internet_information_server") {
-			fmt.Println("option product Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Vendor("apple"))
-	for _, cve := range resCve {
-		if !strings.Contains(cve.Vendor, "apple") {
-			fmt.Println("option vendor Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.Before(2022, 1, 3))
-	for _, cve := range resCve {
-		formatTime := "2022-01-03 00:00:00"
-		testTime, err := time.Parse("2006-01-02 15:04:05", formatTime)
-		if err != nil {
-			panic("parse time error")
-		}
-		if !cve.PublishedDate.Before(testTime) {
-			fmt.Println("option before Fail ")
-			break
-		}
-	}
-
-	resCve, num = cvequeryops.Query("./date.db", cvequeryops.After(2022, 1, 3))
-	for _, cve := range resCve {
-		formatTime := "2022-01-03 00:00:00"
-		testTime, err := time.Parse("2006-01-02 15:04:05", formatTime)
-		if err != nil {
-			panic("parse time error")
-		}
-		if !cve.PublishedDate.After(testTime) {
-			fmt.Println("option after Fail ")
-			break
-		}
-	}
-}
-
-func TestFunc(t *testing.T) {
-	cvequeryops.MakeCtScript("php", "./date.db", "php", "./")
-}
+//go:embed CIDate.db
+var DbFs embed.FS
 
 func TestMigrate(t *testing.T) {
 	_migrateTable()
+}
+
+type productWithVersion struct {
+	name    string
+	version string
+	target  string
+}
+
+func TestQueryCVEWithFixName(t *testing.T) {
+	data := []productWithVersion{
+		{
+			name:    "httpd", //硬编码修复测试
+			version: "2.4.49",
+			target:  "CVE-2021-42013",
+		},
+		{
+			name:    "apt2", //产品名冗杂修复
+			version: "0.7.5",
+			target:  "CVE-2009-1358",
+		},
+		{
+			name:    "python3-e", //产品名冗杂修复
+			version: "2.2",
+			target:  "CVE-2006-1542",
+		},
+		{
+			name:    "linux-2019",
+			version: "9.0",
+			target:  "CVE-2003-0780",
+		},
+	}
+
+	//读 embed 文件
+	DbFp, err := DbFs.Open("CIDate.db")
+	if err != nil {
+		log.Errorf("%v", err)
+	}
+	defer DbFp.Close()
+
+	//写到临时目录
+	tempFp, err := os.CreateTemp("", "Date.db")
+	if err != nil {
+		log.Errorf("%v", err)
+	}
+	defer tempFp.Close()
+
+	_, err = io.Copy(tempFp, DbFp)
+	if err != nil {
+		log.Errorf("%v", err)
+	}
+
+	M := cveresources.GetManager(tempFp.Name())
+	for _, datum := range data {
+		cve := cvequeryops.QueryCVEYields(M.DB, cvequeryops.ProductWithVersion(datum.name, datum.version))
+		count := 0
+		for {
+			flag := false
+			select {
+			case item, ok := <-cve:
+				if !ok {
+					flag = true
+					break
+				}
+				if item.CVE != datum.target {
+					panic("Mismatch: Redundant data: " + datum.name)
+				} else {
+					count++
+				}
+
+			}
+			if flag {
+				break
+			}
+		}
+		if count < 1 {
+			panic("Mismatch: Lack of data: " + datum.name)
+		}
+	}
 }

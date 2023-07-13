@@ -18,7 +18,7 @@ func GetManager(path string) *SqliteManager {
 		panic("failed to connect database")
 	}
 
-	db.AutoMigrate(&CNNVD{}, &CVE{}, &ProductsTable{})
+	db.AutoMigrate(&CVE{}, &ProductsTable{})
 
 	return &SqliteManager{db}
 }

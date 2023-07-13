@@ -183,6 +183,7 @@ func (n Nodes) Result(CheckCpe []CPE) float64 {
 				Level += insideLevel
 			}
 		default:
+
 			panic("Operator err")
 
 		}
