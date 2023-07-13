@@ -63,12 +63,13 @@ func _withConcurrent(n int) dockerContextOption {
 
 func saveImageFromContext(host, imageID string, f io.Writer) error {
 	opts := []client.Opt{
-		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	}
 	if host != "" {
 		// adding host parameter to the last assuming it will pick up more preference
-		opts = append(opts, client.WithHost(host), client.WithAPIVersionNegotiation())
+		opts = append(opts, client.WithHost(host))
+	} else {
+		opts = append(opts, client.FromEnv)
 	}
 	c, err := client.NewClientWithOpts(opts...)
 	if err != nil {
