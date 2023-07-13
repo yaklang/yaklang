@@ -10,24 +10,114 @@ type PortRule struct {
 	Any      bool
 	Negative bool
 
-	Ports []int
-	Rules []*PortRule
-	Env   string
+	// port cache
+	portsMap map[int]int
+	Ports    []int
+
+	envTable map[string]string
+
+	// rule cache
+	negativeRules []*PortRule
+	positiveRules []*PortRule
+	Rules         []*PortRule
+
+	Env string
+}
+
+func (p *PortRule) postHandle() {
+	if len(p.Ports) > 0 {
+		if p.portsMap == nil {
+			p.portsMap = make(map[int]int)
+		}
+		for _, port := range p.Ports {
+			p.portsMap[port] = port
+		}
+	}
+
+	if len(p.Rules) > 0 {
+		for _, r := range p.Rules {
+			if r.Negative {
+				p.negativeRules = append(p.negativeRules, r)
+			} else {
+				p.positiveRules = append(p.positiveRules, r)
+			}
+		}
+	}
+}
+
+func (p *PortRule) _matchWithoutNegative(i int) bool {
+	if p == nil {
+		return false
+	}
+	if p.Any {
+		return true
+	}
+
+	if len(p.Ports) > 0 {
+		if p.portsMap != nil {
+			_, ok := p.portsMap[i]
+			if ok {
+				return ok
+			}
+		} else {
+			for _, pInt := range p.Ports {
+				if pInt == i {
+					return true
+				}
+			}
+		}
+	}
+
+	if len(p.Rules) > 0 {
+		if len(p.negativeRules) <= 0 && len(p.positiveRules) <= 0 {
+			p.postHandle()
+		}
+		for _, nr := range p.negativeRules {
+			if !nr.Match(i) {
+				return false
+			}
+		}
+		for _, pr := range p.positiveRules {
+			if pr.Match(i) {
+				return true
+			}
+		}
+	}
+
+	if p.Env != "" && p.envTable != nil {
+		result, ok := p.envTable[p.Env]
+		result = strings.TrimSpace(result)
+		if ok && utils.Atoi(result) == i {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (p *PortRule) Match(i int) bool {
+	if p.Negative {
+		return !p._matchWithoutNegative(i)
+	} else {
+		return p._matchWithoutNegative(i)
+	}
 }
 
 func (v *RuleSyntaxVisitor) VisitSrcPort(i *parser.Src_portContext) *PortRule {
-	return v.VisitPortRule(i.Port().(*parser.PortContext))
+	p := v.VisitPortRule(i.Port().(*parser.PortContext))
+	return p
 }
 
 func (v *RuleSyntaxVisitor) VisitDstPort(i *parser.Dest_portContext) *PortRule {
-	return v.VisitPortRule(i.Port().(*parser.PortContext))
+	p := v.VisitPortRule(i.Port().(*parser.PortContext))
+	return p
 }
 
 func (v *RuleSyntaxVisitor) VisitPortRule(i *parser.PortContext) *PortRule {
 	if i == nil {
 		return nil
 	}
-	r := &PortRule{}
+	r := &PortRule{envTable: v.Environment}
 	if i.Any() != nil {
 		r.Any = true
 		return r

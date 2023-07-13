@@ -7,6 +7,7 @@ Any: 'any';
 Negative: '!';
 Dollar: '$';
 Arrow: '->';
+BothDirect: '<>';
 Mul: '*';
 Div: '/';
 Mod: '%';
@@ -48,11 +49,6 @@ HEX
     : HexDigit+
     ;
 
-FLOAT
-    : Digit+ '.' Digit* ExponentPart?
-    | '.' Digit+ ExponentPart?
-    | Digit+ ExponentPart
-    ;
 
 fragment
 ExponentPart
