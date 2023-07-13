@@ -1,7 +1,9 @@
 package sca
 
 import (
+	"embed"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"sort"
@@ -17,6 +19,11 @@ import (
 	"github.com/samber/lo"
 )
 
+var (
+	//go:embed testdata
+	testFS embed.FS
+)
+
 type testcase struct {
 	name           string
 	filePath       string
@@ -29,16 +36,45 @@ type testcase struct {
 	matchedFileMap map[string]string
 }
 
+func CreateTempFromFsFile(path string) (*os.File, error) {
+	// remove ./ prefix
+	if strings.HasPrefix(path, "./") {
+		path = path[2:]
+	}
+
+	tempFile, err := os.CreateTemp("", "test")
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := testFS.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(tempFile, f); err != nil {
+		return nil, err
+	}
+
+	return tempFile, nil
+}
+
 func Run(tc testcase) {
 	t := tc.t
 	fmt.Printf("TestCase: %s\n===============================\n", tc.name)
 
-	f, err := os.Open(tc.filePath)
+	f, err := CreateTempFromFsFile(tc.filePath)
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
 	if err != nil {
 		t.Fatalf("%s: con't open file: %v", err, tc.name)
 	}
+
 	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, analyzer.FileInfo) {
-		f, err := os.Open(v)
+		f, err := CreateTempFromFsFile(v)
 		if err != nil {
 			t.Fatalf("%s: con't open file: %v", err, tc.name)
 		}
@@ -49,6 +85,13 @@ func Run(tc testcase) {
 			MatchStatus: tc.matchType,
 		}
 	})
+	defer func() {
+		for _, fi := range matchedFileInfos {
+			f := fi.LazyFile
+			f.Close()
+			os.Remove(f.Name())
+		}
+	}()
 
 	pkgs, err := tc.a.Analyze(analyzer.AnalyzeFileInfo{
 		Self: analyzer.FileInfo{
@@ -59,9 +102,6 @@ func Run(tc testcase) {
 		},
 		MatchedFileInfos: matchedFileInfos,
 	})
-	// for _, pkg := range pkgs {
-	// 	fmt.Printf("%s\n", pkg)
-	// }
 
 	if tc.wantError && err == nil {
 		t.Fatalf("%s: want error but nil", tc.name)

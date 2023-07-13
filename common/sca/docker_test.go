@@ -1,7 +1,9 @@
 package sca
 
 import (
+	"bytes"
 	"compress/gzip"
+	_ "embed"
 	"io"
 	"os"
 	"sort"
@@ -11,18 +13,15 @@ import (
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
-const (
-	gzipFile = "./testdata/sca_dockertest.tar.gz"
+var (
+	//go:embed testdata/sca_dockertest.tar.gz
+	gzipFile []byte
 )
 
 func TestLoadDockerImageFromFile(t *testing.T) {
-	f, err := os.Open(gzipFile)
-	if err != nil {
-		t.Fatalf("can't open gzip file: %v", err)
-	}
-	defer f.Close()
+	br := bytes.NewReader(gzipFile)
 
-	r, err := gzip.NewReader(f)
+	r, err := gzip.NewReader(br)
 	if err != nil {
 		t.Fatalf("can't new gzip Reader: %v", err)
 	}
