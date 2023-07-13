@@ -61,7 +61,7 @@ func _withConcurrent(n int) dockerContextOption {
 	}
 }
 
-func saveImageFromContext(host, imageID string, f io.Writer) error {
+func NewDockerClient(host string) (*client.Client, error) {
 	opts := []client.Opt{
 		client.WithAPIVersionNegotiation(),
 	}
@@ -73,10 +73,12 @@ func saveImageFromContext(host, imageID string, f io.Writer) error {
 	}
 	c, err := client.NewClientWithOpts(opts...)
 	if err != nil {
-		return utils.Errorf("failed to initialize a docker client: %v", err)
+		return nil, utils.Errorf("failed to initialize a docker client: %v", err)
 	}
-	defer c.Close()
+	return c, nil
+}
 
+func saveImageFromContext(c *client.Client, imageID string, f io.Writer) error {
 	// Store the tarball in local filesystem and return a new reader into the bytes each time we need to access something.
 	ctx := context.Background()
 	rc, err := c.ImageSave(ctx, []string{imageID})
@@ -177,7 +179,7 @@ func walkImage(image *os.File, handler walkFunc) error {
 	return nil
 }
 
-func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes.Package, error) {
+func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
 
 	// match file
@@ -205,7 +207,22 @@ func loadDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes
 	return ag.Packages(), nil
 }
 
-func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
+func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
+	config := NewDockerContextConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	// save container as tarball
+
+	// scanImage
+
+	// scan mount FS
+
+	return nil, nil
+}
+
+func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -223,17 +240,25 @@ func LoadDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	}()
 
 	log.Infof("start to save the image: %s", imageID)
-	if err = saveImageFromContext(config.endpoint, imageID, f); err != nil {
+	client, err := NewDockerClient(config.endpoint)
+	defer client.Close()
+	if err != nil {
+		return nil, err
+	}
+	if err = saveImageFromContext(client, imageID, f); err != nil {
 		return nil, err
 
 	}
 
-	// defer f.Close()
+	pkgs, err := scanDockerImage(f, *config)
+	if err != nil {
+		return nil, utils.Errorf("failed to scan image[%s] : %v", imageID, err)
+	}
 
-	return loadDockerImage(f, *config)
+	return pkgs, nil
 }
 
-func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
+func ScanDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -245,5 +270,10 @@ func LoadDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtyp
 	}
 	defer f.Close()
 
-	return loadDockerImage(f, *config)
+	pkgs, err := scanDockerImage(f, *config)
+	if err != nil {
+		return nil, utils.Errorf("failed to scan image from filepath[%s] : %v", path, err)
+	}
+
+	return pkgs, nil
 }
