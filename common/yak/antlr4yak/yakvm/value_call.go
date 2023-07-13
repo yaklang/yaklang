@@ -2,10 +2,11 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"math"
 	"reflect"
 	"runtime"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (v *Value) NativeAsyncCall(vm *Frame, wavy bool, vs ...*Value) interface{} {
@@ -83,8 +84,8 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 		}
 	} else {
 		// 不可变参数的话，输入的函数参数列表长度和需要的参数列表长度应该是相等的
-		if vm.vm.GetConfig().GetFunctionNumberCheck() && funcType.NumIn() != len(args) {
-			msg := fmt.Sprintf("native func `%s` need [%v] params, actually got [%v] params", funcName, funcType.NumIn(), len(args))
+		if vm.vm.GetConfig().GetFunctionNumberCheck() && funcType.NumIn() != len(vs) {
+			msg := fmt.Sprintf("native func `%s` need [%v] params, actually got [%v] params", funcName, funcType.NumIn(), len(vs))
 			panic(msg)
 		}
 		for i := 0; i < funcType.NumIn(); i++ {
