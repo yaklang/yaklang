@@ -846,6 +846,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
+			Request:     requestRaw,
 			ResponseId:  responseCounter,
 			RemoteAddr:  remoteAddr,
 		}
