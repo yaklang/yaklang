@@ -31,16 +31,21 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 		return nil, errors.New("empty rules is not allowed")
 	}
 	_ = bestMode
-
 	if firstBlock != nil {
-		state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
-		result.State = state
-		result.Fingerprint = info
-		if err != nil {
-			result.Reason = err.Error()
-		}
-		if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
-			return specialCase(result, config), nil
+		if config.CanScanUDP() {
+			blocks = append(blocks, firstBlock)
+		} else if config.CanScanTCP() {
+			log.Infof("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
+
+			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
+			result.State = state
+			result.Fingerprint = info
+			if err != nil {
+				result.Reason = err.Error()
+			}
+			if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
+				return specialCase(result, config), nil
+			}
 		}
 	}
 
@@ -127,6 +132,7 @@ func mergeStates(states ...PortState) PortState {
 	return CLOSED
 }
 
+// 当 ProbesMax 设置的比较大时,后探测的结果中可能是存在正确的指纹信息的
 func mergeInfo(rawInfos ...*FingerprintInfo) *FingerprintInfo {
 	var info []*FingerprintInfo
 	for _, r := range rawInfos {
@@ -152,6 +158,10 @@ func mergeInfo(rawInfos ...*FingerprintInfo) *FingerprintInfo {
 		}
 		if infoIns.Port != root.Port {
 			continue
+		}
+		// 当有 Raw 字段时，代表和 match rule 匹配成功了
+		if len(root.Raw) == 0 && len(infoIns.Raw) != 0 {
+			root = infoIns
 		}
 
 		root.HttpFlows = append(root.HttpFlows, infoIns.HttpFlows...)

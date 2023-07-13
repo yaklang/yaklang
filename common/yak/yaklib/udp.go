@@ -289,7 +289,7 @@ func DebugMockUDPProtocol(name string) (string, int) {
 			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
 		}
 	}
-	return DebugMockUDPFromScan(1*time.Minute, responses)
+	return DebugMockUDPFromScan(3*time.Minute, responses)
 }
 
 func DebugMockUDPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
