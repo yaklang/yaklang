@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/samber/lo"
@@ -78,7 +79,7 @@ func NewDockerClient(host string) (*client.Client, error) {
 	return c, nil
 }
 
-func saveImageFromContext(c *client.Client, imageID string, f io.Writer) error {
+func saveImage(c *client.Client, imageID string, f io.Writer) error {
 	// Store the tarball in local filesystem and return a new reader into the bytes each time we need to access something.
 	ctx := context.Background()
 	rc, err := c.ImageSave(ctx, []string{imageID})
@@ -93,6 +94,28 @@ func saveImageFromContext(c *client.Client, imageID string, f io.Writer) error {
 	return nil
 }
 
+func exportContainer(c *client.Client, containerID string) (io.ReadCloser, error) {
+	ctx := context.Background()
+	rc, err := c.ContainerExport(ctx, containerID)
+	if err != nil {
+		return nil, utils.Errorf("unable to export the container: %v", err)
+	}
+
+	return rc, nil
+}
+
+func getContainerMountFSSource(c *client.Client, containerID string) ([]string, error) {
+	ctx := context.Background()
+	containerJSON, err := c.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return nil, utils.Errorf("unable to get container mount FS: %v", err)
+	}
+
+	return lo.Map(containerJSON.Mounts, func(item types.MountPoint, _ int) string {
+		return item.Source
+	}), nil
+}
+
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
 func walkFS(pathStr string, handler walkFunc) error {
@@ -105,7 +128,7 @@ func walkFS(pathStr string, handler walkFunc) error {
 		}
 	}
 
-	return fs.WalkDir(os.DirFS(startPath), startPath, func(filePath string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(os.DirFS(startPath), ".", func(filePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return utils.Errorf("failed to walk the directory: %v", err)
 		}
@@ -113,8 +136,9 @@ func walkFS(pathStr string, handler walkFunc) error {
 			log.Debugf("skipping the directory: %s", filePath)
 			return nil
 		}
+		filePath = path.Join(startPath, filePath)
 
-		statsInfo, err := os.Stat(filePath)
+		statsInfo, err := d.Info()
 		if err != nil {
 			return err
 		}
@@ -143,38 +167,43 @@ func walkImage(image *os.File, handler walkFunc) error {
 			// continue
 			return utils.Errorf("unable to get  uncompressed layer: %v", err)
 		}
-		tr := tar.NewReader(rc)
-		for {
-			hdr, err := tr.Next()
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return utils.Errorf("failed to extract the archive: %v", err)
-			}
+		walkLayer(rc, handler)
+	}
+	return nil
+}
 
-			// filepath.Clean cannot be used since tar file paths should be OS-agnostic.
-			filePath := path.Clean(hdr.Name)
-			// filePath = strings.TrimLeft(filePath, "/")
-			_, fileName := path.Split(filePath)
-
-			// "OverlayFS" creates a set of hidden files beginning with ".wh." (which stands for "whiteout") to record changes made to the underlying filesystem.
-			// e.g. etc/.wh..wh..opq
-			if opq == fileName {
-				// opqDirs = append(opqDirs, fileDir)
-				continue
-			}
-			// etc/.wh.hostname
-			if strings.HasPrefix(fileName, wh) {
-				// name := strings.TrimPrefix(fileName, wh)
-				// fpath := path.Join(fileDir, name)
-				// whFiles = append(whFiles, fpath)
-				continue
-			}
-			if err = handler(filePath, hdr.FileInfo(), tr); err != nil {
-				return err
-			}
-
+func walkLayer(rc io.ReadCloser, handler walkFunc) error {
+	tr := tar.NewReader(rc)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return utils.Errorf("failed to extract the archive: %v", err)
 		}
+
+		// filepath.Clean cannot be used since tar file paths should be OS-agnostic.
+		filePath := path.Clean(hdr.Name)
+		// filePath = strings.TrimLeft(filePath, "/")
+		_, fileName := path.Split(filePath)
+
+		// "OverlayFS" creates a set of hidden files beginning with ".wh." (which stands for "whiteout") to record changes made to the underlying filesystem.
+		// e.g. etc/.wh..wh..opq
+		if opq == fileName {
+			// opqDirs = append(opqDirs, fileDir)
+			continue
+		}
+		// etc/.wh.hostname
+		if strings.HasPrefix(fileName, wh) {
+			// name := strings.TrimPrefix(fileName, wh)
+			// fpath := path.Join(fileDir, name)
+			// whFiles = append(whFiles, fpath)
+			continue
+		}
+		if err = handler(filePath, hdr.FileInfo(), tr); err != nil {
+			return err
+		}
+
 	}
 	return nil
 }
@@ -193,7 +222,6 @@ func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes
 		return nil, err
 	}
 
-	// ctx, cancel := context.WithCancel(context.Background())
 	var wg = new(sync.WaitGroup)
 
 	// analyzer-consumer
@@ -207,19 +235,105 @@ func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes
 	return ag.Packages(), nil
 }
 
-func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
+func scanContainer(rc io.ReadCloser, config dockerContextConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
+
+	// match file
+	err := walkLayer(rc, func(path string, fi fs.FileInfo, r io.Reader) error {
+		if err := ag.Match(path, fi, r); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var wg = new(sync.WaitGroup)
+
+	// analyzer-consumer
+	ag.Consume(wg)
+
+	// analyzer-productor
+	ag.Analyze()
+
+	wg.Wait()
+	ag.Clear()
+	return ag.Packages(), nil
+}
+
+func scanFS(fsPath string, config dockerContextConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
+
+	// match file
+	err := walkFS(fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
+		if err := ag.Match(path, fi, r); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var wg = new(sync.WaitGroup)
+
+	// analyzer-consumer
+	ag.Consume(wg)
+
+	// analyzer-productor
+	ag.Analyze()
+
+	wg.Wait()
+	ag.Clear()
+	return ag.Packages(), nil
+}
+
+func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOption) (pkgs []*dxtypes.Package, err error) {
+	// merge pkgs
+	// defer func() {
+	// 	if len(pkgs) > 0 {
+	// 		pkgs =
+	// 	}
+	// }
+
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	// save container as tarball
+	// docker client
+	c, err := NewDockerClient(config.endpoint)
+	if err != nil {
+		return nil, err
+	}
 
-	// scanImage
+	// get and scan mount FS
+	sources, err := getContainerMountFSSource(c, containerID)
+	if err != nil {
+		return nil, err
+	}
+	for _, source := range sources {
+		fsPkgs, err := scanFS(source, *config)
+		if err != nil {
+			continue // ?
+		}
+		pkgs = append(pkgs, fsPkgs...)
+	}
 
-	// scan mount FS
+	// get and scan container fs
+	rc, err := exportContainer(c, containerID)
+	if err != nil {
+		return nil, err
+	}
+	containerPkgs, err := scanContainer(rc, *config)
 
-	return nil, nil
+	if err != nil {
+		return pkgs, err
+	}
+	pkgs = append(pkgs, containerPkgs...)
+
+	return pkgs, nil
 }
 
 func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
@@ -245,9 +359,8 @@ func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	if err != nil {
 		return nil, err
 	}
-	if err = saveImageFromContext(client, imageID, f); err != nil {
+	if err = saveImage(client, imageID, f); err != nil {
 		return nil, err
-
 	}
 
 	pkgs, err := scanDockerImage(f, *config)
