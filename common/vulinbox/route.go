@@ -32,6 +32,10 @@ func (s *VulinServer) init() {
 			writer.Write(bytes)
 		}
 	})
+
+	// agent ws connector
+	s.registerWSAgent()
+
 	// 通用型
 	s.registerSQLinj()
 	s.registerXSS()
