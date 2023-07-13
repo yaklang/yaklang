@@ -125,8 +125,9 @@ func GetNExcludeExcludeHighPort(n int, excluded ...string) []int {
 
 var ParseStringToInts = ParseStringToPorts
 
+// ParseStringToPorts 负数端口代表了是 UDP 扫描端口
 func ParseStringToPorts(ports string) []int {
-	lports := []int{}
+	var lports []int
 
 	if strings.HasPrefix(ports, "-") {
 		ports = "1" + ports
@@ -138,6 +139,12 @@ func ParseStringToPorts(ports string) []int {
 
 	for _, raw := range strings.Split(ports, ",") {
 		raw = strings.TrimSpace(raw)
+		udpMultiplier := 1
+		if strings.Contains(raw, "U:") {
+			udpMultiplier = -1
+			raw = strings.TrimPrefix(raw, "U:")
+		}
+
 		if strings.Contains(raw, "-") {
 			var (
 				low  int64
@@ -165,14 +172,14 @@ func ParseStringToPorts(ports string) []int {
 			}
 
 			for i := low; i <= high; i++ {
-				lports = append(lports, int(i))
+				lports = append(lports, int(i)*udpMultiplier)
 			}
 		} else {
 			port, err := strconv.ParseInt(raw, 10, 64)
 			if err != nil {
 				continue
 			}
-			lports = append(lports, int(port))
+			lports = append(lports, int(port)*udpMultiplier)
 		}
 	}
 

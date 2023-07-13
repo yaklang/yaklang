@@ -9,4 +9,25 @@ for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...)
     }
 }
 
-if !checked { die("ERROR for nuclei smoking test!")}
+checked2 = false
+// U:port 的优先级比 servicescan.proto("tcp") 高
+for result in servicescan.Scan(host, "U:"+string(port), servicescan.proto(["tcp"]...))~{
+    dump(result)
+    if result.GetServiceName() == "snmp" {
+        checked2 = true
+    }
+}
+
+checked3 = false
+for result in servicescan.Scan(host, string(port),
+    servicescan.proto(["tcp","udp"]...),
+    servicescan.maxProbes(100),
+)~{
+    dump(result)
+    if result.GetServiceName() == "snmp" {
+        checked3 = true
+    }
+}
+
+
+if !checked ||!checked2 || !checked3 { die("ERROR for Mock protocol smoking test!")}
