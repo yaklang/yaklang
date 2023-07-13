@@ -3,7 +3,6 @@ package scannode
 import (
 	"context"
 	_ "embed"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -15,13 +14,13 @@ var embedGenReport []byte
 
 const GENREPORT_KEY = "JznQXuFDSepeNWHbiLGEwONiaBxhvj_SERVER_SCAN_MANAGER"
 
-func genReportFromKey(ctx context.Context, node string, helper *scanrpc.SCANServerHelper, broker *mq.Broker) error {
+func genReportFromKey(ctx context.Context, node string, helper *scanrpc.SCANServerHelper, broker *mq.Broker, req *scanrpc.SCAN_InvokeScriptRequest) error {
 	if value := yakit.GetKey(consts.GetGormProjectDatabase(), GENREPORT_KEY); value != "" {
 		yakit.DelKey(consts.GetGormProjectDatabase(), GENREPORT_KEY)
 		genGeport := &scanrpc.SCAN_InvokeScriptRequest{
-			TaskId:          uuid.NewV4().String(),
-			RuntimeId:       uuid.NewV4().String(),
-			SubTaskId:       uuid.NewV4().String(),
+			TaskId:          req.TaskId,
+			RuntimeId:       req.RuntimeId,
+			SubTaskId:       req.SubTaskId,
 			ScriptContent:   string(embedGenReport),
 			ScriptJsonParam: value,
 		}
