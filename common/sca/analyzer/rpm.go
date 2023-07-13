@@ -3,8 +3,8 @@ package analyzer
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
 
@@ -49,6 +49,54 @@ func NewRPMAnalyzer() *rpmAnalyzer {
 	return &rpmAnalyzer{}
 }
 
+func (a rpmAnalyzer) createPackage(pkgInfo *rpmdb.PackageInfo, provides map[string]*dxtypes.Package) *dxtypes.Package {
+	pkg := &dxtypes.Package{
+		Name:         pkgInfo.Name,
+		Version:      pkgInfo.Version,
+		Verification: fmt.Sprintf("md5:%s", pkgInfo.SigMD5),
+		License:      []string{licenses.Normalize(pkgInfo.License)},
+	}
+	for _, provide := range pkgInfo.Provides {
+		// handler libc.so.6(GLIBC_2.2.5)(64bit) => libc.so.6
+		if strings.Contains(provide, "(") {
+			provide = provide[:strings.Index(provide, "(")]
+		}
+		// handler /usr/bin/pkg-config => pkg-config
+		if strings.Contains(provide, "/") {
+			provide = provide[strings.LastIndex(provide, "/")+1:]
+		}
+		provides[provide] = pkg
+	}
+	pkg.DependsOn.And = make(map[string]string)
+	for _, dep := range pkgInfo.Requires {
+		// pass rpm package manage
+		// all package depend on rpm because these installed by rpm
+		if strings.HasPrefix(dep, "rpmlib") {
+			continue
+		}
+
+		// handler libc.so.6(GLIBC_2.2.5)(64bit) => libc.so.6
+		if strings.Contains(dep, "(") {
+			dep = dep[:strings.Index(dep, "(")]
+		}
+		// handler /usr/bin/pkg-config => pkg-config
+		if strings.Contains(dep, "/") {
+			dep = dep[strings.LastIndex(dep, "/")+1:]
+		}
+
+		// remove depende that provide by self
+		if p, ok := provides[dep]; ok {
+			if p == pkg {
+				continue
+			}
+			pkg.DependsOn.And[dep] = p.Version
+		} else {
+			pkg.DependsOn.And[dep] = "*"
+		}
+	}
+	return pkg
+}
+
 func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
@@ -65,22 +113,15 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 		}
 		pkgs := make([]*dxtypes.Package, len(pkgList))
 		for i, pkgInfo := range pkgList {
-			pkgs[i] = &dxtypes.Package{
-				Name:         pkgInfo.Name,
-				Version:      pkgInfo.Version,
-				Verification: fmt.Sprintf("md5:%s", pkgInfo.SigMD5),
-				DependsOn: dxtypes.PackageRelationShip{
-					And: lo.SliceToMap(pkgInfo.Requires, func(depName string) (string, string) {
-						return depName, "*" // version is not available
-					}),
-				},
-				License: []string{licenses.Normalize(pkgInfo.License)},
-			}
-			for _, provide := range pkgInfo.Provides {
-				provides[provide] = pkgs[i]
-			}
+			pkgs[i] = a.createPackage(pkgInfo, provides)
 		}
 		handleDependsOn(pkgs, provides)
+		// lo.ForEach(pkgs, func(pkg *dxtypes.Package, _ int) {
+		// 	fmt.Printf(`
+		// 	name: %s
+		// 	depends: %v
+		// 	`, pkg.Name, pkg.DependsOn)
+		// })
 		return linkPackages(pkgs), nil
 	}
 	return nil, nil
