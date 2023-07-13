@@ -9,7 +9,7 @@ var Exports = map[string]interface{}{
 	"scanMode":             _withScanMode,
 	"concurrent":           _withConcurrent,
 
-	"AllMode":      analyzer.AllMode,
-	"PkgMode":      analyzer.PkgMode,
-	"LanguageMode": analyzer.LanguageMode,
+	"ALL_MODE":      analyzer.AllMode,
+	"PKG_MODE":      analyzer.PkgMode,
+	"LANGUAGE_MODE": analyzer.LanguageMode,
 }
