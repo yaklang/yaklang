@@ -2,16 +2,73 @@ package vulinbox
 
 import (
 	_ "embed"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"net/http"
+	"strings"
 )
 
 //go:embed route.html
 var routeHtml []byte
 
 func (s *VulinServer) init() {
+	if s.agentFeedbackChan == nil {
+		s.agentFeedbackChan = make(chan []byte, 10000)
+	}
+
 	router := s.router
 
+	// FE AND FEEDBACK
+	fe := http.FileServer(http.FS(staticFS))
+	router.NotFoundHandler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		/* load to agent feedback */
+		reqRaw, err := utils.HttpDumpWithBody(request, true)
+		if err != nil {
+			log.Errorf("dump request failed: %v", err)
+		}
+		if len(reqRaw) > 0 {
+			select {
+			case s.agentFeedbackChan <- reqRaw:
+				log.Infof("agentFeedbackHandler: %s", string(reqRaw))
+			default:
+				log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
+			}
+		}
+
+		if strings.HasPrefix(request.URL.Path, "/static") {
+			var u, _ = lowhttp.ExtractURLFromHTTPRequest(request, true)
+			if u != nil {
+				log.Infof("request static file: %v", u.Path)
+				// request.URL.Path = strings.TrimLeft(request.URL.Path, "/")
+			}
+			fe.ServeHTTP(writer, request)
+			return
+		}
+		log.Infof("404 for %s", request.URL.Path)
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.WriteHeader(404)
+			writer.Write([]byte("404 not found"))
+		}).ServeHTTP(writer, request)
+	})
+	router.Use(func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			reqRaw, err := utils.HttpDumpWithBody(request, true)
+			if err != nil {
+				log.Errorf("dump request failed: %v", err)
+			}
+			if len(reqRaw) > 0 {
+				select {
+				case s.agentFeedbackChan <- reqRaw:
+					log.Infof("agentFeedbackHandler: %s", string(reqRaw))
+				default:
+					log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
+				}
+			}
+			handler.ServeHTTP(writer, request)
+		})
+	})
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
 		var renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
@@ -32,6 +89,10 @@ func (s *VulinServer) init() {
 			writer.Write(bytes)
 		}
 	})
+
+	// agent ws connector
+	s.registerWSAgent()
+
 	// 通用型
 	s.registerSQLinj()
 	s.registerXSS()
