@@ -35,7 +35,6 @@ type Package struct {
 
 	DependsOn PackageRelationShip
 
-	Indirect  bool
 	Potential bool
 
 	// 订正 CPE 和 强制关联 CVE

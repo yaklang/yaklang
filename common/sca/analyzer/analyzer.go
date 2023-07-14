@@ -227,9 +227,8 @@ func handlerParsed(parsedLibs godeptypes.Libraries, parsedDeps godeptypes.Depend
 
 	for _, lib := range parsedLibs {
 		p := dxtypes.Package{
-			Name:     lib.Name,
-			Version:  lib.Version,
-			Indirect: lib.Indirect,
+			Name:    lib.Name,
+			Version: lib.Version,
 		}
 		if lib.License != "" {
 			p.License = lo.Map(strings.Split(lib.License, ","), func(license string, _ int) string {

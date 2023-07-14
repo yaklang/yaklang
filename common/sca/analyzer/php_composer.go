@@ -3,7 +3,6 @@ package analyzer
 import (
 	"encoding/json"
 	"io"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -47,23 +46,6 @@ func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, erro
 		pkgs, err := ParseLanguageConfiguration(fi, lockParser)
 		if err != nil {
 			return nil, err
-		}
-
-		// parse composer json file
-		var p map[string]string
-		jsonPath := path.Join(path.Dir(fi.Path), "composer.json")
-		if jsonFi, ok := afi.MatchedFileInfos[jsonPath]; ok {
-			p, err = a.parseComposerJson(jsonFi.LazyFile)
-			if err != nil {
-				p = nil
-			}
-		}
-		if p != nil {
-			for i, pkg := range pkgs {
-				if _, ok := p[pkg.Name]; !ok {
-					pkgs[i].Indirect = true
-				}
-			}
 		}
 		return pkgs, nil
 	}
