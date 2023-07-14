@@ -471,7 +471,7 @@ var startGRPCServerCommand = cli.Command{
 				log.Warnf("open ca-key failed: %s", err)
 			}
 			if cert == nil || key == nil {
-				cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx("Yakit TeamServer Root", "", nil, nil, nil, false)
+				cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx("Yakit TeamServer Root", "Yakit TeamServer Root", "", nil, nil, nil, false)
 				if err != nil {
 					return err
 				}
