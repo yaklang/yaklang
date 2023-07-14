@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
@@ -191,46 +190,4 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		}
 	}
 	return nil
-}
-
-func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAddrAvailableRequest) (*ypb.IsRemoteAddrAvailableResponse, error) {
-	matcher, err := fp.NewDefaultFingerprintMatcher(
-		fp.NewConfig(
-			fp.WithActiveMode(true),
-			fp.WithProbeTimeout(time.Duration(req.GetTimeout())*time.Second),
-			fp.WithProbesMax(3),
-		),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	host, port, err := utils.ParseStringToHostPort(req.GetAddr())
-	if err != nil {
-		return nil, err
-	}
-	result, err := matcher.Match(host, port)
-	if err != nil {
-		return nil, err
-	}
-
-	var status string
-	var reason string
-	if !result.IsOpen() {
-		status = "offline"
-		reason = "BAS Agent未上线"
-	} else {
-		if ret := result.GetServiceName(); ret != "" && strings.Contains(strings.ToLower(ret), req.GetProbe()) {
-			status = "online"
-		} else {
-			status = "external"
-		}
-	}
-
-	return &ypb.IsRemoteAddrAvailableResponse{
-		Addr:        req.GetAddr(),
-		IsAvailable: result.IsOpen(),
-		Reason:      reason,
-		Status:      status,
-	}, nil
 }

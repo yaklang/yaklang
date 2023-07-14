@@ -311,7 +311,11 @@ type YakClient interface {
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
 	ExecuteChaosMakerRule(ctx context.Context, in *ExecuteChaosMakerRuleRequest, opts ...grpc.CallOption) (Yak_ExecuteChaosMakerRuleClient, error)
+	// 这个接口是判断 BAS Agent 远程端口是否可用的，使用 Vulinbox ws agent 协议连接
 	IsRemoteAddrAvailable(ctx context.Context, in *IsRemoteAddrAvailableRequest, opts ...grpc.CallOption) (*IsRemoteAddrAvailableResponse, error)
+	ConnectVulinboxAgent(ctx context.Context, in *IsRemoteAddrAvailableRequest, opts ...grpc.CallOption) (*IsRemoteAddrAvailableResponse, error)
+	GetRegisteredVulinboxAgent(ctx context.Context, in *GetRegisteredAgentRequest, opts ...grpc.CallOption) (*GetRegisteredAgentResponse, error)
+	DisconnectVulinboxAgent(ctx context.Context, in *DisconnectVulinboxAgentRequest, opts ...grpc.CallOption) (*Empty, error)
 	// CVE
 	IsCVEDatabaseReady(ctx context.Context, in *IsCVEDatabaseReadyRequest, opts ...grpc.CallOption) (*IsCVEDatabaseReadyResponse, error)
 	UpdateCVEDatabase(ctx context.Context, in *UpdateCVEDatabaseRequest, opts ...grpc.CallOption) (Yak_UpdateCVEDatabaseClient, error)
@@ -3141,6 +3145,33 @@ func (c *yakClient) IsRemoteAddrAvailable(ctx context.Context, in *IsRemoteAddrA
 	return out, nil
 }
 
+func (c *yakClient) ConnectVulinboxAgent(ctx context.Context, in *IsRemoteAddrAvailableRequest, opts ...grpc.CallOption) (*IsRemoteAddrAvailableResponse, error) {
+	out := new(IsRemoteAddrAvailableResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/ConnectVulinboxAgent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetRegisteredVulinboxAgent(ctx context.Context, in *GetRegisteredAgentRequest, opts ...grpc.CallOption) (*GetRegisteredAgentResponse, error) {
+	out := new(GetRegisteredAgentResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetRegisteredVulinboxAgent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DisconnectVulinboxAgent(ctx context.Context, in *DisconnectVulinboxAgentRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DisconnectVulinboxAgent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) IsCVEDatabaseReady(ctx context.Context, in *IsCVEDatabaseReadyRequest, opts ...grpc.CallOption) (*IsCVEDatabaseReadyResponse, error) {
 	out := new(IsCVEDatabaseReadyResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/IsCVEDatabaseReady", in, out, opts...)
@@ -3811,7 +3842,11 @@ type YakServer interface {
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
 	ExecuteChaosMakerRule(*ExecuteChaosMakerRuleRequest, Yak_ExecuteChaosMakerRuleServer) error
+	// 这个接口是判断 BAS Agent 远程端口是否可用的，使用 Vulinbox ws agent 协议连接
 	IsRemoteAddrAvailable(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error)
+	ConnectVulinboxAgent(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error)
+	GetRegisteredVulinboxAgent(context.Context, *GetRegisteredAgentRequest) (*GetRegisteredAgentResponse, error)
+	DisconnectVulinboxAgent(context.Context, *DisconnectVulinboxAgentRequest) (*Empty, error)
 	// CVE
 	IsCVEDatabaseReady(context.Context, *IsCVEDatabaseReadyRequest) (*IsCVEDatabaseReadyResponse, error)
 	UpdateCVEDatabase(*UpdateCVEDatabaseRequest, Yak_UpdateCVEDatabaseServer) error
@@ -4549,6 +4584,15 @@ func (UnimplementedYakServer) ExecuteChaosMakerRule(*ExecuteChaosMakerRuleReques
 }
 func (UnimplementedYakServer) IsRemoteAddrAvailable(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsRemoteAddrAvailable not implemented")
+}
+func (UnimplementedYakServer) ConnectVulinboxAgent(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConnectVulinboxAgent not implemented")
+}
+func (UnimplementedYakServer) GetRegisteredVulinboxAgent(context.Context, *GetRegisteredAgentRequest) (*GetRegisteredAgentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRegisteredVulinboxAgent not implemented")
+}
+func (UnimplementedYakServer) DisconnectVulinboxAgent(context.Context, *DisconnectVulinboxAgentRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DisconnectVulinboxAgent not implemented")
 }
 func (UnimplementedYakServer) IsCVEDatabaseReady(context.Context, *IsCVEDatabaseReadyRequest) (*IsCVEDatabaseReadyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsCVEDatabaseReady not implemented")
@@ -8958,6 +9002,60 @@ func _Yak_IsRemoteAddrAvailable_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ConnectVulinboxAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsRemoteAddrAvailableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ConnectVulinboxAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/ConnectVulinboxAgent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ConnectVulinboxAgent(ctx, req.(*IsRemoteAddrAvailableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetRegisteredVulinboxAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRegisteredAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetRegisteredVulinboxAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetRegisteredVulinboxAgent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetRegisteredVulinboxAgent(ctx, req.(*GetRegisteredAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DisconnectVulinboxAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisconnectVulinboxAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DisconnectVulinboxAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DisconnectVulinboxAgent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DisconnectVulinboxAgent(ctx, req.(*DisconnectVulinboxAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_IsCVEDatabaseReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IsCVEDatabaseReadyRequest)
 	if err := dec(in); err != nil {
@@ -10182,6 +10280,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IsRemoteAddrAvailable",
 			Handler:    _Yak_IsRemoteAddrAvailable_Handler,
+		},
+		{
+			MethodName: "ConnectVulinboxAgent",
+			Handler:    _Yak_ConnectVulinboxAgent_Handler,
+		},
+		{
+			MethodName: "GetRegisteredVulinboxAgent",
+			Handler:    _Yak_GetRegisteredVulinboxAgent_Handler,
+		},
+		{
+			MethodName: "DisconnectVulinboxAgent",
+			Handler:    _Yak_DisconnectVulinboxAgent_Handler,
 		},
 		{
 			MethodName: "IsCVEDatabaseReady",
