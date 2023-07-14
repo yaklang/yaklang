@@ -2,7 +2,7 @@ package sca
 
 import "github.com/yaklang/yaklang/common/sca/dxtypes"
 
-var APKWantPkgs = []dxtypes.Package{
+var APKWantPkgs = []*dxtypes.Package{
 
 	{
 		Name:         "alpine-baselayout",
@@ -159,7 +159,7 @@ var APKWantPkgs = []dxtypes.Package{
 	},
 }
 
-var APKNegativePkgs = []dxtypes.Package{
+var APKNegativePkgs = []*dxtypes.Package{
 	{
 		Name:         "ssl_client",
 		Version:      "1.36.1-r0",
@@ -202,7 +202,7 @@ var APKNegativePkgs = []dxtypes.Package{
 	},
 }
 
-var DPKGWantPkgs = []dxtypes.Package{
+var DPKGWantPkgs = []*dxtypes.Package{
 	{
 		Name:         "adduser",
 		Version:      "3.118ubuntu5",
@@ -445,7 +445,7 @@ var DPKGWantPkgs = []dxtypes.Package{
 	},
 }
 
-var RPMWantPkgs = []dxtypes.Package{
+var RPMWantPkgs = []*dxtypes.Package{
 	{
 		Name:         "mariner-release",
 		Version:      "2.0",
@@ -1528,7 +1528,7 @@ var RPMWantPkgs = []dxtypes.Package{
 	},
 }
 
-var ConanWantPkgs = []dxtypes.Package{
+var ConanWantPkgs = []*dxtypes.Package{
 	{
 		Name:    "openssl",
 		Version: "3.0.5",
@@ -1539,7 +1539,7 @@ var ConanWantPkgs = []dxtypes.Package{
 		Indirect: true,
 	},
 }
-var GOBianryWantPkgs = []dxtypes.Package{
+var GOBianryWantPkgs = []*dxtypes.Package{
 	{
 		Name:    "github.com/aquasecurity/go-pep440-version",
 		Version: "v0.0.0-20210121094942-22b2f8951d46",
@@ -1554,7 +1554,7 @@ var GOBianryWantPkgs = []dxtypes.Package{
 	},
 }
 
-var GoModWantPkgs = []dxtypes.Package{
+var GoModWantPkgs = []*dxtypes.Package{
 	{
 		Name:    "github.com/aquasecurity/go-dep-parser",
 		Version: "0.0.0-20220406074731-71021a481237",
@@ -1565,7 +1565,7 @@ var GoModWantPkgs = []dxtypes.Package{
 		Indirect: true,
 	},
 }
-var GoModLess117Pkgs = []dxtypes.Package{
+var GoModLess117Pkgs = []*dxtypes.Package{
 	{
 		Name:    "github.com/aquasecurity/go-dep-parser",
 		Version: "0.0.0-20230219131432-590b1dfb6edd",
@@ -1577,7 +1577,7 @@ var GoModLess117Pkgs = []dxtypes.Package{
 	},
 }
 
-var PHPComposerPkgs = []dxtypes.Package{
+var PHPComposerPkgs = []*dxtypes.Package{
 	{
 		Name:         "pear/log",
 		Version:      "1.13.3",
@@ -1594,7 +1594,7 @@ var PHPComposerPkgs = []dxtypes.Package{
 	},
 }
 
-var PHPComposerWrongJsonPkgs = []dxtypes.Package{
+var PHPComposerWrongJsonPkgs = []*dxtypes.Package{
 	{
 		Name:         "pear/log",
 		Version:      "1.13.3",
@@ -1610,7 +1610,7 @@ var PHPComposerWrongJsonPkgs = []dxtypes.Package{
 		License:      []string{"BSD-2-Clause"},
 	},
 }
-var PHPComposerNoJsonPkgs = []dxtypes.Package{
+var PHPComposerNoJsonPkgs = []*dxtypes.Package{
 	{
 		Name:         "pear/log",
 		Version:      "1.13.3",
@@ -1627,7 +1627,7 @@ var PHPComposerNoJsonPkgs = []dxtypes.Package{
 	},
 }
 
-var PythonPackagingPkgs = []dxtypes.Package{
+var PythonPackagingPkgs = []*dxtypes.Package{
 	{
 		Name:         "kitchen",
 		Version:      "1.2.6",
@@ -1637,7 +1637,7 @@ var PythonPackagingPkgs = []dxtypes.Package{
 	},
 }
 
-var PythonPackagingEggPkg = []dxtypes.Package{
+var PythonPackagingEggPkg = []*dxtypes.Package{
 	{
 		Name:         "distlib",
 		Version:      "0.3.1",
@@ -1646,7 +1646,7 @@ var PythonPackagingEggPkg = []dxtypes.Package{
 		License:      []string{"Python license"},
 	},
 }
-var PythonPackagingWheel = []dxtypes.Package{
+var PythonPackagingWheel = []*dxtypes.Package{
 	{
 		Name:         "distlib",
 		Version:      "0.3.1",
@@ -1656,7 +1656,7 @@ var PythonPackagingWheel = []dxtypes.Package{
 	},
 }
 
-var PythonPIPPkgs = []dxtypes.Package{
+var PythonPIPPkgs = []*dxtypes.Package{
 	{
 		Name:    "click",
 		Version: "8.0.0",
@@ -1671,14 +1671,14 @@ var PythonPIPPkgs = []dxtypes.Package{
 	},
 }
 
-var PythonPIPEnvPkgs = []dxtypes.Package{
+var PythonPIPEnvPkgs = []*dxtypes.Package{
 	{
 		Name:    "pytz",
 		Version: "2022.7.1",
 	},
 }
 
-var PythonPoetryPkgs = []dxtypes.Package{
+var PythonPoetryPkgs = []*dxtypes.Package{
 	{
 		Name:     "certifi",
 		Version:  "2022.12.7",
@@ -1733,7 +1733,7 @@ var PythonPoetryPkgs = []dxtypes.Package{
 		Indirect: true,
 	},
 }
-var PythonPoetryNoProjectPkgs = []dxtypes.Package{
+var PythonPoetryNoProjectPkgs = []*dxtypes.Package{
 	{
 		Name:    "click",
 		Version: "8.1.3",
@@ -1744,7 +1744,7 @@ var PythonPoetryNoProjectPkgs = []dxtypes.Package{
 	},
 }
 
-var PythonPoetryWrongProjectPkgs = []dxtypes.Package{
+var PythonPoetryWrongProjectPkgs = []*dxtypes.Package{
 	{
 		Name:    "click",
 		Version: "8.1.3",
@@ -1755,12 +1755,12 @@ var PythonPoetryWrongProjectPkgs = []dxtypes.Package{
 	},
 }
 
-var JavaGradlePkgs = []dxtypes.Package{
+var JavaGradlePkgs = []*dxtypes.Package{
 	{Name: "com.example:example",
 		Version: "0.0.1",
 	},
 }
-var JavaPomPkgs = []dxtypes.Package{
+var JavaPomPkgs = []*dxtypes.Package{
 	{
 		Name:         "com.example:example",
 		Version:      "1.0.0",
@@ -1769,7 +1769,7 @@ var JavaPomPkgs = []dxtypes.Package{
 		License:      []string{"Apache-2.0"},
 	},
 }
-var JavaPomRequirementPkgs = []dxtypes.Package{
+var JavaPomRequirementPkgs = []*dxtypes.Package{
 	{
 		Name:         "com.example:example",
 		Version:      "2.0.0",
