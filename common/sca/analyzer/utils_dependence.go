@@ -1,10 +1,19 @@
 package analyzer
 
 import (
+	"fmt"
+	"html"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/emicklei/dot"
+	"github.com/gofrs/uuid"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -188,4 +197,64 @@ func mergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 		ret = append(ret, p)
 	}
 	return ret
+}
+func DrawPackagesDOT(pkgs []*dxtypes.Package) {
+	g := dot.NewGraph(dot.Directed)
+	// rankdir=LR,splines=ortho,concentrate=true
+	g.Attr("rankdir", "LR")
+	g.Attr("concentrate", "true")
+	nodes := make(map[string]dot.Node, len(pkgs))
+	for _, pkg := range pkgs {
+		label := fmt.Sprintf("%s-%s", pkg.Name, html.EscapeString(pkg.Version))
+		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">License: %s</FONT>`, strings.Join(pkg.License, ", "))
+		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Verification: %s</FONT>`, pkg.Verification)
+		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Indirect: %v</FONT>`, pkg.Indirect)
+		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Potential: %v</FONT>`, pkg.Potential)
+		node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label)).Attr("shape", "box")
+		// node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label))
+		nodes[pkg.Identifier()] = node
+	}
+	edgeExistMap := make(map[string]struct{})
+	for _, pkg := range pkgs {
+		for _, upStreamPkg := range pkg.UpStreamPackages {
+			if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())]; ok {
+				continue
+			}
+			g.Edge(nodes[pkg.Identifier()], nodes[upStreamPkg.Identifier()])
+			edgeExistMap[fmt.Sprintf("%s-%s", pkg.Identifier(), upStreamPkg.Identifier())] = struct{}{}
+		}
+		for _, downStreamPkg := range pkg.DownStreamPackages {
+			if _, ok := edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())]; ok {
+				continue
+			}
+			g.Edge(nodes[downStreamPkg.Identifier()], nodes[pkg.Identifier()])
+			edgeExistMap[fmt.Sprintf("%s-%s", downStreamPkg.Identifier(), pkg.Identifier())] = struct{}{}
+		}
+	}
+	f, err := os.CreateTemp("", "temp-dot")
+	defer f.Close()
+	if err != nil {
+		return
+	}
+	_, err = io.Copy(f, strings.NewReader(g.String()))
+	if err != nil {
+		return
+	}
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return
+	}
+	pngPath := filepath.Join(os.TempDir(), uuid.String())
+	cmd := exec.Command("C:\\Users\\ad\\scoop\\shims\\dot.exe", "-T", "svg", fmt.Sprintf("-o%s", pngPath), f.Name())
+	err = cmd.Run()
+	if err != nil {
+		log.Errorf("dot: %v", err)
+		return
+	}
+	cmd = exec.Command("C:\\Windows\\explorer.exe", pngPath)
+	err = cmd.Run()
+	if err != nil {
+		log.Errorf("explorer: %v", err)
+		return
+	}
 }
