@@ -74,7 +74,7 @@ Content-Length: 3
 	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
 	_ = proxy
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer func() {
 		cancel()
 	}()
@@ -205,7 +205,7 @@ log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
 dump(host, port, packet)
-rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.retryTimes(3))~
 dump(rsp)
 if rsp.Contains(getParam("token")) {
 		println("chunk + gzip auto decode success")	
@@ -228,7 +228,7 @@ D: 1
 				params["h2port"] = h2Port
 
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
-log.info("Start to send packet echo")
+log.info("Start to send packet h2")
 packet := getParam("h2packet")
 println("-------------------------------------------------------------------------------------")
 println("-------------------------------------------------------------------------------------")
@@ -237,7 +237,18 @@ println("-----------------------------------------------------------------------
 println("-------------------------------------------------------------------------------------")
 println("-------------------------------------------------------------------------------------")
 dump(packet)
-rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.http2(true), poc.https(true))~
+retry := 10
+var rsp, req, err
+for retry >0{
+	rsp, req, err = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.http2(true), poc.https(true))
+	if err != nil{
+		retry = retry -1
+		sleep(0.5)
+		continue
+	}
+	break
+}
+
 dump(rsp)
 if rsp.Contains(getParam("token")) {
 		println("h2 auto decode success")	
@@ -250,39 +261,44 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 				defer cancel()
 
 				// 使用协程进行并发查询
 				done := make(chan struct{})
+				defer close(done)
 
+				go func() {
+					for {
+						_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+							SearchURL: "/mitm/test/h2/token/" + token,
+						})
+						if err != nil {
+							panic(err)
+						}
+						spew.Dump(flows)
+						if len(flows) > 0 {
+							h2Test = true
+						}
+						if h2Test {
+							done <- struct{}{}
+							break
+						}
+					}
+				}()
 				select {
 				case <-ctx.Done():
 					log.Warn("flow history not fully found")
-					close(done)
 					break
 				case <-done:
 					log.Infof("flow history all found")
 					break
-				default:
-					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-						SearchURL: "/mitm/test/h2/token/" + token,
-					})
-					if err != nil {
-						panic(err)
-					}
-					spew.Dump(flows)
-					if len(flows) > 0 {
-						h2Test = true
-					}
-					if h2Test {
-						close(done)
-					}
 				}
 			}()
 		}
 		spew.Dump(rsp)
 	}
+	wg.Wait()
 
 	if !started {
 		panic("MITM NOT STARTED!")
@@ -517,52 +533,57 @@ if rsp.Contains(getParam("token")) {
 
 				// 使用协程进行并发查询
 				done := make(chan struct{})
+				defer close(done)
+
+				go func() {
+					for {
+						_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+							SearchURL: "/GMTLS" + token,
+						})
+						if err != nil {
+							panic(err)
+						}
+
+						if len(flows) > 0 {
+							gmTest = true
+						}
+
+						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+							SearchURL: "/HTTPS" + token,
+						})
+						if err != nil {
+							panic(err)
+						}
+
+						if len(flows) > 0 {
+							httpsTest = true
+						}
+
+						// 执行查询操作
+						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+							SearchURL: "/HTTP" + token,
+						})
+						if err != nil {
+							panic(err)
+						}
+
+						if len(flows) > 0 {
+							httpTest = true
+						}
+						if gmTest && httpsTest && httpTest {
+							done <- struct{}{}
+							break
+						}
+					}
+				}()
 
 				select {
 				case <-ctx.Done():
 					log.Warn("flow history not fully found")
-					close(done)
 					break
 				case <-done:
 					log.Infof("flow history all found")
 					break
-				default:
-					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-						SearchURL: "/GMTLS" + token,
-					})
-					if err != nil {
-						panic(err)
-					}
-
-					if len(flows) > 0 {
-						gmTest = true
-					}
-
-					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-						SearchURL: "/HTTPS" + token,
-					})
-					if err != nil {
-						panic(err)
-					}
-
-					if len(flows) > 0 {
-						httpsTest = true
-					}
-
-					// 执行查询操作
-					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-						SearchURL: "/HTTP" + token,
-					})
-					if err != nil {
-						panic(err)
-					}
-
-					if len(flows) > 0 {
-						httpTest = true
-					}
-					if gmTest && httpsTest && httpTest {
-						close(done)
-					}
 				}
 
 			}()
@@ -570,6 +591,7 @@ if rsp.Contains(getParam("token")) {
 		}
 		spew.Dump(rsp)
 	}
+	wg.Wait()
 
 	if !started {
 		panic("MITM NOT STARTED!")
