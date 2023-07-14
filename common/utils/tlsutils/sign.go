@@ -104,12 +104,24 @@ func SelfSignCACertificateAndPrivateKey(common string, opts ...SelfSignConfigOpt
 	template := x509.Certificate{
 		SerialNumber: sid,
 		Subject: pkix.Name{
-			CommonName: commonName,
+			Country:            []string{commonName},
+			Province:           []string{commonName},
+			Locality:           []string{commonName},
+			Organization:       []string{commonName},
+			OrganizationalUnit: []string{commonName},
+			CommonName:         commonName,
+		},
+		Issuer: pkix.Name{
+			Country:            []string{commonName},
+			Province:           []string{commonName},
+			Locality:           []string{commonName},
+			Organization:       []string{commonName},
+			OrganizationalUnit: []string{commonName},
+			CommonName:         commonName,
 		},
 		NotBefore: notBeforeYear,
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 10),
-
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		KeyUsage:  x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 			x509.ExtKeyUsageServerAuth,
