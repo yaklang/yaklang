@@ -108,6 +108,16 @@ func (p *Package) SetFrom(analyzer, file string) {
 func (p *Package) From() ([]string, []string) {
 	return p.FromAnalyzer, p.FromFile
 }
+func (down *Package) LinkDepend(up *Package) {
+	if up.DownStreamPackages == nil {
+		up.DownStreamPackages = make(map[string]*Package)
+	}
+	up.DownStreamPackages[down.Identifier()] = down
+	if down.UpStreamPackages == nil {
+		down.UpStreamPackages = make(map[string]*Package)
+	}
+	down.UpStreamPackages[up.Identifier()] = up
+}
 
 // merge p1 to p1
 func (p *Package) Merge(p2 *Package) *Package {
@@ -121,15 +131,13 @@ func (p *Package) Merge(p2 *Package) *Package {
 	p.FromFile = append(p.FromFile, p2.FromFile...)
 
 	for _, p2up := range p2.UpStreamPackages {
-		p.UpStreamPackages[p2up.Identifier()] = p2up
-		p2up.DownStreamPackages[p.Identifier()] = p
+		p.LinkDepend(p2up)
 		if p.Identifier() != p2.Identifier() {
 			delete(p2up.DownStreamPackages, p2.Identifier())
 		}
 	}
 	for _, p2down := range p2.DownStreamPackages {
-		p.DownStreamPackages[p2down.Identifier()] = p2down
-		p2down.UpStreamPackages[p.Identifier()] = p
+		p2down.LinkDepend(p)
 		if p.Identifier() != p2.Identifier() {
 			delete(p2down.UpStreamPackages, p2.Identifier())
 		}
