@@ -56,6 +56,22 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 		},
 		ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字[ID] 双引号闭合】": 3, "存在基于UNION SQL 注入: [参数名:ID 值:[1]]": 3},
 	}
+	vul8 := VulInfo{
+		Path:           "/user/name/like?name=a",
+		ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 3, "存在基于UNION SQL 注入: [参数名:name 值:[a]]": 3},
+	}
+	vul9 := VulInfo{
+		Path:           "/user/name/like/2?name=a",
+		ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 3},
+	}
+	//vul10 := VulInfo{
+	//	Path:           "/user/name/like/b64?nameb64=%59%51%3d%3d",
+	//	ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 3},
+	//}
+	vul11 := VulInfo{
+		Path:           "/user/name/like/b64j?data=eyJuYW1lYjY0aiI6ImEifQ%3D%3D",
+		ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[data] like注入( %' )】": 3},
+	}
 
 	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), "SQL插件对于安全的SQL注入检测结果不符合预期")
 	Must(TestCoreMitmPlug(pluginName, server, vul2, client, t), "SQL插件对于不安全的SQL注入(ID)检测结果不符合预期")
@@ -64,4 +80,8 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 	Must(TestCoreMitmPlug(pluginName, server, vul5, client, t), "SQL插件对于不安全的SQL注入(NAME)检测结果不符合预期")
 	Must(TestCoreMitmPlug(pluginName, server, vul6, client, t), "SQL插件对于报错注入检测结果不符合预期")
 	Must(TestCoreMitmPlug(pluginName, server, vul7, client, t), "SQL插件对于Cookie头注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul8, client, t), "SQL插件对于like注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul9, client, t), "SQL插件对于like注入检测结果不符合预期")
+	//Must(TestCoreMitmPlug(pluginName, server, vul10, client, t), "SQL插件对于like注入检测结果不符合预期")
+	Must(TestCoreMitmPlug(pluginName, server, vul11, client, t), "SQL插件对于limit注入检测结果不符合预期")
 }
