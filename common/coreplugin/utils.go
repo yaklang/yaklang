@@ -142,23 +142,36 @@ func GetCorePluginData(name string) []byte {
 	return codeBytes
 }
 
-func ConnectVulinboxAgent(addr string, handler func(request []byte), onPing ...func()) (func(), error) {
+func ConnectVulinboxAgentEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
 	return ConnectVulinboxAgentRaw(addr, func(bytes []byte) {
 		spew.Dump(bytes)
 		t := strings.ToLower(utils.ExtractMapValueString(bytes, "type"))
 		log.Infof(`vulinbox ws agent fetch message: %v`, t)
 		switch t {
 		case "ping":
-			if len(onPing) > 0 {
-				onPing[0]()
+			if onPing != nil {
+				onPing()
 			}
 		case "request":
 			handler([]byte(utils.ExtractMapValueString(bytes, "request")))
 		}
+	}, func() {
+		if onClose != nil {
+			onClose()
+		}
+		log.Infof("vulinbox agent: %v is closed", addr)
 	})
 }
 
-func ConnectVulinboxAgentRaw(addr string, handler func([]byte)) (func(), error) {
+func ConnectVulinboxAgent(addr string, handler func(request []byte), onPing ...func()) (func(), error) {
+	return ConnectVulinboxAgentEx(addr, handler, func() {
+		for _, i := range onPing {
+			i()
+		}
+	}, nil)
+}
+
+func ConnectVulinboxAgentRaw(addr string, handler func([]byte), onClose func()) (func(), error) {
 	var cancel = func() {}
 
 	if addr == "" {
@@ -210,6 +223,12 @@ User-Agent: FeedbackStreamer/1.0
 		cancel()
 		return nil, utils.Errorf("vulinbox ws agent connect timeout")
 	}
+	go func() {
+		client.Wait()
+		if onClose != nil {
+			onClose()
+		}
+	}()
 	log.Info("vulinbox ws agent connected")
 	return cancel, nil
 }

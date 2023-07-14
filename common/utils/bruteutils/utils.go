@@ -1,7 +1,6 @@
 package bruteutils
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -13,13 +12,7 @@ func keywordToRegexp(k string) *regexp.Regexp {
 }
 
 func appendDefaultPort(i string, defaultPort int) string {
-	host, port, _ := utils.ParseStringToHostPort(i)
-	if port <= 0 {
-		i = fmt.Sprintf("%v:%v", i, defaultPort)
-	} else {
-		i = utils.HostPort(host, port)
-	}
-	return i
+	return utils.AppendDefaultPort(i, defaultPort)
 }
 
 func packetToBrute(

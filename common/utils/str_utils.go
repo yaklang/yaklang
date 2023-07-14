@@ -628,6 +628,17 @@ func ParseStringUrlToUrlInstance(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
 
+func AppendDefaultPort(raw string, port int) string {
+	var i string
+	host, port, _ := ParseStringToHostPort(raw)
+	if port <= 0 {
+		i = fmt.Sprintf("%v:%v", i, port)
+	} else {
+		i = HostPort(host, port)
+	}
+	return i
+}
+
 func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	if strings.Contains(raw, "://") {
 		urlObject, _ := url.Parse(raw)
