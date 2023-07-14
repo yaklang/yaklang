@@ -40,6 +40,8 @@ func init() {
 func main() {
 	app := cli.NewApp()
 
+	// aes rsa - http://116.214.131.28/wui/index.html#/?logintype=1&_key=g2jsh9
+
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
 			Name:  "port,p",
