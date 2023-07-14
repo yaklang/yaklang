@@ -244,7 +244,7 @@ func DrawPackagesDOT(pkgs []*dxtypes.Package) {
 	if err != nil {
 		return
 	}
-	pngPath := filepath.Join(os.TempDir(), uuid.String())
+	pngPath := filepath.Join(os.TempDir(), uuid.String()+".svg")
 	cmd := exec.Command("C:\\Users\\ad\\scoop\\shims\\dot.exe", "-T", "svg", fmt.Sprintf("-o%s", pngPath), f.Name())
 	err = cmd.Run()
 	if err != nil {
