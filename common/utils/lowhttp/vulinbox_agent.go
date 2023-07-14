@@ -1,10 +1,12 @@
 package lowhttp
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+	"time"
 )
 
 func ConnectVulinboxAgentEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
@@ -87,8 +89,21 @@ User-Agent: FeedbackStreamer/1.0
 		cancel()
 		return nil, utils.Errorf("vulinbox ws agent connect timeout")
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					client.WriteText([]byte(`{"type":"ping"}`))
+					time.Sleep(time.Second)
+				}
+			}
+		}()
 		client.Wait()
+		cancel()
 		if onClose != nil {
 			onClose()
 		}

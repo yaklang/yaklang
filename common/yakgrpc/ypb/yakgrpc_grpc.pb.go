@@ -312,8 +312,10 @@ type YakClient interface {
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
 	ExecuteChaosMakerRule(ctx context.Context, in *ExecuteChaosMakerRuleRequest, opts ...grpc.CallOption) (Yak_ExecuteChaosMakerRuleClient, error)
 	// 这个接口是判断 BAS Agent 远程端口是否可用的，使用 Vulinbox ws agent 协议连接
+	// ConnectVulinboxAgent is the same as IsRemoteAddrAvailable
 	IsRemoteAddrAvailable(ctx context.Context, in *IsRemoteAddrAvailableRequest, opts ...grpc.CallOption) (*IsRemoteAddrAvailableResponse, error)
 	ConnectVulinboxAgent(ctx context.Context, in *IsRemoteAddrAvailableRequest, opts ...grpc.CallOption) (*IsRemoteAddrAvailableResponse, error)
+	// vulinbox agent 的操作接口
 	GetRegisteredVulinboxAgent(ctx context.Context, in *GetRegisteredAgentRequest, opts ...grpc.CallOption) (*GetRegisteredAgentResponse, error)
 	DisconnectVulinboxAgent(ctx context.Context, in *DisconnectVulinboxAgentRequest, opts ...grpc.CallOption) (*Empty, error)
 	// CVE
@@ -3843,8 +3845,10 @@ type YakServer interface {
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
 	ExecuteChaosMakerRule(*ExecuteChaosMakerRuleRequest, Yak_ExecuteChaosMakerRuleServer) error
 	// 这个接口是判断 BAS Agent 远程端口是否可用的，使用 Vulinbox ws agent 协议连接
+	// ConnectVulinboxAgent is the same as IsRemoteAddrAvailable
 	IsRemoteAddrAvailable(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error)
 	ConnectVulinboxAgent(context.Context, *IsRemoteAddrAvailableRequest) (*IsRemoteAddrAvailableResponse, error)
+	// vulinbox agent 的操作接口
 	GetRegisteredVulinboxAgent(context.Context, *GetRegisteredAgentRequest) (*GetRegisteredAgentResponse, error)
 	DisconnectVulinboxAgent(context.Context, *DisconnectVulinboxAgentRequest) (*Empty, error)
 	// CVE
