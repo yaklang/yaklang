@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
 	"testing"
@@ -16,7 +17,7 @@ func TestConnectVulinboxAgent(t *testing.T) {
 		panic(err)
 	}
 	var count int
-	cancel, err := ConnectVulinboxAgent(vulAddr, func(request []byte) {
+	cancel, err := lowhttp.ConnectVulinboxAgent(vulAddr, func(request []byte) {
 		count++
 		spew.Dump(request)
 	})
