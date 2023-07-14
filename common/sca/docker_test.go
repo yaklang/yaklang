@@ -71,7 +71,7 @@ func TestLoadDockerImageFromFile(t *testing.T) {
 	}
 }
 
-var wantpkgs = []dxtypes.Package{}
+var wantpkgs = []*dxtypes.Package{}
 
 func init() {
 	wantpkgs = append(wantpkgs, APKWantPkgs...)
