@@ -21,6 +21,7 @@ type SelfSignConfig struct {
 	EnableAuth     bool
 	AlternativeDNS []string
 	AlternativeIP  []string
+	Org            string
 }
 
 type SelfSignConfigOpt func(*SelfSignConfig)
@@ -46,6 +47,11 @@ func WithSelfSign_SignTo(s ...string) SelfSignConfigOpt {
 func WithSelfSign_PrivateKey(p *rsa.PrivateKey) SelfSignConfigOpt {
 	return func(c *SelfSignConfig) {
 		c.PrivateKey = p
+	}
+}
+func WithSelfSign_Organization(s string) SelfSignConfigOpt {
+	return func(c *SelfSignConfig) {
+		c.Org = s
 	}
 }
 
@@ -104,19 +110,19 @@ func SelfSignCACertificateAndPrivateKey(common string, opts ...SelfSignConfigOpt
 	template := x509.Certificate{
 		SerialNumber: sid,
 		Subject: pkix.Name{
-			Country:            []string{commonName},
-			Province:           []string{commonName},
-			Locality:           []string{commonName},
-			Organization:       []string{commonName},
-			OrganizationalUnit: []string{commonName},
+			Country:            []string{config.Org},
+			Province:           []string{config.Org},
+			Locality:           []string{config.Org},
+			Organization:       []string{config.Org},
+			OrganizationalUnit: []string{config.Org},
 			CommonName:         commonName,
 		},
 		Issuer: pkix.Name{
-			Country:            []string{commonName},
-			Province:           []string{commonName},
-			Locality:           []string{commonName},
-			Organization:       []string{commonName},
-			OrganizationalUnit: []string{commonName},
+			Country:            []string{config.Org},
+			Province:           []string{config.Org},
+			Locality:           []string{config.Org},
+			Organization:       []string{config.Org},
+			OrganizationalUnit: []string{config.Org},
 			CommonName:         commonName,
 		},
 		NotBefore: notBeforeYear,

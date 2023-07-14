@@ -162,7 +162,8 @@ func ParsePEMCertificate(ca []byte) (*x509.Certificate, error) {
 }
 
 func GenerateSelfSignedCertKeyWithCommonName(commonName, host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
-	return GenerateSelfSignedCertKeyWithCommonNameWithPrivateKey(commonName, host, alternateIPs, alternateDNS, nil)
+	// 默认使用commonName作为organization
+	return GenerateSelfSignedCertKeyWithCommonNameWithPrivateKeyWithOrg(commonName, commonName, host, alternateIPs, alternateDNS, nil)
 }
 
 func init() {
@@ -178,11 +179,11 @@ func init() {
 	})
 }
 
-func GenerateSelfSignedCertKeyWithCommonNameWithPrivateKey(commonName, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey) ([]byte, []byte, error) {
-	return GenerateSelfSignedCertKeyWithCommonNameEx(commonName, host, alternateIPs, alternateDNS, priv, false)
+func GenerateSelfSignedCertKeyWithCommonNameWithPrivateKeyWithOrg(commonName, org, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey) ([]byte, []byte, error) {
+	return GenerateSelfSignedCertKeyWithCommonNameEx(commonName, org, host, alternateIPs, alternateDNS, priv, false)
 }
 
-func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey, auth bool) ([]byte, []byte, error) {
+func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, org, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey, auth bool) ([]byte, []byte, error) {
 	var hosts []string
 	if host != "" {
 		hosts = append(hosts, host)
@@ -197,7 +198,7 @@ func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, host string, alternat
 			hosts = append(hosts, i.String())
 		}
 	}
-	return SelfSignCACertificateAndPrivateKey(commonName, WithSelfSign_SignTo(hosts...), WithSelfSign_EnableAuth(auth), WithSelfSign_PrivateKey(priv))
+	return SelfSignCACertificateAndPrivateKey(commonName, WithSelfSign_SignTo(hosts...), WithSelfSign_EnableAuth(auth), WithSelfSign_PrivateKey(priv), WithSelfSign_Organization(org))
 }
 
 func SignServerCrtNKey(ca []byte, key []byte) (cert []byte, sKey []byte, _ error) {
