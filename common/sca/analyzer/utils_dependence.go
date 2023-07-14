@@ -49,17 +49,6 @@ func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Packa
 	}
 }
 
-func linkStream(down, up *dxtypes.Package) {
-	if up.DownStreamPackages == nil {
-		up.DownStreamPackages = make(map[string]*dxtypes.Package)
-	}
-	up.DownStreamPackages[down.Identifier()] = down
-	if down.UpStreamPackages == nil {
-		down.UpStreamPackages = make(map[string]*dxtypes.Package)
-	}
-	down.UpStreamPackages[up.Identifier()] = up
-}
-
 func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	potentialPkgs := make([]*dxtypes.Package, 0)
 
@@ -72,7 +61,7 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 		// and
 		for andDepPkgName, andDepVersion := range pkg.DependsOn.And {
 			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
-				linkStream(pkg, andDepPkg)
+				pkg.LinkDepend(andDepPkg)
 			} else {
 				// if not found, make a potential package
 				potentialPkg := &dxtypes.Package{
@@ -83,7 +72,7 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
 				pkgMap[potentialPkg.Name] = potentialPkg
-				linkStream(pkg, potentialPkg)
+				pkg.LinkDepend(potentialPkg)
 			}
 		}
 		// or
@@ -91,7 +80,7 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			exist := false
 			for orDepPkgName := range orDepPkgMap {
 				if orDepPkg, ok := pkgMap[orDepPkgName]; ok {
-					linkStream(pkg, orDepPkg)
+					pkg.LinkDepend(orDepPkg)
 					exist = true
 					break
 				}
@@ -116,7 +105,7 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
 				pkgMap[potentialPkg.Name] = potentialPkg
-				linkStream(pkg, potentialPkg)
+				pkg.LinkDepend(potentialPkg)
 			}
 		}
 	}
@@ -161,7 +150,7 @@ func mergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			}
 			//修正上下游关系
 			for _, downp := range pkg.DownStreamPackages {
-				linkStream(downp, p)
+				downp.LinkDepend(p)
 			}
 			//加入同名pkg的数组中
 			plist = append(plist, p)
