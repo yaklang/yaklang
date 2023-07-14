@@ -271,8 +271,12 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:   hostname,
-			Organization: []string{c.org},
+			Country:            []string{c.org},
+			Province:           []string{c.org},
+			Locality:           []string{c.org},
+			Organization:       []string{c.org},
+			OrganizationalUnit: []string{c.org},
+			CommonName:         hostname,
 		},
 		SubjectKeyId:          c.keyID,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
