@@ -31,7 +31,7 @@ func (s *VulinServer) init() {
 		if len(reqRaw) > 0 {
 			select {
 			case s.agentFeedbackChan <- reqRaw:
-				log.Infof("agentFeedbackHandler: %s", string(reqRaw))
+				//log.Infof("agentFeedbackHandler: %s", string(reqRaw))
 			default:
 				log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
 			}

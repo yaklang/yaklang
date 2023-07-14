@@ -1,6 +1,7 @@
 package vulinbox
 
 import (
+	"context"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
@@ -109,19 +110,26 @@ User-Agent: FeedbackStreamer/1.0
 			conn.Close()
 		}()
 		var wr sync.Mutex
+		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
+			defer cancel()
 			for {
-				wr.Lock()
-				err := conn.WriteJSON(map[string]any{"type": "ping"})
-				wr.Unlock()
+				conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+				_, m, err := conn.ReadMessage()
 				if err != nil {
 					return
 				}
-				time.Sleep(time.Second)
+				if utils.ExtractMapValueString(m, "type") != "ping" {
+					log.Infof("recv from client: %v", string(m))
+				} else {
+					log.Infof("recv from client ping: %v", string(m))
+				}
 			}
 		}()
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case bytes := <-agentFeedbackHandler:
 				wr.Lock()
 				err := conn.WriteJSON(map[string]any{
@@ -130,8 +138,21 @@ User-Agent: FeedbackStreamer/1.0
 				})
 				wr.Unlock()
 				if err != nil {
+					log.Infof("ws conn from: %v closed", conn.LocalAddr())
+					cancel()
 					return
 				}
+			case <-time.After(time.Second):
+				log.Infof("ws conn start to send: %v ping", conn.LocalAddr())
+				wr.Lock()
+				err := conn.WriteJSON(map[string]any{"type": "ping"})
+				wr.Unlock()
+				if err != nil {
+					log.Info("ws conn from: %v closed", conn.LocalAddr())
+					cancel()
+					return
+				}
+				continue
 			}
 		}
 	})
