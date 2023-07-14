@@ -129,16 +129,16 @@ func TestMergePackagesNormal(t *testing.T) {
 
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
-	linkStream(pa1, pa22)
-	linkStream(pa1, pa21)
-	linkStream(pa22, pa3)
-	linkStream(pa22, pa3b)
+	pa1.LinkDepend(pa22)
+	pa1.LinkDepend(pa21)
+	pa21.LinkDepend(pa3)
+	pa3.LinkDepend(pa3b)
 
 	// pb1 -> pb2(pa22) -> pb3
-	linkStream(pb1, pb2)
-	linkStream(pb2, pb3)
+	pb1.LinkDepend(pb2)
+	pb2.LinkDepend(pb3)
 
-	ret := mergePackages(pkgs)
+	ret := MergePackages(pkgs)
 	wantPkg := []*testPackage{
 
 		{
@@ -204,16 +204,16 @@ func TestMergePackagesVersionRange(t *testing.T) {
 
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
-	linkStream(pa1, pa22)
-	linkStream(pa1, pa21)
-	linkStream(pa22, pa3)
-	linkStream(pa22, pa3b)
+	pa1.LinkDepend(pa22)
+	pa1.LinkDepend(pa21)
+	pa21.LinkDepend(pa3)
+	pa3.LinkDepend(pa3b)
 	// pe1 -> pe2(pa2<0.0.5) -> pe3
-	linkStream(pe1, pe2)
-	linkStream(pe2, pe3)
+	pe1.LinkDepend(pe2)
+	pe2.LinkDepend(pe3)
 
 	// DrawPackagesDOT(pkgs, "org.png")
-	ret := mergePackages(pkgs)
+	ret := MergePackages(pkgs)
 	wantPkg := []*testPackage{
 
 		{
@@ -283,22 +283,22 @@ func TestMergePackagesOrPackage(t *testing.T) {
 
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
-	linkStream(pa1, pa22)
-	linkStream(pa1, pa21)
-	linkStream(pa22, pa3)
-	linkStream(pa22, pa3b)
+	pa1.LinkDepend(pa22)
+	pa1.LinkDepend(pa21)
+	pa21.LinkDepend(pa3)
+	pa3.LinkDepend(pa3b)
 
 	// pb1 -> pb2(pa22) -> pb3
-	linkStream(pb1, pb2)
-	linkStream(pb2, pb3)
+	pb1.LinkDepend(pb2)
+	pb2.LinkDepend(pb3)
 
 	// pc1 -> pc2 -> pc3
 	//     -> pa1|pc4|pb2
-	linkStream(pc1, pc2)
-	linkStream(pc2, pc3)
-	linkStream(pc1, pcor)
+	pc1.LinkDepend(pc2)
+	pc1.LinkDepend(pcor)
+	pc2.LinkDepend(pc3)
 	// DrawPackagesDOT(pkgs, "org.png")
-	ret := mergePackages(pkgs)
+	ret := MergePackages(pkgs)
 	// _ = ret
 	// DrawPackagesDOT(ret, "ret.png")
 	wantPkg := []*testPackage{
@@ -386,22 +386,23 @@ func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pkgs = append(pkgs, pkgMaps["pd"]...)
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
-	linkStream(pa1, pa22)
-	linkStream(pa1, pa21)
-	linkStream(pa22, pa3)
-	linkStream(pa22, pa3b)
+	pa1.LinkDepend(pa22)
+	pa1.LinkDepend(pa21)
+	pa21.LinkDepend(pa3)
+	pa3.LinkDepend(pa3b)
 
 	// pb1 -> pb2(pa22) -> pb3
-	linkStream(pb1, pb2)
-	linkStream(pb2, pb3)
+
+	pb1.LinkDepend(pb2)
+	pb2.LinkDepend(pb3)
 
 	// pd1 -> pd2 -> pd3
 	//     -> pa1|pb1|pb2
-	linkStream(pd1, pd2)
-	linkStream(pd2, pd3)
-	linkStream(pd1, pdor)
+	pd1.LinkDepend(pd2)
+	pd2.LinkDepend(pd3)
+	pd3.LinkDepend(pdor)
 	// DrawPackagesDOT(pkgs, "org.png")
-	ret := mergePackages(pkgs)
+	ret := MergePackages(pkgs)
 	// DrawPackagesDOT(ret, "ret.png")
 	// ShowDot(ret)
 	wantPkg := []*testPackage{
