@@ -7,6 +7,7 @@ import (
 
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/mod"
 	"github.com/aquasecurity/go-dep-parser/pkg/golang/sum"
+	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
 )
 
 const (
@@ -51,12 +52,17 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 	switch fi.MatchStatus {
 	case statusGoMod:
 		p := mod.NewParser(true)
-		pkgs, err := ParseLanguageConfiguration(fi, p)
+		parsedLibs, parsedDeps, err := p.Parse(fi.LazyFile)
+		if err != nil {
+			return nil, err
+		}
+
+		pkgs, err := handlerParsed(parsedLibs, parsedDeps)
 		if err != nil {
 			return nil, err
 		}
 		// if golang version < 1.17, need to parse go.sum
-		if lessThanGo117(pkgs) {
+		if lessThanGo117(parsedLibs) {
 			sumPath := path.Join(path.Dir(fi.Path), goSumFile)
 			if sfi, ok := afi.MatchedFileInfos[sumPath]; ok {
 				sp := sum.NewParser()
@@ -74,7 +80,6 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 					if ok {
 						continue
 					}
-					sPkg.Indirect = true
 					subPkgs = append(subPkgs, sPkg)
 				}
 				pkgs = append(pkgs, subPkgs...)
@@ -85,7 +90,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 	return nil, nil
 }
 
-func lessThanGo117(pkgs []*dxtypes.Package) bool {
+func lessThanGo117(pkgs []godeptypes.Library) bool {
 	for _, pkg := range pkgs {
 		// The indirect field is populated only in Go 1.17+
 		if pkg.Indirect {

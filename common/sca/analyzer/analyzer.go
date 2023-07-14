@@ -219,7 +219,10 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtyp
 	if err != nil {
 		return nil, err
 	}
+	return handlerParsed(parsedLibs, parsedDeps)
+}
 
+func handlerParsed(parsedLibs godeptypes.Libraries, parsedDeps godeptypes.Dependencies) ([]*dxtypes.Package, error) {
 	pkgIDMap := make(map[string]*dxtypes.Package, len(parsedLibs))
 
 	for _, lib := range parsedLibs {
