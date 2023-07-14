@@ -82,7 +82,7 @@ func (v *VulinboxAgentFacade) Status() *ypb.IsRemoteAddrAvailableResponse {
 	return &ypb.IsRemoteAddrAvailableResponse{
 		Addr:         v.addr,
 		IsAvailable:  true,
-		Status:       "offline",
+		Status:       "online",
 		PingCount:    v.pingCount,
 		RequestCount: v.requestCount,
 		LastActiveAt: v.lastActiveAt,
@@ -104,6 +104,9 @@ func (s *Server) GetRegisteredVulinboxAgent(ctx context.Context, req *ypb.GetReg
 	vulinboxAgentMap.Range(func(key, value any) bool {
 		info, ok := value.(*VulinboxAgentFacade)
 		if !ok {
+			return true
+		}
+		if info.addr == "" {
 			return true
 		}
 		infos = append(infos, info.Status())
@@ -140,7 +143,9 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 		return agent.Status(), nil
 	}
 
-	info := &VulinboxAgentFacade{}
+	info := &VulinboxAgentFacade{
+		addr: addr,
+	}
 	disconnectBox, err := lowhttp.ConnectVulinboxAgentEx(addr, func(request []byte) {
 		info.AddRequestCount()
 	}, func() {

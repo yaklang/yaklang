@@ -278,12 +278,12 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 
 	// 接收响应并判断
 	var responseRaw bytes.Buffer
-
 	rsp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(conn, &responseRaw)), nil)
 	if err != nil {
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
-	if rsp.StatusCode != 101 {
+	//if rsp.StatusCode != 101 {
+	if rsp.StatusCode != 101 && rsp.StatusCode != 200 {
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
 	// 如果响应中不存在permessage-deflate扩展则要反设置isDeflate
