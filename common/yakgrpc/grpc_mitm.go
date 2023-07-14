@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -940,7 +941,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.WebsocketHash = wshash
 				flow.HiddenIndex = wshash
 				flow.Hash = flow.CalcHash()
-				err = yakit.CreateOrUpdateHTTPFlow(s.GetProjectDatabase(), flow.Hash, flow)
+				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow.Hash, flow)
 				if err != nil {
 					log.Errorf("create / save httpflow(websocket) error: %s", err)
 				}
@@ -1313,6 +1314,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
+		flow.Ksuid = ksuid.New().String()
 
 		flow.Hash = flow.CalcHash()
 		if modified {

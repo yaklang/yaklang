@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -64,6 +65,7 @@ type HTTPFlow struct {
 	gorm.Model
 
 	HiddenIndex        string
+	Ksuid              string
 	NoFixContentLength bool   `json:"no_fix_content_length"`
 	Hash               string `gorm:"unique_index"`
 	IsHTTPS            bool
@@ -409,7 +411,10 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex)
+	if f.Ksuid == "" {
+		f.Ksuid = uuid.NewV4().String()
+	}
+	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.Ksuid)
 	//return utils.CalcSha1(uuid.NewV4().String())
 }
 
@@ -543,6 +548,28 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 		return nil, err
 	}
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
+}
+
+func InsertHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			fErr = utils.Errorf("met panic error: %v", err)
+		}
+	}()
+
+	db = db.Model(&HTTPFlow{})
+	switch i.(type) {
+	case *HTTPFlow:
+		log.Info("start insert flow mode: " + hash)
+		if fErr := db.LogMode(true).Debug().Save(i); fErr.Error == nil {
+			return nil
+		}
+	}
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&HTTPFlow{}); db.Error != nil {
+		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
+	}
+
+	return nil
 }
 
 func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error) {
