@@ -34,6 +34,7 @@ require (
 	github.com/dlclark/regexp2 v1.2.0
 	github.com/docker/docker v24.0.2+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/emicklei/dot v1.5.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
 	github.com/gilliek/go-opml v1.0.0
