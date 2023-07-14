@@ -197,9 +197,9 @@ func DrawPackagesDOT(pkgs []*dxtypes.Package) {
 		label := fmt.Sprintf("%s-%s", pkg.Name, html.EscapeString(pkg.Version))
 		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">License: %s</FONT>`, strings.Join(pkg.License, ", "))
 		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Verification: %s</FONT>`, pkg.Verification)
-		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Indirect: %v</FONT>`, pkg.Indirect)
-		// label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Potential: %v</FONT>`, pkg.Potential)
+		label += fmt.Sprintf(`<br/><FONT POINT-SIZE="10">Potential: %v</FONT>`, pkg.Potential)
 		node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label)).Attr("shape", "box")
+
 		// node := g.Node(pkg.Identifier()).Attr("label", dot.HTML(label))
 		nodes[pkg.Identifier()] = node
 	}
