@@ -53,11 +53,12 @@ Host: baidu.com
 	if len(rsp.GetResults()) <= 0 {
 		panic("no http request is build")
 	}
-
-	var host, port = utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Content-Length: 12
 
 aaabbbaaabbb`))
+
+	var host, port = utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to decug mock http on: %v", utils.HostPort(host, port))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
@@ -105,10 +106,11 @@ func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug2(t *testing.T) {
 		panic(err)
 	}
 
-	var host, port = utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Content-Length: 12
 
 aaacccaaabbb`))
+	var host, port = utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
