@@ -6,17 +6,12 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	grpcMetadata "google.golang.org/grpc/metadata"
 	"io"
 	"net/http"
 	"net/url"
 )
-
-func new_EmptyServer() *yakgrpc.Server {
-	return &yakgrpc.Server{}
-}
 
 type VirtualYakExecServer struct {
 	send func(result *ypb.ExecResult) error
