@@ -4,7 +4,7 @@ checked = false
 
 for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...))~{
     dump(result)
-    if result.GetServiceName() == "snmp" {
+    if result.Fingerprint.ServiceName == "snmp" {
         checked = true
     }
 }
@@ -13,7 +13,7 @@ checked2 = false
 // U:port 的优先级比 servicescan.proto("tcp") 高
 for result in servicescan.Scan(host, "U:"+string(port), servicescan.proto(["tcp"]...))~{
     dump(result)
-    if result.GetServiceName() == "snmp" {
+    if result.Fingerprint.ServiceName == "snmp" {
         checked2 = true
     }
 }
@@ -24,7 +24,7 @@ for result in servicescan.Scan(host, string(port),
     servicescan.maxProbes(100),
 )~{
     dump(result)
-    if result.GetServiceName() == "snmp" {
+    if result.Fingerprint.ServiceName == "snmp" {
         checked3 = true
     }
 }
