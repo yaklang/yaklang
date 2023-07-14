@@ -1,13 +1,11 @@
 package analyzer
 
 import (
-	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/aquasecurity/go-dep-parser/pkg/python/poetry"
-	"github.com/aquasecurity/go-dep-parser/pkg/python/pyproject"
 )
 
 const (
@@ -45,26 +43,6 @@ func (a pythonPoetryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, 
 		if err != nil {
 			return nil, err
 		}
-		if pkgs == nil {
-			return nil, nil
-		}
-
-		// Parse pyproject.toml to identify the direct dependencies
-		pyprojectPath := path.Join(path.Dir(fi.Path), PyProjectFile)
-		if pyprojectFi, ok := afi.MatchedFileInfos[pyprojectPath]; ok {
-			pyProjectParser := pyproject.NewParser()
-			parsed, err := pyProjectParser.Parse(pyprojectFi.LazyFile)
-			if err != nil {
-				return nil, err
-			}
-			for i, pkg := range pkgs {
-				// Identify the direct/transitive dependencies
-				if _, ok := parsed[pkg.Name]; !ok {
-					pkgs[i].Indirect = true
-				}
-			}
-		}
-
 		return pkgs, nil
 	}
 

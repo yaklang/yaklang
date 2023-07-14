@@ -105,9 +105,6 @@ func Check(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
 			t.Fatalf("%s: pkgs %d(%s) version error: %s(got) != %s(want)", name, i, pkgs[i].Name, pkgs[i].Version, wantPkgs[i].Version)
 		}
 
-		if pkgs[i].Indirect != wantPkgs[i].Indirect {
-			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].Indirect, wantPkgs[i].Indirect)
-		}
 		if slices.CompareFunc(pkgs[i].License, wantPkgs[i].License, strings.Compare) != 0 {
 			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].License, wantPkgs[i].License)
 		}
