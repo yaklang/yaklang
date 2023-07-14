@@ -118,8 +118,13 @@ func (down *Package) LinkDepend(up *Package) {
 	down.UpStreamPackages[up.Identifier()] = up
 }
 
-// merge p1 to p1
+// merge p2 to p1
 func (p *Package) Merge(p2 *Package) *Package {
+	p.Potential = false
+	if p.License == nil {
+		p.License = make([]string, 0)
+	}
+	p.License = lo.Uniq(append(p.License, p2.License...))
 	if p.FromAnalyzer == nil {
 		p.FromAnalyzer = make([]string, 0)
 	}
@@ -143,8 +148,12 @@ func (p *Package) Merge(p2 *Package) *Package {
 	}
 	return p
 }
+
 func (p *Package) CanMerge(p2 *Package) bool {
 	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
+		return false
+	}
+	if p.Name != p.Name {
 		return false
 	}
 	// version

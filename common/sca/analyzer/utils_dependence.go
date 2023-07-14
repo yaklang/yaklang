@@ -171,19 +171,28 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			continue
 		}
 
-		p := list[0]
-		for _, p2 := range list {
-			if p2 == p {
+		// check
+		merge := make(map[*dxtypes.Package]*dxtypes.Package)
+		for i := 0; i < len(list); i++ {
+			p := list[i]
+			if _, ok := merge[p]; ok {
 				continue
 			}
-			// match
+			for j := i + 1; j < len(list); j++ {
+				p2 := list[j]
+				if _, ok := merge[p2]; ok {
+					continue
+				}
 			if p.CanMerge(p2) {
-				p.Merge(p2)
-			} else {
-				ret = append(ret, p2)
+					merge[p2] = p
 			}
 		}
 		ret = append(ret, p)
+	}
+
+		for p2, p := range merge {
+			p.Merge(p2)
+		}
 	}
 	return ret
 }
