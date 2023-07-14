@@ -114,7 +114,7 @@ func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	return append(pkgs, potentialPkgs...)
 }
 
-func mergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
+func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	pkgMaps := make(map[string][]*dxtypes.Package) // name -> []packages
 	orPkgs := make([]*dxtypes.Package, 0)
 	for _, pkg := range pkgs {
