@@ -395,11 +395,11 @@ bruteScan = func(result){
 		uL = make([]string)
 		pL = make([]string)
 
-		if (!replaceDefaultUsernameDict) {
+		if (replaceDefaultUsernameDict) {
 			uL = append(uL, brute.GetUsernameListFromBruteType(bruteType)...)
 		}
 
-		if (!replaceDefaultPasswordDict) {
+		if (replaceDefaultPasswordDict) {
 			pL = append(pL, brute.GetPasswordListFromBruteType(bruteType)...)
 		}
 
