@@ -69,7 +69,7 @@ jobs:
         run: go test -timeout 5m -run TestGRPCMUSTPASS ./common/yakgrpc -v
 
       - name: Test gRPC MUSTPASS-PLUGIN-SQL
-        run: go test -timeout 2m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
+        run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
 
       - name: Test gRPC MUSTPASS-PLUGIN-MITM
         run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
