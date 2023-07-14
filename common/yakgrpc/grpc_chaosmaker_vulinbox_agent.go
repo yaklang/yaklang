@@ -2,8 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sort"
 	"sync"
@@ -141,7 +141,7 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 	}
 
 	info := &VulinboxAgentFacade{}
-	disconnectBox, err := coreplugin.ConnectVulinboxAgentEx(addr, func(request []byte) {
+	disconnectBox, err := lowhttp.ConnectVulinboxAgentEx(addr, func(request []byte) {
 		info.AddRequestCount()
 	}, func() {
 		info.AddPing()
