@@ -252,9 +252,16 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtyp
 		for _, uid := range upStreamIDs {
 			upPkg, ok := pkgIDMap[uid]
 			if !ok {
-				continue
+				data := strings.Split(uid, "@")
+				// name(data[0]) => version(data[1])
+				// pkg.DependsOn.And[data[0]] = data[1]
+				upPkg = &dxtypes.Package{
+					Name:    data[0],
+					Version: data[1],
+				}
+				pkgIDMap[uid] = upPkg
 			}
-			linkStream(pkg, upPkg)
+			pkg.LinkDepend(upPkg)
 		}
 	}
 
