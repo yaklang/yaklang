@@ -28,8 +28,9 @@ type testcase struct {
 	name           string
 	filePath       string
 	virtualPath    string
-	wantPkgs       []dxtypes.Package
+	wantPkgs       []*dxtypes.Package
 	wantError      bool
+	check          bool
 	t              *testing.T
 	a              analyzer.Analyzer
 	matchType      int
@@ -60,7 +61,63 @@ func CreateTempFromFsFile(path string) (*os.File, error) {
 	return tempFile, nil
 }
 
-func Run(tc testcase) {
+func Check(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
+	sort.Slice(pkgs, func(i, j int) bool {
+		c := strings.Compare(pkgs[i].Name, pkgs[j].Name)
+		if c == 0 {
+			return strings.Compare(pkgs[i].Version, pkgs[j].Version) > 0
+		}
+		return c > 0
+	})
+	sort.Slice(wantPkgs, func(i, j int) bool {
+		c := strings.Compare(wantPkgs[i].Name, wantPkgs[j].Name)
+		if c == 0 {
+			return strings.Compare(wantPkgs[i].Version, wantPkgs[j].Version) > 0
+		}
+		return c > 0
+	})
+
+	if len(pkgs) != len(wantPkgs) {
+		t.Fatalf("%s: pkgs length error: %d(got) != %d(want)", name, len(pkgs), len(wantPkgs))
+	}
+
+	for i := 0; i < len(pkgs); i++ {
+		if strings.Contains(pkgs[i].Name, "|") {
+			pkgNames := strings.Split(pkgs[i].Name, "|")
+			wantPkgNames := strings.Split(wantPkgs[i].Name, "|")
+			sort.Strings(pkgNames)
+			sort.Strings(wantPkgNames)
+			if slices.CompareFunc(pkgNames, wantPkgNames, strings.Compare) != 0 {
+				t.Fatalf("%s: pkgs %d name error: %#v(got) != %#v(want)", name, i, pkgNames, wantPkgNames)
+			}
+		} else if pkgs[i].Name != wantPkgs[i].Name {
+			t.Fatalf("%s: pkgs %d name error: %s(got) != %s(want)", name, i, pkgs[i].Name, wantPkgs[i].Name)
+		}
+		if strings.Contains(pkgs[i].Version, "|") {
+			pkgVersions := strings.Split(pkgs[i].Version, "|")
+			wantPkgVersions := strings.Split(wantPkgs[i].Version, "|")
+			sort.Strings(pkgVersions)
+			sort.Strings(wantPkgVersions)
+			if slices.CompareFunc(pkgVersions, wantPkgVersions, strings.Compare) != 0 {
+				t.Fatalf("%s: pkgs %d version error: %#v(got) != %#v(want)", name, i, pkgVersions, wantPkgVersions)
+			}
+		} else if pkgs[i].Version != wantPkgs[i].Version {
+			t.Fatalf("%s: pkgs %d(%s) version error: %s(got) != %s(want)", name, i, pkgs[i].Name, pkgs[i].Version, wantPkgs[i].Version)
+		}
+
+		if pkgs[i].Indirect != wantPkgs[i].Indirect {
+			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].Indirect, wantPkgs[i].Indirect)
+		}
+		if slices.CompareFunc(pkgs[i].License, wantPkgs[i].License, strings.Compare) != 0 {
+			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].License, wantPkgs[i].License)
+		}
+		if pkgs[i].Verification != wantPkgs[i].Verification {
+			t.Fatalf("%s: pkgs %d(%s) verfication error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].Verification, wantPkgs[i].Verification)
+		}
+	}
+}
+
+func Run(tc testcase) []*dxtypes.Package {
 	t := tc.t
 	fmt.Printf("TestCase: %s\n===============================\n", tc.name)
 
@@ -110,60 +167,13 @@ func Run(tc testcase) {
 		t.Fatalf("%s: analyze error: %v", tc.name, err)
 	}
 
-	sort.Slice(pkgs, func(i, j int) bool {
-		c := strings.Compare(pkgs[i].Name, pkgs[j].Name)
-		if c == 0 {
-			return strings.Compare(pkgs[i].Version, pkgs[j].Version) > 0
-		}
-		return c > 0
-	})
-	sort.Slice(tc.wantPkgs, func(i, j int) bool {
-		c := strings.Compare(tc.wantPkgs[i].Name, tc.wantPkgs[j].Name)
-		if c == 0 {
-			return strings.Compare(tc.wantPkgs[i].Version, tc.wantPkgs[j].Version) > 0
-		}
-		return c > 0
-	})
+	if tc.check {
+		Check(pkgs, tc.wantPkgs, t.Name(), tc.t)
 
-	if len(pkgs) != len(tc.wantPkgs) {
-		t.Fatalf("%s: pkgs length error: %d(got) != %d(want)", tc.name, len(pkgs), len(tc.wantPkgs))
 	}
 
-	for i := 0; i < len(pkgs); i++ {
-		if strings.Contains(pkgs[i].Name, "|") {
-			pkgNames := strings.Split(pkgs[i].Name, "|")
-			wantPkgNames := strings.Split(tc.wantPkgs[i].Name, "|")
-			sort.Strings(pkgNames)
-			sort.Strings(wantPkgNames)
-			if slices.CompareFunc(pkgNames, wantPkgNames, strings.Compare) != 0 {
-				t.Fatalf("%s: pkgs %d name error: %#v(got) != %#v(want)", tc.name, i, pkgNames, wantPkgNames)
-			}
-		} else if pkgs[i].Name != tc.wantPkgs[i].Name {
-			t.Fatalf("%s: pkgs %d name error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, tc.wantPkgs[i].Name)
-		}
-		if strings.Contains(pkgs[i].Version, "|") {
-			pkgVersions := strings.Split(pkgs[i].Version, "|")
-			wantPkgVersions := strings.Split(tc.wantPkgs[i].Version, "|")
-			sort.Strings(pkgVersions)
-			sort.Strings(wantPkgVersions)
-			if slices.CompareFunc(pkgVersions, wantPkgVersions, strings.Compare) != 0 {
-				t.Fatalf("%s: pkgs %d version error: %#v(got) != %#v(want)", tc.name, i, pkgVersions, wantPkgVersions)
-			}
-		} else if pkgs[i].Version != tc.wantPkgs[i].Version {
-			t.Fatalf("%s: pkgs %d(%s) version error: %s(got) != %s(want)", tc.name, i, pkgs[i].Name, pkgs[i].Version, tc.wantPkgs[i].Version)
-		}
-
-		if pkgs[i].Indirect != tc.wantPkgs[i].Indirect {
-			t.Fatalf("%s: pkgs %d(%s) indirect error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Indirect, tc.wantPkgs[i].Indirect)
-		}
-		if slices.CompareFunc(pkgs[i].License, tc.wantPkgs[i].License, strings.Compare) != 0 {
-			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].License, tc.wantPkgs[i].License)
-		}
-		if pkgs[i].Verification != tc.wantPkgs[i].Verification {
-			t.Fatalf("%s: pkgs %d(%s) verfication error: %v(got) != %v(want)", tc.name, i, pkgs[i].Name, pkgs[i].Verification, tc.wantPkgs[i].Verification)
-		}
-	}
 	fmt.Println("===============================")
+	return pkgs
 }
 
 // package
@@ -225,7 +235,7 @@ func TestDpkg(t *testing.T) {
 		t:         t,
 		a:         a,
 		matchType: 1,
-		wantPkgs:  []dxtypes.Package{},
+		wantPkgs:  []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -250,7 +260,7 @@ func TestConan(t *testing.T) {
 		t:         t,
 		a:         analyzer.NewConanAnalyzer(),
 		matchType: 1,
-		wantPkgs:  []dxtypes.Package{},
+		wantPkgs:  []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -274,7 +284,7 @@ func TestGoBinary(t *testing.T) {
 		t:         t,
 		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
-		wantPkgs:  []dxtypes.Package{},
+		wantPkgs:  []*dxtypes.Package{},
 	}
 	Run(tc)
 
@@ -285,7 +295,7 @@ func TestGoBinary(t *testing.T) {
 		t:         t,
 		a:         analyzer.NewGoBinaryAnalyzer(),
 		matchType: 1,
-		wantPkgs:  []dxtypes.Package{},
+		wantPkgs:  []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -329,7 +339,7 @@ func TestGoMod(t *testing.T) {
 		t:           t,
 		a:           analyzer.NewGoModAnalyzer(),
 		matchType:   1,
-		wantPkgs:    []dxtypes.Package{},
+		wantPkgs:    []*dxtypes.Package{},
 		wantError:   true,
 	}
 	Run(tc)
@@ -387,7 +397,7 @@ func TestPHPComposer(t *testing.T) {
 		a:              analyzer.NewPHPComposerAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 		wantError:      true,
 	}
 	Run(tc)
@@ -435,7 +445,7 @@ func TestPythonPackaging(t *testing.T) {
 		a:              analyzer.NewPythonPackagingAnalyzer(),
 		matchType:      2,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -460,7 +470,7 @@ func TestPythonPIP(t *testing.T) {
 		a:              analyzer.NewPythonPIPAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -485,7 +495,7 @@ func TestPythonPIPEnv(t *testing.T) {
 		a:              analyzer.NewPythonPIPEnvAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 		wantError:      true,
 	}
 	Run(tc)
@@ -527,7 +537,7 @@ func TestPythonPoetry(t *testing.T) {
 		a:              analyzer.NewPythonPoetryAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 		wantError:      true,
 	}
 	Run(tc)
@@ -565,7 +575,7 @@ func TestJavaGradle(t *testing.T) {
 		t:           t,
 		a:           analyzer.NewJavaGradleAnalyzer(),
 		matchType:   1,
-		wantPkgs:    []dxtypes.Package{},
+		wantPkgs:    []*dxtypes.Package{},
 	}
 	Run(tc)
 }
@@ -603,7 +613,7 @@ func TestJavaPom(t *testing.T) {
 		a:              analyzer.NewJavaPomAnalyzer(),
 		matchType:      1,
 		matchedFileMap: map[string]string{},
-		wantPkgs:       []dxtypes.Package{},
+		wantPkgs:       []*dxtypes.Package{},
 		wantError:      true,
 	}
 	Run(tc)
