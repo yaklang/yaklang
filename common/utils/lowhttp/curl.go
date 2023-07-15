@@ -22,9 +22,10 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 	}
 
 	var (
-		method  string = "GET"
-		headers        = make(http.Header)
-		body           = ""
+		method   string = "GET"
+		headers         = make(http.Header)
+		body            = ""
+		urlIndex        = len(items) - 1
 	)
 
 	maxItem := len(items)
@@ -32,6 +33,7 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 	// fetch method
 	methodIndex := 0
 	mustHead := false
+	forceGet := false
 	for index, item := range items {
 		if item == `-I` || item == `--head` {
 			mustHead = true
@@ -40,6 +42,15 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 
 		if item == "-X" || item == "--request" {
 			methodIndex = index
+		}
+
+		// add a condition for --get or -G
+		if item == "-G" || item == "--get" {
+			forceGet = true
+		}
+
+		if item == "--url" {
+			urlIndex = index + 1
 		}
 	}
 	if methodIndex > 0 && methodIndex+1 < maxItem {
@@ -57,6 +68,9 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 		return nil, utils.Errorf("cookiejar.New failed: %v", err)
 	}
 	fakeU, _ := url.Parse("http://127.0.0.1")
+
+	var referer string
+	var userAgent string
 	for index, item := range items {
 		// basic user
 		if item == "-u" || item == "--user" {
@@ -87,20 +101,78 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 					}
 				}
 				k, v := SplitHTTPHeader(val)
-				headers.Add(k, v)
+				if strings.ToLower(k) == "referer" {
+					referer = v
+				} else if strings.ToLower(k) == "cookie" {
+					kv := strings.SplitN(v, "=", 2)
+					if len(kv) == 2 {
+						cookies.SetCookies(fakeU, []*http.Cookie{
+							{Name: kv[0], Value: kv[1]},
+						})
+					}
+				} else {
+					headers.Add(k, v)
+				}
+			}
+		}
+
+		if item == "-e" || item == "--referer" {
+			if index+1 < maxItem {
+				referer = items[index+1]
+			}
+		}
+
+		if item == "-A" || item == "--user-agent" {
+			if index+1 < maxItem {
+				userAgent = items[index+1]
 			}
 		}
 	}
 
+	if referer != "" {
+		headers.Set("Referer", referer)
+	}
+
+	// -A 或者 --user-agent 应该覆盖 -H 中设置的
+	if userAgent != "" {
+		headers.Set("User-Agent", userAgent)
+	}
+
+	// 合并 -H 设置的 cookie，和 -b 设置的 cookie。
+	var cookieStrings []string
 	for _, cookie := range cookies.Cookies(fakeU) {
-		headers.Add("Cookie", cookie.String())
+		cookieStrings = append(cookieStrings, cookie.String())
+	}
+	if len(cookieStrings) != 0 {
+		headers.Add("Cookie", strings.Join(cookieStrings, "; "))
 	}
 
 	// fetch post body
+	data := make(url.Values)
 	for index, item := range items {
 		if item == "-d" || item == "--data" {
 			if index+1 < maxItem {
 				body = items[index+1]
+				if method == "GET" {
+					method = "POST"
+				}
+
+				// If forceGet is true, convert data to query parameters
+				if forceGet {
+					kv := strings.SplitN(body, "=", 2)
+					if len(kv) == 2 {
+						data.Add(kv[0], kv[1])
+					}
+				}
+			}
+		}
+
+		if item == "--data-raw" {
+			if index+1 < maxItem {
+				body = items[index+1]
+				if method == "GET" {
+					method = "POST"
+				}
 			}
 		}
 	}
@@ -149,7 +221,7 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 		headers.Set("Content-Type", w.FormDataContentType())
 	}
 
-	targetUrl := items[len(items)-1]
+	targetUrl := items[urlIndex]
 
 	var mayDomain string
 	if strings.Contains(targetUrl, "/") {
@@ -218,6 +290,23 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 	if err != nil {
 		return nil, utils.Errorf("invalid url: %v", err)
 	}
+
+	if forceGet && len(data) > 0 {
+		parsedUrl, err := url.Parse(targetUrl)
+		if err != nil {
+			return nil, utils.Errorf("invalid url: %v", err)
+		}
+		parsedUrl.RawQuery = data.Encode()
+		targetUrl = parsedUrl.String()
+		method = "GET"
+	}
+
+	// Fetch the host from the targetUrl
+	host := urlIns.Host
+
+	// Set the Host field in headers
+	headers.Set("Host", host)
+
 	var headerBuf bytes.Buffer
 	for k, v := range headers {
 		for _, v1 := range v {
