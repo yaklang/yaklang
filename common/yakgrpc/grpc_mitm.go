@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -50,7 +49,8 @@ func _checker(includes, excludes []string, target string) bool {
 	}
 }
 
-const MatchedRules = "MatchedRules"
+const REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
+const REQUEST_CONTEXT_KEY_INFOMAP = "InfoMap"
 
 var enabledHooks = yak.MITMAndPortScanHooks
 var saveHTTPFlowMutex = new(sync.Mutex)
@@ -349,8 +349,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	feedbackToUser("初始化过滤器... / initializing filters")
 
 	// 开始准备劫持
-	var hijackedResponseByRequestPTRMap = new(sync.Map)
-	_ = hijackedResponseByRequestPTRMap
+	//var hijackedResponseByRequestPTRMap = new(sync.Map)
 
 	//callers := yak.NewYakToCallerManager()
 	mitmPluginCaller, err := yak.NewMixPluginCaller()
@@ -654,10 +653,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
-		_, ok := hijackedResponseByRequestPTRMap.Load(wshash)
-		if !ok {
+		if !GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
 			return raw
 		}
+		//_, ok := hijackedResponseByRequestPTRMap.Load(wshash)
+		//if !ok {
+		//	return raw
+		//}
 
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		host, port, _ := utils.ParseStringToHostPort(urlStr)
@@ -731,17 +733,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		   这里是调用 hijackHTTPResponse 的问题
 		*/
 		originRspRaw := rsp[:]
-		var urlStr string
-		u, _ := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
-		if u != nil {
-			urlStr = u.String()
-		}
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseBytes, string(originRspRaw))
+		var urlStr = GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_Url)
+
 		var handled = utils.NewBool(false)
 		var dropped = utils.NewBool(false)
 		var modifiedResponse []byte
 
-		var requestRaw []byte
-		requestRaw, _ = utils.HttpDumpWithBody(req, true)
+		var requestRaw = []byte(GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestBytes))
+		if len(requestRaw) <= 0 {
+			requestRaw, _ = utils.HttpDumpWithBody(req, true)
+		}
+
 		// 响应，带请求
 		mitmPluginCaller.CallHijackResponseEx(isHttps, urlStr, func() interface{} {
 			return requestRaw
@@ -785,28 +788,30 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		// 自动转发与否
 		if autoForward.IsSet() {
+			SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_AutoFoward, true)
 			/*
 				自动过滤下，不是所有 response 都应该替换
 				应该替换的条件是不匹配过滤器的内容
 			*/
 
 			// 这个来过滤一些媒体文件
-			rspIns, err := lowhttp.ParseBytesToHTTPResponse(rsp)
-			if err != nil {
-				return rsp
-			}
-			if !responseShouldBeHijacked(rspIns, isHttps) {
-				return rsp
+			rspIns, _ := lowhttp.ParseBytesToHTTPResponse(rsp)
+			if rspIns != nil {
+				if !responseShouldBeHijacked(rspIns, isHttps) {
+					SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
+					return rsp
+				}
 			}
 
 			// 处理响应规则
 			if replacer.haveHijackingRules() {
 				rules, rspHooked, dropped := replacer.hook(false, true, rsp)
 				if dropped {
+					SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_IsDropped, true)
 					log.Warn("response should be dropped(VIA replacer.hook)")
 					return nil
 				}
-				if v := req.Context().Value(MatchedRules); v != nil {
+				if v := req.Context().Value(REQUEST_CONTEXT_KEY_MatchedRules); v != nil {
 					if v1, ok := v.(*[]*ypb.MITMContentReplacer); ok {
 						*v1 = append(*v1, rules...)
 					}
@@ -819,10 +824,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		rules, rsp1, shouldBeDropped := replacer.hook(false, true, rsp)
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
+			SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_IsDropped, true)
 			return nil
 		}
 		rsp = rsp1
-		if v := req.Context().Value(MatchedRules); v != nil {
+		if v := req.Context().Value(REQUEST_CONTEXT_KEY_MatchedRules); v != nil {
 			if v1, ok := v.(*[]*ypb.MITMContentReplacer); ok {
 				*v1 = append(*v1, rules...)
 			}
@@ -830,14 +836,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		responseCounter := time.Now().UnixNano()
 
 		ptr := fmt.Sprintf("%p", req)
-		_, ok := hijackedResponseByRequestPTRMap.Load(ptr)
-		if !ok {
-			// 不在响应的劫持列表，返回
+		if !GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
 			return rsp
 		}
+		//_, ok := hijackedResponseByRequestPTRMap.Load(ptr)
+		//if !ok {
+		//	// 不在响应的劫持列表，返回
+		//	return rsp
+		//}
 
 		// 确定要劫持该响应
-		hijackedResponseByRequestPTRMap.Delete(ptr)
+		// hijackedResponseByRequestPTRMap.Delete(ptr)
 
 		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
 		if err != nil {
@@ -1038,9 +1047,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 
 				if reqInstance.GetHijackResponse() {
-					hijackedPtr := wshash
 					log.Infof("the ws hash: %s's mitm ws response is wait for hijacked", wshash)
-					hijackedResponseByRequestPTRMap.Store(hijackedPtr, req)
+					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, req)
+					SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					continue
 				}
 
@@ -1053,9 +1062,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) []byte {
 		var matchedRules []*ypb.MITMContentReplacer
 		matchedRulesP := &matchedRules
-		ctx := context.WithValue(originReqIns.Context(), MatchedRules, matchedRulesP)
+		ctx := context.WithValue(originReqIns.Context(), REQUEST_CONTEXT_KEY_MatchedRules, matchedRulesP)
 		*originReqIns = *originReqIns.WithContext(ctx)
-		originReqRaw := req[:]
+		var originReqRaw = req[:]
+		SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsHttps, true)
+		SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestBytes, string(originReqRaw))
 		// 保证始终只有一个 Goroutine 在处理请求
 		mitmLock.Lock()
 		defer mitmLock.Unlock()
@@ -1069,6 +1080,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 触发劫持修改内容
 		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
 		if shouldBeDropped {
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
 			return nil
 		}
@@ -1087,6 +1099,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		urlRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(hijackedReqStore["request"], isHttps)
 		if urlRaw != nil {
 			urlStr = urlRaw.String()
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_Url, urlStr)
 		}
 		mitmPluginCaller.CallHijackRequest(isHttps, urlStr,
 			func() interface{} {
@@ -1104,15 +1117,21 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				defer hijackedByHook.Unlock()
 
 				if replaced != nil {
-					hijackedReqStore["request"] = utils.InterfaceToBytes(replaced)
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsModified, true)
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_ModifiedBy, "hook")
+					after := utils.InterfaceToBytes(replaced)
+					hijackedReqStore["request"] = after
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_Modified, string(after))
 				}
 			}),
 			constClujore(func() {
+				SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsDropped, true)
 				dropped.Set()
 			}))
 
 		// 如果丢弃就直接丢！
 		if dropped.IsSet() {
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsDropped, true)
 			return nil
 		}
 
@@ -1124,15 +1143,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		// MITM 手动劫持放行
 		if autoForward.IsSet() {
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
 
 		// 过滤
 		if !shouldBeHijacked(req, isHttps) {
-			u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
-			if u != nil {
-				log.Infof("req: %s is filtered", u.String())
-			}
+			log.Infof("req: %s is filtered", urlStr)
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
 
@@ -1159,19 +1177,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				return req
 			}
 
-			// 提取 URL
-			urlRaw, err := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
-			if err != nil {
-				log.Errorf("extract url from req failed: %s", err)
-				return req
-			}
-
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestIsHijacked, true)
 			for {
 				feedbackOrigin := &ypb.MITMResponse{
 					Request:             req,
 					Refresh:             false,
 					IsHttps:             isHttps,
-					Url:                 urlRaw.String(),
+					Url:                 urlStr,
 					Id:                  id,
 					IncludeHostname:     filterManager.IncludeHostnames,
 					ExcludeHostname:     filterManager.ExcludeHostnames,
@@ -1219,6 +1231,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 直接丢包
 				if reqInstance.GetDrop() {
+					log.Infof("MITM %v recv drop hijacked request[%v]", addr, reqInstance.GetId())
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsDropped, true)
 					return nil
 				}
 
@@ -1229,9 +1243,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if reqInstance.GetHijackResponse() {
 					// 设置将会当读劫持
+					SetContextValueInfoFromRequest(originReqIns, RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					hijackedPtr := fmt.Sprintf("%p", originReqIns)
 					log.Infof("the ptr: %v's mitm request is waiting for hijacked", hijackedPtr)
-					hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
+					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
 					continue
 				}
 
@@ -1246,6 +1261,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 				md5after := codec.Md5(bytes.TrimSpace(current))
 				if md5orig != md5after {
+					log.Infof("MITM %v recv hijacked request[%v] changed", addr, reqInstance.GetId())
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsModified, true)
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_ModifiedBy, "user")
+					SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_Modified, string(current))
 					ctx = context.WithValue(originReqIns.Context(), "Modified", 1)
 					*originReqIns = *originReqIns.WithContext(ctx)
 				} else {
@@ -1260,29 +1279,22 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
-		//if strings.Contains(req.URL.String(), "/xxx")  {
-		//	log.Infof("Hit")
-		//}
 		addCounter()
 
 		// 不符合劫持条件就不劫持
-		if !responseShouldBeHijacked(rsp, isHttps) {
-			return
+		var isFilteredByResponse = GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
+		var isFilteredByRequest = GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsFiltered)
+		var isFilter = isFilteredByResponse || isFilteredByRequest
+		var requestRaw = []byte(GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestBytes))
+		if len(requestRaw) <= 0 {
+			requestRaw, err = utils.HttpDumpWithBody(req, true)
+			if err != nil {
+				log.Errorf("dump request failed: %s", err)
+				return
+			}
 		}
-
-		requestRaw, err := utils.HttpDumpWithBody(req, true)
-		if err != nil {
-			return
-		}
-
-		var modified bool
-		var viewed bool
-		if req.Context().Value("Modified") != nil {
-			modified = true
-		}
-		if req.Context().Value("Viewed") != nil {
-			viewed = true
-		}
+		var modified = GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_IsModified)
+		var viewed = GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsHijacked)
 
 		// 处理 gzip
 		var newRequest *http.Request
@@ -1297,12 +1309,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			responseRaw = noGzippedResponse
 		}
 
-		filtered := shouldBeHijacked(requestRaw, isHttps)
+		shouldeBeHijacked := !isFilter
 		go func() {
-			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, requestRaw, responseRaw, body, filtered)
+			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, requestRaw, responseRaw, body, shouldeBeHijacked)
 		}()
 		// 劫持过滤
-		if !filtered {
+		if isFilter {
 			return
 		}
 
@@ -1314,7 +1326,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
-		flow.Ksuid = ksuid.New().String()
 
 		flow.Hash = flow.CalcHash()
 		if modified {
