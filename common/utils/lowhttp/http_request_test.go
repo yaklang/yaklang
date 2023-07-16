@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -490,5 +491,17 @@ asdf
 as
 df`)) != 199 {
 		panic(1)
+	}
+}
+
+func TestGZIPCHUNKED(t *testing.T) {
+	var a = ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+Host: www.baidu.com
+
+abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`), "Transfer-Encoding", "chunked")
+	fmt.Println(string(a))
+	fmt.Println(strconv.Quote(string(a)))
+	if !strings.HasSuffix(string(a), "\r\n0\r\n\r\n") {
+		t.FailNow()
 	}
 }

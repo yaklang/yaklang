@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -36,6 +39,93 @@ Host: ` + h2Addr,
 	}
 }
 
+func TestGRPCMUSTPASS_MITM_WITH_REPLACE_RULE_GZIP_NCHUNKED(t *testing.T) {
+	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		fixedRequest := lowhttp.FixHTTPRequestOut(req)
+		spew.Dump(fixedRequest)
+		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
+		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
+
+		if reqIsChunked {
+			body, _ = codec.HTTPChunkedDecode(body)
+		}
+		if reqIsGzip {
+			body, _ = utils.GzipDeCompress(body)
+		}
+
+		if reqIsGzip {
+			body, _ = utils.GzipCompress(body)
+			rsp = lowhttp.ReplaceHTTPPacketHeader(rsp, "Content-Encoding", "gzip")
+		}
+		rsp = lowhttp.ReplaceHTTPPacketBodyEx(rsp, body, reqIsChunked, false)
+		return rsp
+	})
+
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+
+	rPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 启动MITM服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host:             "127.0.0.1",
+		Port:             uint32(rPort),
+		Recover:          true,
+		Forward:          true,
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+		EnableHttp2:      true,
+	})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var started = false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
+			println("----------------------")
+			started = true
+
+			token := ksuid.New().String()
+			body, _ := utils.GzipCompress(token)
+			var packet = "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
+			var packetBytes = lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
+			packetBytes = lowhttp.ReplaceHTTPPacketHeader(packetBytes, "Transfer-Encoding", "chunked")
+			_, err := yak.Execute(`
+proxy = "http://"+str.HostPort(mitmHost, mitmPort)
+println("PROXY: %v" % proxy)
+rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
+println(string(rsp))
+assert rsp.Contains(token), "gzip + chunk failed"
+`, map[string]any{
+				"mitmHost": "127.0.0.1", "mitmPort": rPort,
+				"mockHost": "127.0.0.1", "mockPort": mockPort,
+				"packet": packetBytes, "token": token,
+			})
+			if err != nil {
+				panic(err)
+			}
+			break
+		}
+	}
+}
+
 func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
@@ -53,19 +143,38 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 
 	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
 		passthroughTested = true // 测试标识位 收到了http请求
-		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Length: 3
 
 111`))
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
-		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body) // 返回包的body是请求包的body
-		if lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip" {
+		fixedRequest := lowhttp.FixHTTPRequestOut(req)
+		spew.Dump(fixedRequest)
+		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
+		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
+
+		if reqIsChunked {
+			body, err = codec.HTTPChunkedDecode(body)
+			if err != nil {
+				panic(err)
+			}
+		}
+		if reqIsGzip {
+			body, err = utils.GzipDeCompress(body)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		if reqIsGzip {
+			body, err = utils.GzipCompress(body)
+			if err != nil {
+				panic(err)
+			}
 			rsp = lowhttp.ReplaceHTTPPacketHeader(rsp, "Content-Encoding", "gzip")
 		}
-		if lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked" {
-			rsp = lowhttp.ReplaceHTTPPacketHeader(rsp, "Transfer-Encoding", "chunked")
-		}
+		rsp = lowhttp.ReplaceHTTPPacketBodyEx(rsp, body, reqIsChunked, false)
 		return rsp
 	})
 
@@ -112,7 +221,6 @@ Host: ` + h2Addr,
 		AutoForwardValue: true,
 		EnableHttp2:      true,
 	})
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 	for {
@@ -121,14 +229,6 @@ Host: ` + h2Addr,
 			break
 		}
 		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
-			println("----------------------")
 			println("----------------------")
 			started = true
 			go func() {
@@ -150,21 +250,16 @@ Host: www.example.com
 					"proxy": proxy,
 					"token": token,
 				}
-				spew.Dump(params)
 				// 将MITM作为代理向mock的http服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H1请求
 				_, err := yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
-dump(host, port, packet)
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
-dump(rsp)
-dump(req)
 if rsp.Contains(getParam("token")) {
-		println("success")	
+		println("基础发包测试：success")	
 }else{
-	dump(rsp)
-	die("not pass!")
+	die("echo test not pass!")
 }
 `, params)
 				if err != nil {
@@ -173,21 +268,19 @@ if rsp.Contains(getParam("token")) {
 				echoTested = true
 
 				var tokenRaw, _ = utils.GzipCompress([]byte(token))
+				params["packet"] = "GET /ca HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
-dump(host, port, packet)
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
-dump(rsp)
-dump(req)
 if rsp.Contains(getParam("token")) {
-		println("success")	
+		println("gzip auto decode success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("gzipAutoDecode not pass!")
 }
 `, params)
 				if err != nil {
@@ -196,22 +289,32 @@ if rsp.Contains(getParam("token")) {
 				gzipAutoDecode = true
 
 				tokenRaw, _ = utils.GzipCompress([]byte(token))
-				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
+				params["packet"] = "GET /cab HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
-				params["packet"] = lowhttp.HTTPPacketForceChunked(utils.InterfaceToBytes(params["packet"]))
+				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, true)
+				originPacket := params["packet"].([]byte)
+				_ = originPacket
+				println(strconv.Quote(string(originPacket)))
 
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
-dump(host, port, packet)
+println("-------------------")
+println("-------------------")
+println("-------------------")
+println(string(packet))
+println("-------------------")
+println("-------------------")
+println("-------------------")
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.retryTimes(3))~
-dump(rsp)
 if rsp.Contains(getParam("token")) {
 		println("chunk + gzip auto decode success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+println("-----------------------------------")
+	dump(poc.FixHTTPResponse(rsp))
+	die("chunkDecode + gzip not pass!")
 }
 `, params)
 				if err != nil {

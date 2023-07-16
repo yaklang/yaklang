@@ -381,8 +381,6 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		}
 		buf.WriteString(CRLF)
 		buf.Write(body)
-		buf.WriteString(CRLF)
-		buf.WriteString(CRLF)
 		return buf.Bytes()
 	}
 

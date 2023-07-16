@@ -323,7 +323,14 @@ func ZeroUnPadding(originData []byte) []byte {
 
 func HTTPChunkedDecode(raw []byte) ([]byte, error) {
 	reader := httputil.NewChunkedReader(bytes.NewBuffer(raw))
-	return ioutil.ReadAll(reader)
+	raw, err := io.ReadAll(reader)
+	if raw == nil {
+		return nil, err
+	}
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		log.Warnf("http chunked decode failed: %v", err)
+	}
+	return raw, nil
 }
 
 func GbkToUtf8(s []byte) ([]byte, error) {

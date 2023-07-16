@@ -29,10 +29,7 @@ var fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
 
 func HTTPPacketForceChunked(raw []byte) []byte {
 	header, body := SplitHTTPHeadersAndBodyFromPacket(raw)
-	header = _contentLengthRE.ReplaceAllString(header, "")
-	header = strings.TrimRight(header, "\r\n") + CRLF + strings.TrimSpace("Transfer-Encoding: chunked") + CRLF + CRLF
-	println(header)
-	return []byte(header + string(codec.HTTPChunkedEncode(body)))
+	return ReplaceHTTPPacketBodyEx([]byte(header), body, true, false)
 }
 
 func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
