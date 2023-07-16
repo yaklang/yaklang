@@ -440,9 +440,9 @@ func SplitHTTPPacket(
 		return headersRaw, nil
 	}
 
-	if bytes.HasSuffix(bodyRaw, []byte(CRLF+CRLF)) {
-		bodyRaw = bodyRaw[:len(bodyRaw)-4]
-	}
+	//if bytes.HasSuffix(bodyRaw, []byte(CRLF+CRLF)) {
+	//	bodyRaw = bodyRaw[:len(bodyRaw)-4]
+	//}
 
 	// 单独修复请求中的问题
 	if !strings.HasPrefix(headersRaw, "HTTP/") {

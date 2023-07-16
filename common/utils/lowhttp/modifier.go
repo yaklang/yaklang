@@ -72,7 +72,10 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	var buf bytes.Buffer
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
-	buf.WriteString(strings.Join(header, CRLF))
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
