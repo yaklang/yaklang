@@ -1126,7 +1126,7 @@ func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	rsp, err := h.proxyToServer.Transport.RoundTrip(req)
 	if err != nil {
-		log.Errorf("martian: error requesting to remote server")
+		log.Errorf("martian: error requesting to remote server: %v", err)
 		return
 	}
 	defer rsp.Body.Close()
