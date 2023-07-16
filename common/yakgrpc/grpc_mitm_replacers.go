@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -483,12 +484,43 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		}
 		origin = originDecoded
 	}
-	headerRaw, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(origin)
+	chunked := false
+	gzip := false
+	var gzipHeader string
+	var chunkedHeader string
+	headerRaw, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(origin, func(line string) {
+		key, value := lowhttp.SplitHTTPHeader(line)
+		switch strings.ToLower(key) {
+		case "transfer-encoding":
+			if value == "chunked" {
+				chunkedHeader = key
+				chunked = true
+			}
+		case "content-encoding":
+			if value == "gzip" {
+				gzipHeader = key
+				gzip = true
+			}
+		}
+	})
+	if chunked {
+		unchunked, err := codec.HTTPChunkedDecode(body)
+		if err == nil {
+			body = unchunked
+			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), chunkedHeader))
+		}
+	}
+	if gzip {
+		ungzip, err := utils.GzipDeCompress(body)
+		if err == nil {
+			body = ungzip
+			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), gzipHeader))
+		}
+	}
+
 	var bodyMerged = make([]byte, len(body))
 	copy(bodyMerged, body)
-
 	headerMerged := headerRaw
-
 	if len(bodyMerged) <= 0 && headerMerged == "" {
 		return matchedRules, origin, false
 	}

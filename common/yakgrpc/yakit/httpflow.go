@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -479,7 +480,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 		}
 	})
 	var rspBody = body
-	var bodyLength int64 = int64(len(rspBody))
+	var bodyLength = int64(len(rspBody))
 	if bodyLength > maxBodyLength {
 		rspBody = append(rspBody[:maxBodyLength], []byte("(dropped for huge body...)")...)
 		rspRaw = lowhttp.ReplaceHTTPPacketBody([]byte(header), rspBody, false)
@@ -550,24 +551,21 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
 }
 
-func InsertHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error) {
+func InsertHTTPFlow(db *gorm.DB, hash string, i *HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
+			debug.PrintStack()
 		}
 	}()
 
-	db = db.Model(&HTTPFlow{})
-	switch i.(type) {
-	case *HTTPFlow:
-		log.Info("start insert flow mode: " + hash)
-		if fErr := db.LogMode(true).Debug().Save(i); fErr.Error == nil {
-			return nil
-		}
+	i.ID = 0
+	if db = db.Model(&HTTPFlow{}).Save(i); db.Error != nil {
+		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&HTTPFlow{}); db.Error != nil {
-		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
-	}
+	//if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&HTTPFlow{}); db.Error != nil {
+	//	return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
+	//}
 
 	return nil
 }
