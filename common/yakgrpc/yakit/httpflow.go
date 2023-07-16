@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -66,7 +65,6 @@ type HTTPFlow struct {
 	gorm.Model
 
 	HiddenIndex        string
-	Ksuid              string
 	NoFixContentLength bool   `json:"no_fix_content_length"`
 	Hash               string `gorm:"unique_index"`
 	IsHTTPS            bool
@@ -91,6 +89,10 @@ type HTTPFlow struct {
 	IsWebsocket bool
 	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
 	WebsocketHash string
+}
+
+func InsertHTTPFlowViaRequest() {
+
 }
 
 type TagAndStatusCode struct {
@@ -412,11 +414,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	if f.Ksuid == "" {
-		f.Ksuid = uuid.NewV4().String()
-	}
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.Ksuid)
-	//return utils.CalcSha1(uuid.NewV4().String())
+	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex)
 }
 
 func (f *HTTPFlow) BeforeSave() error {

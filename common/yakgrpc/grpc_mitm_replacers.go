@@ -214,7 +214,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}()
 
 	if req.Context() != nil {
-		if v := req.Context().Value(MatchedRules); v != nil {
+		if v := req.Context().Value(REQUEST_CONTEXT_KEY_MatchedRules); v != nil {
 			if v1, ok := v.(*[]*ypb.MITMContentReplacer); ok && len(*v1) > 0 {
 				stringForSettingColor((*v1)[0].Color, (*v1)[0].ExtraTag, flow)
 				return
