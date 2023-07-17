@@ -30,7 +30,7 @@ type testcase struct {
 	virtualPath    string
 	wantPkgs       []*dxtypes.Package
 	wantError      bool
-	check          bool
+	skipCheck      bool
 	t              *testing.T
 	a              analyzer.Analyzer
 	matchType      int
@@ -164,7 +164,7 @@ func Run(tc testcase) []*dxtypes.Package {
 		t.Fatalf("%s: analyze error: %v", tc.name, err)
 	}
 
-	if tc.check {
+	if !tc.skipCheck {
 		Check(pkgs, tc.wantPkgs, t.Name(), tc.t)
 
 	}
