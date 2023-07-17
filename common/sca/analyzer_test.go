@@ -156,6 +156,8 @@ func Run(tc testcase) []*dxtypes.Package {
 		},
 		MatchedFileInfos: matchedFileInfos,
 	})
+	pkgs = analyzer.MergePackages(pkgs)
+
 
 	if tc.wantError && err == nil {
 		t.Fatalf("%s: want error but nil", tc.name)

@@ -49,68 +49,54 @@ func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Packa
 	}
 }
 
-func linkPackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
+func makePotentialPkgs(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	potentialPkgs := make([]*dxtypes.Package, 0)
-
-	pkgMap := lo.SliceToMap(pkgs, func(item *dxtypes.Package) (string, *dxtypes.Package) {
-		return item.Name, item
-	})
-
+	pkgMaps := make(map[string]*dxtypes.Package)
 	for _, pkg := range pkgs {
-
 		// and
 		for andDepPkgName, andDepVersion := range pkg.DependsOn.And {
-			if andDepPkg, ok := pkgMap[andDepPkgName]; ok {
-				pkg.LinkDepend(andDepPkg)
-			} else {
-				// if not found, make a potential package
-				potentialPkg := &dxtypes.Package{
+			id := andDepPkgName + andDepVersion
+			potentialPkg, ok := pkgMaps[id]
+			if !ok {
+				potentialPkg = &dxtypes.Package{
 					Name:           andDepPkgName,
 					Version:        andDepVersion,
-					IsVersionRange: true,
+					IsVersionRange: strings.ContainsAny(andDepVersion, "><*"),
 					Potential:      true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
-				pkgMap[potentialPkg.Name] = potentialPkg
-				pkg.LinkDepend(potentialPkg)
+				pkgMaps[id] = potentialPkg
 			}
+			pkg.LinkDepend(potentialPkg)
 		}
 		// or
 		for _, orDepPkgMap := range pkg.DependsOn.Or {
-			exist := false
-			for orDepPkgName := range orDepPkgMap {
-				if orDepPkg, ok := pkgMap[orDepPkgName]; ok {
-					pkg.LinkDepend(orDepPkg)
-					exist = true
-					break
-				}
-			}
-
-			if !exist {
-				// if not found, make a potential package
-				orDepName := make([]string, 0, len(orDepPkgMap))
-				for name := range orDepPkgMap {
-					orDepName = append(orDepName, name)
-				}
+			orDepName := lo.MapToSlice(orDepPkgMap, func(name, _ string) string {
+				return name
+			})
 				sort.Strings(orDepName)
+			potentialName := strings.Join(orDepName, "|") // potential package name, splited by "|";
 				orDepVersion := lo.Map(orDepName, func(name string, index int) string {
 					return orDepPkgMap[name]
 				})
-
-				potentialPkg := &dxtypes.Package{
-					Name:           strings.Join(orDepName, "|"),    // potential package name, splited by "|";
+			potentialVersion := strings.Join(orDepVersion, "|")
+			id := potentialName + potentialVersion
+			potentialPkg, ok := pkgMaps[id]
+			if !ok {
+				potentialPkg = &dxtypes.Package{
+					Name:           potentialName,
 					Version:        strings.Join(orDepVersion, "|"), // potential package version, splited by "|",
 					IsVersionRange: true,
 					Potential:      true,
 				}
 				potentialPkgs = append(potentialPkgs, potentialPkg)
-				pkgMap[potentialPkg.Name] = potentialPkg
-				pkg.LinkDepend(potentialPkg)
+				pkgMaps[id] = potentialPkg
 			}
+
+			pkg.LinkDepend(potentialPkg)
 		}
 	}
 
-	// append potential packages
 	return append(pkgs, potentialPkgs...)
 }
 
