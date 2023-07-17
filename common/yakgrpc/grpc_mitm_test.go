@@ -375,37 +375,20 @@ if rsp.Contains(getParam("token")) {
 				}
 
 				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+				_ = ctx
 				defer cancel()
-
-				// 使用协程进行并发查询
-				done := make(chan struct{})
-				defer close(done)
-
-				go func() {
-					for {
-						_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/mitm/test/h2/token/" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
-						spew.Dump(flows)
-						if len(flows) > 0 {
-							h2Test = true
-						}
-						if h2Test {
-							done <- struct{}{}
-							break
-						}
-					}
-				}()
-				select {
-				case <-ctx.Done():
-					log.Warn("flow history not fully found")
-					break
-				case <-done:
-					log.Infof("flow history all found")
-					break
+				time.Sleep(time.Second)
+				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+					SearchURL: "/mitm/test/h2/token/" + token,
+				})
+				if err != nil {
+					panic(err)
+				}
+				if len(flows) > 0 {
+					spew.Dump(flows)
+					h2Test = true
+				} else {
+					panic("/mitm/test/h2/token/" + token + " is not logged in db")
 				}
 			}()
 		}

@@ -12,7 +12,7 @@ import (
 func ConnectVulinboxAgentEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
 	return ConnectVulinboxAgentRaw(addr, func(bytes []byte) {
 		t := strings.ToLower(utils.ExtractMapValueString(bytes, "type"))
-		log.Infof(`vulinbox ws agent fetch message: %v`, t)
+		log.Debugf(`vulinbox ws agent fetch message: %v`, t)
 		switch t {
 		case "ping":
 			if onPing != nil {
