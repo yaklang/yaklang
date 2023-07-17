@@ -308,13 +308,13 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		/*
 		 use buildin cert domains
 		*/
-		ctx := martian.NewContext(req, m.GetMartianProxy())
-		if ctx == nil {
-			return nil
-		}
+
 		//log.Infof("hostname: %v", req.URL.Hostname())
 		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
-			ctx.SkipRoundTrip()
+			ctx := martian.NewContext(req, m.GetMartianProxy())
+			if ctx != nil {
+				ctx.SkipRoundTrip()
+			}
 			return nil
 		}
 
