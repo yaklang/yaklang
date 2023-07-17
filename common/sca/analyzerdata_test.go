@@ -1,6 +1,10 @@
 package sca
 
-import "github.com/yaklang/yaklang/common/sca/dxtypes"
+import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+)
 
 var APKWantPkgs = []*dxtypes.Package{
 
@@ -2292,4 +2296,48 @@ var NodeNpmPkgsFolder = []*dxtypes.Package{
 		License:      nil,
 		Potential:    false,
 	},
+}
+
+func check(t *testing.T, tag string, target []*dxtypes.Package) {
+	seen := make(map[string]*dxtypes.Package, len(target))
+
+	for _, item := range target {
+		key := item.Name + item.Version
+
+		if p, ok := seen[key]; ok {
+			// same
+			// fmt.Println(name, item.Name, item.Version)
+			// fmt.Printf("%s: [%s]%s and [%s]%s\n", tag, item.Name, item.Version, p.Name, p.Version)
+			t.Fatalf("%s: [%s]%s and [%s]%s\n", tag, item.Name, item.Version, p.Name, p.Version)
+		}
+
+		seen[key] = item
+	}
+}
+
+func TestData(t *testing.T) {
+	check(t, "apk", APKWantPkgs)
+	check(t, "apk-negative", APKNegativePkgs)
+	check(t, "dpkg", DPKGWantPkgs)
+	check(t, "rpm", RPMWantPkgs)
+	check(t, "conan", ConanWantPkgs)
+	check(t, "go-bianary", GOBianryWantPkgs)
+	check(t, "go-mod", GoModWantPkgs)
+	check(t, "go-modless", GoModLess117Pkgs)
+	check(t, "php-composer", PHPComposerPkgs)
+	check(t, "", PHPComposerWrongJsonPkgs)
+	check(t, "", PHPComposerNoJsonPkgs)
+	check(t, "", PythonPackagingPkgs)
+	check(t, "", PythonPackagingEggPkg)
+	check(t, "", PythonPackagingWheel)
+	check(t, "", PythonPIPPkgs)
+	check(t, "", PythonPIPEnvPkgs)
+	check(t, "", PythonPoetryPkgs)
+	check(t, "", PythonPoetryNoProjectPkgs)
+	check(t, "", PythonPoetryWrongProjectPkgs)
+	check(t, "", JavaGradlePkgs)
+	check(t, "", JavaPomPkgs)
+	check(t, "", JavaPomRequirementPkgs)
+	check(t, "", NodeNpmPkgs)
+	check(t, "", NodeNpmPkgsFolder)
 }
