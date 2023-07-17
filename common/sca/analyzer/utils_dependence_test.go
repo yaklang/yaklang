@@ -112,7 +112,6 @@ func CoverPackageToPkg(packages []*dxtypes.Package) []*testPackage {
 
 func TestMergePackagesNormal(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
-	// DrawPackagesDOT(pkgs, "org.png")
 	pkgMaps = make(map[string][]*dxtypes.Package)
 
 	pa1 := newPackage("pa1", "0.0.3", "pa")
@@ -125,18 +124,19 @@ func TestMergePackagesNormal(t *testing.T) {
 	pb3 := newPackage("pb3", "0.0.3", "pb")
 	pkgs = append(pkgs, pkgMaps["pa"]...)
 	pkgs = append(pkgs, pkgMaps["pb"]...)
-	// DrawPackagesDOT(pkgs, "org.png")
 
+	//             -> pa3b
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
 	pa1.LinkDepend(pa22)
 	pa1.LinkDepend(pa21)
-	pa21.LinkDepend(pa3)
-	pa3.LinkDepend(pa3b)
+	pa22.LinkDepend(pa3)
+	pa22.LinkDepend(pa3b)
 
 	// pb1 -> pb2(pa22) -> pb3
 	pb1.LinkDepend(pb2)
 	pb2.LinkDepend(pb3)
+	// DrawPackagesDOT(pkgs)
 
 	ret := MergePackages(pkgs)
 	wantPkg := []*testPackage{
@@ -183,7 +183,7 @@ func TestMergePackagesNormal(t *testing.T) {
 			DownStream: []string{"pa22-0.0.3"},
 		},
 	}
-	// DrawPackagesDOT(ret, "ret.png")
+	// DrawPackagesDOT(ret)
 	// ShowDot(ret)
 	Check(t, ret, wantPkg)
 }
@@ -202,12 +202,14 @@ func TestMergePackagesVersionRange(t *testing.T) {
 	pkgs = append(pkgs, pkgMaps["pa"]...)
 	pkgs = append(pkgs, pkgMaps["pe"]...)
 
+	//             -> pa3b
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
 	pa1.LinkDepend(pa22)
 	pa1.LinkDepend(pa21)
-	pa21.LinkDepend(pa3)
-	pa3.LinkDepend(pa3b)
+	pa22.LinkDepend(pa3)
+	pa22.LinkDepend(pa3b)
+
 	// pe1 -> pe2(pa2<0.0.5) -> pe3
 	pe1.LinkDepend(pe2)
 	pe2.LinkDepend(pe3)
@@ -281,12 +283,13 @@ func TestMergePackagesOrPackage(t *testing.T) {
 	pkgs = append(pkgs, pkgMaps["pb"]...)
 	pkgs = append(pkgs, pkgMaps["pc"]...)
 
+	//             -> pa3b
 	// pa1 -> pa22 -> pa3
 	//     -> pa21
 	pa1.LinkDepend(pa22)
 	pa1.LinkDepend(pa21)
-	pa21.LinkDepend(pa3)
-	pa3.LinkDepend(pa3b)
+	pa22.LinkDepend(pa3)
+	pa22.LinkDepend(pa3b)
 
 	// pb1 -> pb2(pa22) -> pb3
 	pb1.LinkDepend(pb2)
@@ -375,7 +378,7 @@ func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pa3 := newPackage("pa3", "0.0.3", "pa")
 	pa3b := newPackage("pb3", "0.0.2", "pa")
 	pb1 := newPackage("pb1", "0.0.3", "pb")
-	pb2 := newPackage("pa22", "0.0.3", "pb")
+	pb2a := newPackage("pa22", "0.0.3", "pb")
 	pb3 := newPackage("pb3", "0.0.3", "pb")
 	pd1 := newPackage("pd1", "0.0.3", "pd")
 	pd2 := newPackage("pd2", "0.0.5", "pd")
@@ -384,26 +387,27 @@ func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pkgs = append(pkgs, pkgMaps["pa"]...)
 	pkgs = append(pkgs, pkgMaps["pb"]...)
 	pkgs = append(pkgs, pkgMaps["pd"]...)
-	// pa1 -> pa22 -> pa3
+
+	//             -> pa3b
+	// pa1 -> pa22 -> pa3a
 	//     -> pa21
 	pa1.LinkDepend(pa22)
 	pa1.LinkDepend(pa21)
-	pa21.LinkDepend(pa3)
-	pa3.LinkDepend(pa3b)
+	pa22.LinkDepend(pa3)
+	pa22.LinkDepend(pa3b)
 
-	// pb1 -> pb2(pa22) -> pb3
-
-	pb1.LinkDepend(pb2)
-	pb2.LinkDepend(pb3)
+	// pb1 -> pb2a(pa22) -> pb3
+	pb1.LinkDepend(pb2a)
+	pb2a.LinkDepend(pb3)
 
 	// pd1 -> pd2 -> pd3
 	//     -> pa1|pb1|pb2
 	pd1.LinkDepend(pd2)
 	pd2.LinkDepend(pd3)
-	pd3.LinkDepend(pdor)
-	// DrawPackagesDOT(pkgs, "org.png")
+	pd1.LinkDepend(pdor)
+	// DrawPackagesDOT(pkgs)
 	ret := MergePackages(pkgs)
-	// DrawPackagesDOT(ret, "ret.png")
+	// DrawPackagesDOT(ret)
 	// ShowDot(ret)
 	wantPkg := []*testPackage{
 		{
