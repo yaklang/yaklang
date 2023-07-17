@@ -85,9 +85,12 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeURI(t *testing.T) {
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
 			{"/a/abc.js", 0},
-			{"/static/abc.ppt", 0},
 			{"/abc.aaac", 0},
 			{"/a1bc.aaac", 1},
+			{"/a1bc.aaac?abc=1", 0},
+			{"/a1bc.aaac?a222bc=1", 1},
+			{"/a1bc.aaac?a222bc=1&a=abc", 0},
+			{"/a1bc.aaac?a222bc=1&a=abcc", 0},
 		} {
 			path := utils.InterfaceToString(ct[0])
 			expectCount := utils.Atoi(utils.InterfaceToString(ct[1]))
@@ -195,9 +198,10 @@ sleep(0.3)
 		})
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
-			{"application/abc", 1},
-			{"abc1111", 1},
+			{"application/abc", 0},
+			{"abc1111", 0},
 			{"application/oct", 0},
+			{"application/zip", 1},
 			{"bbbbbb", 0},
 			{"aabb", 1},
 			{"cccc", 0},

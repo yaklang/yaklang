@@ -199,7 +199,7 @@ func StringHasPrefix(s string, prefix []string) bool {
 
 func StringSubStringArrayContains(array []string, element string) bool {
 	for _, s := range array {
-		if strings.Contains(s, element) {
+		if strings.Contains(element, s) {
 			return true
 		}
 	}
@@ -208,8 +208,8 @@ func StringSubStringArrayContains(array []string, element string) bool {
 
 func StringGlobArrayContains(array []string, element string, seps ...rune) bool {
 	for _, r := range array {
-		if !strings.Contains(element, "*") {
-			if IContains(r, element) {
+		if !strings.Contains(r, "*") {
+			if IContains(element, r) {
 				return true
 			}
 			continue
