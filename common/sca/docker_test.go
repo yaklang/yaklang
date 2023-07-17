@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -19,6 +20,7 @@ var (
 )
 
 func TestLoadDockerImageFromFile(t *testing.T) {
+	check(t, "docker", wantpkgs)
 	br := bytes.NewReader(gzipFile)
 
 	r, err := gzip.NewReader(br)
@@ -77,4 +79,5 @@ func init() {
 	wantpkgs = append(wantpkgs, APKWantPkgs...)
 	wantpkgs = append(wantpkgs, RPMWantPkgs...)
 	wantpkgs = append(wantpkgs, DPKGWantPkgs...)
+	wantpkgs = analyzer.MergePackages(wantpkgs)
 }
