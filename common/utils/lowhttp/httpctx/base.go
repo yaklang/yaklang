@@ -70,6 +70,14 @@ func GetRequestBytes(r *http.Request) []byte {
 	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes))
 }
 
+func GetRequestHTTPS(r *http.Request) bool {
+	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsHttps)
+}
+
+func SetRequestHTTPS(r *http.Request, b bool) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsHttps, b)
+}
+
 func SetRequestBytes(r *http.Request, bytes []byte) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes, string(bytes))
 }

@@ -601,15 +601,6 @@ func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Respon
 	})
 }
 
-func MITM_SetMirrorRequestCacheTTL(ttl time.Duration) MITMConfig {
-	return func(server *MITMServer) error {
-		if server.mirrorCache != nil {
-			server.mirrorCache.SetTTL(ttl)
-		}
-		return nil
-	}
-}
-
 func MITM_SetTransparentHijackMode(t bool) MITMConfig {
 	return func(server *MITMServer) error {
 		if server.transparentHijackMode == nil {
