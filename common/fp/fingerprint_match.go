@@ -87,9 +87,9 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 
 		if len(ips) >= 1 {
 			ip = ips[0].IP
-			if len(ips) > 1 {
-				log.Infof("resolve host[%s] for multi ip addrs[%#v], use first: %s", host, ips, ip.String())
-			}
+			//if len(ips) > 1 {
+			//	log.Infof("resolve host[%s] for multi ip addrs[%#v], use first: %s", host, ips, ip.String())
+			//}
 		} else {
 			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
 			result.Reason = dataErr.Error()

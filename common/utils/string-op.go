@@ -52,6 +52,15 @@ func StringSliceContain(s interface{}, raw string) (result bool) {
 		}
 	}()
 	haveResult := false
+	switch ret := s.(type) {
+	case []string:
+		for _, i := range ret {
+			if i == raw {
+				return true
+			}
+		}
+		return false
+	}
 	funk.ForEach(s, func(i interface{}) {
 		if haveResult {
 			return
