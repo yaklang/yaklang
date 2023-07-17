@@ -87,7 +87,7 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	var buffer = bytes.NewBuffer(nil)
 	readTimeout := 1000 * time.Millisecond
 	readAsyncTimeout := 250 * time.Millisecond
-	readGapTimeout := 600 * time.Millisecond
+	readGapTimeout := 350 * time.Millisecond
 	defer conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	ddlCtx, originCancel := context.WithTimeout(context.Background(), timeout)
 	var cancel = func() {
