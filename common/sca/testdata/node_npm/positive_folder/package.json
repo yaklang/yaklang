@@ -1,0 +1,13 @@
+{
+  "name": "testname",
+  "version": "1.0.0",
+  "license": "MIT",
+
+  "dependencies": {
+    "ansi-colors":"3.2.3", 
+    "array-flatten": "1.1.1", 
+    "body-parser":"1.18.3", 
+    "express": "4.16.4", 
+    "ms": "2.1.1"
+  }
+}
