@@ -170,6 +170,7 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 		// O(n) -- O(n * lg(N))
 		for i := 0; i < len(list); i++ {
 			p := list[i]
+			mergeToOther := false // can return
 			// skip pkg in merge
 			if _, ok := merge[p]; ok {
 				continue
@@ -181,11 +182,26 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 					continue
 				}
 				// check can merge
-			if p.CanMerge(p2) {
-					// set pkg to merge map
+				ret := dxtypes.CanMerge(p, p2)
+				if ret == 0 {
+					// don't merge
+					// pass
+				} else if ret == -1 {
+					// merge p to p2
+					merge[p] = p2
+					// the p don't return! p is *merge to other*
+					mergeToOther = true
+				} else if ret == 1 {
+					// merge p2 to p // p is *merge other*
 					merge[p2] = p
 			}
 		}
+			// only three type in pakcage of list:
+			// 		* not merge  * merge to other  * merge other
+			// we only return *not merge* and *merge other* packages
+			if mergeToOther {
+				continue
+			}
 		ret = append(ret, p)
 	}
 
