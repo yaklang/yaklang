@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
-	"github.com/yaklang/yaklang/common/crawlerx/newcrawlerx"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
@@ -232,7 +231,6 @@ func initYaklangLib() {
 
 	//crawlerX
 	yaklang.Import("crawlerx", crawlerx.CrawlerXExports)
-	yaklang.Import("newcrawlerx", newcrawlerx.NewCrawlerXExports)
 
 	//CVE
 	yaklang.Import("cve", cve.CVEExports)
