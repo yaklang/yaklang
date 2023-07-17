@@ -44,11 +44,20 @@ type SuricataRuleParserVisitor interface {
 	// Visit a parse tree produced by SuricataRuleParser#ipv6.
 	VisitIpv6(ctx *Ipv6Context) interface{}
 
-	// Visit a parse tree produced by SuricataRuleParser#hex_part.
-	VisitHex_part(ctx *Hex_partContext) interface{}
+	// Visit a parse tree produced by SuricataRuleParser#ipv6full.
+	VisitIpv6full(ctx *Ipv6fullContext) interface{}
 
-	// Visit a parse tree produced by SuricataRuleParser#h16.
-	VisitH16(ctx *H16Context) interface{}
+	// Visit a parse tree produced by SuricataRuleParser#ipv6compact.
+	VisitIpv6compact(ctx *Ipv6compactContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#ipv6part.
+	VisitIpv6part(ctx *Ipv6partContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#ipv6block.
+	VisitIpv6block(ctx *Ipv6blockContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#ipv6mask.
+	VisitIpv6mask(ctx *Ipv6maskContext) interface{}
 
 	// Visit a parse tree produced by SuricataRuleParser#src_port.
 	VisitSrc_port(ctx *Src_portContext) interface{}
