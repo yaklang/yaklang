@@ -70,6 +70,9 @@ type YakScript struct {
 	OnlineOfficial bool        `json:"online_official"`
 	OnlineGroup    string      `json:"online_group"`
 	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
+
+	IsCorePlugin bool `json:"is_core_plugin"` // 判断是否是核心插件
+
 }
 
 func (s *YakScript) BeforeSave() error {
@@ -454,6 +457,19 @@ func QueryYakScriptByNames(db *gorm.DB, names ...string) []*YakScript {
 		all = append(all, tmp...)
 	}
 	return all
+}
+
+func QueryYakScriptByIsCore(db *gorm.DB, isCore bool) []*YakScript {
+	yakScriptOpLock.Lock()
+	defer yakScriptOpLock.Unlock()
+	db = UserDataAndPluginDatabaseScope(db)
+
+	db = db.Model(&YakScript{})
+	var yakScripts []*YakScript
+	if err := db.Where("is_core_plugin = ?", isCore).Find(&yakScripts).Error; err != nil {
+		log.Errorf("dberror(query yak scripts): %v", err)
+	}
+	return yakScripts
 }
 
 func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {

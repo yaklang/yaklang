@@ -1,0 +1,31 @@
+yakit.AutoInitYakit()
+
+scriptNameStr = cli.String("script-name", cli.setDefault(""))
+taskName = cli.String("task-name", cli.setDefault(""))
+
+cli.check()
+
+manager, err = hook.NewMixPluginCaller()
+if err != nil {
+    yakit.Error("build mix plugin caller failed: %s", err)
+    die(err)
+}
+
+// 这个有必要设置：独立上下文，避免在大并发的时候出现问题
+manager.SetConcurrent(20)
+manager.SetDividedContext(true)
+
+scriptNames = str.Split(scriptNameStr, ",")
+
+x.Foreach(scriptNames, func(e){
+    yakit.Info("Start to Load Plugin: %v", e)
+    err = manager.LoadPlugin(e)
+    if err != nil {
+        yakit.Error("load plugin[%v] error: %v", e, err)
+    }
+    println(e + " Is Loaded")
+})
+
+defer manager.Wait()
+
+

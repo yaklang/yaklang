@@ -91,3 +91,7 @@ func (s *Server) InstallVulinbox(req *ypb.InstallVulinboxRequest, stream ypb.Yak
 
 	return utils.Errorf("download finished, but vulinbox is not available: %v", rsp.GetReason())
 }
+
+func (s *Server) GenQualityInspectionReport(req *ypb.GenQualityInspectionReportRequest, stream ypb.Yak_GenQualityInspectionReportServer) error {
+	return nil
+}
