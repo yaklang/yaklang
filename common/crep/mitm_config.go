@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/martian/v3"
@@ -159,6 +160,7 @@ type PKCS12Config struct {
 func NewDefaultClientOptions() *HTTPClientOptions {
 	return &HTTPClientOptions{
 		DialTimeout:         120,
+		DnsResolveTimeout:   120,
 		TLSHandshakeTimeout: 120,
 		ReadTimeout:         120,
 		IdleConnTimeout:     120,
@@ -173,6 +175,7 @@ func NewDefaultClientOptions() *HTTPClientOptions {
 type HTTPClientOptions struct {
 	Proxy               string       `json:"proxy" yaml:"proxy"`               // HTTP 代理
 	DialTimeout         int          `json:"dial_timeout" yaml:"dial_timeout"` // tcp connect timeout
+	DnsResolveTimeout   int          `json:"dns_resolve_timeout" yaml:"dns_resolve_timeout"`
 	TLSHandshakeTimeout int          `json:"tls_handshake_timeout" yaml:"tls_handshake_timeout"`
 	ReadTimeout         int          `json:"read_timeout" yaml:"read_timeout"` // http read timeout
 	IdleConnTimeout     int          `json:"idle_conn_timeout" yaml:"idle_conn_timeout"`
@@ -256,6 +259,18 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 				return v, nil
 			} else if v, ok := lowhttp.GetSystemHostByName(host); ok {
 				return v, nil
+			}
+			if len(opts.DnsServers) == 0 { // 未指定dns服务器默认使用系统dns解析
+				timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.DnsResolveTimeout)*time.Second)
+				defer cancel()
+				ips, err := net.DefaultResolver.LookupHost(timeoutCtx, host)
+				if err != nil {
+					return "", err
+				}
+				if len(ips) == 0 {
+					return "", errors.New("resolve host failed")
+				}
+				return ips[0], nil
 			}
 			return utils.GetFirstIPByDnsWithCache(host, 5*time.Second, opts.DnsServers...), nil
 		}).DialContext,
