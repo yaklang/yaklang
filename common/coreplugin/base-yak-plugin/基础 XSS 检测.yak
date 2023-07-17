@@ -76,7 +76,7 @@ checkErr = func(err) {
 }
 
 // 最后结果 日志输出
-xssLog = func(result, saveDB) {
+xssLog = func(result) {
     maybeVuln = result.maybeVuln
     url = result.url
     param = result.param 
@@ -93,18 +93,18 @@ xssLog = func(result, saveDB) {
     report = {"message": msg, "payload": payloadString, "payload_type": payload.payloadType, "param_position": param.PositionVerbose()}
     
     yakit_output(report)
-    if saveDB {
-        risk.NewRisk(
-            url,
-            risk.title(sprintf("XSS for: %v", url)),
-            risk.details(report),
-            risk.type("xss"),
-            risk.payload(payloadString),
-            risk.request(reqRaw), 
-            risk.response(respRaw),
-            risk.severity("warning"),
-        )
-    }
+
+    risk.NewRisk(
+        url,
+        risk.title(sprintf("XSS for: %v", url)),
+        risk.details(report),
+        risk.type("xss"),
+        risk.payload(payloadString),
+        risk.request(reqRaw), 
+        risk.response(respRaw),
+        risk.severity("warning"),
+    )
+    
 }
 
 // 将参数在页面中回显的payload 存入数据库中
@@ -218,8 +218,16 @@ payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
         }
 
         if existVuln {
-            result = newResult(maybeVuln, url, param, payload, reqBody, newBody)
-            resultCh <- result
+            contentType = ""
+            try {
+                contentType = rsp.Header["Content-Type"][0]
+            } catch {
+                contentType = ""
+            }
+            if contentType.Contains("html") { // 响应类型包含html
+                result = newResult(maybeVuln, url, param, payload, reqBody, newBody)
+                resultCh <- result
+            }
         } else {
             // 如果判断不存在漏洞，就将有回显的位置payload写入数据库中，防止误报
             // EchoLog(newResult(false, url, param, payload, reqBody, newBody))
@@ -372,11 +380,12 @@ paramFuzzTask = func(threads, url, param) {
     // ! 六 输出结果
     saveDB = true 
     for result = range resultCh {
-        xssLog(result, saveDB)
-        if saveDB {
-            saveDB = false
+        if !saveDB {
+            continue
         }
-    }    
+        xssLog(result)
+        saveDB = false
+    }
 }
 
 
