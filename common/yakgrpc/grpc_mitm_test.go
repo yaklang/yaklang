@@ -183,7 +183,7 @@ Content-Length: 3
 	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
 	_ = proxy
 
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
 	}()
@@ -374,7 +374,7 @@ if rsp.Contains(getParam("token")) {
 					panic(err)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 				defer cancel()
 
 				// 使用协程进行并发查询
