@@ -93,6 +93,7 @@ Content-Length: 3
 	var wg sync.WaitGroup
 	wg.Add(1)
 	var started = false
+	var failed = false
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -119,11 +120,17 @@ assert rsp.Contains(token), "gzip + chunk failed"
 				"packet": packetBytes, "token": token,
 			})
 			if err != nil {
-				panic(err)
+				time.Sleep(time.Second)
+				failed = true
 			}
 			break
 		}
 	}
+
+	if failed {
+		t.Fail()
+	}
+	time.Sleep(5 * time.Second)
 }
 
 func TestGRPCMUSTPASS_MITM(t *testing.T) {

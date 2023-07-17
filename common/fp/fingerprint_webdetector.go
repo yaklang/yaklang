@@ -80,7 +80,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		httpflows   []*HTTPFlow
 	)
 	if httpBanners != nil {
-		log.Infof("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(httpBanners))
+		log.Debugf("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(httpBanners))
 		result.State = OPEN
 		result.Fingerprint.ServiceName = "http"
 		for _, i := range httpBanners {
