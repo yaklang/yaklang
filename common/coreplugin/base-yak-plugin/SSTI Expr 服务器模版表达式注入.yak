@@ -104,10 +104,10 @@ checkCase = (instance, https, reqBytes) => {
     }
 }
 
-checkReq = (ishttps, req) => {
+checkReq = (isHttps, req) => {
     for instance in cases {
         try {
-            checkCase(instance, ishttps, req)
+            checkCase(instance, isHttps, req)
         } catch err {
             yakit.Error(err)
         }
@@ -115,5 +115,5 @@ checkReq = (ishttps, req) => {
 }
 
 mirrorNewWebsitePathParams = (isHttps, url, req, rsp, body) => {
-    checkReq(ishttps, req)
+    checkReq(isHttps, req)
 }
