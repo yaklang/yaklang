@@ -30,26 +30,6 @@ func init() {
 type dpkgAnalyzer struct {
 }
 
-// ReadBlock reads Analyzer data block from the underlying reader until Analyzer blank line is encountered.
-func ReadBlock(r *bufio.Reader) ([]byte, error) {
-	var block bytes.Buffer
-
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			return block.Bytes(), err
-		}
-
-		if line == "\n" || line == "\r\n" {
-			break
-		}
-
-		block.WriteString(line)
-	}
-
-	return block.Bytes(), nil
-}
-
 func (a dpkgAnalyzer) parseStatus(s string) bool {
 	for _, ss := range strings.Fields(s) {
 		if ss == "deinstall" || ss == "purge" {
