@@ -803,7 +803,7 @@ func (s *Server) QueryYakScriptByNames(ctx context.Context, req *ypb.QueryYakScr
 	return ret, nil
 }
 
-func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB)  []*ypb.Tags {
+func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB) []*ypb.Tags {
 	var tag []*ypb.Tags
 	tagData := make(map[string]int64)
 	db = db.Where("tags <> '' and tags <> '\"\"' and tags <> 'null' and is_history = '0' and ignored = '0'  ")
@@ -811,7 +811,7 @@ func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB)  []*ypb.Tags {
 	for v := range yakScriptData {
 		var tags []string
 		tags = strings.Split(v.Tags, ",")
-		for _, tag := range utils.RemoveRepeatStringSlice(tags){
+		for _, tag := range utils.RemoveRepeatStringSlice(tags) {
 			lowerTag := strings.ToLower(tag)
 			tagData[lowerTag]++
 		}
@@ -828,4 +828,12 @@ func (s *Server) QueryYakScriptTagsGroup(db *gorm.DB)  []*ypb.Tags {
 		return tag[i].Total > tag[j].Total
 	})
 	return tag
+}
+
+func (s *Server) QueryYakScriptByIsCore(ctx context.Context, req *ypb.QueryYakScriptByIsCoreRequest) (*ypb.QueryYakScriptByIsCoreResponse, error) {
+	ret := &ypb.QueryYakScriptByIsCoreResponse{}
+	for _, y := range yakit.QueryYakScriptByIsCore(s.GetProfileDatabase(), req.IsCorePlugin) {
+		ret.Data = append(ret.Data, y.ToGRPCModel())
+	}
+	return ret, nil
 }

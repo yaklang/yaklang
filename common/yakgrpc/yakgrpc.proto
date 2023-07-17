@@ -159,6 +159,7 @@ service Yak {
   rpc QueryYakScriptByOnlineGroup(QueryYakScriptByOnlineGroupRequest) returns (QueryYakScriptLocalAndUserResponse);
   rpc QueryYakScriptLocalAll(Empty) returns (QueryYakScriptLocalAndUserResponse);
   rpc QueryYakScriptByNames(QueryYakScriptByNamesRequest) returns (QueryYakScriptByNamesResponse);
+  rpc QueryYakScriptByIsCore(QueryYakScriptByIsCoreRequest) returns (QueryYakScriptByIsCoreResponse);
 
   // HTTPFlow
   rpc GetHTTPFlowByHash(GetHTTPFlowByHashRequest) returns (HTTPFlow);
@@ -502,6 +503,7 @@ service Yak {
   rpc IsVulinboxReady(IsVulinboxReadyRequest) returns (IsVulinboxReadyResponse);
   rpc InstallVulinbox(InstallVulinboxRequest) returns (stream ExecResult);
   rpc StartVulinbox(StartVulinboxRequest) returns (stream ExecResult);
+  rpc GenQualityInspectionReport(GenQualityInspectionReportRequest) returns (stream ExecResult);
 
   // 通过他可以构造一个 HTTP 请求
   // 这个请求可能是一个，也可能是一系列
@@ -601,6 +603,11 @@ message StartVulinboxRequest {
   bool NoHttps = 3;
   // 安全模式：不启用命令执行靶场
   bool SafeMode = 4;
+}
+
+message GenQualityInspectionReportRequest {
+  repeated string ScriptNames = 1;
+  string TaskName = 2;
 }
 
 message DebugPluginRequest {
@@ -1484,7 +1491,15 @@ message QueryYakScriptByNamesRequest {
   repeated string YakScriptName = 1;
 }
 
+message QueryYakScriptByIsCoreRequest {
+  bool IsCorePlugin = 1;
+}
+
 message QueryYakScriptByNamesResponse {
+  repeated YakScript Data = 1;
+}
+
+message QueryYakScriptByIsCoreResponse {
   repeated YakScript Data = 1;
 }
 
@@ -2701,6 +2716,7 @@ message YakScript {
   int64  BaseOnlineId = 27;
   bool OnlineOfficial = 28;
   string OnlineGroup = 29;
+  bool IsCorePlugin = 30;
 }
 
 message GetYakScriptTagsAndTypeResponse {
