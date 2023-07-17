@@ -204,6 +204,12 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 	default:
 		flow.Red()
 	}
+	for i := 0; i < 3; i++ {
+		err := yakit.UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
+		if err != nil {
+			log.Errorf("update flow tags failed: %v", err)
+		}
+	}
 }
 
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) {
@@ -290,10 +296,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 							break
 						}
 					}
-					// return
 				}
 			}
-			//continue
 		}
 
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -161,9 +162,6 @@ type MITMServer struct {
 
 	proxyAuth *ProxyAuth
 
-	// mirror
-	mirrorCache           *ttlcache.Cache
-	mirrorCacheTTL        time.Duration
 	requestHijackHandler  func(isHttps bool, originReq *http.Request, req []byte) []byte
 	responseHijackHandler func(isHttps bool, r *http.Request, rsp []byte, remoteAddr string) []byte
 
@@ -317,10 +315,10 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			return nil
 		}
 
-		reqCtx, cancel := context.WithCancel(rootCtx)
-		httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone, reqCtx)
+		//reqCtx, cancel := context.WithCancel(rootCtx)
+		//httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone, reqCtx)
 		defer func() {
-			defer cancel()
+			//defer cancel()
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
@@ -359,6 +357,8 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		case "http", "HTTP":
 			isHttps = false
 		}
+
+		httpctx.SetRequestHTTPS(req, isHttps)
 
 		var (
 			raw       []byte
@@ -452,10 +452,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			}
 			httpctx.SetRequestBytes(req, raw)
 		}
-		m.mirrorCache.Set(fmt.Sprintf("%p", req), &rawRequest{
-			IsHttps: isHttps,
-			Raw:     raw,
-		})
 		if m.requestMirror != nil {
 			m.requestMirror(isHttps, raw)
 		}
@@ -470,25 +466,12 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		*/
 		if utils.StringArrayContains(defaultBuildinDomains, rsp.Request.URL.Hostname()) {
 			body := defaultCA
-			rsp.Body = ioutil.NopCloser(bytes.NewReader(body))
+			rsp.Body = io.NopCloser(bytes.NewReader(body))
 			rsp.ContentLength = int64(len(body))
 			// rsp.Header.Set("Content-Length", strconv.Itoa(len(body)))
 			rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-server.crt"`)
 			rsp.Header.Set("Content-Type", "octet-stream")
 			return nil
-		}
-
-		val, ok := httpctx.GetContextInfoMap(rsp.Request).Load(httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone)
-		if !ok {
-			msg := `[BUG]! ResponseModifer Cannot Fetch InfoMap Context`
-			fmt.Println(msg)
-			fmt.Println(msg)
-			fmt.Println(msg)
-			return utils.Error(msg)
-		}
-		cond := val.(context.Context)
-		select {
-		case <-cond.Done():
 		}
 
 		var (
@@ -561,20 +544,18 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				}
 			}
 
-			_req, ok := m.mirrorCache.Get(reqP)
-			if !ok {
-				log.Debugf("mirror cache cannot fetch requestP: %p", rsp.Request)
-				return nil
-			}
-			rawRequestIns := _req.(*rawRequest)
-			reqRawBytes := rawRequestIns.Raw
-			if ok {
-				//log.Infof("response mirror recv request len: [%v]", len(rawReq))
-				remoteAddr := m.GetRemoteAddr(rawRequestIns.IsHttps, rsp.Request.Host)
-				m.responseMirrorWithInstance(rawRequestIns.IsHttps, reqRawBytes, responseBytes, remoteAddr, rsp)
-				m.mirrorCache.Remove(reqP)
+			reqRawBytes := httpctx.GetRequestBytes(rsp.Request)
+			if reqRawBytes != nil {
+				https := httpctx.GetRequestHTTPS(rsp.Request)
+				var start = time.Now()
+				m.responseMirrorWithInstance(https, reqRawBytes, responseBytes, m.GetRemoteAddr(https, rsp.Request.Host), rsp)
+				var end = time.Now()
+				cost := end.Sub(start)
+				if cost.Milliseconds() > 300 {
+					log.Infof(`m.responseMirrorWithInstance cost: %v`)
+				}
 			} else {
-				log.Errorf("no such request-id: %v", reqP)
+				log.Errorf("request raw bytes is nil")
 			}
 			return nil
 		}
@@ -594,14 +575,11 @@ var (
 )
 
 func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
-	cache := ttlcache.NewCache()
-
 	initMITMCertOnce.Do(InitMITMCert)
 
 	proxy := martian.NewProxy()
 	server := &MITMServer{
 		proxy:                    proxy,
-		mirrorCache:              ttlcache.NewCache(),
 		DNSServers:               []string{"8.8.8.8", "114.114.114.114"},
 		dnsCache:                 new(sync.Map),
 		HostMapping:              make(map[string]string),
@@ -645,10 +623,6 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}
-	}
-
-	if server.mirrorCacheTTL <= 0 {
-		cache.SetTTL(60 * time.Second)
 	}
 
 	if server.proxyUrl != nil {

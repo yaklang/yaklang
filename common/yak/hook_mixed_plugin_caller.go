@@ -578,12 +578,12 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 					go func() {
 						defer m.swg.Done()
 						addr := utils.HostPort(host, port)
-						log.Infof("(port/mitm) start to match %v", addr)
-						matchResult, err := m.fingerprintMatcher.Match(host, port, fp.WithCache(m.cache))
+						log.Debugf("(port/mitm) start to match %v", addr)
+						matchResult, err := m.fingerprintMatcher.Match(host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true))
 						if err != nil {
 							return
 						}
-						log.Infof("%v", matchResult.String())
+						log.Debugf("%v", matchResult.String())
 						m.callers.CallByName(HOOK_PortScanHandle, matchResult)
 					}()
 				}

@@ -336,25 +336,25 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		passed = _exactChecker(nil, filterManager.ExcludeMethods, method)
 		if !passed {
-			log.Infof("[%v] url: %s is filtered via method", method, urlStr)
+			log.Debugf("[%v] url: %s is filtered via method", method, truncate(urlStr))
 			return false
 		}
 
 		passed = _exactChecker(filterManager.IncludeSuffix, filterManager.ExcludeSuffix, strings.ToLower(ext))
 		if !passed {
-			log.Infof("url: %v is filtered via suffix(%v)", urlStr, ext)
+			log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
 			return false
 		}
 
 		passed = _checker(filterManager.IncludeHostnames, filterManager.ExcludeHostnames, hostport)
 		if !passed {
-			log.Infof("url: %s is filtered via hostnames(%v)", urlStr, hostport)
+			log.Debugf("url: %s is filtered via hostnames(%v)", truncate(urlStr), hostport)
 			return false
 		}
 
-		passed = _checker(filterManager.IncludeUri, filterManager.ExcludeUri, urlStr)
+		passed = _checker(filterManager.IncludeUri, filterManager.ExcludeUri, truncate(urlStr))
 		if !passed {
-			log.Infof("url: %s is filtered via uri(url)", urlStr)
+			log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
 			return false
 		}
 		return true
@@ -963,7 +963,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.WebsocketHash = wshash
 				flow.HiddenIndex = wshash
 				flow.Hash = flow.CalcHash()
-				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow.Hash, flow)
+				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
 				if err != nil {
 					log.Errorf("create / save httpflow(websocket) error: %s", err)
 				}
@@ -1306,24 +1306,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
-		//count := 0
-		//var done *sync.Cond
-		//for {
-		//	if count > 100 {
-		//		return
-		//	}
-		//	v, ok := httpctx.GetContextInfoMap(req).Load(httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone)
-		//	if ok {
-		//		time.Sleep(50 * time.Millisecond)
-		//		count++
-		//		fmt.Printf("%6d--------------------------------------------------------------\n", count)
-		//		continue
-		//	}
-		//	done = v.(*sync.Cond)
-		//	break
-		//}
-		//done.Wait()
-
 		addCounter()
 
 		// 不符合劫持条件就不劫持
@@ -1346,7 +1328,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var newRequest *http.Request
 		newRequest, requestRaw = StripHTTPRequestGzip(req, requestRaw)
 		if newRequest != nil {
-			req = newRequest
+			*req = *newRequest
 		}
 
 		responseRaw, _ := utils.HttpDumpWithBody(rsp, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
@@ -1365,14 +1347,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 保存到数据库
+		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
+		var startCreateFlow = time.Now()
 		flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
 			return
 		}
+		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		startCreateFlow = time.Now()
+
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
-
 		flow.Hash = flow.CalcHash()
 		if modified {
 			flow.AddTagToFirst("[被修改]")
@@ -1382,7 +1368,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow.AddTagToFirst("[被劫持]")
 			flow.Orange()
 		}
-
 		var hijackedFlowMutex = new(sync.Mutex)
 		var dropped = utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
@@ -1400,39 +1385,48 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				dropped.IsSet()
 			},
 		)
+		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		startCreateFlow = time.Now()
 
 		// HOOK 存储过程
 		if flow != nil && !dropped.IsSet() {
 			flow.Hash = flow.CalcHash()
 			flow := flow
-			go func() {
-				saveHTTPFlowMutex.Lock()
-				defer saveHTTPFlowMutex.Unlock()
-
-				defer func() {
+			//log.Infof("start to do sth with tag")
+			if replacer != nil {
+				go func() {
 					if err := recover(); err != nil {
-						log.Error("panic from save httpflow to database! " + fmt.Sprint(err) + " current url: " + flow.Url)
+						log.Errorf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v panic: %s", truncate(reqUrl), err)
+						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-				}()
-
-				//log.Infof("start to do sth with tag")
-				if replacer != nil {
 					replacer.hookColor(requestRaw, responseRaw, req, flow)
-				}
+					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+				}()
+				startCreateFlow = time.Now()
+			}
 
-				//if flow.Tags != "" {
-				//	log.Infof("save with tag: %v", flow.Tags)
-				//}
-				for i := 0; i < 3; i++ {
-					err = yakit.CreateOrUpdateHTTPFlow(s.GetProjectDatabase(), flow.CalcHash(), flow)
-					if err != nil {
-						log.Errorf("create / save httpflow from mirror error: %s", err)
-						time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
-						continue
-					}
-					return
+			for i := 0; i < 3; i++ {
+				startCreateFlow = time.Now()
+				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+				log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+				if err != nil {
+					log.Errorf("create / save httpflow from mirror error: %s", err)
+					time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
+					continue
 				}
-			}()
+				break
+			}
+			//
+			//go func() {
+			//	saveHTTPFlowMutex.Lock()
+			//	defer saveHTTPFlowMutex.Unlock()
+			//
+			//	defer func() {
+			//		if err := recover(); err != nil {
+			//			log.Error("panic from save httpflow to database! " + fmt.Sprint(err) + " current url: " + flow.Url)
+			//		}
+			//	}()
+			//}()
 		}
 	}
 	// 核心 MITM 服务器
@@ -1571,4 +1565,11 @@ func (s *Server) GetCurrentRules(c context.Context, req *ypb.Empty) (*ypb.MITMCo
 	var rules []*ypb.MITMContentReplacer
 	_ = json.Unmarshal([]byte(result), &rules)
 	return &ypb.MITMContentReplacers{Rules: rules}, nil
+}
+
+func truncate(u string) string {
+	if len(u) > 64 {
+		return u[:64] + "..."
+	}
+	return u
 }

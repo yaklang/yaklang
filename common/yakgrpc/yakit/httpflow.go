@@ -286,7 +286,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	if full && !flow.NoFixContentLength {
 		req, err := lowhttp.ParseStringToHttpRequest(unquotedReq)
 		if err != nil {
-			return nil, utils.Errorf("parse request failed: %s", err)
+			return nil, utils.Errorf("[lowhttp.ParseStringToHttpRequest] parse request failed: %s", err)
 		}
 		for k, vs := range req.Header {
 			for _, v := range vs {
@@ -465,6 +465,11 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 		reqRaw = lowhttp.ReplaceHTTPPacketBody([]byte(header), body[:maxBodyLength], false)
 	}
 	requestRaw := strconv.Quote(string(reqRaw))
+	if strings.HasPrefix(requestRaw, `"HTTP/1.`) {
+		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
+		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
+		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
+	}
 
 	rawNoGzip, _, _ := lowhttp.FixHTTPResponse(rspRaw)
 	if len(rawNoGzip) > 0 {
@@ -527,7 +532,10 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
 	var urlRaw = url
 	if urlRaw == "" {
-		u, _ := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
+		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
+		if err != nil {
+			log.Warnf("extract url from request failed: %s", err)
+		}
 		if u != nil {
 			urlRaw = u.String()
 		} else {
@@ -558,7 +566,31 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
 }
 
-func InsertHTTPFlow(db *gorm.DB, hash string, i *HTTPFlow) (fErr error) {
+func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {
+	if i == nil {
+		return nil
+	}
+
+	if i.ID > 0 {
+		if db = db.Model(&HTTPFlow{}).Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by id) failed: %s", db.Error)
+			return db.Error
+		}
+	} else if i.HiddenIndex != "" {
+		if db = db.Model(&HTTPFlow{}).Where("hidden_index = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by hidden_index) failed: %s", db.Error)
+			return db.Error
+		}
+	} else if i.Hash != "" {
+		if db = db.Model(&HTTPFlow{}).Where("hash = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by hash) failed: %s", db.Error)
+			return db.Error
+		}
+	}
+	return nil
+}
+
+func InsertHTTPFlow(db *gorm.DB, i *HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
