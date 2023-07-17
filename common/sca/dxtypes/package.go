@@ -148,17 +148,10 @@ func (p *Package) Merge(p2 *Package) *Package {
 	return p
 }
 
-func (p *Package) CanMerge(p2 *Package) bool {
-	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
-		return false
-	}
-	if p.Name != p.Name {
-		return false
-	}
-	// version
-	if p2.IsVersionRange {
+// p2 is version range
+func CanMergeWithVersionRange(p *Package, p2 *Package) bool {
 		if p2.Version == "*" {
-			// pass
+		return true
 		} else {
 			index := strings.IndexFunc(p2.Version, func(r rune) bool {
 				return r >= '0' && r <= '9'
@@ -182,7 +175,33 @@ func (p *Package) CanMerge(p2 *Package) bool {
 				return true
 			}
 		}
-	} else if p.Version == p2.Version {
+	return false
+}
+
+func (p *Package) CanMerge(p2 *Package) bool {
+	// verification
+	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
+		return false
+	}
+	// name
+	if p.Name != p2.Name {
+		return false
+	}
+
+	// version range
+	if p2.IsVersionRange {
+		if CanMergeWithVersionRange(p, p2) {
+			return true
+		}
+	}
+	if p.IsVersionRange {
+		if CanMergeWithVersionRange(p2, p) {
+			return true
+		}
+	}
+
+	// version
+	if p.Version == p2.Version {
 		return true
 	}
 
