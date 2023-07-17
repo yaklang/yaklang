@@ -813,9 +813,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 这个来过滤一些媒体文件
 			rspIns, _ := lowhttp.ParseBytesToHTTPResponse(rsp)
 			if rspIns != nil {
-				if !responseShouldBeHijacked(rspIns.Header.Get("Content-Type"), isHttps) {
-					SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
-					return rsp
+				ctStr := rspIns.Header.Get("Content-Type")
+				if ctStr != "" {
+					if !responseShouldBeHijacked(ctStr, isHttps) {
+						SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
+						return rsp
+					}
 				}
 			}
 
