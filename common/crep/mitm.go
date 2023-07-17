@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -380,6 +379,7 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
 				return nil
 			}
+			httpctx.SetRequestBytes(req, hijackedRaw)
 			raw = hijackedRaw
 
 			/*
@@ -405,6 +405,7 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			} else {
 				hijackedRaw = hijackedRequestRaw
 				raw = hijackedRequestRaw
+				httpctx.SetRequestBytes(req, hijackedRequestRaw)
 				hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
 				if err != nil {
 					log.Errorf("mitm-hijacked request to http.Request failed: %s", err)
@@ -444,11 +445,12 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		}
 
 		if raw == nil {
-			raw, err = httputil.DumpRequest(req, true)
+			raw, err = utils.HttpDumpWithBody(req, true)
 			if err != nil {
 				log.Errorf("dump request failed: %s", err)
 				return nil
 			}
+			httpctx.SetRequestBytes(req, raw)
 		}
 		m.mirrorCache.Set(fmt.Sprintf("%p", req), &rawRequest{
 			IsHttps: isHttps,
