@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,8 +27,6 @@ func TestGRPCMUSTPASS_GetYakitCompletionRaw(t *testing.T) {
 	if len(rsp.RawJson) <= 0 {
 		test.FailNow("empty result")
 	}
-
-	fmt.Println(string(rsp.RawJson))
 
 	if !utils.MatchAllOfSubString(
 		string(rsp.RawJson),

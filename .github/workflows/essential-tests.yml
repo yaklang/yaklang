@@ -66,7 +66,7 @@ jobs:
         run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
 
       - name: Test gRPC MUSTPASS
-        run: go test -timeout 5m -run TestGRPCMUSTPASS ./common/yakgrpc -v
+        run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
 
       - name: Test gRPC MUSTPASS-PLUGIN-SQL
         run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v

@@ -321,10 +321,8 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 						conn.Close()
 						return
 					default:
-						log.Info("start to execute stable reader ex")
 						conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 						reqBytes := StableReaderEx(conn, 5*time.Second, 1024*10)
-						log.Info("finish stable reader ex")
 						if len(reqBytes) == 0 {
 							conn.Close()
 							return

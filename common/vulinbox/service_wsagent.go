@@ -120,9 +120,9 @@ User-Agent: FeedbackStreamer/1.0
 					return
 				}
 				if utils.ExtractMapValueString(m, "type") != "ping" {
-					log.Infof("recv from client: %v", string(m))
+					log.Debugf("recv from client: %v", string(m))
 				} else {
-					log.Infof("recv from client ping: %v", string(m))
+					log.Debugf("recv from client ping: %v", string(m))
 				}
 			}
 		}()
@@ -138,17 +138,17 @@ User-Agent: FeedbackStreamer/1.0
 				})
 				wr.Unlock()
 				if err != nil {
-					log.Infof("ws conn from: %v closed", conn.LocalAddr())
+					log.Debugf("ws conn from: %v closed", conn.LocalAddr())
 					cancel()
 					return
 				}
 			case <-time.After(time.Second):
-				log.Infof("ws conn start to send: %v ping", conn.LocalAddr())
+				log.Debugf("ws conn start to send: %v ping", conn.LocalAddr())
 				wr.Lock()
 				err := conn.WriteJSON(map[string]any{"type": "ping"})
 				wr.Unlock()
 				if err != nil {
-					log.Info("ws conn from: %v closed", conn.LocalAddr())
+					log.Debugf("ws conn from: %v closed", conn.LocalAddr())
 					cancel()
 					return
 				}
