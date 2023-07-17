@@ -63,6 +63,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	if err != nil {
 		return nil, utils.Errorf(`target url %s check failed: %s`, targetUrl, err)
 	}
+	WithTargetUrl(checkedUrl)(config)
 	core := CrawlerCore{
 		targetUrl: checkedUrl,
 		config:    config,
