@@ -510,6 +510,7 @@ service Yak {
   // rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
   rpc DebugPlugin(DebugPluginRequest) returns (stream ExecResult);
   rpc SmokingEvaluatePlugin(SmokingEvaluatePluginRequest) returns (SmokingEvaluatePluginResponse);
+  rpc GetSystemDefaultDnsServers(Empty) returns (DefaultDnsServerResponse);
 }
 
 message DisconnectVulinboxAgentRequest {
@@ -3525,4 +3526,7 @@ message GetLicenseResponse {
 message CheckLicenseRequest {
   string LicenseActivation = 1;
   string CompanyVersion = 2;
+}
+message DefaultDnsServerResponse{
+  repeated string DefaultDnsServer = 1;
 }

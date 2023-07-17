@@ -983,3 +983,7 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 	finalResults = append(finalResults, responseVars...)
 	return &ypb.RenderVariablesResponse{Results: finalResults}, nil
 }
+func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
+	servers, err := utils.GetSystemDnsServers()
+	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err
+}
