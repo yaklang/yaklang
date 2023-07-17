@@ -369,6 +369,117 @@ func TestMergePackagesOrPackage(t *testing.T) {
 	Check(t, ret, wantPkg)
 }
 
+func TestMergePackagesOrPackageNotMatch(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	pkgMaps = make(map[string][]*dxtypes.Package)
+	pa1 := newPackage("pa1", "0.0.3", "pa")
+	pa22 := newPackage("pa22", "0.0.3", "pa")
+	pa21 := newPackage("pa21", "0.0.3", "pa")
+	pa3 := newPackage("pa3", "0.0.3", "pa")
+	pa3b := newPackage("pb3", "0.0.2", "pa")
+	pb1 := newPackage("pb1", "0.0.3", "pb")
+	pb2a := newPackage("pa22", "0.0.3", "pb")
+	pb3 := newPackage("pb3", "0.0.3", "pb")
+	pd1 := newPackage("pd1", "0.0.3", "pd")
+	pd2 := newPackage("pd2", "0.0.5", "pd")
+	pd3 := newPackage("pd3", "0.0.3", "pd")
+	// not match
+	pdor := newPackage("pe1|pf1|pg2", "0.0.2|0.0.3|0.0.4", "pd")
+	pkgs = append(pkgs, pkgMaps["pa"]...)
+	pkgs = append(pkgs, pkgMaps["pb"]...)
+	pkgs = append(pkgs, pkgMaps["pd"]...)
+
+	//             -> pa3b
+	// pa1 -> pa22 -> pa3a
+	//     -> pa21
+	pa1.LinkDepend(pa22)
+	pa1.LinkDepend(pa21)
+	pa22.LinkDepend(pa3)
+	pa22.LinkDepend(pa3b)
+
+	// pb1 -> pb2a(pa22) -> pb3
+	pb1.LinkDepend(pb2a)
+	pb2a.LinkDepend(pb3)
+
+	// pd1 -> pd2 -> pd3
+	//     -> pe1|pf1|pg2
+	pd1.LinkDepend(pd2)
+	pd2.LinkDepend(pd3)
+	pd1.LinkDepend(pdor)
+	// DrawPackagesDOT(pkgs)
+	ret := MergePackages(pkgs)
+	// DrawPackagesDOT(ret)
+	// ShowDot(ret)
+	wantPkg := []*testPackage{
+		{
+			ID:         "pa1-0.0.3",
+			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pa21-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa1-0.0.3"},
+		},
+
+		{
+			ID:         "pa22-0.0.3",
+			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
+			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
+		},
+
+		{
+			ID:         "pa3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb1-0.0.3",
+			UpStream:   []string{"pa22-0.0.3"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pb3-0.0.2",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pb3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pa22-0.0.3"},
+		},
+
+		{
+			ID:         "pd1-0.0.3",
+			UpStream:   []string{"pd2-0.0.5", "pe1|pf1|pg2-0.0.2|0.0.3|0.0.4"},
+			DownStream: []string{},
+		},
+
+		{
+			ID:         "pd2-0.0.5",
+			UpStream:   []string{"pd3-0.0.3"},
+			DownStream: []string{"pd1-0.0.3"},
+		},
+
+		{
+			ID:         "pd3-0.0.3",
+			UpStream:   []string{},
+			DownStream: []string{"pd2-0.0.5"},
+		},
+		{
+			ID:         "pe1|pf1|pg2-0.0.2|0.0.3|0.0.4",
+			UpStream:   []string{},
+			DownStream: []string{"pd1-0.0.3"},
+		},
+	}
+	Check(t, ret, wantPkg)
+
+}
+
 func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
