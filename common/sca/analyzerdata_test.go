@@ -1721,3 +1721,530 @@ var JavaPomRequirementPkgs = []*dxtypes.Package{
 		License: []string{"Apache-2.0"},
 	},
 }
+
+var NodeNpmPkgs = []*dxtypes.Package{
+	{
+		Name:         "send",
+		Version:      "0.16.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "safe-buffer",
+		Version:      "5.1.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "parseurl",
+		Version:      "~1.3.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "serve-static",
+		Version:      "1.13.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "setprototypeof",
+		Version:      "1.1.0",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "express",
+		Version:      "4.16.4",
+		Verification: "",
+		License:      []string{"MIT"},
+
+		Potential: false,
+	},
+	{
+		Name:         "content-type",
+		Version:      "~1.0.4",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "path-to-regexp",
+		Version:      "0.1.7",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "encodeurl",
+		Version:      "~1.0.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "content-disposition",
+		Version:      "0.5.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "merge-descriptors",
+		Version:      "1.0.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "vary",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "depd",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "utils-merge",
+		Version:      "1.0.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "debug",
+		Version:      "2.6.9",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "type-is",
+		Version:      "~1.6.16",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "body-parser",
+		Version:      "1.18.3",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "cookie",
+		Version:      "0.3.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "array-flatten",
+		Version:      "1.1.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "escape-html",
+		Version:      "~1.0.3",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "finalhandler",
+		Version:      "1.1.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "fresh",
+		Version:      "0.5.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "cookie-signature",
+		Version:      "1.0.6",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "qs",
+		Version:      "6.5.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "statuses",
+		Version:      "~1.4.0",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "on-finished",
+		Version:      "~2.3.0",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "methods",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "etag",
+		Version:      "~1.8.1",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "accepts",
+		Version:      "~1.3.5",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "proxy-addr",
+		Version:      "~2.0.4",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+	{
+		Name:         "range-parser",
+		Version:      "~1.2.0",
+		Verification: "",
+		License:      nil,
+
+		Potential: false,
+	},
+}
+var NodeNpmPkgsFolder = []*dxtypes.Package{
+	{
+		Name:         "array-flatten",
+		Version:      "1.1.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "body-parser",
+		Version:      "1.18.3",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "send",
+		Version:      "0.16.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "iconv-lite",
+		Version:      "0.4.23",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "escape-html",
+		Version:      "~1.0.3",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "etag",
+		Version:      "~1.8.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "range-parser",
+		Version:      "~1.2.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "finalhandler",
+		Version:      "1.1.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "cookie",
+		Version:      "0.3.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "http-errors",
+		Version:      "~1.6.3",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "debug",
+		Version:      "2.6.9",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "setprototypeof",
+		Version:      "1.1.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "on-finished",
+		Version:      "~2.3.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "safe-buffer",
+		Version:      "5.1.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "parseurl",
+		Version:      "~1.3.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "content-disposition",
+		Version:      "0.5.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "proxy-addr",
+		Version:      "~2.0.4",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "utils-merge",
+		Version:      "1.0.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "cookie-signature",
+		Version:      "1.0.6",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "qs",
+		Version:      "6.5.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "methods",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "testname",
+		Version:      "1.0.0",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "merge-descriptors",
+		Version:      "1.0.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "depd",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "raw-body",
+		Version:      "2.3.3",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "ansi-colors",
+		Version:      "3.2.3",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "content-type",
+		Version:      "~1.0.4",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "encodeurl",
+		Version:      "~1.0.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "type-is",
+		Version:      "~1.6.16",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "bytes",
+		Version:      "3.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "ms",
+		Version:      "2.0.0",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "ms",
+		Version:      "2.1.1",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "vary",
+		Version:      "~1.1.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "statuses",
+		Version:      "~1.4.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "fresh",
+		Version:      "0.5.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "path-to-regexp",
+		Version:      "0.1.7",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "express",
+		Version:      "4.16.4",
+		Verification: "",
+		License:      []string{"MIT"},
+		Potential:    false,
+	},
+	{
+		Name:         "accepts",
+		Version:      "~1.3.5",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "serve-static",
+		Version:      "1.13.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+}
+
