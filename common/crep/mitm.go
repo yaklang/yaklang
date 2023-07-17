@@ -551,8 +551,8 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				m.responseMirrorWithInstance(https, reqRawBytes, responseBytes, m.GetRemoteAddr(https, rsp.Request.Host), rsp)
 				var end = time.Now()
 				cost := end.Sub(start)
-				if cost.Milliseconds() > 300 {
-					log.Infof(`m.responseMirrorWithInstance cost: %v`)
+				if cost.Milliseconds() > 600 {
+					log.Infof(`m.responseMirrorWithInstance cost: %v`, cost)
 				}
 			} else {
 				log.Errorf("request raw bytes is nil")
