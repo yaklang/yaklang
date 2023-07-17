@@ -1141,16 +1141,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = originReqRaw
 		}
 
-		// MITM 手动劫持放行
-		if autoForward.IsSet() {
-			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_AutoFoward, true)
-			return req
-		}
-
 		// 过滤
 		if !shouldBeHijacked(req, isHttps) {
 			log.Infof("req: %s is filtered", urlStr)
 			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
+			return req
+		}
+
+		// MITM 手动劫持放行
+		if autoForward.IsSet() {
+			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
 
