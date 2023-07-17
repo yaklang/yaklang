@@ -22,12 +22,32 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
+
+func _exactChecker(includes, excludes []string, target string) bool {
+	excludes = utils.StringArrayFilterEmpty(excludes)
+	includes = utils.StringArrayFilterEmpty(includes)
+
+	if includes == nil {
+		if utils.StringSliceContain(excludes, target) {
+			return false
+		}
+		return true
+	} else {
+		if utils.StringSliceContain(excludes, target) {
+			return false
+		}
+		if utils.StringSliceContain(includes, target) {
+			return true
+		}
+		return false
+	}
+}
 
 func _checker(includes, excludes []string, target string) bool {
 	excludes = utils.StringArrayFilterEmpty(excludes)
@@ -43,6 +63,26 @@ func _checker(includes, excludes []string, target string) bool {
 			return false
 		}
 		if utils.StringGlobArrayContains(includes, target) {
+			return true
+		}
+		return false
+	}
+}
+
+func _subStrChecker(includes, excludes []string, target string) bool {
+	excludes = utils.StringArrayFilterEmpty(excludes)
+	includes = utils.StringArrayFilterEmpty(includes)
+
+	if includes == nil {
+		if utils.StringSubStringArrayContains(excludes, target) {
+			return false
+		}
+		return true
+	} else {
+		if utils.StringSubStringArrayContains(excludes, target) {
+			return false
+		}
+		if utils.StringSubStringArrayContains(includes, target) {
 			return true
 		}
 		return false
@@ -311,39 +351,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		})
 	}
 
-	var shouldBeHijacked = func(r []byte, isHttps bool) bool {
-		reqInstance, err := lowhttp.ParseBytesToHttpRequest(r)
-		if err != nil {
-			log.Errorf("mitm filter error: parse http request failed: %s", err)
-			return false
-		}
-
-		urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(r, isHttps)
-		if err != nil {
-			log.Errorf("mitm filter error: parse req to url failed: %s", err)
-			return false
-		}
-
-		host, _, err := utils.ParseStringToHostPort(urlIns.String())
-		if err != nil {
-			return false
-		}
-
-		// 后缀过滤
-		ext := filepath.Ext(urlIns.Path)
-		return _checker(filterManager.IncludeSuffix, filterManager.ExcludeSuffix, strings.ToLower(ext)) &&
-			_checker(filterManager.IncludeHostnames, filterManager.ExcludeHostnames, strings.ToLower(host)) &&
-			_checker(nil, filterManager.ExcludeMethods, strings.ToUpper(reqInstance.Method)) &&
-			_checker(nil, filterManager.ExcludeMIME, strings.ToLower(reqInstance.Header.Get("Content-Type"))) &&
-			_checker(filterManager.IncludeUri, filterManager.ExcludeUri, strings.ToLower(reqInstance.RequestURI))
+	var shouldBeHijacked = func(method string, hostport, urlStr string, ext string, isHttps bool) bool {
+		return _exactChecker(filterManager.IncludeSuffix, filterManager.ExcludeSuffix, strings.ToLower(ext)) &&
+			_checker(filterManager.IncludeHostnames, filterManager.ExcludeHostnames, hostport) &&
+			_exactChecker(nil, filterManager.ExcludeMethods, method) &&
+			_checker(filterManager.IncludeUri, filterManager.ExcludeUri, urlStr)
 	}
 
-	var responseShouldBeHijacked = func(rsp *http.Response, isHttps bool) bool {
-		//l, _ := strconv.Atoi(rsp.Header.Get("Content-Length"))
-		//if l > packetLimit {
-		//	return false
-		//}
-		return _checker(nil, filterManager.ExcludeMIME, strings.ToLower(rsp.Header.Get("Content-Type")))
+	var responseShouldBeHijacked = func(contentType string, isHttps bool) bool {
+		return _checker(nil, filterManager.ExcludeMIME, contentType)
 	}
 
 	feedbackToUser("初始化过滤器... / initializing filters")
@@ -797,7 +813,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 这个来过滤一些媒体文件
 			rspIns, _ := lowhttp.ParseBytesToHTTPResponse(rsp)
 			if rspIns != nil {
-				if !responseShouldBeHijacked(rspIns, isHttps) {
+				if !responseShouldBeHijacked(rspIns.Header.Get("Content-Type"), isHttps) {
 					SetContextValueInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
 					return rsp
 				}
@@ -839,14 +855,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if !GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
 			return rsp
 		}
-		//_, ok := hijackedResponseByRequestPTRMap.Load(ptr)
-		//if !ok {
-		//	// 不在响应的劫持列表，返回
-		//	return rsp
-		//}
-
-		// 确定要劫持该响应
-		// hijackedResponseByRequestPTRMap.Delete(ptr)
 
 		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
 		if err != nil {
@@ -1065,6 +1073,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		ctx := context.WithValue(originReqIns.Context(), REQUEST_CONTEXT_KEY_MatchedRules, matchedRulesP)
 		*originReqIns = *originReqIns.WithContext(ctx)
 		var originReqRaw = req[:]
+		var (
+			method = originReqIns.Method
+		)
 		SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_IsHttps, true)
 		SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestBytes, string(originReqRaw))
 		// 保证始终只有一个 Goroutine 在处理请求
@@ -1094,11 +1105,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			hijackedReqStore = map[string][]byte{
 				"request": lowhttp.FixHTTPRequestOut(req),
 			}
-			urlStr = ""
+			urlStr   = ""
+			hostname = originReqIns.Host
+			extName  = ""
 		)
 		urlRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(hijackedReqStore["request"], isHttps)
 		if urlRaw != nil {
 			urlStr = urlRaw.String()
+			hostname = urlRaw.Host
+			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
+				extName = ret
+			}
 			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_Url, urlStr)
 		}
 		mitmPluginCaller.CallHijackRequest(isHttps, urlStr,
@@ -1142,7 +1159,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		if !shouldBeHijacked(req, isHttps) {
+		if !shouldBeHijacked(method, hostname, urlStr, extName, isHttps) {
 			log.Infof("req: %s is filtered", urlStr)
 			SetContextValueInfoFromRequest(originReqIns, REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req

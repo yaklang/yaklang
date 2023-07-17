@@ -197,28 +197,32 @@ func StringHasPrefix(s string, prefix []string) bool {
 	return false
 }
 
-func StringGlobArrayContains(array []string, element string) bool {
-	var globs []glob.Glob
-	var strList []string
+func StringSubStringArrayContains(array []string, element string) bool {
+	for _, s := range array {
+		if strings.Contains(s, element) {
+			return true
+		}
+	}
+	return false
+}
+
+func StringGlobArrayContains(array []string, element string, seps ...rune) bool {
 	for _, r := range array {
-		rule, err := glob.Compile(r)
-		if err != nil {
-			strList = append(strList, r)
+		if !strings.Contains(element, "*") {
+			if IContains(r, element) {
+				return true
+			}
 			continue
 		}
-		globs = append(globs, rule)
-	}
 
-	for _, s := range array {
-		if element == s {
+		rule, err := glob.Compile(r, seps...)
+		if err != nil {
+			continue
+		}
+		if rule.Match(element) {
 			return true
 		}
-	}
-
-	for _, g := range globs {
-		if g.Match(element) {
-			return true
-		}
+		continue
 	}
 	return false
 }

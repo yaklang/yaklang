@@ -33,7 +33,7 @@ checkCase = (instance, https, reqBytes) => {
     prefix, suffix = instance.boundary
     yakit.Info("开始测试 SSTI:%v ... %v", prefix, suffix)
 
-    var params = fuzz.HTTPRequest(reqBytes, fuzz.https(true))~.GetCommonParams()
+    var params = fuzz.HTTPRequest(reqBytes, fuzz.https(https))~.GetCommonParams()
     for param in params {
         checked = 0
         failed = false
