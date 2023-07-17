@@ -116,7 +116,7 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 }
 
 func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
-	return ag.pkgs
+	return MergePackages(ag.pkgs)
 }
 
 func (ag *AnalyzerGroup) Append(a ...Analyzer) {
