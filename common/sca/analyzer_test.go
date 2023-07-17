@@ -557,6 +557,54 @@ func TestPythonPoetry(t *testing.T) {
 	Run(tc)
 }
 
+func TestJavaJar(t *testing.T) {
+	// positive
+	tc := testcase{
+		name:           "positive-war",
+		filePath:       "./testdata/java_jar/positive/test.war",
+		t:              t,
+		a:              analyzer.NewJavaJarAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       JavaJarWarPkgs,
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-par",
+		filePath:       "./testdata/java_jar/positive/test.par",
+		t:              t,
+		a:              analyzer.NewJavaJarAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       JavaJarParPkgs,
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "positive-jar",
+		filePath:       "./testdata/java_jar/positive/test.jar",
+		t:              t,
+		a:              analyzer.NewJavaJarAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       JavaJarJarPkgs,
+	}
+	Run(tc)
+
+	// negative
+	tc = testcase{
+		name:           "negative-broken-jar",
+		filePath:       "./testdata/java_jar/negative/test.txt",
+		t:              t,
+		a:              analyzer.NewPythonPIPEnvAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       []*dxtypes.Package{},
+		wantError:      true,
+	}
+	Run(tc)
+}
 func TestJavaGradle(t *testing.T) {
 	// positive
 	tc := testcase{
