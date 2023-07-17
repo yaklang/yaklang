@@ -129,12 +129,10 @@ aaacccaaabbb`))
 	var checked = false
 	for {
 		exec, err := stream.Recv()
-		println(spew.Sdump(exec))
 		if err != nil {
 			log.Warn(err)
 			break
 		}
-		spew.Dump(exec)
 		if string(exec.Message) != "" {
 			if strings.Contains(string(exec.Message), "PLUGIN IS EXECUTED") {
 				checked = true
@@ -179,7 +177,6 @@ aaacccaaabbb`))
 			log.Warn(err)
 			break
 		}
-		spew.Dump(exec)
 		if string(exec.Message) != "" {
 			if strings.Contains(string(exec.Message), "MESSAGE:FETCH URL") ||
 				strings.Contains(string(exec.Message), "/abc?key=value") {
