@@ -66,6 +66,14 @@ func GetContextStringInfoFromRequest(r *http.Request, key string) string {
 	return utils.InterfaceToString(v)
 }
 
+func GetRequestBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes))
+}
+
+func SetRequestBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes, string(bytes))
+}
+
 func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 	var infoMap = GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)

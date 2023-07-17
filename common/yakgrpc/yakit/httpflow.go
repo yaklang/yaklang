@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -538,13 +539,21 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 		}
 	}
 
-	reqRaw, err := utils.HttpDumpWithBody(req, allowReqBody)
-	if err != nil {
-		return nil, err
+	reqRaw := httpctx.GetRequestBytes(req)
+	if reqRaw == nil {
+		var err error
+		reqRaw, err = utils.HttpDumpWithBody(req, allowReqBody)
+		if err != nil {
+			reqRaw, err = utils.HttpDumpWithBody(req, false)
+			if err != nil {
+				log.Errorf("dump request failed: %s", err)
+			}
+		}
 	}
+
 	rspRaw, err := utils.HttpDumpWithBody(rsp, allowRspBody)
 	if err != nil {
-		return nil, err
+		log.Errorf("dump response failed: %s", err)
 	}
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
 }

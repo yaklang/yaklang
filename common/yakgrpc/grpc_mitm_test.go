@@ -246,6 +246,7 @@ Host: ` + h2Addr,
 					wg.Done()
 					cancel()
 					if err := recover(); err != nil {
+						spew.Dump(err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()
