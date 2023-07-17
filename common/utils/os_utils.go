@@ -145,7 +145,7 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, false, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute*5), false, false, false, handle)
 }
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
