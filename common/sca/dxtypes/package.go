@@ -127,11 +127,11 @@ func (p *Package) Merge(p2 *Package) *Package {
 	if p.FromAnalyzer == nil {
 		p.FromAnalyzer = make([]string, 0)
 	}
-	p.FromAnalyzer = append(p.FromAnalyzer, p2.FromAnalyzer...)
+	p.FromAnalyzer = lo.Uniq(append(p.FromAnalyzer, p2.FromAnalyzer...))
 	if p.FromFile == nil {
 		p.FromFile = make([]string, 0)
 	}
-	p.FromFile = append(p.FromFile, p2.FromFile...)
+	p.FromFile = lo.Uniq(append(p.FromFile, p2.FromFile...))
 
 	for _, p2up := range p2.UpStreamPackages {
 		p.LinkDepend(p2up)
@@ -150,31 +150,31 @@ func (p *Package) Merge(p2 *Package) *Package {
 
 // p2 is version range
 func CanMergeWithVersionRange(p *Package, p2 *Package) bool {
-		if p2.Version == "*" {
+	if p2.Version == "*" {
 		return true
-		} else {
-			index := strings.IndexFunc(p2.Version, func(r rune) bool {
-				return r >= '0' && r <= '9'
-			})
-			if index == -1 {
-				return false
-			}
-			op := p2.Version[:index]
-			version := p2.Version[index:]
-			ret, err := utils.VersionCompare(p.Version, version)
-			if err != nil {
-				return false
-			}
-			if strings.Contains(op, "=") && ret == 0 {
-				return true
-			}
-			if strings.Contains(op, ">") && ret > 0 {
-				return true
-			}
-			if strings.Contains(op, "<") && ret < 0 {
-				return true
-			}
+	} else {
+		index := strings.IndexFunc(p2.Version, func(r rune) bool {
+			return r >= '0' && r <= '9'
+		})
+		if index == -1 {
+			return false
 		}
+		op := p2.Version[:index]
+		version := p2.Version[index:]
+		ret, err := utils.VersionCompare(p.Version, version)
+		if err != nil {
+			return false
+		}
+		if strings.Contains(op, "=") && ret == 0 {
+			return true
+		}
+		if strings.Contains(op, ">") && ret > 0 {
+			return true
+		}
+		if strings.Contains(op, "<") && ret < 0 {
+			return true
+		}
+	}
 	return false
 }
 
