@@ -178,32 +178,33 @@ func CanMergeWithVersionRange(p *Package, p2 *Package) bool {
 	return false
 }
 
-func (p *Package) CanMerge(p2 *Package) bool {
+func CanMerge(p *Package, p2 *Package) int {
+	// func (p *Package) CanMerge(p2 *Package) bool {
 	// verification
 	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
-		return false
+		return 0
 	}
 	// name
 	if p.Name != p2.Name {
-		return false
+		return 0
 	}
 
 	// version range
-	if p2.IsVersionRange {
+	if p2.IsVersionRange || strings.ContainsAny(p2.Version, "><=") {
 		if CanMergeWithVersionRange(p, p2) {
-			return true
+			return 1
 		}
 	}
-	if p.IsVersionRange {
+	if p.IsVersionRange || strings.ContainsAny(p.Version, "><=") {
 		if CanMergeWithVersionRange(p2, p) {
-			return true
+			return -1
 		}
 	}
 
 	// version
 	if p.Version == p2.Version {
-		return true
+		return 1
 	}
 
-	return false
+	return 0
 }

@@ -128,41 +128,50 @@ func TestPackageCanMerge(t *testing.T) {
 	// same
 	pa := createPackage("pa", "0.0.1", "", "")
 	pb := createPackage("pa", "0.0.1", "", "")
-	if pa.CanMerge(&pb) == false {
-		t.Fatal("same name and version shoud merge pa.CanMerge(pb)")
+	if CanMerge(&pa, &pb) != 1 {
+		t.Fatal("same name and version shoud merge pa(pb)")
 	}
-	if pb.CanMerge(&pa) == false {
-		t.Fatal("same name and version shoud merge pb.CanMerge(pa)")
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version shoud merge pb(pa)")
 	}
 
 	pa = createPackage("pa", "*", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
-	if pa.CanMerge(&pb) == false {
-		t.Fatal("same name and version is * shoud merge pa.CanMerge(pb)")
+	if CanMerge(&pa, &pb) != -1 {
+		t.Fatal("same name and version is * shoud merge pa(pb)")
 	}
-	if pb.CanMerge(&pa) == false {
-		t.Fatal("same name and version is * shoud merge pb.CanMerge(pa)")
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version is * shoud merge pb(pa)")
 	}
 
 	pa = createPackage("pa", "<0.0.3", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
-	if pa.CanMerge(&pb) == false {
-		t.Fatal("same name and version match range shoud merge pa.CanMerge(pb)")
+	if CanMerge(&pa, &pb) != -1 {
+		t.Fatal("same name and version match range shoud merge pa(pb)")
 	}
-	if pb.CanMerge(&pa) == false {
-		t.Fatal("same name and version match range shoud merge pb.CanMerge(pa)")
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version match range shoud merge pb(pa)")
 	}
 
 	pa = createPackage("pa", ">0.0.3", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
-	if pa.CanMerge(&pb) == true {
-		t.Fatal("same name and version not match range shoud not merge pa.CanMerge(pb)")
+	if CanMerge(&pa, &pb) != 0 {
+		t.Fatal("same name and version not match range shoud not merge pa(pb)")
 	}
-	if pb.CanMerge(&pa) == true {
-		t.Fatal("same name and version not match range shoud not merge pb.CanMerge(pa)")
+	if CanMerge(&pb, &pa) != 0 {
+		t.Fatal("same name and version not match range shoud not merge pb(pa)")
 	}
 
+	// if ignore pa.IsVersionRange
+	pa = createPackage("pa", "<0.0.3", "", "")
+	pb = createPackage("pa", "0.0.1", "", "")
+	if CanMerge(&pa, &pb) != -1 {
+		t.Fatal("same name and version match range shoud merge even not set IsVersionRange pa(pb)")
+	}
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version match range shoud merge even not set IsVersionRange pb(pa)")
+	}
 }

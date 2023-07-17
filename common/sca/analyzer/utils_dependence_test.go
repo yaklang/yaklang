@@ -583,3 +583,21 @@ func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	}
 	Check(t, ret, wantPkg)
 }
+
+func TestMregePackagesVersionRangeFirst(t *testing.T) {
+	pkgs := make([]*dxtypes.Package, 0)
+	pkgs = append(pkgs, newPackage("p1", "> 0.0.3", "p1"))
+	pkgs = append(pkgs, newPackage("p1", "0.0.4", "p1"))
+	pkgs = append(pkgs, newPackage("p3", "0.0.4", "p1"))
+
+	ret := MergePackages(pkgs)
+	wantPkg := []*testPackage{
+		{
+			ID: "p1-0.0.4",
+		},
+		{
+			ID: "p3-0.0.4",
+		},
+	}
+	Check(t, ret, wantPkg)
+}
