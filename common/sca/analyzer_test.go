@@ -158,6 +158,9 @@ func Run(tc testcase) []*dxtypes.Package {
 	})
 	pkgs = analyzer.MergePackages(pkgs)
 
+	// for _, pkg := range pkgs {
+	// 	fmt.Printf("%s\n", pkg)
+	// }
 
 	if tc.wantError && err == nil {
 		t.Fatalf("%s: want error but nil", tc.name)
@@ -618,6 +621,82 @@ func TestJavaPom(t *testing.T) {
 	Run(tc)
 }
 
+func TestNodeNpm(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/node_npm/positive_file/package.json",
+		virtualPath: "/test/package.json",
+		t:           t,
+		a:           analyzer.NewNpmAnalyzer(),
+		matchType:   1,
+		wantPkgs:    NodeNpmPkgs,
+	}
+	// Run(tc)
+
+	// folder
+	tc = testcase{
+		name:      "positive-folder",
+		t:         t,
+		a:         analyzer.NewNpmAnalyzer(),
+		skipCheck: true,
+	}
+	pkgs := make([]*dxtypes.Package, 0)
+	{
+		tc.filePath = "./testdata/node_npm/positive_folder/package-lock.json"
+		tc.matchType = 2
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/ms/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/debug/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/ms/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/debug/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/ms/package.json"
+		tc.matchType = 1
+		pkgs = append(pkgs, Run(tc)...)
+
+	}
+	if len(pkgs) != 62 {
+		t.Fatalf("%s: package length error: %d(get)", tc.name, len(pkgs))
+	}
+	// fmt.Println("before: ", len(pkgs))
+	// analyzer.DrawPackagesDOT(pkgs)
+	ret := analyzer.MergePackages(pkgs)
+	fmt.Println("after: ", len(ret))
+	// showPgks(ret)
+	Check(ret, NodeNpmPkgsFolder, tc.name, t)
+	// analyzer.DrawPackagesDOT(ret)
+}
+
+func showPgks(pkgs []*dxtypes.Package) {
+	for _, pkg := range pkgs {
+		fmt.Printf("%s\n", pkg)
+	}
+}
+
 func TestFilterAnalyzer(t *testing.T) {
 	wantPkgAnalyzerTypes := []string{
 		reflect.TypeOf(analyzer.NewRPMAnalyzer()).String(),
@@ -635,6 +714,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewPythonPackagingAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPIPEnvAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewNpmAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
