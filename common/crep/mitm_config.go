@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
@@ -587,42 +588,16 @@ func MITM_SetHTTPRequestMirror(f func(isHttps bool, req *http.Request)) MITMConf
 	})
 }
 
-func MITM_SetHTTPResponseMirror(f func(isHttps bool, reqUrl string, _ *http.Request, _ *http.Response, remoteAddr string)) MITMConfig {
+func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Response, string)) MITMConfig {
 	return MITM_SetHTTPResponseMirrorInstance(func(isHttps bool, req, rsp []byte, remoteAddr string, response *http.Response) {
-		var schema = "http"
-		if isHttps {
-			schema = "https"
+		var urlStr = httpctx.GetContextStringInfoFromRequest(response.Request, httpctx.REQUEST_CONTEXT_KEY_Url)
+		if urlStr == "" {
+			u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
+			if u != nil {
+				urlStr = u.String()
+			}
 		}
-
-		reqObj, err := lowhttp.ParseBytesToHttpRequest(req)
-		if response != nil && response.Request != nil {
-			*reqObj = *reqObj.WithContext(response.Request.Context())
-		}
-		//reqObj, err := http.ReadRequest(bufio.NewReader(bytes.NewBuffer(req)))
-		if err != nil {
-			log.Errorf("parse raw to http.Request failed: %s", err)
-			return
-		}
-		reqObj.URL.Scheme = schema
-
-		urlObj, err := lowhttp.ExtractURLFromHTTPRequest(reqObj, isHttps)
-		if err != nil {
-			log.Debugf("extract url from httpRequest: %v", err)
-			urlObj = reqObj.URL
-		}
-		reqObj.URL.Host = urlObj.Host
-
-		rspObj, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(rsp)), reqObj)
-		if err != nil {
-			log.Errorf("parse raw to http.Response failed: %s", err)
-			return
-		}
-		//log.Infof("recv request len:%-6d ==> response len:%-6d", len(req), len(rsp))
-		if urlObj == nil {
-			f(isHttps, "", reqObj, rspObj, remoteAddr)
-		} else {
-			f(isHttps, urlObj.String(), reqObj, rspObj, remoteAddr)
-		}
+		f(isHttps, urlStr, response.Request, response, remoteAddr)
 	})
 }
 

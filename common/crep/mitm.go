@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io/ioutil"
 	"net"
@@ -256,18 +257,12 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	return nil
 }
 
-func (m *MITMServer) fixHeader(req *http.Request) {
-	if req.Header.Get("user-agent") == "" {
-		req.Header.Set("user-agent", consts.DefaultUserAgent)
-	}
-}
-
 type rawRequest struct {
 	IsHttps bool
 	Raw     []byte
 }
 
-func (m *MITMServer) preHandle(ctx context.Context) {
+func (m *MITMServer) preHandle(rootCtx context.Context) {
 	group := fifo.NewGroup()
 
 	largerThanMaxContentLength := func(res *http.Response) bool {
@@ -279,7 +274,85 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		return false
 	}
 
-	requestHijackCallback := func(req *http.Request) error {
+	wsModifier := &WebSocketModifier{
+		websocketHijackMode:            m.websocketHijackMode,
+		forceTextFrame:                 m.forceTextFrame,
+		websocketRequestHijackHandler:  m.websocketRequestHijackHandler,
+		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
+		websocketRequestMirror:         m.websocketRequestMirror,
+		websocketResponseMirror:        m.websocketResponseMirror,
+		TR:                             m.httpTransport,
+		ProxyGetter:                    m.GetMartianProxy,
+		RequestHijackCallback: func(req *http.Request) error {
+			var isHttps bool
+			switch req.URL.Scheme {
+			case "https", "HTTPS":
+				isHttps = true
+			case "http", "HTTP":
+				isHttps = false
+			}
+			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
+			if err != nil {
+				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
+				return nil
+			}
+			m.requestHijackHandler(isHttps, req, hijackedRaw)
+			return nil
+		},
+	}
+	if m.proxyUrl != nil {
+		wsModifier.ProxyStr = m.proxyUrl.String()
+	}
+
+	group.AddRequestModifier(NewRequestModifier(func(req *http.Request) error {
+		/*
+		 use buildin cert domains
+		*/
+		ctx := martian.NewContext(req, m.GetMartianProxy())
+		if ctx == nil {
+			return nil
+		}
+		//log.Infof("hostname: %v", req.URL.Hostname())
+		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
+			ctx.SkipRoundTrip()
+			return nil
+		}
+
+		reqCtx, cancel := context.WithCancel(rootCtx)
+		httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone, reqCtx)
+		defer func() {
+			defer cancel()
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+
+		/*
+			handle websocket
+		*/
+		if utils.IContains(req.Header.Get("Connection"), "upgrade") && req.Header.Get("Upgrade") == "websocket" {
+			return wsModifier.ModifyRequest(req)
+		}
+
+		err := header.NewHopByHopModifier().ModifyRequest(req)
+		if err != nil {
+			log.Errorf("remove hop by hop header failed: %s", err)
+		}
+
+		// content-length and transfer-encoding existed
+		firstLine, _, _ := strings.Cut(req.Header.Get("Content-Length"), ",")
+		if firstLine != "" {
+			req.Header.Set("Content-Length", firstLine)
+		}
+		te, _, _ := strings.Cut(req.Header.Get("Transfer-Encoding"), ",")
+		if te != "" {
+			req.Header.Set("Transfer-Encoding", "chunked")
+			req.Header.Del("Content-Length")
+		}
+
+		/*
+			handle hijack
+		*/
 		var isHttps bool
 		switch req.URL.Scheme {
 		case "https", "HTTPS":
@@ -288,6 +361,10 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 			isHttps = false
 		}
 
+		var (
+			raw       []byte
+			isDropped = utils.NewBool(false)
+		)
 		if m.requestHijackHandler != nil {
 			originUrl, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
 			if err != nil {
@@ -298,126 +375,82 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 				return nil
 			}
 
-			log.Debugf("start to hijack mitm request: %p", req)
-			m.fixHeader(req)
-			hijackedRaw, err := httputil.DumpRequest(req, true)
-
+			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
 				return nil
 			}
+			raw = hijackedRaw
 
+			/*
+				ctx control
+			*/
+			select {
+			case <-rootCtx.Done():
+				reqContext := martian.NewContext(req, m.proxy)
+				reqContext.SkipRoundTrip()
+				return utils.Error("request hijacker error: MITM Proxy Context Canceled")
+			default:
+			}
 			hijackedRequestRaw := m.requestHijackHandler(isHttps, req, hijackedRaw)
 			select {
-			case <-ctx.Done():
+			case <-rootCtx.Done():
 				reqContext := martian.NewContext(req, m.proxy)
 				reqContext.SkipRoundTrip()
 				return utils.Error("request hijacker error: MITM Proxy Context Canceled")
 			default:
 			}
 			if hijackedRequestRaw == nil {
-				time.Sleep(5 * time.Minute)
-				return nil
-			}
-			hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
-			if err != nil {
-				log.Errorf("mitm-hijacked request to http.Request failed: %s", err)
-				return nil
-			}
-			if isHttps {
-				hijackedReq.TLS = req.TLS
-			}
-
-			if req.ProtoMajor != 2 {
-				hijackedReq, err = utils.FixHTTPRequestForHTTPDoWithHttps(hijackedReq, isHttps)
+				isDropped.Set()
+			} else {
+				hijackedRaw = hijackedRequestRaw
+				raw = hijackedRequestRaw
+				hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
 				if err != nil {
-					log.Errorf("fix mitm-hijacked http.Request failed: %s", err)
+					log.Errorf("mitm-hijacked request to http.Request failed: %s", err)
 					return nil
 				}
-			}
-
-			*req = *hijackedReq.WithContext(req.Context())
-			m.fixHeader(req)
-
-			if req.URL.Host == "" || req.URL.Hostname() == "" {
-				hostInHeader := req.Header.Get("Host")
-				if hostInHeader == "" && req.Host != "" {
-					hostInHeader = req.Host
+				if isHttps {
+					hijackedReq.TLS = req.TLS
 				}
-				if hostInHeader != "" {
-					req.Host = hostInHeader
-					req.URL.Host = hostInHeader
-				} else {
-					req.Host = originUrl.Host
-					req.URL.Host = originUrl.Host
+
+				if req.ProtoMajor != 2 {
+					hijackedReq, err = utils.FixHTTPRequestForHTTPDoWithHttps(hijackedReq, isHttps)
+					if err != nil {
+						log.Errorf("fix mitm-hijacked http.Request failed: %s", err)
+						return nil
+					}
 				}
+
+				*req = *hijackedReq.WithContext(req.Context())
+				if req.URL.Host == "" || req.URL.Hostname() == "" {
+					hostInHeader := req.Header.Get("Host")
+					if hostInHeader == "" && req.Host != "" {
+						hostInHeader = req.Host
+					}
+					if hostInHeader != "" {
+						req.Host = hostInHeader
+						req.URL.Host = hostInHeader
+					} else {
+						req.Host = originUrl.Host
+						req.URL.Host = originUrl.Host
+					}
+				}
+				if isHttps {
+					req.URL.Scheme = "https"
+				}
+
 			}
-			if isHttps {
-				req.URL.Scheme = "https"
+		}
+
+		if raw == nil {
+			raw, err = httputil.DumpRequest(req, true)
+			if err != nil {
+				log.Errorf("dump request failed: %s", err)
+				return nil
 			}
-			//log.Infof("finished to hijack mitm request: %p", req)
 		}
-		return nil
-	}
-
-	// 过滤证书请求-直接跳过
-	group.AddRequestModifier(NewRequestModifier(func(req *http.Request) error {
-		ctx := martian.NewContext(req, m.GetMartianProxy())
-		if ctx == nil {
-			return nil
-		}
-		//log.Infof("hostname: %v", req.URL.Hostname())
-		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
-			ctx.SkipRoundTrip()
-		}
-		return nil
-	}))
-	wsModifier := &WebSocketModifier{
-		websocketHijackMode:            m.websocketHijackMode,
-		forceTextFrame:                 m.forceTextFrame,
-		websocketRequestHijackHandler:  m.websocketRequestHijackHandler,
-		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
-		websocketRequestMirror:         m.websocketRequestMirror,
-		websocketResponseMirror:        m.websocketResponseMirror,
-		TR:                             m.httpTransport,
-		ProxyGetter:                    m.GetMartianProxy,
-		RequestHijackCallback:          requestHijackCallback,
-	}
-	if m.proxyUrl != nil {
-		wsModifier.ProxyStr = m.proxyUrl.String()
-	}
-	group.AddRequestModifier(wsModifier)
-
-	group.AddRequestModifier(header.NewHopByHopModifier())
-
-	// fix err frame
-	group.AddRequestModifier(header.NewBadFramingModifier())
-
-	// 劫持
-	group.AddRequestModifier(NewRequestModifier(func(req *http.Request) error {
-		return requestHijackCallback(req)
-	}))
-
-	// 镜像分流
-	group.AddRequestModifier(NewRequestModifier(func(req *http.Request) error {
-		var isHttps bool
-		switch req.URL.Scheme {
-		case "https", "HTTPS":
-			isHttps = true
-		case "http", "HTTP":
-			isHttps = false
-		}
-
-		raw, err := httputil.DumpRequest(req, true)
-		if err != nil {
-			log.Errorf("dump request failed: %s", err)
-			return nil
-		}
-
-		p := fmt.Sprintf("%p", req)
-
-		log.Debugf("request-id: [%v]", p)
-		m.mirrorCache.Set(p, &rawRequest{
+		m.mirrorCache.Set(fmt.Sprintf("%p", req), &rawRequest{
 			IsHttps: isHttps,
 			Raw:     raw,
 		})
@@ -428,19 +461,11 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		return nil
 	}))
 
-	if m.allowForwarded {
-		group.AddRequestModifier(header.NewForwardedModifier())
-	}
-
-	if m.via != "" {
-		log.Warnf("VIA is unsupported by yak mitm (no longer)")
-		//vm := header.NewViaModifier(m.via)
-		//group.AddRequestModifier(vm)
-		//group.AddResponseModifier(vm)
-	}
-
-	// 证书-下载证书
+	// 劫持响应
 	group.AddResponseModifier(NewResponseModifier(func(rsp *http.Response) error {
+		/*
+			return the ca certs
+		*/
 		if utils.StringArrayContains(defaultBuildinDomains, rsp.Request.URL.Hostname()) {
 			body := defaultCA
 			rsp.Body = ioutil.NopCloser(bytes.NewReader(body))
@@ -450,16 +475,33 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 			rsp.Header.Set("Content-Type", "octet-stream")
 			return nil
 		}
-		return nil
-	}))
 
-	// 劫持响应
-	group.AddResponseModifier(NewResponseModifier(func(rsp *http.Response) error {
-		if largerThanMaxContentLength(rsp) {
-			return nil
+		val, ok := httpctx.GetContextInfoMap(rsp.Request).Load(httpctx.REQUEST_CONTEXT_KEY_RequestHijackDone)
+		if !ok {
+			msg := `[BUG]! ResponseModifer Cannot Fetch InfoMap Context`
+			fmt.Println(msg)
+			fmt.Println(msg)
+			fmt.Println(msg)
+			return utils.Error(msg)
+		}
+		cond := val.(context.Context)
+		select {
+		case <-cond.Done():
 		}
 
+		var (
+			responseBytes    []byte
+			dropped          = utils.NewBool(false)
+			shouldHandleBody = true
+		)
+
+		// response hijacker
 		if m.responseHijackHandler != nil {
+			// max content-length
+			if largerThanMaxContentLength(rsp) {
+				shouldHandleBody = false
+			}
+
 			var isHttps bool
 			switch rsp.Request.URL.Scheme {
 			case "https", "HTTPS":
@@ -468,71 +510,66 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 				isHttps = false
 			}
 
-			var rspRaw []byte
 			var err error
-			rspRaw, err = utils.HttpDumpWithBody(rsp, true)
+			responseBytes, err = utils.HttpDumpWithBody(rsp, shouldHandleBody)
 			if err != nil {
 				log.Errorf("hijack response failed: %s", err)
 				return nil
 			}
-			if rspRaw == nil {
+			if responseBytes == nil {
 				return nil
 			}
-			result := m.responseHijackHandler(isHttps, rsp.Request, rspRaw, m.GetRemoteAddr(isHttps, rsp.Request.Host))
+			result := m.responseHijackHandler(isHttps, rsp.Request, responseBytes, m.GetRemoteAddr(isHttps, rsp.Request.Host))
 			if result == nil {
-				// 解析结果为空，这个时候可能是有意 drop 掉了请求，我们不返回就行了
-				time.Sleep(5 * time.Minute)
-				return nil
+				dropped.Set()
+			} else {
+				responseBytes = result[:]
+				req := rsp.Request
+				resultRsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(result)), req)
+				if err != nil {
+					log.Errorf("parse fixed response to body failed: %s", err)
+					return utils.Errorf("hijacking modified response parsing failed: %s", err)
+				}
+				*rsp = *resultRsp
 			}
-			req := rsp.Request
-			resultRsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(result)), req)
-			if err != nil {
-				log.Errorf("parse fixed response to body failed: %s", err)
-				return err
-			}
-			*rsp = *resultRsp
-			return nil
-		}
-		return nil
-	}))
-
-	m.proxy.SetRequestModifier(group)
-	m.proxy.SetResponseModifier(group)
-
-	// mirror response
-	group.AddResponseModifier(NewResponseModifier(func(res *http.Response) error {
-		//if strings.Contains(res.Request.URL.String(), "/xxx") {
-		//	log.Infof("Hit")
-		//}
-		// 过滤一下最大长度
-		haveBody := true
-		if largerThanMaxContentLength(res) {
-			haveBody = false
 		}
 
-		rspP := fmt.Sprintf("%p", res)
-		reqP := utils.InterfaceToString(res.Request.Context().Value("request-id"))
+		defer func() {
+			if dropped.IsSet() {
+				log.Info("drop response cause sleep in httpflow")
+				time.Sleep(3 * time.Minute)
+			}
+		}()
+
+		/**
+		mirror below, no modify packet!
+		*/
+		rspP := fmt.Sprintf("%p", rsp)
+		reqP := utils.InterfaceToString(rsp.Request.Context().Value("request-id"))
 
 		log.Debugf("request-id: [%v]   -->   response-id: [%v] ", reqP, rspP)
 
 		if m.responseMirrorWithInstance != nil {
-			rsp, err := httputil.DumpResponse(res, haveBody)
-			if err != nil {
-				log.Errorf("dump response mirror failed: %s", err)
-				return nil
+			if len(responseBytes) <= 0 {
+				var err error
+				responseBytes, err = utils.HttpDumpWithBody(rsp, shouldHandleBody)
+				if err != nil {
+					log.Errorf("dump response mirror failed: %s", err)
+					return nil
+				}
 			}
 
 			_req, ok := m.mirrorCache.Get(reqP)
 			if !ok {
-				log.Debugf("mirror cache cannot fetch requestP: %p", res.Request)
+				log.Debugf("mirror cache cannot fetch requestP: %p", rsp.Request)
 				return nil
 			}
 			rawRequestIns := _req.(*rawRequest)
 			reqRawBytes := rawRequestIns.Raw
 			if ok {
 				//log.Infof("response mirror recv request len: [%v]", len(rawReq))
-				remoteAddr := m.GetRemoteAddr(rawRequestIns.IsHttps, res.Request.Host)
-				m.responseMirrorWithInstance(rawRequestIns.IsHttps, reqRawBytes, rsp, remoteAddr, res)
+				remoteAddr := m.GetRemoteAddr(rawRequestIns.IsHttps, rsp.Request.Host)
+				m.responseMirrorWithInstance(rawRequestIns.IsHttps, reqRawBytes, responseBytes, remoteAddr, rsp)
 				m.mirrorCache.Remove(reqP)
 			} else {
 				log.Errorf("no such request-id: %v", reqP)
@@ -541,6 +578,9 @@ func (m *MITMServer) preHandle(ctx context.Context) {
 		}
 		return nil
 	}))
+
+	m.proxy.SetRequestModifier(group)
+	m.proxy.SetResponseModifier(group)
 }
 
 var (
