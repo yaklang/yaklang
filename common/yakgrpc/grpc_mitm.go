@@ -260,29 +260,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	feedbackToUser("初始化劫持流... / initializing hijacking stream")
 
 	// 设置过滤器
-	var packetLimit = 10 * 1000 * 1000
-	//var includeHostname []string
-	//var excludeHostname = []string{
-	//	"google.com", "*google.com", "*google*.com",
-	//	//"baidu.com", "*baidu.com",
-	//}
-	//var excludeSuffix = []string{
-	//	".css",
-	//	".jpg", ".jpeg", ".png",
-	//	".mp3", ".mp4", ".ico", ".bmp",
-	//	".flv", ".aac", ".ogg", "avi",
-	//	".svg", ".gif", ".woff", ".woff2",
-	//	".doc", ".docx", ".pptx",
-	//	".ppt", ".pdf"}
-	//var includeSuffix []string
-	//var excludeMethods = []string{"OPTIONS", "CONNECT"}
-	//var excludeMIME = []string{
-	//	// https://www.runoob.com/http/http-content-type.html
-	//	"image/*",
-	//	"audio/*", "video/*",
-	//	"application/ogg", "application/pdf", "application/msword",
-	//	"application/x-ppt", "video/avi", "application/x-ico",
-	//}
+	// 10M - 10 * 1000 * 1000
+	var packetLimit = 8 * 10 * 1000 * 1000
 
 	/*
 		设置过滤器
@@ -1331,7 +1310,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			*req = *newRequest
 		}
 
-		responseRaw, _ := utils.HttpDumpWithBody(rsp, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
+		toolarge := utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit)
+		if toolarge {
+			log.Infof(`utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit) -> too large`)
+		}
+		responseRaw, _ := utils.HttpDumpWithBody(rsp, !toolarge)
 		noGzippedResponse, body, _ := lowhttp.FixHTTPResponse(responseRaw)
 		if noGzippedResponse != nil {
 			responseRaw = noGzippedResponse
