@@ -125,7 +125,8 @@ func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
 		log.Infof("no-existed plugin: %v, insert plugin instance", name)
-
+		// 添加核心插件字段
+		scriptData.IsCorePlugin = true
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
 		if err != nil {
 			log.Errorf("create/update yak script[%v] failed: %s", name, err)
@@ -133,11 +134,12 @@ func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content) == backendSha1 {
+	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content) == backendSha1 && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
 		databasePlugin.Content = string(codeBytes)
+		databasePlugin.IsCorePlugin = true
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, databasePlugin)
 		if err != nil {
 			log.Errorf("override %v failed: %s", name, err)
