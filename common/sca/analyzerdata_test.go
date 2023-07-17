@@ -208,240 +208,196 @@ var DPKGWantPkgs = []*dxtypes.Package{
 		Version:      "3.118ubuntu5",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "apt",
 		Version:      "2.4.9",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "base-files",
 		Version:      "12ubuntu4.3",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "base-passwd",
 		Version:      "3.5.52build1",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "bash",
 		Version:      "5.1-6ubuntu1",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "bsdutils",
 		Version:      "1:2.37.2-4ubuntu3",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "ca-certificates",
 		Version:      "20230311ubuntu0.22.04.1",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "coreutils",
 		Version:      "8.32-4.1ubuntu1",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "curl",
 		Version:      "7.81.0-1ubuntu1.10",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "dash",
 		Version:      "0.5.11+git20210903+057cd650a4ed-3build1",
 		Verification: "",
 		License:      nil,
-
-		Potential: false,
+		Potential:    false,
 	},
 	{
 		Name:         "passwd",
 		Version:      "*",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "debconf|debconf-2.0",
 		Version:      ">= 0.5|*",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libstdc++6",
-		Version:      ">= 11",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libsystemd0",
-		Version:      "*",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libgcc-s1",
-		Version:      ">= 3.3.1",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libc6",
-		Version:      ">= 2.34",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libgnutls30",
-		Version:      ">= 3.7.0",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libseccomp2",
-		Version:      ">= 2.4.2",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "libapt-pkg6.0",
-		Version:      ">= 2.4.9",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "ubuntu-keyring",
 		Version:      "*",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
+	},
+	{
+		Name:         "libc6",
+		Version:      ">= 2.34",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libseccomp2",
+		Version:      ">= 2.4.2",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libapt-pkg6.0",
+		Version:      ">= 2.4.9",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libgcc-s1",
+		Version:      ">= 3.3.1",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libgnutls30",
+		Version:      ">= 3.7.0",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libstdc++6",
+		Version:      ">= 11",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
+	},
+	{
+		Name:         "libsystemd0",
+		Version:      "*",
+		Verification: "",
+		License:      nil,
+		Potential:    true,
 	},
 	{
 		Name:         "gpgv|gpgv1|gpgv2",
 		Version:      "*|*|*",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "libcrypt1",
 		Version:      ">= 1:4.4.10-10ubuntu3",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "libdebconfclient0",
 		Version:      ">= 0.145",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "debianutils",
 		Version:      ">= 2.15",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "openssl",
 		Version:      ">= 1.1.1",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "debconf|debconf-2.0",
-		Version:      ">= 0.5|*",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "libcurl4",
 		Version:      "= 7.81.0-1ubuntu1.10",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "zlib1g",
 		Version:      ">= 1:1.1.4",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 	{
 		Name:         "dpkg",
 		Version:      ">= 1.19.1",
 		Verification: "",
 		License:      nil,
-
-		Potential: true,
-	},
-	{
-		Name:         "debconf|debconf-2.0",
-		Version:      ">= 0.5|*",
-		Verification: "",
-		License:      nil,
-
-		Potential: true,
+		Potential:    true,
 	},
 }
 

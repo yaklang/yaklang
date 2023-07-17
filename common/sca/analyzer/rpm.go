@@ -122,7 +122,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 		// 	depends: %v
 		// 	`, pkg.Name, pkg.DependsOn)
 		// })
-		return linkPackages(pkgs), nil
+		return makePotentialPkgs(pkgs), nil
 	}
 	return nil, nil
 }

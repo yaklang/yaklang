@@ -150,7 +150,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
 		}
 	}
 
-	return linkPackages(pkgs), nil
+	return makePotentialPkgs(pkgs), nil
 }
 
 func NewDpkgAnalyzer() *dpkgAnalyzer {
