@@ -1721,6 +1721,52 @@ var JavaPomRequirementPkgs = []*dxtypes.Package{
 		License: []string{"Apache-2.0"},
 	},
 }
+var JavaJarWarPkgs = []*dxtypes.Package{
+	{
+		Name:    "org.glassfish:javax.el",
+		Version: "3.0.0",
+	},
+	{
+		Name:    "com.fasterxml.jackson.core:jackson-databind",
+		Version: "2.9.10.6",
+	},
+	{
+		Name:    "com.fasterxml.jackson.core:jackson-annotations",
+		Version: "2.9.10",
+	},
+	{
+		Name:    "com.fasterxml.jackson.core:jackson-core",
+		Version: "2.9.10",
+	},
+	{
+		Name:    "org.slf4j:slf4j-api",
+		Version: "1.7.30",
+	},
+	{
+		Name:    "com.cronutils:cron-utils",
+		Version: "9.1.2",
+	},
+	{
+		Name:    "org.apache.commons:commons-lang3",
+		Version: "3.11",
+	},
+	{
+		Name:    "com.example:web-app",
+		Version: "1.0-SNAPSHOT",
+	},
+}
+var JavaJarParPkgs = []*dxtypes.Package{
+	{
+		Name:    "com.fasterxml.jackson.core:jackson-core",
+		Version: "2.9.10",
+	},
+}
+var JavaJarJarPkgs = []*dxtypes.Package{
+	{
+		Name:    "org.apache:tomcat-embed-websocket",
+		Version: "9.0.65",
+	},
+}
 
 var NodeNpmPkgs = []*dxtypes.Package{
 	{
@@ -2247,4 +2293,3 @@ var NodeNpmPkgsFolder = []*dxtypes.Package{
 		Potential:    false,
 	},
 }
-
