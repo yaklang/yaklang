@@ -115,8 +115,10 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 		plist = append(plist, pkg)
 		pkgMaps[pkg.Name] = plist
 	}
+	ret := make([]*dxtypes.Package, 0, len(pkgs))
 	//将orpkg切分为多个普通包
 	for _, pkg := range orPkgs {
+		match := false
 		names := strings.Split(pkg.Name, "|")
 		versions := strings.Split(pkg.Version, "|")
 		for i, name := range names {
@@ -126,6 +128,8 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			if !ok {
 				continue
 			}
+			// 如果存在 则创建一个potential包
+			match = true
 			p := &dxtypes.Package{
 				Name:           name,
 				Version:        version,
@@ -138,18 +142,22 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			for _, downp := range pkg.DownStreamPackages {
 				downp.LinkDepend(p)
 			}
-			//加入同名pkg的数组中
+			//加入同名pkg的数组中 期待进行合并
 			plist = append(plist, p)
 			pkgMaps[name] = plist
 		}
+		if match {
 		//修正上下游关系
 		for _, downp := range pkg.DownStreamPackages {
 			delete(downp.UpStreamPackages, pkg.Identifier())
 			delete(pkg.UpStreamPackages, downp.Identifier())
 		}
+		} else {
+			// 如果没有命中则保存这个或包不进行合并。
+			ret = append(ret, pkg)
+		}
 	}
 
-	ret := make([]*dxtypes.Package, 0, len(pkgs))
 	// handler pkg list of same name, merge package that can be merged.
 	for _, list := range pkgMaps {
 		if len(list) == 1 {
