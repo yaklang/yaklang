@@ -173,17 +173,22 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 
 		// check
 		merge := make(map[*dxtypes.Package]*dxtypes.Package)
+		// O(n) -- O(n * lg(N))
 		for i := 0; i < len(list); i++ {
 			p := list[i]
+			// skip pkg in merge
 			if _, ok := merge[p]; ok {
 				continue
 			}
 			for j := i + 1; j < len(list); j++ {
 				p2 := list[j]
+				// skip pkg in merge
 				if _, ok := merge[p2]; ok {
 					continue
 				}
+				// check can merge
 			if p.CanMerge(p2) {
+					// set pkg to merge map
 					merge[p2] = p
 			}
 		}
