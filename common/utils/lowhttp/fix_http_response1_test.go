@@ -1,6 +1,9 @@
 package lowhttp
 
 import (
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
@@ -89,6 +92,22 @@ Host: www.baidu.com
 ` + "\xac\xedasdfasdfasdf\x00\u0000)))\u0000\u0000\u0000\u0000\u0000\u0000\x0100"))
 	if !strings.Contains(string(a), `{{unquote("\xac\xed`) {
 		panic(1)
+	}
+}
+
+func TestNewHTTPRequest_2(t *testing.T) {
+	var a = ConvertHTTPRequestToFuzzTag([]byte(`GET / HTTP/1.1
+Host: www.baidu.com
+
+` + "\xac\xedasdfasdfasdf\x44\x21\x00\u0000)))\"\"\u0000\u0000\u0000\u0000\u0000\u0000\x0100"))
+	aStr := string(a)
+	fmt.Println(aStr)
+	spew.Dump(a)
+	if utils.MatchAllOfSubString(aStr, `{{unquote("\xac\xed`, "D", "!", `\"\"`) {
+		fmt.Println("fetch D n !")
+	} else {
+		fmt.Println("not fetch D n !")
+		panic(`ConvertHTTPRequestToFuzzTag`)
 	}
 }
 
