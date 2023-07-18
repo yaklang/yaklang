@@ -2,6 +2,8 @@ package vulinbox
 
 import (
 	_ "embed"
+	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -109,5 +111,17 @@ func (s *VulinServer) init() {
 	// 靶场是否是安全的？
 	if !s.safeMode {
 		s.registerPingCMDI()
+	}
+
+	err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+
+		pathTemplate, _ := route.GetPathTemplate()
+		name := route.GetName() // 获取路由的名字（函数名）
+		fmt.Printf("路由地址：%s，对应的处理函数：%s\n", pathTemplate, name)
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("Error walking the routes: %v\n", err)
 	}
 }

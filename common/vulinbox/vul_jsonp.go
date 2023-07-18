@@ -29,7 +29,11 @@ var vulJSONPHTML []byte
 
 func (s *VulinServer) registerJSONP() {
 	r := s.router
-	r.HandleFunc("/jsonp/center", func(writer http.ResponseWriter, request *http.Request) {
+
+	// 创建一个路由分组 "/jsonp"
+	jsonpGroup := r.PathPrefix("/jsonp").Subrouter()
+
+	jsonpGroup.HandleFunc("/jsonp/center", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 			return
 		}
@@ -52,7 +56,7 @@ func (s *VulinServer) registerJSONP() {
 		}
 
 	})
-	r.HandleFunc("/jsonp/basic", func(writer http.ResponseWriter, request *http.Request) {
+	jsonpGroup.HandleFunc("/jsonp/basic", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 			return
 		}
