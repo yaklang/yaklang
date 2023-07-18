@@ -1,5 +1,0 @@
-Probe TCP socks5 q|\x05\x02\x00\x02|
-rarity 2
-
-match socks5 m|\x05\x00|s p/Socks5 Non-auth/ v/5/ cpe:/a:*:socks:5:unauth/a
-match socks5 m|\x05\x02|s p/Socks5 Auth/ v/5/ cpe:/a:*:socks5:5:auth/a
