@@ -126,6 +126,7 @@ func TestPackageMergeRepeat(t *testing.T) {
 
 func TestPackageCanMerge(t *testing.T) {
 	// same
+	// merge (pa to pb) or (pb to pa)
 	pa := createPackage("pa", "0.0.1", "", "")
 	pb := createPackage("pa", "0.0.1", "", "")
 	if CanMerge(&pa, &pb) != 1 {
@@ -134,7 +135,19 @@ func TestPackageCanMerge(t *testing.T) {
 	if CanMerge(&pb, &pa) != 1 {
 		t.Fatal("same name and version shoud merge pb(pa)")
 	}
+	// not same
+	// not merge
+	pa = createPackage("pa", "0.0.1", "", "")
+	pb = createPackage("pb", "0.0.1", "", "")
+	if CanMerge(&pa, &pb) != 0 {
+		t.Fatal("same version wrong name shoud not merge pa(pb)")
+	}
+	if CanMerge(&pb, &pa) != 0 {
+		t.Fatal("same version wrong name shoud not merge pb(pa)")
+	}
 
+	// pa is range : "*"
+	// merge pa to pb
 	pa = createPackage("pa", "*", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
@@ -145,6 +158,8 @@ func TestPackageCanMerge(t *testing.T) {
 		t.Fatal("same name and version is * shoud merge pb(pa)")
 	}
 
+	// pa range: "<0.0.3"
+	// merge pa to pb
 	pa = createPackage("pa", "<0.0.3", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
@@ -155,6 +170,20 @@ func TestPackageCanMerge(t *testing.T) {
 		t.Fatal("same name and version match range shoud merge pb(pa)")
 	}
 
+	// pa range: "=0.0.3"
+	// merge pa to pb
+	pa = createPackage("pa", "=0.0.3", "", "")
+	pa.IsVersionRange = true
+	pb = createPackage("pa", "0.0.3", "", "")
+	if CanMerge(&pa, &pb) != -1 {
+		t.Fatal("same name and version match range shoud merge pa(pb)")
+	}
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version match range shoud merge pb(pa)")
+	}
+
+	// pa range ">0.0.3"
+	// not merge
 	pa = createPackage("pa", ">0.0.3", "", "")
 	pa.IsVersionRange = true
 	pb = createPackage("pa", "0.0.1", "", "")
@@ -165,7 +194,9 @@ func TestPackageCanMerge(t *testing.T) {
 		t.Fatal("same name and version not match range shoud not merge pb(pa)")
 	}
 
-	// if ignore pa.IsVersionRange
+	// ignore pa.IsVersionRange
+	// pa range "<0.0.3"
+	// merge pa to pb
 	pa = createPackage("pa", "<0.0.3", "", "")
 	pb = createPackage("pa", "0.0.1", "", "")
 	if CanMerge(&pa, &pb) != -1 {
@@ -176,6 +207,7 @@ func TestPackageCanMerge(t *testing.T) {
 	}
 
 	// pa version no number
+	// not merge
 	pa = createPackage("pa", "a", "", "")
 	pb = createPackage("pa", "0.0.1", "", "")
 	if CanMerge(&pa, &pb) != 0 {
@@ -184,7 +216,9 @@ func TestPackageCanMerge(t *testing.T) {
 	if CanMerge(&pb, &pa) != 0 {
 		t.Fatal("same name but no version number, don't merge: pb-pa")
 	}
+
 	// pa version no number with range
+	// not merge
 	pa = createPackage("pa", ">a", "", "")
 	pb = createPackage("pa", "0.0.1", "", "")
 	if CanMerge(&pa, &pb) != 0 {
@@ -192,5 +226,27 @@ func TestPackageCanMerge(t *testing.T) {
 	}
 	if CanMerge(&pb, &pa) != 0 {
 		t.Fatal("same name but no version number, don't merge: pb-pa")
+	}
+
+	// pa range ">0.0.1 && <0.0.3"
+	// merge pa to pb
+	pa = createPackage("pa", ">0.0.1 && <0.0.3", "", "")
+	pb = createPackage("pa", "0.0.2", "", "")
+	if CanMerge(&pa, &pb) != -1 {
+		t.Fatal("same name and version range match, merge")
+	}
+	if CanMerge(&pb, &pa) != 1 {
+		t.Fatal("same name and version range match, merge")
+	}
+
+	// pa range  and pb range
+	// not merge
+	pa = createPackage("pa", ">0.0.1", "", "")
+	pb = createPackage("pa", ">0.0.2", "", "")
+	if CanMerge(&pa, &pb) != 0 {
+		t.Fatal("two package with version range, don't merge")
+	}
+	if CanMerge(&pb, &pa) != 0 {
+		t.Fatal("two package with version range, don't merge")
 	}
 }

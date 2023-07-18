@@ -55,19 +55,11 @@ func (p *Package) Identifier() string {
 	return utils.CalcSha1(p.Name, p.Version)
 }
 
+func (p *Package) HasVersionRange() bool {
+	return p.IsVersionRange || strings.ContainsAny(p.Version, "><=")
+}
+
 func (p Package) String() string {
-	// 	license := "nil"
-	// 	if len(p.License) > 0 {
-	// 		license = fmt.Sprintf(`[]string{"%s"}`, strings.Join(p.License, `", "`))
-	// 	}
-	// 	return fmt.Sprintf(`{
-	// 	Name:         "%s",
-	// 	Version:      "%s",
-	// 	Verification: "%s",
-	// 	License:      %s,
-	// 	Indirect:     %v,
-	// 	Potential:    %v,
-	// },`, p.Name, p.Version, p.Verification, license, p.Indirect, p.Potential)
 	ret := fmt.Sprintf("%s-%s", p.Name, p.Version)
 	ret += "\n\tupstream: "
 	ret += strings.Join(
@@ -148,34 +140,44 @@ func (p *Package) Merge(p2 *Package) *Package {
 	return p
 }
 
-// p2 is version range
-func CanMergeWithVersionRange(p *Package, p2 *Package) bool {
-	if p2.Version == "*" {
+func CompareVersionRange(target, versionRange string) bool {
+	index := strings.IndexFunc(versionRange, func(r rune) bool {
+		return r >= '0' && r <= '9'
+	})
+	if index == -1 {
+		return false
+	}
+	op := versionRange[:index]
+	version := versionRange[index:]
+	ret, err := utils.VersionCompare(target, version)
+	if err != nil {
+		return false
+	}
+	if strings.Contains(op, "=") && ret == 0 {
 		return true
-	} else {
-		index := strings.IndexFunc(p2.Version, func(r rune) bool {
-			return r >= '0' && r <= '9'
-		})
-		if index == -1 {
-			return false
-		}
-		op := p2.Version[:index]
-		version := p2.Version[index:]
-		ret, err := utils.VersionCompare(p.Version, version)
-		if err != nil {
-			return false
-		}
-		if strings.Contains(op, "=") && ret == 0 {
-			return true
-		}
-		if strings.Contains(op, ">") && ret > 0 {
-			return true
-		}
-		if strings.Contains(op, "<") && ret < 0 {
-			return true
-		}
+	}
+	if strings.Contains(op, ">") && ret > 0 {
+		return true
+	}
+	if strings.Contains(op, "<") && ret < 0 {
+		return true
 	}
 	return false
+}
+
+// p2 is version range
+func CanMergeWithVersionRange(version, versionRange string) bool {
+	if versionRange == "*" {
+		return true
+	} else {
+		versionRanges := strings.Split(versionRange, "&&")
+		for _, vrange := range versionRanges {
+			if !CompareVersionRange(version, strings.TrimSpace(vrange)) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 func CanMerge(p *Package, p2 *Package) int {
@@ -188,22 +190,29 @@ func CanMerge(p *Package, p2 *Package) int {
 	if p.Name != p2.Name {
 		return 0
 	}
-
-	// version range
-	if p2.IsVersionRange || strings.ContainsAny(p2.Version, "><=") {
-		if CanMergeWithVersionRange(p, p2) {
-			return 1
-		}
-	}
-	if p.IsVersionRange || strings.ContainsAny(p.Version, "><=") {
-		if CanMergeWithVersionRange(p2, p) {
-			return -1
-		}
-	}
-
 	// version
 	if p.Version == p2.Version {
 		return 1
+	}
+
+	// version range
+	p1HasRange := p.HasVersionRange()
+	p2HasRange := p2.HasVersionRange()
+
+	// two range, not merge
+	if p1HasRange && p2HasRange {
+		return 0
+	}
+
+	if p2HasRange {
+		if CanMergeWithVersionRange(p.Version, p2.Version) {
+			return 1
+		}
+	}
+	if p1HasRange {
+		if CanMergeWithVersionRange(p2.Version, p.Version) {
+			return -1
+		}
 	}
 
 	return 0
