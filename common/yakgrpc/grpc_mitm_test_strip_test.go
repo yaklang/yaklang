@@ -7,19 +7,6 @@ import (
 	"testing"
 )
 
-func TestMITMTestStripTest(t *testing.T) {
-	_, raw := StripHTTPRequestGzip(nil, []byte(`POST / HTTP/1.1
-Host: www.example.com
-User-Agent: Go-http-client/1.1
-Content-Length: 16
-Content-Type: application/json
-Test: abcasdfasdfasdf
-Accept-Encoding: gzip
-
-{"key": "value"}`))
-	println(string(raw))
-}
-
 func TestReplaceString(t *testing.T) {
 	replacer := NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{

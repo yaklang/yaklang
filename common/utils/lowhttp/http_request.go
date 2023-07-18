@@ -174,17 +174,35 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, false)
 }
 
+const printableMin = 32
+const printableMax = 126
+
 func ToUnquoteFuzzTag(i []byte) string {
 	if utf8.Valid(i) {
 		return string(i)
 	}
-	var raw = codec.StrConvQuote(string(i))
-	raw = strings.ReplaceAll(raw, `)`, `\x28`)
-	raw = strings.ReplaceAll(raw, `(`, `\x29`)
-	raw = strings.ReplaceAll(raw, `{`, `\x7b`)
-	raw = strings.ReplaceAll(raw, `}`, `\x7d`)
-	raw = `{{unquote(` + raw + `)}}`
-	return raw
+
+	var buf = bytes.NewBufferString(`{{unquote("`)
+	for _, b := range i {
+		if b >= printableMin && b <= printableMax {
+			switch b {
+			case '(':
+				buf.WriteString(`\x29`)
+			case ')':
+				buf.WriteString(`\x28`)
+			case '}':
+				buf.WriteString(`\x7d`)
+			case '"':
+				buf.WriteString(`\"`)
+			default:
+				buf.WriteByte(b)
+			}
+		} else {
+			buf.WriteString(fmt.Sprintf(`\x%02x`, b))
+		}
+	}
+	buf.WriteString(`")}}`)
+	return buf.String()
 }
 
 //func FixHTTPRequestOut(raw []byte) []byte {

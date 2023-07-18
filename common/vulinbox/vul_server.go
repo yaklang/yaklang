@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
 	"net/http"
@@ -40,7 +41,12 @@ func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, 
 			log.Infof("VULINBOX: %s %s", request.Method, request.URL)
 			raw, _ := utils.HttpDumpWithBody(request, true)
 			if string(raw) != "" {
-				log.Println(string(raw))
+				if len(raw) > 4000 {
+					header, _ := lowhttp.SplitHTTPPacketFast(raw)
+					println(header)
+				} else {
+					log.Println(string(raw))
+				}
 			}
 			handler.ServeHTTP(writer, request)
 		})
