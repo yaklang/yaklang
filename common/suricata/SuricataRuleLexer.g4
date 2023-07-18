@@ -33,10 +33,6 @@ Dot: '.';
 
 LINE_COMMENT: ('#' | '//') SingleLineInputCharacter* -> skip;
 
-ID
-    : [a-zA-Z_][a-zA-Z_0-9]*
-    ;
-
 NORMALSTRING
     : '"' ( EscapeSequence | ~('\\'|'"') )* '"'
     ;
@@ -47,6 +43,10 @@ INT
 
 HEX
     : HexDigit+
+    ;
+
+ID
+    : [a-zA-Z_][a-zA-Z_0-9]*
     ;
 
 
@@ -91,9 +91,8 @@ Digit
     : [0-9]
     ;
 
-fragment
 HexDigit
-    : [0-9a-fA-F]
+    : [a-fA-F0-9]
     ;
 
 fragment

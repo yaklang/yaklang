@@ -31,9 +31,26 @@ ipv4mask
 environment_var: '$' ID;
 
 /* ipv6 */
-ipv6 : hex_part (':' hex_part)* ('::' (hex_part ':')* hex_part)?;
-hex_part : h16 | h16? ':' ':' h16 | ':' ':' h16;
-h16 : HEX HEX*;
+ipv6
+    : ( ipv6full | ipv6compact ) ( '/' ipv6mask ) ?
+    ;
+ipv6full
+    : ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block
+    ;
+ipv6compact
+    : ipv6part '::' ipv6part
+    ;
+ipv6part
+    : ipv6block ?
+    | ipv6part ':' ipv6block
+    ;
+ipv6block
+    : HEX
+    | INT
+    ;
+ipv6mask
+    : INT
+    ;
 
 /* ports */
 src_port : port;
