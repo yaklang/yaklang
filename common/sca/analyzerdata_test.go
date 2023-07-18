@@ -2275,6 +2275,137 @@ var NodePnpmPkgs = []*dxtypes.Package{
 	},
 }
 
+var NodeYarnPkgs = []*dxtypes.Package{
+	{
+		Name:         "object-assign",
+		Version:      "4.1.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "prop-types",
+		Version:      "15.7.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "react-is",
+		Version:      "16.13.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "scheduler",
+		Version:      "0.13.6",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "js-tokens",
+		Version:      "2.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "js-tokens",
+		Version:      "4.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "loose-envify",
+		Version:      "1.4.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+}
+var NodeYarnProtocolPkgs = []*dxtypes.Package{
+	{
+		Name:         "prettier",
+		Version:      "2.8.8",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "scheduler",
+		Version:      "0.23.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "is-odd",
+		Version:      "3.0.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "object-assign",
+		Version:      "4.1.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "js-tokens",
+		Version:      "8.0.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "js-tokens",
+		Version:      "4.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "react-is",
+		Version:      "16.13.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "prop-types",
+		Version:      "15.8.1",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "loose-envify",
+		Version:      "1.4.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "is-number",
+		Version:      "6.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "is-number",
+		Version:      "7.0.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+}
+
 var RubyBundlerPkgs = []*dxtypes.Package{
 	{
 		Name:    "sawyer",
@@ -3108,4 +3239,9 @@ func TestData(t *testing.T) {
 	check(t, "java-pom-requirement", JavaPomRequirementPkgs)
 	check(t, "node-npm", NodeNpmPkgs)
 	check(t, "node-npm-folder", NodeNpmPkgsFolder)
+	check(t, "node-pnpm", NodePnpmPkgs)
+	check(t, "node-yarn", NodeYarnPkgs)
+	check(t, "node-yarn-monorepo", NodeYarnProtocolPkgs)
+	check(t, "ruby-bundler", RubyBundlerPkgs)
+	check(t, "ruby-gemspec", RubyGemspecPkgs)
 }
