@@ -183,10 +183,11 @@
                     文件上传与特定文件格式漏洞
                 </div>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><a target="_blank" href="/csrf">基础文件上传</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/csrf">通过文件名与后缀绕过上传限制</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/csrf">通过 MIME 类型绕过限制</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/csrf">通过文件头的检查绕过上传限制</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=safe">基础文件上传案例</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=nullbyte">图片上传：nullbyte 可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=mime">图片上传：MIME 类型可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=cve-2017-15715">图片上传：Apache HTTPD 换行解析漏洞(CVE-2017-15715)</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=fileheader">图片上传：检查文件头，需配合包含</a></li>
                 </ul>
             </div>
         </div>

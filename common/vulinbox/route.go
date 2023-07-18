@@ -54,7 +54,7 @@ func (s *VulinServer) init() {
 	})
 	router.Use(func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			reqRaw, err := utils.HttpDumpWithBody(request, true)
+			reqRaw, err := utils.HttpDumpWithBody(request, false)
 			if err != nil {
 				log.Errorf("dump request failed: %v", err)
 			}
@@ -103,6 +103,7 @@ func (s *VulinServer) init() {
 	s.registerLoginRoute()
 	s.registerCryptoJS()
 	s.registerCryptoSM()
+	s.registerUploadCases()
 
 	// 业务型
 	s.registerUserRoute()

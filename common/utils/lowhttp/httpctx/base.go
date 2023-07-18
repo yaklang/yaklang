@@ -134,7 +134,6 @@ const REQUEST_CONTEXT_INFOMAP = "InfoMap"
 
 const (
 	REQUEST_CONTEXT_KEY_IsHttps                      = "isHttps"
-	REQUEST_CONTEXT_KEY_RequestHijackDone            = "requestHijackDone"
 	REQUEST_CONTEXT_KEY_IsDropped                    = "isRequestDropped"
 	RESPONSE_CONTEXT_KEY_IsDropped                   = "isResponseDropped"
 	REQUEST_CONTEXT_KEY_AutoFoward                   = "isRequestAutoForward"
@@ -148,5 +147,6 @@ const (
 	REQUEST_CONTEXT_KEY_RequestIsHijacked            = "requestIsHijacked"
 	REQUEST_CONTEXT_KEY_RequestBytes                 = "requestBytes"
 	REQUEST_CONTEXT_KEY_ResponseBytes                = "responseBytes"
+	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
 )

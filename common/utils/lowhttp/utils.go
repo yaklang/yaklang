@@ -365,6 +365,14 @@ func SplitHTTPHeadersAndBodyFromPacketEx(raw []byte, mf func(method string, requ
 	return SplitHTTPPacket(raw, mf, nil)
 }
 
+func SplitHTTPPacketFast(raw any) (string, []byte){
+	return SplitHTTPPacket(utils.InterfaceToBytes(raw), func(method string, requestUri string, proto string) error {
+		return nil
+	}, func(proto string, code int, codeMsg string) error {
+		return nil
+	})
+}
+
 // SplitHTTPPacket split http packet to headers and body
 // reqFirstLine: method, requestUri, proto: error for empty result
 // rspFirstLine: proto, code, codeMsg: error for empty result

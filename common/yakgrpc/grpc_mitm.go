@@ -77,30 +77,8 @@ var saveHTTPFlowMutex = new(sync.Mutex)
 
 var mustAcceptEncodingRegexp = regexp.MustCompile(`(?i)Accept-Encoding: ([^\r\n]*)?`)
 
-func StripHTTPRequestGzip(reqIns *http.Request, req []byte) (*http.Request, []byte) {
-	// Accept-Encoding => identity
-	var haveAcceptEncoding = false
-	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req, func(line string) {
-		if strings.HasPrefix(
-			strings.ToLower(strings.TrimSpace(line)),
-			"accept-encoding") {
-			haveAcceptEncoding = true
-		}
-	})
-	if haveAcceptEncoding {
-		indexes := mustAcceptEncodingRegexp.FindStringSubmatchIndex(header)
-		if len(indexes) >= 4 {
-			start, end := indexes[2], indexes[3]
-			header = header[:start] + "identity" + header[end:]
-		}
-	} else {
-		header = header[:len(header)-2]
-		header += "Accept-Encoding: identity\r\n\r\n"
-	}
-
-	var buffer = bytes.NewBufferString(header)
-	buffer.Write(body)
-	return reqIns, buffer.Bytes()
+func StripHTTPRequestGzip(req []byte) []byte {
+	return lowhttp.ReplaceHTTPPacketHeader(req, "Accept-Encoding", "identity")
 }
 
 var mitmSaveToDBLock = new(sync.Mutex)
@@ -1161,9 +1139,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 处理 gzip
-		_, req = StripHTTPRequestGzip(nil, req)
-		if req == nil {
+		var strippedGzip = StripHTTPRequestGzip(req)
+		if strippedGzip == nil {
 			req = originReqRaw[:]
+		} else {
+			req = strippedGzip
+			httpctx.SetRequestBytes(originReqIns, strippedGzip)
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip, true)
 		}
 
 		// 开始劫持
@@ -1292,7 +1274,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
 		var isFilter = isFilteredByResponse || isFilteredByRequest
 
-		var requestRaw = []byte(httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestBytes))
+		var requestRaw = httpctx.GetRequestBytes(req)
 		if len(requestRaw) <= 0 {
 			requestRaw, err = utils.HttpDumpWithBody(req, true)
 			if err != nil {
@@ -1304,17 +1286,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var viewed = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsHijacked)
 
 		// 处理 gzip
-		var newRequest *http.Request
-		newRequest, requestRaw = StripHTTPRequestGzip(req, requestRaw)
-		if newRequest != nil {
-			*req = *newRequest
+		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip) {
+			requestRaw = StripHTTPRequestGzip(requestRaw)
 		}
 
-		toolarge := utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit)
-		if toolarge {
+		tooLarge := utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit)
+		if tooLarge {
 			log.Infof(`utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit) -> too large`)
 		}
-		responseRaw, _ := utils.HttpDumpWithBody(rsp, !toolarge)
+		responseRaw, _ := utils.HttpDumpWithBody(rsp, !tooLarge)
 		noGzippedResponse, body, _ := lowhttp.FixHTTPResponse(responseRaw)
 		if noGzippedResponse != nil {
 			responseRaw = noGzippedResponse
