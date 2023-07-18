@@ -82,7 +82,7 @@ func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
-func AddHTTPPacketQueryParam(packet []byte, key, value string) []byte {
+func AppendHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
 	var header []string
@@ -179,7 +179,7 @@ func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
 }
 
-func AddHTTPPacketPostParam(packet []byte, key, value string) []byte {
+func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
