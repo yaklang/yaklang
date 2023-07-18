@@ -778,6 +778,33 @@ func TestRubyBundler(t *testing.T) {
 	Run(tc)
 }
 
+func TestRubyGemspec(t *testing.T) {
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/ruby_gemspec/positive/multiple_licenses.gemspec",
+		virtualPath:    "/test/multiple_licenses.gemspec",
+		t:              t,
+		a:              analyzer.NewRubyGemSpecAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       RubyGemspecPkgs,
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:           "negative",
+		filePath:       "./testdata/ruby_gemspec/negative/empty_name.gemspec",
+		virtualPath:    "/test/empty_name.gemspec",
+		t:              t,
+		a:              analyzer.NewRubyGemSpecAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       nil,
+		wantError:      true,
+	}
+	Run(tc)
+}
+
 func showPkgs(pkgs []*dxtypes.Package) {
 	for _, p := range pkgs {
 		license := "nil"
@@ -816,6 +843,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewNodeNpmAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewNodePnpmAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewRubyBundlerAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewRubyGemSpecAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
