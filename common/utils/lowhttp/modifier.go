@@ -3,12 +3,14 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"net/url"
 	"strings"
+	"unsafe"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func IsChunkedHeaderLine(line string) bool {
@@ -37,6 +39,174 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 		return line
 	})
 	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+}
+
+func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+			q := u.Query()
+			q.Set(key, value)
+			u.RawQuery = q.Encode()
+			requestUri = u.String()
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func AddHTTPPacketQueryParam(packet []byte, key, value string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+			q := u.Query()
+			q.Add(key, value)
+			u.RawQuery = q.Encode()
+			requestUri = u.String()
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func DeleteHTTPPacketQueryParam(packet []byte, key string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+			q := u.Query()
+			q.Del(key)
+			u.RawQuery = q.Encode()
+			requestUri = u.String()
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
+	var isChunked bool
+
+	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
+	bodyString := unsafe.String(unsafe.SliceData(bodyRaw), len(bodyRaw))
+	values, err := url.ParseQuery(bodyString)
+	if err == nil {
+		values.Set(key, value)
+		newBody := values.Encode()
+		bodyRaw = unsafe.Slice(unsafe.StringData(newBody), len(newBody))
+	}
+
+	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
+}
+
+func AddHTTPPacketPostParam(packet []byte, key, value string) []byte {
+	var isChunked bool
+
+	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
+	bodyString := unsafe.String(unsafe.SliceData(bodyRaw), len(bodyRaw))
+	values, err := url.ParseQuery(bodyString)
+	if err == nil {
+		values.Add(key, value)
+		newBody := values.Encode()
+		bodyRaw = unsafe.Slice(unsafe.StringData(newBody), len(newBody))
+	}
+
+	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
+}
+
+func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
+	var isChunked bool
+
+	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
+	bodyString := unsafe.String(unsafe.SliceData(bodyRaw), len(bodyRaw))
+	values, err := url.ParseQuery(bodyString)
+	if err == nil {
+		values.Del(key)
+		newBody := values.Encode()
+		bodyRaw = unsafe.Slice(unsafe.StringData(newBody), len(newBody))
+	}
+
+	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
 }
 
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
