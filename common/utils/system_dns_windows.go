@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package utils
 
 import "golang.org/x/sys/windows/registry"
