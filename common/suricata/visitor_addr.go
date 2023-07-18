@@ -16,7 +16,7 @@ type AddressRule struct {
 	hostFilter *utils.HostsFilter
 
 	IPv4CIDR string
-	IPv6     string
+	IPv6CIDR string
 
 	negativeRules []*AddressRule
 	positiveRules []*AddressRule
@@ -71,11 +71,11 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 		a.hostFilter.Add(a.IPv4CIDR)
 	}
 
-	if a.IPv6 != "" {
+	if a.IPv6CIDR != "" {
 		if a.hostFilter == nil {
 			a.hostFilter = utils.NewHostsFilter()
 		}
-		a.hostFilter.Add(a.IPv6)
+		a.hostFilter.Add(a.IPv6CIDR)
 	}
 
 	if a.hostFilter != nil {
@@ -124,7 +124,7 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) *AddressRule 
 		addr.IPv4CIDR = trim(i.Ipv4().GetText())
 		return addr
 	case i.Ipv6() != nil:
-		addr.IPv6 = trim(i.Ipv6().GetText())
+		addr.IPv6CIDR = trim(i.Ipv6().GetText())
 		return addr
 	case i.Environment_var() != nil:
 		addr.Env = strings.Trim(trim(i.Environment_var().GetText()), "${}")
