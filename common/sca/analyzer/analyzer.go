@@ -119,10 +119,6 @@ func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
 	return MergePackages(ag.pkgs)
 }
 
-func (ag *AnalyzerGroup) Append(a ...Analyzer) {
-	ag.analyzers = append(ag.analyzers, a...)
-}
-
 func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 	wg.Add(ag.numWorkers)
 
