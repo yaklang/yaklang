@@ -751,6 +751,30 @@ func TestNodePnpm(t *testing.T) {
 	}
 	Run(tc)
 }
+func TestNodeYarn(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/node_yarn/positive/yarn.lock",
+		virtualPath: "/test/yarn.lock",
+		t:           t,
+		a:           analyzer.NewNodeYarnAnalyzer(),
+		matchType:   1,
+		wantPkgs:    NodeYarnPkgs,
+	}
+	Run(tc)
+
+	tc = testcase{
+		name:        "positive-protocol",
+		filePath:    "./testdata/node_yarn/positive_protocol/yarn.lock",
+		virtualPath: "/test/yarn.lock",
+		t:           t,
+		a:           analyzer.NewNodeYarnAnalyzer(),
+		matchType:   1,
+		wantPkgs:    NodeYarnProtocolPkgs,
+	}
+	Run(tc)
+
+}
 
 func TestRubyBundler(t *testing.T) {
 	tc := testcase{
@@ -842,6 +866,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewNodeNpmAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewNodePnpmAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewNodeYarnAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewRubyBundlerAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewRubyGemSpecAnalyzer()).String(),
 	}
