@@ -2,8 +2,8 @@ package webfingerprint
 
 import (
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/bindata"
 	log "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/embed"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 )
@@ -20,7 +20,7 @@ func GetYamlWebFingerprintRules(yamlFilePath string) ([]*WebRule, error) {
 	}
 
 	getRulesInCode := func(path string) ([]byte, error) {
-		ruleFileData, err := bindata.Asset(path)
+		ruleFileData, err := embed.Asset(path)
 		if err != nil {
 			return nil, errors.Errorf("read fingerprint rules in code fail: %s", err)
 		}

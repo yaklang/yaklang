@@ -2,12 +2,12 @@ package antlr4nasl
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/embed"
 	"strings"
 )
 
@@ -177,7 +177,7 @@ var Exports = map[string]interface{}{
 			engine.SetAutoLoadDependencies(true)
 			// 需要把ACT_SCAN的脚本都patch一遍
 			engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
-				codeBytes, err := bindata.Asset("data/nasl-patches/" + "ping_host_patch.nasl")
+				codeBytes, err := embed.Asset("data/nasl-patches/" + "ping_host_patch.nasl")
 				if err != nil {
 					log.Errorf("read ping_host_patch.nasl error: %v", err)
 					return code

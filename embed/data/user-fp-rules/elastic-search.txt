@@ -1,0 +1,6 @@
+// 这个指纹是为了把 ElasticSearch 设置为 HTTP 指纹，然后有了这个指纹把 9200 转给 http 交给 wfp 进行指纹识别
+Probe TCP ElasticSearchProbe q|GET / HTTP/1.0\r\n\r\n|
+ports 9200
+rarity 3
+
+softmatch http m|^HTTP/[^ ]{1,3} \d{3}|i

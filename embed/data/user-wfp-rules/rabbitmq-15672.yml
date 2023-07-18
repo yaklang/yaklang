@@ -1,0 +1,4 @@
+- methods:
+    - keywords:
+        - product: rabbitmq
+          regexp: <title>RabbitMQ Management</title>
