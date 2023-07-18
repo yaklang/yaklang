@@ -2298,6 +2298,14 @@ var NodeNpmPkgsFolder = []*dxtypes.Package{
 	},
 }
 
+var NodePnpmPkgs = []*dxtypes.Package{
+	{
+		// lodash-4.17.21
+		Name:    "lodash",
+		Version: "4.17.21",
+	},
+}
+
 func check(t *testing.T, tag string, target []*dxtypes.Package) {
 	seen := make(map[string]*dxtypes.Package, len(target))
 
