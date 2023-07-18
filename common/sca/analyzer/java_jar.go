@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	RegisterAnalyzer(TypPom, NewJavaJarAnalyzer())
+	RegisterAnalyzer(TypJar, NewJavaJarAnalyzer())
 }
 
 type jarAnalyzer struct{}
