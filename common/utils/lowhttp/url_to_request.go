@@ -1,15 +1,20 @@
 package lowhttp
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
+	return UrlToRequestPacket("GET", u, originRequest, originRequestHttps, cookies...)
+}
+
+func UrlToRequestPacket(method string, u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
 	if originRequest == nil {
-		reqIns, err := http.NewRequest("GET", u, http.NoBody)
+		reqIns, err := http.NewRequest(method, u, http.NoBody)
 		if err != nil {
 			return nil
 		}
@@ -52,7 +57,7 @@ func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bo
 		}
 		return raw
 	} else {
-		reqIns, err := http.NewRequest("GET", u, http.NoBody)
+		reqIns, err := http.NewRequest(method, u, http.NoBody)
 		if err != nil {
 			return nil
 		}

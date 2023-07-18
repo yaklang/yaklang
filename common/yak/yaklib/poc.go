@@ -2,14 +2,16 @@ package yaklib
 
 import (
 	"context"
+	"net/http"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"reflect"
-	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -42,6 +44,9 @@ type _pocConfig struct {
 	Session              interface{} // session的标识符，可以用任意对象
 	SaveHTTPFlow         bool
 	Source               string
+
+	// packetHandler
+	PacketHandler []func([]byte) []byte
 
 	// websocket opt
 	// 标注是否开启 Websocket 连接？
@@ -144,6 +149,7 @@ func NewDefaultPoCConfig() *_pocConfig {
 		Websocket:              false,
 		WebsocketHandler:       nil,
 		WebsocketClientHandler: nil,
+		PacketHandler:          make([]func([]byte) []byte, 0),
 	}
 	return config
 }
@@ -290,7 +296,180 @@ func _pocOptWIthSource(i string) PocConfig {
 	}
 }
 
-func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketFirstLine(packet, firstLine)
+		},
+		)
+	}
+}
+
+func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketHeader(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketCookie(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketBody(packet, body, chunk)
+		},
+		)
+	}
+}
+
+func _pocOptReplaceHttpPacketQueryParam(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketQueryParam(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptReplaceHttpPacketPostParam(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketPostParam(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendHeader(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketHeader(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendCookie(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketCookie(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendQueryParam(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketQueryParam(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendPostParam(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketPostParam(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptDeleteHeader(key string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.DeleteHTTPPacketHeader(packet, key)
+		},
+		)
+	}
+}
+
+func _pocOptDeleteCookie(key string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.DeleteHTTPPacketCookie(packet, key)
+		},
+		)
+	}
+}
+
+func _pocOptDeleteQueryParam(key string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.DeleteHTTPPacketQueryParam(packet, key)
+		},
+		)
+	}
+}
+
+func _pocOptDeletePostParam(key string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.DeleteHTTPPacketPostParam(packet, key)
+		},
+		)
+	}
+}
+
+func fixPacketByConfig(packet []byte, config *_pocConfig) []byte {
+	for _, fixFunc := range config.PacketHandler {
+		packet = fixFunc(packet)
+	}
+	return packet
+}
+
+func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
+	// poc 模块收 proxy 影响
+	proxy := _cliStringSlice("proxy")
+	config := NewDefaultPoCConfig()
+	config.Proxy = proxy
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	if len(config.Proxy) <= 0 && utils.GetProxyFromEnv() != "" {
+		config.Proxy = append(config.Proxy, utils.GetProxyFromEnv())
+	}
+
+	host, port, err := utils.ParseStringToHostPort(urlStr)
+	if err != nil {
+		return config, utils.Errorf("parse url failed: %s", err)
+	}
+
+	if port == 443 {
+		config.ForceHttps = true
+	}
+
+	if config.Host == "" {
+		config.Host = host
+	}
+
+	if config.Port == 0 {
+		config.Port = port
+	}
+
+	if config.NoRedirect {
+		config.RedirectTimes = 0
+	}
+
+	if config.RetryTimes < 0 {
+		config.RetryTimes = 0
+	}
+	return config, nil
+}
+
+func handleRawPacketAndConfig(raw interface{}, opts ...PocConfig) ([]byte, *_pocConfig, error) {
 	var packet []byte
 	switch raw.(type) {
 	case string:
@@ -298,7 +477,7 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	case []byte:
 		packet = raw.([]byte)
 	default:
-		return nil, nil, utils.Errorf("poc.HTTP cannot support: %s", reflect.TypeOf(raw))
+		return nil, nil, utils.Errorf("cannot support: %s", reflect.TypeOf(raw))
 	}
 
 	// poc 模块收 proxy 影响
@@ -317,10 +496,10 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
 		packets, err := mutate.QuickMutate(string(packet), consts.GetGormProfileDatabase(), mutate.MutateWithExtraParams(config.FuzzParams))
 		if err != nil {
-			return nil, nil, utils.Errorf("fuzz.Mutate With Params failed: %v\n\nParams: \n%v", err, spew.Sdump(config.FuzzParams))
+			return nil, config, utils.Errorf("fuzz parameters failed: %v\n\nParams: \n%v", err, spew.Sdump(config.FuzzParams))
 		}
 		if len(packets) <= 0 {
-			return nil, nil, utils.Error("fuzzed packets empty!")
+			return nil, config, utils.Error("fuzzed packets empty!")
 		}
 
 		packet = []byte(packets[0])
@@ -328,24 +507,24 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 
 	u, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.ForceHttps)
 	if err != nil {
-		return nil, nil, utils.Errorf("extract url failed: %s", err)
+		return nil, config, utils.Errorf("extract url failed: %s", err)
 	}
 
 	host, port, err := utils.ParseStringToHostPort(u.String())
 	if err != nil {
-		return nil, nil, utils.Errorf("parse url failed: %s", err)
+		return nil, config, utils.Errorf("parse url failed: %s", err)
 	}
 
 	if port == 443 {
 		config.ForceHttps = true
 	}
 
-	if config.Host != "" {
-		host = config.Host
+	if config.Host == "" {
+		config.Host = host
 	}
 
-	if config.Port > 0 {
-		port = config.Port
+	if config.Port == 0 {
+		config.Port = port
 	}
 
 	if config.NoRedirect {
@@ -356,6 +535,11 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 		config.RetryTimes = 0
 	}
 
+	packet = fixPacketByConfig(packet, config)
+	return packet, config, nil
+}
+
+func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error) {
 	if config.Websocket {
 		if config.Timeout <= 0 {
 			config.Timeout = 15 * time.Second
@@ -384,15 +568,17 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 			c.Wait()
 		}
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "lowhttp.Websocket handshake failed")
+			return nil, errors.Wrap(err, "websocket handshake failed")
 		}
-		return c.Response, c.Request, nil
+		return &lowhttp.LowhttpResponse{
+			RawPacket: c.Response,
+		}, nil
 	}
 
 	response, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
 		lowhttp.WithHttps(config.ForceHttps),
-		lowhttp.WithHost(host),
-		lowhttp.WithPort(port),
+		lowhttp.WithHost(config.Host),
+		lowhttp.WithPort(config.Port),
 		lowhttp.WithPacket(packet),
 		lowhttp.WithTimeout(config.Timeout),
 		lowhttp.WithRetryTimes(config.RetryTimes),
@@ -415,12 +601,80 @@ func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 		lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 		lowhttp.WithSource(config.Source),
 	)
+	return response, err
+}
+
+func pocHTTPEx(raw interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	packet, config, err := handleRawPacketAndConfig(raw, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	response, err := pochttp(packet, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	request, err := lowhttp.ParseBytesToHttpRequest(packet)
+	if err != nil {
+		return nil, nil, err
+	}
+	return response, request, nil
+}
+
+func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+	packet, config, err := handleRawPacketAndConfig(raw, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	response, err := pochttp(packet, config)
 	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, config.NoFixContentLength), err
 }
 
-var PoCExports = map[string]interface{}{
-	"HTTP": pocHTTP,
+func do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	config, err := handleUrlAndConfig(urlStr, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
 
+	packet := lowhttp.UrlToRequestPacket(method, urlStr, nil, config.ForceHttps)
+	packet = fixPacketByConfig(packet, config)
+
+	response, err := pochttp(packet, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	request, err := lowhttp.ParseBytesToHttpRequest(packet)
+	if err != nil {
+		return nil, nil, err
+	}
+	return response, request, nil
+}
+
+func get(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("GET", urlStr, opts...)
+}
+
+func post(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("POST", urlStr, opts...)
+}
+
+func head(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("HEAD", urlStr, opts...)
+}
+
+var PoCExports = map[string]interface{}{
+	"HTTP":   pocHTTP,
+	"HTTPEx": pocHTTPEx,
+	"Get":    get,
+	"Post":   post,
+	"Head":   head,
+	"Do":     do,
+	// websocket，可以直接复用 HTTP 参数
+	"Websocket": func(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+		opts = append(opts, _pocOptWebsocket(true))
+		return pocHTTP(raw, opts...)
+	},
+
+	// options
 	"host":                 _pocOptWithHost,
 	"port":                 _pocOptWithPort,
 	"retryTimes":           _pocOptWithRetryTimes,
@@ -439,15 +693,23 @@ var PoCExports = map[string]interface{}{
 	"session":              _pocOptWithSession,
 	"save":                 _pocOptWithSave,
 	"source":               _pocOptWIthSource,
-
-	// websocket，可以直接复用 HTTP 参数
-	"Websocket": func(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
-		opts = append(opts, _pocOptWebsocket(true))
-		return pocHTTP(raw, opts...)
-	},
-	"websocket":           _pocOptWebsocket,
-	"websocketFromServer": _pocOptWebsocketHandler,
-	"websocketOnClient":   _pocOptWebsocketClientHandler,
+	"websocket":            _pocOptWebsocket,
+	"websocketFromServer":  _pocOptWebsocketHandler,
+	"websocketOnClient":    _pocOptWebsocketClientHandler,
+	"replaceFirstLine":     _pocOptReplaceHttpPacketFirstLine,
+	"replaceHeader":        _pocOptReplaceHttpPacketHeader,
+	"replaceCookie":        _pocOptReplaceHttpPacketCookie,
+	"replaceBody":          _pocOptReplaceHttpPacketBody,
+	"replaceQueryParam":    _pocOptReplaceHttpPacketQueryParam,
+	"replacePostParam":     _pocOptReplaceHttpPacketPostParam,
+	"appendHeader":         _pocOptAppendHeader,
+	"appendCookie":         _pocOptAppendCookie,
+	"appendQueryParam":     _pocOptAppendQueryParam,
+	"appendPostParam":      _pocOptAppendPostParam,
+	"deleteHeader":         _pocOptDeleteHeader,
+	"deleteCookie":         _pocOptDeleteCookie,
+	"deleteQueryParam":     _pocOptDeleteQueryParam,
+	"deletePostParam":      _pocOptDeletePostParam,
 
 	// split
 	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
@@ -456,10 +718,38 @@ var PoCExports = map[string]interface{}{
 		rsp, _, _ := lowhttp.FixHTTPResponse(r)
 		return rsp
 	},
+
+	// packet helper
 	"ReplaceBody":              lowhttp.ReplaceHTTPPacketBody,
 	"FixHTTPPacketCRLF":        lowhttp.FixHTTPPacketCRLF,
 	"HTTPPacketForceChunked":   lowhttp.HTTPPacketForceChunked,
 	"ParseBytesToHTTPRequest":  lowhttp.ParseBytesToHttpRequest,
 	"ParseBytesToHTTPResponse": lowhttp.ParseBytesToHTTPResponse,
 	"ParseUrlToHTTPRequestRaw": lowhttp.ParseUrlToHttpRequestRaw,
+
+	"ReplaceHTTPPacketFirstLine":  lowhttp.ReplaceHTTPPacketFirstLine,
+	"ReplaceHTTPPacketHeader":     lowhttp.ReplaceHTTPPacketHeader,
+	"ReplaceHTTPPacketBody":       lowhttp.ReplaceHTTPPacketBodyFast,
+	"ReplaceHTTPPacketCookie":     lowhttp.ReplaceHTTPPacketCookie,
+	"ReplaceHTTPPacketQueryParam": lowhttp.ReplaceHTTPPacketQueryParam,
+	"ReplaceHTTPPacketPostParam":  lowhttp.ReplaceHTTPPacketPostParam,
+	"AppendHTTPPacketHeader":      lowhttp.AppendHTTPPacketHeader,
+	"AppendHTTPPacketCookie":      lowhttp.AppendHTTPPacketCookie,
+	"AppendHTTPPacketQueryParam":  lowhttp.AppendHTTPPacketQueryParam,
+	"AppendHTTPPacketPostParam":   lowhttp.AppendHTTPPacketPostParam,
+	"DeleteHTTPPacketHeader":      lowhttp.DeleteHTTPPacketHeader,
+	"DeleteHTTPPacketCookie":      lowhttp.DeleteHTTPPacketCookie,
+	"DeleteHTTPPacketQueryParam":  lowhttp.DeleteHTTPPacketQueryParam,
+	"DeleteHTTPPacketPostParam":   lowhttp.DeleteHTTPPacketPostParam,
+
+	"GetHTTPPacketCookieValues": lowhttp.GetHTTPPacketCookieValues,
+	"GetHTTPPacketCookieFirst":  lowhttp.GetHTTPPacketCookieFirst,
+	"GetHTTPPacketCookie":       lowhttp.GetHTTPPacketCookie,
+	"GetHTTPPacketContentType":  lowhttp.GetHTTPPacketContentType,
+	"GetHTTPPacketCookies":      lowhttp.GetHTTPPacketCookies,
+	"GetHTTPPacketCookiesFull":  lowhttp.GetHTTPPacketCookiesFull,
+	"GetHTTPPacketHeaders":      lowhttp.GetHTTPPacketHeaders,
+	"GetHTTPPacketHeadersFull":  lowhttp.GetHTTPPacketHeadersFull,
+	"GetHTTPPacketHeader":       lowhttp.GetHTTPPacketHeader,
+	"GetStatusCodeFromResponse": lowhttp.GetStatusCodeFromResponse,
 }
