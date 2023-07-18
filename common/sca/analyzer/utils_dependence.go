@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/emicklei/dot"
@@ -27,6 +29,42 @@ func fastVersionCompare(old, new string) bool {
 	}
 
 	return false
+}
+
+func parseVersion(version string) ([]int, error) {
+	parts := strings.Split(version, ".")
+	if len(parts) < 3 {
+		return nil, errors.New("not semver version format")
+	}
+	v := make([]int, 3)
+	for i := 0; i < 3; i++ {
+		t, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return nil, err
+		}
+		v[i] = t
+	}
+	return v, nil
+}
+
+func hanlderSemverVersionRange(semverRange string) string {
+	if semverRange[0] == '~' {
+		v, err := parseVersion(semverRange[1:])
+		if err != nil {
+			return semverRange
+		}
+		return fmt.Sprintf(">= %d.%d.%d && < %d.%d.%d", v[0], v[1], v[2], v[0], v[1]+1, 0)
+	}
+
+	if semverRange[0] == '^' {
+		v, err := parseVersion(semverRange[1:])
+		if err != nil {
+			return semverRange
+		}
+		return fmt.Sprintf(">= %d.%d.%d && < %d.%d.%d", v[0], v[1], v[2], v[0]+1, 0, 0)
+	}
+
+	return semverRange
 }
 
 func handleDependsOn(pkgs []*dxtypes.Package, provides map[string]*dxtypes.Package) {
