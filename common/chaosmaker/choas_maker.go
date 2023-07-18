@@ -112,7 +112,7 @@ func (c *ChaosMaker) _suricataGenerate(originRule *ChaosMakerRule) (chan *ChaosT
 	if !ok {
 		return nil, utils.Errorf("cannot found protocol %s", mapRule)
 	}
-	h, ok := handler.(*chaosHandler)
+	h, ok := handler.(chaosHandler)
 	if !ok {
 		return nil, utils.Errorf("cannot convert %v to chaosHandler", handler)
 	}

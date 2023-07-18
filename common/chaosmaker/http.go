@@ -16,33 +16,37 @@ import (
 )
 
 func init() {
-	httpHandler := &chaosHandler{
-		Generator: func(maker *ChaosMaker, chaosRule *ChaosMakerRule, originRule *suricata.Rule) chan *ChaosTraffic {
-			if originRule == nil {
-				return nil
-			}
-			if originRule.Protocol != "http" {
-				return nil
-			}
+	chaosMap.Store("suricata-http", &httpHandler{})
+}
+
+type httpHandler struct {
+}
+
+func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *ChaosMakerRule, originRule *suricata.Rule) chan *ChaosTraffic {
+	if originRule == nil {
+		return nil
+	}
+	if originRule.Protocol != "http" {
+		return nil
+	}
 
 			httpPacket, err := mutate.NewFuzzHTTPRequest(`GET / HTTP/1.1
 Host: www.example.com
 `)
-			if err != nil {
-				return nil
-			}
-			_ = httpPacket
+	if err != nil {
+		return nil
+	}
+	_ = httpPacket
+    config := originRule.ContentRuleConfig
+	ch := make(chan *ChaosTraffic)
+	var forReq = true
+	var forRsp = true
 
-			config := originRule.ContentRuleConfig
-			ch := make(chan *ChaosTraffic)
-			var forReq = true
-			var forRsp = true
-
-			// flow control
-			if config.Flow != nil {
-				forReq = config.Flow.ToServer || config.Flow.Established
-				forRsp = config.Flow.ToClient || config.Flow.Established
-			}
+	// flow control
+	if config.Flow != nil {
+	forReq = config.Flow.ToServer || config.Flow.Established
+	forRsp = config.Flow.ToClient || config.Flow.Established
+	}
 
 			go func() {
 				defer close(ch)
@@ -130,46 +134,46 @@ Host: www.example.com
 							}
 						}
 
-						extraBody = append(extraBody, content)
-					}
-					if len(extraRules) > 0 {
-						rules = extraRules
-						extraRules = nil
-						goto REQ_RULES
-					}
+				extraBody = append(extraBody, content)
+			}
+			if len(extraRules) > 0 {
+				rules = extraRules
+				extraRules = nil
+				goto REQ_RULES
+			}
 
-					if len(extraBody) > 0 {
-						var result []string
-						concatStr := strings.Join(extraBody, "")
-						if len(concatStr) <= 50 {
-							result = append(result, concatStr)
-							result = append(result, strings.Join(extraBody, " "))
-							result = append(result, strings.Join(extraBody, ",{{rs(3)}}.{{ri(0,24)}}.{{ri(0,24)}}"))
-						}
-						result = append(result, extraBody...)
-						freq = freq.FuzzPostRaw(result...)
-					}
-					res, _ := freq.Results()
-					if res != nil {
-						for _, result := range res {
-							var raw, err = utils.HttpDumpWithBody(result, true)
-							if err != nil {
-								log.Error(err)
-							}
-							feedback(raw)
-						}
-					}
+			if len(extraBody) > 0 {
+				var result []string
+				concatStr := strings.Join(extraBody, "")
+				if len(concatStr) <= 50 {
+					result = append(result, concatStr)
+					result = append(result, strings.Join(extraBody, " "))
+					result = append(result, strings.Join(extraBody, ",{{rs(3)}}.{{ri(0,24)}}.{{ri(0,24)}}"))
 				}
-				// http request/response
-				if forRsp {
-					var (
-						httpVersion  = "HTTP/1.1"
-						extraHeader  = make(http.Header)
-						code         = "200"
-						status       = "OK"
-						extraContent []string
-						bodyJson     = `{"ami": "ok", "reason": "ok", "uid": "1-2-3-4-5", "uuid": ` + uuid2.NewV4().String() + `}`
-						htmlBody     = `<html>
+				result = append(result, extraBody...)
+				freq = freq.FuzzPostRaw(result...)
+			}
+			res, _ := freq.Results()
+			if res != nil {
+				for _, result := range res {
+					var raw, err = utils.HttpDumpWithBody(result, true)
+					if err != nil {
+						log.Error(err)
+					}
+					feedback(raw)
+				}
+			}
+		}
+		// http request/response
+		if forRsp {
+			var (
+				httpVersion  = "HTTP/1.1"
+				extraHeader  = make(http.Header)
+				code         = "200"
+				status       = "OK"
+				extraContent []string
+				bodyJson     = `{"ami": "ok", "reason": "ok", "uid": "1-2-3-4-5", "uuid": ` + uuid2.NewV4().String() + `}`
+				htmlBody     = `<html>
     <body>
         <div>
 Hello

@@ -14,11 +14,17 @@ import (
 	"strings"
 )
 
-var tcpHandler = &chaosHandler{
-	Generator: func(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
-		if rule.Protocol != "tcp" {
-			return nil
-		}
+func init() {
+	chaosMap.Store("suricata-tcp", &tcpHandler{})
+}
+
+type tcpHandler struct {
+}
+
+func (t *tcpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+	if rule.Protocol != "tcp" {
+		return nil
+	}
 
 		if rule.ContentRuleConfig == nil {
 			return nil
@@ -230,12 +236,11 @@ var tcpHandler = &chaosHandler{
 			}
 		}()
 		return ch
-	},
-	MatchBytes: nil,
 }
 
-func init() {
-	chaosMap.Store("suricata-tcp", tcpHandler)
+func (t *tcpHandler) MatchBytes(i interface{}) bool {
+	//TODO implement me
+	panic("implement me")
 }
 
 func splitRangeString(input string) (int, int, error) {
