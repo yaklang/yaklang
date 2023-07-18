@@ -74,11 +74,11 @@ func makePotentialPkgs(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			orDepName := lo.MapToSlice(orDepPkgMap, func(name, _ string) string {
 				return name
 			})
-				sort.Strings(orDepName)
+			sort.Strings(orDepName)
 			potentialName := strings.Join(orDepName, "|") // potential package name, splited by "|";
-				orDepVersion := lo.Map(orDepName, func(name string, index int) string {
-					return orDepPkgMap[name]
-				})
+			orDepVersion := lo.Map(orDepName, func(name string, index int) string {
+				return orDepPkgMap[name]
+			})
 			potentialVersion := strings.Join(orDepVersion, "|")
 			id := potentialName + potentialVersion
 			potentialPkg, ok := pkgMaps[id]
@@ -147,11 +147,11 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 			pkgMaps[name] = plist
 		}
 		if match {
-		//修正上下游关系
-		for _, downp := range pkg.DownStreamPackages {
-			delete(downp.UpStreamPackages, pkg.Identifier())
-			delete(pkg.UpStreamPackages, downp.Identifier())
-		}
+			//修正上下游关系
+			for _, downp := range pkg.DownStreamPackages {
+				delete(downp.UpStreamPackages, pkg.Identifier())
+				delete(pkg.UpStreamPackages, downp.Identifier())
+			}
 		} else {
 			// 如果没有命中则保存这个或包不进行合并。
 			ret = append(ret, pkg)
@@ -194,16 +194,16 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 				} else if ret == 1 {
 					// merge p2 to p // p is *merge other*
 					merge[p2] = p
+				}
 			}
-		}
 			// only three type in pakcage of list:
 			// 		* not merge  * merge to other  * merge other
 			// we only return *not merge* and *merge other* packages
 			if mergeToOther {
 				continue
 			}
-		ret = append(ret, p)
-	}
+			ret = append(ret, p)
+		}
 
 		for p2, p := range merge {
 			p.Merge(p2)
