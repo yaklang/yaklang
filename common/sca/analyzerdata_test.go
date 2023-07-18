@@ -3196,6 +3196,93 @@ var RubyGemspecPkgs = []*dxtypes.Package{
 		},
 	},
 }
+var RustCargoPkgs = []*dxtypes.Package{
+
+	{
+		Name:         "memchr",
+		Version:      "1.0.2",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "memchr",
+		Version:      "2.5.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "app",
+		Version:      "0.1.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "libc",
+		Version:      "0.2.140",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "regex-syntax",
+		Version:      "0.6.29",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "regex-syntax",
+		Version:      "0.5.6",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "regex",
+		Version:      "1.7.3",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "winapi-i686-pc-windows-gnu",
+		Version:      "0.4.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "winapi-x86_64-pc-windows-gnu",
+		Version:      "0.4.0",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "aho-corasick",
+		Version:      "0.7.20",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "ucd-util",
+		Version:      "0.1.10",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+	{
+		Name:         "winapi",
+		Version:      "0.3.9",
+		Verification: "",
+		License:      nil,
+		Potential:    false,
+	},
+}
 
 func check(t *testing.T, tag string, target []*dxtypes.Package) {
 	seen := make(map[string]*dxtypes.Package, len(target))
@@ -3244,4 +3331,5 @@ func TestData(t *testing.T) {
 	check(t, "node-yarn-monorepo", NodeYarnProtocolPkgs)
 	check(t, "ruby-bundler", RubyBundlerPkgs)
 	check(t, "ruby-gemspec", RubyGemspecPkgs)
+	check(t, "rust-cargo", RustCargoPkgs)
 }
