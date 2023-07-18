@@ -3085,6 +3085,18 @@ var RubyBundlerPkgs = []*dxtypes.Package{
 	},
 }
 
+var RubyGemspecPkgs = []*dxtypes.Package{
+	{
+		Name:    "test-unit",
+		Version: "3.3.7",
+		License: []string{
+			"Ruby",
+			"BSDL",
+			"PSFL",
+		},
+	},
+}
+
 func check(t *testing.T, tag string, target []*dxtypes.Package) {
 	seen := make(map[string]*dxtypes.Package, len(target))
 
