@@ -758,6 +758,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewPHPComposerAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewJavaGradleAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewJavaPomAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewJavaJarAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPIPAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPackagingAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPIPEnvAnalyzer()).String(),
