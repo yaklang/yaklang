@@ -875,7 +875,7 @@ Host: www.baidu.com
 	}
 }
 
-func TestAddHTTPPacketQueryParam(t *testing.T) {
+func TestAppendHTTPPacketQueryParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
 		key      string
@@ -904,7 +904,7 @@ Host: www.baidu.com
 		},
 	}
 	for _, testcase := range testcases {
-		actual := AddHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
+		actual := AppendHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("AddHTTPPacketQueryParam failed: %s", string(actual))
@@ -985,7 +985,7 @@ a=3&b=2`,
 	}
 }
 
-func TestAddHTTPPacketPostParam(t *testing.T) {
+func TestAppendHTTPPacketPostParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
 		key      string
@@ -1019,7 +1019,7 @@ a=1&b=2`,
 	}
 	for _, testcase := range testcases {
 
-		actual := AddHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
+		actual := AppendHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("AddHTTPPacketPostParam failed: %s", string(actual))
