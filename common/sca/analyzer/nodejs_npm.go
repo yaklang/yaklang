@@ -3,6 +3,7 @@ package analyzer
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	dio "github.com/aquasecurity/go-dep-parser/pkg/io"
 	"github.com/aquasecurity/go-dep-parser/pkg/nodejs/npm"
@@ -33,24 +34,24 @@ func NewNodeNpmAnalyzer() *npmAnalyzer {
 
 func (a npmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
+	var p godeptypes.Parser
 	switch fi.MatchStatus {
 	case statusNpmJson:
-		p := newNpmParse()
-		pkgs, err := ParseLanguageConfiguration(fi, p)
-		if err != nil {
-			return nil, err
-		}
-		return pkgs, nil
+		p = newNpmParse()
 
 	case statusNpmLockJson:
-		p := npm.NewParser()
-		pkgs, err := ParseLanguageConfiguration(fi, p)
-		if err != nil {
-			return nil, err
-		}
-		return pkgs, nil
+		p = npm.NewParser()
+	default:
+		return nil, nil
 	}
-	return nil, nil
+	pkgs, err := ParseLanguageConfiguration(fi, p)
+	if err != nil {
+		return nil, err
+	}
+	lo.ForEach(pkgs, func(pkg *dxtypes.Package, _ int) {
+		pkg.Version = hanlderSemverVersionRange(strings.TrimSpace(pkg.Version))
+	})
+	return pkgs, nil
 }
 
 func (a npmAnalyzer) Match(info MatchInfo) int {
