@@ -985,6 +985,7 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 			MaxVersion:         tls.VersionTLS13,
 			NextProtos:         []string{"h2", "http/1.1"},
+			ServerName:         utils.ExtractHost(req.URL.Host),
 		})
 
 	}
@@ -994,18 +995,21 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 			MaxVersion:         tls.VersionTLS13,
 			NextProtos:         []string{"h2", "http/1.1"},
+			ServerName:         utils.ExtractHost(req.URL.Host),
 		})
 	}
 	gmTLS := func() {
 		rawConn, err = gmtls.Dial("tcp", req.URL.Host, &gmtls.Config{
 			InsecureSkipVerify: true,
 			GMSupport:          &gmtls.GMSupport{},
+			ServerName:         utils.ExtractHost(req.URL.Host),
 		})
 	}
 	gmTLSWithProxy := func() {
 		rawConn, err = utils.GetAutoProxyConnWithGMTLS(req.URL.Host, p.proxyURL.String(), time.Second*10, &gmtls.Config{
 			InsecureSkipVerify: true,
 			GMSupport:          &gmtls.GMSupport{},
+			ServerName:         utils.ExtractHost(req.URL.Host),
 		})
 	}
 	var taskGroup []func()
