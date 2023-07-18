@@ -7,14 +7,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"reflect"
-	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protowire"
@@ -599,26 +600,6 @@ var FuzzExports = map[string]interface{}{
 	"ProtobufBytes": _protobufRecordsFromBytes,
 	"ProtobufJSON":  _protobufRecordsFromJSON,
 	"ProtobufYAML":  _protobufRecordsFromYAML,
-
-	// packet helper
-	"ReplaceHTTPPacketFirstLine": lowhttp.ReplaceHTTPPacketFirstLine,
-	"ReplaceHTTPPacketHeader":    lowhttp.ReplaceHTTPPacketHeader,
-	"AppendHTTPPacketHeader":     lowhttp.AppendHTTPPacketHeader,
-	"DeleteHTTPPacketHeader":     lowhttp.DeleteHTTPPacketHeader,
-	"ReplaceHTTPPacketCookie":    lowhttp.ReplaceHTTPPacketCookie,
-	"AppendHTTPPacketCookie":     lowhttp.AppendHTTPPacketCookie,
-	"DeleteHTTPPacketCookie":     lowhttp.DeleteHTTPPacketCookie,
-	"GetHTTPPacketCookieValues":  lowhttp.GetHTTPPacketCookieValues,
-	"GetHTTPPacketCookieFirst":   lowhttp.GetHTTPPacketCookieFirst,
-	"GetHTTPPacketCookie":        lowhttp.GetHTTPPacketCookie,
-	"GetHTTPPacketContentType":   lowhttp.GetHTTPPacketContentType,
-	"GetHTTPPacketCookies":       lowhttp.GetHTTPPacketCookies,
-	"GetHTTPPacketCookiesFull":   lowhttp.GetHTTPPacketCookiesFull,
-	"GetHTTPPacketHeaders":       lowhttp.GetHTTPPacketHeaders,
-	"GetHTTPPacketHeadersFull":   lowhttp.GetHTTPPacketHeadersFull,
-	"GetHTTPPacketHeader":        lowhttp.GetHTTPPacketHeader,
-	"GetStatusCodeFromResponse":  lowhttp.GetStatusCodeFromResponse,
-	"ReplaceHTTPPacketBody":      lowhttp.ReplaceHTTPPacketBodyFast,
 
 	"WithDelay":           mutate.WithPoolOPt_DelaySeconds,
 	"WithNamingContext":   mutate.WithPoolOpt_NamingContext,
