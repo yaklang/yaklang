@@ -828,6 +828,29 @@ func TestRubyGemspec(t *testing.T) {
 	}
 	Run(tc)
 }
+func TestRustCargo(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/rust_cargo/positive/Cargo.lock",
+		virtualPath: "/test/Cargo.lock",
+		t:           t,
+		a:           analyzer.NewRustCargoAnalyzer(),
+		matchType:   1,
+		wantPkgs:    RustCargoPkgs,
+	}
+	Run(tc)
+	tc = testcase{
+		name:        "negative",
+		filePath:    "./testdata/rust_cargo/negative/Cargo.lock",
+		virtualPath: "/test/Cargo.lock",
+		t:           t,
+		a:           analyzer.NewRustCargoAnalyzer(),
+		matchType:   1,
+		wantPkgs:    []*dxtypes.Package{},
+		wantError:   true,
+	}
+	Run(tc)
+}
 
 func showPkgs(pkgs []*dxtypes.Package) {
 	for _, p := range pkgs {
@@ -869,6 +892,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewNodeYarnAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewRubyBundlerAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewRubyGemSpecAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewRustCargoAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
