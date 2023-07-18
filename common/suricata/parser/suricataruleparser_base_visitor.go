@@ -56,11 +56,23 @@ func (v *BaseSuricataRuleParserVisitor) VisitIpv6(ctx *Ipv6Context) interface{} 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSuricataRuleParserVisitor) VisitHex_part(ctx *Hex_partContext) interface{} {
+func (v *BaseSuricataRuleParserVisitor) VisitIpv6full(ctx *Ipv6fullContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSuricataRuleParserVisitor) VisitH16(ctx *H16Context) interface{} {
+func (v *BaseSuricataRuleParserVisitor) VisitIpv6compact(ctx *Ipv6compactContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSuricataRuleParserVisitor) VisitIpv6part(ctx *Ipv6partContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSuricataRuleParserVisitor) VisitIpv6block(ctx *Ipv6blockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSuricataRuleParserVisitor) VisitIpv6mask(ctx *Ipv6maskContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -143,6 +143,9 @@ func TestParse_AddrSyntaxAndMatch(t *testing.T) {
 		{`alert tcp ![$HOME2,$HOME] any <> any any (msg: "abc")`, []string{"3.3.2.3", "3.3.3.1"}, []string{"2.3.4.5", "1.2.3.4"}},
 		{`alert tcp 127.0.0.1/24 any <> any any (msg: "abc")`, []string{"127.0.0.2"}, []string{"2.3.4.5", "1.2.3.4"}},
 		{`alert tcp !127.0.0.1/24 any <> any any (msg: "abc")`, []string{"1.0.0.2"}, []string{"127.0.0.1", "127.0.0.2"}},
+		{`alert tcp ff80::1/64 any <> fe80::5d03:c04a:1f87:e661/64 any (msg: "abc")`, []string{"ff80::1"}, []string{"fe80::5d03:c04a:1f87:1", "fe80::5d03:c04a:1f87:2"}},
+		{`alert tcp ff80::1/64 any <> fe80:8e9c:5d03:c04a:1f87:e661:ff91:1 8080 (msg: "abc")`, []string{"ff80::2"}, []string{"fe80:8e9c:5d03:c04a:1f87:e661:ff91:1"}},
+		{`alert tcp !ff80::1/64 any <> !fe80:8e9c:5d03:c04a:1f87:e661:ff91:1 8080 (msg: "abc")`, []string{"ff81::1"}, []string{"ff80::1"}},
 	} {
 		r, err := Parse(utils.InterfaceToString(i[0]), envs...)
 		if err != nil {
