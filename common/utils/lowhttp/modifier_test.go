@@ -3,10 +3,11 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestReplaceHTTPPacketFirstLine(t *testing.T) {
@@ -843,6 +844,227 @@ d=1&e=555&f=1&e=111`), [2]string{"e", "555"}},
 			spew.Dump(vals)
 			spew.Dump(c)
 			panic(fmt.Sprintf("GetHTTPRequestQueryParamFull failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
+
+func TestReplaceHTTPPacketQueryParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "a",
+			value: "3",
+			expected: `GET /?a=3&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketQueryParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestAddHTTPPacketQueryParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "a",
+			value: "1",
+			expected: `GET /?a=1 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "c",
+			value: "3",
+			expected: `GET /?a=1&b=2&c=3 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := AddHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("AddHTTPPacketQueryParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestDeleteHTTPPacketQueryParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			key: "a",
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /?a=1 HTTP/1.1
+Host: www.baidu.com
+`,
+			key: "a",
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			key: "a",
+			expected: `GET /?b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := DeleteHTTPPacketQueryParam([]byte(testcase.origin), testcase.key)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("DeleteHTTPPacketQueryParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestReplaceHTTPPacketPostParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+			key:   "a",
+			value: "3",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=3&b=2`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := ReplaceHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketPostParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestAddHTTPPacketPostParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+`,
+			key:   "a",
+			value: "1",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1`,
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1`,
+			key:   "b",
+			value: "2",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := AddHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("AddHTTPPacketPostParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestDeleteHTTPPacketPostParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		expected string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 3
+
+a=1`,
+			key: "a",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+`,
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 7
+
+a=1&b=2`,
+			key: "a",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 3
+
+b=2`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := DeleteHTTPPacketPostParam([]byte(testcase.origin), testcase.key)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), true)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketPostParam failed: \ngot:\n%s\n\nwant:\n%s", string(actual), string(expected))
 		}
 	}
 }
