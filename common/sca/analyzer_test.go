@@ -764,6 +764,18 @@ func TestRubyBundler(t *testing.T) {
 		wantPkgs:       RubyBundlerPkgs,
 	}
 	Run(tc)
+
+	tc = testcase{
+		name:           "negative",
+		filePath:       "./testdata/ruby_bundler/negative/Gemfile.lock",
+		virtualPath:    "/test/Gemfile.lock",
+		t:              t,
+		a:              analyzer.NewRubyBundlerAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       nil,
+	}
+	Run(tc)
 }
 
 func showPkgs(pkgs []*dxtypes.Package) {
