@@ -22,12 +22,12 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypNpm, NewNpmAnalyzer())
+	RegisterAnalyzer(TypNpm, NewNodeNpmAnalyzer())
 }
 
 type npmAnalyzer struct{}
 
-func NewNpmAnalyzer() *npmAnalyzer {
+func NewNodeNpmAnalyzer() *npmAnalyzer {
 	return &npmAnalyzer{}
 }
 

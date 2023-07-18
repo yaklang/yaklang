@@ -675,17 +675,17 @@ func TestNodeNpm(t *testing.T) {
 		filePath:    "./testdata/node_npm/positive_file/package.json",
 		virtualPath: "/test/package.json",
 		t:           t,
-		a:           analyzer.NewNpmAnalyzer(),
+		a:           analyzer.NewNodeNpmAnalyzer(),
 		matchType:   1,
 		wantPkgs:    NodeNpmPkgs,
 	}
-	// Run(tc)
+	Run(tc)
 
 	// folder
 	tc = testcase{
 		name:      "positive-folder",
 		t:         t,
-		a:         analyzer.NewNpmAnalyzer(),
+		a:         analyzer.NewNodeNpmAnalyzer(),
 		skipCheck: true,
 	}
 	pkgs := make([]*dxtypes.Package, 0)
@@ -733,13 +733,25 @@ func TestNodeNpm(t *testing.T) {
 	// fmt.Println("before: ", len(pkgs))
 	// analyzer.DrawPackagesDOT(pkgs)
 	ret := analyzer.MergePackages(pkgs)
-	fmt.Println("after: ", len(ret))
+	// fmt.Println("after: ", len(ret))
 	// showPgks(ret)
 	Check(ret, NodeNpmPkgsFolder, tc.name, t)
 	// analyzer.DrawPackagesDOT(ret)
 }
+func TestNodePnpm(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/node_pnpm/pnpm-lock.yaml",
+		virtualPath: "/test/pnpm-lock.yaml",
+		t:           t,
+		a:           analyzer.NewNodePnpmAnalyzer(),
+		matchType:   1,
+		wantPkgs:    NodePnpmPkgs,
+	}
+	Run(tc)
+}
 
-func showPgks(pkgs []*dxtypes.Package) {
+func showPkgs(pkgs []*dxtypes.Package) {
 	for _, pkg := range pkgs {
 		fmt.Printf("%s\n", pkg)
 	}
@@ -763,7 +775,8 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewPythonPackagingAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPIPEnvAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewNpmAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewNodeNpmAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewNodePnpmAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
