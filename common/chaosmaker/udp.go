@@ -10,23 +10,28 @@ import (
 	"net"
 )
 
-var udpHandler = &chaosHandler{
-	Generator: func(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
-		if rule.Protocol != "udp" {
-			return nil
-		}
+func init() {
+	chaosMap.Store("suricata-udp", &udpHandler{})
+}
+
+type udpHandler struct {
+}
+
+func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+	if rule.Protocol != "udp" {
+		return nil
+	}
 
 		if rule.ContentRuleConfig == nil {
 			return nil
 		}
 
-		if rule.ContentRuleConfig.UdpConfig == nil {
+	if rule.ContentRuleConfig.UdpConfig == nil {
 			log.Errorf("[BUG]: not prepared udp config from: %v", rule.Raw)
 			return nil
 		}
-
-		var toServer bool
-		var toClient bool
+	var toServer bool
+	var toClient bool
 
 		if rule.ContentRuleConfig.Flow != nil {
 			toServer = rule.ContentRuleConfig.Flow.ToServer
@@ -155,12 +160,12 @@ var udpHandler = &chaosHandler{
 			}
 		}()
 		return ch
-	},
-	MatchBytes: nil,
-}
+	}
 
-func init() {
-	chaosMap.Store("suricata-udp", udpHandler)
+
+func (h *udpHandler) MatchBytes(i interface{}) bool {
+	//TODO implement me
+	panic("implement me")
 }
 
 func UDPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {

@@ -9,87 +9,94 @@ import (
 	"net"
 )
 
-var dnsHandler = &chaosHandler{
-	Generator: func(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
-		if rule.Protocol != "dns" {
-			return nil
-		}
+func init() {
+	chaosMap.Store("suricata-dns", &dnsHandler{})
+}
 
-		if rule.ContentRuleConfig == nil {
-			return nil
-		}
+type dnsHandler struct {
+}
 
-		dnsRule := rule.ContentRuleConfig.DNS
+var _ chaosHandler = &dnsHandler{}
+
+func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+	if rule.Protocol != "dns" {
+		return nil
+	}
+
+	if rule.ContentRuleConfig == nil {
+		return nil
+	}
+
+	dnsRule := rule.ContentRuleConfig.DNS
 		if dnsRule == nil {
 			dnsRule = &suricata.DNSRule{}
 		}
 
-		var baseUDPLayer = &layers.UDP{}
-		var baseDNSLayer = &layers.DNS{}
+	var baseUDPLayer = &layers.UDP{}
+	var baseDNSLayer = &layers.DNS{}
 
-		// 定义IPv4报文头部
-		baseIPLayer := &layers.IPv4{
-			Version:  4,                    // 版本号
-			TTL:      64,                   // 生存时间
-			Protocol: layers.IPProtocolUDP, // 协议类型
+	// 定义IPv4报文头部
+	baseIPLayer := &layers.IPv4{
+		Version:  4,                    // 版本号
+		TTL:      64,                   // 生存时间
+		Protocol: layers.IPProtocolUDP, // 协议类型
+	}
+
+	// todo: consider dnsRule.OpcodeNegative == true
+	baseDNSLayer.OpCode = layers.DNSOpCode(dnsRule.Opcode)
+	baseDNSLayer.QR = !dnsRule.DNSQuery
+	if dnsRule.OpcodeNegative && baseDNSLayer.OpCode == layers.DNSOpCode(dnsRule.Opcode) {
+		log.Warn("DNS 规则可能存在错误")
+	} else if !dnsRule.OpcodeNegative && baseDNSLayer.OpCode != layers.DNSOpCode(dnsRule.Opcode) {
+		log.Warn("DNS 规则可能存在错误")
+	}
+
+	ch := make(chan *ChaosTraffic)
+	feedback := func(raw []byte) {
+		if raw == nil {
+			return
+		}
+		ch <- DNSIPBytesToChaosTraffic(makerRule, rule, raw)
+	}
+	go func() {
+		defer close(ch)
+
+		var payloads string
+		var extraRules []*suricata.ContentRule
+		for _, r := range rule.ContentRuleConfig.ContentRules {
+			if r.Negative {
+				continue
+			}
+			payloads += string(r.Content)
+			if r.PCRE == "" {
+				continue
+			}
+			extraRules = append(extraRules, r.PCREStringGenerator(2)...)
 		}
 
-		// todo: consider dnsRule.OpcodeNegative == true
-		baseDNSLayer.OpCode = layers.DNSOpCode(dnsRule.Opcode)
-		if dnsRule.OpcodeNegative && baseDNSLayer.OpCode == layers.DNSOpCode(dnsRule.Opcode) {
-			log.Warn("DNS 规则可能存在错误")
-		} else if !dnsRule.OpcodeNegative && baseDNSLayer.OpCode != layers.DNSOpCode(dnsRule.Opcode) {
-			log.Warn("DNS 规则可能存在错误")
+		for _, r := range extraRules {
+			payloads += string(r.Content)
 		}
 
-		baseDNSLayer.QR = true
+		baseIPLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
 
-		ch := make(chan *ChaosTraffic)
-		feedback := func(raw []byte) {
-			if raw == nil {
-				return
-			}
-			ch <- DNSIPBytesToChaosTraffic(makerRule, rule, raw)
+		baseIPLayer.SrcIP = net.ParseIP(maker.LocalIPAddress)
+
+		if baseIPLayer.SrcIP == nil {
+			log.Error("fetch local ip address failed")
+			return
 		}
-		go func() {
-			defer close(ch)
 
-			var payloads string
-			var extraRules []*suricata.ContentRule
-			for _, r := range rule.ContentRuleConfig.ContentRules {
-				if r.Negative {
-					continue
-				}
-				payloads += string(r.Content)
-				if r.PCRE == "" {
-					continue
-				}
-				extraRules = append(extraRules, r.PCREStringGenerator(2)...)
-			}
-
-			for _, r := range extraRules {
-				payloads += string(r.Content)
-			}
-
-			baseIPLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
-
-			baseIPLayer.SrcIP = net.ParseIP(maker.LocalIPAddress)
-
-			if baseIPLayer.SrcIP == nil {
-				log.Error("fetch local ip address failed")
-				return
-			}
-
-			var dstPort uint16
-			// 这是主机接收到的包
-			if rule.DestinationPort.Any {
-				dstPort = 53
-			} else {
-				dstPort = uint16(rule.DestinationPort.GetAvailablePort())
-			}
-			srcPort := uint16(rule.SourcePort.GetHighPort())
-			baseUDPLayer.SrcPort = layers.UDPPort(srcPort)
-			baseUDPLayer.DstPort = layers.UDPPort(dstPort)
+		var dstPort uint16
+		// 这是主机接收到的包
+		if rule.DestinationPort.Any {
+			dstPort = 53
+		} else {
+			dstPort = uint16(rule.DestinationPort.GetAvailablePort())
+		}
+		srcPort := uint16(rule.SourcePort.GetHighPort())
+		baseUDPLayer.SrcPort = layers.UDPPort(srcPort)
+		baseUDPLayer.DstPort = layers.UDPPort(dstPort)
 
 			for i := 0; i < rule.ContentRuleConfig.Thresholding.Repeat(); i++ {
 				dnsQuestion := layers.DNSQuestion{
@@ -101,10 +108,8 @@ var dnsHandler = &chaosHandler{
 				feedback(encodeDNS(baseIPLayer, baseUDPLayer, baseDNSLayer))
 			}
 
-		}()
-		return ch
-	},
-	MatchBytes: nil,
+	}()
+	return ch
 }
 
 func encodeDNS(ipLayer *layers.IPv4, udpLayer *layers.UDP, dnsLayer *layers.DNS, payloads ...gopacket.Payload) []byte {
@@ -129,8 +134,9 @@ func encodeDNS(ipLayer *layers.IPv4, udpLayer *layers.UDP, dnsLayer *layers.DNS,
 	return buffer.Bytes()
 }
 
-func init() {
-	chaosMap.Store("suricata-dns", dnsHandler)
+func (h *dnsHandler) MatchBytes(i any) bool {
+	//todo: implement
+	return false
 }
 
 func DNSIPBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
