@@ -735,7 +735,7 @@ func TestNodeNpm(t *testing.T) {
 	// analyzer.DrawPackagesDOT(pkgs)
 	ret := analyzer.MergePackages(pkgs)
 	// fmt.Println("after: ", len(ret))
-	// showPgks(ret)
+	// showPkgs(ret)
 	Check(ret, NodeNpmPkgsFolder, tc.name, t)
 	// analyzer.DrawPackagesDOT(ret)
 }
