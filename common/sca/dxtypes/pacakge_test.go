@@ -174,4 +174,23 @@ func TestPackageCanMerge(t *testing.T) {
 	if CanMerge(&pb, &pa) != 1 {
 		t.Fatal("same name and version match range shoud merge even not set IsVersionRange pb(pa)")
 	}
+
+	// pa version no number
+	pa = createPackage("pa", "a", "", "")
+	pb = createPackage("pa", "0.0.1", "", "")
+	if CanMerge(&pa, &pb) != 0 {
+		t.Fatal("same name but no version number, don't merge: pa-pb")
+	}
+	if CanMerge(&pb, &pa) != 0 {
+		t.Fatal("same name but no version number, don't merge: pb-pa")
+	}
+	// pa version no number with range
+	pa = createPackage("pa", ">a", "", "")
+	pb = createPackage("pa", "0.0.1", "", "")
+	if CanMerge(&pa, &pb) != 0 {
+		t.Fatal("same name but no version number, don't merge: pa-pb")
+	}
+	if CanMerge(&pb, &pa) != 0 {
+		t.Fatal("same name but no version number, don't merge: pb-pa")
+	}
 }
