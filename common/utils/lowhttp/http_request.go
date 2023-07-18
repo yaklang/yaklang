@@ -192,6 +192,8 @@ func ToUnquoteFuzzTag(i []byte) string {
 				buf.WriteString(`\x28`)
 			case '}':
 				buf.WriteString(`\x7d`)
+			case '{':
+				buf.WriteString(`\x7b`)
 			case '"':
 				buf.WriteString(`\"`)
 			default:
