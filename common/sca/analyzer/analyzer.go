@@ -228,7 +228,7 @@ func handlerParsed(parsedLibs godeptypes.Libraries, parsedDeps godeptypes.Depend
 		}
 		if lib.License != "" {
 			p.License = lo.Map(strings.Split(lib.License, ","), func(license string, _ int) string {
-				return licenses.Normalize(license)
+				return licenses.Normalize(strings.TrimSpace(license))
 			})
 		}
 		id := lib.ID
