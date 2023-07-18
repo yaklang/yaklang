@@ -2306,6 +2306,785 @@ var NodePnpmPkgs = []*dxtypes.Package{
 	},
 }
 
+var RubyBundlerPkgs = []*dxtypes.Package{
+	{
+		Name:    "sawyer",
+		Version: "0.9.2",
+	},
+	{
+		Name:    "metasploit-model",
+		Version: "5.0.1",
+	},
+	{
+		Name:    "sinatra",
+		Version: "3.0.6",
+	},
+	{
+		Name:    "domain_name",
+		Version: "0.5.20190701",
+	},
+	{
+		Name:    "ruby-prof",
+		Version: "1.4.2",
+	},
+	{
+		Name:    "gyoku",
+		Version: "1.4.0",
+	},
+	{
+		Name:    "rubocop",
+		Version: "1.52.0",
+	},
+	{
+		Name:    "unix-crypt",
+		Version: "1.3.1",
+	},
+	{
+		Name:    "rkelly-remix",
+		Version: "0.0.7",
+	},
+	{
+		Name:    "aws-sdk-ssm",
+		Version: "1.151.0",
+	},
+	{
+		Name:    "yard",
+		Version: "0.9.34",
+	},
+	{
+		Name:    "unicode-display_width",
+		Version: "2.4.2",
+	},
+	{
+		Name:    "xdr",
+		Version: "3.0.3",
+	},
+	{
+		Name:    "net-smtp",
+		Version: "0.3.3",
+	},
+	{
+		Name:    "unf_ext",
+		Version: "0.0.8.2",
+	},
+	{
+		Name:    "recog",
+		Version: "3.1.1",
+	},
+	{
+		Name:    "ruby2_keywords",
+		Version: "0.0.5",
+	},
+	{
+		Name:    "thin",
+		Version: "1.8.2",
+	},
+	{
+		Name:    "ffi",
+		Version: "1.15.5",
+	},
+	{
+		Name:    "rack-test",
+		Version: "2.1.0",
+	},
+	{
+		Name:    "metasploit-credential",
+		Version: "6.0.5",
+	},
+	{
+		Name:    "simpleidn",
+		Version: "0.2.1",
+	},
+	{
+		Name:    "windows_error",
+		Version: "0.1.5",
+	},
+	{
+		Name:    "rex-encoder",
+		Version: "0.1.6",
+	},
+	{
+		Name:    "builder",
+		Version: "3.2.4",
+	},
+	{
+		Name:    "ed25519",
+		Version: "1.3.0",
+	},
+	{
+		Name:    "tilt",
+		Version: "2.2.0",
+	},
+	{
+		Name:    "faraday-retry",
+		Version: "2.2.0",
+	},
+	{
+		Name:    "swagger-blocks",
+		Version: "3.0.0",
+	},
+	{
+		Name:    "method_source",
+		Version: "1.0.0",
+	},
+	{
+		Name:    "msgpack",
+		Version: "1.6.1",
+	},
+	{
+		Name:    "rex-sslscan",
+		Version: "0.1.9",
+	},
+	{
+		Name:    "patch_finder",
+		Version: "1.0.2",
+	},
+	{
+		Name:    "packetfu",
+		Version: "2.0.0",
+	},
+	{
+		Name:    "metasploit_data_models",
+		Version: "6.0.2",
+	},
+	{
+		Name:    "rex-text",
+		Version: "0.2.52",
+	},
+	{
+		Name:    "rasn1",
+		Version: "0.12.1",
+	},
+	{
+		Name:    "addressable",
+		Version: "2.8.4",
+	},
+	{
+		Name:    "rexml",
+		Version: "3.2.5",
+	},
+	{
+		Name:    "net-ldap",
+		Version: "0.18.0",
+	},
+	{
+		Name:    "metasm",
+		Version: "1.0.5",
+	},
+	{
+		Name:    "rainbow",
+		Version: "3.1.1",
+	},
+	{
+		Name:    "httpclient",
+		Version: "2.8.3",
+	},
+	{
+		Name:    "rack",
+		Version: "2.2.7",
+	},
+	{
+		Name:    "octokit",
+		Version: "4.25.1",
+	},
+	{
+		Name:    "aws-sdk-kms",
+		Version: "1.66.0",
+	},
+	{
+		Name:    "openssl-cmac",
+		Version: "2.0.2",
+	},
+	{
+		Name:    "logging",
+		Version: "2.3.1",
+	},
+	{
+		Name:    "json",
+		Version: "2.6.3",
+	},
+	{
+		Name:    "network_interface",
+		Version: "0.0.2",
+	},
+	{
+		Name:    "chunky_png",
+		Version: "1.4.0",
+	},
+	{
+		Name:    "rex-zip",
+		Version: "0.1.4",
+	},
+	{
+		Name:    "eventmachine",
+		Version: "1.2.7",
+	},
+	{
+		Name:    "net-ssh",
+		Version: "7.1.0",
+	},
+	{
+		Name:    "rubyzip",
+		Version: "2.3.2",
+	},
+	{
+		Name:    "nexpose",
+		Version: "7.3.0",
+	},
+	{
+		Name:    "pdf-reader",
+		Version: "2.11.0",
+	},
+	{
+		Name:    "win32api",
+		Version: "0.1.0",
+	},
+	{
+		Name:    "jsobfu",
+		Version: "0.4.2",
+	},
+	{
+		Name:    "rex-powershell",
+		Version: "0.1.97",
+	},
+	{
+		Name:    "aws-sdk-s3",
+		Version: "1.123.1",
+	},
+	{
+		Name:    "jmespath",
+		Version: "1.6.2",
+	},
+	{
+		Name:    "websocket-extensions",
+		Version: "0.1.5",
+	},
+	{
+		Name:    "concurrent-ruby",
+		Version: "1.2.2",
+	},
+	{
+		Name:    "parser",
+		Version: "3.2.2.3",
+	},
+	{
+		Name:    "rex-exploitation",
+		Version: "0.1.38",
+	},
+	{
+		Name:    "em-http-request",
+		Version: "1.1.7",
+	},
+	{
+		Name:    "rubocop-ast",
+		Version: "1.29.0",
+	},
+	{
+		Name:    "ttfunk",
+		Version: "1.7.0",
+	},
+	{
+		Name:    "timeout",
+		Version: "0.3.2",
+	},
+	{
+		Name:    "rspec-rerun",
+		Version: "1.1.0",
+	},
+	{
+		Name:    "rex-random_identifier",
+		Version: "0.1.10",
+	},
+	{
+		Name:    "gssapi",
+		Version: "1.3.1",
+	},
+	{
+		Name:    "rb-readline",
+		Version: "0.5.5",
+	},
+	{
+		Name:    "debug",
+		Version: "1.8.0",
+	},
+	{
+		Name:    "racc",
+		Version: "1.7.0",
+	},
+	{
+		Name:    "aws-sdk-core",
+		Version: "3.174.0",
+	},
+	{
+		Name:    "rex-registry",
+		Version: "0.1.4",
+	},
+	{
+		Name:    "winrm",
+		Version: "2.3.6",
+	},
+	{
+		Name:    "daemons",
+		Version: "1.4.1",
+	},
+	{
+		Name:    "cookiejar",
+		Version: "0.3.3",
+	},
+	{
+		Name:    "aws-eventstream",
+		Version: "1.2.0",
+	},
+	{
+		Name:    "ruby_smb",
+		Version: "3.2.5",
+	},
+	{
+		Name:    "pry-byebug",
+		Version: "3.10.1",
+	},
+	{
+		Name:    "strptime",
+		Version: "0.2.5",
+	},
+	{
+		Name:    "redcarpet",
+		Version: "3.6.0",
+	},
+	{
+		Name:    "rex-socket",
+		Version: "0.1.52",
+	},
+	{
+		Name:    "rex-ole",
+		Version: "0.1.7",
+	},
+	{
+		Name:    "nokogiri",
+		Version: "1.14.5",
+	},
+	{
+		Name:    "openssl-ccm",
+		Version: "1.2.3",
+	},
+	{
+		Name:    "rex-core",
+		Version: "0.1.31",
+	},
+	{
+		Name:    "rex-bin_tools",
+		Version: "0.1.8",
+	},
+	{
+		Name:    "bootsnap",
+		Version: "1.16.0",
+	},
+	{
+		Name:    "rspec-rails",
+		Version: "6.0.3",
+	},
+	{
+		Name:    "activemodel",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "rspec-core",
+		Version: "3.12.2",
+	},
+	{
+		Name:    "i18n",
+		Version: "1.14.1",
+	},
+	{
+		Name:    "factory_bot_rails",
+		Version: "6.2.0",
+	},
+	{
+		Name:    "rails-dom-testing",
+		Version: "2.0.3",
+	},
+	{
+		Name:    "ruby-rc4",
+		Version: "0.1.5",
+	},
+	{
+		Name:    "pry",
+		Version: "0.14.2",
+	},
+	{
+		Name:    "faker",
+		Version: "3.2.0",
+	},
+	{
+		Name:    "rspec-support",
+		Version: "3.12.0",
+	},
+	{
+		Name:    "http_parser.rb",
+		Version: "0.8.0",
+	},
+	{
+		Name:    "rex-java",
+		Version: "0.1.6",
+	},
+	{
+		Name:    "multi_json",
+		Version: "1.15.0",
+	},
+	{
+		Name:    "aws-sigv4",
+		Version: "1.5.2",
+	},
+	{
+		Name:    "xmlrpc",
+		Version: "0.3.2",
+	},
+	{
+		Name:    "simplecov-html",
+		Version: "0.12.3",
+	},
+	{
+		Name:    "hashery",
+		Version: "2.1.2",
+	},
+	{
+		Name:    "rack-protection",
+		Version: "3.0.6",
+	},
+	{
+		Name:    "activerecord",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "webrick",
+		Version: "1.8.1",
+	},
+	{
+		Name:    "rake",
+		Version: "13.0.6",
+	},
+	{
+		Name:    "warden",
+		Version: "1.2.9",
+	},
+	{
+		Name:    "sshkey",
+		Version: "2.0.0",
+	},
+	{
+		Name:    "hrr_rb_ssh",
+		Version: "0.4.2",
+	},
+	{
+		Name:    "rspec-mocks",
+		Version: "3.12.5",
+	},
+	{
+		Name:    "actionpack",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "zeitwerk",
+		Version: "2.6.8",
+	},
+	{
+		Name:    "mini_portile2",
+		Version: "2.8.2",
+	},
+	{
+		Name:    "crass",
+		Version: "1.0.6",
+	},
+	{
+		Name:    "docile",
+		Version: "1.4.0",
+	},
+	{
+		Name:    "filesize",
+		Version: "0.2.0",
+	},
+	{
+		Name:    "ruby-macho",
+		Version: "3.0.0",
+	},
+	{
+		Name:    "rex-struct2",
+		Version: "0.1.3",
+	},
+	{
+		Name:    "io-console",
+		Version: "0.6.0",
+	},
+	{
+		Name:    "faraday",
+		Version: "2.7.6",
+	},
+	{
+		Name:    "net-protocol",
+		Version: "0.2.1",
+	},
+	{
+		Name:    "metasploit-concern",
+		Version: "5.0.1",
+	},
+	{
+		Name:    "reline",
+		Version: "0.3.5",
+	},
+	{
+		Name:    "websocket-driver",
+		Version: "0.7.5",
+	},
+	{
+		Name:    "bcrypt",
+		Version: "3.1.18",
+	},
+	{
+		Name:    "memory_profiler",
+		Version: "1.0.1",
+	},
+	{
+		Name:    "regexp_parser",
+		Version: "2.8.0",
+	},
+	{
+		Name:    "mustermann",
+		Version: "3.0.0",
+	},
+	{
+		Name:    "tzinfo",
+		Version: "2.0.6",
+	},
+	{
+		Name:    "http-cookie",
+		Version: "1.0.5",
+	},
+	{
+		Name:    "metasploit-framework",
+		Version: "6.3.26",
+	},
+	{
+		Name:    "nio4r",
+		Version: "2.5.9",
+	},
+	{
+		Name:    "pcaprub",
+		Version: "0.13.1",
+	},
+	{
+		Name:    "minitest",
+		Version: "5.18.0",
+	},
+	{
+		Name:    "metasploit-payloads",
+		Version: "2.0.148",
+	},
+	{
+		Name:    "coderay",
+		Version: "1.1.3",
+	},
+	{
+		Name:    "bcrypt_pbkdf",
+		Version: "1.1.0",
+	},
+	{
+		Name:    "em-socksify",
+		Version: "0.3.2",
+	},
+	{
+		Name:    "railties",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "dnsruby",
+		Version: "1.70.0",
+	},
+	{
+		Name:    "tzinfo-data",
+		Version: "1.2023.3",
+	},
+	{
+		Name:    "timecop",
+		Version: "0.9.6",
+	},
+	{
+		Name:    "arel-helpers",
+		Version: "2.14.0",
+	},
+	{
+		Name:    "rex-rop_builder",
+		Version: "0.1.4",
+	},
+	{
+		Name:    "pg",
+		Version: "1.5.3",
+	},
+	{
+		Name:    "aws-sdk-iam",
+		Version: "1.79.0",
+	},
+	{
+		Name:    "rails-html-sanitizer",
+		Version: "1.6.0",
+	},
+	{
+		Name:    "rubyntlm",
+		Version: "0.6.3",
+	},
+	{
+		Name:    "thor",
+		Version: "1.2.2",
+	},
+	{
+		Name:    "rex-mime",
+		Version: "0.1.7",
+	},
+	{
+		Name:    "irb",
+		Version: "1.7.0",
+	},
+	{
+		Name:    "little-plugger",
+		Version: "1.1.4",
+	},
+	{
+		Name:    "ast",
+		Version: "2.4.2",
+	},
+	{
+		Name:    "loofah",
+		Version: "2.21.3",
+	},
+	{
+		Name:    "hrr_rb_ssh-ed25519",
+		Version: "0.4.2",
+	},
+	{
+		Name:    "unf",
+		Version: "0.1.4",
+	},
+	{
+		Name:    "rspec-expectations",
+		Version: "3.12.3",
+	},
+	{
+		Name:    "sqlite3",
+		Version: "1.6.3",
+	},
+	{
+		Name:    "parallel",
+		Version: "1.23.0",
+	},
+	{
+		Name:    "aws-partitions",
+		Version: "1.776.0",
+	},
+	{
+		Name:    "faraday-net_http",
+		Version: "3.0.2",
+	},
+	{
+		Name:    "diff-lcs",
+		Version: "1.5.0",
+	},
+	{
+		Name:    "bson",
+		Version: "4.15.0",
+	},
+	{
+		Name:    "puma",
+		Version: "6.3.0",
+	},
+	{
+		Name:    "nori",
+		Version: "2.6.0",
+	},
+	{
+		Name:    "nessus_rest",
+		Version: "0.1.6",
+	},
+	{
+		Name:    "simplecov",
+		Version: "0.18.2",
+	},
+	{
+		Name:    "mqtt",
+		Version: "0.6.0",
+	},
+	{
+		Name:    "rex-arch",
+		Version: "0.1.14",
+	},
+	{
+		Name:    "afm",
+		Version: "0.2.2",
+	},
+	{
+		Name:    "byebug",
+		Version: "11.1.3",
+	},
+	{
+		Name:    "faye-websocket",
+		Version: "0.11.2",
+	},
+	{
+		Name:    "bindata",
+		Version: "2.4.15",
+	},
+	{
+		Name:    "metasploit_payloads-mettle",
+		Version: "1.0.20",
+	},
+	{
+		Name:    "public_suffix",
+		Version: "5.0.1",
+	},
+	{
+		Name:    "fivemat",
+		Version: "1.3.7",
+	},
+	{
+		Name:    "erubi",
+		Version: "1.12.0",
+	},
+	{
+		Name:    "rspec",
+		Version: "3.12.0",
+	},
+	{
+		Name:    "aws-sdk-ec2",
+		Version: "1.382.0",
+	},
+	{
+		Name:    "ruby-progressbar",
+		Version: "1.13.0",
+	},
+	{
+		Name:    "actionview",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "activesupport",
+		Version: "7.0.5",
+	},
+	{
+		Name:    "rex-nop",
+		Version: "0.1.2",
+	},
+	{
+		Name:    "Ascii85",
+		Version: "1.1.0",
+	},
+	{
+		Name:    "openvas-omp",
+		Version: "0.0.4",
+	},
+	{
+		Name:    "factory_bot",
+		Version: "6.2.1",
+	},
+}
+
 func check(t *testing.T, tag string, target []*dxtypes.Package) {
 	seen := make(map[string]*dxtypes.Package, len(target))
 

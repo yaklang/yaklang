@@ -751,6 +751,20 @@ func TestNodePnpm(t *testing.T) {
 	Run(tc)
 }
 
+func TestRubyBundler(t *testing.T) {
+	tc := testcase{
+		name:           "positive",
+		filePath:       "./testdata/ruby_bundler/positive/Gemfile.lock",
+		virtualPath:    "/test/Gemfile.lock",
+		t:              t,
+		a:              analyzer.NewRubyBundlerAnalyzer(),
+		matchType:      1,
+		matchedFileMap: map[string]string{},
+		wantPkgs:       RubyBundlerPkgs,
+	}
+	Run(tc)
+}
+
 func showPkgs(pkgs []*dxtypes.Package) {
 	for _, pkg := range pkgs {
 		fmt.Printf("%s\n", pkg)
@@ -777,6 +791,7 @@ func TestFilterAnalyzer(t *testing.T) {
 		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewNodeNpmAnalyzer()).String(),
 		reflect.TypeOf(analyzer.NewNodePnpmAnalyzer()).String(),
+		reflect.TypeOf(analyzer.NewRubyBundlerAnalyzer()).String(),
 	}
 
 	wantAnalyzerTypes := []string{}
