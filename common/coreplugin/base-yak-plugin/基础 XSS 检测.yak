@@ -98,6 +98,19 @@ xssLog = func(result) {
         url,
         risk.title(sprintf("XSS for: %v", url)),
         risk.details(report),
+        risk.description(`XSS 是一种常见的网站安全漏洞，它允许攻击者注入恶意脚本到网页中，然后在其他用户的浏览器上执行。这种攻击发生在用户浏览器端，攻击者可以利用这种漏洞窃取用户信息，如 cookie、session tokens、或其他敏感信息。
+
+XSS 攻击通常可以归类为三种类型：
+    1. 存储型 XSS：攻击者提交的恶意脚本被存储在服务器上，当其他用户请求页面时，恶意脚本被发送到用户的浏览器并执行。
+    2. 反射型 XSS：恶意脚本不存储在服务器上，而是在 URL 中传输。当用户点击恶意链接或提交一个表单时，恶意脚本被发送到用户的浏览器并执行。
+    3. DOM 型 XSS：攻击者利用网页的 DOM 脚本，使得恶意脚本在用户浏览器上执行。`),
+        risk.solution(`输入过滤：所有用户输入都应被视为不可信，需要进行适当的处理。在将用户输入插入到 HTML 页面之前，应该进行 HTML 转义，将特殊字符转换为对应的 HTML 实体。例如，将 < 转换为 <，将 > 转换为 > 等。
+输出编码：在将数据输出到 HTML 页面时，应使用安全的编码方式，如使用 HTML 实体编码来处理所有的非信任数据。
+使用 HTTP-only Cookies：将敏感的 cookies 标记为 HTTP-only，这样 JavaScript 就无法读取这些 cookies。这可以防止攻击者通过 XSS 攻击窃取用户的 cookies。
+内容安全策略 (CSP)：CSP 是一种浏览器安全机制，可以限制网页中脚本的来源和执行方式，从而防止 XSS 攻击。例如，你可以设置 CSP 只允许执行自身站点的脚本，或者禁止执行内联脚本。
+更新并维护系统：保持系统、网络和应用程序的安全更新，以防止已知的安全漏洞被利用。
+
+以上就是 XSS 漏洞的基本描述和修复方案，需要注意的是，修复 XSS 漏洞需要全面的安全策略和持续的维护，以上提供的修复方案只是其中的一部分。`),
         risk.type("xss"),
         risk.payload(payloadString),
         risk.request(reqRaw), 
@@ -306,7 +319,7 @@ paramFuzzTask = func(threads, url, param) {
                 payload = sprintf("\"></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=\"", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
                 payloads = append(payloads, newPayload(payload, "<>/", "attr"))
 
-                payload = sprintf("'></%s><% id='%s' src=1 onerror='prompt(1)'><%s %s='", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
+                payload = sprintf("'></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s='", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
                 payloads = append(payloads, newPayload(payload, "<>/", "attr"))
 
                 payload = sprintf("></%s><%s id='%s' src=1 onerror='prompt(1)'><%s %s=", xhtml.RandomUpperAndLower(matchNode.TagName), xhtml.RandomUpperAndLower("img"), verifyRandStr, xhtml.RandomUpperAndLower(matchNode.TagName), matchNode.Key)
