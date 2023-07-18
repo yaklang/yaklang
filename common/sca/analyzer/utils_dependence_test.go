@@ -601,3 +601,19 @@ func TestMregePackagesVersionRangeFirst(t *testing.T) {
 	}
 	Check(t, ret, wantPkg)
 }
+
+func TestSemverRange(t *testing.T) {
+	check := func(semver, want string) {
+		got := hanlderSemverVersionRange(semver)
+		if got != want {
+			t.Fatalf("error: %s(org): %s(got) vs %s(want)", semver, got, want)
+		}
+	}
+
+	check("~3.4.1", ">= 3.4.1 && < 3.5.0")
+	check("^3.4.1", ">= 3.4.1 && < 4.0.0")
+	check("3.4.1", "3.4.1")
+	check("~3.41", "~3.41")
+	check("^3.41", "^3.41")
+	check("~3.4.1a", "~3.4.1a")
+}
