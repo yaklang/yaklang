@@ -81,28 +81,6 @@ func (a apkAnalyzer) parseProvides(line string, pkg *dxtypes.Package, provides m
 	}
 }
 
-func (a apkAnalyzer) handleDependsOn(pkgs []dxtypes.Package, provides map[string]*dxtypes.Package) {
-	for i := range pkgs {
-		// e.g. libc6 => libc6@2.31-13+deb11u4
-		pkg := &pkgs[i]
-
-		ret := make(map[string]string)
-		for provide_name, version := range pkg.DependsOn.And {
-			if p, ok := provides[provide_name]; ok {
-				ret[p.Name] = p.Version
-			}
-			if oldVersion, ok := ret[provide_name]; !ok || fastVersionCompare(version, oldVersion) {
-				// ret[packageName] = packageVersion
-				ret[provide_name] = version
-			}
-		}
-
-		if len(pkg.DependsOn.And) == 0 {
-			pkg.DependsOn.And = nil
-		}
-	}
-}
-
 func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
