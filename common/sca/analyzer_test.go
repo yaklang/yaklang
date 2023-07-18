@@ -157,6 +157,7 @@ func Run(tc testcase) []*dxtypes.Package {
 		MatchedFileInfos: matchedFileInfos,
 	})
 	pkgs = analyzer.MergePackages(pkgs)
+	// showPkgs(pkgs)
 
 	// for _, pkg := range pkgs {
 	// 	fmt.Printf("%s\n", pkg)
@@ -766,8 +767,19 @@ func TestRubyBundler(t *testing.T) {
 }
 
 func showPkgs(pkgs []*dxtypes.Package) {
-	for _, pkg := range pkgs {
-		fmt.Printf("%s\n", pkg)
+	for _, p := range pkgs {
+		license := "nil"
+		if len(p.License) > 0 {
+			license = fmt.Sprintf(`[]string{"%s"}`, strings.Join(p.License, `", "`))
+		}
+		fmt.Printf(`{
+	Name:         "%s",
+	Version:      "%s",
+	Verification: "%s",
+	License:      %s,
+	Potential:    %t,
+},
+`, p.Name, p.Version, p.Verification, license, p.Potential)
 	}
 }
 
