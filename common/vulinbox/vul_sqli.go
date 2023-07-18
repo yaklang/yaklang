@@ -3,6 +3,9 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strconv"
@@ -46,7 +49,10 @@ func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Re
 
 func (s *VulinServer) registerSQLinj() {
 	var router = s.router
-	router.HandleFunc("/user/by-id-safe", func(writer http.ResponseWriter, request *http.Request) {
+
+	sqli := router.PathPrefix("/sqli").Subrouter()
+
+	sqli.HandleFunc("/user/by-id-safe", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		i, err := strconv.ParseInt(a, 10, 64)
 		if err != nil {
@@ -62,8 +68,8 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	})
-	router.HandleFunc("/user/id", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("sqli-user-by-id-safe")
+	sqli.HandleFunc("/user/id", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		u, err := s.database.GetUserByIdUnsafe(a)
 		if err != nil {
@@ -74,7 +80,7 @@ func (s *VulinServer) registerSQLinj() {
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
 	})
-	router.HandleFunc("/user/id-json", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/id-json", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		var jsonMap map[string]any
 		err := json.Unmarshal([]byte(a), &jsonMap)
@@ -99,7 +105,7 @@ func (s *VulinServer) registerSQLinj() {
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
 	})
-	router.HandleFunc("/user/id-b64-json", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/id-b64-json", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		decodedB64, err := codec.DecodeBase64(a)
 		if err != nil {
@@ -130,7 +136,7 @@ func (s *VulinServer) registerSQLinj() {
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
 	})
-	router.HandleFunc("/user/name", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/name", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("name")
 		u, err := s.database.GetUserByUsernameUnsafe(a)
 		if err != nil {
@@ -142,7 +148,7 @@ func (s *VulinServer) registerSQLinj() {
 		return
 	})
 
-	router.HandleFunc("/user/id-error", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/id-error", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		u, err := s.database.GetUserByIdUnsafe(a)
 		if err != nil {
@@ -159,7 +165,7 @@ func (s *VulinServer) registerSQLinj() {
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
 	})
-	router.HandleFunc("/user/cookie-id", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/cookie-id", func(writer http.ResponseWriter, request *http.Request) {
 		a, err := request.Cookie("ID")
 		if err != nil {
 			cookie := http.Cookie{
@@ -186,7 +192,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 	})
-	router.HandleFunc("/user/name/like", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/name/like", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetParams(request, "name")
 		msg := `select * from vulin_users where username LIKE '%` + name + `%';`
@@ -203,7 +209,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, msg)
 	})
-	router.HandleFunc("/user/name/like/2", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/name/like/2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetParams(request, "name")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
@@ -220,7 +226,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/name/like/b64", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/name/like/b64", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetBase64Params(request, "nameb64")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
@@ -237,7 +243,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/name/like/b64j", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/name/like/b64j", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetBase64JSONParam(request, "data", "nameb64j")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
@@ -254,7 +260,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/limit/int", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/int", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var limit = LoadFromGetParams(request, "limit")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') LIMIT ` + limit + `;`
@@ -272,7 +278,7 @@ func (s *VulinServer) registerSQLinj() {
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
 
-	router.HandleFunc("/user/limit/4/order1", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/4/order1", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "order")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + ` LIMIT 5;`
@@ -289,7 +295,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/limit/4/order2", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/4/order2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "order")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + `, created_at LIMIT 5;`
@@ -306,7 +312,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/order3", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/order3", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "order")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY created_at desc, username ` + data + `;`
@@ -323,7 +329,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/limit/4/orderby", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/4/orderby", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + data + ` desc LIMIT 5;`
@@ -340,7 +346,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/limit/4/orderby1", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/4/orderby1", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "` desc" + ` LIMIT 5;`
@@ -357,7 +363,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-	router.HandleFunc("/user/limit/4/orderby2", func(writer http.ResponseWriter, request *http.Request) {
+	sqli.HandleFunc("/user/limit/4/orderby2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
 		var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "`,created_at" + ` LIMIT 5;`
@@ -374,4 +380,23 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
+}
+
+func (s *VulinServer) GetSQLinjRoutePath() *coreplugin.VulInfo {
+	err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+
+		pathTemplate, _ := route.GetPathTemplate()
+		name := route.GetName() // 获取路由的名字（函数名）
+		fmt.Printf("路由地址：%s，对应的处理函数：%s\n", pathTemplate, name)
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("Error walking the routes: %v\n", err)
+	}
+	return &coreplugin.VulInfo{
+		Path:           "",
+		Headers:        nil,
+		ExpectedResult: nil,
+	}
 }
