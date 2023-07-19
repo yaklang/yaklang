@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	TypPnpm      = "npmp-lang"
+	TypNodePnpm TypAnalyzer = "npmp-lang"
+
 	pnpmLockYaml = "pnpm-lock.yaml"
 
 	pnpmLockStatus = 1
@@ -15,7 +16,7 @@ const (
 type pnpmAnalyzer struct{}
 
 func init() {
-	RegisterAnalyzer(TypPnpm, NewNodePnpmAnalyzer())
+	RegisterAnalyzer(TypNodePnpm, NewNodePnpmAnalyzer())
 }
 
 func NewNodePnpmAnalyzer() *pnpmAnalyzer {

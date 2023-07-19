@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	TypJar    TypAnalyzer = "jar-lang"
-	statusJar int         = 1
+	TypJavaJar TypAnalyzer = "jar-lang"
+	statusJar  int         = 1
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	RegisterAnalyzer(TypJar, NewJavaJarAnalyzer())
+	RegisterAnalyzer(TypJavaJar, NewJavaJarAnalyzer())
 }
 
 type jarAnalyzer struct{}

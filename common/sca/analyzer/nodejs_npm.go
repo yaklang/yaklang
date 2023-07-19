@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	TypNpm TypAnalyzer = "npm-lang"
+	TypNodeNpm TypAnalyzer = "npm-lang"
 
 	packageJson     = "package.json"
 	packageLockJson = "package-lock.json"
@@ -23,7 +23,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypNpm, NewNodeNpmAnalyzer())
+	RegisterAnalyzer(TypNodeNpm, NewNodeNpmAnalyzer())
 }
 
 type npmAnalyzer struct{}

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	TypYarn = "yarm-lang"
+	TypNodeYarn TypAnalyzer = "yarm-lang"
 
 	YarnLock       = "yarn.lock"
 	yarnLockStatus = 1
@@ -15,7 +15,7 @@ const (
 type yarnAnalyzer struct{}
 
 func init() {
-	RegisterAnalyzer(TypYarn, NewNodeYarnAnalyzer())
+	RegisterAnalyzer(TypNodeYarn, NewNodeYarnAnalyzer())
 }
 
 func NewNodeYarnAnalyzer() *yarnAnalyzer {

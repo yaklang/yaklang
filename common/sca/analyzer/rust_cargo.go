@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	TypCargo TypAnalyzer = "cargo-lang"
+	TypRustCargo TypAnalyzer = "cargo-lang"
 
 	CargoLock = "Cargo.lock"
 	CargoToml = "Cargo.toml"
@@ -16,7 +16,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypCargo, NewRustCargoAnalyzer())
+	RegisterAnalyzer(TypRustCargo, NewRustCargoAnalyzer())
 }
 
 type cargoAnalyzer struct{}
