@@ -2,18 +2,19 @@ package chaosmaker
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-func yieldRules() chan *ChaosMakerRule {
-	return YieldChaosMakerRules(consts.GetGormProfileDatabase().Model(&ChaosMakerRule{}), context.Background())
+func yieldRules() chan *rule.Storage {
+	return rule.YieldRules(consts.GetGormProfileDatabase().Model(&rule.Storage{}), context.Background())
 }
 
-func YieldRulesByKeywords(keywords string, protos ...string) chan *ChaosMakerRule {
-	db := consts.GetGormProfileDatabase().Model(&ChaosMakerRule{})
+func YieldRulesByKeywords(keywords string, protos ...string) chan *rule.Storage {
+	db := consts.GetGormProfileDatabase().Model(&rule.Storage{})
 	protos = utils.RemoveRepeatedWithStringSlice(protos)
 	if len(protos) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "protocol", protos)
@@ -21,7 +22,7 @@ func YieldRulesByKeywords(keywords string, protos ...string) chan *ChaosMakerRul
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		"name", "keywords",
 	}, utils.PrettifyListFromStringSplitEx(keywords, ",", "|"), false)
-	return YieldChaosMakerRules(db, context.Background())
+	return rule.YieldRules(db, context.Background())
 }
 
 func LoadSuricataToDatabase(raw string) error {
@@ -30,13 +31,13 @@ func LoadSuricataToDatabase(raw string) error {
 		return err
 	}
 	for _, r := range rules {
-		SaveSuricata(consts.GetGormProfileDatabase(), r)
+		rule.SaveSuricata(consts.GetGormProfileDatabase(), r)
 	}
 	return nil
 }
 
 var (
-	ChaosMakerExports = map[string]interface{}{
+	ChaosMakerExports = map[string]any{
 		"ParseSuricata":          suricata.Parse,
 		"YieldRules":             yieldRules,
 		"YieldRulesByKeyword":    YieldRulesByKeywords,

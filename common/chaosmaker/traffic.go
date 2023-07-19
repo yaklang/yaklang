@@ -1,9 +1,12 @@
 package chaosmaker
 
-import "github.com/yaklang/yaklang/common/suricata"
+import (
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
+	"github.com/yaklang/yaklang/common/suricata"
+)
 
 type ChaosTraffic struct {
-	ChaosRule             *ChaosMakerRule
+	ChaosRule             *rule.Storage
 	SuricataRule          *suricata.Rule
 	RawTCP                bool
 	LocalIP               string

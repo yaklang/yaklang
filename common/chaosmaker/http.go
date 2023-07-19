@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	uuid2 "github.com/satori/go.uuid"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -24,7 +25,7 @@ type httpHandler struct {
 
 var _ chaosHandler = (*httpHandler)(nil)
 
-func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *ChaosMakerRule, originRule *suricata.Rule) chan *ChaosTraffic {
+func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *suricata.Rule) chan *ChaosTraffic {
 	if originRule == nil {
 		return nil
 	}
@@ -361,7 +362,7 @@ func (h *httpHandler) MatchBytes(i interface{}) bool {
 	panic("implement me")
 }
 
-func HttpRequestBytesToChaosTraffic(mainRule *ChaosMakerRule, rule *suricata.Rule, req []byte) *ChaosTraffic {
+func HttpRequestBytesToChaosTraffic(mainRule *rule.Storage, rule *suricata.Rule, req []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:    mainRule,
 		SuricataRule: rule,
@@ -369,7 +370,7 @@ func HttpRequestBytesToChaosTraffic(mainRule *ChaosMakerRule, rule *suricata.Rul
 	}
 }
 
-func HttpResponseBytesToChaosTraffic(mainRule *ChaosMakerRule, rule *suricata.Rule, rsp []byte) *ChaosTraffic {
+func HttpResponseBytesToChaosTraffic(mainRule *rule.Storage, rule *suricata.Rule, rsp []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:    mainRule,
 		SuricataRule: rule,

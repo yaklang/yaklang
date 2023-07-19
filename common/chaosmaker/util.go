@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
@@ -10,9 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func ParseRuleFromRawSuricataRules(content string) []*ChaosMakerRule {
+func ParseRuleFromRawSuricataRules(content string) []*rule.Storage {
 
-	var rules []*ChaosMakerRule
+	var rules []*rule.Storage
 	for line := range utils.ParseLines(content) {
 		log.Infof("start to handle line: %v", line)
 		raw, err := suricata.Parse(line)
@@ -21,15 +22,15 @@ func ParseRuleFromRawSuricataRules(content string) []*ChaosMakerRule {
 			continue
 		}
 		for _, r := range raw {
-			rules = append(rules, NewChaosMakerRuleFromSuricata(r))
+			rules = append(rules, rule.NewRuleFromSuricata(r))
 		}
 	}
 
 	return rules
 }
 
-func ParseRuleFromHTTPRequestRawJSON(content string) []*ChaosMakerRule {
-	var rules []*ChaosMakerRule
+func ParseRuleFromHTTPRequestRawJSON(content string) []*rule.Storage {
+	var rules []*rule.Storage
 	for i := range utils.ParseLines(content) {
 		var r = map[string]string{}
 		err := json.Unmarshal([]byte(i), &r)
@@ -46,7 +47,7 @@ func ParseRuleFromHTTPRequestRawJSON(content string) []*ChaosMakerRule {
 			title, _ := r["title"]
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
-				rules = append(rules, NewHTTPRequestChaosMakerRule(title, raw))
+				rules = append(rules, rule.NewHTTPRequestRule(title, raw))
 			} else {
 				log.Error("database empty")
 			}

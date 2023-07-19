@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
@@ -146,10 +147,10 @@ func TestChaosMaker_HttpGenerate(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		var fRule []*ChaosMakerRule
+		var fRule []*rule.Storage
 		for _, r := range rules {
-			SaveSuricata(consts.GetGormProfileDatabase(), r)
-			fRule = append(fRule, NewChaosMakerRuleFromSuricata(r))
+			rule.SaveSuricata(consts.GetGormProfileDatabase(), r)
+			fRule = append(fRule, rule.NewRuleFromSuricata(r))
 		}
 		maker.FeedRule(fRule...)
 		res := maker.Generate()
@@ -168,24 +169,18 @@ func TestChaosMaker_HttpGenerate(t *testing.T) {
 			if debug {
 				println("START TO DEBUG")
 			}
-			if result.SuricataRule.Protocol == "http" {
-				if result.HttpRequest != nil {
-					if debug {
-						fmt.Println(string(result.HttpRequest))
-					}
+			switch result.SuricataRule.Protocol {
+			case "http":
+				if result.HttpRequest != nil && debug {
+					fmt.Println(string(result.HttpRequest))
 				}
-				if result.HttpResponse != nil {
-					if debug {
-						fmt.Println(string(result.HttpResponse))
-					}
+				if result.HttpResponse != nil && debug {
+					fmt.Println(string(result.HttpResponse))
 				}
-
 				if result.HttpRequest == nil && result.HttpResponse == nil {
 					panic("Empty Result")
 				}
-			}
-
-			if result.SuricataRule.Protocol == "tcp" {
+			case "tcp":
 				spew.Dump(result.TCPIPPayload)
 			}
 		}
@@ -262,7 +257,7 @@ func TestHTTPRequest(t *testing.T) {
 			println(count, title)
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
-				SaveHTTPRequest(db, title, raw)
+				rule.SaveHTTPRequest(db, title, raw)
 			} else {
 				log.Error("database empty")
 			}
@@ -306,7 +301,7 @@ func TestParseICMPEcho(t *testing.T) {
 			println(count, title)
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
-				SaveICMPTraffic(db, title, raw)
+				rule.SaveICMPTraffic(db, title, raw)
 			} else {
 				log.Error("database empty")
 			}
@@ -343,7 +338,7 @@ func TestParseTCP(t *testing.T) {
 			println(count, title)
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
-				SaveTCPTraffic(db, title, raw)
+				rule.SaveTCPTraffic(db, title, raw)
 			} else {
 				log.Error("database empty")
 			}
@@ -352,7 +347,7 @@ func TestParseTCP(t *testing.T) {
 }
 
 func TestTranslating(t *testing.T) {
-	consts.GetGormProfileDatabase().AutoMigrate(&ChaosMakerRule{})
+	consts.GetGormProfileDatabase().AutoMigrate(&rule.Storage{})
 	for r := range yieldRules() {
 		r.DecoratedByOpenAI(consts.GetGormProfileDatabase(), openai.WithAPIKeyFromYakitHome(), openai.WithProxy("http://127.0.0.1:7890"))
 	}
@@ -370,10 +365,10 @@ func TestChaosMaker_UDPBasedGenerate(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		var fRule []*ChaosMakerRule
+		var fRule []*rule.Storage
 		for _, r := range rules {
-			SaveSuricata(consts.GetGormProfileDatabase(), r)
-			fRule = append(fRule, NewChaosMakerRuleFromSuricata(r))
+			rule.SaveSuricata(consts.GetGormProfileDatabase(), r)
+			fRule = append(fRule, rule.NewRuleFromSuricata(r))
 		}
 		maker.FeedRule(fRule...)
 		res := maker.Generate()
@@ -428,12 +423,12 @@ func TestChaosMaker_UDPBasedGenerate(t *testing.T) {
 func TestExportChaosRulesToFile(t *testing.T) {
 	consts.InitilizeDatabase("", "")
 	consts.GetGormProjectDatabase()
-	ExportChaosRulesToFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
+	rule.ExportRulesToFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
 }
 
 func TestImportChaosRulesToFile(t *testing.T) {
 	consts.InitilizeDatabase("", "")
 	consts.GetGormProjectDatabase()
-	consts.GetGormProfileDatabase().AutoMigrate(&ChaosMakerRule{})
-	ImportChaosRulesFromFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
+	consts.GetGormProfileDatabase().AutoMigrate(&rule.Storage{})
+	rule.ImportRulesFromFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
 }
