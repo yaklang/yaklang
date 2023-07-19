@@ -58,6 +58,11 @@ type DNSLogGRPCServer struct {
 }
 
 func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.RequireDomainParams) (*tpb.RequireDomainResponse, error) {
+	switch strings.ToLower(params.Mode) {
+	case "dnslog.cn":
+	case "dig.pm-1433":
+	case "dig.pm-bypass":
+	}
 	token := utils.RandStringBytes(10)
 	token = strings.ToLower(token)
 	return &tpb.RequireDomainResponse{
