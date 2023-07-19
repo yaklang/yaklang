@@ -1,7 +1,7 @@
 package dnslogbrokers
 
 import (
-	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"time"
@@ -14,6 +14,10 @@ var defaultDigPm1433 = &digpm1433Broker{}
 
 func init() {
 	register("dig.pm-1433", &digpm1433Broker{})
+}
+
+func (s *digpm1433Broker) GetResult(du time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
+	return nil, utils.Error("emtpy result or not implemented")
 }
 
 func (s *digpm1433Broker) Require(du time.Duration, proxy ...string) (string, string, error) {
@@ -38,6 +42,14 @@ domain=ipv6.1433.eu.org.
 	if err != nil {
 		return "", "", utils.Errorf("send dig.pm packet failed: %v", err)
 	}
-	header, body := lowhttp.SplitHTTPPacket(rsp)
-	jsonpath.Find(body, `$.`)
+	_, body := lowhttp.SplitHTTPPacketFast(rsp)
+	var results = utils.ParseStringToGeneralMap(body)
+	token := utils.MapGetString(results, "token")
+	domain := utils.MapGetString(results, "domain")
+	key := utils.MapGetString(results, "key")
+	_ = key
+	if token == "" || domain == "" {
+		return "", "", utils.Errorf("cannot fetch token n domain from response: \n%v", string(rsp))
+	}
+	return domain, token, nil
 }

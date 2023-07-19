@@ -35,5 +35,5 @@ func Get(name string) (DNSLogBroker, error) {
 
 type DNSLogBroker interface {
 	Require(timeout time.Duration, proxy ...string) (domain, token string, err error)
-	GetResult() ([]*tpb.DNSLogEvent, error)
+	GetResult(timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error)
 }
