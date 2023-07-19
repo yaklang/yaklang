@@ -352,30 +352,29 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
-	var host, port, _ = ParseStringToHostPort(addr)
-	go func() {
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			panic(err)
-		}
-		go func() {
-			time.Sleep(du)
-			lis.Close()
-		}()
+	host, port, _ := ParseStringToHostPort(addr)
 
-		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				return
-			}
-			go func(c net.Conn) {
-				c.Write(rsp)
-				time.Sleep(50 * time.Millisecond)
-				c.Close()
-			}(conn)
+	// 创建http处理函数
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(rsp)
+	})
+
+	// 创建http服务器
+	server := &http.Server{Addr: addr}
+
+	// 启动http服务器
+	go func() {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("ListenAndServe(): %v", err)
 		}
-		lis.Close()
 	}()
+
+	// 关闭http服务器
+	go func() {
+		time.Sleep(du)
+		server.Close()
+	}()
+
 	time.Sleep(time.Millisecond * 100)
 	return host, port
 }
