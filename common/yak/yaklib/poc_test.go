@@ -1,19 +1,29 @@
 package yaklib
 
 import (
+	"net/http"
 	"net/http/httputil"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func TestPoC(t *testing.T) {
-	rsp, req, err := pocHTTP(`GET / HTTP/1.1
-Host: dppt98.guangdong.chinatax.gov.cn:8443
-
+	_, _, err := pocHTTP(`GET / HTTP/1.1
+Host: example.com
+	
 `)
-	spew.Dump(rsp, req, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = pocHTTPEx(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestPoCmethod(t *testing.T) {
