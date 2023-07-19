@@ -1041,7 +1041,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var (
 			method = originReqIns.Method
 		)
-		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
 		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestBytes, string(originReqRaw))
 
 		// 保证始终只有一个 Goroutine 在处理请求

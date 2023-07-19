@@ -88,9 +88,9 @@ func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 	if !ok {
 		return false
 	}
-	switch v.(type) {
+	switch ret := v.(type) {
 	case bool:
-		return true
+		return ret
 	default:
 		result, err := strconv.ParseBool(utils.InterfaceToString(v))
 		if err != nil {
