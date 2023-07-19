@@ -7,6 +7,7 @@ type BruteConfig struct {
 	passwordList []string
 
 	wsAddress     string
+	exePath       string
 	proxy         string
 	proxyUsername string
 	proxyPassword string
@@ -24,6 +25,8 @@ type BruteConfig struct {
 
 	loginDetect      loginDetectMode
 	similarityDegree float64
+
+	extraWaitLoadTime int
 }
 
 type BruteConfigOpt func(*BruteConfig)
@@ -76,6 +79,12 @@ func WithPasswords(passwords []string) BruteConfigOpt {
 func WithWsAddress(wsAddress string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.wsAddress = wsAddress
+	}
+}
+
+func WithExePath(exePath string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.exePath = exePath
 	}
 }
 
@@ -143,5 +152,11 @@ func WithLoginDetectMode(detectMode loginDetectMode, degree ...float64) BruteCon
 		if len(degree) > 0 {
 			config.similarityDegree = degree[0]
 		}
+	}
+}
+
+func WithExtraWaitLoadTime(time int) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.extraWaitLoadTime = time
 	}
 }
