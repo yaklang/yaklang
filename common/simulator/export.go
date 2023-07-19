@@ -22,6 +22,8 @@ var Exports = map[string]interface{}{
 	"captchaImgSelector":   httpbrute.WithCaptchaImgSelector,
 	"submitButtonSelector": httpbrute.WithButtonSelector,
 	"loginDetectMode":      httpbrute.WithLoginDetectMode,
+	"exePath":              httpbrute.WithExePath,
+	"extraWaitLoadTime":    httpbrute.WithExtraWaitLoadTime,
 
 	"urlChangeMode":     httpbrute.UrlChangeMode,
 	"htmlChangeMode":    httpbrute.HtmlChangeMode,
