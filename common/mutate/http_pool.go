@@ -712,16 +712,17 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						return
 					}
 					ret := &_httpResult{
-						Url:             urlStr,
-						Request:         reqIns,
-						Error:           err,
-						RequestRaw:      targetRequest,
-						ResponseRaw:     rsp,
-						DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
-						Timestamp:       time.Now().Unix(),
-						Payloads:        payloads,
-						Source:          config.Source,
-						LowhttpResponse: rspInstance,
+						Url:              urlStr,
+						Request:          reqIns,
+						Error:            err,
+						RequestRaw:       targetRequest,
+						ResponseRaw:      rsp,
+						DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
+						ServerDurationMs: rspInstance.TraceInfo.GetServerDurationMS(),
+						Timestamp:        time.Now().Unix(),
+						Payloads:         payloads,
+						Source:           config.Source,
+						LowhttpResponse:  rspInstance,
 					}
 					utils.Debug(func() {
 						println(string(rsp))

