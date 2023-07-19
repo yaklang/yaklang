@@ -19,6 +19,8 @@ func init() {
 type icmpHandler struct {
 }
 
+var _ chaosHandler = (*icmpHandler)(nil)
+
 func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "icmp" {
 		return nil
@@ -186,10 +188,6 @@ func parseCondition(condition string) int {
 		}
 		return fixed
 	}
-}
-
-func init() {
-	chaosMap.Store("suricata-icmp", &icmpHandler{})
 }
 
 func ICMPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
