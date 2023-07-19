@@ -1,6 +1,7 @@
 package chaosmaker
 
 import (
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/suricata"
 	"sync"
 )
@@ -12,7 +13,7 @@ import (
 */
 
 type chaosHandler interface {
-	Generator(maker *ChaosMaker, chaosRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic
+	Generator(maker *ChaosMaker, chaosRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic
 	MatchBytes(i any) bool
 }
 

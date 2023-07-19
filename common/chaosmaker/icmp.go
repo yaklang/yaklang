@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,7 +22,7 @@ type icmpHandler struct {
 
 var _ chaosHandler = (*icmpHandler)(nil)
 
-func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "icmp" {
 		return nil
 	}
@@ -190,7 +191,7 @@ func parseCondition(condition string) int {
 	}
 }
 
-func ICMPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func ICMPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:            makerRule,
 		SuricataRule:         r,
@@ -198,7 +199,7 @@ func ICMPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rul
 	}
 }
 
-func ICMPIPOutboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func ICMPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:             makerRule,
 		SuricataRule:          r,
