@@ -38,8 +38,9 @@ type DNSServer struct {
 	udpCoreServer *dns.Server
 	tcpCoreServer *dns.Server
 
-	callback      FacadeCallback
-	addrConvertor func(i string) string
+	hijackCallback func(t string, domain string) string
+	callback       FacadeCallback
+	addrConvertor  func(i string) string
 }
 
 func (d *DNSServer) SetCallback(f FacadeCallback) {
@@ -142,6 +143,9 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	case dns.TypeTXT:
 		visitorLog.SetDNSType("TXT")
 		var txts []string
+		if d.hijackCallback != nil {
+			txts = []string{d.hijackCallback("TXT", domain)}
+		}
 		if d.txtRecordHandler != nil {
 			txts = d.txtRecordHandler()
 		}
@@ -152,48 +156,68 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	case dns.TypeA:
 		log.Infof("recv A record from %v", w.RemoteAddr())
 		visitorLog.SetDNSType("A")
-		//nsHeader := dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}
-		handleCloud := func(ipAddress net.IP) {
-			m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ipAddress})
-
-			//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns1Domain})
-			//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns2Domain})
-			//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns1Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
-			//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns2Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
-		}
-		handleAppWithCname := func(cname string, ips ...net.IP) {
-			fqdnCname := dns.Fqdn(cname)
-			m.Answer = append(m.Answer, &dns.CNAME{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: ttl}, Target: fqdnCname})
-			for _, ip := range ips {
-				m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: fqdnCname, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip})
+		if d.hijackCallback != nil {
+			addr := net.ParseIP(utils.FixForParseIP(d.hijackCallback("A", domain)))
+			if addr != nil {
+				m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: addr})
 			}
+		} else {
+			//nsHeader := dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}
+			handleCloud := func(ipAddress net.IP) {
+				m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ipAddress})
 
-			//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns1Domain})
-			//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns2Domain})
-			//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns1Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
-			//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns2Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
-		}
-		_ = handleAppWithCname
+				//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns1Domain})
+				//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns2Domain})
+				//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns1Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
+				//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns2Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
+			}
+			handleAppWithCname := func(cname string, ips ...net.IP) {
+				fqdnCname := dns.Fqdn(cname)
+				m.Answer = append(m.Answer, &dns.CNAME{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: ttl}, Target: fqdnCname})
+				for _, ip := range ips {
+					m.Answer = append(m.Answer, &dns.A{Hdr: dns.RR_Header{Name: fqdnCname, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip})
+				}
 
-		switch {
-		case strings.EqualFold(domain, "aws"+d.dotDomain):
-			handleCloud(net.ParseIP("169.254.169.254"))
-		case strings.EqualFold(domain, "alibaba"+d.dotDomain):
-			handleCloud(net.ParseIP("100.100.100.200"))
-		//case strings.EqualFold(domain, "app"+h.dotDomain):
-		//	handleAppWithCname("projectdiscovery.github.io", net.ParseIP("185.199.108.153"), net.ParseIP("185.199.110.153"), net.ParseIP("185.199.111.153"), net.ParseIP("185.199.108.153"))
-		default:
-			handleCloud(d.ipAddr)
+				//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns1Domain})
+				//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns2Domain})
+				//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns1Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
+				//m.Extra = append(m.Extra, &dns.A{Hdr: dns.RR_Header{Name: d.ns2Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: d.ipAddr})
+			}
+			_ = handleAppWithCname
+
+			switch {
+			case strings.EqualFold(domain, "aws"+d.dotDomain):
+				handleCloud(net.ParseIP("169.254.169.254"))
+			case strings.EqualFold(domain, "alibaba"+d.dotDomain):
+				handleCloud(net.ParseIP("100.100.100.200"))
+			//case strings.EqualFold(domain, "app"+h.dotDomain):
+			//	handleAppWithCname("projectdiscovery.github.io", net.ParseIP("185.199.108.153"), net.ParseIP("185.199.110.153"), net.ParseIP("185.199.111.153"), net.ParseIP("185.199.108.153"))
+			default:
+				handleCloud(d.ipAddr)
+			}
 		}
 	//case dns.TypeSOA:
 	//	visitorLog.SetDNSType("SOA")
 	//	hostmaster := "admin" + d.dotDomain
 	//	m.Answer = append(m.Answer, &dns.SOA{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: ttl}, Ns: d.ns1Domain, Mbox: hostmaster})
 	case dns.TypeMX:
-		visitorLog.SetDNSType("MX")
-		m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: d.mxDomain, Preference: 1})
+		if d.hijackCallback != nil {
+			mx := d.hijackCallback("MX", domain)
+			if mx != "" {
+				m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: mx, Preference: 1})
+			}
+		} else {
+			visitorLog.SetDNSType("MX")
+			m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: d.mxDomain, Preference: 1})
+		}
 	case dns.TypeNS:
 		visitorLog.SetDNSType("NS")
+		if d.hijackCallback != nil {
+			ns := d.hijackCallback("NS", domain)
+			if ns != "" {
+				m.Answer = append(m.Answer, &dns.NS{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}, Ns: ns})
+			}
+		}
 		//nsHeader := dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}
 		//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns1Domain})
 		//m.Ns = append(m.Ns, &dns.NS{Hdr: nsHeader, Ns: d.ns2Domain})
