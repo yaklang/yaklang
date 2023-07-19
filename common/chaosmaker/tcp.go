@@ -21,6 +21,8 @@ func init() {
 type tcpHandler struct {
 }
 
+var _ chaosHandler = (*tcpHandler)(nil)
+
 func (t *tcpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "tcp" {
 		return nil

@@ -17,6 +17,8 @@ func init() {
 type udpHandler struct {
 }
 
+var _ chaosHandler = (*udpHandler)(nil)
+
 func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "udp" {
 		return nil
