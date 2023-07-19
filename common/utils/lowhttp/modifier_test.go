@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -844,6 +845,76 @@ d=1&e=555&f=1&e=111`), [2]string{"e", "555"}},
 			spew.Dump(vals)
 			spew.Dump(c)
 			panic(fmt.Sprintf("GetHTTPRequestQueryParamFull failed: %s", string(c[0].([]byte))))
+		}
+	}
+}
+
+func TestGetAllHTTPRequestQueryParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		expected map[string]string
+	}{
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+
+			expected: map[string]string{
+				"a": "1",
+				"b": "2",
+			},
+		},
+		{
+			origin: `GET /?a=1&b=2&a=3 HTTP/1.1
+Host: www.baidu.com
+`,
+
+			expected: map[string]string{
+				"a": "3",
+				"b": "2",
+			},
+		},
+	}
+	for _, testcase := range testcases {
+		actual := GetAllHTTPRequestQueryParams([]byte(testcase.origin))
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Fatalf("GetAllHTTPRequestQueryParam failed: %v", actual)
+		}
+	}
+}
+
+func TestGetAllHTTPRequestPostParam(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		expected map[string]string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+
+			expected: map[string]string{
+				"a": "1",
+				"b": "2",
+			},
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2&a=3`,
+
+			expected: map[string]string{
+				"a": "3",
+				"b": "2",
+			},
+		},
+	}
+	for _, testcase := range testcases {
+		actual := GetAllHTTPRequestPostParams([]byte(testcase.origin))
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Fatalf("GetAllHTTPRequestPostParam failed: %v", actual)
 		}
 	}
 }
