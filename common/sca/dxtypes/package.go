@@ -9,8 +9,6 @@ import (
 )
 
 type Package struct {
-	id string // name + version
-
 	Name           string
 	Version        string
 	IsVersionRange bool // Version is a version range
