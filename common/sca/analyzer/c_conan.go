@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	TypConan TypAnalyzer = "conan-lang"
+	TypClangConan TypAnalyzer = "conan-lang"
 
 	ConanLock = "conan.lock"
 
@@ -17,7 +17,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypConan, NewConanAnalyzer())
+	RegisterAnalyzer(TypClangConan, NewConanAnalyzer())
 }
 
 type conanAnalyzer struct{}
