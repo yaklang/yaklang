@@ -1014,6 +1014,17 @@ func GetIPFromHostWithContextAndDNSServers(
 	}
 
 	if DNSServers == nil {
+		addrs, _ := net.DefaultResolver.LookupHost(ctx, strings.Trim(domain, "."))
+		if len(addrs) > 0 {
+			for _, domain := range addrs {
+				if cb != nil {
+					if !cb(domain) {
+						return nil
+					}
+				}
+			}
+			return nil
+		}
 		DNSServers = DefaultDNSServer
 	}
 
