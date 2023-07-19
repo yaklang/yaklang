@@ -350,7 +350,6 @@ func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 		opt(config)
 	}
 
-	log.Infof("create temporary file to store the image: %s", imageID)
 	f, err := os.CreateTemp("", "fanal-*")
 	if err != nil {
 		return nil, utils.Errorf("failed to create a temporary file")
@@ -361,7 +360,6 @@ func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 		os.Remove(name)
 	}()
 
-	log.Infof("start to save the image: %s", imageID)
 	client, err := NewDockerClient(config.endpoint)
 	defer client.Close()
 	if err != nil {
