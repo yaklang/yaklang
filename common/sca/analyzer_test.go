@@ -948,77 +948,147 @@ func showPkgs(pkgs []*dxtypes.Package) {
 }
 
 func TestFilterAnalyzer(t *testing.T) {
+	getName := func(i interface{}) string {
+		return reflect.TypeOf(i).String()
+	}
+
+	compare := func(got, wanted []string) {
+		sort.Slice(wanted, func(i, j int) bool {
+			return strings.Compare(wanted[i], wanted[j]) < 0
+		})
+
+		sort.Slice(got, func(i, j int) bool {
+			return strings.Compare(got[i], got[j]) < 0
+		})
+
+		if len(got) != len(wanted) {
+			t.Fatalf("analyzers length error: %d(got) != %d(want)", len(got), len(wanted))
+		}
+		if !reflect.DeepEqual(got, wanted) {
+			t.Fatalf("analyzers error: %v(got) != %v(want)", got, wanted)
+		}
+	}
+
 	wantPkgAnalyzerTypes := []string{
-		reflect.TypeOf(analyzer.NewRPMAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewDpkgAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewApkAnalyzer()).String(),
+		getName(analyzer.NewRPMAnalyzer()),
+		getName(analyzer.NewDpkgAnalyzer()),
+		getName(analyzer.NewApkAnalyzer()),
 	}
+
 	wantLangAnalyzerTypes := []string{
-		reflect.TypeOf(analyzer.NewConanAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewGoBinaryAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewGoModAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewPHPComposerAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewJavaGradleAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewJavaPomAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewJavaJarAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewPythonPIPAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewPythonPackagingAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewPythonPIPEnvAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewPythonPoetryAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewNodeNpmAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewNodePnpmAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewNodeYarnAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewRubyBundlerAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewRubyGemSpecAnalyzer()).String(),
-		reflect.TypeOf(analyzer.NewRustCargoAnalyzer()).String(),
+		getName(analyzer.NewConanAnalyzer()),
+		getName(analyzer.NewGoBinaryAnalyzer()),
+		getName(analyzer.NewGoModAnalyzer()),
+		getName(analyzer.NewPHPComposerAnalyzer()),
+		getName(analyzer.NewJavaGradleAnalyzer()),
+		getName(analyzer.NewJavaPomAnalyzer()),
+		getName(analyzer.NewJavaJarAnalyzer()),
+		getName(analyzer.NewPythonPIPAnalyzer()),
+		getName(analyzer.NewPythonPackagingAnalyzer()),
+		getName(analyzer.NewPythonPIPEnvAnalyzer()),
+		getName(analyzer.NewPythonPoetryAnalyzer()),
+		getName(analyzer.NewNodeNpmAnalyzer()),
+		getName(analyzer.NewNodePnpmAnalyzer()),
+		getName(analyzer.NewNodeYarnAnalyzer()),
+		getName(analyzer.NewRubyBundlerAnalyzer()),
+		getName(analyzer.NewRubyGemSpecAnalyzer()),
+		getName(analyzer.NewRustCargoAnalyzer()),
 	}
 
-	wantAnalyzerTypes := []string{}
-	wantAnalyzerTypes = append(wantAnalyzerTypes, wantPkgAnalyzerTypes...)
-	wantAnalyzerTypes = append(wantAnalyzerTypes, wantLangAnalyzerTypes...)
+	t.Run("filter-by-mode", func(t *testing.T) {
+		wantAnalyzerTypes := []string{}
+		wantAnalyzerTypes = append(wantAnalyzerTypes, wantPkgAnalyzerTypes...)
+		wantAnalyzerTypes = append(wantAnalyzerTypes, wantLangAnalyzerTypes...)
 
-	testcases := []struct {
-		scanMode          analyzer.ScanMode
-		wantAnalyzerTypes []string
-	}{
-		{
-			scanMode:          analyzer.AllMode,
-			wantAnalyzerTypes: wantAnalyzerTypes,
-		},
-		{
-			scanMode:          analyzer.AllMode | analyzer.PkgMode, // mean PkgMode
-			wantAnalyzerTypes: wantPkgAnalyzerTypes,
-		},
-		{
-			scanMode:          analyzer.PkgMode,
-			wantAnalyzerTypes: wantPkgAnalyzerTypes,
-		},
-		{
-			scanMode:          analyzer.LanguageMode,
-			wantAnalyzerTypes: wantLangAnalyzerTypes,
-		},
-	}
-
-	for _, testcase := range testcases {
-		wantTypes := testcase.wantAnalyzerTypes
-		got := analyzer.FilterAnalyzer(testcase.scanMode)
-		gotTypes := lo.Map(got, func(a analyzer.Analyzer, _ int) string {
-			return reflect.TypeOf(a).String()
-		})
-
-		sort.Slice(wantTypes, func(i, j int) bool {
-			return strings.Compare(wantTypes[i], wantTypes[j]) < 0
-		})
-
-		sort.Slice(gotTypes, func(i, j int) bool {
-			return strings.Compare(gotTypes[i], gotTypes[j]) < 0
-		})
-
-		if len(got) != len(wantTypes) {
-			t.Fatalf("analyzers length error: %d(got) != %d(want)", len(got), len(wantTypes))
+		testcases := []struct {
+			scanMode          analyzer.ScanMode
+			wantAnalyzerTypes []string
+		}{
+			{
+				scanMode:          analyzer.AllMode,
+				wantAnalyzerTypes: wantAnalyzerTypes,
+			},
+			{
+				scanMode:          analyzer.AllMode | analyzer.PkgMode, // mean PkgMode
+				wantAnalyzerTypes: wantPkgAnalyzerTypes,
+			},
+			{
+				scanMode:          analyzer.PkgMode,
+				wantAnalyzerTypes: wantPkgAnalyzerTypes,
+			},
+			{
+				scanMode:          analyzer.LanguageMode,
+				wantAnalyzerTypes: wantLangAnalyzerTypes,
+			},
 		}
-		if !reflect.DeepEqual(gotTypes, wantTypes) {
-			t.Fatalf("analyzers error: %v(got) != %v(want)", gotTypes, wantTypes)
+
+		for _, testcase := range testcases {
+			wantTypes := testcase.wantAnalyzerTypes
+			got := analyzer.FilterAnalyzer(testcase.scanMode, nil)
+			gotTypes := lo.Map(got, func(a analyzer.Analyzer, _ int) string {
+				return getName(a)
+			})
+			compare(gotTypes, wantTypes)
+
 		}
-	}
+	})
+
+	t.Run("filter-by-analyzer-name", func(t *testing.T) {
+		testcases := []struct {
+			usedAnalayzers    []analyzer.TypAnalyzer
+			wantAnalyzerTypes []string
+		}{
+			{
+				usedAnalayzers:    []analyzer.TypAnalyzer{analyzer.TypRPM},
+				wantAnalyzerTypes: []string{getName(analyzer.NewRPMAnalyzer())},
+			},
+			{
+				usedAnalayzers:    []analyzer.TypAnalyzer{analyzer.TypRPM, analyzer.TypAPK},
+				wantAnalyzerTypes: []string{getName(analyzer.NewRPMAnalyzer()), getName(analyzer.NewApkAnalyzer())},
+			},
+		}
+		for _, testcase := range testcases {
+			wantTypes := testcase.wantAnalyzerTypes
+			got := analyzer.FilterAnalyzer(analyzer.AllMode, testcase.usedAnalayzers)
+			gotTypes := lo.Map(got, func(a analyzer.Analyzer, _ int) string {
+				return getName(a)
+			})
+			compare(gotTypes, wantTypes)
+		}
+	})
+
+	t.Run("filter-by-analyzer-name-and-mode", func(t *testing.T) {
+		wantAnalyzerTypes1 := make([]string, 0)
+		wantAnalyzerTypes1 = append(wantAnalyzerTypes1, wantPkgAnalyzerTypes...)
+		wantAnalyzerTypes1 = append(wantAnalyzerTypes1, getName(analyzer.NewConanAnalyzer()))
+
+		wantAnalyzerTypes2 := make([]string, 0)
+		wantAnalyzerTypes2 = append(wantAnalyzerTypes2, wantLangAnalyzerTypes...)
+		wantAnalyzerTypes2 = append(wantAnalyzerTypes2, getName(analyzer.NewDpkgAnalyzer()))
+
+		testcases := []struct {
+			scanMode          analyzer.ScanMode
+			usedAnalayzers    []analyzer.TypAnalyzer
+			wantAnalyzerTypes []string
+		}{
+			{
+				scanMode:          analyzer.PkgMode,
+				usedAnalayzers:    []analyzer.TypAnalyzer{analyzer.TypClangConan},
+				wantAnalyzerTypes: wantAnalyzerTypes1,
+			},
+			{
+				scanMode:          analyzer.LanguageMode,
+				usedAnalayzers:    []analyzer.TypAnalyzer{analyzer.TypDPKG},
+				wantAnalyzerTypes: wantAnalyzerTypes2,
+			},
+		}
+		for _, testcase := range testcases {
+			wantTypes := testcase.wantAnalyzerTypes
+			got := analyzer.FilterAnalyzer(testcase.scanMode, testcase.usedAnalayzers)
+			gotTypes := lo.Map(got, func(a analyzer.Analyzer, _ int) string {
+				return getName(a)
+			})
+			compare(gotTypes, wantTypes)
+		}
+	})
 }

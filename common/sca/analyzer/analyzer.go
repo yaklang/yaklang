@@ -80,14 +80,14 @@ func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
 	analyzerTyp[a] = typ
 }
 
-func FilterAnalyzer(mode ScanMode) []Analyzer {
-	ret := make([]Analyzer, 0, len(analyzers))
-	if mode == AllMode {
+func FilterAnalyzer(mode ScanMode, usedAnalyzers []TypAnalyzer) []Analyzer {
+	if mode == AllMode && len(usedAnalyzers) == 0 {
 		return lo.MapToSlice(analyzers, func(_ TypAnalyzer, a Analyzer) Analyzer {
 			return a
 		})
 	}
 
+	ret := make([]Analyzer, 0, len(analyzers))
 	for analyzerName, a := range analyzers {
 		// filter by ScanMode
 		if mode&PkgMode == PkgMode {
@@ -104,15 +104,21 @@ func FilterAnalyzer(mode ScanMode) []Analyzer {
 		}
 
 	}
+
+	for _, typ := range usedAnalyzers {
+		if a, ok := analyzers[typ]; ok {
+			ret = append(ret, a)
+		}
+	}
 	return ret
 }
 
-func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
+func NewAnalyzerGroup(numWorkers int, scanMode ScanMode, usedAnalyzers []TypAnalyzer) *AnalyzerGroup {
 	return &AnalyzerGroup{
 		ch:               make(chan AnalyzeFileInfo),
 		numWorkers:       numWorkers,
 		matchedFileInfos: make(map[string]FileInfo),
-		analyzers:        FilterAnalyzer(scanMode),
+		analyzers:        FilterAnalyzer(scanMode, usedAnalyzers),
 		pkgs:             make([]*dxtypes.Package, 0),
 	}
 }
