@@ -29,18 +29,20 @@ const (
 )
 
 type dockerContextConfig struct {
-	endpoint   string
-	numWorkers int
-	scanMode   analyzer.ScanMode
+	endpoint       string
+	numWorkers     int
+	scanMode       analyzer.ScanMode
+	usedAnalayzers []analyzer.TypAnalyzer
 }
 
 type dockerContextOption func(*dockerContextConfig)
 
 func NewDockerContextConfig() *dockerContextConfig {
 	return &dockerContextConfig{
-		numWorkers: 5,
-		endpoint:   "",
-		scanMode:   analyzer.AllMode,
+		numWorkers:     5,
+		endpoint:       "",
+		scanMode:       analyzer.AllMode,
+		usedAnalayzers: []analyzer.TypAnalyzer{},
 	}
 }
 
@@ -59,6 +61,12 @@ func _withScanMode(mode analyzer.ScanMode) dockerContextOption {
 func _withConcurrent(n int) dockerContextOption {
 	return func(c *dockerContextConfig) {
 		c.numWorkers = n
+	}
+}
+
+func _withAnalayzers(a ...analyzer.TypAnalyzer) dockerContextOption {
+	return func(c *dockerContextConfig) {
+		c.usedAnalayzers = append(c.usedAnalayzers, a...)
 	}
 }
 
@@ -209,7 +217,7 @@ func walkLayer(rc io.ReadCloser, handler walkFunc) error {
 }
 
 func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
 
 	// match file
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -236,7 +244,7 @@ func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes
 }
 
 func scanContainer(rc io.ReadCloser, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
 
 	// match file
 	err := walkLayer(rc, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -263,7 +271,7 @@ func scanContainer(rc io.ReadCloser, config dockerContextConfig) ([]*dxtypes.Pac
 }
 
 func scanFS(fsPath string, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
 
 	// match file
 	err := walkFS(fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
