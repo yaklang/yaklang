@@ -5,13 +5,20 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"math/rand"
+	"strings"
 	"sync"
 	"time"
 )
 
 var brokers = new(sync.Map)
+var list []string
+var registerMutex = new(sync.Mutex)
 
 func register(i DNSLogBroker) {
+	registerMutex.Lock()
+	defer registerMutex.Unlock()
+
 	var name = i.Name()
 	_, ok := brokers.Load(name)
 	if ok {
@@ -19,6 +26,30 @@ func register(i DNSLogBroker) {
 		return
 	}
 	brokers.Store(name, i)
+	list = append(list, name)
+}
+
+func Random() string {
+	registerMutex.Lock()
+	defer registerMutex.Unlock()
+	if len(list) == 0 {
+		return ""
+	}
+	if strings.Join(list, "") == "*" {
+		return ""
+	}
+	return list[rand.Intn(len(list))]
+}
+
+func AvialableBrokers() []string {
+	var a = []string{"*"}
+	brokers.Range(func(key, value any) bool {
+		if ret := utils.InterfaceToString(key); ret != "" {
+			a = append(a, ret)
+		}
+		return true
+	})
+	return a
 }
 
 func Get(name string) (DNSLogBroker, error) {
