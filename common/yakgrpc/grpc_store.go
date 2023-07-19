@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"sync"
 )
 
@@ -22,6 +23,16 @@ func (s *Server) UpdateFromGithub(ctx context.Context, req *ypb.UpdateFromGithub
 }
 
 func (s *Server) GetKey(ctx context.Context, req *ypb.GetKeyRequest) (*ypb.GetKeyResult, error) {
+	// patch
+	switch req.GetKey() {
+	case "YAKIT_MITMDefaultDnsServers":
+		patched := req.GetKey() + "_PATCHED"
+		result, _ := strconv.ParseBool(yakit.GetKey(s.GetProfileDatabase(), patched))
+		if !result {
+			yakit.SetKey(s.GetProfileDatabase(), req.GetKey(), "[]")
+			yakit.SetKey(s.GetProfileDatabase(), patched, "true")
+		}
+	}
 	result := yakit.GetKey(s.GetProfileDatabase(), req.GetKey())
 	return &ypb.GetKeyResult{
 		Value: utils.EscapeInvalidUTF8Byte([]byte(result)),
@@ -108,7 +119,6 @@ func (s *Server) DelKey(ctx context.Context, req *ypb.GetKeyRequest) (*ypb.Empty
 
 	return &ypb.Empty{}, nil
 }
-
 
 func (s *Server) GetProjectKey(ctx context.Context, req *ypb.GetKeyRequest) (*ypb.GetKeyResult, error) {
 	result := yakit.GetProjectKey(s.GetProjectDatabase(), req.GetKey())
