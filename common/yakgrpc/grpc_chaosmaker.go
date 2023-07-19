@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -22,7 +23,7 @@ func (s *Server) ImportChaosMakerRules(ctx context.Context, req *ypb.ImportChaos
 		return nil, utils.Error("empty content")
 	}
 
-	var rules []*chaosmaker.ChaosMakerRule
+	var rules []*rule.Storage
 	switch strings.ToLower(req.GetRuleType()) {
 	case "suricata":
 		log.Infof("start to load suricata rules from content-len: %v", utils.ByteSize(uint64(len(req.GetContent()))))
@@ -32,27 +33,27 @@ func (s *Server) ImportChaosMakerRules(ctx context.Context, req *ypb.ImportChaos
 	}
 	log.Infof("load suricata rules finished! fetch rule: %v", len(rules))
 	for _, i := range rules {
-		chaosmaker.CreateOrUpdateChaosMakerRule(consts.GetGormProfileDatabase(), i.CalcHash(), i)
+		rule.UpsertRule(consts.GetGormProfileDatabase(), i.CalcHash(), i)
 	}
 	return &ypb.Empty{}, nil
 }
 
 func (s *Server) QueryChaosMakerRule(ctx context.Context, req *ypb.QueryChaosMakerRuleRequest) (*ypb.QueryChaosMakerRuleResponse, error) {
-	p, res, err := chaosmaker.QueryChaosMakerRule(consts.GetGormProfileDatabase(), req)
+	p, res, err := rule.QueryRule(consts.GetGormProfileDatabase(), req)
 	if err != nil {
-		return nil, utils.Errorf("QueryChaosMakerRule failed: %s", err)
+		return nil, utils.Errorf("QueryRule failed: %s", err)
 	}
 	return &ypb.QueryChaosMakerRuleResponse{
 		Pagination: req.GetPagination(),
 		Total:      int64(p.TotalRecord),
-		Data: funk.Map(res, func(i *chaosmaker.ChaosMakerRule) *ypb.ChaosMakerRule {
+		Data: funk.Map(res, func(i *rule.Storage) *ypb.ChaosMakerRule {
 			return i.ToGPRCModel()
 		}).([]*ypb.ChaosMakerRule),
 	}, nil
 }
 
 func (s *Server) DeleteChaosMakerRuleByID(ctx context.Context, req *ypb.DeleteChaosMakerRuleByIDRequest) (*ypb.Empty, error) {
-	err := chaosmaker.DeleteSuricataChaosMakerRuleByID(consts.GetGormProfileDatabase(), req.GetId())
+	err := rule.DeleteSuricataRuleByID(consts.GetGormProfileDatabase(), req.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		} else {
 			generator := chaosmaker.NewChaosMaker()
 			sendLog("info", "开始加载全部模拟攻击剧本")
-			for rule := range chaosmaker.YieldChaosMakerRules(consts.GetGormProfileDatabase(), stream.Context()) {
+			for rule := range rule.YieldRules(consts.GetGormProfileDatabase(), stream.Context()) {
 				generator.FeedRule(rule)
 			}
 			sendLog("info", "模拟场景加载完成，共加载规则: %v", len(generator.ChaosRules))

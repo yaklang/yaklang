@@ -2,6 +2,7 @@ package chaosmaker
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
@@ -12,10 +13,10 @@ import (
 
 type ChaosMaker struct {
 	LocalIPAddress string
-	ChaosRules     []*ChaosMakerRule
+	ChaosRules     []*rule.Storage
 }
 
-func NewChaosMakerWithRules(rules []*ChaosMakerRule) *ChaosMaker {
+func NewChaosMakerWithRules(rules []*rule.Storage) *ChaosMaker {
 	return &ChaosMaker{ChaosRules: rules, LocalIPAddress: utils.GetLocalIPAddress()}
 }
 
@@ -24,8 +25,8 @@ func NewChaosMaker() *ChaosMaker {
 }
 
 func (c *ChaosMaker) ApplyAll() error {
-	for r := range YieldChaosMakerRules(
-		consts.GetGormProfileDatabase().Model(&ChaosMakerRule{}),
+	for r := range rule.YieldRules(
+		consts.GetGormProfileDatabase().Model(&rule.Storage{}),
 		context.Background(),
 	) {
 		c.FeedRule(r)
@@ -33,7 +34,7 @@ func (c *ChaosMaker) ApplyAll() error {
 	return nil
 }
 
-func (c *ChaosMaker) FeedRule(a ...*ChaosMakerRule) {
+func (c *ChaosMaker) FeedRule(a ...*rule.Storage) {
 	c.ChaosRules = append(c.ChaosRules, a...)
 }
 
@@ -59,7 +60,7 @@ func (c *ChaosMaker) Generate() chan *ChaosTraffic {
 	return fChan
 }
 
-func (c *ChaosMaker) generate(r *ChaosMakerRule) (chan *ChaosTraffic, error) {
+func (c *ChaosMaker) generate(r *rule.Storage) (chan *ChaosTraffic, error) {
 	switch strings.ToLower(r.RuleType) {
 	case "suricata":
 		return c._suricataGenerate(r)
@@ -97,7 +98,7 @@ func (c *ChaosMaker) generate(r *ChaosMakerRule) (chan *ChaosTraffic, error) {
 	}
 }
 
-func (c *ChaosMaker) _suricataGenerate(originRule *ChaosMakerRule) (chan *ChaosTraffic, error) {
+func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *ChaosTraffic, error) {
 	if originRule == nil {
 		return nil, utils.Error("rule is nil")
 	}

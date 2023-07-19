@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
@@ -735,7 +735,7 @@ var translatingCommand = cli.Command{
 	Hidden: true,
 	Action: func(c *cli.Context) error {
 		if c.Bool("chaosmaker-rules") {
-			chaosmaker.DecorateRules(c.Int("concurrent"), "http://127.0.0.1:7890")
+			rule.DecorateRules(c.Int("concurrent"), "http://127.0.0.1:7890")
 			return nil
 		}
 

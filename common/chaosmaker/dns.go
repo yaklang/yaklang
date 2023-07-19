@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,7 +19,7 @@ type dnsHandler struct {
 
 var _ chaosHandler = (*dnsHandler)(nil)
 
-func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "dns" {
 		return nil
 	}
@@ -139,7 +140,7 @@ func (h *dnsHandler) MatchBytes(i any) bool {
 	return false
 }
 
-func DNSIPBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func DNSIPBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:            makerRule,
 		SuricataRule:         r,

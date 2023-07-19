@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,7 +20,7 @@ type udpHandler struct {
 
 var _ chaosHandler = (*udpHandler)(nil)
 
-func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "udp" {
 		return nil
 	}
@@ -170,7 +171,7 @@ func (h *udpHandler) MatchBytes(i interface{}) bool {
 	panic("implement me")
 }
 
-func UDPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func UDPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:           makerRule,
 		SuricataRule:        r,
@@ -178,7 +179,7 @@ func UDPIPInboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule
 	}
 }
 
-func UDPIPOutboundBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func UDPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:            makerRule,
 		SuricataRule:         r,
