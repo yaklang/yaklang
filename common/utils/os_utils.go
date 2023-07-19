@@ -354,25 +354,28 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 	time.Sleep(time.Millisecond * 300)
 	host, port, _ := ParseStringToHostPort(addr)
 
-	// 创建http处理函数
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(rsp)
-	})
-
-	// 创建http服务器
-	server := &http.Server{Addr: addr}
-
-	// 启动http服务器
 	go func() {
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe(): %v", err)
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			panic(err)
 		}
-	}()
+		go func() {
+			time.Sleep(du)
+			lis.Close()
+		}()
 
-	// 关闭http服务器
-	go func() {
-		time.Sleep(du)
-		server.Close()
+		for {
+			conn, err := lis.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				time.Sleep(50 * time.Millisecond)
+				c.Write(rsp)
+				c.Close()
+			}(conn)
+		}
+		lis.Close()
 	}()
 
 	time.Sleep(time.Millisecond * 100)
