@@ -3,6 +3,7 @@ package yaklib
 import (
 	"context"
 	"net/http"
+	"net/http/httputil"
 	"reflect"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 
 	"github.com/pkg/errors"
 
@@ -469,15 +471,36 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
 	return config, nil
 }
 
-func handleRawPacketAndConfig(raw interface{}, opts ...PocConfig) ([]byte, *_pocConfig, error) {
+func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocConfig, error) {
 	var packet []byte
-	switch raw.(type) {
+	switch ret := i.(type) {
 	case string:
-		packet = []byte(raw.(string))
+		packet = []byte(ret)
 	case []byte:
-		packet = raw.([]byte)
+		packet = ret
+	case http.Request:
+		r := &ret
+		lowhttp.FixRequestHostAndPort(r)
+		raw, err := httputil.DumpRequest(r, true)
+		if err != nil {
+			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+		}
+		packet = raw
+	case *http.Request:
+		lowhttp.FixRequestHostAndPort(ret)
+		raw, err := httputil.DumpRequest(ret, true)
+		if err != nil {
+			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+		}
+		packet = raw
+	case *yakhttp.YakHttpRequest:
+		raw, err := httputil.DumpRequest(ret.Request, true)
+		if err != nil {
+			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+		}
+		packet = raw
 	default:
-		return nil, nil, utils.Errorf("cannot support: %s", reflect.TypeOf(raw))
+		return nil, nil, utils.Errorf("cannot support: %s", reflect.TypeOf(i))
 	}
 
 	// poc 模块收 proxy 影响
@@ -604,8 +627,8 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 	return response, err
 }
 
-func pocHTTPEx(raw interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-	packet, config, err := handleRawPacketAndConfig(raw, opts...)
+func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -620,8 +643,8 @@ func pocHTTPEx(raw interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *h
 	return response, request, nil
 }
 
-func pocHTTP(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
-	packet, config, err := handleRawPacketAndConfig(raw, opts...)
+func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
