@@ -6,9 +6,6 @@ import (
 	"compress/flate"
 	"compress/zlib"
 	"fmt"
-	"github.com/yaklang/yaklang/common/filter"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"math"
@@ -23,6 +20,10 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"golang.org/x/net/http/httpguts"
 )
@@ -697,4 +698,31 @@ func IsPermessageDeflate(headers http.Header) bool {
 		}
 	}
 	return isDeflate
+}
+
+func FixRequestHostAndPort(r *http.Request) {
+	var host string
+	if r.Host != "" {
+		host = r.Host
+	}
+
+	if host == "" {
+		host = r.Header.Get("Host")
+	}
+
+	if host == "" {
+		host = r.URL.Host
+	}
+
+	if host != "" && r.URL.Host == "" {
+		r.URL.Host = host
+	}
+
+	host, port, err := utils.ParseStringToHostPort(r.URL.String())
+	if err != nil {
+		return
+	}
+	r.Host = utils.HostPort(host, port)
+	r.Header.Set("Host", r.Host)
+	r.URL.Host = r.Host
 }
