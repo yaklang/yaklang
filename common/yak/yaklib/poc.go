@@ -334,6 +334,15 @@ func _pocOptReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
 	}
 }
 
+func _pocOptReplaceHttpPacketPath(path string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketPath(packet, path)
+		},
+		)
+	}
+}
+
 func _pocOptReplaceHttpPacketQueryParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -383,6 +392,15 @@ func _pocOptAppendPostParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketPostParam(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendHttpPacketPath(path string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketPath(packet, path)
 		},
 		)
 	}
@@ -725,10 +743,12 @@ var PoCExports = map[string]interface{}{
 	"replaceBody":          _pocOptReplaceHttpPacketBody,
 	"replaceQueryParam":    _pocOptReplaceHttpPacketQueryParam,
 	"replacePostParam":     _pocOptReplaceHttpPacketPostParam,
+	"replacePath":          _pocOptReplaceHttpPacketPath,
 	"appendHeader":         _pocOptAppendHeader,
 	"appendCookie":         _pocOptAppendCookie,
 	"appendQueryParam":     _pocOptAppendQueryParam,
 	"appendPostParam":      _pocOptAppendPostParam,
+	"appendPath":           _pocOptAppendHttpPacketPath,
 	"deleteHeader":         _pocOptDeleteHeader,
 	"deleteCookie":         _pocOptDeleteCookie,
 	"deleteQueryParam":     _pocOptDeleteQueryParam,
@@ -756,10 +776,12 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketCookie":     lowhttp.ReplaceHTTPPacketCookie,
 	"ReplaceHTTPPacketQueryParam": lowhttp.ReplaceHTTPPacketQueryParam,
 	"ReplaceHTTPPacketPostParam":  lowhttp.ReplaceHTTPPacketPostParam,
+	"ReplaceHTTPPacketPath":       lowhttp.ReplaceHTTPPacketPath,
 	"AppendHTTPPacketHeader":      lowhttp.AppendHTTPPacketHeader,
 	"AppendHTTPPacketCookie":      lowhttp.AppendHTTPPacketCookie,
 	"AppendHTTPPacketQueryParam":  lowhttp.AppendHTTPPacketQueryParam,
 	"AppendHTTPPacketPostParam":   lowhttp.AppendHTTPPacketPostParam,
+	"AppendHTTPPacketPath":        lowhttp.AppendHTTPPacketPath,
 	"DeleteHTTPPacketHeader":      lowhttp.DeleteHTTPPacketHeader,
 	"DeleteHTTPPacketCookie":      lowhttp.DeleteHTTPPacketCookie,
 	"DeleteHTTPPacketQueryParam":  lowhttp.DeleteHTTPPacketQueryParam,

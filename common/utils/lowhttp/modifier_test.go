@@ -1068,3 +1068,91 @@ b=2`,
 		}
 	}
 }
+
+func TestReplaceHTTPPacketPath(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		path     string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "path",
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "/path",
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET invalid HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "/path",
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := ReplaceHTTPPacketPath([]byte(testcase.origin), testcase.path)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketPath failed: %s", string(actual))
+		}
+	}
+}
+
+func TestAppendHTTPPacketPath(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		path     string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "/path",
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /prefix HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "/path",
+			expected: `GET /prefix/path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /prefix HTTP/1.1
+Host: www.baidu.com
+`,
+			path: "path",
+			expected: `GET /prefix/path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := AppendHTTPPacketPath([]byte(testcase.origin), testcase.path)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("AddHTTPPacketPath failed: %s", string(actual))
+		}
+	}
+}
