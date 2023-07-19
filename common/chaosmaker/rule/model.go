@@ -1,4 +1,4 @@
-package chaosmaker
+package rule
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-type ChaosMakerRule struct {
+type Storage struct {
 	gorm.Model
 
 	RawTrafficBeyondIPPacketBase64  string
@@ -51,8 +51,8 @@ type ChaosMakerRule struct {
 	CVE           string
 }
 
-func QueryChaosMakerRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*bizhelper.Paginator, []*ChaosMakerRule, error) {
-	db = db.Model(&ChaosMakerRule{})
+func QueryRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*bizhelper.Paginator, []*Storage, error) {
+	db = db.Model(&Storage{})
 
 	params := req.GetPagination()
 
@@ -64,7 +64,7 @@ func QueryChaosMakerRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*biz
 
 	db = bizhelper.QueryOrder(db, params.OrderBy, params.Order)
 
-	var ret []*ChaosMakerRule
+	var ret []*Storage
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -73,7 +73,7 @@ func QueryChaosMakerRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*biz
 	return paging, ret, nil
 }
 
-func (c *ChaosMakerRule) ToGPRCModel() *ypb.ChaosMakerRule {
+func (c *Storage) ToGPRCModel() *ypb.ChaosMakerRule {
 	return &ypb.ChaosMakerRule{
 		Id:                              int64(c.ID),
 		RawTrafficBeyondIpPacketBase64:  c.RawTrafficBeyondIPPacketBase64,
@@ -96,7 +96,7 @@ func (c *ChaosMakerRule) ToGPRCModel() *ypb.ChaosMakerRule {
 	}
 }
 
-func (c *ChaosMakerRule) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOption) {
+func (c *Storage) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOption) {
 	/*
 		这是一个提炼攻击流量特征的任务，请提炼 %v 中的特征关键字（去除引用）？提取成 json array，以方便系统打标签和筛选，提供中文和英文的版本，放在 json 中，以 keywords 和 keywords_zh 作为字段，再描述一下这个特征（中文50字以内，去除‘检测’等字段意图），作为 description_zh 字段，同时补充他的 description（英文）
 	*/
@@ -166,7 +166,7 @@ func (c *ChaosMakerRule) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOpt
 		}
 	}
 
-	err := CreateOrUpdateChaosMakerRule(db, c.Hash, c)
+	err := UpsertRule(db, c.Hash, c)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -175,7 +175,7 @@ func (c *ChaosMakerRule) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOpt
 func DecorateRules(concurrent int, proxy string) {
 	var db = consts.GetGormProfileDatabase()
 	swg := utils.NewSizedWaitGroup(concurrent)
-	for r := range YieldChaosMakerRules(db, context.Background()) {
+	for r := range YieldRules(db, context.Background()) {
 		swg.Add()
 		r := r
 		go func() {
@@ -186,7 +186,7 @@ func DecorateRules(concurrent int, proxy string) {
 	swg.Wait()
 }
 
-func (c *ChaosMakerRule) CalcHash() string {
+func (c *Storage) CalcHash() string {
 	c.Hash = utils.CalcSha1(
 		c.RawTrafficBeyondIPPacketBase64,
 		c.RawTrafficBeyondLinkLayerBase64,
@@ -197,7 +197,7 @@ func (c *ChaosMakerRule) CalcHash() string {
 	return c.Hash
 }
 
-func (c *ChaosMakerRule) BeforeSave() error {
+func (c *Storage) BeforeSave() error {
 	if c.Hash == "" {
 		c.CalcHash()
 	}
@@ -207,14 +207,14 @@ func (c *ChaosMakerRule) BeforeSave() error {
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		if db := consts.GetGormProfileDatabase(); db != nil {
-			db.AutoMigrate(&ChaosMakerRule{})
+			db.AutoMigrate(&Storage{})
 		}
 		return nil
 	})
 }
 
-func NewChaosMakerRuleFromSuricata(s *suricata.Rule) *ChaosMakerRule {
-	return &ChaosMakerRule{
+func NewRuleFromSuricata(s *suricata.Rule) *Storage {
+	return &Storage{
 		SuricataRaw: s.Raw,
 		Protocol:    s.Protocol,
 		RuleType:    "suricata",
@@ -225,12 +225,12 @@ func NewChaosMakerRuleFromSuricata(s *suricata.Rule) *ChaosMakerRule {
 }
 
 func SaveSuricata(db *gorm.DB, s *suricata.Rule) error {
-	r := NewChaosMakerRuleFromSuricata(s)
-	return CreateOrUpdateChaosMakerRule(db, r.CalcHash(), r)
+	r := NewRuleFromSuricata(s)
+	return UpsertRule(db, r.CalcHash(), r)
 }
 
-func NewHTTPRequestChaosMakerRule(name string, raw []byte) *ChaosMakerRule {
-	return &ChaosMakerRule{
+func NewHTTPRequestRule(name string, raw []byte) *Storage {
+	return &Storage{
 		Model:                      gorm.Model{},
 		RawTrafficBeyondHTTPBase64: codec.EncodeBase64(raw),
 		RuleType:                   "http-request",
@@ -241,12 +241,12 @@ func NewHTTPRequestChaosMakerRule(name string, raw []byte) *ChaosMakerRule {
 }
 
 func SaveHTTPRequest(db *gorm.DB, name string, raw []byte) error {
-	r := NewHTTPRequestChaosMakerRule(name, raw)
-	return CreateOrUpdateChaosMakerRule(db, r.CalcHash(), r)
+	r := NewHTTPRequestRule(name, raw)
+	return UpsertRule(db, r.CalcHash(), r)
 }
 
 func SaveTCPTraffic(db *gorm.DB, name string, raw []byte) error {
-	r := &ChaosMakerRule{
+	r := &Storage{
 		Model:                          gorm.Model{},
 		RawTrafficBeyondIPPacketBase64: codec.EncodeBase64(raw),
 		RuleType:                       "tcp",
@@ -254,11 +254,11 @@ func SaveTCPTraffic(db *gorm.DB, name string, raw []byte) error {
 		Action:                         "alert",
 		Name:                           name,
 	}
-	return CreateOrUpdateChaosMakerRule(db, r.CalcHash(), r)
+	return UpsertRule(db, r.CalcHash(), r)
 }
 
 func SaveICMPTraffic(db *gorm.DB, name string, raw []byte) error {
-	r := &ChaosMakerRule{
+	r := &Storage{
 		Model:                          gorm.Model{},
 		RawTrafficBeyondIPPacketBase64: codec.EncodeBase64(raw),
 		RuleType:                       "icmp",
@@ -266,50 +266,50 @@ func SaveICMPTraffic(db *gorm.DB, name string, raw []byte) error {
 		Action:                         "alert",
 		Name:                           name,
 	}
-	return CreateOrUpdateChaosMakerRule(db, r.CalcHash(), r)
+	return UpsertRule(db, r.CalcHash(), r)
 }
 
-var saveChaosMaker = sync.Mutex{}
+var saveChaosMaker sync.Mutex
 
-func CreateOrUpdateChaosMakerRule(db *gorm.DB, hash string, i interface{}) error {
+func UpsertRule(db *gorm.DB, hash string, i interface{}) error {
 	saveChaosMaker.Lock()
 	defer saveChaosMaker.Unlock()
 
-	db = db.Model(&ChaosMakerRule{})
+	db = db.Model(&Storage{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&ChaosMakerRule{}); db.Error != nil {
-		return utils.Errorf("create/update ChaosMakerRule failed: %s", db.Error)
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Storage{}); db.Error != nil {
+		return utils.Errorf("create/update Storage failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetSuricataChaosMakerRule(db *gorm.DB, id int64) (*ChaosMakerRule, error) {
-	var req ChaosMakerRule
-	if db := db.Model(&ChaosMakerRule{}).Where("id = ?", id).First(&req); db.Error != nil {
-		return nil, utils.Errorf("get ChaosMakerRule failed: %s", db.Error)
+func GetSuricataChaosMakerRule(db *gorm.DB, id int64) (*Storage, error) {
+	var req Storage
+	if db := db.Model(&Storage{}).Where("id = ?", id).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get Storage failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func DeleteSuricataChaosMakerRuleByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&ChaosMakerRule{}).Where(
+func DeleteSuricataRuleByID(db *gorm.DB, id int64) error {
+	if db := db.Model(&Storage{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&ChaosMakerRule{}); db.Error != nil {
+	).Unscoped().Delete(&Storage{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func YieldChaosMakerRules(db *gorm.DB, ctx context.Context) chan *ChaosMakerRule {
-	outC := make(chan *ChaosMakerRule)
+func YieldRules(db *gorm.DB, ctx context.Context) chan *Storage {
+	outC := make(chan *Storage)
 	go func() {
 		defer close(outC)
 
 		var page = 1
 		for {
-			var items []*ChaosMakerRule
+			var items []*Storage
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -337,13 +337,13 @@ func YieldChaosMakerRules(db *gorm.DB, ctx context.Context) chan *ChaosMakerRule
 	return outC
 }
 
-func ExportChaosRulesToFile(db *gorm.DB, fileName string) error {
+func ExportRulesToFile(db *gorm.DB, fileName string) error {
 	fp, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
 	defer fp.Close()
-	for result := range YieldChaosMakerRules(db.Model(&ChaosMakerRule{}), context.Background()) {
+	for result := range YieldRules(db.Model(&Storage{}), context.Background()) {
 		raw, err := json.Marshal(result)
 		if err != nil {
 			log.Errorf("marshal rules failed: %s", err)
@@ -355,16 +355,16 @@ func ExportChaosRulesToFile(db *gorm.DB, fileName string) error {
 	return nil
 }
 
-func ImportChaosRulesFromFile(db *gorm.DB, fileName string) error {
+func ImportRulesFromFile(db *gorm.DB, fileName string) error {
 	fp, err := os.Open(fileName)
 	if err != nil {
 		return err
 	}
 	defer fp.Close()
 
-	raw, _ := ioutil.ReadAll(fp)
+	raw, _ := io.ReadAll(fp)
 	for result := range utils.ParseLines(string(raw)) {
-		var rule ChaosMakerRule
+		var rule Storage
 		if err := json.Unmarshal([]byte(result), &rule); err != nil {
 			log.Errorf("unmarshal rules failed: %s", err)
 			continue
@@ -373,7 +373,7 @@ func ImportChaosRulesFromFile(db *gorm.DB, fileName string) error {
 		rule.DeletedAt = nil
 		rule.CreatedAt = time.Now()
 		rule.UpdatedAt = time.Now()
-		if err := CreateOrUpdateChaosMakerRule(db, rule.Hash, rule); err != nil {
+		if err := UpsertRule(db, rule.Hash, rule); err != nil {
 			log.Errorf("create/update rules failed: %s", err)
 			continue
 		}

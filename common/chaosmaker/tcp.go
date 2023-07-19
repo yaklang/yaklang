@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +24,7 @@ type tcpHandler struct {
 
 var _ chaosHandler = (*tcpHandler)(nil)
 
-func (t *tcpHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
+func (t *tcpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "tcp" {
 		return nil
 	}
@@ -268,7 +269,7 @@ func splitRangeString(input string) (int, int, error) {
 	return minimum, maximum, nil
 }
 
-func TCPIPBytesToChaosTraffic(makerRule *ChaosMakerRule, r *suricata.Rule, raw []byte) *ChaosTraffic {
+func TCPIPBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
 	return &ChaosTraffic{
 		ChaosRule:    makerRule,
 		SuricataRule: r,
