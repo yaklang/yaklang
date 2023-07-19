@@ -11,7 +11,8 @@ import (
 
 var brokers = new(sync.Map)
 
-func register(name string, i DNSLogBroker) {
+func register(i DNSLogBroker) {
+	var name = i.Name()
 	_, ok := brokers.Load(name)
 	if ok {
 		log.Errorf("broker: %v is existed", name)
@@ -35,5 +36,6 @@ func Get(name string) (DNSLogBroker, error) {
 
 type DNSLogBroker interface {
 	Require(timeout time.Duration, proxy ...string) (domain, token string, err error)
-	GetResult(timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error)
+	GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error)
+	Name() string
 }
