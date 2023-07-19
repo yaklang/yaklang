@@ -298,13 +298,6 @@ func scanFS(fsPath string, config dockerContextConfig) ([]*dxtypes.Package, erro
 }
 
 func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOption) (pkgs []*dxtypes.Package, err error) {
-	// merge pkgs
-	// defer func() {
-	// 	if len(pkgs) > 0 {
-	// 		pkgs =
-	// 	}
-	// }
-
 	config := NewDockerContextConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -341,7 +334,7 @@ func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOpt
 	}
 	pkgs = append(pkgs, containerPkgs...)
 
-	return pkgs, nil
+	return analyzer.MergePackages(pkgs), nil
 }
 
 func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
@@ -374,7 +367,7 @@ func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 		return nil, utils.Errorf("failed to scan image[%s] : %v", imageID, err)
 	}
 
-	return pkgs, nil
+	return analyzer.MergePackages(pkgs), nil
 }
 
 func ScanDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
@@ -394,5 +387,5 @@ func ScanDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtyp
 		return nil, utils.Errorf("failed to scan image from filepath[%s] : %v", path, err)
 	}
 
-	return pkgs, nil
+	return analyzer.MergePackages(pkgs), nil
 }
