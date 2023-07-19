@@ -1,3 +1,0 @@
-# 这里的 Probe 的 Name 很关键
-# 最后做 Probe 整理的时候会按照名称，将 Probe 进行整合
-Probe TCP NULL q||

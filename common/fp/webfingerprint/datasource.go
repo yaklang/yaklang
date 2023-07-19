@@ -2,14 +2,14 @@ package webfingerprint
 
 import (
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/embed"
 	"path"
 )
 
 func LoadDefaultDataSource() ([]*WebRule, error) {
-	content, err := bindata.Asset("data/fingerprint-rules.yml.gz")
+	content, err := embed.Asset("data/fingerprint-rules.yml.gz")
 	if err != nil {
 		return nil, errors.Errorf("get local web fingerprint rules failed: %s", err)
 	}
@@ -27,7 +27,7 @@ func LoadDefaultDataSource() ([]*WebRule, error) {
 
 	// 加载用户自定义的规则库
 	userDefinedPath := "data/user-wfp-rules"
-	files, err := bindata.AssetDir(userDefinedPath)
+	files, err := embed.AssetDir(userDefinedPath)
 	if err != nil {
 		log.Infof("user defined rules is missed: %s", err)
 		return rules, nil
@@ -35,7 +35,7 @@ func LoadDefaultDataSource() ([]*WebRule, error) {
 
 	for _, fileName := range files {
 		absFileName := path.Join(userDefinedPath, fileName)
-		content, err := bindata.Asset(absFileName)
+		content, err := embed.Asset(absFileName)
 		if err != nil {
 			log.Warnf("bindata fetch asset: %s failed: %s", absFileName, err)
 			continue
