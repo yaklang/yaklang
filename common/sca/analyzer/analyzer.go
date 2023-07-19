@@ -65,7 +65,8 @@ type AnalyzerGroup struct {
 	numWorkers int
 
 	// return
-	pkgs []*dxtypes.Package
+	pkgLock sync.Mutex
+	pkgs    []*dxtypes.Package
 
 	// matched file
 	matchedFileInfos map[string]FileInfo
@@ -112,6 +113,7 @@ func NewAnalyzerGroup(numWorkers int, scanMode ScanMode) *AnalyzerGroup {
 		numWorkers:       numWorkers,
 		matchedFileInfos: make(map[string]FileInfo),
 		analyzers:        FilterAnalyzer(scanMode),
+		pkgs:             make([]*dxtypes.Package, 0),
 	}
 }
 
@@ -131,7 +133,9 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 					for _, pkg := range pkgs {
 						pkg.SetFrom(string(analyzerTyp[fileInfo.Self.Analyzer]), fileInfo.Self.Path)
 					}
+					ag.pkgLock.Lock()
 					ag.pkgs = append(ag.pkgs, pkgs...)
+					ag.pkgLock.Unlock()
 				}
 			}
 		}()
