@@ -714,6 +714,32 @@ func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
 	return []string{}
 }
 
+func GetAllHTTPRequestPostParams(packet []byte) map[string]string {
+	body := GetHTTPPacketBody(packet)
+	vals, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil
+	}
+	ret := make(map[string]string)
+	for k, v := range vals {
+		ret[k] = v[len(v)-1]
+	}
+	return ret
+}
+
+func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
+	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
+	if err != nil {
+		return nil
+	}
+	vals := u.Query()
+	ret := make(map[string]string)
+	for k, v := range vals {
+		ret[k] = v[len(v)-1]
+	}
+	return nil
+}
+
 func GetStatusCodeFromResponse(packet []byte) int {
 	var statusCode int
 	SplitHTTPPacket(packet, nil, func(proto string, code int, codeMsg string) error {
