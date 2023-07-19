@@ -400,6 +400,7 @@ func (generalElement *GeneralElement) Input(inputStr string) {
 	err := generalElement.element.SelectAllText()
 	if err != nil {
 		generalElement.Redirect()
+		generalElement.element.SelectAllText()
 	} else {
 		generalElement.element.Type(input.Backspace)
 	}

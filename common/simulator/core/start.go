@@ -47,6 +47,11 @@ func (mode *StartMode) setContext(ctx context.Context) {
 	configFunc(&mode.config)
 }
 
+func (mode *StartMode) SetExePath(exePath string) {
+	configFunc := config.WithExePath(exePath)
+	configFunc(&mode.config)
+}
+
 func (mode *StartMode) Test() {
 
 }

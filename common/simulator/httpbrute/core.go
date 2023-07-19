@@ -4,14 +4,14 @@ package httpbrute
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
-
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/simulator/core"
 	"github.com/yaklang/yaklang/common/simulator/extend"
 	"github.com/yaklang/yaklang/common/utils"
+	"regexp"
+	"strings"
+	"time"
 )
 
 type SimulatorCore interface {
@@ -220,6 +220,9 @@ func (bruteForce *BruteForceCore) inputClickTry(username, password string) (bool
 	bruteForce.usernameElement.Input(username)
 	bruteForce.passwordElement.Input(password)
 	if bruteForce.captchaElement != nil {
+		if bruteForce.config.extraWaitLoadTime != 0 {
+			time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
+		}
 		captchaStr, err := bruteForce.captchaDetectModule.Detect(bruteForce.captchaImgElement)
 		if err != nil {
 			return false, err
@@ -303,6 +306,9 @@ func (bruteForce *BruteForceCore) Start() error {
 	browserModule.SetURL(bruteForce.targetUrl)
 	if bruteForce.config.wsAddress != "" {
 		browserModule.SetWsAddress(bruteForce.config.wsAddress)
+	}
+	if bruteForce.config.exePath != "" {
+		browserModule.SetExePath(bruteForce.config.exePath)
 	}
 	if bruteForce.config.proxy != "" {
 		browserModule.SetProxy(bruteForce.config.proxy, bruteForce.config.proxyUsername, bruteForce.config.proxyPassword)
