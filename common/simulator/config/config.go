@@ -13,6 +13,7 @@ type PageConfig struct {
 	proxyPassword string `default:""`
 
 	wsAddress string `default:""`
+	exePath   string `default:""`
 
 	ctx context.Context
 }
@@ -27,6 +28,10 @@ func (pc *PageConfig) Proxy() (string, string, string) {
 
 func (pc *PageConfig) WsAddress() string {
 	return pc.wsAddress
+}
+
+func (pc *PageConfig) ExePath() string {
+	return pc.exePath
 }
 
 func (pageConfig *PageConfig) Context() context.Context {
@@ -66,5 +71,11 @@ func WithContext(context context.Context) ConfigFunc {
 func WithWsAddress(wsAddress string) ConfigFunc {
 	return func(config *PageConfig) {
 		config.wsAddress = wsAddress
+	}
+}
+
+func WithExePath(exePath string) ConfigFunc {
+	return func(config *PageConfig) {
+		config.exePath = exePath
 	}
 }

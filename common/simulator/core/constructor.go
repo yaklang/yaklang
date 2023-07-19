@@ -189,6 +189,10 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 		browser = browser.Client(client)
 	} else {
 		launch := launcher.New()
+		if conf.ExePath() != "" {
+			//log.Info("exe path: ", conf.ExePath())
+			launch = launch.Bin(conf.ExePath())
+		}
 		if proxy != "" {
 			launch.Proxy(proxy)
 		}
