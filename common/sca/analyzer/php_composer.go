@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	TypComposer TypAnalyzer = "composer-lang"
+	TypPHPComposer TypAnalyzer = "composer-lang"
 
 	phpLockFile = "composer.lock"
 	phpJsonFile = "composer.json"
@@ -21,7 +21,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypComposer, NewPHPComposerAnalyzer())
+	RegisterAnalyzer(TypPHPComposer, NewPHPComposerAnalyzer())
 }
 
 type composerAnalyzer struct{}

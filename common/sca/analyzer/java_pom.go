@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	TypPom TypAnalyzer = "pom-lang"
+	TypJavaPom TypAnalyzer = "pom-lang"
 
 	MavenPom = "pom.xml"
 
@@ -17,7 +17,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypPom, NewJavaPomAnalyzer())
+	RegisterAnalyzer(TypJavaPom, NewJavaPomAnalyzer())
 }
 
 type pomAnalyzer struct{}

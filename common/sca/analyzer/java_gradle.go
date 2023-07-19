@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	TypGradle TypAnalyzer = "gradle-lang"
+	TypJavaGradle TypAnalyzer = "gradle-lang"
 
 	javaGradleFile = "gradle.lockfile"
 
@@ -17,7 +17,7 @@ const (
 )
 
 func init() {
-	RegisterAnalyzer(TypGradle, NewJavaGradleAnalyzer())
+	RegisterAnalyzer(TypJavaGradle, NewJavaGradleAnalyzer())
 }
 
 type gradleAnalyzer struct{}
