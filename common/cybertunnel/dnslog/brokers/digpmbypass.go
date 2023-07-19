@@ -9,20 +9,20 @@ import (
 	"time"
 )
 
-type digpm1433Broker struct {
+type digpmByPassBroker struct {
 }
 
-func (c *digpm1433Broker) Name() string {
-	return "dig.pm-1433"
+func (c *digpmByPassBroker) Name() string {
+	return "dig.pm-bypass"
 }
 
-var defaultDigPm1433 = &digpm1433Broker{}
+var defaultDigPMBYPASS = &digpmByPassBroker{}
 
 func init() {
-	register(defaultDigPm1433)
+	register(defaultDigPMBYPASS)
 }
 
-func (s *digpm1433Broker) GetResult(token string, du time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
+func (s *digpmByPassBroker) GetResult(token string, du time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
 	var packet = `POST /get_results HTTP/1.1
 Host: dig.pm
 Accept-Encoding: identity
@@ -31,7 +31,7 @@ Origin: https://dig.pm
 Referer: https://dig.pm/
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
 
-domain=ipv6.1433.eu.org.&token=ab`
+domain=ipv6.bypass.eu.org.&token=ab`
 
 	rsp, err := lowhttp.HTTP(
 		lowhttp.WithPacket(lowhttp.ReplaceHTTPPacketPostParam([]byte(packet), "token", token)),
@@ -43,15 +43,6 @@ domain=ipv6.1433.eu.org.&token=ab`
 		return nil, err
 	}
 
-	/*
-		{
-		    "0": {
-		        "ip": "172.253.0.3:63509",
-		        "subdomain": "Bf3B80Fb.ipv6.1433.eu.org.",
-		        "time": "2023-07-19T12:58:15+08:00"
-		    }
-		}
-	*/
 	_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
 	var results []*tpb.DNSLogEvent
 	for _, data := range utils.ParseStringToGeneralMap(body) {
@@ -67,7 +58,6 @@ domain=ipv6.1433.eu.org.&token=ab`
 		if subdomain == "" {
 			continue
 		}
-
 		var remoteAddr string
 		var remoteIP string
 		var remotePort int32
@@ -105,7 +95,7 @@ domain=ipv6.1433.eu.org.&token=ab`
 	return nil, utils.Error("emtpy result or not implemented")
 }
 
-func (s *digpm1433Broker) Require(du time.Duration, proxy ...string) (string, string, error) {
+func (s *digpmByPassBroker) Require(du time.Duration, proxy ...string) (string, string, error) {
 	packet := `POST /new_gen HTTP/1.1
 Host: dig.pm
 Content-Type: application/x-www-form-urlencoded
@@ -113,7 +103,7 @@ Origin: https://dig.pm
 Referer: https://dig.pm/
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
 
-domain=ipv6.1433.eu.org.`
+domain=ipv6.bypass.eu.org.`
 	/*
 
 	 */
