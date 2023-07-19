@@ -737,7 +737,7 @@ func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
 	for k, v := range vals {
 		ret[k] = v[len(v)-1]
 	}
-	return nil
+	return ret
 }
 
 func GetStatusCodeFromResponse(packet []byte) int {
