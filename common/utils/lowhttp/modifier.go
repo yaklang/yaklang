@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"unsafe"
 
@@ -39,6 +40,89 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 		return line
 	})
 	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+}
+
+func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+
+			if !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			u.Path = p
+			requestUri = u.String()
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func AppendHTTPPacketPath(packet []byte, p string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+
+			u.Path = path.Join(u.Path, p)
+			requestUri = u.String()
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
