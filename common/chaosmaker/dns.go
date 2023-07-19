@@ -16,7 +16,7 @@ func init() {
 type dnsHandler struct {
 }
 
-var _ chaosHandler = &dnsHandler{}
+var _ chaosHandler = (*dnsHandler)(nil)
 
 func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *ChaosMakerRule, rule *suricata.Rule) chan *ChaosTraffic {
 	if rule.Protocol != "dns" {

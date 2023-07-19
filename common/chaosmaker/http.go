@@ -22,6 +22,8 @@ func init() {
 type httpHandler struct {
 }
 
+var _ chaosHandler = (*httpHandler)(nil)
+
 func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *ChaosMakerRule, originRule *suricata.Rule) chan *ChaosTraffic {
 	if originRule == nil {
 		return nil
