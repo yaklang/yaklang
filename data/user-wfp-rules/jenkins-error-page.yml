@@ -1,6 +1,0 @@
-# <a href="http://jenkins-ci.org/">Jenkins ver. 1.400</a>
-- methods:
-    - keywords:
-        - product: jenkins
-          regexp: < *a href="http://jenkins-ci.org/">Jenkins ver. ([\d\.]+)</a>
-          version_index: 1

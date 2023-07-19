@@ -2,10 +2,10 @@ package fp
 
 import (
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/embed"
 	"path"
 	"sync"
 )
@@ -18,7 +18,7 @@ var (
 )
 
 func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
-	content, err := bindata.Asset("data/nfp.gz")
+	content, err := embed.Asset("data/nfp.gz")
 	if err != nil {
 		return nil, errors.Errorf("get local service probe failed: %s", err)
 	}
@@ -48,7 +48,7 @@ func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 
 	// 加载用户自定义的规则库
 	userDefinedPath := "data/user-fp-rules"
-	files, err := bindata.AssetDir(userDefinedPath)
+	files, err := embed.AssetDir(userDefinedPath)
 	if err != nil {
 		log.Infof("user defined rules is missed: %s", err)
 		return rules, nil
@@ -56,7 +56,7 @@ func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 
 	for _, fileName := range files {
 		absFileName := path.Join(userDefinedPath, fileName)
-		content, err := bindata.Asset(absFileName)
+		content, err := embed.Asset(absFileName)
 		if err != nil {
 			log.Warnf("bindata fetch asset: %s failed: %s", absFileName, err)
 			continue

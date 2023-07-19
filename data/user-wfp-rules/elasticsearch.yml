@@ -1,7 +1,0 @@
-- methods:
-    - keywords:
-        - regexp: You Know, for Search
-          product: elasticsearch
-        - product: elasticsearch
-          regexp: '"number" ?: ?"([\d\.]+)",?.*'
-          version_index: 1

@@ -1,6 +1,0 @@
-# Redis key-value store
-Probe TCP Redis q|*1\r\n$4\r\ninfo\r\n|
-rarity 3
-ports 6379
-match redis m|-ERR operation not permitted\r\n|s p/Redis key-value store/ cpe:/*:redis/a
-match redis m|^\$\d+\r\n(?:#[^\r\n]*\r\n)*redis_version:([.\d]+)\r\n|s p/Redis key-value store/ v/$1/ cpe:/a:*:redis:$1/a

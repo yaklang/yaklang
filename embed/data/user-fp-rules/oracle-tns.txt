@@ -1,0 +1,27 @@
+Probe TCP ORACLE q|\0Z\0\0\x01\0\0\0\x016\x01,\0\0\x08\0\x7F\xFF\x7F\x08\0\0\0\x01\0 \0:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\04\xE6\0\0\0\x01\0\0\0\0\0\0\0\0(CONNECT_DATA=(COMMAND=version))|
+rarity 1
+ports 1035,1521,1522,1525,1526,1574,1748,1754,14238,20000
+
+match http m|^HTTP/1\.0 400 Bad Request\r\nDate: .*\r\nServer: Boa/([\w._-]+)\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n<HTML><HEAD><TITLE>400 Bad Request</TITLE></HEAD>\n<BODY><H1>400 Bad Request</H1>\nYour client has issued a malformed or illegal request\.\n</BODY></HTML>\n$| p/Boa httpd/ v/$1/ i/Prolink ADSL router/ d/broadband router/ cpe:/a:boa:boa:$1/
+
+match iscsi m|^\x3f\x80\x04\0\0\0\x00\x30\0\0\0\0\0\0\0\0\xff\xff\xff\xff\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01\xf7\0\0\0\0\0\0\0\0\0\0\0\0\0Z\0\0\x01\0\0\0\x016\x01\x2c\0\0\x08\0\x7f\xff\x7f\x08\0\0\0\x01\0\x20\0\x3a\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x004\xe6\0\0$| p/iSCSI/
+match iscsi m|^\x3f\x80\x04\0\0\0\x00\x30\0\0\0\0\0\0\0\0\xff\xff\xff\xff\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x00\x00\0\0\0\0\0\0\0\0\0\0\0\0\0Z\0\0\x01\0\0\0\x016\x01\x2c\0\0\x08\0\x7f\xff\x7f\x08\0\0\0\x01\0\x20\0\x3a\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x004\xe6\0\0$| p/HP StorageWorks D2D backup system iSCSI/ d/storage-misc/
+
+match palm-hotsync m|^\x01.\0\0\0\x14\x11\x01\0\0\0\0\0\0\0\x20\0\0\0\x06\x01\0..\0\0$|s p/Palm Pilot HotSync/
+
+match oracle-tns m|^\0.\0\0[\x02\x04]\0\0\0.*TNSLSNR for ([-.+/ \w]{2,24}): Version ([-\d.]+) - Production|s p/Oracle TNS Listener/ v/$2/ i/for $1/
+match dbsnmp m|^\0.\0\0\x02\0\0\0.*\(IAGENT = \(AGENT_VERSION = ([\d.]+)\)\(RPC_VERSION = ([\d.]+)\)\)|s p/Oracle Intelligent Agent/ v/$1/ i/RPC v$2/
+match oracle m|^\0\x20\0\0\x02\0\0\0\x016\0\0\x08\0\x7f\xff\x01\0\0\0\0\x20|s p/Oracle Database/ cpe:/a:oracle:database_server/
+match oracle m|^\+\0\0\0$| p/Oracle Database/ cpe:/a:oracle:database_server/
+match oracle-tns m|^..\0\0\x04\0\0\0\"\0..\(DESCRIPTION=\(TMP=\)\(VSNNUM=\d+\)\(ERR=1189\)\(ERROR_STACK=\(ERROR=\(CODE=1189\)\(EMFI=4\)\)| p/Oracle TNS Listener/ i/unauthorized/
+match oracle-tns m|^..\0\0\x04\0\0\0\"\0..\(DESCRIPTION=\(TMP=\)\(VSNNUM=\d+\)\(ERR=1194\)\(ERROR_STACK=\(ERROR=\(CODE=1194\)\(EMFI=4\)\)\)\)| p/Oracle TNS Listener/ i/insecure transport/
+match oracle-tns m|^..\0\0\x04\0\0\0\"\0..\(DESCRIPTION=\(ERR=12504\)\)\0| p/Oracle TNS listener/ i/requires service name/
+softmatch oracle-tns m|^\0.\0\0[\x02\x04]\0\0\0.*\([ABD-Z]|s p/Oracle TNS Listener/
+match dbsnmp m|^\0,\0\0\x04\0\0\0\"\0\0 \(CONNECT_DATA=\(COMMAND=version\)\)| p/Oracle DBSNMP/
+
+match hp-radia m|^\xff\xff$| p/HP Radia configuration server/
+
+match winbox m|^.\x01\0.M2\x01\0\xff\x88\0\0\x02\0\xff\x88[\x01\x02]\0|s p/MikroTik WinBox/ cpe:/a:mikrotik:winbox/
+
+# TrinityCore
+match wow m|^\0\0\t.{32}\x01..{32}| p/World of Warcraft authserver/

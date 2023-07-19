@@ -2,7 +2,7 @@ package feedly
 
 import (
 	"github.com/gilliek/go-opml/opml"
-	"github.com/yaklang/yaklang/common/bindata"
+	"github.com/yaklang/yaklang/embed"
 )
 
 func viewOutlines(ols []opml.Outline, f func(outline opml.Outline)) {
@@ -31,7 +31,7 @@ func LoadOpmlRawToOutlines(raw []byte) ([]opml.Outline, error) {
 }
 
 func LoadOutlinesFromBindata() ([]opml.Outline, error) {
-	raw, err := bindata.Asset("data/rss/feedly.opml")
+	raw, err := embed.Asset("data/rss/feedly.opml")
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func LoadOutlinesFromBindata() ([]opml.Outline, error) {
 	r, _ = LoadOpmlRawToOutlines(raw)
 	outls = append(outls, r...)
 
-	raw, err = bindata.Asset("data/rss/cyber_security_rss.opml")
+	raw, err = embed.Asset("data/rss/cyber_security_rss.opml")
 	if err != nil {
 		return nil, err
 	}

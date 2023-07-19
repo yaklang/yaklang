@@ -3,13 +3,13 @@ package antlr4nasl
 import (
 	"context"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/bindata"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/embed"
 	"os"
 	"path"
 	"path/filepath"
@@ -210,7 +210,7 @@ func (e *Engine) EvalInclude(name string) error {
 	}
 	//本地文件加载失败，从内置文件中加载
 	if sourceBytes == nil {
-		data, err := bindata.Asset("data/nasl-incs/" + name)
+		data, err := embed.Asset("data/nasl-incs/" + name)
 		if err != nil {
 			err = utils.Errorf("not found include file: %s", name)
 			log.Error(err)
