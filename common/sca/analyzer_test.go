@@ -182,674 +182,752 @@ func Run(tc testcase) []*dxtypes.Package {
 // package
 func TestRPM(t *testing.T) {
 	// positive
-	tc := testcase{
-		name:      "positive",
-		filePath:  "./testdata/rpm/rpmdb.sqlite",
-		wantPkgs:  RPMWantPkgs,
-		t:         t,
-		a:         analyzer.NewRPMAnalyzer(),
-		matchType: 1,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:      "positive",
+			filePath:  "./testdata/rpm/rpmdb.sqlite",
+			wantPkgs:  RPMWantPkgs,
+			t:         t,
+			a:         analyzer.NewRPMAnalyzer(),
+			matchType: 1,
+		}
+		Run(tc)
+	})
 }
 
 func TestApk(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:     "positive",
-		filePath: "./testdata/apk/apk",
-		wantPkgs: APKWantPkgs,
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:     "positive",
+			filePath: "./testdata/apk/apk",
+			wantPkgs: APKWantPkgs,
 
-		t:         t,
-		a:         analyzer.NewApkAnalyzer(),
-		matchType: 1,
-	}
-	Run(tc)
+			t:         t,
+			a:         analyzer.NewApkAnalyzer(),
+			matchType: 1,
+		}
+		Run(tc)
+	})
 
-	// negative
-	tc = testcase{
-		name:      "negative",
-		filePath:  "./testdata/apk/negative-apk",
-		wantPkgs:  APKNegativePkgs,
-		t:         t,
-		a:         analyzer.NewApkAnalyzer(),
-		matchType: 1,
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:      "negative",
+			filePath:  "./testdata/apk/negative-apk",
+			wantPkgs:  APKNegativePkgs,
+			t:         t,
+			a:         analyzer.NewApkAnalyzer(),
+			matchType: 1,
+		}
+		Run(tc)
+	})
 }
 
 func TestDpkg(t *testing.T) {
-	// positive
-	a := analyzer.NewDpkgAnalyzer()
-	tc := testcase{
-		name:      "positive",
-		filePath:  "./testdata/dpkg/dpkg",
-		t:         t,
-		a:         a,
-		matchType: 1,
-		wantPkgs:  DPKGWantPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		a := analyzer.NewDpkgAnalyzer()
+		tc := testcase{
+			name:      "positive",
+			filePath:  "./testdata/dpkg/dpkg",
+			t:         t,
+			a:         a,
+			matchType: 1,
+			wantPkgs:  DPKGWantPkgs,
+		}
+		Run(tc)
+	})
 
-	// negative
-	tc = testcase{
-		name:      "negative",
-		filePath:  "./testdata/dpkg/negative-dpkg",
-		t:         t,
-		a:         a,
-		matchType: 1,
-		wantPkgs:  []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		a := analyzer.NewDpkgAnalyzer()
+		tc := testcase{
+			name:      "negative",
+			filePath:  "./testdata/dpkg/negative-dpkg",
+			t:         t,
+			a:         a,
+			matchType: 1,
+			wantPkgs:  []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 // language
 func TestConan(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:      "positive",
-		filePath:  "./testdata/conan/conan",
-		t:         t,
-		a:         analyzer.NewConanAnalyzer(),
-		matchType: 1,
-		wantPkgs:  ConanWantPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:      "positive",
+			filePath:  "./testdata/conan/conan",
+			t:         t,
+			a:         analyzer.NewConanAnalyzer(),
+			matchType: 1,
+			wantPkgs:  ConanWantPkgs,
+		}
+		Run(tc)
+	})
 
-	// negative
-	tc = testcase{
-		name:      "negative",
-		filePath:  "./testdata/conan/negative-conan",
-		t:         t,
-		a:         analyzer.NewConanAnalyzer(),
-		matchType: 1,
-		wantPkgs:  []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:      "negative",
+			filePath:  "./testdata/conan/negative-conan",
+			t:         t,
+			a:         analyzer.NewConanAnalyzer(),
+			matchType: 1,
+			wantPkgs:  []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 func TestGoBinary(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:      "positive",
-		filePath:  "./testdata/go_binary/go-binary",
-		t:         t,
-		a:         analyzer.NewGoBinaryAnalyzer(),
-		matchType: 1,
-		wantPkgs:  GOBianryWantPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:      "positive",
+			filePath:  "./testdata/go_binary/go-binary",
+			t:         t,
+			a:         analyzer.NewGoBinaryAnalyzer(),
+			matchType: 1,
+			wantPkgs:  GOBianryWantPkgs,
+		}
+		Run(tc)
+	})
 
-	// negative broken elf
-	tc = testcase{
-		name:      "negative-broken-elf",
-		filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
-		t:         t,
-		a:         analyzer.NewGoBinaryAnalyzer(),
-		matchType: 1,
-		wantPkgs:  []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("negative-broken-elf", func(t *testing.T) {
+		tc := testcase{
+			name:      "negative-broken-elf",
+			filePath:  "./testdata/go_binary/negative-go-binary-broken_elf",
+			t:         t,
+			a:         analyzer.NewGoBinaryAnalyzer(),
+			matchType: 1,
+			wantPkgs:  []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 
-	// negative bash
-	tc = testcase{
-		name:      "negative-bash",
-		filePath:  "./testdata/go_binary/negative-go-binary-bash",
-		t:         t,
-		a:         analyzer.NewGoBinaryAnalyzer(),
-		matchType: 1,
-		wantPkgs:  []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("negative-bash", func(t *testing.T) {
+		tc := testcase{
+			name:      "negative-bash",
+			filePath:  "./testdata/go_binary/negative-go-binary-bash",
+			t:         t,
+			a:         analyzer.NewGoBinaryAnalyzer(),
+			matchType: 1,
+			wantPkgs:  []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 func TestGoMod(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/go_mod/positive/mod",
-		virtualPath: "/test/go.mod",
-		t:           t,
-		a:           analyzer.NewGoModAnalyzer(),
-		matchType:   1,
-		matchedFileMap: map[string]string{
-			"/test/go.sum": "./testdata/go_mod/positive/sum",
-		},
-		wantPkgs: GoModWantPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/go_mod/positive/mod",
+			virtualPath: "/test/go.mod",
+			t:           t,
+			a:           analyzer.NewGoModAnalyzer(),
+			matchType:   1,
+			matchedFileMap: map[string]string{
+				"/test/go.sum": "./testdata/go_mod/positive/sum",
+			},
+			wantPkgs: GoModWantPkgs,
+		}
+		Run(tc)
+	})
 
-	// postivie less than golang 1.17, nedd parse go.sum
-	tc = testcase{
-		name:        "positive-less-than-117",
-		filePath:    "./testdata/go_mod/lessthan117/mod",
-		virtualPath: "/test/go.mod",
-		t:           t,
-		a:           analyzer.NewGoModAnalyzer(),
-		matchType:   1,
-		matchedFileMap: map[string]string{
-			"/test/go.sum": "./testdata/go_mod/lessthan117/sum",
-		},
-		wantPkgs: GoModLess117Pkgs,
-	}
-	Run(tc)
+	t.Run("positive-less-than-117", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive-less-than-117",
+			filePath:    "./testdata/go_mod/lessthan117/mod",
+			virtualPath: "/test/go.mod",
+			t:           t,
+			a:           analyzer.NewGoModAnalyzer(),
+			matchType:   1,
+			matchedFileMap: map[string]string{
+				"/test/go.sum": "./testdata/go_mod/lessthan117/sum",
+			},
+			wantPkgs: GoModLess117Pkgs,
+		}
+		Run(tc)
+	})
 
-	// negative
-	tc = testcase{
-		name:        "negative-wrongmod",
-		filePath:    "./testdata/go_mod/negative/mod",
-		virtualPath: "/test/go.mod",
-		t:           t,
-		a:           analyzer.NewGoModAnalyzer(),
-		matchType:   1,
-		wantPkgs:    []*dxtypes.Package{},
-		wantError:   true,
-	}
-	Run(tc)
+	t.Run("negative-wrongmod", func(t *testing.T) {
+		tc := testcase{
+			name:        "negative-wrongmod",
+			filePath:    "./testdata/go_mod/negative/mod",
+			virtualPath: "/test/go.mod",
+			t:           t,
+			a:           analyzer.NewGoModAnalyzer(),
+			matchType:   1,
+			wantPkgs:    []*dxtypes.Package{},
+			wantError:   true,
+		}
+		Run(tc)
+	})
 }
 
 func TestPHPComposer(t *testing.T) {
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/php_composer/positive/composer.lock",
-		virtualPath: "/test/composer.lock",
-		t:           t,
-		a:           analyzer.NewPHPComposerAnalyzer(),
-		matchType:   1,
-		matchedFileMap: map[string]string{
-			"/test/composer.json": "./testdata/php_composer/positive/composer.json",
-		},
-		wantPkgs: PHPComposerPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/php_composer/positive/composer.lock",
+			virtualPath: "/test/composer.lock",
+			t:           t,
+			a:           analyzer.NewPHPComposerAnalyzer(),
+			matchType:   1,
+			matchedFileMap: map[string]string{
+				"/test/composer.json": "./testdata/php_composer/positive/composer.json",
+			},
+			wantPkgs: PHPComposerPkgs,
+		}
+		Run(tc)
+	})
 
-	// json error
-	tc = testcase{
-		name:        "negative-wrongjson",
-		filePath:    "./testdata/php_composer/negative/composer.lock",
-		virtualPath: "/test/composer.lock",
-		t:           t,
-		a:           analyzer.NewPHPComposerAnalyzer(),
-		matchType:   1,
-		matchedFileMap: map[string]string{
-			"/test/composer.json": "./testdata/php_composer/wrong.json",
-		},
-		wantPkgs: PHPComposerWrongJsonPkgs,
-	}
-	Run(tc)
+	t.Run("negative-wrongjson", func(t *testing.T) {
+		tc := testcase{
+			name:        "negative-wrongjson",
+			filePath:    "./testdata/php_composer/negative/composer.lock",
+			virtualPath: "/test/composer.lock",
+			t:           t,
+			a:           analyzer.NewPHPComposerAnalyzer(),
+			matchType:   1,
+			matchedFileMap: map[string]string{
+				"/test/composer.json": "./testdata/php_composer/wrong.json",
+			},
+			wantPkgs: PHPComposerWrongJsonPkgs,
+		}
+		Run(tc)
+	})
 
-	// no json file
-	tc = testcase{
-		name:           "negative-nojson",
-		filePath:       "./testdata/php_composer/negative/composer.lock",
-		virtualPath:    "/test/composer.lock",
-		t:              t,
-		a:              analyzer.NewPHPComposerAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PHPComposerNoJsonPkgs,
-	}
-	Run(tc)
+	t.Run("negative-nojson", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative-nojson",
+			filePath:       "./testdata/php_composer/negative/composer.lock",
+			virtualPath:    "/test/composer.lock",
+			t:              t,
+			a:              analyzer.NewPHPComposerAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PHPComposerNoJsonPkgs,
+		}
+		Run(tc)
+	})
 
-	// lock error
-	tc = testcase{
-		name:           "wronglock",
-		filePath:       "./testdata/php_composer/wrong.json",
-		virtualPath:    "/test/composer.lock",
-		t:              t,
-		a:              analyzer.NewPHPComposerAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("wronglock", func(t *testing.T) {
+		tc := testcase{
+			name:           "wronglock",
+			filePath:       "./testdata/php_composer/wrong.json",
+			virtualPath:    "/test/composer.lock",
+			t:              t,
+			a:              analyzer.NewPHPComposerAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+			wantError:      true,
+		}
+		Run(tc)
+	})
 }
 
 func TestPythonPackaging(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:           "positive-egg-zip",
-		filePath:       "./testdata/python_packaging/egg/kitchen-1.2.6-py2.7.egg",
-		t:              t,
-		a:              analyzer.NewPythonPackagingAnalyzer(),
-		matchType:      2,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPackagingPkgs,
-	}
-	Run(tc)
+	t.Run("positive-egg-zip", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-egg-zip",
+			filePath:       "./testdata/python_packaging/egg/kitchen-1.2.6-py2.7.egg",
+			t:              t,
+			a:              analyzer.NewPythonPackagingAnalyzer(),
+			matchType:      2,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPackagingPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-egg-info",
-		filePath:       "./testdata/python_packaging/egg-info/PKG-INFO",
-		t:              t,
-		a:              analyzer.NewPythonPackagingAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPackagingEggPkg,
-	}
-	Run(tc)
+	t.Run("positive-egg-info", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-egg-info",
+			filePath:       "./testdata/python_packaging/egg-info/PKG-INFO",
+			t:              t,
+			a:              analyzer.NewPythonPackagingAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPackagingEggPkg,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-wheel",
-		filePath:       "./testdata/python_packaging/dist-info/METADATA",
-		t:              t,
-		a:              analyzer.NewPythonPackagingAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPackagingWheel,
-	}
-	Run(tc)
+	t.Run("positive-wheel", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-wheel",
+			filePath:       "./testdata/python_packaging/dist-info/METADATA",
+			t:              t,
+			a:              analyzer.NewPythonPackagingAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPackagingWheel,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-no-required-files",
-		filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
-		t:              t,
-		a:              analyzer.NewPythonPackagingAnalyzer(),
-		matchType:      2,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("positive-no-required-files", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-no-required-files",
+			filePath:       "./testdata/python_packaging/egg/no-required-files.egg",
+			t:              t,
+			a:              analyzer.NewPythonPackagingAnalyzer(),
+			matchType:      2,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 func TestPythonPIP(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/python_pip/requirements.txt",
-		t:              t,
-		a:              analyzer.NewPythonPIPAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPIPPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/python_pip/requirements.txt",
+			t:              t,
+			a:              analyzer.NewPythonPIPAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPIPPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-empty",
-		filePath:       "./testdata/python_pip/empty.txt",
-		t:              t,
-		a:              analyzer.NewPythonPIPAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("positive-empty", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-empty",
+			filePath:       "./testdata/python_pip/empty.txt",
+			t:              t,
+			a:              analyzer.NewPythonPIPAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 func TestPythonPIPEnv(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/python_pipenv/Pipfile.lock",
-		t:              t,
-		a:              analyzer.NewPythonPIPEnvAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPIPEnvPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/python_pipenv/Pipfile.lock",
+			t:              t,
+			a:              analyzer.NewPythonPIPEnvAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPIPEnvPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-empty",
-		filePath:       "./testdata/python_pipenv/empty.lock",
-		t:              t,
-		a:              analyzer.NewPythonPIPEnvAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("positive-empty", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-empty",
+			filePath:       "./testdata/python_pipenv/empty.lock",
+			t:              t,
+			a:              analyzer.NewPythonPIPEnvAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+			wantError:      true,
+		}
+		Run(tc)
+	})
 }
 
 func TestPythonPoetry(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/python_poetry/positive/poetry.lock",
-		virtualPath: "/poetry.lock",
-		t:           t,
-		a:           analyzer.NewPythonPoetryAnalyzer(),
-		matchType:   1,
-		matchedFileMap: map[string]string{
-			"/pyproject.toml": "./testdata/python_poetry/positive/pyproject.toml",
-		},
-		wantPkgs: PythonPoetryPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/python_poetry/positive/poetry.lock",
+			virtualPath: "/poetry.lock",
+			t:           t,
+			a:           analyzer.NewPythonPoetryAnalyzer(),
+			matchType:   1,
+			matchedFileMap: map[string]string{
+				"/pyproject.toml": "./testdata/python_poetry/positive/pyproject.toml",
+			},
+			wantPkgs: PythonPoetryPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-nopyproject",
-		filePath:       "./testdata/python_poetry/positive-nopyproject/poetry.lock",
-		virtualPath:    "/poetry.lock",
-		t:              t,
-		a:              analyzer.NewPythonPoetryAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPoetryNoProjectPkgs,
-	}
-	Run(tc)
+	t.Run("positive-nopyproject", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-nopyproject",
+			filePath:       "./testdata/python_poetry/positive-nopyproject/poetry.lock",
+			virtualPath:    "/poetry.lock",
+			t:              t,
+			a:              analyzer.NewPythonPoetryAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPoetryNoProjectPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "negative",
-		filePath:       "./testdata/python_poetry/negative/poetry.lock",
-		virtualPath:    "/poetry.lock",
-		t:              t,
-		a:              analyzer.NewPythonPoetryAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative",
+			filePath:       "./testdata/python_poetry/negative/poetry.lock",
+			virtualPath:    "/poetry.lock",
+			t:              t,
+			a:              analyzer.NewPythonPoetryAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+			wantError:      true,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "negative-wrong-project",
-		filePath:       "./testdata/python_poetry/negative-wrong-project/poetry.lock",
-		virtualPath:    "/poetry.lock",
-		t:              t,
-		a:              analyzer.NewPythonPoetryAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       PythonPoetryWrongProjectPkgs,
-	}
-	Run(tc)
+	t.Run("negative-wrong-project", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative-wrong-project",
+			filePath:       "./testdata/python_poetry/negative-wrong-project/poetry.lock",
+			virtualPath:    "/poetry.lock",
+			t:              t,
+			a:              analyzer.NewPythonPoetryAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       PythonPoetryWrongProjectPkgs,
+		}
+		Run(tc)
+	})
 }
 
 func TestJavaJar(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:           "positive-war",
-		filePath:       "./testdata/java_jar/positive/test.war",
-		t:              t,
-		a:              analyzer.NewJavaJarAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaJarWarPkgs,
-	}
-	Run(tc)
+	t.Run("positive-war", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-war",
+			filePath:       "./testdata/java_jar/positive/test.war",
+			t:              t,
+			a:              analyzer.NewJavaJarAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaJarWarPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-par",
-		filePath:       "./testdata/java_jar/positive/test.par",
-		t:              t,
-		a:              analyzer.NewJavaJarAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaJarParPkgs,
-	}
-	Run(tc)
+	t.Run("positive-par", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-par",
+			filePath:       "./testdata/java_jar/positive/test.par",
+			t:              t,
+			a:              analyzer.NewJavaJarAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaJarParPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-jar",
-		filePath:       "./testdata/java_jar/positive/test.jar",
-		t:              t,
-		a:              analyzer.NewJavaJarAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaJarJarPkgs,
-	}
-	Run(tc)
+	t.Run("positive-jar", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-jar",
+			filePath:       "./testdata/java_jar/positive/test.jar",
+			t:              t,
+			a:              analyzer.NewJavaJarAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaJarJarPkgs,
+		}
+		Run(tc)
+	})
 
-	// negative
-	tc = testcase{
-		name:           "negative-broken-jar",
-		filePath:       "./testdata/java_jar/negative/test.txt",
-		t:              t,
-		a:              analyzer.NewPythonPIPEnvAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("negative-broken-jar", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative-broken-jar",
+			filePath:       "./testdata/java_jar/negative/test.txt",
+			t:              t,
+			a:              analyzer.NewPythonPIPEnvAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+			wantError:      true,
+		}
+		Run(tc)
+	})
 }
 func TestJavaGradle(t *testing.T) {
-	// positive
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/java_gradle/positive.lockfile",
-		virtualPath:    "/test/gradle.lockfile",
-		t:              t,
-		a:              analyzer.NewJavaGradleAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaGradlePkgs,
-	}
-	Run(tc)
-	tc = testcase{
-		name:        "negative",
-		filePath:    "./testdata/java_gradle/negative.lockfile",
-		virtualPath: "/test/gradle.lockfile",
-		t:           t,
-		a:           analyzer.NewJavaGradleAnalyzer(),
-		matchType:   1,
-		wantPkgs:    []*dxtypes.Package{},
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/java_gradle/positive.lockfile",
+			virtualPath:    "/test/gradle.lockfile",
+			t:              t,
+			a:              analyzer.NewJavaGradleAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaGradlePkgs,
+		}
+		Run(tc)
+	})
+
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:        "negative",
+			filePath:    "./testdata/java_gradle/negative.lockfile",
+			virtualPath: "/test/gradle.lockfile",
+			t:           t,
+			a:           analyzer.NewJavaGradleAnalyzer(),
+			matchType:   1,
+			wantPkgs:    []*dxtypes.Package{},
+		}
+		Run(tc)
+	})
 }
 
 func TestJavaPom(t *testing.T) {
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/java_pom/positive/pom.xml",
-		virtualPath:    "/test/pom.xml",
-		t:              t,
-		a:              analyzer.NewJavaPomAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaPomPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/java_pom/positive/pom.xml",
+			virtualPath:    "/test/pom.xml",
+			t:              t,
+			a:              analyzer.NewJavaPomAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaPomPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "positive-requirement",
-		filePath:       "./testdata/java_pom/requirements/pom.xml",
-		virtualPath:    "/test/pom.xml",
-		t:              t,
-		a:              analyzer.NewJavaPomAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       JavaPomRequirementPkgs,
-	}
-	Run(tc)
+	t.Run("positive-requirement", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive-requirement",
+			filePath:       "./testdata/java_pom/requirements/pom.xml",
+			virtualPath:    "/test/pom.xml",
+			t:              t,
+			a:              analyzer.NewJavaPomAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaPomRequirementPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "negative",
-		filePath:       "./testdata/java_pom/negative/pom.xml",
-		virtualPath:    "/test/pom.xml",
-		t:              t,
-		a:              analyzer.NewJavaPomAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       []*dxtypes.Package{},
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative",
+			filePath:       "./testdata/java_pom/negative/pom.xml",
+			virtualPath:    "/test/pom.xml",
+			t:              t,
+			a:              analyzer.NewJavaPomAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       []*dxtypes.Package{},
+			wantError:      true,
+		}
+		Run(tc)
+	})
 }
 
 func TestNodeNpm(t *testing.T) {
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/node_npm/positive_file/package.json",
-		virtualPath: "/test/package.json",
-		t:           t,
-		a:           analyzer.NewNodeNpmAnalyzer(),
-		matchType:   1,
-		wantPkgs:    NodeNpmPkgs,
-	}
-	Run(tc)
-
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/node_npm/positive_file/package.json",
+			virtualPath: "/test/package.json",
+			t:           t,
+			a:           analyzer.NewNodeNpmAnalyzer(),
+			matchType:   1,
+			wantPkgs:    NodeNpmPkgs,
+		}
+		Run(tc)
+	})
 	// folder
-	tc = testcase{
-		name:      "positive-folder",
-		t:         t,
-		a:         analyzer.NewNodeNpmAnalyzer(),
-		skipCheck: true,
-	}
-	pkgs := make([]*dxtypes.Package, 0)
-	{
-		tc.filePath = "./testdata/node_npm/positive_folder/package-lock.json"
-		tc.matchType = 2
-		pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+	t.Run("positive-folder", func(t *testing.T) {
+		tc := testcase{
+			name:      "positive-folder",
+			t:         t,
+			a:         analyzer.NewNodeNpmAnalyzer(),
+			skipCheck: true,
+		}
+		pkgs := make([]*dxtypes.Package, 0)
+		{
+			tc.filePath = "./testdata/node_npm/positive_folder/package-lock.json"
+			tc.matchType = 2
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/ms/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/ms/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/debug/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/ms/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/debug/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/ms/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/debug/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-		tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/ms/package.json"
-		tc.matchType = 1
-		pkgs = append(pkgs, Run(tc)...)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/debug/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
 
-	}
-	if len(pkgs) != 62 {
-		t.Fatalf("%s: package length error: %d(get)", tc.name, len(pkgs))
-	}
-	// fmt.Println("before: ", len(pkgs))
-	// analyzer.DrawPackagesDOT(pkgs)
-	ret := analyzer.MergePackages(pkgs)
-	// fmt.Println("after: ", len(ret))
-	// showPkgs(ret)
-	Check(ret, NodeNpmPkgsFolder, tc.name, t)
-	// analyzer.DrawPackagesDOT(ret)
+			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/ms/package.json"
+			tc.matchType = 1
+			pkgs = append(pkgs, Run(tc)...)
+
+		}
+		if len(pkgs) != 62 {
+			t.Fatalf("%s: package length error: %d(get)", tc.name, len(pkgs))
+		}
+		// fmt.Println("before: ", len(pkgs))
+		// analyzer.DrawPackagesDOT(pkgs)
+		ret := analyzer.MergePackages(pkgs)
+		// fmt.Println("after: ", len(ret))
+		// showPkgs(ret)
+		Check(ret, NodeNpmPkgsFolder, tc.name, t)
+		// analyzer.DrawPackagesDOT(ret)
+	})
 }
 func TestNodePnpm(t *testing.T) {
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/node_pnpm/pnpm-lock.yaml",
-		virtualPath: "/test/pnpm-lock.yaml",
-		t:           t,
-		a:           analyzer.NewNodePnpmAnalyzer(),
-		matchType:   1,
-		wantPkgs:    NodePnpmPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/node_pnpm/pnpm-lock.yaml",
+			virtualPath: "/test/pnpm-lock.yaml",
+			t:           t,
+			a:           analyzer.NewNodePnpmAnalyzer(),
+			matchType:   1,
+			wantPkgs:    NodePnpmPkgs,
+		}
+		Run(tc)
+	})
 }
 func TestNodeYarn(t *testing.T) {
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/node_yarn/positive/yarn.lock",
-		virtualPath: "/test/yarn.lock",
-		t:           t,
-		a:           analyzer.NewNodeYarnAnalyzer(),
-		matchType:   1,
-		wantPkgs:    NodeYarnPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/node_yarn/positive/yarn.lock",
+			virtualPath: "/test/yarn.lock",
+			t:           t,
+			a:           analyzer.NewNodeYarnAnalyzer(),
+			matchType:   1,
+			wantPkgs:    NodeYarnPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:        "positive-protocol",
-		filePath:    "./testdata/node_yarn/positive_protocol/yarn.lock",
-		virtualPath: "/test/yarn.lock",
-		t:           t,
-		a:           analyzer.NewNodeYarnAnalyzer(),
-		matchType:   1,
-		wantPkgs:    NodeYarnProtocolPkgs,
-	}
-	Run(tc)
-
+	t.Run("positive-protocol", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive-protocol",
+			filePath:    "./testdata/node_yarn/positive_protocol/yarn.lock",
+			virtualPath: "/test/yarn.lock",
+			t:           t,
+			a:           analyzer.NewNodeYarnAnalyzer(),
+			matchType:   1,
+			wantPkgs:    NodeYarnProtocolPkgs,
+		}
+		Run(tc)
+	})
 }
 
 func TestRubyBundler(t *testing.T) {
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/ruby_bundler/positive/Gemfile.lock",
-		virtualPath:    "/test/Gemfile.lock",
-		t:              t,
-		a:              analyzer.NewRubyBundlerAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       RubyBundlerPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/ruby_bundler/positive/Gemfile.lock",
+			virtualPath:    "/test/Gemfile.lock",
+			t:              t,
+			a:              analyzer.NewRubyBundlerAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       RubyBundlerPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "negative",
-		filePath:       "./testdata/ruby_bundler/negative/Gemfile.lock",
-		virtualPath:    "/test/Gemfile.lock",
-		t:              t,
-		a:              analyzer.NewRubyBundlerAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       nil,
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative",
+			filePath:       "./testdata/ruby_bundler/negative/Gemfile.lock",
+			virtualPath:    "/test/Gemfile.lock",
+			t:              t,
+			a:              analyzer.NewRubyBundlerAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       nil,
+		}
+		Run(tc)
+	})
 }
 
 func TestRubyGemspec(t *testing.T) {
-	tc := testcase{
-		name:           "positive",
-		filePath:       "./testdata/ruby_gemspec/positive/multiple_licenses.gemspec",
-		virtualPath:    "/test/multiple_licenses.gemspec",
-		t:              t,
-		a:              analyzer.NewRubyGemSpecAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       RubyGemspecPkgs,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/ruby_gemspec/positive/multiple_licenses.gemspec",
+			virtualPath:    "/test/multiple_licenses.gemspec",
+			t:              t,
+			a:              analyzer.NewRubyGemSpecAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       RubyGemspecPkgs,
+		}
+		Run(tc)
+	})
 
-	tc = testcase{
-		name:           "negative",
-		filePath:       "./testdata/ruby_gemspec/negative/empty_name.gemspec",
-		virtualPath:    "/test/empty_name.gemspec",
-		t:              t,
-		a:              analyzer.NewRubyGemSpecAnalyzer(),
-		matchType:      1,
-		matchedFileMap: map[string]string{},
-		wantPkgs:       nil,
-		wantError:      true,
-	}
-	Run(tc)
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:           "negative",
+			filePath:       "./testdata/ruby_gemspec/negative/empty_name.gemspec",
+			virtualPath:    "/test/empty_name.gemspec",
+			t:              t,
+			a:              analyzer.NewRubyGemSpecAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       nil,
+			wantError:      true,
+		}
+		Run(tc)
+	})
 }
+
 func TestRustCargo(t *testing.T) {
-	tc := testcase{
-		name:        "positive",
-		filePath:    "./testdata/rust_cargo/positive/Cargo.lock",
-		virtualPath: "/test/Cargo.lock",
-		t:           t,
-		a:           analyzer.NewRustCargoAnalyzer(),
-		matchType:   1,
-		wantPkgs:    RustCargoPkgs,
-	}
-	Run(tc)
-	tc = testcase{
-		name:        "negative",
-		filePath:    "./testdata/rust_cargo/negative/Cargo.lock",
-		virtualPath: "/test/Cargo.lock",
-		t:           t,
-		a:           analyzer.NewRustCargoAnalyzer(),
-		matchType:   1,
-		wantPkgs:    []*dxtypes.Package{},
-		wantError:   true,
-	}
-	Run(tc)
+	t.Run("positive", func(t *testing.T) {
+		tc := testcase{
+			name:        "positive",
+			filePath:    "./testdata/rust_cargo/positive/Cargo.lock",
+			virtualPath: "/test/Cargo.lock",
+			t:           t,
+			a:           analyzer.NewRustCargoAnalyzer(),
+			matchType:   1,
+			wantPkgs:    RustCargoPkgs,
+		}
+		Run(tc)
+	})
+	t.Run("negative", func(t *testing.T) {
+		tc := testcase{
+			name:        "negative",
+			filePath:    "./testdata/rust_cargo/negative/Cargo.lock",
+			virtualPath: "/test/Cargo.lock",
+			t:           t,
+			a:           analyzer.NewRustCargoAnalyzer(),
+			matchType:   1,
+			wantPkgs:    []*dxtypes.Package{},
+			wantError:   true,
+		}
+		Run(tc)
+	})
 }
 
 func showPkgs(pkgs []*dxtypes.Package) {
