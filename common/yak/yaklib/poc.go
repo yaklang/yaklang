@@ -344,6 +344,10 @@ func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 	}
 }
 
+func _pocOptReplaceHttpPacketHost(host string) PocConfig {
+	return _pocOptAppendHeader("Host", host)
+}
+
 func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -771,6 +775,7 @@ var PoCExports = map[string]interface{}{
 	"replaceFirstLine":  _pocOptReplaceHttpPacketFirstLine,
 	"replaceMethod":     _pocOptReplaceHttpPacketMethod,
 	"replaceHeader":     _pocOptReplaceHttpPacketHeader,
+	"replaceHost":       _pocOptReplaceHttpPacketHost,
 	"replaceCookie":     _pocOptReplaceHttpPacketCookie,
 	"replaceBody":       _pocOptReplaceHttpPacketBody,
 	"replaceQueryParam": _pocOptReplaceHttpPacketQueryParam,
@@ -807,6 +812,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketHeader":     lowhttp.ReplaceHTTPPacketHeader,
 	"ReplaceHTTPPacketBody":       lowhttp.ReplaceHTTPPacketBodyFast,
 	"ReplaceHTTPPacketCookie":     lowhttp.ReplaceHTTPPacketCookie,
+	"ReplaceHTTPPacketHost":       lowhttp.ReplaceHTTPPacketHost,
 	"ReplaceHTTPPacketQueryParam": lowhttp.ReplaceHTTPPacketQueryParam,
 	"ReplaceHTTPPacketPostParam":  lowhttp.ReplaceHTTPPacketPostParam,
 	"ReplaceHTTPPacketPath":       lowhttp.ReplaceHTTPPacketPath,
