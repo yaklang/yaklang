@@ -955,6 +955,42 @@ a=1&b=2&a=3`,
 	}
 }
 
+func TestGetHTTPPacketFirstLine(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		expected [3]string
+	}{
+		{
+			origin: `POST /path HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+
+			expected: [3]string{"POST", "/path", "HTTP/1.1"},
+		},
+		{
+			origin: `HTTP/1.1 200 OK
+Content-Length: 4
+
+test`,
+			expected: [3]string{"HTTP/1.1", "200", "OK"},
+		},
+	}
+	for _, testcase := range testcases {
+		first, second, third := GetHTTPPacketFirstLine([]byte(testcase.origin))
+		if first != testcase.expected[0] {
+			t.Fatalf("GetHTTPPacketFirstLine first failed: %v(got) != %v(want)", first, testcase.expected[0])
+		}
+		if second != testcase.expected[1] {
+			t.Fatalf("GetHTTPPacketFirstLine second failed: %v(got) != %v(want)", second, testcase.expected[1])
+		}
+		if third != testcase.expected[2] {
+			t.Fatalf("GetHTTPPacketFirstLine third failed: %v(got) != %v(want)", third, testcase.expected[2])
+		}
+
+	}
+}
+
 func TestReplaceHTTPPacketQueryParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
