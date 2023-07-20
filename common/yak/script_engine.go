@@ -330,10 +330,6 @@ func (e *ScriptEngine) init() {
 	})
 }
 
-func (e *ScriptEngine) RegisterEngineHooksLegacy(f func(engine *antlr4yak.Engine) error) {
-	e.engineHooks = append(e.engineHooks, f)
-}
-
 func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) error) {
 	e.engineHooks = append(e.engineHooks, f)
 }
@@ -364,7 +360,7 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 }
 
 func (e *ScriptEngine) HookOsExit() {
-	e.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
+	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		val, ok := engine.GetVar("os")
 		if !ok {
 			return nil

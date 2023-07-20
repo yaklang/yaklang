@@ -61,6 +61,9 @@ type _pocConfig struct {
 	// 获取 Websocket 客户端的手段，如果连接成功，Websocket 客户端在这里
 	// 可以直接 c.WriteText 即可写入数据
 	WebsocketClientHandler func(c *lowhttp.WebsocketClient)
+
+	FromPlugin string
+	RuntimeId  string
 }
 
 func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
@@ -249,6 +252,20 @@ func _pocOptWithHost(h string) PocConfig {
 }
 
 var PoCOptWithSource = _pocOptWIthSource
+var PoCOptWithRuntimeId = _pocOptWithRuntimeId
+var PoCOptWithFromPlugin = _pocOptWithFromPlugin
+
+func _pocOptWithRuntimeId(r string) PocConfig {
+	return func(c *_pocConfig) {
+		c.RuntimeId = r
+	}
+}
+
+func _pocOptWithFromPlugin(b string) PocConfig {
+	return func(c *_pocConfig) {
+		c.FromPlugin = b
+	}
+}
 
 func _pocOptWebsocket(w bool) PocConfig {
 	return func(c *_pocConfig) {
@@ -641,6 +658,8 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 		lowhttp.WithProxy(config.Proxy...),
 		lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 		lowhttp.WithSource(config.Source),
+		lowhttp.WithRuntimeId(config.RuntimeId),
+		lowhttp.WithFromPlugin(config.FromPlugin),
 	)
 	return response, err
 }

@@ -55,6 +55,8 @@ type LowhttpExecConfig struct {
 	EtcHosts             map[string]string
 	DNSServers           []string
 	DefaultDnsServerType string // system or custom, if DNSServers is empty, use system dns or custom dns, default is system
+	RuntimeId            string
+	FromPlugin           string
 }
 
 type LowhttpResponse struct {
@@ -69,6 +71,8 @@ type LowhttpResponse struct {
 	Http2              bool
 	RawRequest         []byte
 	Source             string // 请求源
+	RuntimeId          string
+	FromPlugin         string
 }
 
 func (l *LowhttpResponse) GetDurationFloat() float64 {
@@ -151,6 +155,18 @@ func WithGmTLS(b bool) LowhttpOpt {
 func WithDNSServers(servers []string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.DNSServers = servers
+	}
+}
+
+func WithRuntimeId(runtimeId string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.RuntimeId = runtimeId
+	}
+}
+
+func WithFromPlugin(fromPlugin string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.FromPlugin = fromPlugin
 	}
 }
 
@@ -292,10 +308,6 @@ func SendHTTPRequestRawQuickWithTimeout(https bool, r *http.Request, timeout tim
 	return SendHTTPRequestRaw(https, host, port, r, timeout)
 }
 
-func SendHTTPRequestRawQuick(https bool, r *http.Request) ([]byte, error) {
-	return SendHTTPRequestRawQuickWithTimeout(https, r, 5*time.Second)
-}
-
 func SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, gmTLS bool, proxy ...string) ([]byte, [][]byte, error) {
 	return SendHTTPRequestWithRawPacketWithRedirectFullEx(https, host, port, r, timeout, redirectTimes, false, nil, false, false, gmTLS, proxy...)
 }
@@ -345,8 +357,12 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 		session              = option.Session
 		requestHook          = option.BeforeDoRequest
 		ctx                  = option.Ctx
+		runtimeId            = option.RuntimeId
+		fromPlugin           = option.FromPlugin
 		redirectRawPackets   [][]byte
 		commonOptions        = []LowhttpOpt{
+			WithRuntimeId(runtimeId),
+			WithFromPlugin(fromPlugin),
 			WithHttp2(forceHttp2),
 			WithTimeout(timeout),
 			WithRetryTimes(retryTimes),
@@ -681,6 +697,8 @@ func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse
 	// 修正域名的情况
 	var ip string = host
 	response.TraceInfo.AvailableDNSServers = dnsServers
+	response.RuntimeId = option.RuntimeId
+	response.FromPlugin = option.FromPlugin
 	startDNS := time.Now()
 	if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
 		var ips string

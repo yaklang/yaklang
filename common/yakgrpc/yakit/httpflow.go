@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
@@ -36,7 +37,7 @@ func yakitColor(i string) string {
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
-		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string) {
+		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string) {
 			if rsp == nil || len(rsp) == 0 {
 				return
 			}
@@ -53,7 +54,10 @@ func init() {
 					flow.AddTag(reqSource)
 				}
 			}
-			err = CreateOrUpdateHTTPFlow(db, flow.Hash, flow)
+			flow.FromPlugin = fromPlugin
+			flow.RuntimeId = runtimeId
+			flow.HiddenIndex = uuid.New().String()
+			err = InsertHTTPFlow(db, flow)
 			if err != nil {
 				log.Errorf("save httpflow failed: %s", err)
 			}
@@ -90,10 +94,9 @@ type HTTPFlow struct {
 	IsWebsocket bool
 	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
 	WebsocketHash string
-}
 
-func InsertHTTPFlowViaRequest() {
-
+	RuntimeId  string
+	FromPlugin string
 }
 
 type TagAndStatusCode struct {
@@ -415,7 +418,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex)
+	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
 }
 
 func (f *HTTPFlow) BeforeSave() error {
@@ -602,9 +605,6 @@ func InsertHTTPFlow(db *gorm.DB, i *HTTPFlow) (fErr error) {
 	if db = db.Model(&HTTPFlow{}).Save(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
-	//if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&HTTPFlow{}); db.Error != nil {
-	//	return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
-	//}
 
 	return nil
 }
@@ -728,6 +728,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.GetHaveBody() {
 		db = db.Where("body_length > 0")
 	}
+
+	db = bizhelper.ExactQueryString(db, "runtime_id", params.GetRuntimeId())
+	db = bizhelper.ExactQueryString(db, "from_plugin", params.GetFromPlugin())
 
 	// 搜索是否有对应的参数
 	if params.GetHaveCommonParams() {

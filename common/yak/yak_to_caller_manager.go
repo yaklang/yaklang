@@ -29,10 +29,14 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 	var fTable = map[string]*YakFunctionCaller{}
 
 	engine := NewScriptEngine(100)
-	engine.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
-		if hook != nil {
-			return hook(engine)
+	engine.RegisterEngineHooks(hook)
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		var runtimeId string
+		raw, ok := engine.GetVar("RUNTIME_ID")
+		if ok {
+			runtimeId = utils.InterfaceToString(raw)
 		}
+		BindYakitPluginContextToEngine(id, engine, runtimeId)
 		return nil
 	})
 	engine.HookOsExit()
@@ -433,15 +437,21 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 	y.table.Store(name, callers)
 }
 
-func bindYakitPluginToYakEngine(id string, nIns *antlr4yak.Engine) {
+func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeIds ...string) {
 	if nIns == nil {
 		return
+	}
+	var runtimeId string
+	if len(runtimeIds) > 0 {
+		runtimeId = runtimeIds[0]
 	}
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) ([]byte, []byte, error))
 		if ok {
 			return func(raw interface{}, opts ...yaklib.PocConfig) ([]byte, []byte, error) {
 				opts = append(opts, yaklib.PoCOptWithSource(id))
+				opts = append(opts, yaklib.PoCOptWithFromPlugin(id))
+				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
 				return originFunc(raw, opts...)
 			}
 		}
@@ -500,7 +510,7 @@ func (y *YakToCallerManager) AddForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
-		bindYakitPluginToYakEngine(id, engine)
+		BindYakitPluginContextToEngine(id, engine)
 		return nil
 	}, hooks...)
 }
@@ -891,7 +901,7 @@ func init() {
 		}
 
 		engineRoot := NewScriptEngine(1)
-		engineRoot.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
+		engineRoot.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 			engine.SetVar("scriptName", script.ScriptName)
 			engine.SetVar("param", utils.InterfaceToString(s))
 			return nil
