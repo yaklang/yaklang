@@ -24,8 +24,6 @@ func bashEscape(str string) string {
 	return `'` + strings.Replace(str, `'`, `'\''`, -1) + `'`
 }
 
-func (nopCloser) Close() error { return nil }
-
 // GetCurlCommand returns a CurlCommand corresponding to an http.Request
 func GetCurlCommand(isHttps bool, req []byte) (*CurlCommand, error) {
 	command := CurlCommand{}
