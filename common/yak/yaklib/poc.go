@@ -326,6 +326,15 @@ func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	}
 }
 
+func _pocOptReplaceHttpPacketMethod(method string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketMethod(packet, method)
+		},
+		)
+	}
+}
+
 func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -758,22 +767,24 @@ var PoCExports = map[string]interface{}{
 	"websocket":            _pocOptWebsocket,
 	"websocketFromServer":  _pocOptWebsocketHandler,
 	"websocketOnClient":    _pocOptWebsocketClientHandler,
-	"replaceFirstLine":     _pocOptReplaceHttpPacketFirstLine,
-	"replaceHeader":        _pocOptReplaceHttpPacketHeader,
-	"replaceCookie":        _pocOptReplaceHttpPacketCookie,
-	"replaceBody":          _pocOptReplaceHttpPacketBody,
-	"replaceQueryParam":    _pocOptReplaceHttpPacketQueryParam,
-	"replacePostParam":     _pocOptReplaceHttpPacketPostParam,
-	"replacePath":          _pocOptReplaceHttpPacketPath,
-	"appendHeader":         _pocOptAppendHeader,
-	"appendCookie":         _pocOptAppendCookie,
-	"appendQueryParam":     _pocOptAppendQueryParam,
-	"appendPostParam":      _pocOptAppendPostParam,
-	"appendPath":           _pocOptAppendHttpPacketPath,
-	"deleteHeader":         _pocOptDeleteHeader,
-	"deleteCookie":         _pocOptDeleteCookie,
-	"deleteQueryParam":     _pocOptDeleteQueryParam,
-	"deletePostParam":      _pocOptDeletePostParam,
+
+	"replaceFirstLine":  _pocOptReplaceHttpPacketFirstLine,
+	"replaceMethod":     _pocOptReplaceHttpPacketMethod,
+	"replaceHeader":     _pocOptReplaceHttpPacketHeader,
+	"replaceCookie":     _pocOptReplaceHttpPacketCookie,
+	"replaceBody":       _pocOptReplaceHttpPacketBody,
+	"replaceQueryParam": _pocOptReplaceHttpPacketQueryParam,
+	"replacePostParam":  _pocOptReplaceHttpPacketPostParam,
+	"replacePath":       _pocOptReplaceHttpPacketPath,
+	"appendHeader":      _pocOptAppendHeader,
+	"appendCookie":      _pocOptAppendCookie,
+	"appendQueryParam":  _pocOptAppendQueryParam,
+	"appendPostParam":   _pocOptAppendPostParam,
+	"appendPath":        _pocOptAppendHttpPacketPath,
+	"deleteHeader":      _pocOptDeleteHeader,
+	"deleteCookie":      _pocOptDeleteCookie,
+	"deleteQueryParam":  _pocOptDeleteQueryParam,
+	"deletePostParam":   _pocOptDeletePostParam,
 
 	// split
 	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
@@ -791,6 +802,7 @@ var PoCExports = map[string]interface{}{
 	"ParseBytesToHTTPResponse": lowhttp.ParseBytesToHTTPResponse,
 	"ParseUrlToHTTPRequestRaw": lowhttp.ParseUrlToHttpRequestRaw,
 
+	"ReplaceHTTPPacketMethod":     lowhttp.ReplaceHTTPPacketMethod,
 	"ReplaceHTTPPacketFirstLine":  lowhttp.ReplaceHTTPPacketFirstLine,
 	"ReplaceHTTPPacketHeader":     lowhttp.ReplaceHTTPPacketHeader,
 	"ReplaceHTTPPacketBody":       lowhttp.ReplaceHTTPPacketBodyFast,
@@ -821,6 +833,7 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPPacketHeaders":        lowhttp.GetHTTPPacketHeaders,
 	"GetHTTPPacketHeadersFull":    lowhttp.GetHTTPPacketHeadersFull,
 	"GetHTTPPacketHeader":         lowhttp.GetHTTPPacketHeader,
+	"GetHTTPPacketBody":           lowhttp.GetHTTPPacketBody,
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
 
 	"CurlToHTTPRequest": func(c string) []byte {
