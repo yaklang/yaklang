@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -15,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func HasHeader(headerLine, wantHeader string) bool {
+func IsHeader(headerLine, wantHeader string) bool {
 	return strings.HasPrefix(strings.ToLower(headerLine), strings.ToLower(wantHeader)+":")
 }
 
@@ -70,7 +73,7 @@ func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 				isChunked = IsChunkedHeaderLine(line)
 			}
 			header = append(header, line)
-			if HasHeader(line, "Content-Type") {
+			if IsHeader(line, "Content-Type") {
 				hasContentType = true
 			}
 
@@ -573,6 +576,188 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 		return line
 	})
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
+}
+
+func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *multipart.Reader, *multipart.Writer) bool) []byte {
+	var header []string
+	var (
+		buf             bytes.Buffer
+		bodyBuf         bytes.Buffer
+		requestMethod                     = ""
+		hasContentType                    = false
+		isChunked                         = false
+		isFormDataPost                    = false
+		fixBody                           = false
+		multipartWriter *multipart.Writer = multipart.NewWriter(&bodyBuf)
+	)
+	// not handle response
+	if bytes.HasPrefix(packet, []byte("HTTP/")) {
+		return packet
+	}
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			requestMethod = method
+			// rewrite method
+			if fixMethod {
+				method = "POST"
+			}
+
+			buf.WriteString(method + " " + requestUri + " " + proto)
+			buf.WriteString(CRLF)
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			if IsHeader(line, "Content-Type") {
+				hasContentType = true
+				_, v := SplitHTTPHeader(line)
+				d, params, _ := mime.ParseMediaType(v)
+
+				if d == "multipart/form-data" {
+					isFormDataPost = true
+					// try to get boundary
+					if boundary, ok := params["boundary"]; ok {
+						multipartWriter.SetBoundary(boundary)
+					}
+				} else if fixContentType {
+					// rewrite content-type
+					line = multipartWriter.FormDataContentType()
+				}
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	if isFormDataPost {
+		// multipart reader
+		multipartReader := multipart.NewReader(bytes.NewReader(body), multipartWriter.Boundary())
+		// append form
+		fixBody = callback(requestMethod, multipartReader, multipartWriter)
+	} else {
+		// rewrite body
+		fixBody = callback(requestMethod, nil, multipartWriter)
+	}
+	multipartWriter.Close()
+	if fixBody {
+		body = bodyBuf.Bytes()
+	}
+
+	if fixContentType && !hasContentType {
+		header = append(header, multipartWriter.FormDataContentType())
+	}
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		if multipartReader != nil {
+			// copy part
+			for {
+				part, err := multipartReader.NextPart()
+				if err != nil {
+					break
+				}
+				partWriter, err := multipartWriter.CreatePart(part.Header)
+
+				if err != nil {
+					break
+				}
+				_, err = io.Copy(partWriter, part)
+				if err != nil {
+					break
+				}
+			}
+		}
+		// append form
+		if multipartWriter != nil {
+			multipartWriter.WriteField(key, value)
+		}
+		return true
+	})
+}
+
+func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}) []byte {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		if multipartReader != nil {
+			// copy part
+			for {
+				part, err := multipartReader.NextPart()
+				if err != nil {
+					break
+				}
+				partWriter, err := multipartWriter.CreatePart(part.Header)
+
+				if err != nil {
+					break
+				}
+				_, err = io.Copy(partWriter, part)
+				if err != nil {
+					break
+				}
+			}
+		}
+		// append form
+		if multipartWriter != nil {
+			partWriter, err := multipartWriter.CreateFormFile(fieldName, fileName)
+			if err == nil {
+				switch r := fileContent.(type) {
+				case string:
+					io.Copy(partWriter, strings.NewReader(r))
+				case []byte:
+					io.Copy(partWriter, bytes.NewReader(r))
+				case io.Reader:
+					io.Copy(partWriter, r)
+				}
+			}
+		}
+		return true
+	})
+}
+
+func DeleteHTTPPacketForm(packet []byte, key string) []byte {
+	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		if strings.ToUpper(method) != "POST" {
+			return false
+		}
+
+		if multipartReader != nil {
+			// copy part
+			for {
+				part, err := multipartReader.NextPart()
+				if err != nil {
+					break
+				}
+
+				// skip part if key matched
+				if part.FormName() == key {
+					continue
+				}
+
+				partWriter, err := multipartWriter.CreatePart(part.Header)
+
+				if err != nil {
+					break
+				}
+				_, err = io.Copy(partWriter, part)
+				if err != nil {
+					break
+				}
+			}
+			return true
+		}
+		return false
+	})
 }
 
 func GetHTTPPacketCookieValues(packet []byte, key string) []string {
