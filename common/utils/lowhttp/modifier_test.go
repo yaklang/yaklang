@@ -2,8 +2,12 @@ package lowhttp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1312,6 +1316,274 @@ Host: www.baidu.com
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("AddHTTPPacketPath failed: %s", string(actual))
+		}
+	}
+}
+
+func TestAppendHTTPPacketFormEncoded(t *testing.T) {
+	compare := func(mutlipartReader *multipart.Reader, key, value string) {
+		part, err := mutlipartReader.NextPart()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatal(err)
+
+			}
+			return
+		}
+		if part.FormName() != key {
+			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FormName(), key)
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err = io.Copy(buf, part); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != value {
+			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), value)
+		}
+	}
+
+	testcases := []struct {
+		origin           string
+		oldKey, oldValue string
+		key, value       string
+		// expected   string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "a",
+			value: "1",
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
+
+a=1&b=2`,
+			key:   "a",
+			value: "1",
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldKey:   "a",
+			oldValue: "1",
+			key:      "b",
+			value:    "2",
+		},
+	}
+	for _, testcase := range testcases {
+		actual := AppendHTTPPacketFormEncoded([]byte(testcase.origin), testcase.key, testcase.value)
+
+		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
+		body := blocks[1]
+		_ = body
+		re := regexp.MustCompile(`(?m)(--\w+)`)
+		result := re.ReplaceAllString(body, "--test")
+
+		// multipart reader
+		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+
+		// compare old key and value
+		if testcase.oldKey != "" {
+			compare(mutlipartReader, testcase.oldKey, testcase.oldValue)
+		}
+
+		// compare new key and value
+		compare(mutlipartReader, testcase.key, testcase.value)
+
+	}
+}
+
+func TestAppendHTTPPacketUploadFile(t *testing.T) {
+	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}) {
+		part, err := mutlipartReader.NextPart()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatal(err)
+
+			}
+			return
+		}
+		if part.FormName() != fieldName {
+			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FormName(), fieldName)
+		}
+		if part.FileName() != fileName {
+			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FileName(), fileName)
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err = io.Copy(buf, part); err != nil {
+			t.Fatal(err)
+		}
+
+		switch r := fileContent.(type) {
+		case string:
+			if buf.String() != r {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+			}
+		case []byte:
+			if bytes.Compare(buf.Bytes(), r) != 0 {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+			}
+		case io.Reader:
+			buf2 := new(bytes.Buffer)
+			if _, err = io.Copy(buf2, r); err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != buf2.String() {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
+			}
+		}
+	}
+
+	testcases := []struct {
+		origin                    string
+		oldfieldName, oldfileName string
+		oldFileContent            string
+		fieldName, fileName       string
+		fileContent               interface{}
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			fieldName:   "test",
+			fileName:    "test.txt",
+			fileContent: "test",
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldfieldName:   "a",
+			oldfileName:    "",
+			oldFileContent: "1",
+			fieldName:      "test",
+			fileName:       "test.txt",
+			fileContent:    "test",
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="aaa"; filename="aaa.txt"
+Content-Type: application/octet-stream
+
+bbb
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldfieldName:   "aaa",
+			oldfileName:    "aaa.txt",
+			oldFileContent: "bbb",
+			fieldName:      "test",
+			fileName:       "test.txt",
+			fileContent:    "test",
+		},
+	}
+	for _, testcase := range testcases {
+		actual := AppendHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
+
+		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
+		body := blocks[1]
+		_ = body
+		re := regexp.MustCompile(`(?m)(--\w+)`)
+		result := re.ReplaceAllString(body, "--test")
+
+		// multipart reader
+		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+
+		// compare old
+		if testcase.oldfieldName != "" {
+			compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent)
+		}
+
+		// compare new
+		compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent)
+
+	}
+}
+
+func TestDeleteHTTPPacketFormEncoded(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			key: "a",
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
+
+a=1&b=2`,
+			key: "a",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
+
+a=1&b=2`,
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="b"
+
+2
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			key: "a",
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Length: 131
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="b"
+
+2
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := DeleteHTTPPacketForm([]byte(testcase.origin), testcase.key)
+
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), true)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("DeleteHTTPPacketFormEncoded failed: \n%s", string(actual))
 		}
 	}
 }
