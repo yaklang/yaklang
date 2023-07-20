@@ -18,9 +18,18 @@ func (w *WaitGroupProxy) Add(delta ...int) {
 	w.WaitGroup.Add(n)
 }
 
+func NewWaitGroup() *WaitGroupProxy {
+	return &WaitGroupProxy{&sync.WaitGroup{}}
+}
+
+func NewSizedWaitGroup(size int) *utils.SizedWaitGroup {
+	swg := utils.NewSizedWaitGroup(size)
+	return &swg
+}
+
 var SyncExport = map[string]interface{}{
-	"NewWaitGroup":      func() *WaitGroupProxy { return new(WaitGroupProxy) },
-	"NewSizedWaitGroup": func(size int) *utils.SizedWaitGroup { swg := utils.NewSizedWaitGroup(size); return &swg },
+	"NewWaitGroup":      NewWaitGroup,
+	"NewSizedWaitGroup": NewSizedWaitGroup,
 	"NewMutex": func() *sync.Mutex {
 		return new(sync.Mutex)
 	},
