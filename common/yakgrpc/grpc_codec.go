@@ -48,6 +48,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	for _, item := range req.GetParams() {
 		params[item.Key] = item.Value
 	}
+	rawParams := utils.InterfaceToGeneralMap(params)
 
 	getParams := func(key string, hexDecode bool) string {
 		value, ok := params[key]
@@ -258,7 +259,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		raw, err = yserx.ToJson(objs)
 		result = string(raw)
 	case "packet-to-curl":
-		cmd, err := lowhttp.GetCurlCommand(false, []byte(text))
+		cmd, err := lowhttp.GetCurlCommand(utils.MapGetBool(rawParams, "https"), []byte(text))
 		if err != nil {
 			return nil, utils.Errorf("codec[%v] failed: %s", `packet-to-curl`, err)
 		}
