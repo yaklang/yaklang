@@ -751,25 +751,21 @@ func do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpRespon
 	return response, request, nil
 }
 
-func get(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-	return do("GET", urlStr, opts...)
-}
-
-func post(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-	return do("POST", urlStr, opts...)
-}
-
-func head(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-	return do("HEAD", urlStr, opts...)
+func methodDo(method string) func(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return func(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+		return do(method, urlStr, opts...)
+	}
 }
 
 var PoCExports = map[string]interface{}{
-	"HTTP":   pocHTTP,
-	"HTTPEx": pocHTTPEx,
-	"Get":    get,
-	"Post":   post,
-	"Head":   head,
-	"Do":     do,
+	"HTTP":    pocHTTP,
+	"HTTPEx":  pocHTTPEx,
+	"Get":     methodDo("GET"),
+	"Post":    methodDo("POST"),
+	"Head":    methodDo("HEAD"),
+	"Delete":  methodDo("DELETE"),
+	"Options": methodDo("OPTIONS"),
+	"Do":      do,
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": func(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 		opts = append(opts, _pocOptWebsocket(true))
