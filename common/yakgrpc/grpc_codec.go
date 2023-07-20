@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
-	"moul.io/http2curl"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -259,11 +258,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		raw, err = yserx.ToJson(objs)
 		result = string(raw)
 	case "packet-to-curl":
-		req, err := lowhttp.ParseStringToHttpRequest(text)
-		if err != nil {
-			return nil, utils.Errorf("codec[%v] failed: %s", "packet-to-curl", err)
-		}
-		cmd, err := http2curl.GetCurlCommand(req)
+		cmd, err := lowhttp.GetCurlCommand(false, []byte(text))
 		if err != nil {
 			return nil, utils.Errorf("codec[%v] failed: %s", `packet-to-curl`, err)
 		}
