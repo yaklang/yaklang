@@ -61,14 +61,22 @@ func (s *SizedWaitGroup) Add(delta ...int) {
 // is acquired.
 //
 // See sync.WaitGroup documentation for more information.
-func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta int) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case s.current <- struct{}{}:
-		break
+func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error {
+	n := 1
+	if len(delta) > 0 {
+		n = delta[0]
 	}
-	s.wg.Add(delta)
+
+	for i := 0; i < n; i++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case s.current <- struct{}{}:
+			break
+		}
+	}
+
+	s.wg.Add(n)
 	return nil
 }
 
