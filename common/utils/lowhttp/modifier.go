@@ -381,6 +381,10 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+func ReplaceHTTPPacketHost(packet []byte, host string) []byte {
+	return ReplaceHTTPPacketHeader(packet, "Host", host)
+}
+
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
