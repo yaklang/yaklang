@@ -40,12 +40,17 @@ func NewSizedWaitGroup(limit int) SizedWaitGroup {
 // been called.
 //
 // See sync.WaitGroup documentation for more information.
-func (s *SizedWaitGroup) Add() {
-	err := s.AddWithContext(context.Background())
+func (s *SizedWaitGroup) Add(delta ...int) {
+	n := 1
+	if len(delta) > 0 {
+		n = delta[0]
+	}
+
+	err := s.AddWithContext(context.Background(), n)
 	if err != nil {
 		return
 	}
-	s.WaitingEventCount += 1
+	s.WaitingEventCount += n
 }
 
 // AddWithContext increments the internal WaitGroup counter.
@@ -56,14 +61,14 @@ func (s *SizedWaitGroup) Add() {
 // is acquired.
 //
 // See sync.WaitGroup documentation for more information.
-func (s *SizedWaitGroup) AddWithContext(ctx context.Context) error {
+func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta int) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case s.current <- struct{}{}:
 		break
 	}
-	s.wg.Add(1)
+	s.wg.Add(delta)
 	return nil
 }
 
