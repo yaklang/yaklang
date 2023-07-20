@@ -33,10 +33,11 @@ func Register(t *mux.Router) {
 	sessionCacher.SetTTL(30 * time.Minute)
 	var defaultPass = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
 	log.Infof("default pass generated: %v", defaultPass)
+	verificationGroup := t.PathPrefix("/verification").Subrouter()
 
 	// 最普通的案例
 	const COOKIECONST = "YSESSIONID"
-	t.HandleFunc("/verification/op", func(writer http.ResponseWriter, request *http.Request) {
+	verificationGroup.HandleFunc("/op", func(writer http.ResponseWriter, request *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("panic: %v", err)
@@ -92,8 +93,8 @@ func Register(t *mux.Router) {
 			writer.Write(opHtml)
 			return
 		}
-	})
-	t.HandleFunc("/verification/code", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("基础验证码拦截的表单提交")
+	verificationGroup.HandleFunc("/code", func(writer http.ResponseWriter, request *http.Request) {
 		reqRaw, _ := utils.HttpDumpWithBody(request, true)
 		session := lowhttp.GetHTTPPacketCookie(reqRaw, COOKIECONST)
 		if session == "" {
@@ -139,7 +140,7 @@ func Register(t *mux.Router) {
 	})
 
 	const COOKIECONST_BAD = "__YSESSIONID1"
-	t.HandleFunc("/verification/bad/op", func(writer http.ResponseWriter, request *http.Request) {
+	verificationGroup.HandleFunc("/bad/op", func(writer http.ResponseWriter, request *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("panic: %v", err)
@@ -206,8 +207,8 @@ func Register(t *mux.Router) {
 			writer.Write(op1Html)
 			return
 		}
-	})
-	t.HandleFunc("/verification/bad/code", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("有验证码拦截的表单提交（逻辑问题）")
+	verificationGroup.HandleFunc("/bad/code", func(writer http.ResponseWriter, request *http.Request) {
 		reqRaw, _ := utils.HttpDumpWithBody(request, true)
 		session := lowhttp.GetHTTPPacketCookie(reqRaw, COOKIECONST_BAD)
 		if session == "" {

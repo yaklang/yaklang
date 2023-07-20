@@ -27,7 +27,6 @@ type GroupedRoutes struct {
 type VulRouter struct {
 	Path          string
 	Query         string
-	Group         string
 	RouteName     string // 名称
 	Detected      bool   // 是否能检出
 	ExpectedValue string // 期望值
@@ -130,37 +129,38 @@ func (s *VulinServer) init() {
 		s.registerPingCMDI()
 	}
 
+	s.genFrontendRoute()
+
 	s.registerVulRouter()
 
 }
 
-func (s *VulinServer) registerVulRouter() {
+func (s *VulinServer) genFrontendRoute() {
 	var router = s.router
 
-	router.HandleFunc("/vul/router", func(writer http.ResponseWriter, request *http.Request) {
+	router.HandleFunc("/1", func(writer http.ResponseWriter, request *http.Request) {
 		var routesData []GroupedRoutes
 		groups := make(map[string][]VulRouter)
 		err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-
 			pathTemplate, _ := route.GetPathTemplate()
 			prefix := strings.SplitN(pathTemplate, "/", 3)[1] // 获取分组名
 			if prefix != "" {
 				queriesTemplates, _ := route.GetQueriesTemplates()
 				name := route.GetName()
+				if name != "" {
+					query := ""
+					if len(queriesTemplates) > 0 {
+						query = "?" + queriesTemplates[0]
+					}
 
-				query := ""
-				if len(queriesTemplates) > 0 {
-					query = "?" + queriesTemplates[0]
+					vulRouter := VulRouter{
+						Path:      pathTemplate,
+						Query:     query,
+						RouteName: name,
+					}
+
+					groups[prefix] = append(groups[prefix], vulRouter)
 				}
-
-				vulRouter := VulRouter{
-					Path:      pathTemplate,
-					Query:     query,
-					Group:     prefix,
-					RouteName: name,
-				}
-
-				groups[prefix] = append(groups[prefix], vulRouter)
 			}
 			return nil
 		})
@@ -175,35 +175,39 @@ func (s *VulinServer) registerVulRouter() {
 				Routes:    routes,
 			})
 		}
+		var renderedData string
+		if s.safeMode {
+			renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
+		} else {
+			renderedData = ""
+		}
+
+		res := strings.Replace(string(autoRouteHtml), "{{.safescript}}", renderedData, 1)
 
 		// Parse and execute template
-		t, err := template.New("vulRouter").Parse(string(autoRouteHtml))
+		t, err := template.New("vulRouter").Parse(res)
 		if err != nil {
 			panic(err)
 		}
 
-		renderedData := `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
-		data := make(map[string]interface{})
-		data["safescript"] = template.HTML(renderedData) // use template.HTML to prevent Go from escaping the HTML
+		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
 
-		err = t.Execute(writer, data) // pass the data map to the Execute function instead of routesData directly
+		err = t.Execute(writer, routesData) // pass the data map to the Execute function instead of routesData directly
 		if err != nil {
 			panic(err)
 		}
 
-		err = t.Execute(writer, data)
-		if err != nil {
-			panic(err)
-		}
-
-		//jsonRoutes, err := json.Marshal(groups)
-		//if err != nil {
-		//	http.Error(writer, err.Error(), http.StatusInternalServerError)
-		//	return
-		//}
-		//
-		//writer.Header().Set("Content-Type", "application/json")
-		//fmt.Fprintf(writer, string(jsonRoutes))
 	})
+}
 
+func (s *VulinServer) registerVulRouter() {
+
+	//jsonRoutes, err := json.Marshal(groups)
+	//if err != nil {
+	//	http.Error(writer, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
+	//
+	//writer.Header().Set("Content-Type", "application/json")
+	//fmt.Fprintf(writer, string(jsonRoutes))
 }
