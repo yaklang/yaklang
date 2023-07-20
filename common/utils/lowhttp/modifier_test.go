@@ -1038,6 +1038,40 @@ Host: www.baidu.com
 	}
 }
 
+func TestReplaceAllHttpPacketQueryParams(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		values   map[string]string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			values: map[string]string{"a": "1", "b": "2"},
+			expected: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /?c=3 HTTP/1.1
+Host: www.baidu.com
+`,
+			values: map[string]string{"a": "1", "b": "2"},
+			expected: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceAllHTTPPacketQueryParams([]byte(testcase.origin), testcase.values)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
+		}
+	}
+}
+
 func TestAppendHTTPPacketQueryParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
@@ -1144,6 +1178,44 @@ a=3&b=2`,
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("ReplaceHTTPPacketPostParam failed: %s", string(actual))
+		}
+	}
+}
+
+func TestReplaceAllHttpPacketPostParams(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		values   map[string]string
+		expected string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+`,
+			values: map[string]string{"a": "1", "b": "2"},
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+c=3`,
+			values: map[string]string{"a": "1", "b": "2"},
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceAllHTTPPacketPostParams([]byte(testcase.origin), testcase.values)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
 		}
 	}
 }
