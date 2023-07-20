@@ -14,7 +14,7 @@ import (
 
 func (s *VulinServer) registerSSRF() {
 
-	ssrfGroup := s.router.PathPrefix("/ssrf").Subrouter()
+	ssrfGroup := s.router.PathPrefix("/ssrf").Name("SSRF 参数多种情况的测试").Subrouter()
 
 	ssrfGroup.HandleFunc("/json-in-get", func(writer http.ResponseWriter, request *http.Request) {
 		raw := request.URL.Query().Get("json")

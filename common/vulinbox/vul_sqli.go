@@ -47,7 +47,7 @@ func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Re
 func (s *VulinServer) registerSQLinj() {
 	var router = s.router
 
-	sqli := router.PathPrefix("/sqli").Subrouter()
+	sqli := router.PathPrefix("/sqli").Name("SQL注入漏洞案例（复杂度递增）").Subrouter()
 
 	sqli.HandleFunc("/user/by-id-safe", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")

@@ -16,11 +16,12 @@ var wsIndexHtml []byte
 
 func (s *VulinServer) registerWebsocket() {
 	r := s.router
-	r.HandleFunc("/websocket/jquery.min.js", func(writer http.ResponseWriter, request *http.Request) {
+	wsGroup := r.Name("Websocket 仿真测试").Subrouter()
+	wsGroup.HandleFunc("/websocket/jquery.min.js", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/javascript")
 		writer.Write(jquery214)
 	})
-	r.HandleFunc("/websocket/", func(writer http.ResponseWriter, request *http.Request) {
+	wsGroup.HandleFunc("/websocket/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html")
 		writer.Write(wsIndexHtml)
 	}).Name("Websocket基础案例")
@@ -62,6 +63,6 @@ func (s *VulinServer) registerWebsocket() {
 			}
 		}
 	}
-	r.HandleFunc("/websocket/ws", wsHandlerFactory(0))
-	r.HandleFunc("/websocket/ws/compression", wsHandlerFactory(3))
+	wsGroup.HandleFunc("/websocket/ws", wsHandlerFactory(0))
+	wsGroup.HandleFunc("/websocket/ws/compression", wsHandlerFactory(3))
 }

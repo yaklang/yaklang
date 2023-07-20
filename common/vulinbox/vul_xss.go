@@ -49,7 +49,7 @@ func unsafeTemplateRender(writer http.ResponseWriter, req *http.Request, html st
 func (s *VulinServer) registerXSS() {
 	var router = s.router
 
-	xssGroup := router.PathPrefix("/xss").Subrouter()
+	xssGroup := router.PathPrefix("/xss").Name("XSS 多场景").Subrouter()
 
 	xssGroup.HandleFunc("/safe", func(writer http.ResponseWriter, request *http.Request) {
 		var name = request.URL.Query().Get("name")

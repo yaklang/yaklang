@@ -29,7 +29,7 @@ func (s *VulinServer) registerLoginRoute() {
 	var keyF jwt.Keyfunc = func(token *jwt.Token) (interface{}, error) {
 		return []byte(key), nil
 	}
-	jwtGroup := r.PathPrefix("/jwt").Subrouter()
+	jwtGroup := r.PathPrefix("/jwt").Name("登陆 JWT").Subrouter()
 
 	jwtGroup.HandleFunc("/login/profile", func(writer http.ResponseWriter, request *http.Request) {
 		authToken := request.Header.Get("Authorization")

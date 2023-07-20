@@ -108,8 +108,8 @@ func (s *VulinServer) registerCryptoJS() {
 		onceGenerator.Do(initKey)
 		return handler
 	})
-
-	r.HandleFunc("/crypto/js/basic", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup := r.Name("高级场景前端加密").Subrouter()
+	cryptoGroup.HandleFunc("/crypto/js/basic", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
 		var data, _ = utils.HttpDumpWithBody(request, true)
@@ -182,7 +182,7 @@ func (s *VulinServer) registerCryptoJS() {
 
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 	}).Name("AES-ECB 加密表单（附密码）")
-	r.HandleFunc("/crypto/js/rsa", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup.HandleFunc("/crypto/js/rsa", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
 		var data, _ = utils.HttpDumpWithBody(request, true)
@@ -260,7 +260,7 @@ func (s *VulinServer) registerCryptoJS() {
 
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 	}).Name("RSA：加密表单，附密钥")
-	r.HandleFunc("/crypto/js/rsa/fromserver", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup.HandleFunc("/crypto/js/rsa/fromserver", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
 		var data, _ = utils.HttpDumpWithBody(request, true)
@@ -338,10 +338,10 @@ func (s *VulinServer) registerCryptoJS() {
 
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 	})
-	r.HandleFunc("/crypto/js/rsa/generator", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup.HandleFunc("/crypto/js/rsa/generator", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"ok": true, "publicKey": ` + strconv.Quote(string(pub)) + `, "privateKey": ` + strconv.Quote(string(pri)) + `}`))
 	}).Name("postMessage 基础案例")
-	r.HandleFunc("/crypto/js/rsa/fromserver/response", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup.HandleFunc("/crypto/js/rsa/fromserver/response", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
 		var data, _ = utils.HttpDumpWithBody(request, true)
@@ -439,7 +439,7 @@ func (s *VulinServer) registerCryptoJS() {
 
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 	}).Name("RSA：加密表单服务器传输密钥+响应加密")
-	r.HandleFunc("/crypto/js/rsa/fromserver/response/aes-gcm", func(writer http.ResponseWriter, request *http.Request) {
+	cryptoGroup.HandleFunc("/crypto/js/rsa/fromserver/response/aes-gcm", func(writer http.ResponseWriter, request *http.Request) {
 		var params = make(map[string]interface{})
 
 		var data, _ = utils.HttpDumpWithBody(request, true)

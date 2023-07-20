@@ -11,7 +11,7 @@ import (
 
 func (s *VulinServer) registerExprInj() {
 	r := s.router
-	exprGroup := r.PathPrefix("/expr").Subrouter()
+	exprGroup := r.PathPrefix("/expr").Name("表达式注入或 SSTI 仿真").Subrouter()
 
 	exprGroup.HandleFunc(`/injection`, func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)

@@ -31,7 +31,7 @@ func (s *VulinServer) registerJSONP() {
 	r := s.router
 
 	// 创建一个路由分组 "/jsonp"
-	jsonpGroup := r.PathPrefix("/jsonp").Subrouter()
+	jsonpGroup := r.PathPrefix("/jsonp").Name("JSONP 通信与 iframe postMessage 通信案例").Subrouter()
 
 	jsonpGroup.HandleFunc("/center", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {

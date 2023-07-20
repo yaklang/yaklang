@@ -12,7 +12,10 @@ import (
 
 func (s *VulinServer) registerPingCMDI() {
 	r := s.router
-	r.HandleFunc("/ping/cmd/shlex", func(writer http.ResponseWriter, request *http.Request) {
+
+	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例").Subrouter()
+
+	cmdIGroup.HandleFunc("/ping/shlex", func(writer http.ResponseWriter, request *http.Request) {
 		ip := request.URL.Query().Get("ip")
 		if ip == "" {
 			writer.Write([]byte(`no ip set`))
@@ -38,8 +41,8 @@ func (s *VulinServer) registerPingCMDI() {
 			writer.Write([]byte("exec : " + err1.Error()))
 			return
 		}
-	})
-	r.HandleFunc("/ping/cmd/bash", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("ip", "").Name("Shlex  解析的命令注入")
+	cmdIGroup.HandleFunc("/ping/bash", func(writer http.ResponseWriter, request *http.Request) {
 		ip := request.URL.Query().Get("ip")
 		if ip == "" {
 			writer.Write([]byte(`no ip set`))
@@ -60,5 +63,5 @@ func (s *VulinServer) registerPingCMDI() {
 			writer.Write([]byte("exec : " + err1.Error()))
 			return
 		}
-	})
+	}).Queries("ip", "").Name("Bash  解析的命令注入")
 }
