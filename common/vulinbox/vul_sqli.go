@@ -3,9 +3,6 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strconv"
@@ -68,7 +65,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	}).Name("sqli-user-by-id-safe")
+	}).Queries("id", "{id}").Name("不存在SQL注入的情况（数字严格校验）")
 	sqli.HandleFunc("/user/id", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		u, err := s.database.GetUserByIdUnsafe(a)
@@ -79,7 +76,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	})
+	}).Queries("id", "{id}").Name("ID 为数字型的简单边界 SQL注入")
 	sqli.HandleFunc("/user/id-json", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		var jsonMap map[string]any
@@ -380,23 +377,4 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
 	})
-}
-
-func (s *VulinServer) GetSQLinjRoutePath() *coreplugin.VulInfo {
-	err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-
-		pathTemplate, _ := route.GetPathTemplate()
-		name := route.GetName() // 获取路由的名字（函数名）
-		fmt.Printf("路由地址：%s，对应的处理函数：%s\n", pathTemplate, name)
-		return nil
-	})
-
-	if err != nil {
-		fmt.Printf("Error walking the routes: %v\n", err)
-	}
-	return &coreplugin.VulInfo{
-		Path:           "",
-		Headers:        nil,
-		ExpectedResult: nil,
-	}
 }

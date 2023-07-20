@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <link rel="icon" href="/static/favicon.ico">
+    <style>
+        .list-group-item:hover {
+            background-color: rgba(0, 0, 0, 0.1); /* Change the color as per your preference */
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">Vulinbox - Agent</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="https://yaklang.com">yaklang.io</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/_/ws">WS Proto Agent</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<div class="container mt-3">
+    <input type="text" class="form-control" id="search-input"
+           placeholder="快速过滤筛选案例">
+</div>
+
+<!-- Your page content goes here -->
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            {{range .}}
+            <div class="card" style="margin-top: 12px">
+                <div class="card-header">
+                    {{.GroupName}}
+                </div>
+                <ul class="list-group list-group-flush">
+                    {{range .Routes}}
+                    <li class="list-group-item"><a target="_blank" href="{{.Path}}{{.Query}}">{{.RouteName}}</a></li>
+                    {{end}}
+                </ul>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+<br>
+<br>
+<br>
+
+{{.safescript}}
+
+<script>
+    const inputForm = document.getElementById("search-input");
+    const items = document.querySelectorAll(".list-group-item")
+
+    function syncHash() {
+        inputForm.value = decodeURIComponent(location.hash.substring(1));
+        inputForm.dispatchEvent(new Event("input"))
+    }
+
+    window.addEventListener("load", function () {
+        syncHash()
+    })
+    window.addEventListener("hashchange", function () {
+        syncHash()
+    })
+    inputForm.addEventListener("input", function () {
+        const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
+        items.forEach(function (item) {
+            const alink = item.childNodes[0];
+            let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+            if (searchItem.indexOf(searchData) !== -1) {
+                item.style.display = "block";
+            } else {
+                item.style.display = "none";
+            }
+        })
+        document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
+            if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
+                cardWrapper.style.display = "none";
+            } else {
+                cardWrapper.style.display = "block";
+            }
+        })
+        location.hash = encodeURIComponent(searchData)
+    })
+</script>
+<!-- 引入 Bootstrap JavaScript -->
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const listItems = document.querySelectorAll('.list-group-item');
+
+        listItems.forEach(function (listItem) {
+            const anchor = listItem.querySelector('a');
+
+            if (anchor) {
+                listItem.addEventListener('click', function () {
+                    anchor.click()
+                });
+            }
+        });
+    });
+</script>
+</body>
+</html>
