@@ -803,6 +803,18 @@ func QuickSearchHTTPFlowCount(token string) int {
 	return count
 }
 
+func QuickSearchMITMHTTPFlowCount(token string) int {
+	db := consts.GetGormProjectDatabase()
+	var count int
+	db.Model(&HTTPFlow{}).Where(
+		"(request like ?) OR (response like ?) OR (url like ?)",
+		"%"+token+"%",
+		"%"+token+"%",
+		"%"+token+"%",
+	).Where("source_type = ?", "mitm").Count(&count)
+	return count
+}
+
 func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
