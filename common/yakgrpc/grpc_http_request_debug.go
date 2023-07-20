@@ -3,12 +3,14 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -29,6 +31,7 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		return utils.Error("code N scriptName is empty")
 	}
 
+	runtimeId := uuid.New().String()
 	var builderParams *ypb.HTTPRequestBuilderParams
 	if len(params) > 0 {
 		builderParams = params[0]
@@ -170,10 +173,17 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		return utils.Error("unsupported plugin type: " + debugType)
 	}
 
-	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(stream.Send)
+	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(func(result *ypb.ExecResult) error {
+		result.RuntimeID = runtimeId
+		return stream.Send(result)
+	})
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		engine.SetVar("RUNTIME_ID", runtimeId)
+		return nil
+	})
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
 		"REQUESTS":    reqs,
 		"CTX":         stream.Context(),
