@@ -349,32 +349,34 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 	}
 }
 
-var Exports = map[string]interface{}{
-	"Scan": func(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-		var vCh = make(chan *tools.PocVul)
-		filterVul := filter.NewFilter()
-		i := processVulnerability(target, filterVul, vCh)
-		opt = append(opt, _callback(i))
-		opt = append(opt, _tcpCallback(i))
+func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
+	var vCh = make(chan *tools.PocVul)
+	filterVul := filter.NewFilter()
+	i := processVulnerability(target, filterVul, vCh)
+	opt = append(opt, _callback(i))
+	opt = append(opt, _tcpCallback(i))
 
-		c, _, _ := toConfig(opt...)
-		if strings.TrimSpace(c.SingleTemplateRaw) != "" {
-			tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
-			if err != nil {
-				log.Errorf("create yak template failed (raw): %s", err)
-				close(vCh)
-				return vCh, err
-			}
-			_ = tpl
+	c, _, _ := toConfig(opt...)
+	if strings.TrimSpace(c.SingleTemplateRaw) != "" {
+		tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
+		if err != nil {
+			log.Errorf("create yak template failed (raw): %s", err)
+			close(vCh)
+			return vCh, err
 		}
+		_ = tpl
+	}
 
-		go func() {
-			defer close(vCh)
-			ScanAuto(target, opt...)
-		}()
+	go func() {
+		defer close(vCh)
+		ScanAuto(target, opt...)
+	}()
 
-		return vCh, nil
-	},
+	return vCh, nil
+}
+
+var Exports = map[string]interface{}{
+	"Scan":     ScanLegacy,
 	"ScanAuto": ScanAuto,
 
 	// params
@@ -427,6 +429,8 @@ var Exports = map[string]interface{}{
 	"tcpResultCallback":       _tcpCallback,
 	"https":                   lowhttp.WithHttps,
 	"http2":                   lowhttp.WithHttp2,
+	"runtimeId":               lowhttp.WithRuntimeId,
+	"fromPlugin":              lowhttp.WithFromPlugin,
 }
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {

@@ -182,6 +182,7 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", runtimeId)
+		yak.BindYakitPluginContextToEngine(scriptName, engine, runtimeId)
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{

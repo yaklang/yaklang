@@ -309,6 +309,8 @@ func _pocOptWithSave(i bool) PocConfig {
 	}
 }
 
+var PoCOptWithSaveHTTPFlow = _pocOptWithSave
+
 func _pocOptWIthSource(i string) PocConfig {
 	return func(c *_pocConfig) {
 		c.Source = i
