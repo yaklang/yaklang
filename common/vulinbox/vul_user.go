@@ -23,7 +23,7 @@ var profilePage []byte
 
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
-	logicGroup := router.PathPrefix("/logic").Subrouter()
+	logicGroup := router.PathPrefix("/logic").Name("逻辑场景").Subrouter()
 
 	// 用户登录
 	logicGroup.HandleFunc("/user/login", func(writer http.ResponseWriter, request *http.Request) {

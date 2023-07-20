@@ -46,7 +46,7 @@
 <div class="container mt-5">
     <div class="row">
         {{range .}}
-        <div class="col-md-6">
+        <div class="col-md-6" {{.SafeStyle}} >
             <div class="card" style="margin-top: 12px">
                 <div class="card-header">
                     {{.GroupName}}

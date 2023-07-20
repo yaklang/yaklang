@@ -10,11 +10,12 @@ var postMessageDemoHtml []byte
 
 func (s *VulinServer) registerPostMessageIframeCase() {
 	r := s.router
-	r.HandleFunc("/iframe/post/message/basic", func(writer http.ResponseWriter, request *http.Request) {
+	iframeGroup := r.Name("JSONP 通信与 iframe postMessage 通信案例").Subrouter()
+	iframeGroup.HandleFunc("/iframe/post/message/basic", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html")
 		writer.Write(postMessageDemoHtml)
 	})
-	r.HandleFunc("/iframe/post/message/basic/frame", func(writer http.ResponseWriter, request *http.Request) {
+	iframeGroup.HandleFunc("/iframe/post/message/basic/frame", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html")
 		writer.Write([]byte(`<!DOCTYPE html>
 <html>
