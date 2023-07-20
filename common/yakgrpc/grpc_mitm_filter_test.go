@@ -115,11 +115,11 @@ sleep(0.3)
 				t.Logf("err: %v", err)
 				t.Fail()
 			}
-			count := yakit.QuickSearchHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchHTTPFlowCount("+`[`+token+`]`+") == %v", count)
+			count := yakit.QuickSearchMITMHTTPFlowCount(token)
+			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchHTTPFlowCount(token)")
+				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				t.FailNow()
 			}
 		}
@@ -187,11 +187,11 @@ sleep(0.3)
 				t.Logf("err: %v", err)
 				t.Fail()
 			}
-			count := yakit.QuickSearchHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchHTTPFlowCount("+`[`+token+`]`+") == %v", count)
+			count := yakit.QuickSearchMITMHTTPFlowCount(token)
+			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchHTTPFlowCount(token)")
+				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				t.FailNow()
 			}
 		}
@@ -257,11 +257,11 @@ sleep(0.3)
 				t.Logf("err: %v", err)
 				t.Fail()
 			}
-			count := yakit.QuickSearchHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchHTTPFlowCount("+`[`+token+`]`+") == %v", count)
+			count := yakit.QuickSearchMITMHTTPFlowCount(token)
+			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchHTTPFlowCount(token)")
+				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				t.FailNow()
 			}
 		}
@@ -304,11 +304,11 @@ sleep(0.5)
 				t.Logf("err: %v", err)
 				t.Fail()
 			}
-			count := yakit.QuickSearchHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchHTTPFlowCount("+`[`+token+`]`+") == %v", count)
+			count := yakit.QuickSearchMITMHTTPFlowCount(token)
+			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchHTTPFlowCount(token)")
+				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				t.FailNow()
 			}
 		}
