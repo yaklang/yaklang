@@ -85,3 +85,6 @@ jobs:
 
       - name: Test CVEQuery
         run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
+
+      - name: Test Sca
+        run: go test -timeout 1m ./common/sca/... -v
