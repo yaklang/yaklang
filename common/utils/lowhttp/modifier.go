@@ -797,6 +797,28 @@ func GetStatusCodeFromResponse(packet []byte) int {
 	return statusCode
 }
 
+func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
+	packet = TrimLeftHTTPPacket(packet)
+	reader := bufio.NewReader(bytes.NewBuffer(packet))
+	var err error
+	firstLineBytes, err := utils.BufioReadLine(reader)
+	if err != nil {
+		return "", "", ""
+	}
+	firstLineBytes = TrimSpaceHTTPPacket(firstLineBytes)
+
+	var headers []string
+	headers = append(headers, string(firstLineBytes))
+	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) {
+		// response
+		proto, code, codeMsg, _ := parseResponseLine(string(firstLineBytes))
+		return proto, fmt.Sprint(code), codeMsg
+	} else {
+		// request
+		method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
+		return method, requestURI, proto
+	}
+}
 
 func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 	var isChunked bool

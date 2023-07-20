@@ -834,6 +834,7 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPPacketHeadersFull":    lowhttp.GetHTTPPacketHeadersFull,
 	"GetHTTPPacketHeader":         lowhttp.GetHTTPPacketHeader,
 	"GetHTTPPacketBody":           lowhttp.GetHTTPPacketBody,
+	"GetHTTPPacketFirstLine":      lowhttp.GetHTTPPacketFirstLine,
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
 
 	"CurlToHTTPRequest": func(c string) []byte {
