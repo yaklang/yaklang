@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -13,6 +14,7 @@ import (
 func init() {
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
+	_ = yakit.CallPostInitDatabase()
 }
 
 func TestGRPCMUSTPASS_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
@@ -20,6 +22,8 @@ func TestGRPCMUSTPASS_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
 		trace traffic http flow:
 			via runtime id
 	*/
+	utils.EnableDebug()
+
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)

@@ -91,6 +91,8 @@ type MixPluginCaller struct {
 	websitePathFilter   *filter.StringFilter
 	websiteParamsFilter *filter.StringFilter
 
+	runtimeId string
+
 	feedbackHandler    func(*ypb.ExecResult) error
 	ordinaryFeedback   func(i interface{}, item ...interface{})
 	callers            *YakToCallerManager
@@ -103,11 +105,17 @@ func (m *MixPluginCaller) SetCache(b bool) {
 	m.cache = b
 }
 
-func (m *MixPluginCaller) ReplaceYakToCallerManager(c *YakToCallerManager) {
-	resetFilterLock.Lock()
-	defer resetFilterLock.Unlock()
-
-	m.callers = c
+func (m *MixPluginCaller) SetRuntimeId(s string) {
+	if s == "" {
+		return
+	}
+	if m == nil {
+		return
+	}
+	m.runtimeId = s
+	if m.callers != nil {
+		m.callers.runtimeId = s
+	}
 }
 
 var resetFilterLock = new(sync.Mutex)
@@ -132,30 +140,8 @@ execNasl = (target)=>{
 }
 `
 const nucleiCodeExecTemplate = `
-// 这个脚本需要进行操作，设置 CURRENT_NUCLEI_PLUGIN_NAME 作为变量名
 nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
-// nucleiPoCName = "[thinkphp-5023-rce]: ThinkPHP 5.0.23 RCE" // MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
-//script, err := db.GetYakitPluginByName(nucleiPoCName)
-//if err != nil {
-//	yakit.Error("load yakit-plugin(nuclei) failed: %s", err)
-//	return
-//}
-//
-//script.LocalPath = str.TrimLeft(script.LocalPath, "/")
-//pocName = file.Join(nuclei.GetPoCDir(), script.LocalPath)
-//if pocName == "" || (!file.IsExisted(pocName)) {
-//	f, err := file.TempFile()
-//	if err != nil {
-//		yakit.Error("load tempfile to save nuclei poc failed: %s", err)
-//		return
-//	}
-//	pocName = f.Name()
-//    f.WriteString(script.Content)
-//    f.Close()	
-//}
-
 proxy = cli.StringSlice("proxy")
-
 execNuclei = func(target) {
     if len(proxy) > 0 {
         yakit.Info("PROXY: %v", proxy)

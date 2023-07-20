@@ -1,6 +1,10 @@
 package yakit
 
-import "sync"
+import (
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"sync"
+)
 
 var __initializingDatabase []func() error
 var __mutexForInit = new(sync.Mutex)
@@ -19,4 +23,13 @@ func CallPostInitDatabase() error {
 		}
 	}
 	return nil
+}
+
+func InitialDatabase() {
+	consts.GetGormProfileDatabase()
+	consts.GetGormProjectDatabase()
+	var err = CallPostInitDatabase()
+	if err != nil {
+		log.Errorf(`yakit.CallPostInitDatabase failed: %s`, err)
+	}
 }

@@ -154,6 +154,11 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				fmt.Printf("--------------REQ---------------\n")
 				fmt.Println(reqRaw)
 			}
+
+			utils.Debug(func() {
+				log.Info("nuclei lowhttp.Exec! ")
+				spew.Dump(reqRaw)
+			})
 			rsp, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(packetOpt...)
 			if err != nil {
 				log.Error(err)
