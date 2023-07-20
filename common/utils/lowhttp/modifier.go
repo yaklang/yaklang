@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func IsHeader(headerLine, wantHeader string) bool {
@@ -338,6 +339,10 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 
 func ReplaceHTTPPacketHost(packet []byte, host string) []byte {
 	return ReplaceHTTPPacketHeader(packet, "Host", host)
+}
+
+func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte {
+	return ReplaceHTTPPacketHeader(packet, "Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
