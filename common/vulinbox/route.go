@@ -2,19 +2,36 @@ package vulinbox
 
 import (
 	_ "embed"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
+	"html/template"
 	"net/http"
 	"strings"
 )
 
 //go:embed route.html
 var routeHtml []byte
+
+//go:embed auto_route.html
+var autoRouteHtml []byte
+
+type GroupedRoutes struct {
+	GroupName string
+	Routes    []VulRouter
+}
+
+type VulRouter struct {
+	Path          string
+	Query         string
+	Group         string
+	RouteName     string // 名称
+	Detected      bool   // 是否能检出
+	ExpectedValue string // 期望值
+}
 
 func (s *VulinServer) init() {
 	if s.wsAgent.wChan == nil {
@@ -113,15 +130,80 @@ func (s *VulinServer) init() {
 		s.registerPingCMDI()
 	}
 
-	err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	s.registerVulRouter()
 
-		pathTemplate, _ := route.GetPathTemplate()
-		name := route.GetName() // 获取路由的名字（函数名）
-		fmt.Printf("路由地址：%s，对应的处理函数：%s\n", pathTemplate, name)
-		return nil
+}
+
+func (s *VulinServer) registerVulRouter() {
+	var router = s.router
+
+	router.HandleFunc("/vul/router", func(writer http.ResponseWriter, request *http.Request) {
+		var routesData []GroupedRoutes
+		groups := make(map[string][]VulRouter)
+		err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+
+			pathTemplate, _ := route.GetPathTemplate()
+			prefix := strings.SplitN(pathTemplate, "/", 3)[1] // 获取分组名
+			if prefix != "" {
+				queriesTemplates, _ := route.GetQueriesTemplates()
+				name := route.GetName()
+
+				query := ""
+				if len(queriesTemplates) > 0 {
+					query = "?" + queriesTemplates[0]
+				}
+
+				vulRouter := VulRouter{
+					Path:      pathTemplate,
+					Query:     query,
+					Group:     prefix,
+					RouteName: name,
+				}
+
+				groups[prefix] = append(groups[prefix], vulRouter)
+			}
+			return nil
+		})
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		for groupName, routes := range groups {
+			routesData = append(routesData, GroupedRoutes{
+				GroupName: groupName,
+				Routes:    routes,
+			})
+		}
+
+		// Parse and execute template
+		t, err := template.New("vulRouter").Parse(string(autoRouteHtml))
+		if err != nil {
+			panic(err)
+		}
+
+		renderedData := `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
+		data := make(map[string]interface{})
+		data["safescript"] = template.HTML(renderedData) // use template.HTML to prevent Go from escaping the HTML
+
+		err = t.Execute(writer, data) // pass the data map to the Execute function instead of routesData directly
+		if err != nil {
+			panic(err)
+		}
+
+		err = t.Execute(writer, data)
+		if err != nil {
+			panic(err)
+		}
+
+		//jsonRoutes, err := json.Marshal(groups)
+		//if err != nil {
+		//	http.Error(writer, err.Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//
+		//writer.Header().Set("Content-Type", "application/json")
+		//fmt.Fprintf(writer, string(jsonRoutes))
 	})
 
-	if err != nil {
-		fmt.Printf("Error walking the routes: %v\n", err)
-	}
 }

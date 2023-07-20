@@ -34,8 +34,8 @@ var cryptoRsaKeyFromServerHtmlWithResponse []byte
 //go:embed vul_cryptojs_rsa_and_aes.html
 var cryptoRsaKeyAndAesHtml []byte
 
-func (v *VulinServer) registerCryptoJS() {
-	r := v.router
+func (s *VulinServer) registerCryptoJS() {
+	r := s.router
 
 	var (
 		backupPass = []string{"admin", "123456", "admin123", "88888888", "666666"}
