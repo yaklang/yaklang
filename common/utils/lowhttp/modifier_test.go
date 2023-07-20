@@ -37,11 +37,27 @@ Content-Type: application/x-www-form-urlencoded
 
 `,
 		},
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/json
+
+{"c":"3"}`,
+			method: "POST",
+			expected: `POST /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/json
+Content-Length: 9
+
+{"c":"3"}`,
+		},
 	}
 	for _, testcase := range testcases {
 		actual := ReplaceHTTPPacketMethod([]byte(testcase.origin), testcase.method)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), true)
 		if bytes.Compare(actual, expected) != 0 {
+			spew.Dump(actual)
+			spew.Dump(expected)
 			t.Fatalf("ReplaceHTTPPacketMethod failed: %s", string(actual))
 		}
 	}
