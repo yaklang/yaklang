@@ -29,8 +29,9 @@ func (s *VulinServer) registerLoginRoute() {
 	var keyF jwt.Keyfunc = func(token *jwt.Token) (interface{}, error) {
 		return []byte(key), nil
 	}
+	jwtGroup := r.PathPrefix("/jwt").Subrouter()
 
-	r.HandleFunc("/jwt/login/profile", func(writer http.ResponseWriter, request *http.Request) {
+	jwtGroup.HandleFunc("/login/profile", func(writer http.ResponseWriter, request *http.Request) {
 		authToken := request.Header.Get("Authorization")
 		if authToken != "" {
 			before, after, _ := strings.Cut(authToken, " ")
@@ -83,7 +84,7 @@ func (s *VulinServer) registerLoginRoute() {
 		writer.Write([]byte("invalid auth token"))
 		return
 	})
-	r.HandleFunc("/jwt/login", func(writer http.ResponseWriter, request *http.Request) {
+	jwtGroup.HandleFunc("/login", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == "GET" {
 			// 不存在登录信息
 			writer.Header().Set("Content-Type", "text/html")
@@ -146,5 +147,5 @@ func (s *VulinServer) registerLoginRoute() {
 
 		writer.WriteHeader(405)
 		writer.Write([]byte("method not allowed"))
-	})
+	}).Name("登陆(JWT)")
 }

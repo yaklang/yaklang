@@ -33,5 +33,5 @@ func (s *VulinServer) registerPostMessageIframeCase() {
   <p id="output"></p>
 </body>
 </html>`))
-	})
+	}).Name("postMessage 基础案例")
 }

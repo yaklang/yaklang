@@ -13,7 +13,10 @@ import (
 )
 
 func (s *VulinServer) registerSSRF() {
-	s.router.HandleFunc("/ssrf-json-in-get", func(writer http.ResponseWriter, request *http.Request) {
+
+	ssrfGroup := s.router.PathPrefix("/ssrf").Subrouter()
+
+	ssrfGroup.HandleFunc("/json-in-get", func(writer http.ResponseWriter, request *http.Request) {
 		raw := request.URL.Query().Get("json")
 		if raw == "" {
 			writer.Write([]byte(`暂无数据！`))
@@ -46,8 +49,8 @@ func (s *VulinServer) registerSSRF() {
 			return
 		}
 		writer.Write(rawResponse)
-	})
-	s.router.HandleFunc("/ssrf-in-get", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("SSRF JSON Body SSRF")
+	ssrfGroup.HandleFunc("/in-get", func(writer http.ResponseWriter, request *http.Request) {
 		ref := request.URL.Query().Get("url")
 		var u = fmt.Sprint(ref)
 		c := utils.NewDefaultHTTPClient()
@@ -63,8 +66,8 @@ func (s *VulinServer) registerSSRF() {
 			return
 		}
 		writer.Write(rawResponse)
-	})
-	s.router.HandleFunc("/ssrf-in-post", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("url", "").Name("SSRF GET 中 URL 参数")
+	ssrfGroup.HandleFunc("/in-post", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == "GET" {
 			writer.Header().Set("Content-Type", "text/html; charset=utf8")
 			writer.Write([]byte(`
@@ -122,8 +125,8 @@ func (s *VulinServer) registerSSRF() {
 			return
 		}
 		writer.Write(rawResponse)
-	})
-	s.router.HandleFunc("/ssrf-in-post-multipart", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("SSRF POST 中 URL 参数")
+	ssrfGroup.HandleFunc("/in-post-multipart", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == "GET" {
 			writer.Header().Set("Content-Type", "text/html; charset=utf8")
 			writer.Write([]byte(`
@@ -243,4 +246,13 @@ window.location.assign(`+strconv.Quote(u)+`);
 			"url": strings.Trim(strconv.Quote(u), `"`),
 		})
 	})
+	}).Name("SSRF POST 中 URL 参数(Multipart)")
+	ssrfGroup.HandleFunc("/in-json-body", func(writer http.ResponseWriter, request *http.Request) {
+
+		return
+	}).Name("SSRF JSON Body SSRF")
+	ssrfGroup.HandleFunc("/json-in-post-param", func(writer http.ResponseWriter, request *http.Request) {
+
+		return
+	}).Name("SSRF POST参数是JSON（包含URL）的情况")
 }

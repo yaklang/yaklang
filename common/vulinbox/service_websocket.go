@@ -23,7 +23,7 @@ func (s *VulinServer) registerWebsocket() {
 	r.HandleFunc("/websocket/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html")
 		writer.Write(wsIndexHtml)
-	})
+	}).Name("Websocket基础案例")
 	var upgrader = websocket.Upgrader{}
 	wsHandlerFactory := func(compress int) func(writer http.ResponseWriter, request *http.Request) {
 		return func(writer http.ResponseWriter, request *http.Request) {

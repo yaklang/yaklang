@@ -11,7 +11,9 @@ import (
 
 func (s *VulinServer) registerExprInj() {
 	r := s.router
-	r.HandleFunc(`/expr/injection`, func(writer http.ResponseWriter, request *http.Request) {
+	exprGroup := r.PathPrefix("/expr").Subrouter()
+
+	exprGroup.HandleFunc(`/injection`, func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		println(string(raw))
 
@@ -47,5 +49,5 @@ func (s *VulinServer) registerExprInj() {
 			buf.WriteByte('\n')
 		}
 		writer.Write(buf.Bytes())
-	})
+	}).Name("表达式注入整合")
 }

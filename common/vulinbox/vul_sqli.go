@@ -65,7 +65,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	}).Queries("id", "{id}").Name("不存在SQL注入的情况（数字严格校验）")
+	}).Queries("id", "1").Name("不存在SQL注入的情况（数字严格校验）")
 	sqli.HandleFunc("/user/id", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		u, err := s.database.GetUserByIdUnsafe(a)
@@ -76,7 +76,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	}).Queries("id", "{id}").Name("ID 为数字型的简单边界 SQL注入")
+	}).Queries("id", "{id:[0-9]+}").Name("ID 为数字型的简单边界 SQL注入")
 	sqli.HandleFunc("/user/id-json", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		var jsonMap map[string]any
@@ -101,7 +101,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	})
+	}).Queries("id", "{.*}").Name("参数是 JSON，JSON中字段存在SQL注入")
 	sqli.HandleFunc("/user/id-b64-json", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
 		decodedB64, err := codec.DecodeBase64(a)
@@ -132,18 +132,7 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	})
-	sqli.HandleFunc("/user/name", func(writer http.ResponseWriter, request *http.Request) {
-		var a = request.URL.Query().Get("name")
-		u, err := s.database.GetUserByUsernameUnsafe(a)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(500)
-			return
-		}
-		sqliWriter(writer, request, u)
-		return
-	})
+	}).Queries("id", "{.*}").Name("GET参数是被编码的JSON，JSON中字段存在SQL注入")
 
 	sqli.HandleFunc("/user/id-error", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
@@ -161,7 +150,8 @@ func (s *VulinServer) registerSQLinj() {
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
 		return
-	})
+	}).Queries("id", "{.*}").Name("ID 为数字型的简单边界SQL报错检测")
+
 	sqli.HandleFunc("/user/cookie-id", func(writer http.ResponseWriter, request *http.Request) {
 		a, err := request.Cookie("ID")
 		if err != nil {
@@ -188,7 +178,20 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriter(writer, request, []*VulinUser{u})
-	})
+	}).Name("Cookie-ID SQL注入")
+
+	sqli.HandleFunc("/user/name", func(writer http.ResponseWriter, request *http.Request) {
+		var a = request.URL.Query().Get("name")
+		u, err := s.database.GetUserByUsernameUnsafe(a)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(500)
+			return
+		}
+		sqliWriter(writer, request, u)
+		return
+	}).Queries("name", "{.*}").Name("字符串为注入点的 SQL注入")
+
 	sqli.HandleFunc("/user/name/like", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetParams(request, "name")
@@ -205,7 +208,8 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, msg)
-	})
+	}).Queries("name", "{.*}").Name("字符串为注入点的 SQL注入")
+
 	sqli.HandleFunc("/user/name/like/2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetParams(request, "name")
@@ -222,7 +226,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("name", "{.*}").Name("字符串注入点模糊查询(括号边界)")
 	sqli.HandleFunc("/user/name/like/b64", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetBase64Params(request, "nameb64")
@@ -239,7 +243,8 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("nameb64", "{.*}").Name("参数编码字符串注入点模糊查询(括号边界)")
+
 	sqli.HandleFunc("/user/name/like/b64j", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var name = LoadFromGetBase64JSONParam(request, "data", "nameb64j")
@@ -256,7 +261,8 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("data", "{.*}").Name("Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)")
+
 	sqli.HandleFunc("/user/limit/int", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var limit = LoadFromGetParams(request, "limit")
@@ -273,7 +279,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("limit", "{.*}").Name("LIMIT（语句结尾）注入案例")
 
 	sqli.HandleFunc("/user/limit/4/order1", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
@@ -291,7 +297,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("order", "{.*}").Name("ORDER注入：单个条件排序位于 LIMIT 之前")
 	sqli.HandleFunc("/user/limit/4/order2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "order")
@@ -308,7 +314,8 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("order", "{.*}").Name("ORDER注入：多条件排序位于 LIMIT 之前")
+
 	sqli.HandleFunc("/user/order3", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "order")
@@ -325,7 +332,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("order", "{.*}").Name("注入：多条件排序位（无LIMIT）")
 	sqli.HandleFunc("/user/limit/4/orderby", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
@@ -342,7 +349,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("orderby", "{.*}").Name("ORDERBY 注入：多字段")
 	sqli.HandleFunc("/user/limit/4/orderby1", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
@@ -359,7 +366,7 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("orderby", "{.*}").Name("ORDER BY注入：反引号+排序")
 	sqli.HandleFunc("/user/limit/4/orderby2", func(writer http.ResponseWriter, request *http.Request) {
 		db := s.database.db
 		var data = LoadFromGetParams(request, "orderby")
@@ -376,5 +383,5 @@ func (s *VulinServer) registerSQLinj() {
 			return
 		}
 		sqliWriterEx(true, writer, request, users, rowStr)
-	})
+	}).Queries("orderby", "{.*}").Name("ORDER BY 注入：反引号+多字段")
 }
