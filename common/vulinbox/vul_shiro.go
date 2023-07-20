@@ -140,7 +140,7 @@ func init() {
 
 func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
-	shiroGroup := router.PathPrefix("/shiro").Subrouter()
+	shiroGroup := router.PathPrefix("/shiro").Name("ShiroVuls Simulation").Subrouter()
 
 	shiroGroup.HandleFunc("/cbc", func(writer http.ResponseWriter, request *http.Request) {
 		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {

@@ -33,7 +33,7 @@ func Register(t *mux.Router) {
 	sessionCacher.SetTTL(30 * time.Minute)
 	var defaultPass = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
 	log.Infof("default pass generated: %v", defaultPass)
-	verificationGroup := t.PathPrefix("/verification").Subrouter()
+	verificationGroup := t.PathPrefix("/verification").Name("验证码场景").Subrouter()
 
 	// 最普通的案例
 	const COOKIECONST = "YSESSIONID"

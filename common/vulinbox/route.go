@@ -8,9 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
-	"html/template"
 	"net/http"
 	"strings"
+	"text/template"
 )
 
 //go:embed route.html
@@ -21,6 +21,7 @@ var autoRouteHtml []byte
 
 type GroupedRoutes struct {
 	GroupName string
+	SafeStyle string
 	Routes    []VulRouter
 }
 
@@ -142,11 +143,18 @@ func (s *VulinServer) genFrontendRoute() {
 		var routesData []GroupedRoutes
 		groups := make(map[string][]VulRouter)
 		err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-			pathTemplate, _ := route.GetPathTemplate()
-			prefix := strings.SplitN(pathTemplate, "/", 3)[1] // 获取分组名
-			if prefix != "" {
+			// 分组名
+			var groupName string
+			// 如果当前路由有父路由，就代表这个路由在一个 group 中
+			if len(ancestors) > 0 {
+				groupName = ancestors[0].GetName()
+			}
+
+			if groupName != "" {
+				pathTemplate, _ := route.GetPathTemplate()
 				queriesTemplates, _ := route.GetQueriesTemplates()
 				name := route.GetName()
+				// 一个组中不是所有的路由都有名称，只有需要在前端展示的路由才有名称
 				if name != "" {
 					query := ""
 					if len(queriesTemplates) > 0 {
@@ -159,7 +167,7 @@ func (s *VulinServer) genFrontendRoute() {
 						RouteName: name,
 					}
 
-					groups[prefix] = append(groups[prefix], vulRouter)
+					groups[groupName] = append(groups[groupName], vulRouter)
 				}
 			}
 			return nil
@@ -170,9 +178,15 @@ func (s *VulinServer) genFrontendRoute() {
 		}
 
 		for groupName, routes := range groups {
+			id := ""
+			if groupName == "exec" {
+				// 当一个变量被作为 HTML attribute 插入时，无法使用 html/template
+				id = `id="safestyle"`
+			}
 			routesData = append(routesData, GroupedRoutes{
 				GroupName: groupName,
 				Routes:    routes,
+				SafeStyle: id,
 			})
 		}
 		var renderedData string
