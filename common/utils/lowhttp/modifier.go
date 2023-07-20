@@ -217,6 +217,20 @@ func handleHTTPPacketQueryParam(packet []byte, callback func(url.Values)) []byte
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
+	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
+		// clear all values
+		for k := range q {
+			q.Del(k)
+		}
+
+		for k, v := range values {
+
+			q.Set(k, v)
+		}
+	})
+}
+
 func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
 		q.Set(key, value)
@@ -251,21 +265,34 @@ func handleHTTPPacketPostParam(packet []byte, callback func(url.Values)) []byte 
 	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
 }
 
+func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []byte {
+	return handleHTTPPacketPostParam(packet, func(q url.Values) {
+		// clear all values
+		for k := range q {
+			q.Del(k)
+		}
+
+		for k, v := range values {
+			q.Set(k, v)
+		}
+	})
+}
+
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, func(values url.Values) {
-		values.Set(key, value)
+	return handleHTTPPacketPostParam(packet, func(q url.Values) {
+		q.Set(key, value)
 	})
 }
 
 func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, func(values url.Values) {
-		values.Add(key, value)
+	return handleHTTPPacketPostParam(packet, func(q url.Values) {
+		q.Add(key, value)
 	})
 }
 
 func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
-	return handleHTTPPacketPostParam(packet, func(values url.Values) {
-		values.Del(key)
+	return handleHTTPPacketPostParam(packet, func(q url.Values) {
+		q.Del(key)
 	})
 }
 

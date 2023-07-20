@@ -384,6 +384,15 @@ func _pocOptReplaceHttpPacketQueryParam(key, value string) PocConfig {
 	}
 }
 
+func _pocOptReplaceAllHttpPacketQueryParams(values map[string]string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceAllHTTPPacketQueryParams(packet, values)
+		},
+		)
+	}
+}
+
 func _pocOptReplaceHttpPacketPostParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -393,6 +402,14 @@ func _pocOptReplaceHttpPacketPostParam(key, value string) PocConfig {
 	}
 }
 
+func _pocOptReplaceAllHttpPacketPostParams(values map[string]string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceAllHTTPPacketPostParams(packet, values)
+		},
+		)
+	}
+}
 func _pocOptAppendHeader(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -795,27 +812,29 @@ var PoCExports = map[string]interface{}{
 	"websocketFromServer":  _pocOptWebsocketHandler,
 	"websocketOnClient":    _pocOptWebsocketClientHandler,
 
-	"replaceFirstLine":  _pocOptReplaceHttpPacketFirstLine,
-	"replaceMethod":     _pocOptReplaceHttpPacketMethod,
-	"replaceHeader":     _pocOptReplaceHttpPacketHeader,
-	"replaceHost":       _pocOptReplaceHttpPacketHost,
-	"replaceCookie":     _pocOptReplaceHttpPacketCookie,
-	"replaceBody":       _pocOptReplaceHttpPacketBody,
-	"replaceQueryParam": _pocOptReplaceHttpPacketQueryParam,
-	"replacePostParam":  _pocOptReplaceHttpPacketPostParam,
-	"replacePath":       _pocOptReplaceHttpPacketPath,
-	"appendHeader":      _pocOptAppendHeader,
-	"appendCookie":      _pocOptAppendCookie,
-	"appendQueryParam":  _pocOptAppendQueryParam,
-	"appendPostParam":   _pocOptAppendPostParam,
-	"appendPath":        _pocOptAppendHttpPacketPath,
-	"appendFormEncoded": _pocOptAppendHttpPacketFormEncoded,
-	"appendUploadFile":  _pocOptAppendHttpPacketUploadFile,
-	"deleteHeader":      _pocOptDeleteHeader,
-	"deleteCookie":      _pocOptDeleteCookie,
-	"deleteQueryParam":  _pocOptDeleteQueryParam,
-	"deletePostParam":   _pocOptDeletePostParam,
-	"deleteForm":        _pocOptDeleteForm,
+	"replaceFirstLine":      _pocOptReplaceHttpPacketFirstLine,
+	"replaceMethod":         _pocOptReplaceHttpPacketMethod,
+	"replaceHeader":         _pocOptReplaceHttpPacketHeader,
+	"replaceHost":           _pocOptReplaceHttpPacketHost,
+	"replaceCookie":         _pocOptReplaceHttpPacketCookie,
+	"replaceBody":           _pocOptReplaceHttpPacketBody,
+	"replaceAllQueryParams": _pocOptReplaceAllHttpPacketQueryParams,
+	"replaceAllPostParams":  _pocOptReplaceAllHttpPacketPostParams,
+	"replaceQueryParam":     _pocOptReplaceHttpPacketQueryParam,
+	"replacePostParam":      _pocOptReplaceHttpPacketPostParam,
+	"replacePath":           _pocOptReplaceHttpPacketPath,
+	"appendHeader":          _pocOptAppendHeader,
+	"appendCookie":          _pocOptAppendCookie,
+	"appendQueryParam":      _pocOptAppendQueryParam,
+	"appendPostParam":       _pocOptAppendPostParam,
+	"appendPath":            _pocOptAppendHttpPacketPath,
+	"appendFormEncoded":     _pocOptAppendHttpPacketFormEncoded,
+	"appendUploadFile":      _pocOptAppendHttpPacketUploadFile,
+	"deleteHeader":          _pocOptDeleteHeader,
+	"deleteCookie":          _pocOptDeleteCookie,
+	"deleteQueryParam":      _pocOptDeleteQueryParam,
+	"deletePostParam":       _pocOptDeletePostParam,
+	"deleteForm":            _pocOptDeleteForm,
 
 	// split
 	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
@@ -833,27 +852,29 @@ var PoCExports = map[string]interface{}{
 	"ParseBytesToHTTPResponse": lowhttp.ParseBytesToHTTPResponse,
 	"ParseUrlToHTTPRequestRaw": lowhttp.ParseUrlToHttpRequestRaw,
 
-	"ReplaceHTTPPacketMethod":     lowhttp.ReplaceHTTPPacketMethod,
-	"ReplaceHTTPPacketFirstLine":  lowhttp.ReplaceHTTPPacketFirstLine,
-	"ReplaceHTTPPacketHeader":     lowhttp.ReplaceHTTPPacketHeader,
-	"ReplaceHTTPPacketBody":       lowhttp.ReplaceHTTPPacketBodyFast,
-	"ReplaceHTTPPacketCookie":     lowhttp.ReplaceHTTPPacketCookie,
-	"ReplaceHTTPPacketHost":       lowhttp.ReplaceHTTPPacketHost,
-	"ReplaceHTTPPacketQueryParam": lowhttp.ReplaceHTTPPacketQueryParam,
-	"ReplaceHTTPPacketPostParam":  lowhttp.ReplaceHTTPPacketPostParam,
-	"ReplaceHTTPPacketPath":       lowhttp.ReplaceHTTPPacketPath,
-	"AppendHTTPPacketHeader":      lowhttp.AppendHTTPPacketHeader,
-	"AppendHTTPPacketCookie":      lowhttp.AppendHTTPPacketCookie,
-	"AppendHTTPPacketQueryParam":  lowhttp.AppendHTTPPacketQueryParam,
-	"AppendHTTPPacketPostParam":   lowhttp.AppendHTTPPacketPostParam,
-	"AppendHTTPPacketPath":        lowhttp.AppendHTTPPacketPath,
-	"AppendHTTPPacketFormEncoded": lowhttp.AppendHTTPPacketFormEncoded,
-	"AppendHTTPPacketUploadFile":  lowhttp.AppendHTTPPacketUploadFile,
-	"DeleteHTTPPacketHeader":      lowhttp.DeleteHTTPPacketHeader,
-	"DeleteHTTPPacketCookie":      lowhttp.DeleteHTTPPacketCookie,
-	"DeleteHTTPPacketQueryParam":  lowhttp.DeleteHTTPPacketQueryParam,
-	"DeleteHTTPPacketPostParam":   lowhttp.DeleteHTTPPacketPostParam,
-	"DeleteHTTPPacketForm":        lowhttp.DeleteHTTPPacketForm,
+	"ReplaceHTTPPacketMethod":         lowhttp.ReplaceHTTPPacketMethod,
+	"ReplaceHTTPPacketFirstLine":      lowhttp.ReplaceHTTPPacketFirstLine,
+	"ReplaceHTTPPacketHeader":         lowhttp.ReplaceHTTPPacketHeader,
+	"ReplaceHTTPPacketBody":           lowhttp.ReplaceHTTPPacketBodyFast,
+	"ReplaceHTTPPacketCookie":         lowhttp.ReplaceHTTPPacketCookie,
+	"ReplaceHTTPPacketHost":           lowhttp.ReplaceHTTPPacketHost,
+	"ReplaceAllHTTPPacketQueryParams": lowhttp.ReplaceAllHTTPPacketQueryParams,
+	"ReplaceAllHTTPPacketPostParams":  lowhttp.ReplaceAllHTTPPacketPostParams,
+	"ReplaceHTTPPacketQueryParam":     lowhttp.ReplaceHTTPPacketQueryParam,
+	"ReplaceHTTPPacketPostParam":      lowhttp.ReplaceHTTPPacketPostParam,
+	"ReplaceHTTPPacketPath":           lowhttp.ReplaceHTTPPacketPath,
+	"AppendHTTPPacketHeader":          lowhttp.AppendHTTPPacketHeader,
+	"AppendHTTPPacketCookie":          lowhttp.AppendHTTPPacketCookie,
+	"AppendHTTPPacketQueryParam":      lowhttp.AppendHTTPPacketQueryParam,
+	"AppendHTTPPacketPostParam":       lowhttp.AppendHTTPPacketPostParam,
+	"AppendHTTPPacketPath":            lowhttp.AppendHTTPPacketPath,
+	"AppendHTTPPacketFormEncoded":     lowhttp.AppendHTTPPacketFormEncoded,
+	"AppendHTTPPacketUploadFile":      lowhttp.AppendHTTPPacketUploadFile,
+	"DeleteHTTPPacketHeader":          lowhttp.DeleteHTTPPacketHeader,
+	"DeleteHTTPPacketCookie":          lowhttp.DeleteHTTPPacketCookie,
+	"DeleteHTTPPacketQueryParam":      lowhttp.DeleteHTTPPacketQueryParam,
+	"DeleteHTTPPacketPostParam":       lowhttp.DeleteHTTPPacketPostParam,
+	"DeleteHTTPPacketForm":            lowhttp.DeleteHTTPPacketForm,
 
 	"GetAllHTTPPacketQueryParams": lowhttp.GetAllHTTPRequestQueryParams,
 	"GetAllHTTPPacketPostParams":  lowhttp.GetAllHTTPRequestPostParams,
