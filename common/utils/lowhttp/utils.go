@@ -60,6 +60,7 @@ func parseResponseLine(line string) (string, int, string, bool) {
 		code = utils.Atoi(line)
 	} else {
 		code = utils.Atoi(line[:s2])
+		status = line[s2+1:]
 	}
 	return proto, code, status, code != 0
 }
@@ -366,7 +367,7 @@ func SplitHTTPHeadersAndBodyFromPacketEx(raw []byte, mf func(method string, requ
 	return SplitHTTPPacket(raw, mf, nil)
 }
 
-func SplitHTTPPacketFast(raw any) (string, []byte){
+func SplitHTTPPacketFast(raw any) (string, []byte) {
 	return SplitHTTPPacket(utils.InterfaceToBytes(raw), func(method string, requestUri string, proto string) error {
 		return nil
 	}, func(proto string, code int, codeMsg string) error {
