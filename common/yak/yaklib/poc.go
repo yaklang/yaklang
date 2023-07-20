@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"moul.io/http2curl"
 	"net/http"
 	"net/http/httputil"
 	"reflect"
@@ -822,4 +823,25 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPPacketHeadersFull":    lowhttp.GetHTTPPacketHeadersFull,
 	"GetHTTPPacketHeader":         lowhttp.GetHTTPPacketHeader,
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
+
+	"CurlToHTTPRequest": func(c string) []byte {
+		raw, err := lowhttp.CurlToHTTPRequest(c)
+		if err != nil {
+			log.Errorf(`CurlToHTTPRequest failed: %s`, err)
+		}
+		return raw
+	},
+	"HTTPRequestToCurl": func(i any) string {
+		req, err := lowhttp.ParseStringToHttpRequest(utils.InterfaceToString(i))
+		if err != nil {
+			log.Errorf(`lowhttp.ParseStringToHttpRequest(utils.InterfaceToString(i)) failed: %s, err`)
+			return ""
+		}
+		cmd, err := http2curl.GetCurlCommand(req)
+		if err != nil {
+			log.Errorf(`http2curl.GetCurlCommand(req): %v`, err)
+			return ""
+		}
+		return cmd.String()
+	},
 }
