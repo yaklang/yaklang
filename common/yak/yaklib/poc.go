@@ -438,6 +438,24 @@ func _pocOptAppendHttpPacketPath(path string) PocConfig {
 	}
 }
 
+func _pocOptAppendHttpPacketFormEncoded(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketFormEncoded(packet, key, value)
+		},
+		)
+	}
+}
+
+func _pocOptAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketUploadFile(packet, fieldName, fileName, fileContent)
+		},
+		)
+	}
+}
+
 func _pocOptDeleteHeader(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -469,6 +487,15 @@ func _pocOptDeletePostParam(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketPostParam(packet, key)
+		},
+		)
+	}
+}
+
+func _pocOptDeleteForm(key string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.DeleteHTTPPacketForm(packet, key)
 		},
 		)
 	}
@@ -786,10 +813,13 @@ var PoCExports = map[string]interface{}{
 	"appendQueryParam":  _pocOptAppendQueryParam,
 	"appendPostParam":   _pocOptAppendPostParam,
 	"appendPath":        _pocOptAppendHttpPacketPath,
+	"appendFormEncoded": _pocOptAppendHttpPacketFormEncoded,
+	"appendUploadFile":  _pocOptAppendHttpPacketUploadFile,
 	"deleteHeader":      _pocOptDeleteHeader,
 	"deleteCookie":      _pocOptDeleteCookie,
 	"deleteQueryParam":  _pocOptDeleteQueryParam,
 	"deletePostParam":   _pocOptDeletePostParam,
+	"deleteForm":        _pocOptDeleteForm,
 
 	// split
 	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
@@ -821,10 +851,13 @@ var PoCExports = map[string]interface{}{
 	"AppendHTTPPacketQueryParam":  lowhttp.AppendHTTPPacketQueryParam,
 	"AppendHTTPPacketPostParam":   lowhttp.AppendHTTPPacketPostParam,
 	"AppendHTTPPacketPath":        lowhttp.AppendHTTPPacketPath,
+	"AppendHTTPPacketFormEncoded": lowhttp.AppendHTTPPacketFormEncoded,
+	"AppendHTTPPacketUploadFile":  lowhttp.AppendHTTPPacketUploadFile,
 	"DeleteHTTPPacketHeader":      lowhttp.DeleteHTTPPacketHeader,
 	"DeleteHTTPPacketCookie":      lowhttp.DeleteHTTPPacketCookie,
 	"DeleteHTTPPacketQueryParam":  lowhttp.DeleteHTTPPacketQueryParam,
 	"DeleteHTTPPacketPostParam":   lowhttp.DeleteHTTPPacketPostParam,
+	"DeleteHTTPPacketForm":        lowhttp.DeleteHTTPPacketForm,
 
 	"GetAllHTTPPacketQueryParams": lowhttp.GetAllHTTPRequestQueryParams,
 	"GetAllHTTPPacketPostParams":  lowhttp.GetAllHTTPRequestPostParams,
