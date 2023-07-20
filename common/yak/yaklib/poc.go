@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 
 	"github.com/pkg/errors"
@@ -346,6 +347,10 @@ func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 
 func _pocOptReplaceHttpPacketHost(host string) PocConfig {
 	return _pocOptAppendHeader("Host", host)
+}
+
+func _pocOptReplaceHttpPacketBasicAuth(username, password string) PocConfig {
+	return _pocOptAppendHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
 func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
@@ -816,6 +821,7 @@ var PoCExports = map[string]interface{}{
 	"replaceMethod":         _pocOptReplaceHttpPacketMethod,
 	"replaceHeader":         _pocOptReplaceHttpPacketHeader,
 	"replaceHost":           _pocOptReplaceHttpPacketHost,
+	"replaceBasicAuth":      _pocOptReplaceHttpPacketBasicAuth,
 	"replaceCookie":         _pocOptReplaceHttpPacketCookie,
 	"replaceBody":           _pocOptReplaceHttpPacketBody,
 	"replaceAllQueryParams": _pocOptReplaceAllHttpPacketQueryParams,
@@ -858,6 +864,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketBody":           lowhttp.ReplaceHTTPPacketBodyFast,
 	"ReplaceHTTPPacketCookie":         lowhttp.ReplaceHTTPPacketCookie,
 	"ReplaceHTTPPacketHost":           lowhttp.ReplaceHTTPPacketHost,
+	"ReplaceHTTPPacketBasicAuth":      lowhttp.ReplaceHTTPPacketBasicAuth,
 	"ReplaceAllHTTPPacketQueryParams": lowhttp.ReplaceAllHTTPPacketQueryParams,
 	"ReplaceAllHTTPPacketPostParams":  lowhttp.ReplaceAllHTTPPacketPostParams,
 	"ReplaceHTTPPacketQueryParam":     lowhttp.ReplaceHTTPPacketQueryParam,
