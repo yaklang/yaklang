@@ -143,6 +143,10 @@ func Debug(f func()) {
 	}
 }
 
+func EnableDebug() {
+	os.Setenv("YAKLANGDEBUG", "1")
+}
+
 func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }

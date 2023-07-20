@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 )
 
@@ -25,6 +26,9 @@ func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 }
 func SaveResponse(r *LowhttpResponse) {
 	if saveHTTPFlowFunc == nil {
+		utils.Debug(func() {
+			log.Warn("SaveResponse failed because yakit.RegisterSaveHTTPFlowHandler is not finished")
+		})
 		return
 	}
 	saveHTTPFlowFunc(r.Https, r.RawRequest, r.RawPacket, r.Url, r.RemoteAddr, r.Source, r.RuntimeId, r.FromPlugin)

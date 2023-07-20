@@ -8,9 +8,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sync"
@@ -25,17 +27,12 @@ type YakFunctionCaller struct {
 	Handler func(args ...interface{})
 }
 
-func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+func FetchFunctionFromSourceCode(ctx context.Context, runtimeId string, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	var fTable = map[string]*YakFunctionCaller{}
 
 	engine := NewScriptEngine(100)
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		var runtimeId string
-		raw, ok := engine.GetVar("RUNTIME_ID")
-		if ok {
-			runtimeId = utils.InterfaceToString(raw)
-		}
 		BindYakitPluginContextToEngine(id, engine, runtimeId)
 		return nil
 	})
@@ -52,6 +49,10 @@ func FetchFunctionFromSourceCode(ctx context.Context, timeout time.Duration, id 
 
 	for _, funcName := range functionNames {
 		funcName := funcName
+		switch funcName {
+		case "execNuclei":
+			log.Debugf("in execNuclei: %v", runtimeId)
+		}
 		raw, ok := ins.GetVar(funcName)
 		if !ok {
 			continue
@@ -99,6 +100,7 @@ type YakToCallerManager struct {
 	baseWaitGroup  *sync.WaitGroup
 	dividedContext bool
 	timeout        time.Duration
+	runtimeId      string
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -245,9 +247,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 	}()
 
 	var engine *antlr4yak.Engine
-	var fetchFuncHandler = FetchFunctionFromSourceCode
-
-	cTable, err := fetchFuncHandler(ctx, y.timeout, "", code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, y.runtimeId, y.timeout, "", code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -452,7 +452,34 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 				opts = append(opts, yaklib.PoCOptWithSource(id))
 				opts = append(opts, yaklib.PoCOptWithFromPlugin(id))
 				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
 				return originFunc(raw, opts...)
+			}
+		}
+		return i
+	})
+	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "Scan", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(target any, opts ...any) (chan *tools.PocVul, error))
+		if ok {
+			return func(target any, opts ...any) (chan *tools.PocVul, error) {
+				if runtimeId != "" {
+					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+				}
+				opts = append(opts, lowhttp.WithFromPlugin(id))
+				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
+				return originFunc(target, opts...)
+			}
+		}
+		return i
+	})
+	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "ScanAuto", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(target any, opts ...any))
+		if ok {
+			return func(target any, opts ...any) {
+				opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+				opts = append(opts, lowhttp.WithFromPlugin(id))
+				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
+				originFunc(target, opts...)
 			}
 		}
 		return i
@@ -487,6 +514,23 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		}
 		return i
 	})
+	if runtimeId != "" {
+		nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
+			origin, ok := i.(func() (*MixPluginCaller, error))
+			if ok {
+				return func() (*MixPluginCaller, error) {
+					manager, err := origin()
+					if err != nil {
+						return nil, err
+					}
+					log.Infof("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
+					manager.SetRuntimeId(runtimeId)
+					return manager, nil
+				}
+			}
+			return i
+		})
+	}
 }
 
 func (y *YakToCallerManager) AddForYakit(
@@ -501,6 +545,7 @@ func (y *YakToCallerManager) AddForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
+		engine.SetVar("RUNTIME_ID", y.runtimeId)
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
 		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, id))
@@ -510,7 +555,7 @@ func (y *YakToCallerManager) AddForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
-		BindYakitPluginContextToEngine(id, engine)
+		BindYakitPluginContextToEngine(id, engine, y.runtimeId)
 		return nil
 	}, hooks...)
 }
@@ -525,13 +570,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	}()
 
 	var engine *antlr4yak.Engine
-	var fetchFuncHandler = FetchFunctionFromSourceCode
-	//if y.dividedContext {
-	//	fetchFuncHandler = FetchFunctionFromCallerDividedContext
-	//} else {
-	//	fetchFuncHandler = FetchFunctionFromCaller
-	//}
-	cTable, err := fetchFuncHandler(ctx, y.timeout, id, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, y.runtimeId, y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
