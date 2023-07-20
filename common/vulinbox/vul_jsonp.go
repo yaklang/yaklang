@@ -33,7 +33,7 @@ func (s *VulinServer) registerJSONP() {
 	// 创建一个路由分组 "/jsonp"
 	jsonpGroup := r.PathPrefix("/jsonp").Subrouter()
 
-	jsonpGroup.HandleFunc("/jsonp/center", func(writer http.ResponseWriter, request *http.Request) {
+	jsonpGroup.HandleFunc("/center", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 			return
 		}
@@ -56,10 +56,10 @@ func (s *VulinServer) registerJSONP() {
 		}
 
 	})
-	jsonpGroup.HandleFunc("/jsonp/basic", func(writer http.ResponseWriter, request *http.Request) {
+	jsonpGroup.HandleFunc("/basic", func(writer http.ResponseWriter, request *http.Request) {
 		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 			return
 		}
 		writer.Write(vulJSONPHTML)
-	})
+	}).Name("JSONP 的最基础案例")
 }

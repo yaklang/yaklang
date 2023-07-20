@@ -23,69 +23,10 @@ var profilePage []byte
 
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
+	logicGroup := router.PathPrefix("/logic").Subrouter()
 
-	router.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/html")
-		writer.Write(registerPage)
-	}).Methods(http.MethodGet)
-	// 用户注册
-	router.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
-
-		// 解析请求体中的 JSON 数据
-		user := &VulinUser{
-			Role: "user",
-		}
-		err := json.NewDecoder(request.Body).Decode(user)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		remake := strings.ToLower(user.Remake)
-		filterRemake := strings.ReplaceAll(remake, "<", "")
-		filterRemake = strings.ReplaceAll(filterRemake, ">", "")
-		filterRemake = strings.ReplaceAll(filterRemake, "script", "")
-		user.Remake = filterRemake
-
-		// 在这里执行用户注册逻辑，将用户信息存储到数据库
-		err = s.database.CreateUser(user)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// 假设验证通过，返回登录成功消息
-		responseData, err := json.Marshal(user)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		response := struct {
-			Id      uint   `json:"id"`
-			Success bool   `json:"success"`
-			Message string `json:"message"`
-			Data    string `json:"data"`
-		}{
-			Id:      user.ID,
-			Success: true,
-			Message: "Register successful",
-			Data:    string(responseData),
-		}
-		writer.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(writer).Encode(response)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		writer.WriteHeader(http.StatusOK)
-		return
-	}).Methods(http.MethodPost)
 	// 用户登录
-	router.HandleFunc("/user/login", func(writer http.ResponseWriter, request *http.Request) {
+	logicGroup.HandleFunc("/user/login", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
 			// 返回登录页面
 			writer.Header().Set("Content-Type", "text/html")
@@ -156,9 +97,71 @@ func (s *VulinServer) registerUserRoute() {
 		}
 		writer.WriteHeader(http.StatusOK)
 		return
-	})
+	}).Name("Web 后台")
+
+	logicGroup.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/html")
+		writer.Write(registerPage)
+	}).Methods(http.MethodGet)
+	// 用户注册
+	logicGroup.HandleFunc("/user/register", func(writer http.ResponseWriter, request *http.Request) {
+
+		// 解析请求体中的 JSON 数据
+		user := &VulinUser{
+			Role: "user",
+		}
+		err := json.NewDecoder(request.Body).Decode(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		remake := strings.ToLower(user.Remake)
+		filterRemake := strings.ReplaceAll(remake, "<", "")
+		filterRemake = strings.ReplaceAll(filterRemake, ">", "")
+		filterRemake = strings.ReplaceAll(filterRemake, "script", "")
+		user.Remake = filterRemake
+
+		// 在这里执行用户注册逻辑，将用户信息存储到数据库
+		err = s.database.CreateUser(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// 假设验证通过，返回登录成功消息
+		responseData, err := json.Marshal(user)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		response := struct {
+			Id      uint   `json:"id"`
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+			Data    string `json:"data"`
+		}{
+			Id:      user.ID,
+			Success: true,
+			Message: "Register successful",
+			Data:    string(responseData),
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(writer).Encode(response)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		writer.WriteHeader(http.StatusOK)
+		return
+	}).Methods(http.MethodPost)
+
 	// 用户信息
-	router.HandleFunc("/user/profile", func(writer http.ResponseWriter, request *http.Request) {
+	logicGroup.HandleFunc("/user/profile", func(writer http.ResponseWriter, request *http.Request) {
 		realUser, err := s.database.Authenticate(writer, request)
 		if err != nil {
 			return
@@ -197,7 +200,7 @@ func (s *VulinServer) registerUserRoute() {
 		}
 	})
 
-	router.HandleFunc("/user/update", func(writer http.ResponseWriter, request *http.Request) {
+	logicGroup.HandleFunc("/user/update", func(writer http.ResponseWriter, request *http.Request) {
 		realUser, err := s.database.Authenticate(writer, request)
 		if err != nil {
 			return
@@ -269,7 +272,7 @@ func (s *VulinServer) registerUserRoute() {
 		}
 	})
 
-	router.HandleFunc("/user/logout", func(writer http.ResponseWriter, request *http.Request) {
+	logicGroup.HandleFunc("/user/logout", func(writer http.ResponseWriter, request *http.Request) {
 		cookie, err := request.Cookie("_cookie")
 		if err != nil {
 			writer.Write([]byte(err.Error()))

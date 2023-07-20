@@ -48,7 +48,10 @@ func unsafeTemplateRender(writer http.ResponseWriter, req *http.Request, html st
 
 func (s *VulinServer) registerXSS() {
 	var router = s.router
-	router.HandleFunc("/xss/safe", func(writer http.ResponseWriter, request *http.Request) {
+
+	xssGroup := router.PathPrefix("/xss").Subrouter()
+
+	xssGroup.HandleFunc("/safe", func(writer http.ResponseWriter, request *http.Request) {
 		var name = request.URL.Query().Get("name")
 		safeName := template.HTMLEscapeString(name)
 		writer.Write([]byte(fmt.Sprintf(`<html>
@@ -57,8 +60,8 @@ Hello %v
 		writer.Header().Set("Content-Type", "text/html")
 		writer.WriteHeader(200)
 		return
-	})
-	router.HandleFunc("/xss/echo", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("安全实体转义")
+	xssGroup.HandleFunc("/echo", func(writer http.ResponseWriter, request *http.Request) {
 		var name = request.URL.Query().Get("name")
 		writer.Header().Set("Content-Type", "text/html")
 		writer.Write([]byte(fmt.Sprintf(`
@@ -98,8 +101,8 @@ Hello %v
 `, name)))
 		writer.WriteHeader(200)
 		return
-	})
-	router.HandleFunc("/xss/replace/nocase", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("直接拼接导致XSS注入")
+	xssGroup.HandleFunc("/replace/nocase", func(writer http.ResponseWriter, request *http.Request) {
 		var name = request.URL.Query().Get("name")
 		scriptRegex := regexp.MustCompile("(?i)<script>")
 		name = scriptRegex.ReplaceAllString(name, "")
@@ -111,8 +114,133 @@ Hello %v
 </html>`, name)))
 		writer.WriteHeader(200)
 		return
-	})
-	router.HandleFunc("/xss/safe/nosniff/jpeg", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("不安全的过滤导致XSS")
+	xssGroup.HandleFunc("/js/in-str", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>console.info("Hello" + '{{ .name }}')</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串中)")
+	xssGroup.HandleFunc("/js/in-str2", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>const name = "{{ .name }}";
+
+console.info("Hello" + `+"`${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串中2)")
+	xssGroup.HandleFunc("/js/in-str-temp", func(writer http.ResponseWriter, request *http.Request) {
+		unsafeTemplateRender(writer, request, `<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	Here are photo for U! <br>
+	<script>const name = "Admin";
+
+console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
+</div>
+</body>
+</html>`, map[string]any{
+			"name": request.URL.Query().Get("name"),
+		})
+		writer.Header().Set("Content-Type", "text/html")
+
+	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串模版中)")
+
+	xssGroup.HandleFunc("/safe/nosniff/jpeg", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("X-Content-Type-Options", "nosniff")
 		writer.Header().Set("Content-Type", "image/jpeg")
 		writer.Write([]byte(
@@ -149,8 +277,9 @@ Hello %v
 </div>
 </body>
 </html>`, request.URL.Query().Get("name"))))
-	})
-	router.HandleFunc("/xss/attr/onclick", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("安全实体转义")
+
+	xssGroup.HandleFunc("/attr/onclick", func(writer http.ResponseWriter, request *http.Request) {
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
@@ -191,8 +320,9 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/alt", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("code", "{.*}").Name("输出存在于HTML节点on...属性中")
+
+	xssGroup.HandleFunc("/attr/alt", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -234,8 +364,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/alt/json", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("value", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
+	xssGroup.HandleFunc("/attr/alt/json", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -277,8 +407,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/alt/b64/json", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("json", "{.*}").Name("进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
+	xssGroup.HandleFunc("/attr/alt/b64/json", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -320,9 +450,9 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
+	}).Queries("b64json", "{.*}").Name("进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
 
-	router.HandleFunc("/xss/attr/src", func(writer http.ResponseWriter, request *http.Request) {
+	xssGroup.HandleFunc("/attr/src", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -364,8 +494,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/href", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("src", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)")
+	xssGroup.HandleFunc("/attr/href", func(writer http.ResponseWriter, request *http.Request) {
 		// %27onmousemove=%27javascript:alert(1)
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -408,8 +538,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/onclick2", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("href", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(HREF)")
+	xssGroup.HandleFunc("/attr/onclick2", func(writer http.ResponseWriter, request *http.Request) {
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
@@ -450,8 +580,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/attr/script", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("code", "{.*}").Name("输出存在于HTML节点on...属性中的部分代码属性")
+	xssGroup.HandleFunc("/attr/script", func(writer http.ResponseWriter, request *http.Request) {
 		unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
@@ -492,132 +622,8 @@ Hello %v
 		})
 		writer.Header().Set("Content-Type", "text/html")
 
-	})
-	router.HandleFunc("/xss/js/in-str", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
-<html>
-<head>
-    <title>Example DEMO</title>
-
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style type="text/css">
-    body {
-        background-color: #f0f0f2;
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        
-    }
-    div {
-        width: 600px;
-        margin: 5em auto;
-        padding: 2em;
-        background-color: #fdfdff;
-        border-radius: 0.5em;
-        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
-    }
-    </style>    
-</head>
-
-<body>
-<div>
-	Here are photo for U! <br>
-	<script>console.info("Hello" + '{{ .name }}')</script>
-</div>
-</body>
-</html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
-
-	})
-	router.HandleFunc("/xss/js/in-str2", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
-<html>
-<head>
-    <title>Example DEMO</title>
-
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style type="text/css">
-    body {
-        background-color: #f0f0f2;
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        
-    }
-    div {
-        width: 600px;
-        margin: 5em auto;
-        padding: 2em;
-        background-color: #fdfdff;
-        border-radius: 0.5em;
-        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
-    }
-    </style>    
-</head>
-
-<body>
-<div>
-	Here are photo for U! <br>
-	<script>const name = "{{ .name }}";
-
-console.info("Hello" + `+"`${name}`"+`);</script>
-</div>
-</body>
-</html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
-
-	})
-	router.HandleFunc("/xss/js/in-str-temp", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
-<html>
-<head>
-    <title>Example DEMO</title>
-
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style type="text/css">
-    body {
-        background-color: #f0f0f2;
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        
-    }
-    div {
-        width: 600px;
-        margin: 5em auto;
-        padding: 2em;
-        background-color: #fdfdff;
-        border-radius: 0.5em;
-        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
-    }
-    </style>    
-</head>
-
-<body>
-<div>
-	Here are photo for U! <br>
-	<script>const name = "Admin";
-
-console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
-</div>
-</body>
-</html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
-
-	})
-	router.HandleFunc("/xss/cookie/name", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("script标签的某些属性中")
+	xssGroup.HandleFunc("/cookie/name", func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCname")
 		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
@@ -625,7 +631,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				Name:  "xCname",
 				Value: "UserAdmin",
 			})
-			writer.Header().Set("Location", "/xss/cookie/name?skip=1")
+			writer.Header().Set("Location", "/cookie/name?skip=1")
 			writer.WriteHeader(302)
 			return
 		}
@@ -670,8 +676,8 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 			"name": xCname,
 		})
 		writer.Header().Set("Content-Type", "text/html")
-	})
-	router.HandleFunc("/xss/cookie/b64/name", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("Cookie 中的 XSS")
+	xssGroup.HandleFunc("/cookie/b64/name", func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
 		xCnameRaw, _ := codec.DecodeBase64(xCname)
@@ -681,7 +687,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				Name:  "xCnameB64",
 				Value: codec.EncodeBase64("OrdinaryUser"),
 			})
-			writer.Header().Set("Location", "/xss/cookie/b64/name?skip=1")
+			writer.Header().Set("Location", "/cookie/b64/name?skip=1")
 			writer.WriteHeader(302)
 			return
 		}
@@ -726,8 +732,8 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 			"name": xCname,
 		})
 		writer.Header().Set("Content-Type", "text/html")
-	})
-	router.HandleFunc("/xss/cookie/b64/json/name", func(writer http.ResponseWriter, request *http.Request) {
+	}).Queries("name", "{.*}").Name("Cookie 中的 XSS（Base64）")
+	xssGroup.HandleFunc("/cookie/b64/json/name", func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64J")
 		xCnameRaw, _ := codec.DecodeBase64(xCname)
@@ -740,7 +746,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				Name:  "xCnameB64J",
 				Value: codec.EncodeBase64(utils.Jsonify(map[string]any{"name": "xCnameB64J-OrdinaryUser"})),
 			})
-			writer.Header().Set("Location", "/xss/cookie/b64/json/name?skip=1")
+			writer.Header().Set("Location", "/cookie/b64/json/name?skip=1")
 			writer.WriteHeader(302)
 			return
 		}
@@ -785,6 +791,6 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 			"name": xCname,
 		})
 		writer.Header().Set("Content-Type", "text/html")
-	})
+	}).Queries("name", "{.*}").Name("Cookie 中的 XSS（Base64-JSON）")
 
 }

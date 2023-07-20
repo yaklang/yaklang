@@ -140,8 +140,9 @@ func init() {
 
 func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
+	shiroGroup := router.PathPrefix("/shiro").Subrouter()
 
-	router.HandleFunc("/shiro/cbc", func(writer http.ResponseWriter, request *http.Request) {
+	shiroGroup.HandleFunc("/cbc", func(writer http.ResponseWriter, request *http.Request) {
 		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 			cookie := http.Cookie{
 				Name:     "rememberMe",
@@ -184,8 +185,8 @@ func (s *VulinServer) registerMockVulShiro() {
 
 		checkGadget(payload, failNow, successNow, writer, request)
 		return
-	})
-	router.HandleFunc("/shiro/gcm", func(writer http.ResponseWriter, request *http.Request) {
+	}).Name("Shiro CBC 默认KEY(<1.4.2)")
+	shiroGroup.HandleFunc("/gcm", func(writer http.ResponseWriter, request *http.Request) {
 		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 			cookie := http.Cookie{
 				Name:     "rememberMe",
@@ -220,7 +221,7 @@ func (s *VulinServer) registerMockVulShiro() {
 		checkGadget(payload, failNow, successNow, writer, request)
 
 		return
-	})
+	}).Name("Shiro GCM 默认KEY(>=1.4.2)")
 }
 
 func checkGadget(payload []byte, failNow func(writer http.ResponseWriter, request *http.Request, err error), successNow func(writer http.ResponseWriter, request *http.Request), writer http.ResponseWriter, request *http.Request) {
