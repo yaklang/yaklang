@@ -1,12 +1,25 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
+type WaitGroupProxy struct {
+	*sync.WaitGroup
+}
+
+func (w *WaitGroupProxy) Add(delta ...int) {
+	n := 1
+	if len(delta) > 0 {
+		n = delta[0]
+	}
+	w.WaitGroup.Add(n)
+}
+
 var SyncExport = map[string]interface{}{
-	"NewWaitGroup":      func() *sync.WaitGroup { return new(sync.WaitGroup) },
+	"NewWaitGroup":      func() *WaitGroupProxy { return new(WaitGroupProxy) },
 	"NewSizedWaitGroup": func(size int) *utils.SizedWaitGroup { swg := utils.NewSizedWaitGroup(size); return &swg },
 	"NewMutex": func() *sync.Mutex {
 		return new(sync.Mutex)
