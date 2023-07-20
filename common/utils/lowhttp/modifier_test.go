@@ -11,6 +11,42 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func TestReplaceHTTPPacketMethod(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		method   string
+		expected string
+	}{
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			method: "PUT",
+			expected: `PUT /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			method: "POST",
+			expected: `POST /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceHTTPPacketMethod([]byte(testcase.origin), testcase.method)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), true)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketMethod failed: %s", string(actual))
+		}
+	}
+}
+
 func TestReplaceHTTPPacketFirstLine(t *testing.T) {
 	for _, c := range [][]string{
 		{

@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net/http"
@@ -13,6 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func HasHeader(headerLine, wantHeader string) bool {
+	return strings.HasPrefix(strings.ToLower(headerLine), strings.ToLower(wantHeader)+":")
+}
 
 func IsChunkedHeaderLine(line string) bool {
 	line = strings.ToLower(line)
@@ -40,6 +45,49 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 		return line
 	})
 	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+}
+
+func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
+	var buf bytes.Buffer
+	var header []string
+	var (
+		isChunked      = false
+		isPost         = strings.ToUpper(newMethod) == "POST"
+		hasContentType = false
+	)
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			method = newMethod
+			buf.WriteString(method + " " + requestUri + " " + proto)
+			buf.WriteString(CRLF)
+
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			if HasHeader(line, "Content-Type") {
+				hasContentType = true
+			}
+
+			return line
+		},
+	)
+
+	// fix content-type
+	if isPost && !hasContentType {
+		header = append(header, "Content-Type: application/x-www-form-urlencoded")
+	}
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
@@ -748,6 +796,7 @@ func GetStatusCodeFromResponse(packet []byte) int {
 	})
 	return statusCode
 }
+
 
 func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 	var isChunked bool
