@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'common/**'
+      - '.github/workflows/essential-tests.yml'
 
 jobs:
 
