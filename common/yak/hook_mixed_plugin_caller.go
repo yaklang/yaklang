@@ -133,7 +133,7 @@ execNasl = (target)=>{
 `
 const nucleiCodeExecTemplate = `
 // 这个脚本需要进行操作，设置 CURRENT_NUCLEI_PLUGIN_NAME 作为变量名
-nucleiPoCName = MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
+nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
 // nucleiPoCName = "[thinkphp-5023-rce]: ThinkPHP 5.0.23 RCE" // MITM_PARAMS.CURRENT_NUCLEI_PLUGIN_NAME
 //script, err := db.GetYakitPluginByName(nucleiPoCName)
 //if err != nil {

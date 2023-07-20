@@ -346,7 +346,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					return nil
 				})
 				engine.HookOsExit()
-				engine.RegisterEngineHooksLegacy(func(engine *antlr4yak.Engine) error {
+				engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 					yaklib.SetEngineClient(engine, feedbackClient)
 					return nil
 				})
