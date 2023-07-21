@@ -48,6 +48,29 @@ func (s *VulinServer) registerSQLinj() {
 	var router = s.router
 
 	sqli := router.PathPrefix("/sqli").Name("SQL注入漏洞案例（复杂度递增）").Subrouter()
+	aa := func(writer http.ResponseWriter, request *http.Request) {
+		var a = request.URL.Query().Get("id")
+		i, err := strconv.ParseInt(a, 10, 64)
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(500)
+			return
+		}
+		u, err := s.database.GetUserById(int(i))
+		if err != nil {
+			writer.Write([]byte(err.Error()))
+			writer.WriteHeader(500)
+			return
+		}
+		sqliWriter(writer, request, []*VulinUser{u})
+		return
+	}
+	addRouteWithComment(sqli, "/asdfasf", aa, &VulnInfo{
+		Query:         "id=1",
+		RouteName:     "xasdfasdf",
+		Detected:      false,
+		ExpectedValue: "asdf",
+	})
 
 	sqli.HandleFunc("/user/by-id-safe", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
