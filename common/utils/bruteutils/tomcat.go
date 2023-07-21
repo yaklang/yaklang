@@ -125,7 +125,7 @@ var tomcat = &DefaultServiceAuthInfo{
 		if isTls {
 			tomcatTlsTTLcache.Set(addr, true)
 		}
-		rsp, _, err := packetToBrute(tomcatProbePacket, map[string][]string{
+		rsp, err := packetToBrute(tomcatProbePacket, map[string][]string{
 			"target": {utils.HostPort(host, port)},
 			"user":   {i.Username},
 			"pass":   {i.Password},
@@ -155,7 +155,7 @@ var tomcat = &DefaultServiceAuthInfo{
 
 		addr := utils.HostPort(host, port)
 		var _, isTls = tomcatTlsTTLcache.Get(addr)
-		rsp, _, _ := packetToBrute(
+		rsp, _ := packetToBrute(
 			tomcatAuthPacket,
 			map[string][]string{
 				"target": {utils.HostPort(host, port)},

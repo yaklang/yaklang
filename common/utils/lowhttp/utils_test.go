@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestExtractURLFromHTTPRequest(t *testing.T) {
@@ -92,14 +91,6 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (
 		return
 	}
 	_ = u
-
-	raw, err := SendHTTPRequestRaw(true, "www.baidu.com", 443, req, 10*time.Second)
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-	_ = raw
-	//log.Infof("\n\n%v", string(raw))
 }
 
 func TestConvertContentToChunked(t *testing.T) {
@@ -111,15 +102,6 @@ Content-Length: 12
 123123123123
 `))
 	println(string(raws))
-}
-
-func TestSendHTTPRequestWithRawPacket(t *testing.T) {
-
-	rsp, _ := SendHTTPRequestWithRawPacket(false, "www.baidu.com", 80, []byte(`GET / HTTP/1.1
-Host: www.baidu.com
-
-`), 5*time.Second)
-	println(string(rsp))
 }
 
 func TestGetRedirectFromHTTPResponse(t *testing.T) {
@@ -173,31 +155,4 @@ aaaaaaaaaaaa` + "\r\n\r\n"))
 		return
 	}
 	println(string(rap))
-}
-
-// https://www.baidu.com/s?cl=3&tn=baidutop10&fr=top1000&wd=%E9%92%9F%E5%8D%97%E5%B1%B1%E8%B0%88%E5%8D%97%E9%9D%9E%E5%8F%91%E7%8E%B0%E7%9A%84%E6%96%B0%E5%8F%98%E7%A7%8D%E7%97%85%E6%AF%92&rsv_idx=2&rsv_dl=fyb_n_homepage&hisfilter=1
-func TestSendHTTPRequestWithRawPacket3(t *testing.T) {
-	//	test := assert.New(t)
-	//
-	//	// EXP 数据包
-	//	packet := `
-	//GET /beidou-sdk/browser/bundle.min_v20211124165842.js?id=asdfasdfasdf HTTP/1.1
-	//Host: {{json(TARGET)}}
-	//User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:94.0) Gecko/20100101 Firefox/94.0
-	//
-	//`
-	//
-	//	// 填充参数
-	//	packets, err := mutate.QuickMutate(packet, nil, mutate.MutateWithExtraParams(map[string][]string{
-	//		"TARGET": {"www.baidu.com"},
-	//	}))
-	//	if err != nil {
-	//		return
-	//	}
-	//	req, err := SendHTTPRequestWithRawPacket(true, "", 443, []byte(packets[0]), 5*time.Second)
-	//	if err != nil {
-	//		test.FailNow(err.Error())
-	//	}
-	//
-	//	println(string(req))
 }

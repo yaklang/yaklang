@@ -26,8 +26,8 @@ func TestSocks5(t *testing.T) {
 	go func() {
 		time.Sleep(time.Second)
 		log.Info("start to proxy to baidu.com ")
-		rsp, err := lowhttp.SendHttpRequestWithRawPacketWithOptEx(
-			lowhttp.WithPacket([]byte(`GET / HTTP/1.1
+		rsp, err := lowhttp.HTTPWithoutRedirect(
+			lowhttp.WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 
 `)), lowhttp.WithHttps(true), lowhttp.WithProxy("s5://127.0.0.1:7892"))

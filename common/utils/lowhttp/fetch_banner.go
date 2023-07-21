@@ -102,10 +102,6 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
 	if err != nil {
 		utils.Errorf("read from remove failed: %s", err)
 	}
-	//utils.Debug(func() {
-	//	println(string(packetRaw))
-	//	spew.Dump(raw)
-	//})
 	if !bytes.HasPrefix(raw, []byte("HTTP/")) {
 		return raw
 	}
@@ -128,7 +124,11 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
 		}
 		newPacket := UrlToGetRequestPacket(target, packetRaw, isTls, ExtractCookieJarFromHTTPResponse(rsp)...)
 		packetRaw = newPacket
-		newResponse, _, _ := SendHTTPRequestWithRawPacketWithRedirect(isTls, nextHost, nextPort, newPacket, 10*time.Second, 5)
+		var newResponse []byte
+		rspDetail, _ := HTTP(WithHttps(isTls), WithHost(nextHost), WithPort(nextPort), WithRequest(newPacket), WithTimeoutFloat(10), WithRedirectTimes(5))
+		if rspDetail != nil {
+			newResponse = rspDetail.RawPacket
+		}
 		if newResponse == nil {
 			utils.Debug(func() {
 				log.Errorf("send http request raw failed: %s", err)

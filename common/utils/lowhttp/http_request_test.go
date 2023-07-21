@@ -131,21 +131,28 @@ func TestParseBytesToHttpRequest2(t *testing.T) {
 
 	}))
 	wait500ms()
-
 	var host, port, _ = utils.ParseStringToHostPort(server.URL)
-	req, err := SendHTTPRequestWithRawPacket(false, host, port, []byte("GET /\x00 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"), 5*time.Second)
+	rsp, err := HTTPWithoutRedirect(
+		WithHttps(true), WithHost(host),
+		WithPort(port),
+		WithPacketBytes([]byte("GET /\x00 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")),
+		WithTimeout(5*time.Second),
+	)
 	if err != nil {
 		log.Error(err)
 		t.FailNow()
 	}
-	spew.Dump(req)
-	req, err = SendHTTPRequestWithRawPacket(false, host, port, []byte("GET /\x00 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"), 5*time.Second)
+	_ = rsp
+	rsp, err = HTTPWithoutRedirect(
+		WithHttps(false), WithHost(host),
+		WithPort(port), WithPacketBytes([]byte("GET /\x00 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")),
+		WithTimeout(5*time.Second),
+	)
 	if err != nil {
 		log.Error(err)
 		t.FailNow()
 	}
-	spew.Dump(req)
-	_ = req
+	_ = rsp
 }
 
 func TestFixHTTPRequestOut(t *testing.T) {

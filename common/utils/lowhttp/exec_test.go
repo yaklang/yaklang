@@ -20,8 +20,8 @@ func TestLowhttpResponse2(t *testing.T) {
 	packet := `GET /delay/2 HTTP/1.1
 Host: ` + utils.HostPort(host, port)
 
-	response, err := SendHttpRequestWithRawPacketWithOptEx(
-		WithPacket([]byte(packet)), WithHttps(true))
+	response, err := HTTPWithoutRedirect(
+		WithPacketBytes([]byte(packet)), WithHttps(true))
 	if err != nil {
 		log.Error(err)
 		t.Fatal("BUG: httptest server failed")
@@ -57,8 +57,8 @@ func TestLowhttpResponse(t *testing.T) {
 Host: ` + utils.HostPort(host, port)
 
 	start := time.Now()
-	response, err := SendHttpRequestWithRawPacketWithOptEx(
-		WithPacket([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true))
+	response, err := HTTPWithoutRedirect(
+		WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true))
 	if err != nil {
 		log.Error(err)
 		t.Fatal("BUG: httptest server failed")
@@ -94,8 +94,8 @@ func TestPocSession(t *testing.T) {
 Host: ` + utils.HostPort(host, port)
 
 	// same session
-	response, err := SendHttpRequestWithRawPacketWithOptEx(
-		WithPacket([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("test"))
+	response, err := HTTPWithoutRedirect(
+		WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("test"))
 	rsp := response.RawPacket
 	if err != nil {
 		log.Error(err)
@@ -108,8 +108,8 @@ Host: ` + utils.HostPort(host, port)
 
 	// check request
 	var req []byte
-	response, err = SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithPacket([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("test"),
+	response, err = HTTP(
+		WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("test"),
 		WithBeforeDoRequest(func(bytes []byte) []byte {
 			req = bytes
 			return bytes
@@ -126,8 +126,8 @@ Host: ` + utils.HostPort(host, port)
 	}
 
 	// check request
-	response, err = SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithPacket([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("abc"),
+	response, err = HTTP(
+		WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithHttps(true), WithSession("abc"),
 		WithBeforeDoRequest(func(bytes []byte) []byte {
 			req = bytes
 			return bytes
@@ -211,8 +211,8 @@ sdf
 asdf
 asdf`))
 	_ = server
-	rsp, err := SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithPacket([]byte(`GET / HTTP/1.1
+	rsp, err := HTTP(
+		WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 
 `)), WithETCHosts(map[string]string{"www.baidu.com": "127.0.0.1"}), WithPort(port))
@@ -224,8 +224,8 @@ Host: www.baidu.com
 		panic(1)
 	}
 
-	rsp, err = SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithPacket([]byte(`GET / HTTP/1.1
+	rsp, err = HTTP(
+		WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: ccc
 
 `)), WithETCHosts(map[string]string{"www.baidu.com": "127.0.0.1", "ccc": "127.0.0.1"}), WithPort(port))
