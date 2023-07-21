@@ -4,17 +4,78 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
 
-func TestServer_HTTPFuzzerBIG(t *testing.T) {
-	consts.GetGormProfileDatabase()
-	consts.GetGormProjectDatabase()
+func init() {
+	yakit.InitialDatabase()
+}
 
+func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Length: 12
+
+{"abc": "111111", "qqq": "12"}`))
+
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET /{{rs}} HTTP/1.1
+Host: %v 
+
+{{params(abc)}}
+{{params(a1)}}
+`, utils.HostPort(host, port)),
+		Concurrent:               10,
+		YamlPoCNames:             []string{"致远OAwpsAssistServlet任意文件上传"},
+		IsHTTPS:                  false,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+		Params: []*ypb.FuzzerParamItem{
+			{Key: "abc", Value: "123"},
+			{Key: "a1", Value: "{{rand_int(1000,9999)}}"},
+		},
+		Extractors: []*ypb.HTTPResponseExtractor{
+			{
+				Name:   "test",
+				Type:   "json",
+				Scope:  "body",
+				Groups: []string{".qqq"},
+			},
+		},
+		Matchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "expr",
+				Group:       []string{"test == '12'"},
+				ExprType:    "nuclei-dsl",
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		fmt.Println(string(rsp.GetRequestRaw()))
+		spew.Dump(rsp.GetExtractedResults())
+		spew.Dump(rsp.GetMatchedByMatcher())
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzerBIG(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12
 
