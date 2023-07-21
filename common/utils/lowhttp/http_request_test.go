@@ -133,7 +133,7 @@ func TestParseBytesToHttpRequest2(t *testing.T) {
 	wait500ms()
 	var host, port, _ = utils.ParseStringToHostPort(server.URL)
 	rsp, err := HTTPWithoutRedirect(
-		WithHttps(true), WithHost(host),
+		WithHttps(false), WithHost(host),
 		WithPort(port),
 		WithPacketBytes([]byte("GET /\x00 HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")),
 		WithTimeout(5*time.Second),
