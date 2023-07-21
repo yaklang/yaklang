@@ -133,6 +133,7 @@ func loadFromFile(filePath string) []crawlerx.ConfigOpt {
 		crawlerx.WithExtraWaitLoadTime(1000),
 		crawlerx.WithSensitiveWords(getSliceFromString(sensitiveWord)),
 		crawlerx.WithLeakless(leakless),
+		crawlerx.WithLocalStorage(map[string]string{"abc": "123"}),
 	)
 	maxDepthInt, err := strconv.Atoi(maxDepth)
 	if err == nil {
