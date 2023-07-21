@@ -350,66 +350,16 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	var (
-		forceHttps           = option.Https
-		forceHttp2           = option.Http2
-		gmTLS                = option.GmTLS
-		host                 = option.Host
-		port                 = option.Port
-		r                    = option.Packet
-		timeout              = option.Timeout
-		retryTimes           = option.RetryTimes
-		retryInStatusCode    = option.RetryInStatusCode
-		retryNotInStatusCode = option.RetryNotInStatusCode
-		retryWaitTime        = option.RetryWaitTime
-		retryMaxWaitTime     = option.RetryMaxWaitTime
-		redirectTimes        = option.RedirectTimes
-		redirectHandler      = option.RedirectHandler
-		jsRedirect           = option.JsRedirect
-		noFixContentLength   = option.NoFixContentLength
-		proxy                = option.Proxy
-		saveHTTPFlow         = option.SaveHTTPFlow
-		session              = option.Session
-		requestHook          = option.BeforeDoRequest
-		ctx                  = option.Ctx
-		runtimeId            = option.RuntimeId
-		fromPlugin           = option.FromPlugin
-		redirectRawPackets   [][]byte
-		commonOptions        = []LowhttpOpt{
-			WithRuntimeId(runtimeId),
-			WithFromPlugin(fromPlugin),
-			WithHttp2(forceHttp2),
-			WithTimeout(timeout),
-			WithRetryTimes(retryTimes),
-			WithRetryInStatusCode(retryInStatusCode),
-			WithRetryNotInStatusCode(retryNotInStatusCode),
-			WithRetryWaitTime(retryWaitTime),
-			WithRetryMaxWaitTime(retryMaxWaitTime),
-			WithRedirectTimes(redirectTimes),
-			WithNoFixContentLength(noFixContentLength),
-			WithProxy(proxy...),
-			WithSession(session),
-			WithBeforeDoRequest(requestHook),
-			WithContext(ctx),
-			WithSaveHTTPFlow(saveHTTPFlow),
-			WithSource(option.RequestSource),
-			WithETCHosts(option.EtcHosts),
-			WithDNSServers(option.DNSServers),
-		}
-		requestOptions []LowhttpOpt
-
-		response *LowhttpResponse
-		err      error
+		forceHttps         = option.Https
+		r                  = option.Packet
+		redirectTimes      = option.RedirectTimes
+		redirectHandler    = option.RedirectHandler
+		jsRedirect         = option.JsRedirect
+		redirectRawPackets [][]byte
+		response           *LowhttpResponse
+		err                error
 	)
-
-	requestOptions = append(commonOptions,
-		WithHttps(forceHttps),
-		WithGmTLS(gmTLS),
-		WithHost(host),
-		WithPort(port),
-		WithPacketBytes(r),
-	)
-
-	response, err = HTTPWithoutRedirect(requestOptions...)
+	response, err = HTTPWithoutRedirect(opts...)
 	raw := response.RawPacket
 	if err != nil {
 		return response, err
@@ -447,15 +397,8 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			nextHost, nextPort, _ := utils.ParseStringToHostPort(targetUrl)
 			log.Debugf("[lowhttp] redirect to: %s", targetUrl)
 
-			requestOptions = append(commonOptions,
-				WithHttps(forceHttps),
-				WithHost(nextHost),
-				WithPort(nextPort),
-				WithPacketBytes(r),
-			)
-
-			// 更新response
-			response, err = HTTPWithoutRedirect(requestOptions...)
+			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r))
+			response, err = HTTPWithoutRedirect(newOpts...)
 			responseRaw := response.RawPacket
 
 			if err != nil {
