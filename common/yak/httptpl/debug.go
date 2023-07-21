@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func MockEchoPlugin() (string, error) {
+func MockEchoPlugin(onTokens ...func(string)) (string, error) {
 	var name = utils.RandStringBytes(10)
 	var raw = `
 id: TEST_` + name + `
@@ -25,5 +25,10 @@ requests:
       words:
         - "` + name + `"
 `
+	defer func() {
+		for _, handler := range onTokens {
+			handler(name)
+		}
+	}()
 	return yakit.CreateTemporaryYakScript("nuclei", raw)
 }
