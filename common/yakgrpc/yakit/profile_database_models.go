@@ -18,7 +18,7 @@ var ProfileTables = []interface{}{
 	&WebFuzzerLabel{},
 }
 
-func InitializeDefaultDatabase() {
+func InitializeDefaultDatabaseSchema() {
 	log.Info("start to initialize default database")
 
 	if db := consts.GetGormProjectDatabase().AutoMigrate(ProjectTables...); db.Error != nil {

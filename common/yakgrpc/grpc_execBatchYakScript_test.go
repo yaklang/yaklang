@@ -81,7 +81,7 @@ requests:
 
 func NewLocalClient() (ypb.YakClient, error) {
 	consts.InitilizeDatabase("", "")
-	yakit.InitializeDefaultDatabase()
+	yakit.InitializeDefaultDatabaseSchema()
 
 	port := utils.GetRandomAvailableTCPPort()
 	addr := utils.HostPort("127.0.0.1", port)
