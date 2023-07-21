@@ -635,11 +635,11 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 		}, nil
 	}
 
-	response, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
+	response, err := lowhttp.HTTP(
 		lowhttp.WithHttps(config.ForceHttps),
 		lowhttp.WithHost(config.Host),
 		lowhttp.WithPort(config.Port),
-		lowhttp.WithPacket(packet),
+		lowhttp.WithPacketBytes(packet),
 		lowhttp.WithTimeout(config.Timeout),
 		lowhttp.WithRetryTimes(config.RetryTimes),
 		lowhttp.WithRetryInStatusCode(config.RetryInStatusCode),

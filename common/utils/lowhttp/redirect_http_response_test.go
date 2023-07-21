@@ -2,7 +2,6 @@ package lowhttp
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,33 +53,28 @@ func TestWithRedirectTimes(t *testing.T) {
 
 	spew.Dump(server.URL)
 	host, port, _ := utils.ParseStringToHostPort(server.URL)
-	rsp, _, err := SendHTTPRequestWithRawPacketWithRedirectFullEx(false, host, port, []byte(fmt.Sprintf(`GET / HTTP/1.1
-Host: %v
-
-`, utils.HostPort(host, port))),
-		3*time.Second, 4, false, func(isHttps bool, req []byte, rsp []byte) bool {
+	rspIns, err := HTTP(WithRequest("GET / HTTP/1.1\r\nHost: "+utils.HostPort(host, port)), WithTimeoutFloat(3), WithRedirectTimes(4),
+		WithJsRedirect(false), WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
 			return true
-		}, false, false, false)
+		}))
 	if err != nil {
 		panic(err)
 	}
+	rsp := rspIns.RawPacket
 	spew.Dump(rsp)
 
 	if !bytes.Contains(rsp, []byte(`Bingo: 111`)) {
 		panic("redirect failed")
 	}
 
-	rsp, _, err = SendHTTPRequestWithRawPacketWithRedirectFullEx(false, host, port, []byte(fmt.Sprintf(`GET /a HTTP/1.1
-Host: %v
-
-`, utils.HostPort(host, port))),
-		3*time.Second, 4, false, func(isHttps bool, req []byte, rsp []byte) bool {
+	rspIns, err = HTTP(WithRequest("GET /a HTTP/1.1\r\nHost: "+utils.HostPort(host, port)), WithTimeoutFloat(3), WithRedirectTimes(4),
+		WithJsRedirect(false), WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
 			return true
-		}, false, false,false)
+		}))
 	if err != nil {
 		panic(err)
 	}
-	spew.Dump(rsp)
+	rsp = rspIns.RawPacket
 
 	if !bytes.Contains(rsp, []byte(`Bingo: 222`)) {
 		panic("redirect failed")

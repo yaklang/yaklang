@@ -48,21 +48,33 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 	}
 
 	originUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, isTls)
-	rsp, _, isOpen, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(isTls, host, portInt, packet, timeout, 5, true, func(isHttps bool, req []byte, rsp []byte) bool {
-		urlRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
-		if urlRaw != nil {
-			redirectResponse = append(redirectResponse, struct {
-				Url     *url.URL
-				Raw     []byte
-				Request []byte
-				IsHttps bool
-			}{Url: urlRaw, Raw: rsp, Request: req, IsHttps: isHttps})
-		}
-		return true
-	}, false, false, false, utils.StringArrayFilterEmpty(proxy)...)
+
+	rspDetail, err := lowhttp.HTTP(
+		lowhttp.WithHttps(isTls),
+		lowhttp.WithHost(host),
+		lowhttp.WithPort(portInt),
+		lowhttp.WithRequest(packet),
+		lowhttp.WithRedirectTimes(5),
+		lowhttp.WithJsRedirect(true),
+		lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
+			urlRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
+			if urlRaw != nil {
+				redirectResponse = append(redirectResponse, struct {
+					Url     *url.URL
+					Raw     []byte
+					Request []byte
+					IsHttps bool
+				}{Url: urlRaw, Raw: rsp, Request: req, IsHttps: isHttps})
+			}
+			return true
+		}),
+		lowhttp.WithProxy(proxy...),
+	)
+	var isOpen bool
 	if err != nil {
-		return isOpen, nil, utils.Errorf("send request failed: %s", err)
+		return isOpen, nil, utils.Errorf("lowhttp.HTTP failed: %s", err)
 	}
+	rsp := rspDetail.RawPacket
 
 	var infos []*HTTPResponseInfo
 	for _, rspRaw := range append([]struct {
