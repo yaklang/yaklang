@@ -28,6 +28,7 @@ func (manager *BrowserManager) CreateBrowserStarters() {
 
 func (manager *BrowserManager) Start() {
 	for _, starter := range manager.browsers {
+		manager.config.baseConfig.startWaitGroup.Add()
 		go starter.Start()
 	}
 }

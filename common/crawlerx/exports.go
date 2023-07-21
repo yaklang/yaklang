@@ -25,4 +25,13 @@ var CrawlerXExports = map[string]interface{}{
 	"ignoreQueryName":   WithIgnoreQueryName,
 	"sensitiveWords":    WithSensitiveWords,
 	"leakless":          WithLeakless,
+
+	"UnLimitRepeat":      unlimited,
+	"LowRepeatLevel":     lowLevel,
+	"MediumRepeatLevel":  midLevel,
+	"HighRepeatLevel":    highLevel,
+	"ExtremeRepeatLevel": extremeLevel,
+
+	"AllDomainScan": mainDomain,
+	"SubMenuScan":   subDomain,
 }
