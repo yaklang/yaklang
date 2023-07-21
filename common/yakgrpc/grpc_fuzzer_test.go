@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
@@ -16,6 +17,11 @@ func init() {
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
+	name, err := httptpl.MockEchoPlugin()
+	if err != nil {
+		panic(err)
+	}
+
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12
 
@@ -34,7 +40,7 @@ Host: %v
 {{params(a1)}}
 `, utils.HostPort(host, port)),
 		Concurrent:               10,
-		YamlPoCNames:             []string{"致远OAwpsAssistServlet任意文件上传"},
+		YamlPoCNames:             []string{name},
 		IsHTTPS:                  false,
 		ForceFuzz:                true,
 		PerRequestTimeoutSeconds: 5,
@@ -68,6 +74,7 @@ Host: %v
 			log.Error(err)
 			break
 		}
+		fmt.Println(rsp.Url)
 		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
 		fmt.Println(string(rsp.GetRequestRaw()))
 		spew.Dump(rsp.GetExtractedResults())
