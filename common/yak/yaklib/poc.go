@@ -346,11 +346,11 @@ func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 }
 
 func _pocOptReplaceHttpPacketHost(host string) PocConfig {
-	return _pocOptAppendHeader("Host", host)
+	return _pocOptReplaceHttpPacketHeader("Host", host)
 }
 
 func _pocOptReplaceHttpPacketBasicAuth(username, password string) PocConfig {
-	return _pocOptAppendHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
+	return _pocOptReplaceHttpPacketHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
 func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
@@ -610,6 +610,9 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 		opt(config)
 	}
 
+	// 根据config修改packet
+	packet = fixPacketByConfig(packet, config)
+
 	if len(config.Proxy) <= 0 && utils.GetProxyFromEnv() != "" {
 		config.Proxy = append(config.Proxy, utils.GetProxyFromEnv())
 	}
@@ -657,7 +660,6 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 		config.RetryTimes = 0
 	}
 
-	packet = fixPacketByConfig(packet, config)
 	return packet, config, nil
 }
 
