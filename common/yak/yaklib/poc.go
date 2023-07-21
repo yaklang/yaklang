@@ -469,10 +469,10 @@ func _pocOptAppendHttpPacketFormEncoded(key, value string) PocConfig {
 	}
 }
 
-func _pocOptAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}) PocConfig {
+func _pocOptAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}, contentType ...string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
-			return lowhttp.AppendHTTPPacketUploadFile(packet, fieldName, fileName, fileContent)
+			return lowhttp.AppendHTTPPacketUploadFile(packet, fieldName, fileName, fileContent, contentType...)
 		},
 		)
 	}
