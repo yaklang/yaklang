@@ -107,7 +107,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 	host, port := _mockHTTP(rsp)
 	rspIns_, err := HTTPWithoutRedirect(
-		WithHttps(true), WithHost(host), WithPort(port), WithPacketBytes([]byte(packet)), WithTimeout(10*time.Second))
+		WithHttps(false), WithHost(host), WithPort(port), WithPacketBytes([]byte(packet)), WithTimeout(10*time.Second))
 	if err != nil {
 		panic(err)
 	}
