@@ -2,6 +2,8 @@ package vulinbox
 
 import (
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net/http"
 	"strings"
+	"sync"
 	"text/template"
 )
 
@@ -22,10 +25,10 @@ var autoRouteHtml []byte
 type GroupedRoutes struct {
 	GroupName string
 	SafeStyle string
-	Routes    []VulRouter
+	VulnInfos []*VulnInfo
 }
 
-type VulRouter struct {
+type VulnInfo struct {
 	Path          string
 	Query         string
 	RouteName     string // 名称
@@ -80,24 +83,29 @@ func (s *VulinServer) init() {
 		})
 	})
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
-		var renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
-		var bytes []byte
-		var err error
+		var renderedData string
 		if s.safeMode {
-			bytes, err = unsafeTemplate(string(routeHtml), map[string]any{
-				"safescript": renderedData,
-			})
+			renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
 		} else {
-			bytes, err = unsafeTemplate(string(routeHtml), map[string]any{
-				"safescript": "",
-			})
+			renderedData = ""
 		}
+
+		res := strings.Replace(string(autoRouteHtml), "{{.safescript}}", renderedData, 1)
+
+		// Parse and execute template
+		t, err := template.New("vulRouter").Parse(res)
 		if err != nil {
-			writer.Write(routeHtml)
-		} else {
-			writer.Write(bytes)
+			panic(err)
 		}
+
+		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
+
+		routesData := s.groupedRoutesCache
+		err = t.Execute(writer, routesData) // pass the data map to the Execute function instead of routesData directly
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		}
+
 	})
 
 	// agent ws connector
@@ -130,19 +138,20 @@ func (s *VulinServer) init() {
 		s.registerPingCMDI()
 	}
 
-	s.genFrontendRoute()
+	s.genRoute()
 
 	s.registerVulRouter()
 
 }
 
-func (s *VulinServer) genFrontendRoute() {
-	var router = s.router
+var once sync.Once
 
-	router.HandleFunc("/1", func(writer http.ResponseWriter, request *http.Request) {
-		var routesData []GroupedRoutes
-		groups := make(map[string][]VulRouter)
-		err := s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+func (s *VulinServer) genRoute() {
+	var routesData []*GroupedRoutes
+	var err error
+	once.Do(func() {
+		groups := make(map[string][]*VulnInfo)
+		err = s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			// 分组名
 			var groupName string
 			// 如果当前路由有父路由，就代表这个路由在一个 group 中
@@ -161,7 +170,7 @@ func (s *VulinServer) genFrontendRoute() {
 						query = "?" + queriesTemplates[0]
 					}
 
-					vulRouter := VulRouter{
+					vulRouter := &VulnInfo{
 						Path:      pathTemplate,
 						Query:     query,
 						RouteName: name,
@@ -173,7 +182,6 @@ func (s *VulinServer) genFrontendRoute() {
 			return nil
 		})
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -183,45 +191,39 @@ func (s *VulinServer) genFrontendRoute() {
 				// 当一个变量被作为 HTML attribute 插入时，无法使用 html/template
 				id = `id="safestyle"`
 			}
-			routesData = append(routesData, GroupedRoutes{
+			routesData = append(routesData, &GroupedRoutes{
 				GroupName: groupName,
-				Routes:    routes,
+				VulnInfos: routes,
 				SafeStyle: id,
 			})
 		}
-		var renderedData string
-		if s.safeMode {
-			renderedData = `<script>const c = document.getElementById("safestyle"); if (c) c.style.display='none';</script>`
-		} else {
-			renderedData = ""
-		}
-
-		res := strings.Replace(string(autoRouteHtml), "{{.safescript}}", renderedData, 1)
-
-		// Parse and execute template
-		t, err := template.New("vulRouter").Parse(res)
-		if err != nil {
-			panic(err)
-		}
-
-		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
-
-		err = t.Execute(writer, routesData) // pass the data map to the Execute function instead of routesData directly
-		if err != nil {
-			panic(err)
-		}
-
+		s.groupedRoutesCache = routesData
 	})
+	if err != nil {
+		//http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *VulinServer) registerVulRouter() {
+	s.router.HandleFunc("/vul/route", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(writer).Encode(s.groupedRoutesCache)
+		if err != nil {
+			http.Error(writer, fmt.Sprintf("Error encoding groupedRoutesCache: %v", err), http.StatusInternalServerError)
+		}
 
-	//jsonRoutes, err := json.Marshal(groups)
-	//if err != nil {
-	//	http.Error(writer, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-	//
-	//writer.Header().Set("Content-Type", "application/json")
-	//fmt.Fprintf(writer, string(jsonRoutes))
+	})
+
+}
+
+func (s *VulinServer) Merge(groupInfo *GroupedRoutes, info *VulnInfo) {
+	groupInfo.VulnInfos = append(groupInfo.VulnInfos, info)
+	s.groupedRoutesCache = append(s.groupedRoutesCache, groupInfo)
+}
+
+func addRouteWithComment(router *mux.Router, p string, handler func(http.ResponseWriter, *http.Request), info *VulnInfo) {
+	infoStr, _ := json.Marshal(info)
+	router.HandleFunc(p, handler).Name(string(infoStr))
+	//routeComments[info.Path] = info.Comment
 }
