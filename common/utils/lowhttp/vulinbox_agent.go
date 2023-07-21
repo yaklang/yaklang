@@ -68,7 +68,7 @@ User-Agent: FeedbackStreamer/1.0
 	var start = false
 	client, err := NewWebsocketClient(wsPacket, WithWebsocketFromServerHandler(func(bytes []byte) {
 		if !start {
-			if utils.ExtractMapValueString(bytes, "type") == "ping" {
+			if utils.ExtractMapValueString(bytes, "action") == "ping" {
 				start = true
 			}
 		}
@@ -97,7 +97,7 @@ User-Agent: FeedbackStreamer/1.0
 				case <-ctx.Done():
 					return
 				default:
-					client.WriteText([]byte(`{"type":"ping"}`))
+					client.WriteText([]byte(`{"action":"ping"}`))
 					time.Sleep(time.Second)
 				}
 			}
