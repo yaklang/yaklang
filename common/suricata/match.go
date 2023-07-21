@@ -26,7 +26,7 @@ type matchContext struct {
 	rejected bool
 	pos      int
 
-	Valaue map[string]any
+	Value map[string]any
 
 	PK   gopacket.Packet
 	Rule *Rule
@@ -61,7 +61,7 @@ func (c *matchContext) Must(ok bool) {
 
 func newMatchCtx(pk gopacket.Packet, r *Rule, hs ...matchHandler) *matchContext {
 	return &matchContext{
-		Valaue:   make(map[string]any),
+		Value:    make(map[string]any),
 		PK:       pk,
 		Rule:     r,
 		workflow: hs,
@@ -107,6 +107,8 @@ func dnsMatcher(c *matchContext) error {
 		c.Must(utils.Atoi(string(dns.(*layers.DNS).OpCode)) != c.Rule.ContentRuleConfig.DNS.Opcode)
 	} else {
 		c.Must(utils.Atoi(string(dns.(*layers.DNS).OpCode)) == c.Rule.ContentRuleConfig.DNS.Opcode)
+	}
+	if c.Rule.ContentRuleConfig.DNS.DNSQuery {
 	}
 	return nil
 }
