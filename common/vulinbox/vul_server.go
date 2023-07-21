@@ -21,7 +21,8 @@ type VulinServer struct {
 	wsAgent  wsAgent
 	matcher  matcher
 
-	safeMode bool
+	safeMode           bool
+	groupedRoutesCache []*GroupedRoutes
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {
