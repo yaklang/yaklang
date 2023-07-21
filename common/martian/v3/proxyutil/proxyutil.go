@@ -19,7 +19,9 @@ package proxyutil
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +31,8 @@ import (
 	"time"
 )
 
+//go:embed template.html
+var templateBody string
 // NewResponse builds new HTTP responses.
 // If body is nil, an empty byte.Buffer will be provided to be consistent with
 // the guarantees provided by http.Transport and http.Client.
@@ -100,4 +104,9 @@ func GetRangeStart(res *http.Response) int64 {
 		return -1
 	}
 	return num
+}
+
+func GetErrorRspBody(msg string) string{
+	msg = html.EscapeString(msg)
+	return strings.ReplaceAll(templateBody, "{{content}}", msg)
 }

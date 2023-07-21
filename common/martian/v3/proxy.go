@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	_ "embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -29,6 +30,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
 	"io"
 	"net"
@@ -818,9 +820,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	res, err := p.roundTrip(ctx, req)
 	if (err != nil && err != io.EOF) || res == nil {
-		log.Debugf("martian: failed to round trip: %v", err)
-		res = proxyutil.NewResponse(502, nil, req)
-		proxyutil.Warning(res.Header, err)
+		if strings.Contains(err.Error(), "no such host") {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG, true)
+			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody(fmt.Sprintf("Unknown host: %s", req.Host))), req)
+		} else {
+			log.Debugf("martian: failed to round trip: %v", err)
+			res = proxyutil.NewResponse(502, nil, req)
+			proxyutil.Warning(res.Header, err)
+		}
 	}
 	defer func() {
 		if res == nil {
@@ -832,10 +839,13 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		res.Body.Close()
 	}()
 
-	if err := p.resmod.ModifyResponse(res); err != nil {
-		log.Errorf("martian: error modifying response: %v", err)
-		proxyutil.Warning(res.Header, err)
+	if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		if err := p.resmod.ModifyResponse(res); err != nil {
+			log.Errorf("martian: error modifying response: %v", err)
+			proxyutil.Warning(res.Header, err)
+		}
 	}
+
 	if session.Hijacked() {
 		log.Debugf("martian: connection hijacked by response modifier")
 		return nil
@@ -926,6 +936,10 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 	if ctx.SkippingRoundTrip() {
 		log.Debugf("martian: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil
+	}
+	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		log.Debugf("martian: skipping round trip due to user manually drop")
+		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
 	}
 	return p.roundTripper.RoundTrip(req)
 }
@@ -1127,25 +1141,30 @@ func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		proxyutil.Warning(req.Header, err)
 		return
 	}
+	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		w.WriteHeader(200)
+		w.Write([]byte(proxyutil.GetErrorRspBody("请求被用户丢弃")))
+	} else {
+		rsp, err := h.proxyToServer.Transport.RoundTrip(req)
+		if err != nil {
+			log.Errorf("martian: error requesting to remote server: %v", err)
+			return
+		}
+		defer rsp.Body.Close()
 
-	rsp, err := h.proxyToServer.Transport.RoundTrip(req)
-	if err != nil {
-		log.Errorf("martian: error requesting to remote server: %v", err)
-		return
+		if err := h.resmod.ModifyResponse(rsp); err != nil {
+			log.Errorf("martian: error modifying response: %v", err)
+			proxyutil.Warning(req.Header, err)
+			return
+		}
+
+		for k, v := range rsp.Header {
+			w.Header().Set(k, v[0])
+		}
+		w.WriteHeader(rsp.StatusCode)
+		rspBody, _ := io.ReadAll(rsp.Body)
+
+		w.Write(rspBody)
 	}
-	defer rsp.Body.Close()
 
-	if err := h.resmod.ModifyResponse(rsp); err != nil {
-		log.Errorf("martian: error modifying response: %v", err)
-		proxyutil.Warning(req.Header, err)
-		return
-	}
-
-	for k, v := range rsp.Header {
-		w.Header().Set(k, v[0])
-	}
-	w.WriteHeader(rsp.StatusCode)
-	rspBody, _ := io.ReadAll(rsp.Body)
-
-	w.Write(rspBody)
 }

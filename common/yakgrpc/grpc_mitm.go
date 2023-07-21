@@ -1221,6 +1221,44 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if reqInstance.GetDrop() {
 					log.Infof("MITM %v recv drop hijacked request[%v]", addr, reqInstance.GetId())
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
+					// 保存到数据库
+					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
+					var startCreateFlow = time.Now()
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, true, true)
+					if err != nil {
+						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
+						return nil
+					}
+					log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
+					// Hidden Index 用来标注 MITM 劫持的顺序
+					flow.HiddenIndex = getPacketIndex()
+					flow.Hash = flow.CalcHash()
+					flow.AddTagToFirst("[被丢弃]")
+					flow.Purple()
+
+					log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
+					startCreateFlow = time.Now()
+
+					// HOOK 存储过程
+					if flow != nil {
+						flow.Hash = flow.CalcHash()
+						flow := flow
+						flow.StatusCode = 200 // 这里先设置成200
+						//log.Infof("start to do sth with tag")
+						for i := 0; i < 3; i++ {
+							startCreateFlow = time.Now()
+							// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
+							flow.Response = ""
+							err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+							log.Debugf("insert http flow %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
+							if err != nil {
+								log.Errorf("create / save httpflow from mirror error: %s", err)
+								time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
+								continue
+							}
+							break
+						}
+					}
 					return nil
 				}
 
@@ -1312,7 +1350,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 保存到数据库
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
 		var startCreateFlow = time.Now()
-		flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
+		var flow *yakit.HTTPFlow
+		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, req, "mitm", reqUrl, remoteAddr, true, true)
+			flow.StatusCode = 200 //先设置成200
+		} else {
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
+
+		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
 			return

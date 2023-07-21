@@ -136,6 +136,7 @@ const (
 	REQUEST_CONTEXT_KEY_IsHttps                      = "isHttps"
 	REQUEST_CONTEXT_KEY_IsDropped                    = "isRequestDropped"
 	RESPONSE_CONTEXT_KEY_IsDropped                   = "isResponseDropped"
+	RESPONSE_CONTEXT_NOLOG                           = "isResponseNoLog"
 	REQUEST_CONTEXT_KEY_AutoFoward                   = "isRequestAutoForward"
 	RESPONSE_CONTEXT_KEY_AutoFoward                  = "isResponseAutoForward"
 	REQUEST_CONTEXT_KEY_Url                          = "url"

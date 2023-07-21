@@ -351,7 +351,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 			flow.Response = append(flow.Response[:1000*1000], []byte("...")...)
 		}
 
-		if !flow.NoFixContentLength {
+		if !flow.NoFixContentLength && f.Response != "" {
 			rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBufferString(unquotedRsp)), nil)
 			if err != nil {
 				log.Errorf("parse response failed: %s", err)
@@ -530,6 +530,39 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 
 	flow.Hash = flow.CalcHash()
 	return flow, nil
+}
+
+func CreateHTTPFlowFromHTTPWithNoRspSaved(db *gorm.DB, isHttps bool, req *http.Request, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
+	var urlRaw = url
+	if urlRaw == "" {
+		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
+		if err != nil {
+			log.Warnf("extract url from request failed: %s", err)
+		}
+		if u != nil {
+			urlRaw = u.String()
+		} else {
+			if isHttps {
+				urlRaw = "https://" + remoteAddr
+			} else {
+				urlRaw = "http://" + remoteAddr
+			}
+		}
+	}
+
+	reqRaw := httpctx.GetRequestBytes(req)
+	if reqRaw == nil {
+		var err error
+		reqRaw, err = utils.HttpDumpWithBody(req, allowReqBody)
+		if err != nil {
+			reqRaw, err = utils.HttpDumpWithBody(req, false)
+			if err != nil {
+				log.Errorf("dump request failed: %s", err)
+			}
+		}
+	}
+
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
 }
 
 func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
