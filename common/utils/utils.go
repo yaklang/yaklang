@@ -204,6 +204,14 @@ func Jsonify(i interface{}) []byte {
 	return raw
 }
 
+func MustUnmarshalJson[T any](raw []byte) *T {
+	var ret T
+	if err := json.Unmarshal(raw, &ret); err != nil {
+		return nil
+	}
+	return &ret
+}
+
 func NewDefaultHTTPClientWithProxy(proxy string) *http.Client {
 	client := NewDefaultHTTPClient()
 	if proxy == "" {
