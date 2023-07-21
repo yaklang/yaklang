@@ -62,7 +62,7 @@ func newUDPAction(content []byte, target netip.AddrPort) *UDPAction {
 type AckAction struct {
 	AgentProtocol
 	Status string `json:"status"`
-	Data   any
+	Data   any    `json:"data"`
 }
 
 func newAckAction(id uint32, status string, data any) *AckAction {
