@@ -273,7 +273,17 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 	return string(jsonBytes), nil
 }
 
-func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul) func(i map[string]interface{}) {
+func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
+	var vCh = make(chan *tools.PocVul)
+	filterVul := filter.NewFilter()
+	i := processVulnerability(target, filterVul, vCh, onRisk)
+	return func(config *Config) {
+		_callback(i)(config)
+		_tcpCallback(i)(config)
+	}
+}
+
+func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul, handlers ...func(i *yakit.Risk)) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)
@@ -338,6 +348,9 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 			if !filterVul.Exist(calcSha1) {
 				filterVul.Insert(calcSha1)
 				risk := tools.PocVulToRisk(pv)
+				for _, h := range handlers {
+					h(risk)
+				}
 				err = yakit.SaveRisk(risk)
 				if err != nil {
 					log.Errorf("save risk failed: %s", err)

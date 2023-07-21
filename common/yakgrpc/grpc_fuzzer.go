@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -270,6 +271,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}()
 
+	/*
+		Plugins
+	*/
 	var pocs []*yakit.YakScript
 	for _, i := range req.GetYamlPoCNames() {
 		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
@@ -301,7 +305,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 		feedbackWg.Add(1)
 		defer func() {
-			feedbackWg.Done()
+			defer feedbackWg.Done()
 			for _, p := range pocs {
 				poc := p
 				err := swg.AddWithContext(stream.Context())
@@ -309,18 +313,36 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					break
 				}
 				go func() {
-
+					defer swg.Done()
+					defer func() {
+						if err := recover(); err != nil {
+							spew.Dump(err)
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
+					httptpl.ScanPacket(
+						rsp.RequestRaw, lowhttp.WithHttps(rsp.IsHTTPS),
+						httptpl.WithTemplateRaw(poc.Content),
+						lowhttp.WithResponseCallback(func(i *lowhttp.LowhttpResponse) {
+							err := stream.Send(ConvertLowhttpResponseToFuzzerResponseBase(i))
+							if err != nil {
+								log.Errorf("yaml poc send failed")
+							}
+						}),
+						httptpl.WithOnRisk(rsp.Url, func(i *yakit.Risk) {
+							log.Infof("found risk: %s", i.Title)
+						}),
+					)
 				}()
-				httptpl.ScanPacket(
-					rsp.RequestRaw, lowhttp.WithHttps(true),
-					httptpl.WithTemplateRaw(poc.Content),
-				)
+
 			}
 		}()
-
 		return nil
 	}
 
+	/*
+
+	 */
 	var mergedParams = make(map[string]interface{})
 	renderedParams, err := s.RenderVariables(stream.Context(), &ypb.RenderVariablesRequest{
 		Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
