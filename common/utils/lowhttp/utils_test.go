@@ -156,3 +156,44 @@ aaaaaaaaaaaa` + "\r\n\r\n"))
 	}
 	println(string(rap))
 }
+
+func TestParseResponseLine(t *testing.T) {
+	testcases := []struct {
+		line          string
+		proto, status string
+		code          int
+	}{
+		{
+			line:   "HTTP/1.1 200 OK",
+			proto:  "HTTP/1.1",
+			code:   200,
+			status: "OK",
+		},
+		{
+			line:   "HTTP/1.1 200",
+			proto:  "HTTP/1.1",
+			code:   200,
+			status: "",
+		},
+		{
+			line:   "HTTP/1.1 301 Moved Permanently",
+			proto:  "HTTP/1.1",
+			code:   301,
+			status: "Moved Permanently",
+		},
+	}
+
+	for _, testcase := range testcases {
+		proto, code, status, _ := parseResponseLine(testcase.line)
+		if proto != testcase.proto {
+			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", proto, testcase.proto)
+		}
+		if code != testcase.code {
+			t.Fatalf("parseResponseLine error: %d(got) != %d(want)", code, testcase.code)
+		}
+		if status != testcase.status {
+			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", status, testcase.status)
+		}
+
+	}
+}
