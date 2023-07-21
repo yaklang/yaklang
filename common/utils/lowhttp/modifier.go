@@ -8,6 +8,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path"
 	"strings"
@@ -18,6 +19,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func escapeQuotes(s string) string {
+	return quoteEscaper.Replace(s)
+}
 
 func IsHeader(headerLine, wantHeader string) bool {
 	return strings.HasPrefix(strings.ToLower(headerLine), strings.ToLower(wantHeader)+":")
@@ -644,7 +651,9 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	})
 }
 
-func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}) []byte {
+func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
+	hasContentType := len(contentType) > 0
+
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
@@ -664,18 +673,41 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 				}
 			}
 		}
-		// append form
+		// append upload file
 		if multipartWriter != nil {
-			partWriter, err := multipartWriter.CreateFormFile(fieldName, fileName)
-			if err == nil {
-				switch r := fileContent.(type) {
-				case string:
-					io.Copy(partWriter, strings.NewReader(r))
-				case []byte:
-					io.Copy(partWriter, bytes.NewReader(r))
-				case io.Reader:
-					io.Copy(partWriter, r)
+			var content []byte
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition",
+				fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+					escapeQuotes(fieldName), escapeQuotes(fileName)))
+
+			guessContentType := "application/octet-stream"
+			if hasContentType {
+				guessContentType = contentType[0]
+			}
+
+			switch r := fileContent.(type) {
+			case string:
+				content = unsafe.Slice(unsafe.StringData(r), len(r))
+				if !hasContentType {
+					guessContentType = http.DetectContentType(content)
 				}
+			case []byte:
+				content = r
+				if !hasContentType {
+					guessContentType = http.DetectContentType(r)
+				}
+			case io.Reader:
+				r.Read(content)
+				if !hasContentType {
+					guessContentType = http.DetectContentType(content)
+				}
+			}
+			h.Set("Content-Type", guessContentType)
+
+			partWriter, err := multipartWriter.CreatePart(h)
+			if err == nil {
+				partWriter.Write(content)
 			}
 		}
 		return true

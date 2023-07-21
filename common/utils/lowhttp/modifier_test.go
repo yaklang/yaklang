@@ -1478,7 +1478,7 @@ Content-Disposition: form-data; name="a"
 }
 
 func TestAppendHTTPPacketUploadFile(t *testing.T) {
-	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}) {
+	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}, contentType string) {
 		part, err := mutlipartReader.NextPart()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
@@ -1517,6 +1517,12 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
 			}
 		}
+
+		if contentType != "" {
+			if part.Header.Get("Content-Type") != contentType {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", part.Header.Get("Content-Type"), contentType)
+			}
+		}
 	}
 
 	testcases := []struct {
@@ -1525,6 +1531,7 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 		oldFileContent            string
 		fieldName, fileName       string
 		fileContent               interface{}
+		contentType               string
 	}{
 		{
 			origin: `GET / HTTP/1.1
@@ -1569,9 +1576,33 @@ bbb
 			fileName:       "test.txt",
 			fileContent:    "test",
 		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="aaa"; filename="aaa.txt"
+Content-Type: application/octet-stream
+
+bbb
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldfieldName:   "aaa",
+			oldfileName:    "aaa.txt",
+			oldFileContent: "bbb",
+			fieldName:      "test",
+			fileName:       "test.php",
+			fileContent:    "<?php phpinfo();?>",
+			contentType:    "image/png",
+		},
 	}
 	for _, testcase := range testcases {
-		actual := AppendHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
+		var actual []byte
+		if testcase.contentType != "" {
+			actual = AppendHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
+		} else {
+			actual = AppendHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
+		}
 
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
 		body := blocks[1]
@@ -1584,11 +1615,13 @@ bbb
 
 		// compare old
 		if testcase.oldfieldName != "" {
-			compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent)
+			compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent, testcase.contentType)
 		}
 
 		// compare new
-		compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent)
+		compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
+
+		fmt.Printf("%s\n\n\n\n", actual)
 
 	}
 }
