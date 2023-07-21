@@ -51,7 +51,7 @@ Content-Type: image/png
 
 <?php phpinfo(); ?>
 ------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7--
-`, _csrfOptWithMultipartDefaultValue(true))
+`, CsrfOptWithMultipartDefaultValue(true))
 	t.Log(poc)
 	spew.Dump(err)
 }

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
 var extractHostRegexp = regexp.MustCompile(`[Hh]ost:\s+([^\r\n]+)`)
@@ -222,7 +223,7 @@ if YAK_MAIN {
 `)
 
 func (s *Server) GenerateCSRFPocByPacket(ctx context.Context, req *ypb.GenerateCSRFPocByPacketRequest) (*ypb.GenerateCSRFPocByPacketResponse, error) {
-	poc, err := yaklib.GenerateCSRFPoc(req.GetRequest())
+	poc, err := yaklib.GenerateCSRFPoc(req.GetRequest(), yaklib.CsrfOptWithHTTPS(req.IsHttps))
 	if err != nil {
 		return nil, err
 	}
