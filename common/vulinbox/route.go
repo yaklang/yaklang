@@ -15,7 +15,7 @@ var routeHtml []byte
 
 func (s *VulinServer) init() {
 	if s.agentFeedbackChan == nil {
-		s.agentFeedbackChan = make(chan []byte, 10000)
+		s.agentFeedbackChan = make(chan any, 10000)
 	}
 
 	router := s.router
@@ -30,7 +30,7 @@ func (s *VulinServer) init() {
 		}
 		if len(reqRaw) > 0 {
 			select {
-			case s.agentFeedbackChan <- reqRaw:
+			case s.agentFeedbackChan <- newDataBackAction("http-request", string(reqRaw)):
 				//log.Infof("agentFeedbackHandler: %s", string(reqRaw))
 			default:
 				log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
@@ -60,7 +60,7 @@ func (s *VulinServer) init() {
 			}
 			if len(reqRaw) > 0 {
 				select {
-				case s.agentFeedbackChan <- reqRaw:
+				case s.agentFeedbackChan <- newDataBackAction("http-request", string(reqRaw)):
 					log.Infof("agentFeedbackHandler: %s", string(reqRaw))
 				default:
 					log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))

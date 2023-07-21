@@ -19,7 +19,7 @@ type VulinServer struct {
 	database *dbm
 	router   *mux.Router
 
-	agentFeedbackChan chan []byte
+	agentFeedbackChan chan any
 	safeMode          bool
 }
 
