@@ -46,21 +46,16 @@ func parseResponseLine(line string) (string, int, string, bool) {
 	var code int
 	var status string
 
-	// 第一个一定是 HTTP/1.1 先解析出 proto
-	s1 := strings.Index(line, " ")
-	if s1 < 0 {
-		return "", 0, "", false
+	blocks := strings.SplitN(line, " ", 3)
+	lenOfBlocks := len(blocks)
+	if lenOfBlocks > 0 {
+		proto = blocks[0]
 	}
-	proto = line[:s1]
-
-	// 剩余的部分，找最后一个分割
-	line = line[s1+1:]
-	s2 := strings.LastIndex(line, " ")
-	if s2 < 0 {
-		code = utils.Atoi(line)
-	} else {
-		code = utils.Atoi(line[:s2])
-		status = line[s2+1:]
+	if lenOfBlocks > 1 {
+		code = utils.Atoi(blocks[1])
+	}
+	if lenOfBlocks > 2 {
+		status = blocks[2]
 	}
 	return proto, code, status, code != 0
 }
