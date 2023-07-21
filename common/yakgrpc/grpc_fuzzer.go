@@ -289,6 +289,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	var swg = utils.NewSizedWaitGroup(int(req.GetConcurrent()))
+	defer swg.Wait()
 	var feedbackWg = new(sync.WaitGroup)
 	defer func() {
 		feedbackWg.Wait()
