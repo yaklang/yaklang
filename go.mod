@@ -125,7 +125,6 @@ require (
 	gopkg.in/sourcemap.v1 v1.0.5
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	moul.io/http2curl v1.0.0
 	rsc.io/qr v0.2.0
 )
 
@@ -210,7 +209,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.5 // indirect
-	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/tebeka/strftime v0.1.3 // indirect
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
