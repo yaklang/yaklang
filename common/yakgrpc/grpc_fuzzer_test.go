@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"testing"
 )
 
@@ -17,7 +18,10 @@ func init() {
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
-	name, err := httptpl.MockEchoPlugin()
+	var token string
+	name, err := httptpl.MockEchoPlugin(func(s string) {
+		token = s
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -68,17 +72,26 @@ Host: %v
 		panic(err)
 	}
 
+	haveToken := false
 	for {
 		rsp, err := client.Recv()
 		if err != nil {
 			log.Error(err)
 			break
 		}
+		if strings.Contains(rsp.Url, token) {
+			haveToken = true
+		}
 		fmt.Println(rsp.Url)
 		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
 		fmt.Println(string(rsp.GetRequestRaw()))
 		spew.Dump(rsp.GetExtractedResults())
 		spew.Dump(rsp.GetMatchedByMatcher())
+	}
+
+	if !haveToken {
+		t.Log("NO TOKEN FOUND, PLUGIN is not executed!")
+		t.FailNow()
 	}
 }
 
