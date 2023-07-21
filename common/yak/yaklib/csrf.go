@@ -1,14 +1,15 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 var csrfFormTemplate = template.Must(template.New("csrf-form").Parse(strings.TrimSpace(`
@@ -66,6 +67,7 @@ type _csrfTemplateConfig struct {
 
 type _csrfConfig struct {
 	MultipartDefaultValue bool
+	https                 bool
 }
 
 func newDefaultCsrfConfig() *_csrfConfig {
@@ -89,7 +91,6 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		builder    = &strings.Builder{}
 
 		config         *_csrfConfig
-		pocConfig      *_pocConfig
 		templateConfig *_csrfTemplateConfig
 
 		isMultipart bool
@@ -111,8 +112,7 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		opt(config)
 	}
 
-	pocConfig = NewDefaultPoCConfig()
-	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, pocConfig.ForceHttps)
+	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.https)
 	if err != nil {
 		return "", utils.Errorf("extract url failed: %s", err)
 	}
@@ -203,13 +203,20 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	return builder.String(), nil
 }
 
-func _csrfOptWithMultipartDefaultValue(b bool) csrfConfig {
+func CsrfOptWithMultipartDefaultValue(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
 		c.MultipartDefaultValue = b
 	}
 }
 
+func CsrfOptWithHTTPS(b bool) csrfConfig {
+	return func(c *_csrfConfig) {
+		c.https = b
+	}
+}
+
 var CSRFExports = map[string]interface{}{
 	"Generate":              GenerateCSRFPoc,
-	"multipartDefaultValue": _csrfOptWithMultipartDefaultValue,
+	"multipartDefaultValue": CsrfOptWithMultipartDefaultValue,
+	"https":                 CsrfOptWithHTTPS,
 }
