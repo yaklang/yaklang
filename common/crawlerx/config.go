@@ -38,15 +38,17 @@ type BaseConfig struct {
 	ignoreParams      []string
 	sensitiveWords    []string
 	leakless          string
+	localStorage      map[string]string
 
-	targetUrl  string
-	ch         chan ReqInfo
-	ctx        context.Context
-	pageVisit  *tools.StringCountFilter
-	resultSent *tools.StringCountFilter
-	uChan      *tools.UChan
-	urlTree    *tools.UrlTree
-	waitGroup  *utils.SizedWaitGroup
+	targetUrl      string
+	ch             chan ReqInfo
+	ctx            context.Context
+	pageVisit      *tools.StringCountFilter
+	resultSent     *tools.StringCountFilter
+	uChan          *tools.UChan
+	urlTree        *tools.UrlTree
+	waitGroup      *utils.SizedWaitGroup
+	startWaitGroup *utils.SizedWaitGroup
 }
 
 type BrowserConfig struct {
@@ -82,6 +84,7 @@ func NewConfig() *Config {
 			sensitiveWords:    make([]string, 0),
 			ch:                make(chan ReqInfo),
 			leakless:          "default",
+			localStorage:      make(map[string]string),
 		},
 	}
 }
@@ -259,6 +262,20 @@ func WithSensitiveWords(words []string) ConfigOpt {
 	}
 }
 
+func WithLeakless(leakless string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.leakless = leakless
+	}
+}
+
+func WithLocalStorage(storage map[string]string) ConfigOpt {
+	return func(config *Config) {
+		for k, v := range storage {
+			config.baseConfig.localStorage[k] = v
+		}
+	}
+}
+
 // transport in code
 
 func WithTargetUrl(targetUrl string) ConfigOpt {
@@ -309,8 +326,8 @@ func WithPageSizedWaitGroup(pageSizedWaitGroup *utils.SizedWaitGroup) ConfigOpt 
 	}
 }
 
-func WithLeakless(leakless string) ConfigOpt {
+func WithStartWaitGroup(waitGroup *utils.SizedWaitGroup) ConfigOpt {
 	return func(config *Config) {
-		config.baseConfig.leakless = leakless
+		config.baseConfig.startWaitGroup = waitGroup
 	}
 }

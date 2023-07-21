@@ -5,6 +5,7 @@ package crawlerx
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/launcher/flags"
@@ -367,6 +368,7 @@ func (starter *BrowserStarter) Start() {
 	}
 	headlessBrowser := starter.browser
 	defer headlessBrowser.MustClose()
+	starter.baseConfig.startWaitGroup.Done()
 running:
 	for {
 		select {
@@ -390,6 +392,16 @@ running:
 			p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 			starter.createPageHijack(p)
 			err = p.Navigate(urlStr)
+			if urlStr == starter.baseUrl && len(starter.baseConfig.localStorage) > 0 {
+				log.Infof(`do local storage on %s`, urlStr)
+				for key, value := range starter.baseConfig.localStorage {
+					setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
+					_, err := p.EvalOnNewDocument(setStorageJS)
+					if err != nil {
+						log.Errorf(`local storage save error: %s`, err)
+					}
+				}
+			}
 			if err != nil {
 				log.Errorf("page navigate %s error: %s", urlStr, err)
 			}

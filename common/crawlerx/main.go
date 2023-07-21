@@ -21,9 +21,10 @@ type CrawlerCore struct {
 	manager *BrowserManager
 	config  *Config
 
-	uChan     *tools.UChan
-	ch        chan ReqInfo
-	waitGroup *utils.SizedWaitGroup
+	uChan          *tools.UChan
+	ch             chan ReqInfo
+	waitGroup      *utils.SizedWaitGroup
+	startWaitGroup *utils.SizedWaitGroup
 }
 
 func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
@@ -36,6 +37,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	}
 	urlTree := tools.CreateTree(targetUrl)
 	waitGroup := utils.NewSizedWaitGroup(20)
+	startWaitGroup := utils.NewSizedWaitGroup(20)
 	baseOpts := make([]ConfigOpt, 0)
 	baseOpts = append(baseOpts,
 		WithTargetUrl(targetUrl),
@@ -45,6 +47,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		WithUChan(uChan),
 		WithUrlTree(urlTree),
 		WithPageSizedWaitGroup(&waitGroup),
+		WithStartWaitGroup(&startWaitGroup),
 	)
 	for _, opt := range baseOpts {
 		opt(config)
@@ -65,11 +68,12 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	}
 	WithTargetUrl(checkedUrl)(config)
 	core := CrawlerCore{
-		targetUrl: checkedUrl,
-		config:    config,
-		uChan:     uChan,
-		ch:        config.baseConfig.ch,
-		waitGroup: &waitGroup,
+		targetUrl:      checkedUrl,
+		config:         config,
+		uChan:          uChan,
+		ch:             config.baseConfig.ch,
+		waitGroup:      &waitGroup,
+		startWaitGroup: &startWaitGroup,
 	}
 	core.init()
 	return &core, nil
@@ -94,7 +98,10 @@ func (core *CrawlerCore) Start() {
 			}
 		}
 	}()
-	time.Sleep(time.Second)
+	log.Info(`[crawlerx core]starting wait...`)
+	core.startWaitGroup.Wait()
+	log.Info(`[crawlerx core]started!`)
+	time.Sleep(500 * time.Millisecond)
 	core.waitGroup.Wait()
 	close(core.uChan.In)
 	close(core.ch)
