@@ -2925,6 +2925,9 @@ message FuzzerRequest {
   repeated HTTPResponseMatcher Matchers = 33;
   string MatchersCondition = 34;
   string HitColor = 36;
+
+  // 如果发包的时候，需要指定一两个插件，那么可以通过他来操作，并把流量一起返回
+  repeated string YamlPoCNames = 37;
 }
 
 message KVPair {

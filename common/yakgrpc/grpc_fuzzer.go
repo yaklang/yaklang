@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/saintfish/chardet"
@@ -128,13 +129,19 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
-	rspRaw, _, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(
-		isHttps, host, port, resultRequest,
-		utils.FloatSecondDuration(req.GetPerRequestTimeoutSeconds()), 0, req.GetIsGmTLS(),
-		utils.PrettifyListFromStringSplited(req.GetProxy(), ",")...)
+	rspIns, err := lowhttp.HTTPWithoutRedirect(
+		lowhttp.WithHttps(isHttps),
+		lowhttp.WithHost(host),
+		lowhttp.WithPort(port),
+		lowhttp.WithRequest(resultRequest),
+		lowhttp.WithTimeoutFloat(req.GetPerRequestTimeoutSeconds()),
+		lowhttp.WithGmTLS(req.GetIsGmTLS()),
+		lowhttp.WithProxy(utils.PrettifyListFromStringSplited(req.GetProxy(), ",")...),
+	)
 	if err != nil {
 		return nil, err
 	}
+	rspRaw := rspIns.RawPacket
 	// 提取响应
 	extractHTTPResponseResult, err := s.ExtractHTTPResponse(ctx, &ypb.ExtractHTTPResponseParams{
 		HTTPResponse: string(rspRaw),
@@ -263,6 +270,57 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}()
 
+	var pocs []*yakit.YakScript
+	for _, i := range req.GetYamlPoCNames() {
+		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
+		if err != nil {
+			log.Errorf("get yaml poc[%v] failed: %s", i, err)
+			continue
+		}
+		if poc.Type != "nuclei" {
+			log.Errorf("poc[%s] is not yaml poc: %s", i, poc.Type)
+			continue
+		}
+		pocs = append(pocs, poc)
+	}
+
+	var swg = utils.NewSizedWaitGroup(int(req.GetConcurrent()))
+	var feedbackWg = new(sync.WaitGroup)
+	defer func() {
+		feedbackWg.Wait()
+	}()
+	var feedbackResponse = func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+		err := stream.Send(rsp)
+		if err != nil {
+			return err
+		}
+
+		if skipPoC {
+			return nil
+		}
+
+		feedbackWg.Add(1)
+		defer func() {
+			feedbackWg.Done()
+			for _, p := range pocs {
+				poc := p
+				err := swg.AddWithContext(stream.Context())
+				if err != nil {
+					break
+				}
+				go func() {
+
+				}()
+				httptpl.ScanPacket(
+					rsp.RequestRaw, lowhttp.WithHttps(true),
+					httptpl.WithTemplateRaw(poc.Content),
+				)
+			}
+		}()
+
+		return nil
+	}
+
 	var mergedParams = make(map[string]interface{})
 	renderedParams, err := s.RenderVariables(stream.Context(), &ypb.RenderVariablesRequest{
 		Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
@@ -284,7 +342,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			if err != nil {
 				continue
 			}
-			err = stream.Send(rsp)
+			err = feedbackResponse(rsp, true)
 			if err != nil {
 				log.Errorf("stream send failed: %s", err)
 				continue
@@ -449,7 +507,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			task.HTTPFlowFailedCount++
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
-			_ = stream.Send(rsp)
+			_ = feedbackResponse(rsp, false)
 			continue
 		}
 
@@ -603,7 +661,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
 		rsp.TaskId = int64(taskId)
-		err := stream.Send(rsp)
+		err := feedbackResponse(rsp, false)
 		if err != nil {
 			log.Errorf("send to client failed: %s", err)
 			continue

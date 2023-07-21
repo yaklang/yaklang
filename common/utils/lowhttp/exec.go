@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,8 +16,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ type LowhttpExecConfig struct {
 	Port                 int
 	Packet               []byte
 	Https                bool
+	ResponseCallback     func(response *LowhttpResponse)
 	Http2                bool
 	GmTLS                bool
 	Timeout              time.Duration
@@ -188,9 +190,31 @@ func WithPort(port int) LowhttpOpt {
 	}
 }
 
-func WithPacket(packet []byte) LowhttpOpt {
+func WithPacketBytes(packet []byte) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Packet = packet
+	}
+}
+
+func WithRequest(packet any) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		switch ret := packet.(type) {
+		case []byte:
+			o.Packet = ret
+			return
+		case string:
+			o.Packet = []byte(ret)
+			return
+		case *http.Request:
+			reqRaw, err := utils.HttpDumpWithBody(ret, true)
+			if err != nil {
+				log.Errorf("parse request failed: %s", err)
+			}
+			o.Packet = reqRaw
+		default:
+			o.Packet = utils.InterfaceToBytes(packet)
+			log.Warnf("any(%v) to request packet: %s", reflect.TypeOf(ret), spew.Sdump(o.Packet))
+		}
 	}
 }
 
@@ -206,6 +230,12 @@ func WithHttps(https bool) LowhttpOpt {
 	}
 }
 
+func WithResponseCallback(h func(i *LowhttpResponse)) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ResponseCallback = h
+	}
+}
+
 func WithHttp2(Http2 bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Http2 = Http2
@@ -215,6 +245,12 @@ func WithHttp2(Http2 bool) LowhttpOpt {
 func WithTimeout(timeout time.Duration) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Timeout = timeout
+	}
+}
+
+func WithTimeoutFloat(i float64) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Timeout = utils.FloatSecondDuration(i)
 	}
 }
 
@@ -266,7 +302,7 @@ func WithContext(ctx context.Context) LowhttpOpt {
 }
 func WithProxy(proxy ...string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.Proxy = proxy
+		o.Proxy = utils.StringArrayFilterEmpty(proxy)
 	}
 }
 
@@ -294,27 +330,6 @@ func WithSession(session interface{}) LowhttpOpt {
 	}
 }
 
-func SendHTTPRequestRawQuickWithTimeout(https bool, r *http.Request, timeout time.Duration) ([]byte, error) {
-	u, err := ExtractURLFromHTTPRequest(r, https)
-	if err != nil {
-		return nil, err
-	}
-
-	host, port, err := utils.ParseStringToHostPort(u.String())
-	if err != nil {
-		return nil, err
-	}
-
-	return SendHTTPRequestRaw(https, host, port, r, timeout)
-}
-
-func SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, gmTLS bool, proxy ...string) ([]byte, [][]byte, error) {
-	return SendHTTPRequestWithRawPacketWithRedirectFullEx(https, host, port, r, timeout, redirectTimes, false, nil, false, false, gmTLS, proxy...)
-}
-func SendHTTPRequestWithRawPacketWithRedirect(https bool, host string, port int, r []byte, timeout time.Duration, redirectTimes int, proxy ...string) ([]byte, [][]byte, error) {
-	return SendHTTPRequestWithRawPacketWithRedirectWithGmTLS(https, host, port, r, timeout, redirectTimes, false, proxy...)
-}
-
 var (
 	_systemEtcHosts = make(map[string]string)
 	systemEtcOnce   = sync.Once{}
@@ -328,8 +343,7 @@ func GetSystemHostByName(domain string) (string, bool) {
 	return raw, ok
 }
 
-// SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx
-func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...LowhttpOpt) (*LowhttpResponse, error) {
+func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
 		opt(option)
@@ -392,10 +406,10 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 		WithGmTLS(gmTLS),
 		WithHost(host),
 		WithPort(port),
-		WithPacket(r),
+		WithPacketBytes(r),
 	)
 
-	response, err = SendHttpRequestWithRawPacketWithOptEx(requestOptions...)
+	response, err = HTTPWithoutRedirect(requestOptions...)
 	raw := response.RawPacket
 	if err != nil {
 		return response, err
@@ -437,11 +451,11 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 				WithHttps(forceHttps),
 				WithHost(nextHost),
 				WithPort(nextPort),
-				WithPacket(r),
+				WithPacketBytes(r),
 			)
 
 			// 更新response
-			response, err = SendHttpRequestWithRawPacketWithOptEx(requestOptions...)
+			response, err = HTTPWithoutRedirect(requestOptions...)
 			responseRaw := response.RawPacket
 
 			if err != nil {
@@ -464,81 +478,8 @@ func SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(opts ...Lowh
 	return response, nil
 }
 
-// SendHTTPRequestWithRawPacketWithRedirectWithState 返回端口状态
-func SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(
-	https bool, host string, port int, r []byte, timeout time.Duration,
-	redirectTimes int, jsRedirect bool,
-	redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
-	noFixContentLength bool, forceHttp2 bool, // 这个参数很关键，一般有这个情况的话，很可能用户发了多个包。
-	gmTls bool,
-	proxy ...string) ([]byte, [][]byte, bool, error) {
-
-	response, err := SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithHttps(https),
-		WithHost(host),
-		WithPort(port),
-		WithPacket(r),
-		WithTimeout(timeout),
-		WithRedirectTimes(redirectTimes),
-		WithJsRedirect(jsRedirect),
-		WithRedirectHandler(redirectHandler),
-		WithNoFixContentLength(noFixContentLength),
-		WithHttp2(forceHttp2),
-		WithProxy(proxy...),
-		WithGmTLS(gmTls),
-	)
-	return response.RawPacket, response.RedirectRawPackets, response.PortIsOpen, err
-}
-
-func SendHTTPRequestWithRawPacketWithRedirectWithContextFullEx(
-	https bool, host string, port int, r []byte, timeout time.Duration,
-	redirectTimes int, jsRedirect bool, ctx context.Context,
-	redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
-	noFixContentLength bool, forceHttp2 bool, source string,
-	proxy ...string) ([]byte, [][]byte, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	response, err := SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-		WithHttps(https),
-		WithHost(host),
-		WithPort(port),
-		WithPacket(r),
-		WithTimeout(timeout),
-		WithRedirectTimes(redirectTimes),
-		WithJsRedirect(jsRedirect),
-		WithRedirectHandler(redirectHandler),
-		WithNoFixContentLength(noFixContentLength),
-		WithHttp2(forceHttp2),
-		WithProxy(proxy...),
-		WithContext(ctx),
-		WithSource(source),
-	)
-	return response.RawPacket, response.RedirectRawPackets, err
-}
-
-// SendHTTPRequestWithRawPacketWithRedirectFullEx
-func SendHTTPRequestWithRawPacketWithRedirectFullEx(
-	https bool, host string, port int, r []byte, timeout time.Duration,
-	redirectTimes int, jsRedirect bool,
-	redirectHandler func(isHttps bool, req []byte, rsp []byte) bool,
-	noFixContentLength bool, forceHttp2 bool, // 这个参数很关键，一般有这个情况的话，很可能用户发了多个包。
-	gmTls bool,
-	proxy ...string) ([]byte, [][]byte, error) {
-	rsp, reqs, _, err := SendHTTPRequestWithRawPacketWithRedirectWithStateFullEx(
-		https, host, port, r, timeout,
-		redirectTimes, jsRedirect, redirectHandler,
-		noFixContentLength, forceHttp2, gmTls, proxy...)
-	return rsp, reqs, err
-}
-
-func SendHTTPRequestWithRawPacket(forceHttps bool, host string, port int, r []byte, timeout time.Duration, proxy ...string) ([]byte, error) {
-	rsp, _, err := SendHTTPRequestWithRawPacketEx(forceHttps, host, port, r, timeout, false, false, proxy...)
-	return rsp, err
-}
-
 // SendHttpRequestWithRawPacketWithOpt
-func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse, error) {
+func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
 		opt(option)
@@ -592,6 +533,9 @@ func SendHttpRequestWithRawPacketWithOptEx(opts ...LowhttpOpt) (*LowhttpResponse
 				}
 				cancel()
 			}()
+			if option.ResponseCallback != nil {
+				option.ResponseCallback(response)
+			}
 			SaveResponse(response)
 		}()
 		select {
@@ -1001,114 +945,6 @@ STATUSCODERETRY:
 	return response, nil
 }
 
-/*
-SendHTTPRequestWithRawPacketEx
-
-Returns:
- 1. response bytes
- 2. is port opened?
- 3. error
-*/
-func SendHTTPRequestWithRawPacketEx(forceHttps bool, host string, port int, r []byte, timeout time.Duration, noFixContentLength bool, forceHttp2 bool, proxy ...string) ([]byte, bool, error) {
-	response, err := SendHttpRequestWithRawPacketWithOptEx(
-		WithHttps(forceHttps),
-		WithHost(host),
-		WithPort(port),
-		WithPacket(r),
-		WithTimeout(timeout),
-		WithNoFixContentLength(noFixContentLength),
-		WithHttp2(forceHttp2),
-		WithProxy(proxy...),
-	)
-	return response.RawPacket, response.PortIsOpen, err
-}
-
-func SendHTTPRequestRaw(https bool, host string, port int, r *http.Request, timeout time.Duration) ([]byte, error) {
-	// 修复 host port
-	if port <= 0 || host == "" {
-		u, err := ExtractURLFromHTTPRequest(r, https)
-		if err != nil {
-			return nil, err
-		}
-
-		newHost, newPort, err := utils.ParseStringToHostPort(u.String())
-		if err != nil {
-			return nil, err
-		}
-
-		if port <= 0 {
-			port = newPort
-		}
-
-		if host == "" {
-			host = newHost
-		}
-	}
-
-	if port <= 0 {
-		return nil, utils.Errorf("empty port...")
-	}
-
-	// 修正域名的情况
-	var (
-		ip string = host
-	)
-	if utils.IsValidDomain(host) {
-		ips := utils.GetFirstIPByDnsWithCache(
-			host,
-			timeout, utils.DefaultDNSServer...)
-		if ips == "" {
-			return nil, utils.Errorf("dns failed for querying: %s", host)
-		}
-		ip = ips
-	}
-
-	raw, err := httputil.DumpRequest(r, true)
-	if err != nil {
-		return nil, utils.Errorf("dump http.Request failed: %s", err)
-	}
-
-	var (
-		conn net.Conn
-	)
-	switch https {
-	case false:
-		dialer := &net.Dialer{Timeout: timeout}
-		conn, err = dialer.Dial("tcp", utils.HostPort(ip, port))
-		if err != nil {
-			return nil, utils.Errorf("dial %v failed: %s", utils.HostPort(ip, port), err)
-		}
-
-	default:
-		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", utils.HostPort(ip, port), &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			ServerName:         host,
-		})
-		if err != nil {
-			return nil, utils.Errorf("tls dial %v failed: %s", utils.HostPort(ip, port), err)
-		}
-	}
-
-	utils.Debug(func() {
-		println(string(raw))
-	})
-
-	// 写报文
-	_, err = conn.Write(raw)
-	if err != nil {
-		return nil, utils.Errorf("write http.Request packet failed: %v ", err)
-	}
-
-	raw, err = utils.ReadConnWithTimeout(conn, timeout)
-	if len(raw) > 0 {
-		return raw, nil
-	}
-
-	return nil, utils.Errorf("read failed: empty with: Err[%v]", err)
-}
-
 func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
 	var nextProtos []string
 	if enableHttp2 {
@@ -1153,42 +989,4 @@ func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, time
 		return nil, err
 	}
 	return tlsConn, nil
-}
-
-func SendPacketQuick(
-	https bool,
-	packet []byte,
-	timeout float64,
-	proxy ...string) ([]byte, [][]byte, error) {
-	req, err := ParseBytesToHttpRequest(packet)
-	if err != nil {
-		return nil, nil, err
-	}
-	var host string = req.Host
-	if host == "" {
-		host = req.Header.Get("Host")
-	}
-
-	targetHost, targetPort, err := utils.ParseStringToHostPort(host)
-	if err != nil {
-		if https {
-			host = utils.HostPort(host, 443)
-		} else {
-			host = utils.HostPort(host, 80)
-		}
-	} else {
-		host = utils.HostPort(targetHost, targetPort)
-	}
-
-	targetHost, targetPort, err = utils.ParseStringToHostPort(host)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !https {
-		https = utils.IsTLSService(targetHost)
-	}
-	return SendHTTPRequestWithRawPacketWithRedirect(
-		https, targetHost, targetPort, packet, utils.FloatSecondDuration(timeout),
-		5, proxy...,
-	)
 }

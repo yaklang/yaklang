@@ -146,7 +146,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 			// multiRequest
 			var packetOpt []lowhttp.LowhttpOpt
 			packetOpt = append(
-				packetOpt, lowhttp.WithPacket([]byte(reqRaw)), lowhttp.WithHttps(isHttps),
+				packetOpt, lowhttp.WithPacketBytes([]byte(reqRaw)), lowhttp.WithHttps(isHttps),
 				lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource(y.Name),
 			)
 			packetOpt = append(packetOpt, opts...)
@@ -159,7 +159,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				log.Info("nuclei lowhttp.Exec! ")
 				spew.Dump(reqRaw)
 			})
-			rsp, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(packetOpt...)
+			rsp, err := lowhttp.HTTP(packetOpt...)
 			if err != nil {
 				log.Error(err)
 				return responses, false, extracted

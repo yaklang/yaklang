@@ -4,12 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"regexp"
 )
-
-func keywordToRegexp(k string) *regexp.Regexp {
-	return regexp.MustCompile(`(?i)` + regexp.QuoteMeta(k))
-}
 
 func appendDefaultPort(i string, defaultPort int) string {
 	return utils.AppendDefaultPort(i, defaultPort)
@@ -20,12 +15,16 @@ func packetToBrute(
 	data map[string][]string,
 	timeout float64,
 	isTls bool,
-) ([]byte, [][]byte, error) {
+) ([]byte, error) {
 	res, _ := mutate.QuickMutate(packet, nil, mutate.MutateWithExtraParams(data))
 	if len(res) <= 0 {
-		return nil, nil, utils.Error("mutate packet error... BUG!")
+		return nil, utils.Error("mutate packet error... BUG!")
 	}
-	return lowhttp.SendPacketQuick(isTls, []byte(res[0]), timeout)
+	rsp, err := lowhttp.HTTP(lowhttp.WithHttps(isTls), lowhttp.WithTimeoutFloat(timeout), lowhttp.WithRequest(res[0]))
+	if err != nil {
+		return nil, err
+	}
+	return rsp.RawPacket, nil
 }
 
 func GeneratePasswordByUser(user []string, pass []string) []string {

@@ -654,10 +654,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						config.RedirectTimes = 0
 					}
 
-					rspInstance, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
+					rspInstance, err := lowhttp.HTTP(
 						lowhttp.WithHttps(config.IsHttps),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
-						lowhttp.WithPacket(targetRequest),
+						lowhttp.WithPacketBytes(targetRequest),
 						lowhttp.WithTimeout(config.PerRequestTimeout),
 						lowhttp.WithRedirectTimes(config.RedirectTimes),
 						lowhttp.WithJsRedirect(config.FollowJSRedirect),
@@ -679,13 +679,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					if rspInstance != nil {
 						rsp = rspInstance.RawPacket
 					}
-					//rsp, _, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithContextFullEx(
-					//	config.isHttps,
-					//	host, port,
-					//	targetRequest, config.perRequestTimeout, 0, false, config.ctx, func(isHttps bool, req []byte, rsp []byte) bool {
-					//		return false
-					//	}, config.NoFixContentLength,
-					//	false, config.source, config.proxies...)
 
 					if config.HookAfterRequest != nil {
 						newRsp := config.HookAfterRequest(rsp)

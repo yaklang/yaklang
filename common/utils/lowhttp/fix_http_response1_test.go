@@ -10,26 +10,6 @@ import (
 )
 
 func TestFixHTTPResponse4(t *testing.T) {
-	//	var req = `GET /info.php?fid=8%27%29%2F%2A%2A%2FUniOn%2F%2A%2A%2FSelect%2F%2A%2A%2FSLeep%284.036285067472142%29%23&id=402 HTTP/1.1
-	//Host: www.bjski.com.cn
-	//Cookie: PHPSESSID=value
-	//User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36
-	//
-	//`
-	//	rsp, err := SendHTTPRequestWithRawPacket(false, "www.bjski.com.cn", 0, []byte(req), 10*time.Second)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	header, body := SplitHTTPHeadersAndBodyFromPacket(rsp)
-	//	_ = header
-	//	var a, _ = codec.CharDetect(body)
-	//	_ = a
-	//	println(string(codec.EncodeToHex(body)))
-	//	decoded, err := codec.GB18030ToUtf8(body)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	println(string(decoded))
 	rawResp, _ := codec.DecodeBase64(`SFRUUC8xLjEgMjAwIE9LDQpEYXRlOiBTdW4sIDI2IEZlYiAyMDIzIDAzOjQ0OjUzIEdNVA0KU2VydmVyOiBBcGFjaGUNClgtUG93ZXJlZC1CeTogUEhQLzUuMi4xNw0KRXhwaXJlczogVGh1LCAxOSBOb3YgMTk4MSAwODo1MjowMCBHTVQNCkNhY2hlLUNvbnRyb2w6IG5vLXN0b3JlLCBuby1jYWNoZSwgbXVzdC1yZXZhbGlkYXRlLCBwb3N0LWNoZWNrPTAsIHByZS1jaGVjaz0wDQpQcmFnbWE6IG5vLWNhY2hlDQpTZXQtQ29va2llOiBQSFBTRVNTSUQ9dmFsdWU7IGh0dHBPbmx5DQpWYXJ5OiBVc2VyLUFnZW50LEFjY2VwdC1FbmNvZGluZw0KVHJhbnNmZXItRW5jb2Rpbmc6IGNodW5rZWQNCkNvbnRlbnQtVHlwZTogdGV4dC9odG1sDQoNCjFmDQrE+rXEzOG9u7T409Cyu7rPt6iyzsr9LNC70Lu6z9f3DQowDQoNCg==`)
 	rsp, body, err := FixHTTPResponse(rawResp)
 	if err != nil {

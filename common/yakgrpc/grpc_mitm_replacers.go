@@ -601,8 +601,8 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 				}
 			}()
 			log.Info("AUTO(EXTRA)-REPEAT FROM MITM")
-			rsp, err := lowhttp.SendHTTPRequestWithRawPacketWithRedirectWithStateWithOptFullEx(
-				lowhttp.WithPacket(modifiedPacket), lowhttp.WithHttps(extraArgHttps),
+			rsp, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes(modifiedPacket), lowhttp.WithHttps(extraArgHttps),
 				lowhttp.WithTimeout(15*time.Second), lowhttp.WithRedirectTimes(3),
 				lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource("mitm"),
 			)
