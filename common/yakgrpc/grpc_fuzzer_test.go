@@ -6,9 +6,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -107,7 +109,7 @@ Content-Length: 12
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: fmt.Sprintf(`GET /{{rs}} HTTP/1.1
+		Request: fmt.Sprintf(`GET /{{rs(10,10,10)}} HTTP/1.1
 Host: %v 
 
 {{params(abc)}}
@@ -154,19 +156,24 @@ Host: %v
 	}
 }
 
-func TestServer_HTTPFuzzer(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer(t *testing.T) {
+	var requestedCount int
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestedCount++
+		writer.Write([]byte("abc"))
+	})
+
 	c, err := NewLocalClient()
 	if err != nil {
 		panic(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: `GET /{{rs(10,10,10)}} HTTP/1.1
+		Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /{{rs(10,10,10)}} HTTP/1.1
 Host: www.baidu.com
 
-`,
+`), "Host", utils.HostPort(host, port))),
 		Concurrent:               10,
-		IsHTTPS:                  true,
 		ForceFuzz:                true,
 		PerRequestTimeoutSeconds: 5,
 	})
@@ -174,12 +181,44 @@ Host: www.baidu.com
 		panic(err)
 	}
 
+	var count int
 	for {
 		rsp, err := client.Recv()
 		if err != nil {
 			break
 		}
-		spew.Dump(rsp)
+		_ = rsp
+		count++
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+
+	client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /{{rs(10,10,10)}} HTTP/1.1
+Host: www.baidu.com
+
+`), "Host", utils.HostPort(host, port))),
+		Concurrent:               10,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+		ForceOnlyOneResponse:     true,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	count = 0
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		_ = rsp
+		count++
+	}
+	if count != 1 {
+		t.Fatalf("expect 1, got %v", count)
 	}
 }
 

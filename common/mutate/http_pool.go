@@ -42,6 +42,7 @@ type httpPoolConfig struct {
 	Ctx                              context.Context
 	ForceFuzz                        bool
 	FuzzParams                       map[string][]string
+	RequestCountLimiter              int
 	NoFixContentLength               bool
 	ExtraRegexpMutateCondition       []*RegexpMutateCondition
 	ExtraRegexpMutateConditionGetter func() *RegexpMutateCondition
@@ -69,6 +70,12 @@ type httpPoolConfig struct {
 	// DNSServers
 	DNSServers []string
 	EtcHosts   map[string]string
+}
+
+func _httpPool_RequestCountLimiter(b int) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.RequestCountLimiter = b
+	}
 }
 
 func _httpPool_NoSystemProxy(b bool) HttpPoolConfigOption {
@@ -551,7 +558,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 		}
 		return _httpPool(reqs, opts...)
 	case *http.Request:
-		return _httpPool([]*http.Request{ret}, opts...)
+		raw, err := utils.HttpDumpWithBody(ret, true)
+		if err != nil {
+			return nil, err
+		}
+		return _httpPool([][]byte{raw}, opts...)
 	case []interface{}:
 		var req []*http.Request
 		for _, r := range ret {
@@ -582,8 +593,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			}()
 			delayer, _ := utils.NewFloatSecondsDelayWaiter(config.DelayMinSeconds, config.DelayMaxSeconds)
 
+			var maxSubmit = config.RequestCountLimiter
+			var requestCounter int
 			swg := utils.NewSizedWaitGroup(config.Size)
 			submitTask := func(targetRequest []byte, payloads ...string) {
+				if maxSubmit > 0 && requestCounter >= maxSubmit {
+					return
+				}
 				if config.Ctx != nil {
 					select {
 					case <-config.Ctx.Done():
@@ -593,6 +609,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 				}
 
 				swg.Add()
+				requestCounter++
 				go func() {
 					defer func() {
 						if delayer != nil {
@@ -765,6 +782,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 									return false
 								default:
 								}
+								if maxSubmit > 0 && requestCounter >= maxSubmit {
+									return false
+								}
 								submitTask([]byte(result.Result), result.Payloads...)
 								return true
 							},
@@ -845,3 +865,4 @@ var WithPoolOpt_RetryMaxWaitTime = _httpPool_RetryMaxWaitTime
 var WithPoolOpt_DNSServers = _httpPool_DNSServers
 var WithPoolOpt_EtcHosts = _httpPool_EtcHosts
 var WithPoolOpt_NoSystemProxy = _httpPool_NoSystemProxy
+var WithPoolOpt_RequestCountLimiter = _httpPool_RequestCountLimiter
