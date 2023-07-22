@@ -504,10 +504,18 @@ func (e *ScriptEngine) ExecuteWithTaskIDAndParams(ctx context.Context, taskId, c
 	return nil
 }
 func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
-	return e.exec(context.Background(), uuid.New().String(), code, params, false)
+	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
+	}
+	return e.exec(context.Background(), runtimeId, code, params, false)
 }
 func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
-	return e.exec(context.Background(), uuid.New().String(), code, params, true)
+	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
+	}
+	return e.exec(context.Background(), runtimeId, code, params, true)
 }
 func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (_ *antlr4yak.Engine, fErr error) {
 	defer func() {
@@ -516,7 +524,11 @@ func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, pa
 			fErr = utils.Errorf("final error: %v", err)
 		}
 	}()
-	return e.exec(ctx, uuid.New().String(), code, params, true)
+	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
+	}
+	return e.exec(ctx, runtimeId, code, params, true)
 }
 
 func (e *ScriptEngine) Execute(code string) error {

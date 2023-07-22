@@ -97,6 +97,20 @@ func MapGetString(m map[string]interface{}, key string) string {
 	return MapGetStringOr(m, key, "")
 }
 
+func MapGetStringByManyFields(m map[string]interface{}, key ...string) string {
+	if len(key) <= 0 {
+		return ""
+	}
+
+	for _, i := range key {
+		result := MapGetStringOr(m, i, "")
+		if result != "" {
+			return result
+		}
+	}
+	return ""
+}
+
 func ExtractMapValueString(m any, key string) string {
 	return MapGetString(ParseStringToGeneralMap(m), key)
 }
