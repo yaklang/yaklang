@@ -24,6 +24,7 @@ type FuzzHTTPRequest struct {
 	Opts                   []BuildFuzzHTTPRequestOption
 	isHttps                bool
 	source                 string
+	runtimeId              string
 	originRequest          []byte
 	_originRequestInstance *http.Request
 	chunked                bool
@@ -168,8 +169,9 @@ func (f *FuzzHTTPRequest) IsBodyFormEncoded() bool {
 }
 
 type buildFuzzHTTPRequestConfig struct {
-	IsHttps bool
-	Source  string
+	IsHttps   bool
+	Source    string
+	RuntimeId string
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
@@ -177,6 +179,12 @@ type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
 func OptHTTPS(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.IsHttps = i
+	}
+}
+
+func OptRuntimeId(r string) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.RuntimeId = r
 	}
 }
 
@@ -367,7 +375,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		return nil, utils.Errorf("unsupported type[%v] to FuzzHTTPRequest", reflect.TypeOf(i))
 	}
 
-	config := &buildFuzzHTTPRequestConfig{IsHttps: false}
+	config := &buildFuzzHTTPRequestConfig{}
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -376,6 +384,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.originRequest = originHttpRequest
 	req.isHttps = config.IsHttps
 	req.source = config.Source
+	req.runtimeId = config.RuntimeId
 	req.Opts = opts
 
 	return req, nil
@@ -717,7 +726,10 @@ func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *_httpRe
 	}
 
 	var originOpts []HttpPoolConfigOption
-	originOpts = append(originOpts, WithPoolOpt_Https(req.isHttps), WithPoolOpt_Source(req.source))
+	originOpts = append(originOpts,
+		WithPoolOpt_Https(req.isHttps), WithPoolOpt_Source(req.source),
+		WithPoolOpt_RuntimeId(req.runtimeId),
+	)
 	return _httpPool(f, append(originOpts, opts...)...)
 }
 

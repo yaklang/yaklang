@@ -24,7 +24,14 @@ caller.SetCache(false)
 caller.SetConcurrent(len(reqs))
 
 swg = sync.NewSizedWaitGroup(10)
+filter = str.NewFilter()
 for req in reqs {
+    reqHash = codec.Sha256(sprintf("%v:%v", req.IsHttps, req.RawHTTPRequest))
+    if filter.Exist(reqHash) {
+        continue
+    }
+    filter.Insert(reqHash)
+
     swg.Add()
     req := req
     go fn {

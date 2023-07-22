@@ -70,6 +70,9 @@ type httpPoolConfig struct {
 	// DNSServers
 	DNSServers []string
 	EtcHosts   map[string]string
+
+	// RuntimeId
+	RuntimeId string
 }
 
 func _httpPool_RequestCountLimiter(b int) HttpPoolConfigOption {
@@ -141,6 +144,12 @@ func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []by
 func _httpPool_Source(i string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Source = i
+	}
+}
+
+func _httpPool_runtimeId(i string) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.RuntimeId = i
 	}
 }
 
@@ -673,6 +682,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 
 					rspInstance, err := lowhttp.HTTP(
 						lowhttp.WithHttps(config.IsHttps),
+						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
 						lowhttp.WithPacketBytes(targetRequest),
 						lowhttp.WithTimeout(config.PerRequestTimeout),
@@ -843,6 +853,7 @@ var WithPoolOpt_RedirectTimes = _httpPool_redirectTimes
 var WithPoolOpt_RawMode = _httpPool_RawMode
 var ExecPool = _httpPool
 var WithPoolOpt_Https = _httpPool_IsHttps
+var WithPoolOpt_RuntimeId = _httpPool_runtimeId
 var WithPoolOpt_GmTLS = _httpPool_IsGmTLS
 var WithPoolOpt_NoFollowRedirect = _httpPool_SetNoFollowRedirect
 var WithPoolOpt_FollowJSRedirect = _httpPool_SetFollowJSRedirect
