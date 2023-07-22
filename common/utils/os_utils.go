@@ -147,6 +147,40 @@ func EnableDebug() {
 	os.Setenv("YAKLANGDEBUG", "1")
 }
 
+func DebugMockHTTPHandlerFunc(handlerFunc http.HandlerFunc) (string, int) {
+	return DebugMockHTTPHandlerFuncContext(TimeoutContext(time.Minute*5), handlerFunc)
+}
+
+func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.HandlerFunc) (string, int) {
+	host := "127.0.0.1"
+	port := GetRandomAvailableTCPPort()
+	lis, err := net.Listen("tcp", HostPort(host, port))
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		select {
+		case <-ctx.Done():
+		}
+		lis.Close()
+	}()
+	go func() {
+		server := &http.Server{
+			Addr:    HostPort(host, port),
+			Handler: handlerFunc,
+		}
+		err := server.Serve(lis)
+		if err != nil {
+			panic(err)
+		}
+	}()
+	err = WaitConnect(HostPort(host, port), 3)
+	if err != nil {
+		panic(err)
+	}
+	return host, port
+}
+
 func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
