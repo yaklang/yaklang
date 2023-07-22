@@ -489,6 +489,9 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		if ok {
 			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error) {
 				opts = append(opts, mutate.OptSource(id))
+				if runtimeId != "" {
+					opts = append(opts, mutate.OptRuntimeId(runtimeId))
+				}
 				return originFunc(i, opts...)
 			}
 		}
