@@ -460,6 +460,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		buf.Write(rawRequest)
 		rawRequest = buf.Bytes()
 	}
+	var requestCount = 0
+	if req.GetForceOnlyOneResponse() {
+		requestCount = 1
+	}
 	res, err := mutate.ExecPool(
 		rawRequest,
 		mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
@@ -492,6 +496,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 		mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 		mutate.WithPoolOpt_FuzzParams(mergedParams),
+		mutate.WithPoolOpt_RequestCountLimiter(requestCount),
 	)
 	if err != nil {
 		task.Ok = false
