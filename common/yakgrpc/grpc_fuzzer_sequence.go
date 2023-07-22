@@ -127,14 +127,14 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 		return utils.Error("empty fuzzer request")
 	}
 
-	var forceOnlyOneRequest = make(map[int]*ypb.FuzzerRequest)
+	var canBeInherited = make(map[int]*ypb.FuzzerRequest)
 	for index, r := range reqs {
 		if index == 0 {
 			continue
 		}
 
 		if r.InheritVariables {
-			forceOnlyOneRequest[index-1] = r
+			canBeInherited[index-1] = r
 		}
 	}
 
@@ -146,7 +146,8 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 		var inheritVars = r.InheritVariables
 
 		// 只有一个 response
-		var _, forceOnlyOneResponse = forceOnlyOneRequest[index]
+		var _, forceOnlyOneResponse = canBeInherited[index]
+		var beInherited = forceOnlyOneResponse
 		var response *ypb.FuzzerResponse
 		r.ForceOnlyOneResponse = true
 
@@ -178,7 +179,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 				Type:  "raw",
 			})
 		}
-		if inheritVars {
+		if beInherited {
 			for _, kv := range response.GetExtractedResults() {
 				vars = append(vars, &ypb.FuzzerParamItem{
 					Key:   kv.Key,
