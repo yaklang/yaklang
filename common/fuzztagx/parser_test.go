@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func DumpResult(data []any) string {
+func DumpResult(data []Node) string {
 	var dumpNodes func(tag []Node) string
 	dumpNodes = func(nodes []Node) string {
 		res := ""
@@ -32,8 +32,6 @@ func DumpResult(data []any) string {
 	res := ""
 	for _, d := range data {
 		switch ret := d.(type) {
-		case string:
-			res += ret
 		case *StringNode:
 			res += strings.Join(ret.Strings(), "")
 		case *Tag:
