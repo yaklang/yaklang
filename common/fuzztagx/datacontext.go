@@ -3,10 +3,10 @@ package fuzztagx
 import "github.com/yaklang/yaklang/common/utils"
 
 type DataContext struct {
-	data         []any
+	data         []Node
 	deep         int
 	unscanstr    string
-	stack        *utils.Stack
+	stack        *utils.Stack[any]
 	currentIndex int
 	preIndex     int
 	currentByte  byte
@@ -27,12 +27,12 @@ func (d *DataContext) SetIndex(i int) {
 //		return s
 //	}
 func NewDataContext(source string) *DataContext {
-	return &DataContext{source: source, stack: utils.NewStack()}
+	return &DataContext{source: source, stack: utils.NewStack[any]()}
 }
 func (d *DataContext) Generate() ([]string, error) {
 	return nil, nil
 }
-func (d *DataContext) PushData(data any) {
+func (d *DataContext) PushData(data Node) {
 	d.data = append(d.data, data)
 }
 

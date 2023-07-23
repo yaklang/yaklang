@@ -36,3 +36,13 @@ func WaitConnect(addr string, timeout float64) error {
 		return nil
 	}
 }
+
+func GetLastElement[T any](list []T) T {
+	l := len(list)
+	if l == 0 {
+		var zero T
+		return zero
+	} else {
+		return list[l-1]
+	}
+}

@@ -21,7 +21,7 @@ const (
 	stateNone            state = "None"
 )
 
-func Parse(raw interface{}) ([]any, error) {
+func Parse(raw interface{}) ([]Node, error) {
 	rawCode := utils.InterfaceToString(raw)
 	ctx := NewDataContext(rawCode) // 在状态切换cb中的上下文
 
@@ -65,6 +65,6 @@ func Parse(raw interface{}) ([]any, error) {
 	for ; ctx.currentIndex < len(rawCode); ctx.currentIndex++ {
 		trans()
 	}
-	ctx.PushData(ctx.source[ctx.preIndex:])
+	ctx.PushData(NewStringNode(ctx.source[ctx.preIndex:]))
 	return ctx.data, nil
 }
