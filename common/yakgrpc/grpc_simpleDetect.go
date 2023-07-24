@@ -267,7 +267,12 @@ if loadPluginFinished > 0 || loadPluginFailed > 0 {
         "加载插件", 
         f"${loadPluginFinished}/${loadPluginFailed+loadPluginFinished}", 
     )
-}else {
+} else if enableBrute {
+	yakit.StatusCard(
+        "加载插件", 
+        "弱口令检测", 
+    )
+} else {
 	yakit.StatusCard("加载插件失败ID", "请检查是否导入了插件", "加载插件失败")
     die("没有插件加载")
 }
