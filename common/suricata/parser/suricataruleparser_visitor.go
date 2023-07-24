@@ -74,6 +74,12 @@ type SuricataRuleParserVisitor interface {
 	// Visit a parse tree produced by SuricataRuleParser#param.
 	VisitParam(ctx *ParamContext) interface{}
 
-	// Visit a parse tree produced by SuricataRuleParser#string.
-	VisitString(ctx *StringContext) interface{}
+	// Visit a parse tree produced by SuricataRuleParser#keyword.
+	VisitKeyword(ctx *KeywordContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#setting.
+	VisitSetting(ctx *SettingContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#singleSetting.
+	VisitSingleSetting(ctx *SingleSettingContext) interface{}
 }

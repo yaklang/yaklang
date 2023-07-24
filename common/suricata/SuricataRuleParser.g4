@@ -18,8 +18,8 @@ address
     | environment_var
     | ipv4
     | ipv6
-    | '[' address (',' address)* ']'
-    | '!' address
+    | '[' address (Comma address)* ']'
+    | Negative address
     ;
 ipv4: ipv4block '.' ipv4block '.' ipv4block '.' ipv4block ('/' ipv4mask ) ? ;
 ipv4block
@@ -35,14 +35,14 @@ ipv6
     : ( ipv6full | ipv6compact ) ( '/' ipv6mask ) ?
     ;
 ipv6full
-    : ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block ':' ipv6block
+    : ipv6block Colon ipv6block Colon ipv6block Colon ipv6block Colon ipv6block Colon ipv6block Colon ipv6block Colon ipv6block
     ;
 ipv6compact
     : ipv6part '::' ipv6part
     ;
 ipv6part
     : ipv6block ?
-    | ipv6part ':' ipv6block
+    | ipv6part Colon ipv6block
     ;
 ipv6block
     : HEX
@@ -58,15 +58,19 @@ dest_port : port;
 port
     : 'any'
     | environment_var
-    |  INT
-    | INT ':' INT ?
-    | ':' INT
-    | INT ':'
-    | '[' port (',' port)* ']'
-    | '!' port
+    | INT
+    | INT Colon INT ?
+    | Colon INT
+    | INT Colon
+    | '[' port (Comma port)* ']'
+    | Negative port
     ;
 
 /* rules configuration */
-params : ParamStart param (';' param) * ';'? ParamEnd;
-param: ParamValue (string)?;
-string: ParamQuotedString;
+params: ParamStart param ( ParamSep param ) * ParamSep ? ParamEnd;
+param: keyword ( ParamColon setting )? ;
+keyword
+    : ParamCommonString;
+setting : singleSetting ( ParamComma singleSetting )*;
+singleSetting
+    : ParamNegative? ( ParamCommonString | ParamQuotedString );

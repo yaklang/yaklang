@@ -107,14 +107,17 @@ WS
 NonSemiColon: [^;]+;
 
 SHEBANG
-    : '#' '!' SingleLineInputCharacter* -> channel(HIDDEN)
+    : '#' Negative SingleLineInputCharacter* -> channel(HIDDEN)
     ;
 
 mode PARAM_MODE;
     fragment Quote: '"';
-    fragment CharInQuotedString: ~["] ;
-    ParamQuotedString: Quote CharInQuotedString* Quote;
-    ParamSep: ';';
-    ParamValue: FreeValueAnyChar+;
+    fragment CharInQuotedString: '\\"' | '\\;' | ~["] ;
+    ParamWS: [ \t\u000C]+ -> skip;
     ParamEnd: ')' -> popMode;
-    fragment FreeValueAnyChar: ~(')' | '"' | ';');
+    ParamQuotedString: Quote CharInQuotedString* Quote;
+    ParamColon: ':';
+    ParamSep: ';';
+    ParamNegative: '!';
+    ParamComma: ',';
+    ParamCommonString: (~[,;":\n!\r()])+;
