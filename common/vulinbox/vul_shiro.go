@@ -140,88 +140,109 @@ func init() {
 
 func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
-	shiroGroup := router.PathPrefix("/shiro").Name("ShiroVuls Simulation").Subrouter()
+	shiroGroup := router.Name("ShiroVuls Simulation").Subrouter()
 
-	shiroGroup.HandleFunc("/cbc", func(writer http.ResponseWriter, request *http.Request) {
-		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
-			cookie := http.Cookie{
-				Name:     "rememberMe",
-				Value:    "deleteMe",                         // 设置 cookie 的值
-				Expires:  time.Now().Add(7 * 24 * time.Hour), // 设置过期时间
-				HttpOnly: false,                              // 仅限 HTTP 访问，不允许 JavaScript 访问
-			}
-			http.SetCookie(writer, &cookie)
-			writer.WriteHeader(200)
-			if err != nil {
-				writer.Write([]byte(err.Error()))
-			}
-			return
-		}
-		successNow := func(writer http.ResponseWriter, request *http.Request) {
-			writer.WriteHeader(200)
-			return
-		}
-		rememberMe, err := request.Cookie("rememberMe")
-		if err != nil { // 请求没有cookie 那就设置一个
-			failNow(writer, request, err)
-			return
-		}
-		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
-		var iv []byte
-		if len(cookieVal) > len(randKey) {
-			iv = cookieVal[:16]
-			cookieVal = cookieVal[16:]
-		} else { // 第一次探测请求
-			failNow(writer, request, err)
-			return
-		}
+	shiroRoutes := []*VulnInfo{
+		{
+			DefaultQuery: "",
+			Path:         "/shiro/cbc",
+			RouteName:    "Shiro CBC 默认KEY(<1.4.2)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
+					cookie := http.Cookie{
+						Name:     "rememberMe",
+						Value:    "deleteMe",                         // 设置 cookie 的值
+						Expires:  time.Now().Add(7 * 24 * time.Hour), // 设置过期时间
+						HttpOnly: false,                              // 仅限 HTTP 访问，不允许 JavaScript 访问
+					}
+					http.SetCookie(writer, &cookie)
+					writer.WriteHeader(200)
+					if err != nil {
+						writer.Write([]byte(err.Error()))
+					}
+					return
+				}
+				successNow := func(writer http.ResponseWriter, request *http.Request) {
+					writer.WriteHeader(200)
+					return
+				}
+				rememberMe, err := request.Cookie("rememberMe")
+				if err != nil { // 请求没有cookie 那就设置一个
+					failNow(writer, request, err)
+					return
+				}
+				cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
+				var iv []byte
+				if len(cookieVal) > len(randKey) {
+					iv = cookieVal[:16]
+					cookieVal = cookieVal[16:]
+				} else { // 第一次探测请求
+					failNow(writer, request, err)
+					return
+				}
 
-		payload, err := codec.AESCBCDecrypt(randKey, cookieVal, iv)
-		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request, err)
-			return
-		}
-		payload = codec.PKCS7UnPadding(payload)
+				payload, err := codec.AESCBCDecrypt(randKey, cookieVal, iv)
+				if err != nil || payload == nil { // key不对返回deleteMe
+					failNow(writer, request, err)
+					return
+				}
+				payload = codec.PKCS7UnPadding(payload)
 
-		checkGadget(payload, failNow, successNow, writer, request)
-		return
-	}).Name("Shiro CBC 默认KEY(<1.4.2)")
-	shiroGroup.HandleFunc("/gcm", func(writer http.ResponseWriter, request *http.Request) {
-		failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
-			cookie := http.Cookie{
-				Name:     "rememberMe",
-				Value:    "deleteMe",                         // 设置 cookie 的值
-				Expires:  time.Now().Add(7 * 24 * time.Hour), // 设置过期时间
-				HttpOnly: false,                              // 仅限 HTTP 访问，不允许 JavaScript 访问
-			}
-			http.SetCookie(writer, &cookie)
-			writer.WriteHeader(200)
-			if err != nil {
-				writer.Write([]byte(err.Error()))
-			}
-			return
-		}
-		successNow := func(writer http.ResponseWriter, request *http.Request) {
-			writer.WriteHeader(200)
-			return
-		}
-		rememberMe, err := request.Cookie("rememberMe")
-		if err != nil { // 请求没有cookie 那就设置一个
-			failNow(writer, request, err)
-			return
-		}
-		cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
+				checkGadget(payload, failNow, successNow, writer, request)
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/shiro/gcm",
+			RouteName:    "Shiro GCM 默认KEY(>=1.4.2)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
+					cookie := http.Cookie{
+						Name:     "rememberMe",
+						Value:    "deleteMe",                         // 设置 cookie 的值
+						Expires:  time.Now().Add(7 * 24 * time.Hour), // 设置过期时间
+						HttpOnly: false,                              // 仅限 HTTP 访问，不允许 JavaScript 访问
+					}
+					http.SetCookie(writer, &cookie)
+					writer.WriteHeader(200)
+					if err != nil {
+						writer.Write([]byte(err.Error()))
+					}
+					return
+				}
+				successNow := func(writer http.ResponseWriter, request *http.Request) {
+					writer.WriteHeader(200)
+					return
+				}
+				rememberMe, err := request.Cookie("rememberMe")
+				if err != nil { // 请求没有cookie 那就设置一个
+					failNow(writer, request, err)
+					return
+				}
+				cookieVal, _ := codec.DecodeBase64(rememberMe.Value)
 
-		payload, err := codec.AESGCMDecrypt(randKey, cookieVal, nil)
-		if err != nil || payload == nil { // key不对返回deleteMe
-			failNow(writer, request, err)
-			return
-		}
+				payload, err := codec.AESGCMDecrypt(randKey, cookieVal, nil)
+				if err != nil || payload == nil { // key不对返回deleteMe
+					failNow(writer, request, err)
+					return
+				}
 
-		checkGadget(payload, failNow, successNow, writer, request)
+				checkGadget(payload, failNow, successNow, writer, request)
 
-		return
-	}).Name("Shiro GCM 默认KEY(>=1.4.2)")
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+	}
+
+	for _, v := range shiroRoutes {
+		addRouteWithComment(shiroGroup, v)
+	}
+
 }
 
 func checkGadget(payload []byte, failNow func(writer http.ResponseWriter, request *http.Request, err error), successNow func(writer http.ResponseWriter, request *http.Request), writer http.ResponseWriter, request *http.Request) {

@@ -29,12 +29,13 @@ type GroupedRoutes struct {
 }
 
 type VulnInfo struct {
-	Handler       func(http.ResponseWriter, *http.Request)
+	Handler       func(http.ResponseWriter, *http.Request) `json:"-"`
 	Path          string
 	DefaultQuery  string
 	RouteName     string // 名称
 	Detected      bool   // 是否能检出
 	ExpectedValue string // 期望值
+	UnSafe        bool
 }
 
 func (s *VulinServer) init() {
@@ -161,23 +162,32 @@ func (s *VulinServer) genRoute() {
 			}
 
 			if groupName != "" {
-				pathTemplate, _ := route.GetPathTemplate()
-				queriesTemplates, _ := route.GetQueriesTemplates()
-				name := route.GetName()
+				info := route.GetName()
+
+				var vulnInfo *VulnInfo
+				err = json.Unmarshal([]byte(info), &vulnInfo)
+				if err != nil {
+					log.Errorf("unmarshal route info failed: %v", err)
+					return nil
+				}
 				// 一个组中不是所有的路由都有名称，只有需要在前端展示的路由才有名称
-				if name != "" {
-					query := ""
-					if len(queriesTemplates) > 0 {
-						query = "?" + queriesTemplates[0]
+				if vulnInfo.RouteName != "" {
+					realRoutePath, err := route.GetPathTemplate()
+					if err != nil {
+						log.Errorf("get route name failed: %v", err)
+						return nil
 					}
-
-					vulRouter := &VulnInfo{
-						Path:         pathTemplate,
-						DefaultQuery: query,
-						RouteName:    name,
+					if strings.HasSuffix(realRoutePath, vulnInfo.Path) {
+						vulnInfo.Path = realRoutePath
 					}
-
-					groups[groupName] = append(groups[groupName], vulRouter)
+					if vulnInfo.DefaultQuery != "" {
+						query := "?" + vulnInfo.DefaultQuery
+						vulnInfo.DefaultQuery = query
+					}
+					if vulnInfo.UnSafe {
+						groupName += " (Unsafe Mode)"
+					}
+					groups[groupName] = append(groups[groupName], vulnInfo)
 				}
 			}
 			return nil
@@ -188,7 +198,7 @@ func (s *VulinServer) genRoute() {
 
 		for groupName, routes := range groups {
 			id := ""
-			if groupName == "exec" {
+			if strings.Contains(groupName, "Unsafe Mode") {
 				// 当一个变量被作为 HTML attribute 插入时，无法使用 html/template
 				id = `id="safestyle"`
 			}
@@ -218,13 +228,12 @@ func (s *VulinServer) registerVulRouter() {
 
 }
 
-func (s *VulinServer) Merge(groupInfo *GroupedRoutes, info *VulnInfo) {
-	groupInfo.VulnInfos = append(groupInfo.VulnInfos, info)
-	s.groupedRoutesCache = append(s.groupedRoutesCache, groupInfo)
-}
-
 func addRouteWithComment(router *mux.Router, info *VulnInfo) {
-	infoStr, _ := json.Marshal(info)
+	infoStr, err := json.Marshal(info)
+	if err != nil {
+		log.Errorf("marshal vuln info failed: %v", err)
+		return
+	}
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 	//routeComments[info.Path] = info.Comment
 }
