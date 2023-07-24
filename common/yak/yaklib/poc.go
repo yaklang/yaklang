@@ -746,6 +746,14 @@ func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 	return response, request, nil
 }
 
+func buildRequest(i interface{}, opts ...PocConfig) []byte {
+	packet, _, err := handleRawPacketAndConfig(i, opts...)
+	if err != nil {
+		log.Errorf("build request error: %s", err)
+	}
+	return packet
+}
+
 func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -782,14 +790,15 @@ func methodDo(method string) func(urlStr string, opts ...PocConfig) (*lowhttp.Lo
 }
 
 var PoCExports = map[string]interface{}{
-	"HTTP":    pocHTTP,
-	"HTTPEx":  pocHTTPEx,
-	"Get":     methodDo("GET"),
-	"Post":    methodDo("POST"),
-	"Head":    methodDo("HEAD"),
-	"Delete":  methodDo("DELETE"),
-	"Options": methodDo("OPTIONS"),
-	"Do":      do,
+	"HTTP":         pocHTTP,
+	"HTTPEx":       pocHTTPEx,
+	"BuildRequest": buildRequest,
+	"Get":          methodDo("GET"),
+	"Post":         methodDo("POST"),
+	"Head":         methodDo("HEAD"),
+	"Delete":       methodDo("DELETE"),
+	"Options":      methodDo("OPTIONS"),
+	"Do":           do,
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": func(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 		opts = append(opts, _pocOptWebsocket(true))
