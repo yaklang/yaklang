@@ -29,8 +29,9 @@ type GroupedRoutes struct {
 }
 
 type VulnInfo struct {
+	Handler       func(http.ResponseWriter, *http.Request)
 	Path          string
-	Query         string
+	DefaultQuery  string
 	RouteName     string // 名称
 	Detected      bool   // 是否能检出
 	ExpectedValue string // 期望值
@@ -171,9 +172,9 @@ func (s *VulinServer) genRoute() {
 					}
 
 					vulRouter := &VulnInfo{
-						Path:      pathTemplate,
-						Query:     query,
-						RouteName: name,
+						Path:         pathTemplate,
+						DefaultQuery: query,
+						RouteName:    name,
 					}
 
 					groups[groupName] = append(groups[groupName], vulRouter)
@@ -222,8 +223,8 @@ func (s *VulinServer) Merge(groupInfo *GroupedRoutes, info *VulnInfo) {
 	s.groupedRoutesCache = append(s.groupedRoutesCache, groupInfo)
 }
 
-func addRouteWithComment(router *mux.Router, p string, handler func(http.ResponseWriter, *http.Request), info *VulnInfo) {
+func addRouteWithComment(router *mux.Router, info *VulnInfo) {
 	infoStr, _ := json.Marshal(info)
-	router.HandleFunc(p, handler).Name(string(infoStr))
+	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 	//routeComments[info.Path] = info.Comment
 }
