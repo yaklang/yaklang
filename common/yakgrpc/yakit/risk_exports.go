@@ -150,6 +150,8 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 				"request", "req", "request_raw", "request_bytes", "request_str",
 				"requestRaw", "requestBytes", "requestStr", "Request",
 				"RequestRaw", "RequestBytes", "RequestStr", "REQUEST",
+				"packet", "packetBytes", "http_request", "http", "http_packet",
+				"httprequest", "httpreq", "httprequest", "HTTP", "HTTP_REQUEST", "HTTPREQUEST",
 			)
 			requestBytes := utils.InterfaceToBytes(requestRaw)
 			var requestStr string
@@ -167,6 +169,8 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 				"response", "rsp", "resp", "response_raw", "response_bytes", "response_str",
 				"responseRaw", "responseBytes", "responseStr", "Response",
 				"ResponseRaw", "ResponseBytes", "ResponseStr", "RESPONSE",
+				"httprsp", "httpresponse", "http_response", "response_packet", "http_rsp",
+				"response", "response_bytes", "HTTP_RESPONSE", "HTTPRESPONSE", "HTTP_RSP",
 			)
 			responseBytes := utils.InterfaceToBytes(responseRaw)
 			var responseStr string
@@ -179,7 +183,7 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 				r.QuotedResponse = strconv.Quote(responseStr)
 			}
 
-			payloadStr := utils.InterfaceToString(utils.MapGetFirstRaw(details, "payload", "payloads", "payloadStr", "payloadRaw", "Payload", "Payloads"))
+			payloadStr := utils.InterfaceToString(utils.MapGetFirstRaw(details, "payload", "payloads", "payloadStr", "payloadRaw", "Payload", "Payloads", "cmd", "command"))
 			if payloadStr != "" {
 				if strings.HasPrefix(payloadStr, `"`) && strings.HasSuffix(payloadStr, `"`) {
 					raw, _ := strconv.Unquote(payloadStr)
