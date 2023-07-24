@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
 	"io"
 	"net"
 	"strings"
@@ -51,13 +52,31 @@ func fetchExternalIP() (net.IP, error) {
 type DNSLogGRPCServer struct {
 	tpb.DNSLogServer
 
-	ExternalIP string
-	domain     string
-	cache      *ttlcache.Cache
-	core       *facades.DNSServer
+	ExternalIP       string
+	domain           string
+	cache            *ttlcache.Cache
+	tokenToModeCache *ttlcache.Cache
+	core             *facades.DNSServer
 }
 
 func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.RequireDomainParams) (*tpb.RequireDomainResponse, error) {
+	var mode = params.GetMode()
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+	var a, _ = dnslogbrokers.Get(params.Mode)
+	if a != nil {
+		domain, token, err := a.Require(30 * time.Second)
+		if err != nil {
+			return nil, utils.Errorf("require[%v] dnslog failed: %s", mode)
+		}
+		D.tokenToModeCache.Set(token, a.Name())
+		return &tpb.RequireDomainResponse{
+			Domain: domain,
+			Token:  token,
+			Mode:   a.Name(),
+		}, nil
+	}
 	token := utils.RandStringBytes(10)
 	token = strings.ToLower(token)
 	return &tpb.RequireDomainResponse{
@@ -67,6 +86,31 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 }
 
 func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.QueryExistedDNSLogParams) (*tpb.QueryExistedDNSLogResponse, error) {
+	mode := params.GetMode()
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+
+	if mode == "" {
+		raw, _ := D.tokenToModeCache.Get(params.GetToken())
+		ret := utils.InterfaceToString(raw)
+		if ret != "" {
+			mode = ret
+		}
+	}
+	if mode != "" {
+		var a, _ = dnslogbrokers.Get(params.Mode)
+		if a != nil {
+			results, err := a.GetResult(params.GetToken(), 30*time.Second)
+			if err != nil {
+				return nil, utils.Errorf("require[%v] dnslog failed: %s", a.Name())
+			}
+			return &tpb.QueryExistedDNSLogResponse{
+				Events: results,
+			}, nil
+		}
+	}
+
 	raw, ok := D.cache.Get(params.GetToken())
 	if !ok {
 		return &tpb.QueryExistedDNSLogResponse{Events: nil}, nil
@@ -100,6 +144,9 @@ func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error
 	}()
 	cache := ttlcache.NewCache()
 	cache.SetTTL(24 * time.Hour)
+	tokenToModeCache := ttlcache.NewCache()
+	cache.SetTTL(24 * time.Hour)
+
 	coreDNSServer.SetCallback(func(i *facades.VisitorLog) {
 		tokenRaw, ok := i.Details["token"]
 		token := fmt.Sprint(tokenRaw)
@@ -132,10 +179,11 @@ func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error
 	})
 
 	grpcServe := &DNSLogGRPCServer{
-		ExternalIP: externalIP,
-		domain:     domain,
-		cache:      cache,
-		core:       coreDNSServer,
+		ExternalIP:       externalIP,
+		domain:           domain,
+		cache:            cache,
+		tokenToModeCache: tokenToModeCache,
+		core:             coreDNSServer,
 	}
 	return grpcServe, nil
 }

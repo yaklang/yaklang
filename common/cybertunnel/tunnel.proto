@@ -91,6 +91,7 @@ service DNSLog {
 
 message QueryExistedDNSLogParams {
   string Token = 1;
+  string Mode = 2;
 }
 
 message DNSLogEvent {
@@ -102,6 +103,7 @@ message DNSLogEvent {
   int32 RemotePort = 6;
   bytes Raw = 7;
   int64 Timestamp = 8;
+  string Mode = 9;
 }
 
 message QueryExistedDNSLogResponse {
@@ -109,12 +111,13 @@ message QueryExistedDNSLogResponse {
 }
 
 message RequireDomainParams {
-
+  string Mode = 1;
 }
 
 message RequireDomainResponse {
   string Domain = 1;
   string Token = 2;
+  string Mode = 3;
 }
 
 message QueryExistedRandomPortTriggerRequest {
