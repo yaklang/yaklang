@@ -73,4 +73,9 @@ keyword
     : ParamCommonString;
 setting : singleSetting ( ParamComma singleSetting )*;
 singleSetting
-    : ParamNegative? ( ParamCommonString | ParamQuotedString );
+    : negative? settingcontent;
+negative: ParamNegative;
+settingcontent
+    : ParamCommonString
+    | ParamQuotedString
+    ;

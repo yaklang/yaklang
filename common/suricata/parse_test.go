@@ -79,6 +79,10 @@ alert http any any -> any any (msg: "test\"\;";)`)
 		spew.Dump(rules)
 		panic("parse failed")
 	}
+	if rules[60].ContentRuleConfig.ContentRules[0].PCRE != `/[a-zA-Z0-9+/]{100,}=/i` {
+		spew.Dump(rules[60])
+		panic("parse failed")
+	}
 }
 
 func TestParse2(t *testing.T) {
