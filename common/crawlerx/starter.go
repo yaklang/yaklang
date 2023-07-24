@@ -36,6 +36,7 @@ type BrowserStarter struct {
 	resultSent func(string) bool
 	scanRange  func(string) bool
 	urlCheck   map[string]func(string) bool
+	banList    *tools.StringCountFilter
 
 	requestAfterRepeat func(*rod.HijackRequest) string
 	urlAfterRepeat     func(string) string
@@ -81,6 +82,7 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		waitGroup: baseConfig.waitGroup,
 
 		urlCheck: make(map[string]func(string) bool),
+		banList:  tools.NewCountFilter(),
 
 		urlTree: baseConfig.urlTree,
 		uChan:   baseConfig.uChan,
