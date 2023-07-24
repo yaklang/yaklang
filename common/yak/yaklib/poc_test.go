@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httputil"
 	"testing"
@@ -23,6 +24,15 @@ Host: example.com
 	_, _, err = pocHTTPEx(req)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBuildRequest(t *testing.T) {
+	after := buildRequest(`GET / HTTP/1.1
+Host: pie.dev
+`, _pocOptAppendHeader("Test", "asd"))
+	if !bytes.Contains(after, []byte(`Test: asd`)) {
+		t.Fatalf("Expected %s to contain %s", after, []byte(`Test: asd`))
 	}
 }
 
