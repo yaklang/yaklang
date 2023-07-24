@@ -15,62 +15,80 @@ import (
 func (s *VulinServer) registerSSRF() {
 
 	ssrfGroup := s.router.PathPrefix("/ssrf").Name("SSRF 参数多种情况的测试").Subrouter()
+	ssrfRoutes := []*VulnInfo{
+		{
+			DefaultQuery: "json={\"abc\": 123, \"ref\": \"http://www.baidu.com\"}",
+			Path:         "/json-in-get",
+			RouteName:    "SSRF JSON Body SSRF",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw := request.URL.Query().Get("json")
+				if raw == "" {
+					writer.Write([]byte(`暂无数据！`))
+					return
+				}
+				var m = make(map[string]interface{})
+				err := json.Unmarshal([]byte(raw), &m)
+				if err != nil {
+					writer.Write([]byte(`JSON Syntax Error: ` + err.Error()))
+					return
+				}
 
-	ssrfGroup.HandleFunc("/json-in-get", func(writer http.ResponseWriter, request *http.Request) {
-		raw := request.URL.Query().Get("json")
-		if raw == "" {
-			writer.Write([]byte(`暂无数据！`))
-			return
-		}
-		var m = make(map[string]interface{})
-		err := json.Unmarshal([]byte(raw), &m)
-		if err != nil {
-			writer.Write([]byte(`JSON Syntax Error: ` + err.Error()))
-			return
-		}
+				ref, ok := m["ref"]
+				if !ok {
+					writer.Write([]byte(`no ref in json found!`))
+					return
+				}
 
-		ref, ok := m["ref"]
-		if !ok {
-			writer.Write([]byte(`no ref in json found!`))
-			return
-		}
-
-		var u = fmt.Sprint(ref)
-		c := utils.NewDefaultHTTPClient()
-		c.Timeout = 5 * time.Second
-		rsp, err := c.Get(u)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		rawResponse, err := utils.HttpDumpWithBody(rsp, true)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		writer.Write(rawResponse)
-	}).Name("SSRF JSON Body SSRF")
-	ssrfGroup.HandleFunc("/in-get", func(writer http.ResponseWriter, request *http.Request) {
-		ref := request.URL.Query().Get("url")
-		var u = fmt.Sprint(ref)
-		c := utils.NewDefaultHTTPClient()
-		c.Timeout = 5 * time.Second
-		rsp, err := c.Get(u)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		rawResponse, err := utils.HttpDumpWithBody(rsp, true)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		writer.Write(rawResponse)
-	}).Queries("url", "").Name("SSRF GET 中 URL 参数")
-	ssrfGroup.HandleFunc("/in-post", func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method == "GET" {
-			writer.Header().Set("Content-Type", "text/html; charset=utf8")
-			writer.Write([]byte(`
+				var u = fmt.Sprint(ref)
+				c := utils.NewDefaultHTTPClient()
+				c.Timeout = 5 * time.Second
+				rsp, err := c.Get(u)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				rawResponse, err := utils.HttpDumpWithBody(rsp, true)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				writer.Write(rawResponse)
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "url=http://www.baidu.com/",
+			Path:         "/in-get",
+			RouteName:    "SSRF GET 中 URL 参数",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				ref := request.URL.Query().Get("url")
+				var u = fmt.Sprint(ref)
+				c := utils.NewDefaultHTTPClient()
+				c.Timeout = 5 * time.Second
+				rsp, err := c.Get(u)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				rawResponse, err := utils.HttpDumpWithBody(rsp, true)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				writer.Write(rawResponse)
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/in-post",
+			RouteName:    "SSRF POST 中 URL 参数",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					writer.Header().Set("Content-Type", "text/html; charset=utf8")
+					writer.Write([]byte(`
 <form action="/ssrf-in-post" method="post">
 	<label for="name">姓名:</label>
 	<input type="text" id="name" name="name" ><br><br>
@@ -99,37 +117,44 @@ func (s *VulinServer) registerSSRF() {
 	<input type="submit" value="提交">
 </form>
 `))
-			return
-		}
-		raw, err := ioutil.ReadAll(request.Body)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		values, err := url.ParseQuery(string(raw))
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		var u = fmt.Sprint(values.Get("url"))
-		c := utils.NewDefaultHTTPClient()
-		c.Timeout = 10 * time.Second
-		rsp, err := c.Get(u)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		rawResponse, err := utils.HttpDumpWithBody(rsp, true)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			return
-		}
-		writer.Write(rawResponse)
-	}).Name("SSRF POST 中 URL 参数")
-	ssrfGroup.HandleFunc("/in-post-multipart", func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method == "GET" {
-			writer.Header().Set("Content-Type", "text/html; charset=utf8")
-			writer.Write([]byte(`
+					return
+				}
+				raw, err := ioutil.ReadAll(request.Body)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				values, err := url.ParseQuery(string(raw))
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				var u = fmt.Sprint(values.Get("url"))
+				c := utils.NewDefaultHTTPClient()
+				c.Timeout = 10 * time.Second
+				rsp, err := c.Get(u)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				rawResponse, err := utils.HttpDumpWithBody(rsp, true)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				writer.Write(rawResponse)
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/in-post-multipart",
+			RouteName:    "SSRF POST 中 URL 参数(Multipart)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					writer.Header().Set("Content-Type", "text/html; charset=utf8")
+					writer.Write([]byte(`
 <form action="/ssrf-in-post" method="post" enctype="multipart/form-data">
 	<label for="name">姓名:</label>
 	<input type="text" id="name" name="name" ><br><br>
@@ -158,9 +183,36 @@ func (s *VulinServer) registerSSRF() {
 	<input type="submit" value="提交">
 </form>
 `))
-			return
-		}
-	})
+					return
+				}
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/in-json-body",
+			RouteName:    "SSRF JSON Body SSRF",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/json-in-post-param",
+			RouteName:    "SSRF POST参数是JSON（包含URL）的情况",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+	}
+
 	s.router.HandleFunc("/redirect/main", func(writer http.ResponseWriter, request *http.Request) {
 		DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
 	})
@@ -245,14 +297,9 @@ window.location.assign(`+strconv.Quote(u)+`);
 `, writer, request, map[string]any{
 			"url": strings.Trim(strconv.Quote(u), `"`),
 		})
-	})
 	}).Name("SSRF POST 中 URL 参数(Multipart)")
-	ssrfGroup.HandleFunc("/in-json-body", func(writer http.ResponseWriter, request *http.Request) {
 
-		return
-	}).Name("SSRF JSON Body SSRF")
-	ssrfGroup.HandleFunc("/json-in-post-param", func(writer http.ResponseWriter, request *http.Request) {
-
-		return
-	}).Name("SSRF POST参数是JSON（包含URL）的情况")
+	for _, v := range ssrfRoutes {
+		addRouteWithComment(ssrfGroup, v)
+	}
 }

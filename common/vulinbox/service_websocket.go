@@ -17,14 +17,6 @@ var wsIndexHtml []byte
 func (s *VulinServer) registerWebsocket() {
 	r := s.router
 	wsGroup := r.Name("Websocket 仿真测试").Subrouter()
-	wsGroup.HandleFunc("/websocket/jquery.min.js", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/javascript")
-		writer.Write(jquery214)
-	})
-	wsGroup.HandleFunc("/websocket/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/html")
-		writer.Write(wsIndexHtml)
-	}).Name("Websocket基础案例")
 	var upgrader = websocket.Upgrader{}
 	wsHandlerFactory := func(compress int) func(writer http.ResponseWriter, request *http.Request) {
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -63,6 +55,35 @@ func (s *VulinServer) registerWebsocket() {
 			}
 		}
 	}
-	wsGroup.HandleFunc("/websocket/ws", wsHandlerFactory(0))
-	wsGroup.HandleFunc("/websocket/ws/compression", wsHandlerFactory(3))
+
+	wsRoutes := []*VulnInfo{
+		{
+			Path:      "/websocket/",
+			RouteName: "Websocket基础案例",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "text/html")
+				writer.Write(wsIndexHtml)
+			},
+			Detected:      true,
+			ExpectedValue: "",
+		},
+		{
+			Path: "/websocket/jquery.min.js",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/javascript")
+				writer.Write(jquery214)
+			},
+		},
+		{
+			Path:    "/websocket/ws",
+			Handler: wsHandlerFactory(0),
+		},
+		{
+			Path:    "/websocket/ws/compression",
+			Handler: wsHandlerFactory(3),
+		},
+	}
+	for _, v := range wsRoutes {
+		addRouteWithComment(wsGroup, v)
+	}
 }
