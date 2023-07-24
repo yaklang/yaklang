@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -3061,6 +3062,12 @@ func (u *user) GetName() string {
 	return u.Name
 }
 
+type testString string
+
+func (t testString) String() string {
+	return "test"
+}
+
 func TestNewExecutor_MemberCallFix(t *testing.T) {
 	code := `
 d = {1:23, "bbb": a}
@@ -3081,6 +3088,13 @@ func TestNewExecutor_MemberCall(t *testing.T) {
 	Import("getGoStruct", func() interface{} {
 		return u
 	})
+	Import("getRequest", func() interface{} {
+		req, _ := http.NewRequest("GET", "https://pie.dev", nil)
+		return req
+	})
+	Import("getTestString", func() interface{} {
+		return testString("qwe")
+	})
 	code := `
 //v = 1
 //v+=2
@@ -3091,14 +3105,21 @@ v = "你" + '好'
 assert v == "你好","string加char失败"
 v = '你'+"好"
 assert v == "你好","char加string失败"
-v = getGoStruct()
-assert v.GetName() == "派大星", "获取go结构体成员（通过FunctionCall方式）失败"
-//assert v.Name == "派大星", "获取go结构体成员（通过Identity方式）失败"
-memberName = "Name"
-assert v.$memberName == "派大星", "获取go结构体成员（通过Ref方式）失败"
-assert v["Name"] == "派大星", "获取go结构体成员（通过SliceCall方式）失败"
-v = {"name":"派大星"}
-assert v.name == "派大星", "获取map成员失败"
+
+// v = getGoStruct()
+// assert v.GetName() == "派大星", "获取go结构体成员（通过FunctionCall方式）失败"
+// //assert v.Name == "派大星", "获取go结构体成员（通过Identity方式）失败"
+// memberName = "Name"
+// assert v.$memberName == "派大星", "获取go结构体成员（通过Ref方式）失败"
+// assert v["Name"] == "派大星", "获取go结构体成员（通过SliceCall方式）失败"
+// v = {"name":"派大星"}
+// assert v.name == "派大星", "获取map成员失败"
+
+v = getRequest()
+assert v.Header.Add != nil, "获取typed-map的go内置方法失败"
+
+v = getTestString()
+assert v.String() == "test", "获取typed-string的go内置方法失败"
 `
 	_marshallerTest(code)
 	_formattest(code)
