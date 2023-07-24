@@ -50,11 +50,11 @@ func (s *VulinServer) registerXSS() {
 	var router = s.router
 
 	xssGroup := router.PathPrefix("/xss").Name("XSS 多场景").Subrouter()
-	xssRoutes := []*VulnInfo{
+	xssRoutes := []*VulInfo{
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/safe",
-			RouteName:    "安全实体转义",
+			Title:        "安全实体转义",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var name = request.URL.Query().Get("name")
 				safeName := template.HTMLEscapeString(name)
@@ -71,7 +71,7 @@ Hello %v
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/echo",
-			RouteName:    "直接拼接导致XSS注入",
+			Title:        "直接拼接导致XSS注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var name = request.URL.Query().Get("name")
 				writer.Header().Set("Content-Type", "text/html")
@@ -119,7 +119,7 @@ Hello %v
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/replace/nocase",
-			RouteName:    "不安全的过滤导致XSS",
+			Title:        "不安全的过滤导致XSS",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var name = request.URL.Query().Get("name")
 				scriptRegex := regexp.MustCompile("(?i)<script>")
@@ -139,7 +139,7 @@ Hello %v
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/js/in-str",
-			RouteName:    "XSS: 存在于 JS 代码中(字符串中)",
+			Title:        "XSS: 存在于 JS 代码中(字符串中)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -186,7 +186,7 @@ Hello %v
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/js/in-str2",
-			RouteName:    "XSS: 存在于 JS 代码中(字符串中2)",
+			Title:        "XSS: 存在于 JS 代码中(字符串中2)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -235,7 +235,7 @@ console.info("Hello" + `+"`${name}`"+`);</script>
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/js/in-str-temp",
-			RouteName:    "XSS: 存在于 JS 代码中(字符串模版中)",
+			Title:        "XSS: 存在于 JS 代码中(字符串模版中)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -328,7 +328,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "code=2-1",
 			Path:         "/attr/onclick",
-			RouteName:    "输出存在于HTML节点on...属性中",
+			Title:        "输出存在于HTML节点on...属性中",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -377,7 +377,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "value=visitor-name",
 			Path:         "/attr/alt",
-			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Title:        "输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				// %27onmousemove=%27javascript:alert(1)
 				unsafeTemplateRender(writer, request, `<!doctype html>
@@ -427,7 +427,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "json={\"value\":\"value=visitor-name\"}",
 			Path:         "/attr/alt/json",
-			RouteName:    "进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Title:        "进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				// %27onmousemove=%27javascript:alert(1)
 				unsafeTemplateRender(writer, request, `<!doctype html>
@@ -477,7 +477,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9",
 			Path:         "/attr/alt/b64/json",
-			RouteName:    "进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Title:        "进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				// %27onmousemove=%27javascript:alert(1)
 				unsafeTemplateRender(writer, request, `<!doctype html>
@@ -527,7 +527,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "src=/static/logo.png",
 			Path:         "/attr/src",
-			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)",
+			Title:        "输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				// %27onmousemove=%27javascript:alert(1)
 				unsafeTemplateRender(writer, request, `<!doctype html>
@@ -577,7 +577,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "href=/static/logo.png",
 			Path:         "/attr/href",
-			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(HREF)",
+			Title:        "输出存在于HTML节点属性中，但是不再on属性中(HREF)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				// %27onmousemove=%27javascript:alert(1)
 				unsafeTemplateRender(writer, request, `<!doctype html>
@@ -628,7 +628,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "code=2-1",
 			Path:         "/attr/onclick2",
-			RouteName:    "输出存在于HTML节点on...属性中的部分代码属性",
+			Title:        "输出存在于HTML节点on...属性中的部分代码属性",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -677,7 +677,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "name=OrdinaryVisitor",
 			Path:         "/attr/script",
-			RouteName:    "script标签的某些属性中",
+			Title:        "script标签的某些属性中",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
@@ -726,7 +726,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "",
 			Path:         "/cookie/name",
-			RouteName:    "Cookie 中的 XSS",
+			Title:        "Cookie 中的 XSS",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, _ := utils.HttpDumpWithBody(request, true)
 				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCname")
@@ -787,7 +787,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "",
 			Path:         "/cookie/b64/name",
-			RouteName:    "Cookie 中的 XSS（Base64）",
+			Title:        "Cookie 中的 XSS（Base64）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, _ := utils.HttpDumpWithBody(request, true)
 				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
@@ -850,7 +850,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "",
 			Path:         "/cookie/b64/json/name",
-			RouteName:    "Cookie 中的 XSS（Base64-JSON）",
+			Title:        "Cookie 中的 XSS（Base64-JSON）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, _ := utils.HttpDumpWithBody(request, true)
 				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64J")
@@ -916,7 +916,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 	}
 
 	for _, v := range xssRoutes {
-		addRouteWithComment(xssGroup, v)
+		addRouteWithVulInfo(xssGroup, v)
 	}
 
 }

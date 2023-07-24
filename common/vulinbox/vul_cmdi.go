@@ -14,11 +14,11 @@ func (s *VulinServer) registerPingCMDI() {
 	r := s.router
 
 	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例").Subrouter()
-	cmdIRoutes := []*VulnInfo{
+	cmdIRoutes := []*VulInfo{
 		{
 			DefaultQuery: "ip=127.0.0.1",
 			Path:         "/ping/shlex",
-			RouteName:    "Shlex  解析的命令注入",
+			Title:        "Shlex  解析的命令注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				ip := request.URL.Query().Get("ip")
 				if ip == "" {
@@ -53,7 +53,7 @@ func (s *VulinServer) registerPingCMDI() {
 		{
 			DefaultQuery: "ip=127.0.0.1",
 			Path:         "/ping/bash",
-			RouteName:    "Bash  解析的命令注入",
+			Title:        "Bash  解析的命令注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				ip := request.URL.Query().Get("ip")
 				if ip == "" {
@@ -83,6 +83,6 @@ func (s *VulinServer) registerPingCMDI() {
 	}
 
 	for _, v := range cmdIRoutes {
-		addRouteWithComment(cmdIGroup, v)
+		addRouteWithVulInfo(cmdIGroup, v)
 	}
 }

@@ -30,11 +30,11 @@ func (s *VulinServer) registerLoginRoute() {
 		return []byte(key), nil
 	}
 	jwtGroup := r.PathPrefix("/jwt").Name("登陆 JWT").Subrouter()
-	jwtRoutes := []*VulnInfo{
+	jwtRoutes := []*VulInfo{
 		{
 			DefaultQuery: "",
 			Path:         "/login",
-			RouteName:    "登陆(JWT)",
+			Title:        "登陆(JWT)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					// 不存在登录信息
@@ -163,7 +163,7 @@ func (s *VulinServer) registerLoginRoute() {
 		},
 	}
 	for _, v := range jwtRoutes {
-		addRouteWithComment(jwtGroup, v)
+		addRouteWithVulInfo(jwtGroup, v)
 	}
 
 }

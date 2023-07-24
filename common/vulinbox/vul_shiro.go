@@ -142,11 +142,11 @@ func (s *VulinServer) registerMockVulShiro() {
 	var router = s.router
 	shiroGroup := router.Name("ShiroVuls Simulation").Subrouter()
 
-	shiroRoutes := []*VulnInfo{
+	shiroRoutes := []*VulInfo{
 		{
 			DefaultQuery: "",
 			Path:         "/shiro/cbc",
-			RouteName:    "Shiro CBC 默认KEY(<1.4.2)",
+			Title:        "Shiro CBC 默认KEY(<1.4.2)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 					cookie := http.Cookie{
@@ -197,7 +197,7 @@ func (s *VulinServer) registerMockVulShiro() {
 		{
 			DefaultQuery: "",
 			Path:         "/shiro/gcm",
-			RouteName:    "Shiro GCM 默认KEY(>=1.4.2)",
+			Title:        "Shiro GCM 默认KEY(>=1.4.2)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				failNow := func(writer http.ResponseWriter, request *http.Request, err error) {
 					cookie := http.Cookie{
@@ -240,7 +240,7 @@ func (s *VulinServer) registerMockVulShiro() {
 	}
 
 	for _, v := range shiroRoutes {
-		addRouteWithComment(shiroGroup, v)
+		addRouteWithVulInfo(shiroGroup, v)
 	}
 
 }

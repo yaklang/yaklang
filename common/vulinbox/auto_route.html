@@ -52,8 +52,8 @@
                     {{.GroupName}}
                 </div>
                 <ul class="list-group list-group-flush">
-                    {{range .VulnInfos}}
-                    <li class="list-group-item"><a target="_blank" href="{{.Path}}{{.DefaultQuery}}">{{.RouteName}}</a></li>
+                    {{range .VulInfos}}
+                    <li class="list-group-item"><a target="_blank" href="{{.Path}}{{.DefaultQuery}}">{{.Title}}</a></li>
                     {{end}}
                 </ul>
             </div>
