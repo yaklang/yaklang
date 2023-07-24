@@ -96,6 +96,14 @@ func (v *BaseSuricataRuleParserVisitor) VisitParam(ctx *ParamContext) interface{
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSuricataRuleParserVisitor) VisitString(ctx *StringContext) interface{} {
+func (v *BaseSuricataRuleParserVisitor) VisitKeyword(ctx *KeywordContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSuricataRuleParserVisitor) VisitSetting(ctx *SettingContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSuricataRuleParserVisitor) VisitSingleSetting(ctx *SingleSettingContext) interface{} {
 	return v.VisitChildren(ctx)
 }
