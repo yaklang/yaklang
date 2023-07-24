@@ -54,6 +54,9 @@ func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 		}
 	} else {
 		for _, url := range urls {
+			if starter.banList.Exist(url) {
+				continue
+			}
 			starter.urlsExploit(originUrl, url)
 		}
 		clickSelectors, err := starter.getClickElements(page)
@@ -169,10 +172,13 @@ func (starter *BrowserStarter) generateUrlsExploit() func(string, string) error 
 		if starter.stopSignal {
 			return nil
 		}
-		for _, f := range starter.urlCheck {
+		for k, f := range starter.urlCheck {
 			afterUrl := starter.urlAfterRepeat(targetUrl)
 			if !f(afterUrl) {
-				//log.Infof(`%s ban url: %s`, k, targetUrl)
+				log.Infof(`%s ban url: %s`, k, targetUrl)
+				if !starter.banList.Exist(targetUrl) {
+					starter.banList.Insert(targetUrl)
+				}
 				return nil
 			}
 		}
@@ -196,6 +202,9 @@ func (starter *BrowserStarter) generateClickElementsExploit() func(*rod.Page, st
 				log.Errorf(`Page %s get urls error: %s`, originUrl, err)
 			} else {
 				for _, url := range urls {
+					if starter.banList.Exist(url) {
+						continue
+					}
 					starter.urlsExploit(originUrl, url)
 				}
 			}
@@ -256,6 +265,9 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 				from:       originUrl,
 			}
 			starter.ch <- &result
+			if starter.banList.Exist(currentUrl) {
+				return nil
+			}
 			starter.urlsExploit(originUrl, currentUrl)
 		}
 		return nil
