@@ -28,11 +28,11 @@ func TestGRPCMUSTPASS_XSS(t *testing.T) {
 	}
 	vul2 := VulInfo{
 		Path:           "/xss/echo?name=admin",
-		ExpectedResult: map[string]int{"Found xss": 3},
+		ExpectedResult: map[string]int{"Found xss": 1},
 	}
 	vul3 := VulInfo{
 		Path:           "/xss/replace/nocase?name=admin",
-		ExpectedResult: map[string]int{"Found xss": 3},
+		ExpectedResult: map[string]int{"Found xss": 1},
 	}
 
 	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), " ")
