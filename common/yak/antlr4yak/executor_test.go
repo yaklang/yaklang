@@ -3108,7 +3108,7 @@ assert v == "你好","char加string失败"
 
 // v = getGoStruct()
 // assert v.GetName() == "派大星", "获取go结构体成员（通过FunctionCall方式）失败"
-// //assert v.Name == "派大星", "获取go结构体成员（通过Identity方式）失败"
+//assert v.Name == "派大星", "获取go结构体成员（通过Identity方式）失败"
 // memberName = "Name"
 // assert v.$memberName == "派大星", "获取go结构体成员（通过Ref方式）失败"
 // assert v["Name"] == "派大星", "获取go结构体成员（通过SliceCall方式）失败"
