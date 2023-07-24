@@ -47,30 +47,37 @@ func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Re
 func (s *VulinServer) registerSQLinj() {
 	var router = s.router
 
-	sqli := router.PathPrefix("/sqli").Name("SQL注入漏洞案例（复杂度递增）").Subrouter()
-	aa := func(writer http.ResponseWriter, request *http.Request) {
-		var a = request.URL.Query().Get("id")
-		i, err := strconv.ParseInt(a, 10, 64)
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(500)
-			return
-		}
-		u, err := s.database.GetUserById(int(i))
-		if err != nil {
-			writer.Write([]byte(err.Error()))
-			writer.WriteHeader(500)
-			return
-		}
-		sqliWriter(writer, request, []*VulinUser{u})
-		return
+	sqli := router.Name("SQL注入漏洞案例（复杂度递增）").Subrouter()
+
+	vroutes := []*VulnInfo{
+		{
+			DefaultQuery: "id=1",
+			Path:         "/user/by-id-safe",
+			RouteName:    "不存在SQL注入的情况（数字严格校验）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var a = request.URL.Query().Get("id")
+				i, err := strconv.ParseInt(a, 10, 64)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+				u, err := s.database.GetUserById(int(i))
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+				sqliWriter(writer, request, []*VulinUser{u})
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "asdf",
+		},
 	}
-	addRouteWithComment(sqli, "/asdfasf", aa, &VulnInfo{
-		Query:         "id=1",
-		RouteName:     "xasdfasdf",
-		Detected:      false,
-		ExpectedValue: "asdf",
-	})
+	for _, v := range vroutes {
+		addRouteWithComment(sqli, v)
+	}
 
 	sqli.HandleFunc("/user/by-id-safe", func(writer http.ResponseWriter, request *http.Request) {
 		var a = request.URL.Query().Get("id")
