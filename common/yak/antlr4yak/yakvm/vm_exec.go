@@ -3,6 +3,10 @@ package yakvm
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
 type ExitCodeType int
@@ -1793,6 +1794,25 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				callerTypeName = "bytes"
 			}
 
+			// 获取go内置成员方法
+			findGolangBuiltinMemberMethod := func() bool {
+				firstChar := memberName[0]
+				newMemberName := memberName
+				if firstChar >= 'a' && firstChar <= 'z' {
+					newMemberName = strings.ToUpper(string(firstChar)) + memberName[1:]
+				}
+				fun := callerReflectValue.MethodByName(newMemberName)
+				if fun.IsValid() {
+					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					value := NewValue(fun.Type().String(), fun.Interface(), literal)
+					value.CalleeRef = memberNameV
+					value.CallerRef = caller
+					v.push(value)
+					return true
+				}
+				return false
+			}
+
 			switch callerTypeKind {
 			case reflect.Map:
 
@@ -1817,8 +1837,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(value)
 					return
 				}
+
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
+
+				// 最后获取内置方法
 				if caller.GetExtraInfo("global") == nil { // 如果是普通变量的话，尝试获取内置方法
-					// 尝试获取内置方法
 					method, ok := mapBuildinMethod[memberName]
 					if ok {
 						ret := method.HandlerFactory(v, caller)
@@ -1827,57 +1853,37 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						return
 					}
 				}
+
 				// map 找不到 key 应该崩掉
 				panic(fmt.Sprintf("runtime error: no such key `%v` in map", memberNameV.Value))
-
 			case reflect.Ptr, reflect.Struct:
-				firstChar := memberName[0]
-				if firstChar >= 'a' && firstChar <= 'z' {
-					memberName = strings.ToUpper(string(firstChar)) + memberName[1:]
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
 				}
-				fun := callerReflectValue.MethodByName(memberName)
-				if fun.IsValid() {
+
+				// 处理ptr类型
+				if callerTypeKind == reflect.Ptr {
+					callerReflectValue = callerReflectValue.Elem()
+				}
+				//获取结构体字段
+				member := callerReflectValue.FieldByName(memberName)
+				if !member.IsValid() {
+					panicByNoSuchKey(memberName, caller.Value)
+					return
+				}
+				if member.CanInterface() {
 					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
-					value := NewValue(fun.Type().String(), fun.Interface(), literal)
+					value := NewValue(member.Type().String(), member.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
 					v.push(value)
 					return
-				}
-				if callerTypeKind == reflect.Ptr {
-					callerReflectValue = callerReflectValue.Elem()
-					fun = callerReflectValue.MethodByName(memberName)
-					if fun.IsValid() {
-						literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
-						value := NewValue(fun.Type().String(), fun.Interface(), literal)
-						value.CalleeRef = memberNameV
-						value.CallerRef = caller
-						v.push(value)
-						return
-					}
-				}
-
-				//获取结构体字段
-				if callerReflectValue.Kind() == reflect.Struct {
-					member := callerReflectValue.FieldByName(memberName)
-					if !member.IsValid() {
-						panicByNoSuchKey(memberName, caller.Value)
-						return
-					}
-					if member.CanInterface() {
-						literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
-						value := NewValue(member.Type().String(), member.Interface(), literal)
-						value.CalleeRef = memberNameV
-						value.CallerRef = caller
-						v.push(value)
-						return
-					} else {
-						panicByNoSuchKey(memberName, caller.Value)
-						return
-					}
+				} else {
+					panicByNoSuchKey(memberName, caller.Value)
+					return
 				}
 			case reflect.Array, reflect.Slice:
-				//memberName = _title(memberName)
 				prefix := "array"
 				targetBuildinMethod := arrayBuildinMethod
 
@@ -1893,6 +1899,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(NewValue(literal, ret, literal))
 					return
 				}
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
+
 			case reflect.String:
 				//memberName = _title(memberName)
 				method, ok := stringBuildinMethod[memberName]
@@ -1902,9 +1913,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(NewValue(literal, method.HandlerFactory(v, caller.Value), literal))
 					return
 				}
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
 
 			default:
-
 			}
 			panic(fmt.Sprintf("cannot find built-in method %s of %s type", memberName, callerTypeName))
 			//v.push(undefined)
