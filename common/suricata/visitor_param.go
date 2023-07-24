@@ -1,10 +1,8 @@
 package suricata
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"strconv"
 	"strings"
 )
@@ -14,6 +12,14 @@ func atoi(i string) int {
 	return parsed
 }
 
+func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
+	if len(ssts) != 1 {
+		return false, ""
+	}
+	ctx := ssts[0].(*parser.SingleSettingContext)
+	return ctx.Negative() != nil, ctx.Settingcontent().GetText()
+}
+
 func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 	var contents []*ContentRule
 	var contentRule *ContentRule
@@ -21,22 +27,23 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		if param == nil {
 			continue
 		}
-		key, v := r.VisitParam(param.(*parser.ParamContext))
-		key = strings.Trim(key, `" :`)
+		paramctx := param.(*parser.ParamContext)
+		key := paramctx.Keyword().GetText()
 		if key == "" {
 			continue
 		}
 
-		vStr := fmt.Sprint(v)
+		var setting *parser.SettingContext
+		var ssts []parser.ISingleSettingContext
+		var vStr string
 		vParams := make(map[string]interface{})
-		for _, v := range utils.PrettifyListFromStringSplitEx(vStr, ",") {
-			ret := strings.SplitN(v, " ", 2)
-			if len(ret) == 1 {
-				vParams[ret[0]] = true
-			} else if len(ret) == 2 {
-				vParams[strings.TrimSpace(ret[0])] = strings.TrimSpace(ret[1])
-			}
+
+		if st := paramctx.Setting(); st != nil {
+			setting = paramctx.Setting().(*parser.SettingContext)
+			vStr = setting.GetText()
+			ssts = setting.AllSingleSetting()
 		}
+
 		switch key {
 		// meta keywords
 		case "sid":
@@ -48,22 +55,22 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "classtype":
 			rule.ClassType = vStr
 		case "reference":
-			results := strings.SplitN(vStr, ",", 1)
 			if rule.Reference == nil {
 				rule.Reference = map[string]string{}
 			}
-			if len(results) == 2 {
-				rule.Reference[results[0]] = results[1]
+			if len(ssts) == 2 {
+				rule.Reference[ssts[0].GetText()] = ssts[1].GetText()
 			} else {
 				rule.Reference[vStr] = ""
 			}
 		case "msg":
-			rule.Message = fmt.Sprint(v)
+			rule.Message, _ = strconv.Unquote(vStr)
 		case "priority":
 			rule.Priority, _ = strconv.Atoi(vStr)
 		case "metadata":
-			rule.Metadata = utils.PrettifyListFromStringSplited(vStr, ",")
-
+			for _, v := range ssts {
+				rule.Metadata = append(rule.Metadata, v.GetText())
+			}
 		case "file_data", "file.data":
 			rule.ContentRuleConfig.HttpBaseSticky.FileData = true
 		case "http_content_type", "http.content_type":
@@ -98,19 +105,12 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				HttpResponseModifier: &HttpResponseModifierRule{},
 				HttpRequestModifier:  &HttpRequestModifierRule{},
 			}
-			neg := strings.HasPrefix(vStr, `!"`)
-			if neg {
-				contentRule.Negative = true
-				vStr = strings.TrimPrefix(vStr, `!`)
-			}
-			contentRule.Content = []byte(UnquoteString(vStr))
-
+			neg, content := mustSoloSingleSetting(ssts)
+			contentRule.Negative, contentRule.Content = neg, []byte(UnquoteString(content))
 		case "dns.opcode", "dns_opcode":
 			config := rule.ContentRuleConfig.DNS
-			if strings.HasPrefix(vStr, "!") {
-				config.OpcodeNegative = true
-			}
-			config.Opcode = atoi(strings.Trim(vStr, "!"))
+			neg, content := mustSoloSingleSetting(ssts)
+			config.OpcodeNegative, config.Opcode = neg, atoi(content)
 		case "dns_query", "dns.query":
 			rule.ContentRuleConfig.DNS.DNSQuery = true
 		case "flow":
@@ -172,13 +172,8 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "ack":
 			rule.ContentRuleConfig.TcpConfig.Ack = atoi(vStr)
 		case "window":
-			if strings.HasPrefix(vStr, "!") {
-				rule.ContentRuleConfig.TcpConfig.NegativeWindow = true
-				rule.ContentRuleConfig.TcpConfig.Window = atoi(vStr[1:])
-			} else {
-				rule.ContentRuleConfig.TcpConfig.NegativeWindow = false
-				rule.ContentRuleConfig.TcpConfig.Window = atoi(vStr)
-			}
+			neg, content := mustSoloSingleSetting(ssts)
+			rule.ContentRuleConfig.TcpConfig.NegativeWindow, rule.ContentRuleConfig.TcpConfig.Window = neg, atoi(content)
 		case "threshold":
 			config := rule.ContentRuleConfig.Thresholding
 			config.Count = atoi(utils.MapGetString(vParams, "count"))
@@ -284,23 +279,11 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "replace":
 			contentRule.RPC = UnquoteString(vStr)
 		case "pcre":
-			contentRule.PCRE = vStr
+			contentRule.PCRE, _ = strconv.Unquote(vStr)
 		}
 	}
 	if contentRule != nil {
 		contents = append(contents, contentRule)
 	}
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)
-}
-
-func (r *RuleSyntaxVisitor) VisitParam(i *parser.ParamContext) (string, interface{}) {
-	var value interface{}
-	raw := strings.TrimSpace(i.GetText())
-	key, valueRaw := lowhttp.SplitHTTPHeader(raw)
-	if valueRaw == "" {
-		value = true
-	} else {
-		value = valueRaw
-	}
-	return key, value
 }
