@@ -82,4 +82,10 @@ type SuricataRuleParserVisitor interface {
 
 	// Visit a parse tree produced by SuricataRuleParser#singleSetting.
 	VisitSingleSetting(ctx *SingleSettingContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#negative.
+	VisitNegative(ctx *NegativeContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#settingcontent.
+	VisitSettingcontent(ctx *SettingcontentContext) interface{}
 }

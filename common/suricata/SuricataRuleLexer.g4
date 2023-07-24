@@ -120,4 +120,4 @@ mode PARAM_MODE;
     ParamSep: ';';
     ParamNegative: '!';
     ParamComma: ',';
-    ParamCommonString: (~[,;":\n!\r()])+;
+    ParamCommonString: ((~[,;":\n!\r() ])(~[,;":\n!\r()])*(~[,;":\n!\r() ])) | (~[,;":\n!\r()]) ;
