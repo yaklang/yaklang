@@ -11,13 +11,13 @@ var postMessageDemoHtml []byte
 func (s *VulinServer) registerPostMessageIframeCase() {
 	r := s.router
 	iframeGroup := r.Name("JSONP 通信与 iframe postMessage 通信案例").Subrouter()
-	iframeGroup.HandleFunc("/iframe/post/message/basic", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/html")
-		writer.Write(postMessageDemoHtml)
-	})
-	iframeGroup.HandleFunc("/iframe/post/message/basic/frame", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/html")
-		writer.Write([]byte(`<!DOCTYPE html>
+	iframeRoutes := []*VulnInfo{
+		{
+			Path:      "/iframe/post/message/basic/frame",
+			RouteName: "postMessage 基础案例",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "text/html")
+				writer.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
   <title>Iframe Page</title>
@@ -34,5 +34,19 @@ func (s *VulinServer) registerPostMessageIframeCase() {
   <p id="output"></p>
 </body>
 </html>`))
-	}).Name("postMessage 基础案例")
+			},
+			Detected:      true,
+			ExpectedValue: "",
+		},
+		{
+			Path: "/iframe/post/message/basic",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "text/html")
+				writer.Write(postMessageDemoHtml)
+			},
+		},
+	}
+	for _, v := range iframeRoutes {
+		addRouteWithComment(iframeGroup, v)
+	}
 }

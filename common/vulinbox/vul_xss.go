@@ -50,21 +50,32 @@ func (s *VulinServer) registerXSS() {
 	var router = s.router
 
 	xssGroup := router.PathPrefix("/xss").Name("XSS 多场景").Subrouter()
-
-	xssGroup.HandleFunc("/safe", func(writer http.ResponseWriter, request *http.Request) {
-		var name = request.URL.Query().Get("name")
-		safeName := template.HTMLEscapeString(name)
-		writer.Write([]byte(fmt.Sprintf(`<html>
+	xssRoutes := []*VulnInfo{
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/safe",
+			RouteName:    "安全实体转义",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var name = request.URL.Query().Get("name")
+				safeName := template.HTMLEscapeString(name)
+				writer.Write([]byte(fmt.Sprintf(`<html>
 Hello %v
 </html>`, safeName)))
-		writer.Header().Set("Content-Type", "text/html")
-		writer.WriteHeader(200)
-		return
-	}).Queries("name", "{.*}").Name("安全实体转义")
-	xssGroup.HandleFunc("/echo", func(writer http.ResponseWriter, request *http.Request) {
-		var name = request.URL.Query().Get("name")
-		writer.Header().Set("Content-Type", "text/html")
-		writer.Write([]byte(fmt.Sprintf(`
+				writer.Header().Set("Content-Type", "text/html")
+				writer.WriteHeader(200)
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/echo",
+			RouteName:    "直接拼接导致XSS注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var name = request.URL.Query().Get("name")
+				writer.Header().Set("Content-Type", "text/html")
+				writer.Write([]byte(fmt.Sprintf(`
 <!doctype html>
 <html>
 <head>
@@ -99,24 +110,38 @@ Hello %v
 </body>
 </html>
 `, name)))
-		writer.WriteHeader(200)
-		return
-	}).Queries("name", "{.*}").Name("直接拼接导致XSS注入")
-	xssGroup.HandleFunc("/replace/nocase", func(writer http.ResponseWriter, request *http.Request) {
-		var name = request.URL.Query().Get("name")
-		scriptRegex := regexp.MustCompile("(?i)<script>")
-		name = scriptRegex.ReplaceAllString(name, "")
+				writer.WriteHeader(200)
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/replace/nocase",
+			RouteName:    "不安全的过滤导致XSS",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var name = request.URL.Query().Get("name")
+				scriptRegex := regexp.MustCompile("(?i)<script>")
+				name = scriptRegex.ReplaceAllString(name, "")
 
-		scriptEndRegex := regexp.MustCompile("(?i)</script>")
-		name = scriptEndRegex.ReplaceAllString(name, "")
-		writer.Write([]byte(fmt.Sprintf(`<html>
+				scriptEndRegex := regexp.MustCompile("(?i)</script>")
+				name = scriptEndRegex.ReplaceAllString(name, "")
+				writer.Write([]byte(fmt.Sprintf(`<html>
 Hello %v
 </html>`, name)))
-		writer.WriteHeader(200)
-		return
-	}).Queries("name", "{.*}").Name("不安全的过滤导致XSS")
-	xssGroup.HandleFunc("/js/in-str", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+				writer.WriteHeader(200)
+				return
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/js/in-str",
+			RouteName:    "XSS: 存在于 JS 代码中(字符串中)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -150,13 +175,20 @@ Hello %v
 </div>
 </body>
 </html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"name": request.URL.Query().Get("name"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串中)")
-	xssGroup.HandleFunc("/js/in-str2", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/js/in-str2",
+			RouteName:    "XSS: 存在于 JS 代码中(字符串中2)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -192,13 +224,20 @@ console.info("Hello" + `+"`${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"name": request.URL.Query().Get("name"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串中2)")
-	xssGroup.HandleFunc("/js/in-str-temp", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=admin",
+			Path:         "/js/in-str-temp",
+			RouteName:    "XSS: 存在于 JS 代码中(字符串模版中)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -234,17 +273,22 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"name": request.URL.Query().Get("name"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("name", "{.*}").Name("XSS: 存在于 JS 代码中(字符串模版中)")
-
-	xssGroup.HandleFunc("/safe/nosniff/jpeg", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("X-Content-Type-Options", "nosniff")
-		writer.Header().Set("Content-Type", "image/jpeg")
-		writer.Write([]byte(
-			fmt.Sprintf(`<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/safe/nosniff/jpeg",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("X-Content-Type-Options", "nosniff")
+				writer.Header().Set("Content-Type", "image/jpeg")
+				writer.Write([]byte(
+					fmt.Sprintf(`<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -277,10 +321,16 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, request.URL.Query().Get("name"))))
-	}).Queries("name", "{.*}").Name("安全实体转义")
-
-	xssGroup.HandleFunc("/attr/onclick", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "code=2-1",
+			Path:         "/attr/onclick",
+			RouteName:    "输出存在于HTML节点on...属性中",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -316,15 +366,21 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"code": request.URL.Query().Get("code"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"code": request.URL.Query().Get("code"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("code", "{.*}").Name("输出存在于HTML节点on...属性中")
-
-	xssGroup.HandleFunc("/attr/alt", func(writer http.ResponseWriter, request *http.Request) {
-		// %27onmousemove=%27javascript:alert(1)
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "value=visitor-name",
+			Path:         "/attr/alt",
+			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				// %27onmousemove=%27javascript:alert(1)
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -360,14 +416,21 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"value": request.URL.Query().Get("value"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"value": request.URL.Query().Get("value"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("value", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
-	xssGroup.HandleFunc("/attr/alt/json", func(writer http.ResponseWriter, request *http.Request) {
-		// %27onmousemove=%27javascript:alert(1)
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "json={\"value\":\"value=visitor-name\"}",
+			Path:         "/attr/alt/json",
+			RouteName:    "进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				// %27onmousemove=%27javascript:alert(1)
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -403,14 +466,21 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"value": LoadFromGetJSONParam(request, "json", "value"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"value": LoadFromGetJSONParam(request, "json", "value"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("json", "{.*}").Name("进阶1：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
-	xssGroup.HandleFunc("/attr/alt/b64/json", func(writer http.ResponseWriter, request *http.Request) {
-		// %27onmousemove=%27javascript:alert(1)
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9",
+			Path:         "/attr/alt/b64/json",
+			RouteName:    "进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				// %27onmousemove=%27javascript:alert(1)
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -446,15 +516,21 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"value": LoadFromGetBase64JSONParam(request, "b64json", "value"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"value": LoadFromGetBase64JSONParam(request, "b64json", "value"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("b64json", "{.*}").Name("进阶2：输出存在于HTML节点属性中，但是不再on属性中(IMG ALT)")
-
-	xssGroup.HandleFunc("/attr/src", func(writer http.ResponseWriter, request *http.Request) {
-		// %27onmousemove=%27javascript:alert(1)
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "src=/static/logo.png",
+			Path:         "/attr/src",
+			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				// %27onmousemove=%27javascript:alert(1)
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -490,14 +566,21 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"value": request.URL.Query().Get("src"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"value": request.URL.Query().Get("src"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("src", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(IMG SRC)")
-	xssGroup.HandleFunc("/attr/href", func(writer http.ResponseWriter, request *http.Request) {
-		// %27onmousemove=%27javascript:alert(1)
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "href=/static/logo.png",
+			Path:         "/attr/href",
+			RouteName:    "输出存在于HTML节点属性中，但是不再on属性中(HREF)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				// %27onmousemove=%27javascript:alert(1)
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -534,13 +617,20 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"value": request.URL.Query().Get("href"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"value": request.URL.Query().Get("href"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("href", "{.*}").Name("输出存在于HTML节点属性中，但是不再on属性中(HREF)")
-	xssGroup.HandleFunc("/attr/onclick2", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "code=2-1",
+			Path:         "/attr/onclick2",
+			RouteName:    "输出存在于HTML节点on...属性中的部分代码属性",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -576,13 +666,20 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"code": request.URL.Query().Get("code"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"code": request.URL.Query().Get("code"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("code", "{.*}").Name("输出存在于HTML节点on...属性中的部分代码属性")
-	xssGroup.HandleFunc("/attr/script", func(writer http.ResponseWriter, request *http.Request) {
-		unsafeTemplateRender(writer, request, `<!doctype html>
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "name=OrdinaryVisitor",
+			Path:         "/attr/script",
+			RouteName:    "script标签的某些属性中",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -618,25 +715,32 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": request.URL.Query().Get("name"),
-		})
-		writer.Header().Set("Content-Type", "text/html")
+					"name": request.URL.Query().Get("name"),
+				})
+				writer.Header().Set("Content-Type", "text/html")
 
-	}).Queries("name", "{.*}").Name("script标签的某些属性中")
-	xssGroup.HandleFunc("/cookie/name", func(writer http.ResponseWriter, request *http.Request) {
-		raw, _ := utils.HttpDumpWithBody(request, true)
-		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCname")
-		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
-			http.SetCookie(writer, &http.Cookie{
-				Name:  "xCname",
-				Value: "UserAdmin",
-			})
-			writer.Header().Set("Location", "/cookie/name?skip=1")
-			writer.WriteHeader(302)
-			return
-		}
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/cookie/name",
+			RouteName:    "Cookie 中的 XSS",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, _ := utils.HttpDumpWithBody(request, true)
+				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCname")
+				if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+					http.SetCookie(writer, &http.Cookie{
+						Name:  "xCname",
+						Value: "UserAdmin",
+					})
+					writer.Header().Set("Location", "/cookie/name?skip=1")
+					writer.WriteHeader(302)
+					return
+				}
 
-		unsafeTemplateRender(writer, request, `<!doctype html>
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -673,26 +777,33 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": xCname,
-		})
-		writer.Header().Set("Content-Type", "text/html")
-	}).Name("Cookie 中的 XSS")
-	xssGroup.HandleFunc("/cookie/b64/name", func(writer http.ResponseWriter, request *http.Request) {
-		raw, _ := utils.HttpDumpWithBody(request, true)
-		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
-		xCnameRaw, _ := codec.DecodeBase64(xCname)
-		xCname = string(xCnameRaw)
-		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
-			http.SetCookie(writer, &http.Cookie{
-				Name:  "xCnameB64",
-				Value: codec.EncodeBase64("OrdinaryUser"),
-			})
-			writer.Header().Set("Location", "/cookie/b64/name?skip=1")
-			writer.WriteHeader(302)
-			return
-		}
+					"name": xCname,
+				})
+				writer.Header().Set("Content-Type", "text/html")
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/cookie/b64/name",
+			RouteName:    "Cookie 中的 XSS（Base64）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, _ := utils.HttpDumpWithBody(request, true)
+				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
+				xCnameRaw, _ := codec.DecodeBase64(xCname)
+				xCname = string(xCnameRaw)
+				if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+					http.SetCookie(writer, &http.Cookie{
+						Name:  "xCnameB64",
+						Value: codec.EncodeBase64("OrdinaryUser"),
+					})
+					writer.Header().Set("Location", "/cookie/b64/name?skip=1")
+					writer.WriteHeader(302)
+					return
+				}
 
-		unsafeTemplateRender(writer, request, `<!doctype html>
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -729,29 +840,36 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": xCname,
-		})
-		writer.Header().Set("Content-Type", "text/html")
-	}).Queries("name", "{.*}").Name("Cookie 中的 XSS（Base64）")
-	xssGroup.HandleFunc("/cookie/b64/json/name", func(writer http.ResponseWriter, request *http.Request) {
-		raw, _ := utils.HttpDumpWithBody(request, true)
-		xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64J")
-		xCnameRaw, _ := codec.DecodeBase64(xCname)
-		xCname = string(xCnameRaw)
-		var MC = make(map[string]any)
-		_ = json.Unmarshal(xCnameRaw, &MC)
-		xCname = utils.MapGetString(MC, "name")
-		if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
-			http.SetCookie(writer, &http.Cookie{
-				Name:  "xCnameB64J",
-				Value: codec.EncodeBase64(utils.Jsonify(map[string]any{"name": "xCnameB64J-OrdinaryUser"})),
-			})
-			writer.Header().Set("Location", "/cookie/b64/json/name?skip=1")
-			writer.WriteHeader(302)
-			return
-		}
+					"name": xCname,
+				})
+				writer.Header().Set("Content-Type", "text/html")
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/cookie/b64/json/name",
+			RouteName:    "Cookie 中的 XSS（Base64-JSON）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, _ := utils.HttpDumpWithBody(request, true)
+				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64J")
+				xCnameRaw, _ := codec.DecodeBase64(xCname)
+				xCname = string(xCnameRaw)
+				var MC = make(map[string]any)
+				_ = json.Unmarshal(xCnameRaw, &MC)
+				xCname = utils.MapGetString(MC, "name")
+				if xCname == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
+					http.SetCookie(writer, &http.Cookie{
+						Name:  "xCnameB64J",
+						Value: codec.EncodeBase64(utils.Jsonify(map[string]any{"name": "xCnameB64J-OrdinaryUser"})),
+					})
+					writer.Header().Set("Location", "/cookie/b64/json/name?skip=1")
+					writer.WriteHeader(302)
+					return
+				}
 
-		unsafeTemplateRender(writer, request, `<!doctype html>
+				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
     <title>Example DEMO</title>
@@ -788,9 +906,17 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </div>
 </body>
 </html>`, map[string]any{
-			"name": xCname,
-		})
-		writer.Header().Set("Content-Type", "text/html")
-	}).Queries("name", "{.*}").Name("Cookie 中的 XSS（Base64-JSON）")
+					"name": xCname,
+				})
+				writer.Header().Set("Content-Type", "text/html")
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+	}
+
+	for _, v := range xssRoutes {
+		addRouteWithComment(xssGroup, v)
+	}
 
 }

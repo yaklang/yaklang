@@ -33,33 +33,49 @@ func (s *VulinServer) registerJSONP() {
 	// 创建一个路由分组 "/jsonp"
 	jsonpGroup := r.PathPrefix("/jsonp").Name("JSONP 通信与 iframe postMessage 通信案例").Subrouter()
 
-	jsonpGroup.HandleFunc("/center", func(writer http.ResponseWriter, request *http.Request) {
-		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
-			return
-		}
+	jsonpRoutes := []*VulnInfo{
+		{
+			DefaultQuery: "",
+			Path:         "/basic",
+			RouteName:    "JSONP 的最基础案例",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
+					return
+				}
+				writer.Write(vulJSONPHTML)
+			},
+			Detected:      true,
+			ExpectedValue: "1",
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/center",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
+					return
+				}
 
-		callbackName := request.URL.Query().Get("callback")
-		writer.Header().Set("Content-Type", "application/javascript")
-		switch callbackName {
-		case "exec_checkpoint":
-			writer.Write([]byte(`(function(){
+				callbackName := request.URL.Query().Get("callback")
+				writer.Header().Set("Content-Type", "application/javascript")
+				switch callbackName {
+				case "exec_checkpoint":
+					writer.Write([]byte(`(function(){
 	setTimeout(function(){
 		document.getElementById("abc").innerText = "This Message is FROM /jsonp/center~, checkpoint is set~"
 	}, 1500)
 	return "This Message is FROM /jsonp/center~, checkpoint is set~"
 })()`))
-		default:
-			writer.Write([]byte(`(function(){
+				default:
+					writer.Write([]byte(`(function(){
 	alert("NO CHECKING POINT")
 	return "no checkpoint cookie"
 })()`))
-		}
+				}
 
-	})
-	jsonpGroup.HandleFunc("/basic", func(writer http.ResponseWriter, request *http.Request) {
-		if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
-			return
-		}
-		writer.Write(vulJSONPHTML)
-	}).Name("JSONP 的最基础案例")
+			},
+		},
+	}
+	for _, v := range jsonpRoutes {
+		addRouteWithComment(jsonpGroup, v)
+	}
 }
