@@ -262,12 +262,14 @@ x.Foreach(scriptNames, func(name){
 	yakit.Info("Load Plugin Success: %s", name)
     return
 })
+onlyBrute = false
 if loadPluginFinished > 0 || loadPluginFailed > 0 {
     yakit.StatusCard(
         "加载插件", 
         f"${loadPluginFinished}/${loadPluginFailed+loadPluginFinished}", 
     )
 } else if enableBrute {
+	onlyBrute = true
 	yakit.StatusCard(
         "加载插件", 
         "弱口令检测", 
@@ -466,7 +468,9 @@ bruteScan = func(result){
 bruteWg = sync.NewSizedWaitGroup(4)
 
 handleServiceScanResult = func(result) {
-	manager.HandleServiceScanResult(result)
+	if !onlyBrute {
+		manager.HandleServiceScanResult(result)
+	}
 	if enableBrute {
 		bruteWg.Add()
 		go func {
