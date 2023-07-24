@@ -49,11 +49,11 @@ func (s *VulinServer) registerSQLinj() {
 
 	sqli := router.Name("SQL注入漏洞案例（复杂度递增）").Subrouter()
 
-	vroutes := []*VulnInfo{
+	vroutes := []*VulInfo{
 		{
 			DefaultQuery: "id=1",
 			Path:         "/user/by-id-safe",
-			RouteName:    "不存在SQL注入的情况（数字严格校验）",
+			Title:        "不存在SQL注入的情况（数字严格校验）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				i, err := strconv.ParseInt(a, 10, 64)
@@ -77,7 +77,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "id=1",
 			Path:         "/user/id",
-			RouteName:    "ID 为数字型的简单边界 SQL注入",
+			Title:        "ID 为数字型的简单边界 SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				u, err := s.database.GetUserByIdUnsafe(a)
@@ -95,7 +95,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "id=1",
 			Path:         "/user/id-json",
-			RouteName:    "参数是 JSON，JSON中字段存在SQL注入",
+			Title:        "参数是 JSON，JSON中字段存在SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				var jsonMap map[string]any
@@ -127,7 +127,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "id=1",
 			Path:         "/user/id-b64-json",
-			RouteName:    "GET参数是被编码的JSON，JSON中字段存在SQL注入",
+			Title:        "GET参数是被编码的JSON，JSON中字段存在SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				decodedB64, err := codec.DecodeBase64(a)
@@ -165,7 +165,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "id=1",
 			Path:         "/user/id-error",
-			RouteName:    "ID 为数字型的简单边界SQL报错检测",
+			Title:        "ID 为数字型的简单边界SQL报错检测",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				u, err := s.database.GetUserByIdUnsafe(a)
@@ -189,7 +189,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "",
 			Path:         "/user/cookie-id",
-			RouteName:    "Cookie-ID SQL注入",
+			Title:        "Cookie-ID SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				a, err := request.Cookie("ID")
 				if err != nil {
@@ -223,7 +223,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/user/name",
-			RouteName:    "字符串为注入点的 SQL注入",
+			Title:        "字符串为注入点的 SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("name")
 				u, err := s.database.GetUserByUsernameUnsafe(a)
@@ -241,7 +241,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/user/name/like",
-			RouteName:    "字符串注入点模糊查询",
+			Title:        "字符串注入点模糊查询",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var name = LoadFromGetParams(request, "name")
@@ -265,7 +265,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "name=admin",
 			Path:         "/user/name/like/2",
-			RouteName:    "字符串注入点模糊查询(括号边界)",
+			Title:        "字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var name = LoadFromGetParams(request, "name")
@@ -289,7 +289,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "nameb64=YQ==",
 			Path:         "/user/name/like/b64",
-			RouteName:    "参数编码字符串注入点模糊查询(括号边界)",
+			Title:        "参数编码字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var name = LoadFromGetBase64Params(request, "nameb64")
@@ -312,7 +312,7 @@ func (s *VulinServer) registerSQLinj() {
 		}, {
 			DefaultQuery: "data=eyJuYW1lYjY0aiI6ImEifQ==",
 			Path:         "/user/name/like/b64j",
-			RouteName:    "Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)",
+			Title:        "Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var name = LoadFromGetBase64JSONParam(request, "data", "nameb64j")
@@ -336,7 +336,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "limit=1",
 			Path:         "/user/limit/int",
-			RouteName:    "LIMIT（语句结尾）注入案例",
+			Title:        "LIMIT（语句结尾）注入案例",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var limit = LoadFromGetParams(request, "limit")
@@ -360,7 +360,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "order=desc",
 			Path:         "/user/limit/4/order1",
-			RouteName:    "ORDER注入：单个条件排序位于 LIMIT 之前",
+			Title:        "ORDER注入：单个条件排序位于 LIMIT 之前",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
@@ -384,7 +384,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "order=desc",
 			Path:         "/user/limit/4/order2",
-			RouteName:    "ORDER注入：多条件排序位于 LIMIT 之前",
+			Title:        "ORDER注入：多条件排序位于 LIMIT 之前",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
@@ -408,7 +408,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "order=desc",
 			Path:         "/user/order3",
-			RouteName:    "注入：多条件排序位（无LIMIT）",
+			Title:        "注入：多条件排序位（无LIMIT）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
@@ -432,7 +432,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "orderby=username",
 			Path:         "/user/limit/4/orderby",
-			RouteName:    "ORDERBY 注入：多字段",
+			Title:        "ORDERBY 注入：多字段",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
@@ -456,7 +456,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "orderby=id",
 			Path:         "/user/limit/4/orderby1",
-			RouteName:    "ORDER BY注入：反引号+排序",
+			Title:        "ORDER BY注入：反引号+排序",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
@@ -480,7 +480,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "orderby=id",
 			Path:         "/user/limit/4/orderby2",
-			RouteName:    "ORDER BY 注入：反引号+多字段",
+			Title:        "ORDER BY 注入：反引号+多字段",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
@@ -503,7 +503,7 @@ func (s *VulinServer) registerSQLinj() {
 		},
 	}
 	for _, v := range vroutes {
-		addRouteWithComment(sqli, v)
+		addRouteWithVulInfo(sqli, v)
 	}
 
 }

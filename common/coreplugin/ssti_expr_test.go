@@ -13,7 +13,7 @@ func TestGRPCMUSTPASS_SSTI(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
+	_, vulAddr, err := vulinbox.NewVulinServer(context.Background())
 	if err != nil {
 		panic(err)
 	}

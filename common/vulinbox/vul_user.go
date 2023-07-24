@@ -24,11 +24,11 @@ var profilePage []byte
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
 	logicGroup := router.PathPrefix("/logic").Name("逻辑场景").Subrouter()
-	logicRoutes := []*VulnInfo{
+	logicRoutes := []*VulInfo{
 		{
 			DefaultQuery: "",
 			Path:         "/user/login",
-			RouteName:    "Web 后台",
+			Title:        "Web 后台",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == http.MethodGet {
 					// 返回登录页面
@@ -310,6 +310,6 @@ func (s *VulinServer) registerUserRoute() {
 	}
 
 	for _, v := range logicRoutes {
-		addRouteWithComment(logicGroup, v)
+		addRouteWithVulInfo(logicGroup, v)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"text/template"
@@ -25,14 +26,14 @@ var autoRouteHtml []byte
 type GroupedRoutes struct {
 	GroupName string
 	SafeStyle string
-	VulnInfos []*VulnInfo
+	VulInfos  []*VulInfo
 }
 
-type VulnInfo struct {
+type VulInfo struct {
 	Handler       func(http.ResponseWriter, *http.Request) `json:"-"`
 	Path          string
 	DefaultQuery  string
-	RouteName     string // 名称
+	Title         string // 名称
 	Detected      bool   // 是否能检出
 	ExpectedValue string // 期望值
 	UnSafe        bool
@@ -152,7 +153,7 @@ func (s *VulinServer) genRoute() {
 	var routesData []*GroupedRoutes
 	var err error
 	once.Do(func() {
-		groups := make(map[string][]*VulnInfo)
+		groups := make(map[string][]*VulInfo)
 		err = s.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 			// 分组名
 			var groupName string
@@ -164,14 +165,14 @@ func (s *VulinServer) genRoute() {
 			if groupName != "" {
 				info := route.GetName()
 
-				var vulnInfo *VulnInfo
+				var vulnInfo *VulInfo
 				err = json.Unmarshal([]byte(info), &vulnInfo)
 				if err != nil {
-					log.Errorf("unmarshal route info failed: %v", err)
+					log.Warnf("unmarshal route info failed: %v", err)
 					return nil
 				}
 				// 一个组中不是所有的路由都有名称，只有需要在前端展示的路由才有名称
-				if vulnInfo.RouteName != "" {
+				if vulnInfo.Title != "" {
 					realRoutePath, err := route.GetPathTemplate()
 					if err != nil {
 						log.Errorf("get route name failed: %v", err)
@@ -181,8 +182,17 @@ func (s *VulinServer) genRoute() {
 						vulnInfo.Path = realRoutePath
 					}
 					if vulnInfo.DefaultQuery != "" {
-						query := "?" + vulnInfo.DefaultQuery
-						vulnInfo.DefaultQuery = query
+						params, err := url.ParseQuery(vulnInfo.DefaultQuery)
+						if err != nil {
+							// handle error
+						}
+
+						for key, values := range params {
+							for i, value := range values {
+								params[key][i] = url.QueryEscape(value)
+							}
+						}
+						vulnInfo.DefaultQuery = "?" + params.Encode()
 					}
 					if vulnInfo.UnSafe {
 						groupName += " (Unsafe Mode)"
@@ -204,7 +214,7 @@ func (s *VulinServer) genRoute() {
 			}
 			routesData = append(routesData, &GroupedRoutes{
 				GroupName: groupName,
-				VulnInfos: routes,
+				VulInfos:  routes,
 				SafeStyle: id,
 			})
 		}
@@ -228,12 +238,21 @@ func (s *VulinServer) registerVulRouter() {
 
 }
 
-func addRouteWithComment(router *mux.Router, info *VulnInfo) {
+func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 	infoStr, err := json.Marshal(info)
 	if err != nil {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
-	//routeComments[info.Path] = info.Comment
+}
+
+func (s *VulinServer) GetGroupVulInfo(group string) []*VulInfo {
+	//	遍历 s.groupedRoutesCache 获取 s.groupedRoutesCache 中的指定的 []*vulInfo
+	for _, groupInfo := range s.groupedRoutesCache {
+		if groupInfo.GroupName == group {
+			return groupInfo.VulInfos
+		}
+	}
+	return nil
 }

@@ -56,10 +56,10 @@ func (s *VulinServer) registerWebsocket() {
 		}
 	}
 
-	wsRoutes := []*VulnInfo{
+	wsRoutes := []*VulInfo{
 		{
-			Path:      "/websocket/",
-			RouteName: "Websocket基础案例",
+			Path:  "/websocket/",
+			Title: "Websocket基础案例",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				writer.Header().Set("Content-Type", "text/html")
 				writer.Write(wsIndexHtml)
@@ -84,6 +84,6 @@ func (s *VulinServer) registerWebsocket() {
 		},
 	}
 	for _, v := range wsRoutes {
-		addRouteWithComment(wsGroup, v)
+		addRouteWithVulInfo(wsGroup, v)
 	}
 }

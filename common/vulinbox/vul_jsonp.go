@@ -33,11 +33,11 @@ func (s *VulinServer) registerJSONP() {
 	// 创建一个路由分组 "/jsonp"
 	jsonpGroup := r.PathPrefix("/jsonp").Name("JSONP 通信与 iframe postMessage 通信案例").Subrouter()
 
-	jsonpRoutes := []*VulnInfo{
+	jsonpRoutes := []*VulInfo{
 		{
 			DefaultQuery: "",
 			Path:         "/basic",
-			RouteName:    "JSONP 的最基础案例",
+			Title:        "JSONP 的最基础案例",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if !ForceEnsureCookie(writer, request, "checkpoint", "1") {
 					return
@@ -76,6 +76,6 @@ func (s *VulinServer) registerJSONP() {
 		},
 	}
 	for _, v := range jsonpRoutes {
-		addRouteWithComment(jsonpGroup, v)
+		addRouteWithVulInfo(jsonpGroup, v)
 	}
 }
