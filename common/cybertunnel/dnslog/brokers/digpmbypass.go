@@ -34,7 +34,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 domain=ipv6.bypass.eu.org.&token=ab`
 
 	rsp, err := lowhttp.HTTP(
-		lowhttp.WithPacket(lowhttp.ReplaceHTTPPacketPostParam([]byte(packet), "token", token)),
+		lowhttp.WithRequest(lowhttp.ReplaceHTTPPacketPostParam([]byte(packet), "token", token)),
 		lowhttp.WithHttps(true),
 		lowhttp.WithTimeout(du),
 		lowhttp.WithProxy(proxy...),
@@ -107,14 +107,16 @@ domain=ipv6.bypass.eu.org.`
 	/*
 
 	 */
-	rsp, _, err := lowhttp.SendHTTPRequestWithRawPacketEx(
-		true, "", 0, []byte(packet), du,
-		false, false,
-		proxy...,
+	rspIns, err := lowhttp.HTTP(
+		lowhttp.WithHttps(true),
+		lowhttp.WithRequest(packet),
+		lowhttp.WithTimeout(du),
+		lowhttp.WithProxy(proxy...),
 	)
 	if err != nil {
 		return "", "", utils.Errorf("send dig.pm packet failed: %v", err)
 	}
+	rsp := rspIns.RawPacket
 	_, body := lowhttp.SplitHTTPPacketFast(rsp)
 	var results = utils.ParseStringToGeneralMap(body)
 	token := utils.MapGetString(results, "token")

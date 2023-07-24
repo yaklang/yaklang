@@ -35,7 +35,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 `)
 	packet = lowhttp.ReplaceHTTPPacketQueryParam(packet, "t", `0.`+r)
 	rsp, err := lowhttp.HTTP(
-		lowhttp.WithPacket(packet),
+		lowhttp.WithRequest(packet),
 		lowhttp.WithTimeout(timeout),
 		lowhttp.WithProxy(proxy...),
 		lowhttp.WithDNSServers([]string{"1.1.1.1", "223.5.5.5"}),
@@ -75,7 +75,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	packet = lowhttp.ReplaceHTTPPacketQueryParam(packet, "t", `0.`+r)
 	packet = lowhttp.ReplaceHTTPPacketCookie(packet, "PHPSESSID", token)
 	rspIns, err := lowhttp.HTTP(
-		lowhttp.WithPacket(packet),
+		lowhttp.WithRequest(packet),
 		lowhttp.WithTimeout(timeout),
 		lowhttp.WithProxy(proxy...),
 		lowhttp.WithDNSServers([]string{"1.1.1.1", "223.5.5.5"}),
