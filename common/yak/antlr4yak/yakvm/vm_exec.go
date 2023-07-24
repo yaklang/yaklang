@@ -1866,12 +1866,20 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if callerTypeKind == reflect.Ptr {
 					callerReflectValue = callerReflectValue.Elem()
 				}
+
+				// 更新memberName
+				firstChar := memberName[0]
+				if firstChar >= 'a' && firstChar <= 'z' {
+					memberName = strings.ToUpper(string(firstChar)) + memberName[1:]
+				}
+
 				//获取结构体字段
 				member := callerReflectValue.FieldByName(memberName)
 				if !member.IsValid() {
 					panicByNoSuchKey(memberName, caller.Value)
 					return
 				}
+				// 这里可能拿到结构体指针的方法
 				if member.CanInterface() {
 					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
 					value := NewValue(member.Type().String(), member.Interface(), literal)
