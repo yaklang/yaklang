@@ -25,7 +25,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	var vulinboxPort = utils.GetRandomAvailableTCPPort()
 	var vulinboxAddr = utils.HostPort("127.0.0.1", vulinboxPort)
 	go func() {
-		v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
+		_, v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
 		if err != nil {
 			t.Fatalf("start vulinbox server failed: %s", err)
 		}
@@ -192,7 +192,7 @@ func TestDEBUG_MITM(t *testing.T) {
 	var vulinboxPort = utils.GetRandomAvailableTCPPort()
 	var vulinboxAddr = utils.HostPort("127.0.0.1", vulinboxPort)
 	go func() {
-		v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
+		_, v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
 		if err != nil {
 			t.Fatalf("start vulinbox server failed: %s", err)
 		}

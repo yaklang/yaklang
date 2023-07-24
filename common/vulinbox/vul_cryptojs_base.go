@@ -109,10 +109,10 @@ func (s *VulinServer) registerCryptoJS() {
 		return handler
 	})
 	cryptoGroup := r.Name("高级场景前端加密").Subrouter()
-	cryptoRoutes := []*VulnInfo{
+	cryptoRoutes := []*VulInfo{
 		{
-			Path:      "/crypto/js/basic",
-			RouteName: "AES-ECB 加密表单（附密码）",
+			Path:  "/crypto/js/basic",
+			Title: "AES-ECB 加密表单（附密码）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
 
@@ -190,8 +190,8 @@ func (s *VulinServer) registerCryptoJS() {
 			ExpectedValue: "1",
 		},
 		{
-			Path:      "/crypto/js/rsa",
-			RouteName: "RSA：加密表单，附密钥",
+			Path:  "/crypto/js/rsa",
+			Title: "RSA：加密表单，附密钥",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
 
@@ -274,8 +274,8 @@ func (s *VulinServer) registerCryptoJS() {
 			ExpectedValue: "1",
 		},
 		{
-			Path:      "/crypto/js/rsa/fromserver",
-			RouteName: "RSA：加密表单服务器传输密钥",
+			Path:  "/crypto/js/rsa/fromserver",
+			Title: "RSA：加密表单服务器传输密钥",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
 
@@ -358,8 +358,8 @@ func (s *VulinServer) registerCryptoJS() {
 			ExpectedValue: "1",
 		},
 		{
-			Path:      "/crypto/js/rsa/fromserver/response",
-			RouteName: "RSA：加密表单服务器传输密钥+响应加密",
+			Path:  "/crypto/js/rsa/fromserver/response",
+			Title: "RSA：加密表单服务器传输密钥+响应加密",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
 
@@ -462,8 +462,8 @@ func (s *VulinServer) registerCryptoJS() {
 			ExpectedValue: "1",
 		},
 		{
-			Path:      "/crypto/js/rsa/fromserver/response/aes-gcm",
-			RouteName: "前端RSA加密AES密钥，服务器传输",
+			Path:  "/crypto/js/rsa/fromserver/response/aes-gcm",
+			Title: "前端RSA加密AES密钥，服务器传输",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
 
@@ -614,7 +614,7 @@ func (s *VulinServer) registerCryptoJS() {
 	}
 
 	for _, v := range cryptoRoutes {
-		addRouteWithComment(cryptoGroup, v)
+		addRouteWithVulInfo(cryptoGroup, v)
 	}
 
 }

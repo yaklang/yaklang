@@ -15,11 +15,11 @@ import (
 func (s *VulinServer) registerSSRF() {
 
 	ssrfGroup := s.router.PathPrefix("/ssrf").Name("SSRF 参数多种情况的测试").Subrouter()
-	ssrfRoutes := []*VulnInfo{
+	ssrfRoutes := []*VulInfo{
 		{
 			DefaultQuery: "json={\"abc\": 123, \"ref\": \"http://www.baidu.com\"}",
 			Path:         "/json-in-get",
-			RouteName:    "SSRF JSON Body SSRF",
+			Title:        "SSRF JSON Body SSRF",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw := request.URL.Query().Get("json")
 				if raw == "" {
@@ -60,7 +60,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "url=http://www.baidu.com/",
 			Path:         "/in-get",
-			RouteName:    "SSRF GET 中 URL 参数",
+			Title:        "SSRF GET 中 URL 参数",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				ref := request.URL.Query().Get("url")
 				var u = fmt.Sprint(ref)
@@ -84,7 +84,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "",
 			Path:         "/in-post",
-			RouteName:    "SSRF POST 中 URL 参数",
+			Title:        "SSRF POST 中 URL 参数",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					writer.Header().Set("Content-Type", "text/html; charset=utf8")
@@ -150,7 +150,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "",
 			Path:         "/in-post-multipart",
-			RouteName:    "SSRF POST 中 URL 参数(Multipart)",
+			Title:        "SSRF POST 中 URL 参数(Multipart)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					writer.Header().Set("Content-Type", "text/html; charset=utf8")
@@ -192,7 +192,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "",
 			Path:         "/in-json-body",
-			RouteName:    "SSRF JSON Body SSRF",
+			Title:        "SSRF JSON Body SSRF",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 
 				return
@@ -203,7 +203,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "",
 			Path:         "/json-in-post-param",
-			RouteName:    "SSRF POST参数是JSON（包含URL）的情况",
+			Title:        "SSRF POST参数是JSON（包含URL）的情况",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 
 				return
@@ -300,6 +300,6 @@ window.location.assign(`+strconv.Quote(u)+`);
 	}).Name("SSRF POST 中 URL 参数(Multipart)")
 
 	for _, v := range ssrfRoutes {
-		addRouteWithComment(ssrfGroup, v)
+		addRouteWithVulInfo(ssrfGroup, v)
 	}
 }
