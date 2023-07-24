@@ -3,10 +3,11 @@ package yakvm
 import (
 	"bufio"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"strings"
 
 	"github.com/kataras/pio"
 )
@@ -76,7 +77,7 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 	for nowLine := 1; scanner.Scan() && nowLine <= code.EndLineNumber; nowLine++ {
 		text := scanner.Text()
 		runeText := []rune(text)
-		lenOfText := len(text)
+		lenOfText := len(runeText)
 
 		if nowLine == code.StartLineNumber {
 			flag = 1 // 后面的行全红
@@ -87,7 +88,7 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 				// 右闭区间
 				code.EndColumnNumber++
 			}
-			codeReview += text[:code.StartColumnNumber]
+			codeReview += string(runeText[:code.StartColumnNumber])
 			if code.EndLineNumber == code.StartLineNumber {
 				codeReview += pio.Red(string(runeText[code.StartColumnNumber:code.EndColumnNumber])) + string(runeText[code.EndColumnNumber:]) + "\n"
 				break
