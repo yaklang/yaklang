@@ -34,12 +34,17 @@ func IsTLSService(addr string, proxies ...string) bool {
 	if err == nil {
 		defer conn.Close()
 		host, _, _ := ParseStringToHostPort(addr)
+		loopBack := IsLoopback(host)
 		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionSSL30, ServerName: host})
 		if err = tlsConn.HandshakeContext(ctx); err != nil {
-			isTlsCached.SetWithTTL(addr, false, 30*time.Second)
+			if !loopBack {
+				isTlsCached.SetWithTTL(addr, false, 30*time.Second)
+			}
 			return false
 		}
-		isTlsCached.SetWithTTL(addr, true, 30*time.Second)
+		if !loopBack {
+			isTlsCached.SetWithTTL(addr, true, 30*time.Second)
+		}
 		return true
 	}
 	return false
