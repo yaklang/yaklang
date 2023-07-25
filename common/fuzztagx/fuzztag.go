@@ -6,45 +6,74 @@ import (
 	"strings"
 )
 
+type NodeAttr struct {
+	index int
+	isDyn bool
+	isRep bool
+}
 type Node interface {
 	Strings() []string
-	GenerateOne(n int) (string, error)
+	GenerateOne() (string, bool)
 }
 
 // String
-type StringNode string
+type StringNode struct {
+	*NodeAttr
+	index int
+	data  string
+}
 
 func NewStringNode(s string) *StringNode {
-	n := StringNode(s)
-	return &n
+	return &StringNode{
+		NodeAttr: &NodeAttr{
+			isDyn: false,
+			isRep: true,
+		},
+		data: s,
+	}
 }
 func (s *StringNode) Strings() []string {
-	return []string{string(*s)}
+	return []string{s.data}
 }
-func (s *StringNode) GenerateOne(n int) (string, error) {
-	if n > 0 {
-		return "", nil
+func (s *StringNode) GenerateOne() (string, bool) {
+	ok := true
+	if s.index > 0 {
+		ok = false
+	} else {
+		s.index++
 	}
-	return string(*s), nil
+	return s.data, ok
 }
 
-// String
-type ExpressionNode string
+// Expression
+type ExpressionNode struct {
+	*NodeAttr
+	data string
+}
 
 func NewExpressionNode(s string) *ExpressionNode {
-	n := ExpressionNode(s)
-	return &n
+	return &ExpressionNode{
+		NodeAttr: &NodeAttr{
+			isDyn: false,
+			isRep: false,
+		},
+		data: s,
+	}
 }
 func (s *ExpressionNode) Strings() []string {
-	return []string{string(*s)}
+	return []string{s.data}
 }
-func (f *ExpressionNode) GenerateOne(n int) (string, error) {
-	box := httptpl.NewNucleiDSLYakSandbox()
-	res, err := box.Execute(string(*f))
-	if err != nil {
-		return "", nil
+func (f *ExpressionNode) GenerateOne() (string, bool) {
+	if f.index > 0 {
+		return "", false
 	} else {
-		return utils.InterfaceToString(res), nil
+		box := httptpl.NewNucleiDSLYakSandbox()
+		res, err := box.Execute(f.data)
+		if err != nil {
+			return "", true
+		} else {
+			return utils.InterfaceToString(res), true
+		}
 	}
 }
 
@@ -57,10 +86,10 @@ type Tag struct {
 func (f *Tag) Strings() []string {
 	return nil
 }
-func (f *Tag) GenerateOne(n int) (string, error) {
+func (f *Tag) GenerateOne() (string, bool) {
 	res := ""
 	for _, node := range f.Nodes {
-		d, err := node.GenerateOne(n)
+		d, err := node.GenerateOne()
 		if err == nil {
 			res += d
 		}
@@ -70,10 +99,15 @@ func (f *Tag) GenerateOne(n int) (string, error) {
 
 // FuzzTagMethod
 type FuzzTagMethod struct {
-	catch  *[]string
-	name   string
-	labels map[string]struct{}
-	params []Node
+	cache     *[]string
+	name      string
+	label     string
+	isDyn     bool
+	isRep     bool
+	params    []Node
+	funTable  map[string]func(string2 string) []string
+	generator *Generator
+	index     int
 }
 
 func (f *FuzzTagMethod) Strings() []string {
@@ -81,36 +115,84 @@ func (f *FuzzTagMethod) Strings() []string {
 }
 func (f *FuzzTagMethod) ParseLabel() {
 	labels := strings.Split(f.name, "::")
-	f.name = labels[0]
+	splits := strings.Split(labels[0], "-")
+	f.name = splits[0]
+	for _, s := range splits[1:] {
+		switch s {
+		case "dyn":
+			f.isDyn = true
+		case "rep":
+			f.isRep = true
+		}
+	}
 	for _, label := range labels[1:] {
-		f.labels[label] = struct{}{}
+		f.label = label
 	}
 }
 
-func (f *FuzzTagMethod) GenerateOne(n int) (string, error) {
-	res := ""
-	for _, param := range f.params {
-		if d, err := param.GenerateOne(n); err == nil {
-			res += d
-		}
+func (f *FuzzTagMethod) GenerateOne() (string, bool) {
+	if f.generator == nil {
+		f.generator = NewGenerator(f.params)
 	}
 
-	_, isDyn := f.labels["dynamic"]
-	_, isRepeat := f.labels["repeat"]
-	if f.catch == nil || isDyn {
-		if v, ok := BuildInTag[f.name]; ok {
-			res := v(res)
-			f.catch = &res
+	s, ok := f.GenerateOne()
+	if !ok {
+		return "", false
+	}
+
+	if f.cache == nil {
+		fun, ok := f.funTable[f.name]
+		if !ok {
+			return "", true
+		}
+		result := fun(s)
+		f.cache = &result
+	}
+
+	if f.index > len(*f.cache) {
+		if !f.isRep {
+			return "", false
 		} else {
-			return "", nil
+			return utils.GetLastElement(*f.cache), true
 		}
 	}
-	if n < len(*f.catch) {
-		return (*f.catch)[n], nil
+	f.index++
+	return (*f.cache)[f.index], true
+
+}
+
+type Generator struct {
+	container []string
+	index     int
+	data      []Node
+}
+
+func NewGenerator(nodes []Node) *Generator {
+	g := &Generator{data: nodes, container: make([]string, len(nodes))}
+	for index, d := range g.data {
+		s, _ := d.GenerateOne()
+		g.container[index] = s
+	}
+	return g
+}
+func (g *Generator) Generate() (string, bool) {
+	if g.index == 0 {
+		return strings.Join(g.container, ""), true
 	} else {
-		if isRepeat {
-			return utils.GetLastElement(*f.catch), nil
+		isOk := false
+		for {
+			if len(g.data) == g.index {
+				break
+			}
+			s, ok := g.data[g.index].GenerateOne()
+			if !ok {
+				g.index++
+			} else {
+				g.container[g.index] = s
+				isOk = true
+				break
+			}
 		}
-		return "", utils.Error("index out bound")
+		return strings.Join(g.container, ""), isOk
 	}
 }

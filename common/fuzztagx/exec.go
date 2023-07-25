@@ -10,22 +10,18 @@ func ExecuteWithStringHandler(source string, param map[string]func(string) []str
 			for _, node := range v.Nodes {
 				node1 := node.(*FuzzTagMethod)
 				node1.ParseLabel()
+				node1.funTable = param
 			}
 		}
 	}
-	for i := 0; ; i++ {
-		oneRes := ""
-		ok := false
-		for _, node := range res {
-			d, err := node.GenerateOne(i)
-			if err == nil {
-				ok = true
-			}
-			oneRes += d
-		}
-		if !ok && i > 10*10000 {
+	generator := NewGenerator(res)
+	result := []string{}
+	for {
+		s, ok := generator.Generate()
+		if !ok {
 			break
 		}
+		result = append(result, s)
 	}
-	return nil, nil
+	return result, nil
 }
