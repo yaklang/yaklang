@@ -115,7 +115,7 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				}
 				var obj interface{}
 				if err := json.Unmarshal([]byte(material), &obj); err != nil {
-					log.Errorf("parse json failed: %s", err)
+					log.Debugf("parse json failed: %s", err)
 					continue
 				}
 				iter := query.Run(obj)
