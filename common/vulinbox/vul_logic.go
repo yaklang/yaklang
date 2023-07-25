@@ -101,8 +101,7 @@ func (s *VulinServer) registerUserRoute() {
 				writer.WriteHeader(http.StatusOK)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",

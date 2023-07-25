@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	_ "embed"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,7 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
+
+//go:embed grpc_vulinbox_script.yak
+var genQualityInspectionReport []byte
 
 func (s *Server) StartVulinbox(req *ypb.StartVulinboxRequest, stream ypb.Yak_StartVulinboxServer) error {
 	p := consts.GetVulinboxPath()
@@ -93,5 +98,18 @@ func (s *Server) InstallVulinbox(req *ypb.InstallVulinboxRequest, stream ypb.Yak
 }
 
 func (s *Server) GenQualityInspectionReport(req *ypb.GenQualityInspectionReportRequest, stream ypb.Yak_GenQualityInspectionReportServer) error {
-	return nil
+	reqParams := &ypb.ExecRequest{
+		Script: string(genQualityInspectionReport),
+	}
+
+	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		Key:   "script-name",
+		Value: strings.Join(req.GetScriptNames(), ","),
+	})
+
+	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		Key:   "task-name",
+		Value: req.GetTaskName(),
+	})
+	return s.Exec(reqParams, stream)
 }

@@ -99,8 +99,7 @@ func (s *VulinServer) registerLoginRoute() {
 				writer.WriteHeader(405)
 				writer.Write([]byte("method not allowed"))
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -158,8 +157,7 @@ func (s *VulinServer) registerLoginRoute() {
 				writer.Write([]byte("invalid auth token"))
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 	}
 	for _, v := range jwtRoutes {

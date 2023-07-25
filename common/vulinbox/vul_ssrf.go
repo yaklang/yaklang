@@ -54,8 +54,7 @@ func (s *VulinServer) registerSSRF() {
 				}
 				writer.Write(rawResponse)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "url=http://www.baidu.com/",
@@ -78,8 +77,7 @@ func (s *VulinServer) registerSSRF() {
 				}
 				writer.Write(rawResponse)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -144,8 +142,7 @@ func (s *VulinServer) registerSSRF() {
 				}
 				writer.Write(rawResponse)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -186,8 +183,7 @@ func (s *VulinServer) registerSSRF() {
 					return
 				}
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -197,8 +193,7 @@ func (s *VulinServer) registerSSRF() {
 
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -208,8 +203,7 @@ func (s *VulinServer) registerSSRF() {
 
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 	}
 

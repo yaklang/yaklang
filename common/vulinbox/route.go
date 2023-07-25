@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,13 +31,16 @@ type GroupedRoutes struct {
 }
 
 type VulInfo struct {
-	Handler       func(http.ResponseWriter, *http.Request) `json:"-"`
-	Path          string
-	DefaultQuery  string
-	Title         string // 名称
-	Detected      bool   // 是否能检出
-	ExpectedValue string // 期望值
-	UnSafe        bool
+	Handler      func(http.ResponseWriter, *http.Request) `json:"-"`
+	Path         string
+	DefaultQuery string
+	// 名称
+	Title string
+	// 是否期望检出 Risk
+	RiskDetected bool
+	Headers      []*ypb.KVPair
+	// 具体期望结果
+	ExpectedResult map[string]int
 }
 
 func (s *VulinServer) init() {
@@ -185,18 +189,18 @@ func (s *VulinServer) genRoute() {
 						params, err := url.ParseQuery(vulnInfo.DefaultQuery)
 						if err != nil {
 							// handle error
+							log.Errorf("parse query failed: %v", err)
+							return nil
 						}
 
 						for key, values := range params {
 							for i, value := range values {
-								params[key][i] = url.QueryEscape(value)
+								params[key][i] = value
 							}
 						}
 						vulnInfo.DefaultQuery = "?" + params.Encode()
 					}
-					if vulnInfo.UnSafe {
-						groupName += " (Unsafe Mode)"
-					}
+
 					groups[groupName] = append(groups[groupName], vulnInfo)
 				}
 			}
@@ -229,12 +233,28 @@ func (s *VulinServer) genRoute() {
 func (s *VulinServer) registerVulRouter() {
 	s.router.HandleFunc("/vul/route", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(writer).Encode(s.groupedRoutesCache)
-		if err != nil {
-			http.Error(writer, fmt.Sprintf("Error encoding groupedRoutesCache: %v", err), http.StatusInternalServerError)
+		group := request.URL.Query().Get("group")
+
+		var results []*GroupedRoutes
+
+		if group == "" {
+			// 没有 group 参数时获取全部的 s.groupedRoutesCache
+			results = s.groupedRoutesCache
+		} else {
+			// 当 group 参数存在时, 获取 GroupedRoutes 对应 GroupName 的 VulInfos
+			for _, groupedRoute := range s.groupedRoutesCache {
+				if strings.Contains(strings.ToLower(groupedRoute.GroupName), group) {
+					results = append(results, groupedRoute)
+				}
+			}
 		}
 
-	})
+		err := json.NewEncoder(writer).Encode(results)
+		if err != nil {
+			http.Error(writer, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		}
+
+	}).Methods(http.MethodGet)
 
 }
 
@@ -247,7 +267,7 @@ func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 }
 
-func (s *VulinServer) GetGroupVulInfo(group string) []*VulInfo {
+func (s *VulinServer) GetGroupVulInfos(group string) []*VulInfo {
 	//	遍历 s.groupedRoutesCache 获取 s.groupedRoutesCache 中的指定的 []*vulInfo
 	for _, groupInfo := range s.groupedRoutesCache {
 		if groupInfo.GroupName == group {

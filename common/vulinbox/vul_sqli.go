@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,8 +72,8 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, []*VulinUser{u})
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   false,
+			ExpectedResult: map[string]int{"参数:id未检测到闭合边界": 1},
 		},
 		{
 			DefaultQuery: "id=1",
@@ -89,13 +90,13 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, []*VulinUser{u})
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字型[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 原值:1]": 1},
 		},
 		{
-			DefaultQuery: "id=1",
+			DefaultQuery: `id={"uid":1,"id":"1"}`,
 			Path:         "/user/id-json",
-			Title:        "参数是 JSON，JSON中字段存在SQL注入",
+			Title:        "参数是 JSON,JSON中字段存在SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var a = request.URL.Query().Get("id")
 				var jsonMap map[string]any
@@ -121,11 +122,11 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, []*VulinUser{u})
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字型[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 原值:1]": 1},
 		},
 		{
-			DefaultQuery: "id=1",
+			DefaultQuery: "id=eyJ1aWQiOjEsImlkIjoiMSJ9",
 			Path:         "/user/id-b64-json",
 			Title:        "GET参数是被编码的JSON，JSON中字段存在SQL注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
@@ -159,8 +160,8 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, []*VulinUser{u})
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字型[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 原值:1]": 1},
 		},
 		{
 			DefaultQuery: "id=1",
@@ -183,13 +184,19 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, []*VulinUser{u})
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 值:[1]]": 1},
 		},
 		{
 			DefaultQuery: "",
 			Path:         "/user/cookie-id",
 			Title:        "Cookie-ID SQL注入",
+			Headers: []*ypb.KVPair{
+				{
+					Key:   "Cookie",
+					Value: "ID=1",
+				},
+			},
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				a, err := request.Cookie("ID")
 				if err != nil {
@@ -217,8 +224,8 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriter(writer, request, []*VulinUser{u})
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字[ID] 双引号闭合】": 1, "存在基于UNION SQL 注入: [参数名:ID 值:[1]]": 1},
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -235,11 +242,11 @@ func (s *VulinServer) registerSQLinj() {
 				sqliWriter(writer, request, u)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] 单引号闭合】": 1, "存在基于UNION SQL 注入: [参数名:name 原值:admin]": 1},
 		},
 		{
-			DefaultQuery: "name=admin",
+			DefaultQuery: "name=a",
 			Path:         "/user/name/like",
 			Title:        "字符串注入点模糊查询",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
@@ -259,11 +266,11 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, msg)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 1, "存在基于UNION SQL 注入: [参数名:name 值:[a]]": 1},
 		},
 		{
-			DefaultQuery: "name=admin",
+			DefaultQuery: "name=a",
 			Path:         "/user/name/like/2",
 			Title:        "字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
@@ -283,8 +290,8 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 1},
 		},
 		{
 			DefaultQuery: "nameb64=YQ==",
@@ -307,9 +314,9 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
-		}, {
+			RiskDetected: true,
+		},
+		{
 			DefaultQuery: "data=eyJuYW1lYjY0aiI6ImEifQ==",
 			Path:         "/user/name/like/b64j",
 			Title:        "Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)",
@@ -330,8 +337,8 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[data] like注入( %' )】": 1},
 		},
 		{
 			DefaultQuery: "limit=1",
@@ -354,8 +361,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "order=desc",
@@ -378,8 +384,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "order=desc",
@@ -402,8 +407,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "order=desc",
@@ -426,8 +430,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "orderby=username",
@@ -450,8 +453,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "orderby=id",
@@ -474,8 +476,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "orderby=id",
@@ -498,8 +499,7 @@ func (s *VulinServer) registerSQLinj() {
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 	}
 	for _, v := range vroutes {

@@ -64,8 +64,7 @@ func (s *VulinServer) registerWebsocket() {
 				writer.Header().Set("Content-Type", "text/html")
 				writer.Write(wsIndexHtml)
 			},
-			Detected:      true,
-			ExpectedValue: "",
+			RiskDetected: true,
 		},
 		{
 			Path: "/websocket/jquery.min.js",

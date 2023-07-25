@@ -65,8 +65,7 @@ Hello %v
 				writer.WriteHeader(200)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -113,8 +112,7 @@ Hello %v
 				writer.WriteHeader(200)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -133,8 +131,7 @@ Hello %v
 				writer.WriteHeader(200)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -180,8 +177,7 @@ Hello %v
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -229,8 +225,7 @@ console.info("Hello" + `+"`${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=admin",
@@ -278,8 +273,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -322,8 +316,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 </body>
 </html>`, request.URL.Query().Get("name"))))
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "code=2-1",
@@ -371,8 +364,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "value=visitor-name",
@@ -421,8 +413,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "json={\"value\":\"value=visitor-name\"}",
@@ -471,8 +462,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9",
@@ -521,8 +511,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "src=/static/logo.png",
@@ -571,8 +560,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "href=/static/logo.png",
@@ -622,8 +610,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "code=2-1",
@@ -671,8 +658,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "name=OrdinaryVisitor",
@@ -720,8 +706,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				writer.Header().Set("Content-Type", "text/html")
 
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -781,8 +766,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				})
 				writer.Header().Set("Content-Type", "text/html")
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -844,8 +828,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				})
 				writer.Header().Set("Content-Type", "text/html")
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -910,8 +893,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 				})
 				writer.Header().Set("Content-Type", "text/html")
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 	}
 

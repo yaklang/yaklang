@@ -191,8 +191,7 @@ func (s *VulinServer) registerMockVulShiro() {
 				checkGadget(payload, failNow, successNow, writer, request)
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
@@ -234,8 +233,7 @@ func (s *VulinServer) registerMockVulShiro() {
 
 				return
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 	}
 
