@@ -133,11 +133,15 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 		return nil, utils.Errorf("remote agent addr empty")
 	}
 
-	var addr = utils.AppendDefaultPort(req.GetAddr(), 8787)
-	if addr == "" {
-		return nil, utils.Errorf("remote agent addr empty")
-	}
-
+	addr := req.GetAddr()
+	addr = utils.AppendDefaultPort(addr, 8787)
+	//if !strings.Contains(addr, "://") {
+	//	addr = "ws://" + addr
+	//}
+	//addr = utils.AppendDefaultPort(addr, 8787)
+	//if addr == "" {
+	//	return nil, utils.Errorf("remote agent addr empty")
+	//}
 	agent, ok := GetVulinboxAgent(addr)
 	if ok {
 		return agent.Status(), nil

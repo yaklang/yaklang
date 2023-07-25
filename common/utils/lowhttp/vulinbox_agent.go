@@ -11,15 +11,17 @@ import (
 
 func ConnectVulinboxAgentEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
 	return ConnectVulinboxAgentRaw(addr, func(bytes []byte) {
-		t := strings.ToLower(utils.ExtractMapValueString(bytes, "type"))
+		t := strings.ToLower(utils.ExtractMapValueString(bytes, "action"))
 		log.Debugf(`vulinbox ws agent fetch message: %v`, t)
 		switch t {
 		case "ping":
 			if onPing != nil {
 				onPing()
 			}
-		case "request":
-			handler([]byte(utils.ExtractMapValueString(bytes, "request")))
+		case "databack":
+			if utils.ExtractMapValueString(bytes, "type") == "http-request" {
+				handler([]byte(utils.ExtractMapValueString(bytes, "data")))
+			}
 		}
 	}, func() {
 		if onClose != nil {
@@ -38,25 +40,20 @@ func ConnectVulinboxAgent(addr string, handler func(request []byte), onPing ...f
 }
 
 func ConnectVulinboxAgentRaw(addr string, handler func([]byte), onClose func()) (func(), error) {
-	var cancel = func() {}
-
-	if addr == "" {
-		addr = "127.0.0.1:8787"
+	addr = utils.AppendDefaultPort(addr, 8787)
+	addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
+	addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
+	host, port, err := utils.ParseStringToHostPort(addr)
+	if err != nil {
+		return nil, utils.Errorf("cannot fetch host and port from addr: %s", err)
 	}
-
-	host, port, _ := utils.ParseStringToHostPort(addr)
-	if port <= 0 {
-		host = "127.0.0.1"
-		port = 8787
-	} else {
-		addr = utils.HostPort(host, port)
-		addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
-		addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
+	var isTls = port == 443
+	if !isTls {
+		isTls = utils.IsTLSService(addr)
 	}
-
 	log.Info("start to create ws client to connect vulinbox/_/ws/agent")
 	wsPacket := ReplaceHTTPPacketHeader([]byte(`GET /_/ws/agent HTTP/1.1
-Host: vuliobox:8787
+Host: vulinbox:8787
 Connection: Upgrade
 Sec-WebSocket-Key: kpFli2X1YeW53YainWGFzA==
 Sec-WebSocket-Version: 13
@@ -73,20 +70,16 @@ User-Agent: FeedbackStreamer/1.0
 			}
 		}
 		handler(bytes)
-	}))
+	}), WithWebsocketTLS(isTls), WithWebsocketHost(host), WithWebsocketPort(port))
 	if err != nil {
-		cancel()
-		return cancel, err
+		return nil, err
 	}
 	client.StartFromServer()
-	cancel = func() {
-		client.Stop()
-	}
 	log.Info("start to wait for vulinbox ws agent connected")
 	if utils.Spinlock(5, func() bool {
 		return start
 	}) != nil {
-		cancel()
+		client.Stop()
 		return nil, utils.Errorf("vulinbox ws agent connect timeout")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -95,6 +88,7 @@ User-Agent: FeedbackStreamer/1.0
 			for {
 				select {
 				case <-ctx.Done():
+					client.Stop()
 					return
 				default:
 					client.WriteText([]byte(`{"action":"ping"}`))
@@ -103,7 +97,7 @@ User-Agent: FeedbackStreamer/1.0
 			}
 		}()
 		client.Wait()
-		cancel()
+		client.Stop()
 		if onClose != nil {
 			onClose()
 		}
