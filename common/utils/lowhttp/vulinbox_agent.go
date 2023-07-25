@@ -11,15 +11,17 @@ import (
 
 func ConnectVulinboxAgentEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
 	return ConnectVulinboxAgentRaw(addr, func(bytes []byte) {
-		t := strings.ToLower(utils.ExtractMapValueString(bytes, "type"))
+		t := strings.ToLower(utils.ExtractMapValueString(bytes, "action"))
 		log.Debugf(`vulinbox ws agent fetch message: %v`, t)
 		switch t {
 		case "ping":
 			if onPing != nil {
 				onPing()
 			}
-		case "request":
-			handler([]byte(utils.ExtractMapValueString(bytes, "request")))
+		case "databack":
+			if utils.ExtractMapValueString(bytes, "type") == "http-request" {
+				handler([]byte(utils.ExtractMapValueString(bytes, "data")))
+			}
 		}
 	}, func() {
 		if onClose != nil {
@@ -48,11 +50,10 @@ func ConnectVulinboxAgentRaw(addr string, handler func([]byte), onClose func()) 
 	if port <= 0 {
 		host = "127.0.0.1"
 		port = 8787
-	} else {
-		addr = utils.HostPort(host, port)
-		addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
-		addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
 	}
+	addr = utils.HostPort(host, port)
+	addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
+	addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
 
 	log.Info("start to create ws client to connect vulinbox/_/ws/agent")
 	wsPacket := ReplaceHTTPPacketHeader([]byte(`GET /_/ws/agent HTTP/1.1
@@ -73,7 +74,7 @@ User-Agent: FeedbackStreamer/1.0
 			}
 		}
 		handler(bytes)
-	}))
+	}), WithWebsocketTLS(true))
 	if err != nil {
 		cancel()
 		return cancel, err

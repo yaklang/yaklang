@@ -133,7 +133,7 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 		return nil, utils.Errorf("remote agent addr empty")
 	}
 
-	var addr = utils.AppendDefaultPort(req.GetAddr(), 8787)
+	addr := utils.AppendDefaultPort(req.GetAddr(), 8787)
 	if addr == "" {
 		return nil, utils.Errorf("remote agent addr empty")
 	}
