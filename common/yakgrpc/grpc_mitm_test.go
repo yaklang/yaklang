@@ -772,11 +772,10 @@ Host: ` + h2Addr,
 		panic(err)
 	}
 	stream.Send(&ypb.MITMRequest{
-		Host:           "127.0.0.1",
-		Port:           uint32(rPort),
-		SetResetFilter: true,
-		Recover:        true,
-		EnableHttp2:    true,
+		Host:        "127.0.0.1",
+		Port:        uint32(rPort),
+		Recover:     true,
+		EnableHttp2: true,
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -789,6 +788,11 @@ Host: ` + h2Addr,
 		}
 		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
 			started = true
+			// 前置测试会替换默认的规则导致运行到MITM GRPC测试时，过滤器不再是默认值，这会影响手动劫持规则，导致connect请求被拦截，进而超时
+			// 因此此处做重置过滤器操作
+			stream.Send(&ypb.MITMRequest{
+				SetResetFilter: true,
+			})
 			stream.Send(&ypb.MITMRequest{
 				SetAutoForward:   true,
 				AutoForwardValue: false, //手动劫持
