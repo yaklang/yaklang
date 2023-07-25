@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"reflect"
@@ -633,22 +634,36 @@ func ParseStringUrlToUrlInstance(s string) (*url.URL, error) {
 }
 
 // AppendDefaultPort ignore schema default port and use the port passed in.
-// only [schema://]ip[:port] is supported for raw, no hostname
+// only [schema://]ip[:port] is supported for raw
 func AppendDefaultPort(raw string, port int) string {
 	if strings.Contains(raw, "://") {
+		// with schema
 		uri, err := url.ParseRequestURI(raw)
 		if err != nil {
 			return ""
 		}
-		if uri.Port() != "" {
-			return net.JoinHostPort(uri.Hostname(), uri.Port())
+		if uri.Port() == "" {
+			uri.Host = net.JoinHostPort(uri.Host, strconv.Itoa(port))
 		}
-		return net.JoinHostPort(uri.Hostname(), strconv.Itoa(port))
+		return uri.String()
 	} else {
+		// without schema
 		pos := strings.LastIndexByte(raw, ':')
+		// ipv4 or hostname without port
 		if pos == -1 {
 			return net.JoinHostPort(raw, strconv.Itoa(port))
 		}
+		// try ipv6
+		addrport, err := netip.ParseAddrPort(raw)
+		if err == nil {
+			return addrport.String()
+		}
+		// try ipv6 without port
+		addr, err := netip.ParseAddr(raw)
+		if err == nil {
+			return net.JoinHostPort(addr.String(), strconv.Itoa(port))
+		}
+		// ipv4 or hostname with port
 		return raw
 	}
 }

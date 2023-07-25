@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -133,7 +134,11 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 		return nil, utils.Errorf("remote agent addr empty")
 	}
 
-	addr := utils.AppendDefaultPort(req.GetAddr(), 8787)
+	addr := req.GetAddr()
+	if !strings.Contains(addr, "://") {
+		addr = "ws://" + addr
+	}
+	addr = utils.AppendDefaultPort(addr, 8787)
 	if addr == "" {
 		return nil, utils.Errorf("remote agent addr empty")
 	}

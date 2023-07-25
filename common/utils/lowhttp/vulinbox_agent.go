@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -40,20 +41,19 @@ func ConnectVulinboxAgent(addr string, handler func(request []byte), onPing ...f
 }
 
 func ConnectVulinboxAgentRaw(addr string, handler func([]byte), onClose func()) (func(), error) {
-	var cancel = func() {}
+
+	addr = utils.AppendDefaultPort(addr, 8787)
 
 	if addr == "" {
-		addr = "127.0.0.1:8787"
+		addr = "ws://127.0.0.1:8787"
 	}
-
-	host, port, _ := utils.ParseStringToHostPort(addr)
-	if port <= 0 {
-		host = "127.0.0.1"
-		port = 8787
-	}
-	addr = utils.HostPort(host, port)
 	addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
 	addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
+
+	uri, err := url.ParseRequestURI(addr)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info("start to create ws client to connect vulinbox/_/ws/agent")
 	wsPacket := ReplaceHTTPPacketHeader([]byte(`GET /_/ws/agent HTTP/1.1
@@ -64,7 +64,7 @@ Sec-WebSocket-Version: 13
 Upgrade: websocket
 User-Agent: FeedbackStreamer/1.0
 
-`), "Host", addr)
+`), "Host", uri.Host)
 	fmt.Println(string(wsPacket))
 	var start = false
 	client, err := NewWebsocketClient(wsPacket, WithWebsocketFromServerHandler(func(bytes []byte) {
@@ -74,20 +74,16 @@ User-Agent: FeedbackStreamer/1.0
 			}
 		}
 		handler(bytes)
-	}), WithWebsocketTLS(true))
+	}), WithWebsocketTLS(strings.HasPrefix(addr, "wss://") || strings.HasPrefix(addr, "https://")))
 	if err != nil {
-		cancel()
-		return cancel, err
+		return nil, err
 	}
 	client.StartFromServer()
-	cancel = func() {
-		client.Stop()
-	}
 	log.Info("start to wait for vulinbox ws agent connected")
 	if utils.Spinlock(5, func() bool {
 		return start
 	}) != nil {
-		cancel()
+		client.Stop()
 		return nil, utils.Errorf("vulinbox ws agent connect timeout")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,6 +92,7 @@ User-Agent: FeedbackStreamer/1.0
 			for {
 				select {
 				case <-ctx.Done():
+					client.Stop()
 					return
 				default:
 					client.WriteText([]byte(`{"action":"ping"}`))
@@ -104,7 +101,7 @@ User-Agent: FeedbackStreamer/1.0
 			}
 		}()
 		client.Wait()
-		cancel()
+		client.Stop()
 		if onClose != nil {
 			onClose()
 		}
