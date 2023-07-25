@@ -16,16 +16,11 @@ var sshAuth = &DefaultServiceAuthInfo{
 	ServiceName:  "ssh",
 	DefaultPorts: "22",
 	DefaultUsernames: []string{
-		"root", "test", "oracle",
-		"admin", "web", "op", "ops",
-		"tomcat", "www", "linux", "ubuntu",
-		"centos", "ftp", "bin", "test1", "user",
+		"root", "admin", "ruijie",
 	},
 	DefaultPasswords: []string{
-		"123456", "admin", "password", "12345", "1234", "root", "123", "qwerty", "test", "1q2w3e4r",
-		"1qaz2wsx", "qazwsx", "123qwe", "12", "123qaz", "0000", "oracle", "1234567",
-		"123456qwerty", "password123", "12345678", "1q2w3e", "abc123", "okmnji", "test123",
-		"123456789", "postgres", "q1w2e3r4", "redhat", "user", "mysql", "apache",
+		"root", "admin123", "root@123", "123456", "admin", "admin@123", "Admin@huawei.com",
+		"Changeme_@123", "huawei@123", "h3c@123", "admin@123456", "ruijie", "ruijie@123",
 	},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 22)
