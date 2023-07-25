@@ -2932,6 +2932,7 @@ message FuzzerRequest {
   // 是否继承上一个 Workflow 的变量？（在 Sequence 中生效）
   bool InheritVariables = 38;
   bool ForceOnlyOneResponse = 39;
+  bool InheritCookies = 40; // 上一个 Request 一般来说是单个请求，他的响应信息中 Cookie 也应该被妥善处理
 }
 
 message KVPair {
@@ -3032,6 +3033,13 @@ message FuzzerResponse {
   repeated KVPair ExtractedResults = 45;
   bool MatchedByMatcher = 46;
   string HitColor = 47;
+  repeated RedirectHTTPFlow RedirectFlows = 48;
+}
+
+message RedirectHTTPFlow {
+  bool IsHttps = 1;
+  bytes Request = 2;
+  bytes Response = 3;
 }
 
 message Paging {
