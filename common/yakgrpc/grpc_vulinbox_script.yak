@@ -28,4 +28,45 @@ x.Foreach(scriptNames, func(e){
 
 defer manager.Wait()
 
+rsp,err = http.Get("http://192.168.3.113:8787/vul/route?group=sql")
+if err != nil {
+    yakit.Error("http get error: %v", err)
+    die(err)
+}
+groups = rsp.Json()
 
+
+
+tableName = "质量检测"
+columnType = "漏洞类型"
+columnTarget = "测试 Url"
+columnExpectedDetected = "预期检出"
+columnExpectedDetectedValue = "预期数"
+columnRealDetected = "实际检出"
+yakit.EnableTable(tableName, [columnType, columnTarget, columnExpectedDetected, columnRealDetected])
+
+scan = func() {
+
+for _, v :=range groups[0].VulInfos {
+    path = v.Path
+    for k, res :=range v.ExpectedResult {
+        yakit.Output(
+         yakit.TableData(
+             tableName, {
+                 columnType:"sql" ,
+                 columnTarget: path,
+                 columnExpectedDetected: k,
+                 columnExpectedDetectedValue: res,
+                 columnRealDetected: "yes",
+
+                }
+            )
+        )
+    }
+    sleep(1)
+}
+
+
+}
+
+scan()

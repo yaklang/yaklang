@@ -457,9 +457,9 @@ func (y *YakHttpResponse) Json() interface{} {
 		return nil
 	}
 	var i interface{}
-	err := json.Unmarshal([]byte(data), i)
+	err := json.Unmarshal([]byte(data), &i)
 	if err != nil {
-		log.Errorf("parse %v to json failed: %s", strconv.Quote(data), err)
+		log.Errorf("parse %v to json failed: %v", strconv.Quote(data), err)
 		return ""
 	}
 	return i
