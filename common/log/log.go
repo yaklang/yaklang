@@ -37,12 +37,13 @@ const (
 
 type Logger struct {
 	*golog.Logger
-	name string
+	vmRuntimeInfoGetter func(infoType string) any
+	name                string
 }
 
 const IGNOREFLAG = `[IGNORE]`
 
-func formatter(l *golog.Log, name string) bool {
+func formatter(l *golog.Log, name string, line int) bool {
 	if l == nil {
 		return true
 	}
@@ -52,12 +53,16 @@ func formatter(l *golog.Log, name string) bool {
 
 	if strings.HasSuffix(strings.ToLower(name), ".yak") {
 		name = name[:len(name)-4]
-		l.Message = fmt.Sprintf("[%v] %v", name, l.Message)
+		if line == -1 {
+			l.Message = fmt.Sprintf("[%v] %v", name, l.Message)
+		} else {
+			l.Message = fmt.Sprintf("[%v:%v] %v", name, line, l.Message)
+		}
 		return false
 	}
 
 	file := "???"
-	line := 0
+	line = 0
 	pc := make([]uintptr, 64)
 	n := runtime.Callers(3, pc)
 	if n != 0 {
@@ -105,7 +110,11 @@ func GetLogger(name string) *Logger {
 			name:   name,
 		}
 		logger.Handle(func(l *golog.Log) bool {
-			return formatter(l, name)
+			line := -1
+			if logger.vmRuntimeInfoGetter != nil {
+				line = logger.vmRuntimeInfoGetter("line").(int)
+			}
+			return formatter(l, name, line)
 		})
 		//logger.SetTimeFormat("2006-01-02 15:04:05 -0700")
 		logger.SetTimeFormat("2006-01-02 15:04:05")
@@ -114,7 +123,12 @@ func GetLogger(name string) *Logger {
 		return logger
 	}
 }
-
+func (l *Logger) SetName(name string) {
+	l.name = name
+}
+func (l *Logger) SetVMRuntimeInfoGetter(f func(infoType string) any) {
+	l.vmRuntimeInfoGetter = f
+}
 func CheckLogDir(dir string) error {
 	if dir == "" {
 		return nil
