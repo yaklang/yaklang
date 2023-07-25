@@ -545,7 +545,20 @@ func (v *VulinServer) registerCryptoJS() {
 			println("-------------------")
 			println("-------------------")
 
-			aesEncrypted, err := codec.AESGCMEncryptWithNonceSize12([]byte(key), rawResponseBody, []byte(iv))
+			var i any
+			json.Unmarshal(origin, &i)
+			if i != nil {
+				params = utils.InterfaceToGeneralMap(i)
+			} else {
+				params = utils.InterfaceToGeneralMap(origin)
+			}
+			username := utils.MapGetString(params, "username")
+			password := utils.MapGetString(params, "password")
+			var results = make(map[string]any)
+			results["username"] = username
+			results["success"] = isLogined(username, password)
+			_ = rawResponseBody
+			aesEncrypted, err := codec.AESGCMEncryptWithNonceSize12([]byte(key), utils.Jsonify(results), []byte(iv))
 			if err != nil {
 				log.Errorf("AES-GCM Encrypt failed nonce size 12: %v", err)
 				writer.Write([]byte(rawResponseBody + "<br/> <br/> <h2>error</h2> <br/>" + err.Error()))
