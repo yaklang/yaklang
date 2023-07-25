@@ -44,8 +44,7 @@ func (s *VulinServer) registerJSONP() {
 				}
 				writer.Write(vulJSONPHTML)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",

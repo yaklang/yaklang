@@ -35,8 +35,7 @@ func (s *VulinServer) registerPostMessageIframeCase() {
 </body>
 </html>`))
 			},
-			Detected:      true,
-			ExpectedValue: "",
+			RiskDetected: true,
 		},
 		{
 			Path: "/iframe/post/message/basic",

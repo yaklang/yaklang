@@ -13,7 +13,7 @@ import (
 func (s *VulinServer) registerPingCMDI() {
 	r := s.router
 
-	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例").Subrouter()
+	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例 (Unsafe Mode)").Subrouter()
 	cmdIRoutes := []*VulInfo{
 		{
 			DefaultQuery: "ip=127.0.0.1",
@@ -46,9 +46,7 @@ func (s *VulinServer) registerPingCMDI() {
 					return
 				}
 			},
-			Detected:      false,
-			ExpectedValue: "",
-			UnSafe:        true,
+			RiskDetected: false,
 		},
 		{
 			DefaultQuery: "ip=127.0.0.1",
@@ -76,9 +74,7 @@ func (s *VulinServer) registerPingCMDI() {
 					return
 				}
 			},
-			Detected:      true,
-			ExpectedValue: "1",
-			UnSafe:        true,
+			RiskDetected: true,
 		},
 	}
 

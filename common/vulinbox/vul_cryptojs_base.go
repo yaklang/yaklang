@@ -169,25 +169,24 @@ func (s *VulinServer) registerCryptoJS() {
 						}
 					}
 
-			var i any
-			json.Unmarshal(origin, &i)
-			params := utils.InterfaceToGeneralMap(i)
-			username := utils.MapGetString(params, "username")
-			password := utils.MapGetString(params, "password")
-			renderLoginSuccess(writer, username, password, []byte(
-						`<br>` +
-							`<pre>` + string(data) + `</pre> <br><br><br>	` +
-							`<pre>` + handled + `</pre> <br><br>	` +
-							`<pre>` + string(origin) + `</pre> <br><br>	` +
-							`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+					var i any
+					json.Unmarshal(origin, &i)
+					params := utils.InterfaceToGeneralMap(i)
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
+					renderLoginSuccess(writer, username, password, []byte(
+						`<br>`+
+							`<pre>`+string(data)+`</pre> <br><br><br>	`+
+							`<pre>`+handled+`</pre> <br><br>	`+
+							`<pre>`+string(origin)+`</pre> <br><br>	`+
+							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 					))
 					return
 				}
 
 				writer.WriteHeader(http.StatusMethodNotAllowed)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			Path:  "/crypto/js/rsa",
@@ -249,29 +248,28 @@ func (s *VulinServer) registerCryptoJS() {
 						}
 					}
 
-			var i any
-			json.Unmarshal(origin, &i)
-			if i != nil {
-				params = utils.InterfaceToGeneralMap(i)
-			} else {
-				params = utils.InterfaceToGeneralMap(origin)
-			}
-			username := utils.MapGetString(params, "username")
-			password := utils.MapGetString(params, "password")
-			renderLoginSuccess(writer, username, password, []byte(
-						`<br>` +
-							`<pre>` + string(data) + `</pre> <br><br><br>	` +
-							`<pre>` + handled + `</pre> <br><br>	` +
-							`<pre>` + string(origin) + `</pre> <br><br>	` +
-							`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+					var i any
+					json.Unmarshal(origin, &i)
+					if i != nil {
+						params = utils.InterfaceToGeneralMap(i)
+					} else {
+						params = utils.InterfaceToGeneralMap(origin)
+					}
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
+					renderLoginSuccess(writer, username, password, []byte(
+						`<br>`+
+							`<pre>`+string(data)+`</pre> <br><br><br>	`+
+							`<pre>`+handled+`</pre> <br><br>	`+
+							`<pre>`+string(origin)+`</pre> <br><br>	`+
+							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 					))
 					return
 				}
 
 				writer.WriteHeader(http.StatusMethodNotAllowed)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			Path:  "/crypto/js/rsa/fromserver",
@@ -333,29 +331,28 @@ func (s *VulinServer) registerCryptoJS() {
 						}
 					}
 
-			var i any
-			json.Unmarshal(origin, &i)
-			if i != nil {
-				params = utils.InterfaceToGeneralMap(i)
-			} else {
-				params = utils.InterfaceToGeneralMap(origin)
-			}
-			username := utils.MapGetString(params, "username")
-			password := utils.MapGetString(params, "password")
-			renderLoginSuccess(writer, username, password, []byte(
-						`<br>` +
-							`<pre>` + string(data) + `</pre> <br><br><br>	` +
-							`<pre>` + handled + `</pre> <br><br>	` +
-							`<pre>` + string(origin) + `</pre> <br><br>	` +
-							`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+					var i any
+					json.Unmarshal(origin, &i)
+					if i != nil {
+						params = utils.InterfaceToGeneralMap(i)
+					} else {
+						params = utils.InterfaceToGeneralMap(origin)
+					}
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
+					renderLoginSuccess(writer, username, password, []byte(
+						`<br>`+
+							`<pre>`+string(data)+`</pre> <br><br><br>	`+
+							`<pre>`+handled+`</pre> <br><br>	`+
+							`<pre>`+string(origin)+`</pre> <br><br>	`+
+							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 					))
 					return
 				}
 
 				writer.WriteHeader(http.StatusMethodNotAllowed)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			Path:  "/crypto/js/rsa/fromserver/response",
@@ -423,19 +420,19 @@ func (s *VulinServer) registerCryptoJS() {
 						`<pre>` + string(origin) + `</pre> <br><br>	` +
 						`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`
 
-			var i any
-			json.Unmarshal(origin, &i)
-			if i != nil {
-				params = utils.InterfaceToGeneralMap(i)
-			} else {
-				params = utils.InterfaceToGeneralMap(origin)
-			}
-			username := utils.MapGetString(params, "username")
-			password := utils.MapGetString(params, "password")
-			var results = make(map[string]any)
-			results["username"] = username
-			results["success"] = isLogined(username, password)
-			encryptedData, err := tlsutils.PemPkcsOAEPEncrypt(pub, utils.Jsonify(results))
+					var i any
+					json.Unmarshal(origin, &i)
+					if i != nil {
+						params = utils.InterfaceToGeneralMap(i)
+					} else {
+						params = utils.InterfaceToGeneralMap(origin)
+					}
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
+					var results = make(map[string]any)
+					results["username"] = username
+					results["success"] = isLogined(username, password)
+					encryptedData, err := tlsutils.PemPkcsOAEPEncrypt(pub, utils.Jsonify(results))
 					if err != nil {
 						writer.Write([]byte(rawResponseBody + "<br/> <br/> <h2>error</h2> <br/>" + err.Error()))
 						return
@@ -452,14 +449,13 @@ func (s *VulinServer) registerCryptoJS() {
 						"data":   codec.EncodeBase64(encryptedData),
 						"origin": string(originData),
 					})
-			renderLoginSuccess(writer, username, password, raw, raw)
+					renderLoginSuccess(writer, username, password, raw, raw)
 					return
 				}
 
 				writer.WriteHeader(http.StatusMethodNotAllowed)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 		{
 			Path:  "/crypto/js/rsa/fromserver/response/aes-gcm",
@@ -508,12 +504,12 @@ func (s *VulinServer) registerCryptoJS() {
 					originIV, decErr := tlsutils.PemPkcsOAEPDecrypt([]byte(prikey), encIVDec)
 					spew.Dump(originIV, decErr)
 
-			origin, err := codec.AESGCMDecryptWithNonceSize12(originKey, encryptedBase64Decoded, originIV)
-			if err != nil {
-				log.Warnf("AES-GCM Decrypt failed nonce size 12: %v", err)
-				writer.Write([]byte("<pre>" + string(data) + "<pre> <br/> <br/> <h2>error</h2> <br/>" + err.Error()))
-				return
-			}
+					origin, err := codec.AESGCMDecryptWithNonceSize12(originKey, encryptedBase64Decoded, originIV)
+					if err != nil {
+						log.Warnf("AES-GCM Decrypt failed nonce size 12: %v", err)
+						writer.Write([]byte("<pre>" + string(data) + "<pre> <br/> <br/> <h2>error</h2> <br/>" + err.Error()))
+						return
+					}
 
 					var handled string
 					var raw, _ = json.MarshalIndent(map[string]any{
@@ -570,20 +566,20 @@ func (s *VulinServer) registerCryptoJS() {
 					println("-------------------")
 					println("-------------------")
 
-			var i any
-			json.Unmarshal(origin, &i)
-			if i != nil {
-				params = utils.InterfaceToGeneralMap(i)
-			} else {
-				params = utils.InterfaceToGeneralMap(origin)
-			}
-			username := utils.MapGetString(params, "username")
-			password := utils.MapGetString(params, "password")
-			var results = make(map[string]any)
-			results["username"] = username
-			results["success"] = isLogined(username, password)
-			_ = rawResponseBody
-			aesEncrypted, err := codec.AESGCMEncryptWithNonceSize12([]byte(key), utils.Jsonify(results), []byte(iv))
+					var i any
+					json.Unmarshal(origin, &i)
+					if i != nil {
+						params = utils.InterfaceToGeneralMap(i)
+					} else {
+						params = utils.InterfaceToGeneralMap(origin)
+					}
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
+					var results = make(map[string]any)
+					results["username"] = username
+					results["success"] = isLogined(username, password)
+					_ = rawResponseBody
+					aesEncrypted, err := codec.AESGCMEncryptWithNonceSize12([]byte(key), utils.Jsonify(results), []byte(iv))
 					if err != nil {
 						log.Errorf("AES-GCM Encrypt failed nonce size 12: %v", err)
 						writer.Write([]byte(rawResponseBody + "<br/> <br/> <h2>error</h2> <br/>" + err.Error()))
@@ -601,8 +597,7 @@ func (s *VulinServer) registerCryptoJS() {
 
 				writer.WriteHeader(http.StatusMethodNotAllowed)
 			},
-			Detected:      true,
-			ExpectedValue: "1",
+			RiskDetected: true,
 		},
 
 		{
