@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,8 +38,65 @@ func (v *VulinServer) registerCryptoJS() {
 	r := v.router
 
 	var (
-		pri, pub []byte
+		backupPass = []string{"admin", "123456", "admin123", "88888888", "666666"}
+		pri, pub   []byte
+		username   = "admin"
+		password   = backupPass[rand.Intn(len(backupPass))]
 	)
+
+	log.Infof("frontend end crypto js user:pass = %v:%v", username, password)
+	var isLogined = func(loginUser, loginPass string) bool {
+		return loginUser == username && loginPass == password
+	}
+	var renderLoginSuccess = func(writer http.ResponseWriter, loginUsername, loginPassword string, fallback []byte, success ...[]byte) {
+		if loginUsername != username || loginPassword != password {
+			writer.WriteHeader(403)
+			writer.Write(fallback)
+			return
+		}
+
+		if len(success) > 0 {
+			writer.Write(success[0])
+			return
+		}
+
+		writer.Write([]byte(`<!doctype html>
+<html>
+<head>
+    <title>Example DEMO</title>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        
+    }
+    div {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);
+    }
+    </style>    
+</head>
+
+<body>
+<div>
+	<p class="success-container">
+        <h1>恭喜您！登录成功！</h1>
+        <p>欢迎，您已成功登录。</p>
+    </p>
+</div>
+</body>
+</html>`))
+	}
 
 	var initKey = func() {
 		log.Infof("start to GeneratePrivateAndPublicKeyPEMWithPrivateFormatter")
@@ -81,9 +139,7 @@ func (v *VulinServer) registerCryptoJS() {
 			encryptedBase64Decoded, _ := codec.DecodeBase64(encrypted)
 
 			var origin, decErr = codec.AESECBDecryptWithPKCS7Padding([]byte(key), []byte(encryptedBase64Decoded), []byte(iv))
-
 			spew.Dump(origin, decErr)
-
 			var handled string
 			var raw, _ = json.MarshalIndent(map[string]any{
 				"key":             utils.MapGetString(params, "key"),
@@ -109,12 +165,17 @@ func (v *VulinServer) registerCryptoJS() {
 				}
 			}
 
-			writer.Write([]byte(
-				`<br>` +
-					`<pre>` + string(data) + `</pre> <br><br><br>	` +
-					`<pre>` + handled + `</pre> <br><br>	` +
-					`<pre>` + string(origin) + `</pre> <br><br>	` +
-					`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+			var i any
+			json.Unmarshal(origin, &i)
+			params := utils.InterfaceToGeneralMap(i)
+			username := utils.MapGetString(params, "username")
+			password := utils.MapGetString(params, "password")
+			renderLoginSuccess(writer, username, password, []byte(
+				`<br>`+
+					`<pre>`+string(data)+`</pre> <br><br><br>	`+
+					`<pre>`+handled+`</pre> <br><br>	`+
+					`<pre>`+string(origin)+`</pre> <br><br>	`+
+					`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 			))
 			return
 		}
@@ -178,12 +239,21 @@ func (v *VulinServer) registerCryptoJS() {
 				}
 			}
 
-			writer.Write([]byte(
-				`<br>` +
-					`<pre>` + string(data) + `</pre> <br><br><br>	` +
-					`<pre>` + handled + `</pre> <br><br>	` +
-					`<pre>` + string(origin) + `</pre> <br><br>	` +
-					`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+			var i any
+			json.Unmarshal(origin, &i)
+			if i != nil {
+				params = utils.InterfaceToGeneralMap(i)
+			} else {
+				params = utils.InterfaceToGeneralMap(origin)
+			}
+			username := utils.MapGetString(params, "username")
+			password := utils.MapGetString(params, "password")
+			renderLoginSuccess(writer, username, password, []byte(
+				`<br>`+
+					`<pre>`+string(data)+`</pre> <br><br><br>	`+
+					`<pre>`+handled+`</pre> <br><br>	`+
+					`<pre>`+string(origin)+`</pre> <br><br>	`+
+					`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 			))
 			return
 		}
@@ -247,12 +317,21 @@ func (v *VulinServer) registerCryptoJS() {
 				}
 			}
 
-			writer.Write([]byte(
-				`<br>` +
-					`<pre>` + string(data) + `</pre> <br><br><br>	` +
-					`<pre>` + handled + `</pre> <br><br>	` +
-					`<pre>` + string(origin) + `</pre> <br><br>	` +
-					`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`,
+			var i any
+			json.Unmarshal(origin, &i)
+			if i != nil {
+				params = utils.InterfaceToGeneralMap(i)
+			} else {
+				params = utils.InterfaceToGeneralMap(origin)
+			}
+			username := utils.MapGetString(params, "username")
+			password := utils.MapGetString(params, "password")
+			renderLoginSuccess(writer, username, password, []byte(
+				`<br>`+
+					`<pre>`+string(data)+`</pre> <br><br><br>	`+
+					`<pre>`+handled+`</pre> <br><br>	`+
+					`<pre>`+string(origin)+`</pre> <br><br>	`+
+					`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
 			))
 			return
 		}
@@ -324,7 +403,20 @@ func (v *VulinServer) registerCryptoJS() {
 				`<pre>` + handled + `</pre> <br><br>	` +
 				`<pre>` + string(origin) + `</pre> <br><br>	` +
 				`<pre>` + fmt.Sprint(err) + `</pre> <br><br>	`
-			encryptedData, err := tlsutils.PemPkcsOAEPEncrypt(pub, `hackeddata=`+utils.RandSecret(10))
+
+			var i any
+			json.Unmarshal(origin, &i)
+			if i != nil {
+				params = utils.InterfaceToGeneralMap(i)
+			} else {
+				params = utils.InterfaceToGeneralMap(origin)
+			}
+			username := utils.MapGetString(params, "username")
+			password := utils.MapGetString(params, "password")
+			var results = make(map[string]any)
+			results["username"] = username
+			results["success"] = isLogined(username, password)
+			encryptedData, err := tlsutils.PemPkcsOAEPEncrypt(pub, utils.Jsonify(results))
 			if err != nil {
 				writer.Write([]byte(rawResponseBody + "<br/> <br/> <h2>error</h2> <br/>" + err.Error()))
 				return
@@ -341,7 +433,7 @@ func (v *VulinServer) registerCryptoJS() {
 				"data":   codec.EncodeBase64(encryptedData),
 				"origin": string(originData),
 			})
-			writer.Write(raw)
+			renderLoginSuccess(writer, username, password, raw, raw)
 			return
 		}
 
