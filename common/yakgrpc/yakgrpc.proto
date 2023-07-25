@@ -2851,6 +2851,8 @@ message FuzzerParamItem {
 
 message FuzzerRequests {
   repeated FuzzerRequest Requests = 1;
+  // concurrent flow
+  int64 Concurrent = 2;
 }
 
 message FuzzerRequest {

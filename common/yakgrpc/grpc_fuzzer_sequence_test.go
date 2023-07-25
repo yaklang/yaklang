@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -80,6 +81,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	for {
 		resp, err := client.Recv()
 		if err != nil {
+			log.Error(err)
 			break
 		}
 		if resp == nil {

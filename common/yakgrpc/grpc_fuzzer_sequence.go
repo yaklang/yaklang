@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"encoding/json"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -22,6 +24,7 @@ type httpFuzzerFallback struct {
 	// resp
 	firstResponse   *ypb.FuzzerResponse
 	onFirstResponse func(response *ypb.FuzzerResponse)
+	onEveryResponse func(response *ypb.FuzzerResponse)
 }
 
 func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
@@ -33,6 +36,10 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 	if h.firstResponse == nil && r != nil && h.onFirstResponse != nil {
 		h.firstResponse = r
 		h.onFirstResponse(h.firstResponse)
+	}
+
+	if h.onEveryResponse != nil {
+		h.onEveryResponse(r)
 	}
 
 	if h.originSender != nil {
@@ -122,93 +129,37 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 	return fuzzerResponse
 }
 
-func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
-	reqs := seqreq.GetRequests()
-	if len(reqs) <= 0 {
-		return utils.Error("empty fuzzer request")
+type fuzzerSequenceFlow struct {
+	hijack func(request *ypb.FuzzerRequest) *ypb.FuzzerRequest
+	origin *ypb.FuzzerRequest
+	next   *ypb.FuzzerRequest
+}
+
+func NewFuzzerSequenceFlow(request *ypb.FuzzerRequest) *fuzzerSequenceFlow {
+	return &fuzzerSequenceFlow{origin: request}
+}
+
+func (f *fuzzerSequenceFlow) GetFuzzerRequest() *ypb.FuzzerRequest {
+	if f.hijack == nil {
+		return f.origin
 	}
+	f.hijack(f.origin)
+	return f.origin
+}
 
-	var canBeInherited = make(map[int]*ypb.FuzzerRequest)
-	for index, r := range reqs {
-		if index == 0 {
-			continue
-		}
-
-		if r.InheritVariables {
-			canBeInherited[index-1] = r
-		}
-	}
-
-	var nextVar = reqs[0].GetParams()
-	var nextCookies = make(map[string]string)
-	for index, r := range reqs {
-		r := r
-
-		// 是否继承？
-		var inheritVars = r.InheritVariables
-
-		// 只有一个 response
-		var _, forceOnlyOneResponse = canBeInherited[index]
-		var beInherited = forceOnlyOneResponse
-		var response *ypb.FuzzerResponse
-		r.ForceOnlyOneResponse = true
-
-		if inheritVars {
-			r.Params = nextVar
-		}
-
-		var reqBytes []byte
-		if r.GetRequest() != "" {
-			reqBytes = []byte(r.GetRequest())
-		} else {
-			reqBytes = r.GetRequestRaw()
-		}
-		if nextCookies != nil && len(nextCookies) > 0 {
-			var cookie []*http.Cookie
-			for k, v := range nextCookies {
-				cookie = append(cookie, &http.Cookie{
-					Name:  k,
-					Value: v,
-				})
-			}
-			reqBytes = lowhttp.ReplaceHTTPPacketHeader(reqBytes, "Cookie", lowhttp.CookiesToString(cookie))
-		}
-		r.RequestRaw = reqBytes
-		r.Request = ""
-
-		fallback := newHTTPFuzzerFallback(r, stream)
-		if r.ForceOnlyOneResponse {
-			fallback.onFirstResponse = func(rsp *ypb.FuzzerResponse) {
-				response = rsp
-			}
-		}
-		err := s.HTTPFuzzer(r, fallback)
-		if err != nil {
-			log.Errorf("exec[%v] request failed: %s", index, err)
-			return err
-		}
-
-		if forceOnlyOneResponse && response == nil {
-			return utils.Errorf("force only one response not executed successfully!")
-		}
-
-		var vars = make([]*ypb.FuzzerParamItem, len(r.GetParams()))
-		for _, i := range r.GetParams() {
-			vars = append(vars, &ypb.FuzzerParamItem{
-				Key:   i.Key,
-				Value: i.Value,
-				Type:  "raw",
-			})
-		}
-		if beInherited {
-			for _, kv := range response.GetExtractedResults() {
-				vars = append(vars, &ypb.FuzzerParamItem{
-					Key:   kv.Key,
-					Value: kv.Value,
+func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *fuzzerSequenceFlow {
+	f.hijack = func(request *ypb.FuzzerRequest) *ypb.FuzzerRequest {
+		if request.InheritVariables {
+			for _, k := range response.GetExtractedResults() {
+				request.Params = append(request.Params, &ypb.FuzzerParamItem{
+					Key:   k.Key,
+					Value: k.Value,
 					Type:  "raw",
 				})
 			}
-			nextVar = vars
+		}
+
+		if request.InheritCookies {
 			var cookieFromReq = lowhttp.GetHTTPPacketCookies(response.GetRequestRaw())
 			for _, f := range response.RedirectFlows {
 				for k, v := range lowhttp.GetHTTPPacketCookies(f.GetRequest()) {
@@ -218,13 +169,199 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 			for k, v := range lowhttp.GetHTTPPacketCookies(response.GetResponseRaw()) {
 				cookieFromReq[k] = v
 			}
-			nextCookies = cookieFromReq
-		} else {
-			nextCookies = make(map[string]string)
-			if len(reqs) > index+1 {
-				nextVar = reqs[index+1].GetParams()
+			var reqBytes = request.RequestRaw
+			if reqBytes == nil || len(reqBytes) <= 0 {
+				reqBytes = []byte(request.Request)
 			}
+			var cookies []*http.Cookie
+			for k, v := range cookieFromReq {
+				cookies = append(cookies, &http.Cookie{Name: k, Value: v})
+			}
+			if len(cookies) > 0 {
+				reqBytes = lowhttp.ReplaceHTTPPacketHeader(reqBytes, "Cookie", lowhttp.CookiesToString(cookies))
+			}
+			request.Request = ""
+			request.RequestRaw = reqBytes
+		}
+
+		return nil
+	}
+	return f
+}
+
+func (s *Server) execFlow(wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
+	var req = f.GetFuzzerRequest()
+	fallback := newHTTPFuzzerFallback(req, stream)
+	if f.next != nil {
+		fallback.onEveryResponse = func(response *ypb.FuzzerResponse) {
+			var copiedReq = ypb.FuzzerRequest{}
+			var raw, err = json.Marshal(f.next)
+			if err != nil {
+				log.Errorf("json marshal ypb.FuzzerRequest failed: %s", err)
+				return
+			}
+			err = json.Unmarshal(raw, &copiedReq)
+			if err != nil {
+				log.Errorf("json unmarshal FuzzerRequest failed: %s", err)
+				return
+			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := s.execFlow(wg, NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response), stream)
+				if err != nil {
+					log.Errorf("execFlow: %v", err)
+				}
+			}()
 		}
 	}
-	return nil
+	err := s.HTTPFuzzer(req, fallback)
+	if err != nil {
+		log.Error(err)
+	}
+	return err
+}
+
+func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
+	reqs := seqreq.GetRequests()
+	if len(reqs) <= 0 {
+		return utils.Error("empty fuzzer request")
+	}
+
+	var sequenceFlow = make(chan *fuzzerSequenceFlow, len(reqs))
+	var finalErr = make(chan error, 1)
+	defer func() {
+		close(finalErr)
+	}()
+	var wg = new(sync.WaitGroup)
+	wg.Add(1)
+	defer wg.Wait()
+	go func() {
+		defer wg.Done()
+		defer func() {
+			close(sequenceFlow)
+		}()
+
+		var firstFlow *fuzzerSequenceFlow
+		var lastFlow *fuzzerSequenceFlow
+		for _, i := range reqs {
+			flow := NewFuzzerSequenceFlow(i)
+			if firstFlow == nil {
+				firstFlow = flow
+			}
+			if lastFlow != nil {
+				lastFlow.next = i
+			}
+			lastFlow = flow
+		}
+
+		if firstFlow == nil {
+			finalErr <- utils.Errorf("BUG: empty first flow")
+			return
+		}
+
+		finalErr <- s.execFlow(wg, firstFlow, stream)
+	}()
+	select {
+	case err := <-finalErr:
+		return err
+	}
+
+	//var canBeInherited = make(map[int]*ypb.FuzzerRequest)
+	//for index, r := range reqs {
+	//	if index == 0 {
+	//		continue
+	//	}
+	//
+	//	if r.InheritVariables {
+	//		canBeInherited[index-1] = r
+	//	}
+	//}
+	//var nextVar = reqs[0].GetParams()
+	//var nextCookies = make(map[string]string)
+	//for index, r := range reqs {
+	//	r := r
+	//
+	//	// 是否继承？
+	//	var inheritVars = r.InheritVariables
+	//
+	//	// 只有一个 response
+	//	var _, forceOnlyOneResponse = canBeInherited[index]
+	//	var beInherited = forceOnlyOneResponse
+	//	var response *ypb.FuzzerResponse
+	//	r.ForceOnlyOneResponse = true
+	//
+	//	if inheritVars {
+	//		r.Params = nextVar
+	//	}
+	//
+	//	var reqBytes []byte
+	//	if r.GetRequest() != "" {
+	//		reqBytes = []byte(r.GetRequest())
+	//	} else {
+	//		reqBytes = r.GetRequestRaw()
+	//	}
+	//	if nextCookies != nil && len(nextCookies) > 0 {
+	//		var cookie []*http.Cookie
+	//		for k, v := range nextCookies {
+	//			cookie = append(cookie, &http.Cookie{
+	//				Name:  k,
+	//				Value: v,
+	//			})
+	//		}
+	//		reqBytes = lowhttp.ReplaceHTTPPacketHeader(reqBytes, "Cookie", lowhttp.CookiesToString(cookie))
+	//	}
+	//	r.RequestRaw = reqBytes
+	//	r.Request = ""
+	//
+	//	fallback := newHTTPFuzzerFallback(r, stream)
+	//	if r.ForceOnlyOneResponse {
+	//		fallback.onFirstResponse = func(rsp *ypb.FuzzerResponse) {
+	//			response = rsp
+	//		}
+	//	}
+	//	err := s.HTTPFuzzer(r, fallback)
+	//	if err != nil {
+	//		log.Errorf("exec[%v] request failed: %s", index, err)
+	//		return err
+	//	}
+	//
+	//	if forceOnlyOneResponse && response == nil {
+	//		return utils.Errorf("force only one response not executed successfully!")
+	//	}
+	//
+	//	var vars = make([]*ypb.FuzzerParamItem, len(r.GetParams()))
+	//	for _, i := range r.GetParams() {
+	//		vars = append(vars, &ypb.FuzzerParamItem{
+	//			Key:   i.Key,
+	//			Value: i.Value,
+	//			Type:  "raw",
+	//		})
+	//	}
+	//	if beInherited {
+	//		for _, kv := range response.GetExtractedResults() {
+	//			vars = append(vars, &ypb.FuzzerParamItem{
+	//				Key:   kv.Key,
+	//				Value: kv.Value,
+	//				Type:  "raw",
+	//			})
+	//		}
+	//		nextVar = vars
+	//		var cookieFromReq = lowhttp.GetHTTPPacketCookies(response.GetRequestRaw())
+	//		for _, f := range response.RedirectFlows {
+	//			for k, v := range lowhttp.GetHTTPPacketCookies(f.GetRequest()) {
+	//				cookieFromReq[k] = v
+	//			}
+	//		}
+	//		for k, v := range lowhttp.GetHTTPPacketCookies(response.GetResponseRaw()) {
+	//			cookieFromReq[k] = v
+	//		}
+	//		nextCookies = cookieFromReq
+	//	} else {
+	//		nextCookies = make(map[string]string)
+	//		if len(reqs) > index+1 {
+	//			nextVar = reqs[index+1].GetParams()
+	//		}
+	//	}
+	//}
 }
