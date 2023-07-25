@@ -50,16 +50,17 @@ var YakitExports = map[string]interface{}{
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
 
 	// dummy
-	"Info":          yakitInfo(emptyVirtualClient),
-	"Warn":          yakitWarn(emptyVirtualClient),
-	"Error":         yakitError(emptyVirtualClient),
-	"Text":          yakitError(emptyVirtualClient),
-	"Markdown":      yakitMarkdown(emptyVirtualClient),
-	"Report":        yakitReport(emptyVirtualClient),
-	"File":          yakitFile(emptyVirtualClient),
-	"Output":        yakitOutput(emptyVirtualClient),
-	"SetProgress":   yakitSetProgress(emptyVirtualClient),
-	"SetProgressEx": yakitSetProgressEx(emptyVirtualClient),
+	"Info":          emptyVirtualClient.YakitInfo,
+	"Warn":          emptyVirtualClient.YakitWarn,
+	"Debug":         emptyVirtualClient.YakitDebug,
+	"Error":         emptyVirtualClient.YakitError,
+	"Text":          emptyVirtualClient.YakitTextBlock,
+	"Markdown":      emptyVirtualClient.YakitMarkdown,
+	"Report":        emptyVirtualClient.YakitReport,
+	"File":          emptyVirtualClient.YakitFile,
+	"Output":        emptyVirtualClient.YakitLog,
+	"SetProgress":   emptyVirtualClient.YakitSetProgress,
+	"SetProgressEx": emptyVirtualClient.YakitSetProgressEx,
 }
 
 func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
@@ -103,16 +104,16 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 }
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 	var YakitExports = map[string]interface{}{
-		"Info":          yakitInfo(client),
-		"Warn":          yakitWarn(client),
-		"Error":         yakitError(client),
-		"Text":          yakitTextBlock(client),
-		"Markdown":      yakitMarkdown(client),
-		"Report":        yakitReport(client),
-		"File":          yakitFile(client),
-		"Output":        yakitOutput(client),
-		"SetProgress":   yakitSetProgress(client),
-		"SetProgressEx": yakitSetProgressEx(client),
+		"Info":          client.YakitInfo,
+		"Warn":          client.YakitWarn,
+		"Error":         client.YakitError,
+		"Text":          client.YakitTextBlock,
+		"Markdown":      client.YakitMarkdown,
+		"Report":        client.YakitReport,
+		"File":          client.YakitFile,
+		"Output":        client.YakitLog,
+		"SetProgress":   client.YakitSetProgress,
+		"SetProgressEx": client.YakitSetProgressEx,
 	}
 	exports := GetExtYakitLibByOutput(client.Output)
 	for k, v := range exports {
@@ -473,94 +474,74 @@ func GetYakitClientInstance() *YakitClient {
 	return yakitClientInstance
 }
 
-func yakitInfo(c *YakitClient) func(tmp string, items ...interface{}) {
-	return func(tmp string, items ...interface{}) {
-		c.Info(tmp, items...)
-	}
+func (c *YakitClient) YakitTextBlock(tmp interface{}) {
+	c.YakitDraw("text", tmp)
 }
 
-func YakitInfo(c *YakitClient) func(tmp string, items ...interface{}) {
-	return func(tmp string, items ...interface{}) {
-		c.Info(tmp, items...)
-	}
+func (c *YakitClient) YakitMarkdown(tmp interface{}) {
+	c.YakitDraw("markdown", tmp)
 }
 
-func yakitTextBlock(c *YakitClient) func(tmp interface{}) {
-	return func(tmp interface{}) {
-		c.OutputLog("text", utils.InterfaceToString(tmp))
-	}
+func (c *YakitClient) YakitReport(i int) {
+	c.YakitDraw("report", fmt.Sprint(i))
 }
 
-func yakitMarkdown(c *YakitClient) func(tmp interface{}) {
-	return func(tmp interface{}) {
-		c.OutputLog("markdown", utils.InterfaceToString(tmp))
+func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
+	var title = fileName
+	var descStr = ""
+	if len(desc) > 1 {
+		title = utils.InterfaceToString(desc[0])
+		descStr = utils.InterfaceToString(funk.Reduce(funk.Tail(desc), func(i interface{}, s interface{}) string {
+			return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
+		}, ""))
+		descStr = strings.Trim(descStr, " \r\n,")
 	}
-}
 
-func yakitReport(c *YakitClient) func(i int) {
-	return func(i int) {
-		c.OutputLog("report", fmt.Sprint(i))
-	}
-}
-
-func yakitFile(c *YakitClient) func(fileName string, desc ...interface{}) {
-	return func(fileName string, desc ...interface{}) {
-		var title = fileName
-		var descStr = ""
-		if len(desc) > 1 {
-			title = utils.InterfaceToString(desc[0])
-			descStr = utils.InterfaceToString(funk.Reduce(funk.Tail(desc), func(i interface{}, s interface{}) string {
-				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
-			}, ""))
-			descStr = strings.Trim(descStr, " \r\n,")
+	existed, _ := utils.PathExists(fileName)
+	var size uint64
+	isDir := utils.IsDir(fileName)
+	if existed && !isDir {
+		if info, _ := os.Stat(fileName); info != nil {
+			size = uint64(info.Size())
 		}
-
-		existed, _ := utils.PathExists(fileName)
-		var size uint64
-		isDir := utils.IsDir(fileName)
-		if existed && !isDir {
-			if info, _ := os.Stat(fileName); info != nil {
-				size = uint64(info.Size())
-			}
-		}
-		dir := fileName
-		if !isDir {
-			dir = filepath.Dir(dir)
-		}
-		raw, err := json.Marshal(map[string]interface{}{
-			"title":       title,
-			"description": descStr,
-			"path":        fileName,
-			"is_dir":      utils.IsDir(fileName),
-			"dir":         dir,
-			"is_existed":  existed,
-			"file_size":   utils.ByteSize(size),
-		})
-		if err != nil {
-			log.Errorf("error for build file struct data: %v", err)
-			return
-		}
-		c.OutputLog("file", string(raw))
 	}
+	dir := fileName
+	if !isDir {
+		dir = filepath.Dir(dir)
+	}
+	raw, err := json.Marshal(map[string]interface{}{
+		"title":       title,
+		"description": descStr,
+		"path":        fileName,
+		"is_dir":      utils.IsDir(fileName),
+		"dir":         dir,
+		"is_existed":  existed,
+		"file_size":   utils.ByteSize(size),
+	})
+	if err != nil {
+		log.Errorf("error for build file struct data: %v", err)
+		return
+	}
+	c.YakitDraw("file", string(raw))
 }
 
-func yakitError(c *YakitClient) func(tmp string, items ...interface{}) {
-	return func(tmp string, items ...interface{}) {
-		c.Error(tmp, items...)
-	}
+func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
+	c.yakLogger.Error(tmp, items...)
+	c.YakitLog("error", tmp, items...)
+}
+func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
+	c.yakLogger.Info(tmp, items...)
+	c.YakitLog("info", tmp, items...)
+}
+func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
+	c.yakLogger.Debug(tmp, items...)
+	c.YakitLog("debug", tmp, items...)
+}
+func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
+	c.yakLogger.Warn(tmp, items...)
+	c.YakitLog("warn", tmp, items...)
 }
 
-func yakitOutput(c *YakitClient) func(i interface{}) error {
-	return func(i interface{}) error {
-		return c.Output(i)
-	}
-}
-
-func yakitWarn(c *YakitClient) func(tmp string, items ...interface{}) {
-	return func(tmp string, items ...interface{}) {
-		c.Warn(tmp, items...)
-	}
-}
 func init() {
 	AutoInitYakit()
 }
@@ -593,16 +574,18 @@ func updateYakitStore() error {
 	return yakit.UpdateYakitStore(db, "")
 }
 
-func yakitSetProgressEx(c *YakitClient) func(id string, f float64) {
-	return func(id string, f float64) {
-		c.SetProgress(id, f)
-	}
+func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
+	c.send(&YakitProgress{
+		Id:       id,
+		Progress: f,
+	})
 }
 
-func yakitSetProgress(c *YakitClient) func(f float64) {
-	return func(f float64) {
-		yakitSetProgressEx(c)("main", f)
-	}
+func (c *YakitClient) YakitSetProgress(f float64) {
+	c.send(&YakitProgress{
+		Id:       "main",
+		Progress: f,
+	})
 }
 
 // mitm risk

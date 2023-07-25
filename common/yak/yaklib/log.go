@@ -2,11 +2,10 @@ package yaklib
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
+	"os"
+	"path/filepath"
 
 	"strings"
 	"sync"
@@ -43,8 +42,8 @@ func _fixYakModName(name string) string {
 	}
 }
 
-type yakLogger struct {
-	logger   *log.Logger
+type YakLogger struct {
+	*log.Logger
 	Info     logFunc
 	Debug    logFunc
 	Warn     logFunc
@@ -52,25 +51,35 @@ type yakLogger struct {
 	SetLevel func(string) *golog.Logger
 }
 
-func CreateYakLogger(yakFile string) *yakLogger {
+func CreateYakLogger(yakFiles ...string) *YakLogger {
+	var yakFile string
+	if len(yakFiles) > 0 {
+		yakFile = yakFiles[0]
+	}
 	var logger *log.Logger
 	loggerRaw, ok := _logs.Load(_fixYakModName(yakFile))
 	if !ok {
 		logger = log.GetLogger(_fixYakModName(yakFile))
 		logger.SetOutput(os.Stdout)
 		logger.Level = log.DefaultLogger.Level
+		logger.Printer.IsTerminal = true
 		_logs.Store(_fixYakModName(yakFile), logger)
 	} else {
 		logger = loggerRaw.(*log.Logger)
 	}
 
-	res := &yakLogger{logger: logger}
+	res := &YakLogger{Logger: logger}
 	res.Info = logger.Infof
 	res.Debug = logger.Debugf
 	res.Warn = logger.Warnf
 	res.Error = logger.Errorf
 	res.SetLevel = logger.SetLevel
 	return res
+}
+func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
+	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) any {
+		return engine.RuntimeInfo(infoType)
+	})
 }
 
 var LogExports = map[string]interface{}{

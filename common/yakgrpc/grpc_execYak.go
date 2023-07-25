@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -248,7 +249,18 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 	history.Ok = true
 	return nil
 }
-
+func (s *Server) execRequestInCurrentServerEngine(req *ypb.ExecRequest, moduleName string, ctx context.Context, handler func(
+	result *ypb.ExecResult, logInfo *yaklib.YakitLog,
+) error, writer io.Writer) error {
+	engine := yak.NewScriptEngine(100)
+	var fp, err = os.CreateTemp(os.TempDir(), "yakit-plugin-selector-*.txt")
+	if err != nil {
+		return utils.Errorf("create yakit plugin selector failed: %s", err)
+	}
+	fp.WriteString(req.GetScript())
+	fp.Close()
+	return engine.ExecuteMain(req.GetScript(), fp.Name())
+}
 func (s *Server) Exec(req *ypb.ExecRequest, stream ypb.Yak_ExecServer) error {
 	return s.ExecWithContext(stream.Context(), req, stream)
 }
@@ -256,6 +268,13 @@ func (s *Server) Exec(req *ypb.ExecRequest, stream ypb.Yak_ExecServer) error {
 func (s *Server) ExecWithContext(ctx context.Context, req *ypb.ExecRequest, stream ypb.Yak_ExecServer) error {
 	if ctx == nil {
 		ctx = stream.Context()
+	}
+	if req.NoDividedEngine {
+		return s.execRequestInCurrentServerEngine(req, req.ScriptId, ctx, func(result *ypb.ExecResult, _ *yaklib.YakitLog) error {
+			return stream.Send(result)
+		}, &YakOutputStreamerHelperWC{
+			stream: stream,
+		})
 	}
 	return s.execRequest(req, req.ScriptId, ctx, func(result *ypb.ExecResult, _ *yaklib.YakitLog) error {
 		return stream.Send(result)

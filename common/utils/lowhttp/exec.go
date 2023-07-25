@@ -938,12 +938,10 @@ RECONNECT:
 	conn.SetDeadline(time.Now().Add(timeout))
 	httpResponseReader := bufio.NewReader(io.TeeReader(conn, &responseRaw))
 
-	// 服务器响应第一个字节
+	// 统计serve时长，到服务器开始响应的第一个字节结束
 	serverTimeStart := time.Now()
-	peek, err := httpResponseReader.Peek(1)
-	if err == nil && len(peek) == 1 {
-		traceInfo.ServerTime = time.Since(serverTimeStart)
-	}
+	httpResponseReader.Peek(1)
+	traceInfo.ServerTime = time.Since(serverTimeStart)
 
 	var multiResponses []*http.Response
 	var isMultiResponses bool

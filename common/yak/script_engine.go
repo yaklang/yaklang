@@ -262,8 +262,8 @@ func initYaklangLib() {
 
 type ScriptEngine struct {
 	swg *utils.SizedWaitGroup
-
-	tasks *sync.Map
+	logger **yaklib.YakLogger // 由于logger是要对client设置的，而client可以通过hook设置，所以这里用个二级指针，方便修改 logger
+	tasks  *sync.Map
 
 	// 设定几个 hook
 	RegisterLogHook          yaklib.RegisterOutputFuncType
@@ -349,6 +349,7 @@ func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) erro
 
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		client.SetYakLog(*e.logger)
 		log.Infof("set yakit client: %v", client)
 		yaklib.SetEngineClient(engine, client)
 		vm := engine.GetVM()
@@ -363,7 +364,10 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 					if err != nil {
 						return nil, err
 					}
-					caller.SetFeedback(yaklib.RawHandlerToExecOutput(client.Output))
+					caller.SetFeedback(func(i *ypb.ExecResult) error {
+						yaklib.RawHandlerToExecOutput(client.YakitAutoLog)(i)
+						return nil
+					})
 					return caller, nil
 				}
 			})
@@ -467,13 +471,19 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		engine.SetSourceFilePath(fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_FILENAME", fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_DIR", filepath.Dir(fmt.Sprint(yakAbsFile)))
+
 	}
 
 	// getParam 和 param 获取参数内容
 	engine.SetVar("getParam", paramGetter)
 	engine.SetVar("getParams", paramGetter)
 	engine.SetVar("param", paramGetter)
-	engine.SetVar("log", yaklib.CreateYakLogger(fmt.Sprint(yakAbsFile)))
+	*e.logger = yaklib.CreateYakLogger(fmt.Sprint(yakAbsFile))
+	engine.SetVar("log", *e.logger) // 设置 log 库
+	(*e.logger).SetEngine(engine)
+	client := yaklib.GetYakitClientInstance() // 设置全局 client 的 log
+	client.SetYakLog(*e.logger)
+	yaklib.SetEngineClient(engine, client)
 
 	for _, hook := range e.engineHooks {
 		err = hook(engine)
@@ -609,11 +619,10 @@ func Execute(code string, params ...map[string]any) (*antlr4yak.Engine, error) {
 }
 
 func NewScriptEngine(maxConcurrent int) *ScriptEngine {
+	var logger *yaklib.YakLogger
 	engine := &ScriptEngine{
-		swg: utils.NewSizedWaitGroup(maxConcurrent),
-
-		tasks: new(sync.Map),
-
+		swg:                      utils.NewSizedWaitGroup(maxConcurrent),
+		tasks:                    new(sync.Map),
 		RegisterLogHook:          yaklib.RegisterLogHook,
 		RegisterLogConsoleHook:   yaklib.RegisterLogConsoleHook,
 		RegisterAlertHook:        yaklib.RegisterAlertHooks,
@@ -626,6 +635,7 @@ func NewScriptEngine(maxConcurrent int) *ScriptEngine {
 		UnregisterFailedHook:     yaklib.UnregisterFailedHooks,
 		UnregisterFinishHook:     yaklib.UnregisterFinishHooks,
 		UnregisterOutputHook:     yaklib.UnregisterOutputHooks,
+		logger:                   &logger,
 	}
 	engine.init()
 	return engine

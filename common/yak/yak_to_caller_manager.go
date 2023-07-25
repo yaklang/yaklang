@@ -135,6 +135,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 	//defer func() { cancel() }()
 	ins, err := engine.ExecuteExWithContext(ctx, code, map[string]interface{}{
 		"ROOT_CONTEXT": ctx,
+		"YAK_FILENAME": id,
 	})
 	if err != nil {
 		log.Errorf("init execute plugin finished: %s", err)
