@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -725,4 +726,269 @@ if rsp.Contains(getParam("token")) {
 		panic("HTTP TEST FAILED")
 	}
 
+}
+
+// TestGRPCMUSTPASS_MITM_Drop 测试MITM设置手动劫持并丢弃响应后MITM响应的行为和HTTP History的记录是否符合预期
+func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+
+	var (
+		started bool // MITM正常启动（此时MITM开启HTTP2支持
+		h2Test  bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer func() {
+		cancel()
+	}()
+
+	/* H2 */
+	h2Host, h2Port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+		return req
+	})
+	h2Addr := utils.HostPort(h2Host, h2Port)
+	log.Infof("start to mock h2 server: %v", utils.HostPort(h2Host, h2Port))
+	var rPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	// 测试我们的h2 mock服务器是否正常工作
+	_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+dump(rsp)
+dump(req)
+`, map[string]any{
+		"packet": `GET / HTTP/2.0
+User-Agent: 111
+Host: ` + h2Addr,
+	})
+	if err != nil {
+		panic(err)
+	}
+	// 启动MITM服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host:        "127.0.0.1",
+		Port:        uint32(rPort),
+		Recover:     true,
+		EnableHttp2: true,
+	})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	dropped := false
+	manual := false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
+			started = true
+			stream.Send(&ypb.MITMRequest{
+				SetAutoForward:   true,
+				AutoForwardValue: false, //手动劫持
+			})
+			time.Sleep(time.Second * 3)
+			manual = true
+			go func() {
+				defer func() {
+					wg.Done()
+					cancel()
+					if err := recover(); err != nil {
+						spew.Dump(err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				var token = utils.RandStringBytes(100)
+				var params = map[string]any{
+					"proxy": proxy,
+					"token": token,
+				}
+				tokenRaw := []byte(token)
+				params["h2packet"] = lowhttp.ReplaceHTTPPacketBody([]byte(`GET /mitm/test/h2/drop/token/`+token+` HTTP/2.0
+Host: `+h2Addr+`
+D: 1
+`), tokenRaw, false)
+				params["h2host"] = h2Host
+				params["h2port"] = h2Port
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("Start to send packet h2")
+packet := getParam("h2packet")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+println("-------------------------------------------------------------------------------------")
+
+_, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true), poc.http2(true), poc.timeout(120))
+
+`, params)
+				if err != nil {
+					panic(err)
+
+				}
+				defer cancel()
+				if utils.Spinlock(15, func() bool {
+					return dropped
+				}) == nil {
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/mitm/test/h2/drop/token/" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+					if len(flows) > 0 && strings.Contains(flows[0].Response, "请求被用户丢弃") { // 被用户手动丢弃的请求 不会有响应
+						spew.Dump(flows)
+						h2Test = true
+					} else if len(flows) == 0 {
+						panic("/mitm/test/h2/drop/token/" + token + " not found")
+					} else if !strings.Contains(flows[0].Response, "请求被用户丢弃") {
+						panic("/mitm/test/h2/drop/token/" + token + "should indicate user manually drop in http history")
+					} else {
+						panic("unknown err")
+					}
+				}
+
+			}()
+		}
+
+		if started && manual && strings.Contains(spew.Sdump(rsp), `/mitm/test/h2/drop/`) {
+			err := stream.Send(&ypb.MITMRequest{
+				Id:   rsp.GetId(),
+				Drop: true,
+			})
+			dropped = true
+			if err != nil {
+				panic(err)
+			}
+		}
+		spew.Dump(rsp)
+	}
+	wg.Wait()
+	if !started {
+		panic("MITM NOT STARTED!")
+	}
+
+	if !h2Test {
+		panic("H2 TEST FAILED")
+	}
+}
+
+// TestGRPCMUSTPASS_MITM_Drop 测试MITM访问不存在域名后后MITM响应的行为和HTTP History的记录是否符合预期
+func TestGRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+	addr := "go0pnb.com:6666"
+	host := "go0pnb.com"
+	port := 6666
+
+	var dnsServer = facades.MockDNSServerDefault(host, func(record string, domain string) string {
+		spew.Dump(domain)
+		return ""
+	})
+	var result = utils.GetFirstIPByDnsWithCache(host, 5*time.Second, dnsServer)
+	spew.Dump(result)
+
+	var (
+		started bool // MITM正常启动（此时MITM开启HTTP2支持
+		pass    bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer func() {
+		cancel()
+	}()
+
+	var rPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+
+	// 启动MITM服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host:        "127.0.0.1",
+		Port:        uint32(rPort),
+		Recover:     true,
+		EnableHttp2: true,
+		DnsServers:  []string{dnsServer},
+	})
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
+			started = true
+			go func() {
+				defer func() {
+					wg.Done()
+					cancel()
+					if err := recover(); err != nil {
+						spew.Dump(err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				var token = utils.RandStringBytes(100)
+				var params = map[string]any{
+					"proxy": proxy,
+					"token": token,
+				}
+				tokenRaw := []byte(token)
+				params["packet"] = lowhttp.ReplaceHTTPPacketBody([]byte(`GET /mitm/test/nohost/token/`+token+` HTTP/1.0
+Host: `+addr+`
+D: 1
+`), tokenRaw, false)
+				params["host"] = "1.1.1.1" // 这里随便指定一个ip避免lowhttp自己dns查询
+				params["port"] = port
+				time.Sleep(time.Second * 3)
+				_, _ = yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req,err := poc.HTTP(getParam("packet"), poc.proxy(getParam("proxy")),poc.host(getParam("host")), poc.port(getParam("port")))
+dump("=============")
+dump(err)
+`, params)
+				defer cancel()
+				time.Sleep(time.Second * 10)
+				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+					SearchURL: "/mitm/test/nohost/token/" + token,
+				})
+				if err != nil {
+					panic(err)
+				}
+				if len(flows) > 0 && strings.Contains(flows[0].Response, "Unknown host:") { // 被用户手动丢弃的请求 不会有响应
+					spew.Dump(flows)
+					pass = true
+				} else if len(flows) == 0 {
+					panic("/mitm/test/nohost/token/" + token + " not found")
+				} else if !strings.Contains(flows[0].Response, "Unknown host:") {
+					panic("/mitm/test/nohost/token/" + token + "unexpected http rsp")
+				} else {
+					panic("unknown err")
+				}
+
+			}()
+		}
+
+		spew.Dump(rsp)
+	}
+	wg.Wait()
+	if !started {
+		panic("MITM NOT STARTED!")
+	}
+
+	if !pass {
+		panic("NO SUCH HOST MITM NOT EXPECTED")
+	}
 }
