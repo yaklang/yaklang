@@ -1167,6 +1167,7 @@ func GetIPsFromHostWithTimeout(timeout time.Duration, domain string, dnsServers 
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// RandStringBytes return length `n` alphabet random string
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
