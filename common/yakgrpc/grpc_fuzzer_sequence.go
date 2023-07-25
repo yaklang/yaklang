@@ -189,10 +189,12 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 	return f
 }
 
-func (s *Server) execFlow(wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
+func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
 	var req = f.GetFuzzerRequest()
 	fallback := newHTTPFuzzerFallback(req, stream)
 	if f.next != nil {
+		var swg = utils.NewSizedWaitGroup(int(flowMax))
+
 		fallback.onEveryResponse = func(response *ypb.FuzzerResponse) {
 			var copiedReq = ypb.FuzzerRequest{}
 			var raw, err = json.Marshal(f.next)
@@ -208,9 +210,13 @@ func (s *Server) execFlow(wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := s.execFlow(wg, NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response), stream)
+				swg.Add()
+				err := s.execFlow(flowMax, wg, NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response), stream)
+				swg.Done()
 				if err != nil {
 					log.Errorf("execFlow: %v", err)
+				} else {
+					log.Infof("execFlow in everyResponse done: %v", err)
 				}
 			}()
 		}
@@ -233,6 +239,12 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 	defer func() {
 		close(finalErr)
 	}()
+
+	var maxFlow = seqreq.GetConcurrent()
+	if maxFlow <= 0 {
+		maxFlow = 5
+	}
+
 	var wg = new(sync.WaitGroup)
 	wg.Add(1)
 	defer wg.Wait()
@@ -260,7 +272,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 			return
 		}
 
-		finalErr <- s.execFlow(wg, firstFlow, stream)
+		finalErr <- s.execFlow(maxFlow, wg, firstFlow, stream)
 	}()
 	select {
 	case err := <-finalErr:
