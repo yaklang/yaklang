@@ -772,10 +772,11 @@ Host: ` + h2Addr,
 		panic(err)
 	}
 	stream.Send(&ypb.MITMRequest{
-		Host:        "127.0.0.1",
-		Port:        uint32(rPort),
-		Recover:     true,
-		EnableHttp2: true,
+		Host:           "127.0.0.1",
+		Port:           uint32(rPort),
+		SetResetFilter: true,
+		Recover:        true,
+		EnableHttp2:    true,
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -916,11 +917,12 @@ func TestGRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
 		panic(err)
 	}
 	stream.Send(&ypb.MITMRequest{
-		Host:        "127.0.0.1",
-		Port:        uint32(rPort),
-		Recover:     true,
-		EnableHttp2: true,
-		DnsServers:  []string{dnsServer},
+		Host:           "127.0.0.1",
+		Port:           uint32(rPort),
+		Recover:        true,
+		EnableHttp2:    true,
+		SetResetFilter: true,
+		DnsServers:     []string{dnsServer},
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
