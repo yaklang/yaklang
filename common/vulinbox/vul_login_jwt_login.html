@@ -27,11 +27,8 @@
         </div>
     </div>
     <script>
-
         const token = localStorage.getItem('VULINBOX_JWT');
         if (token) {
-            document.getElementById("authcheck").innerHTML = "<div class='alert alert-success'>已登录</div>" ;
-
             fetch('/jwt/login/profile', {
                 method: 'GET',
                 headers: {
@@ -41,6 +38,8 @@
             })
                 .then(response => response.json())
                 .then(data => {
+                    document.getElementById("authcheck").innerHTML = "<div class='alert alert-success'>已登录</div>" ;
+
                     // 处理个人资料数据
                     const profileData = data[0];
                     const profileContainer = document.createElement('div');
