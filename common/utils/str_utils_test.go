@@ -137,3 +137,17 @@ func TestGetIPFromHostWithContextAndDNSServers(t *testing.T) {
 		_ = err
 	}
 }
+
+func TestHostPort(t *testing.T) {
+	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("127.0.0.1:80", 8787))
+	assert.Equal(t, "127.0.0.1:8787", AppendDefaultPort("127.0.0.1", 8787))
+	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("http://127.0.0.1", 8787))
+	assert.Equal(t, "127.0.0.1:443", AppendDefaultPort("https://127.0.0.1", 8787))
+	assert.Equal(t, "127.0.0.1:7777", AppendDefaultPort("https://127.0.0.1:7777", 8787))
+	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("ws://127.0.0.1", 8787))
+	assert.Equal(t, "127.0.0.1:443", AppendDefaultPort("wss://127.0.0.1", 8787))
+	assert.Equal(t, ":7777", AppendDefaultPort(":7777", 8787))
+	assert.Equal(t, ":8787", AppendDefaultPort(":8787", 8787))
+	assert.Equal(t, "127.0.0.1:8787", AppendDefaultPort("127.0.0.1", 8787))
+	assert.Equal(t, "yaklang.io:8787", AppendDefaultPort("yaklang.io", 8787))
+}
