@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"net/http"
 	"time"
 )
 
@@ -163,9 +164,14 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 			reqBytes = r.GetRequestRaw()
 		}
 		if nextCookies != nil && len(nextCookies) > 0 {
+			var cookie []*http.Cookie
 			for k, v := range nextCookies {
-				reqBytes = lowhttp.ReplaceHTTPPacketCookie(reqBytes, k, v)
+				cookie = append(cookie, &http.Cookie{
+					Name:  k,
+					Value: v,
+				})
 			}
+			reqBytes = lowhttp.ReplaceHTTPPacketHeader(reqBytes, "Cookie", lowhttp.CookiesToString(cookie))
 		}
 		r.RequestRaw = reqBytes
 		r.Request = ""
