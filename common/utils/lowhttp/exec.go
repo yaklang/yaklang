@@ -63,7 +63,7 @@ type LowhttpExecConfig struct {
 
 type LowhttpResponse struct {
 	RawPacket          []byte
-	RedirectRawPackets [][]byte
+	RedirectRawPackets []*RedirectFlow
 	PortIsOpen         bool
 	TraceInfo          *LowhttpTraceInfo
 	Url                string
@@ -343,6 +343,12 @@ func GetSystemHostByName(domain string) (string, bool) {
 	return raw, ok
 }
 
+type RedirectFlow struct {
+	IsHttps  bool
+	Request  []byte
+	Response []byte
+}
+
 func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
@@ -355,16 +361,19 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		redirectTimes      = option.RedirectTimes
 		redirectHandler    = option.RedirectHandler
 		jsRedirect         = option.JsRedirect
-		redirectRawPackets [][]byte
+		redirectRawPackets []*RedirectFlow
 		response           *LowhttpResponse
 		err                error
 	)
 	response, err = HTTPWithoutRedirect(opts...)
-	raw := response.RawPacket
 	if err != nil {
 		return response, err
 	}
-
+	raw := &RedirectFlow{
+		IsHttps:  response.Https,
+		Request:  response.RawRequest,
+		Response: response.RawPacket,
+	}
 	if raw != nil {
 		redirectRawPackets = append(redirectRawPackets, raw)
 	}
@@ -372,7 +381,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if redirectTimes > 0 {
 		lastPacket := raw
 		for i := 0; i < redirectTimes; i++ {
-			target := GetRedirectFromHTTPResponse(lastPacket, jsRedirect)
+			target := GetRedirectFromHTTPResponse(lastPacket.Response, jsRedirect)
 			if target == "" {
 				response.RedirectRawPackets = redirectRawPackets
 				return response, nil
@@ -386,28 +395,31 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}
 
 			if redirectHandler != nil {
-				if !redirectHandler(forceHttps, r, lastPacket) {
+				if !redirectHandler(forceHttps, r, lastPacket.Response) {
 					break
 				}
 			}
 
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
-			r = UrlToGetRequestPacket(targetUrl, r, forceHttps, ExtractCookieJarFromHTTPResponse(lastPacket)...)
+			r = UrlToGetRequestPacket(targetUrl, r, forceHttps, ExtractCookieJarFromHTTPResponse(lastPacket.Response)...)
 			nextHost, nextPort, _ := utils.ParseStringToHostPort(targetUrl)
 			log.Debugf("[lowhttp] redirect to: %s", targetUrl)
 
 			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r))
 			response, err = HTTPWithoutRedirect(newOpts...)
-			responseRaw := response.RawPacket
-
 			if err != nil {
 				log.Errorf("met error in redirect...: %s", err)
-				response.RawPacket = lastPacket // 保留原始报文
+				response.RawPacket = lastPacket.Response // 保留原始报文
 				return response, nil
 			}
+			responseRaw := &RedirectFlow{
+				IsHttps:  response.Https,
+				Request:  response.RawRequest,
+				Response: response.RawPacket,
+			}
 			if responseRaw == nil {
-				response.RawPacket = lastPacket // 保留原始报文
+				response.RawPacket = lastPacket.Response // 保留原始报文
 				return response, nil
 			}
 			redirectRawPackets = append(redirectRawPackets, responseRaw)

@@ -604,6 +604,18 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			MatchedByMatcher:      httpTPLmatchersResult,
 			HitColor:              req.GetHitColor(),
 		}
+
+		if result.LowhttpResponse != nil {
+			// redirect
+			for _, f := range result.LowhttpResponse.RedirectRawPackets {
+				rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
+					IsHttps:  f.IsHttps,
+					Request:  f.Request,
+					Response: f.Response,
+				})
+			}
+		}
+
 		// 处理额外时间
 		if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 			rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
