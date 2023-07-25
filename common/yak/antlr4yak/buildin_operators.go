@@ -144,6 +144,13 @@ func init() {
 				Value:       v,
 				Literal:     fmt.Sprint(v),
 			}
+		} else if op2.IsString() && op1.IsString() {
+			v := op1.String() > op2.String()
+			return &yakvm.Value{
+				TypeVerbose: "bool",
+				Value:       v,
+				Literal:     fmt.Sprint(v),
+			}
 		}
 
 		panic(fmt.Sprintf("cannot support op1[%v] > op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
@@ -166,6 +173,13 @@ func init() {
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() >= op2.Float64()
+			return &yakvm.Value{
+				TypeVerbose: "bool",
+				Value:       v,
+				Literal:     fmt.Sprint(v),
+			}
+		} else if op2.IsString() && op1.IsString() {
+			v := op1.String() >= op2.String()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
@@ -198,8 +212,14 @@ func init() {
 				Value:       v,
 				Literal:     fmt.Sprint(v),
 			}
+		} else if op2.IsString() && op1.IsString() {
+			v := strings.Compare(op1.String(), op2.String()) < 0
+			return &yakvm.Value{
+				TypeVerbose: "bool",
+				Value:       v,
+				Literal:     fmt.Sprint(v),
+			}
 		}
-
 		panic(fmt.Sprintf("cannot support op1[%v] < op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
 	})
 
@@ -220,6 +240,13 @@ func init() {
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() <= op2.Float64()
+			return &yakvm.Value{
+				TypeVerbose: "bool",
+				Value:       v,
+				Literal:     fmt.Sprint(v),
+			}
+		} else if op2.IsString() && op1.IsString() {
+			v := strings.Compare(op1.String(), op2.String()) <= 0
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,

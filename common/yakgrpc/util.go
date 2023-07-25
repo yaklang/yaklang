@@ -5,17 +5,14 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/consts"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
 // OpenPortServerStreamerHelperRWC
@@ -122,6 +119,45 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 		log.Info("loading plugin empty")
 	}
 	return params, callback, nil
+}
+func NewLocalClient() (ypb.YakClient, error) {
+	consts.InitilizeDatabase("", "")
+	yakit.InitializeDefaultDatabase()
+
+	port := utils.GetRandomAvailableTCPPort()
+	addr := utils.HostPort("127.0.0.1", port)
+	grpcTrans := grpc.NewServer(
+		grpc.MaxRecvMsgSize(100*1024*1024),
+		grpc.MaxSendMsgSize(100*1024*1024),
+	)
+	s, err := NewServer()
+	if err != nil {
+		log.Errorf("build yakit server failed: %s", err)
+		return nil, err
+	}
+	ypb.RegisterYakServer(grpcTrans, s)
+	var lis net.Listener
+	lis, err = net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		err = grpcTrans.Serve(lis)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
+
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+		grpc.MaxCallRecvMsgSize(100*1024*1045),
+	))
+	if err != nil {
+		return nil, err
+	}
+	return ypb.NewYakClient(conn), nil
 }
 
 type YamlMapBuilder struct {

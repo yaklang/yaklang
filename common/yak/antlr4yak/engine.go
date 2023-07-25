@@ -421,3 +421,6 @@ func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interf
 	}
 	return val.Value, nil
 }
+func (e *Engine) RuntimeInfo(infoType string) any {
+	return e.vm.RuntimeInfo(infoType)
+}

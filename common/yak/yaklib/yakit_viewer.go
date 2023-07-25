@@ -19,7 +19,7 @@ type YakitFeature struct {
 }
 
 func yakitEnableCrawlerViewer(targets string) {
-	yakitClientInstance.Output(&YakitFeature{
+	yakitClientInstance.YakitAutoLog(&YakitFeature{
 		Feature: "website-trees",
 		Params: map[string]interface{}{
 			"targets":          targets,
@@ -29,7 +29,7 @@ func yakitEnableCrawlerViewer(targets string) {
 }
 
 func yakitEnableFixedTable(tableName string, columns []string) {
-	yakitClientInstance.Output(&YakitFeature{
+	yakitClientInstance.YakitAutoLog(&YakitFeature{
 		Feature: "fixed-table",
 		Params: map[string]interface{}{
 			"table_name": tableName,
@@ -53,7 +53,7 @@ func yakitTableData(tableName string, data any) *YakitFixedTableData {
 	}
 	tableData.Data["uuid"] = uuid.NewV4().String()
 	if yakitClientInstance != nil {
-		yakitClientInstance.Output(tableData)
+		yakitClientInstance.YakitAutoLog(tableData)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ type YakitStatusCard struct {
 }
 
 func yakitStatusCard(id string, data interface{}, tags ...string) {
-	yakitClientInstance.Output(&YakitStatusCard{
+	yakitClientInstance.YakitAutoLog(&YakitStatusCard{
 		Id: id, Data: fmt.Sprint(data), Tags: tags,
 	})
 }

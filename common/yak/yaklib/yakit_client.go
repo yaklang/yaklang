@@ -3,16 +3,14 @@ package yaklib
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -49,21 +47,24 @@ func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	return remoteClient
 }
 
-func RawHandlerToExecOutput(h func(any) error) func(result *ypb.ExecResult) error {
-	return func(result *ypb.ExecResult) error {
-		return h(result)
+func RawHandlerToExecOutput(h func(any)) func(result *ypb.ExecResult) {
+	return func(result *ypb.ExecResult) {
+		h(result)
 	}
 }
 
 type YakitClient struct {
-	addr   string
-	client *http.Client
-	send   func(i interface{}) error
+	addr      string
+	client    *http.Client
+	yakLogger *YakLogger
+	send      func(i interface{}) error
 }
 
 func NewYakitClient(addr string) *YakitClient {
+	logger := CreateYakLogger()
 	client := &YakitClient{
-		addr: addr,
+		addr:      addr,
+		yakLogger: logger,
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -83,6 +84,7 @@ func NewYakitClient(addr string) *YakitClient {
 			Timeout: 15 * time.Second,
 		},
 	}
+
 	client.send = func(i interface{}) error {
 		if client == nil {
 			return utils.Errorf("no client set")
@@ -107,64 +109,40 @@ func NewYakitClient(addr string) *YakitClient {
 		}
 		return nil
 	}
-
 	client.client.Timeout = 15 * time.Second
 	return client
 }
-
-func (c *YakitClient) SetProgress(id string, progress float64) error {
-	if c == nil {
-		return nil
-	}
-
-	return c.send(&YakitProgress{
-		Id:       id,
-		Progress: progress,
-	})
+func (c *YakitClient) SetYakLog(logger *YakLogger) {
+	c.yakLogger = logger
 }
 
 // 输入
-func (c *YakitClient) OutputLog(level string, info string, items ...interface{}) error {
-	var data string
-	if len(items) > 0 {
-		data = fmt.Sprintf(info, items...)
-	} else {
-		data = info
-	}
-	f := log.Info
-	switch strings.ToLower(level) {
-	case "error", "errorf", "failed", "fatal", "panic":
-		f = log.Error
-	case "warning", "warn":
-		f = log.Warn
-	case "info", "note", "debug", "":
-		fallthrough
-	default:
-		f = log.Info
-	}
-	if len(data) > 256 {
-		f(string(data[:100]) + "...")
-	} else {
-		f(data)
-	}
-
-	// client 不存在
-	if c == nil {
-		return nil
-	}
-
+func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) {
+	data := fmt.Sprintf(tmp, items...)
 	err := c.send(&YakitLog{
 		Level:     level,
 		Data:      data,
 		Timestamp: time.Now().Unix(),
 	})
 	if err != nil {
-		log.Errorf("feedback yakit log failed: %s", err)
-		return err
+		log.Error(err)
 	}
-	return nil
 }
 
+func (c *YakitClient) YakitDraw(level string, data interface{}) {
+	err := c.send(&YakitLog{
+		Level:     level,
+		Data:      utils.InterfaceToString(data),
+		Timestamp: time.Now().Unix(),
+	})
+	if err != nil {
+		log.Error(err)
+	}
+}
+func (c *YakitClient) YakitAutoLog(i interface{}) {
+	level, msg := MarshalYakitOutput(i)
+	c.YakitLog(level, msg)
+}
 func (c *YakitClient) SendRaw(y *YakitLog) error {
 	if c == nil {
 		return utils.Error("no client")
@@ -172,57 +150,6 @@ func (c *YakitClient) SendRaw(y *YakitLog) error {
 	return c.send(y)
 }
 
-func (c *YakitClient) Info(info string, items ...interface{}) error {
-	return c.OutputLog("info", info, items...)
-}
-
-func (c *YakitClient) Error(tmp string, items ...interface{}) error {
-	return c.OutputLog("error", tmp, items...)
-}
-
-func (c *YakitClient) Warn(info string, items ...interface{}) error {
-	return c.OutputLog("warning", info, items...)
-}
-
-func (c *YakitClient) Output(t interface{}) error {
-	if t == nil {
-		return nil
-	}
-	switch t.(type) {
-	case *ypb.ExecResult:
-		return c.send(t)
-	}
-	level, data := MarshalYakitOutput(t)
-	if level == "" {
-		return utils.Errorf("marshal yakit output failed")
-	}
-
-	return c.OutputLog(level, data)
-}
-
-func (c *YakitClient) Save(t interface{}) error {
-	var r interface{}
-	switch ret := t.(type) {
-	case *fp.MatchResult:
-		r = NewPortFromMatchResult(ret)
-	case *synscan.SynScanResult:
-		r = NewPortFromSynScanResult(ret)
-	}
-
-	raw, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	switch t.(type) {
-	case *fp.MatchResult:
-		return c.OutputLog("asset-port", string(raw))
-	case *synscan.SynScanResult:
-		return c.OutputLog("asset-port", string(raw))
-	default:
-		return c.OutputLog("json", string(raw))
-	}
-}
 func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	//修改yakit库的客户端
 	e.ImportSubLibs("yakit", GetExtYakitLibByClient(client))
