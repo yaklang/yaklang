@@ -89,3 +89,5 @@ jobs:
 
       - name: Test Sca
         run: go test -timeout 1m ./common/sca/... -v
+      - name: Test Utils
+        run: go test -timeout 1m -run TestHostPort ./common/utils/ -v
