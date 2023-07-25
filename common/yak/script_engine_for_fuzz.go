@@ -128,7 +128,9 @@ func MutateWithYaklang(raw string) *mutate.RegexpMutateCondition {
 		log.Errorf("load yak hook failed: %s", err)
 		engine = nil
 	}
-	log.Infof("create YAK_HOOK rule[clen:%v]", len(raw))
+	if len(raw) > 0 {
+		log.Infof("create YAK_HOOK rule[clen:%v]", len(raw))
+	}
 
 	return &mutate.RegexpMutateCondition{
 		Verbose: "YAK_HOOK",

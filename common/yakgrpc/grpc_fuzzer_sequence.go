@@ -215,8 +215,6 @@ func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFl
 				swg.Done()
 				if err != nil {
 					log.Errorf("execFlow: %v", err)
-				} else {
-					log.Infof("execFlow in everyResponse done: %v", err)
 				}
 			}()
 		}
