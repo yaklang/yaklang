@@ -139,6 +139,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 	}
 
 	var nextVar = reqs[0].GetParams()
+	var nextCookies = make(map[string]string)
 	for index, r := range reqs {
 		r := r
 
@@ -154,6 +155,20 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 		if inheritVars {
 			r.Params = nextVar
 		}
+
+		var reqBytes []byte
+		if r.GetRequest() != "" {
+			reqBytes = []byte(r.GetRequest())
+		} else {
+			reqBytes = r.GetRequestRaw()
+		}
+		if nextCookies != nil && len(nextCookies) > 0 {
+			for k, v := range nextCookies {
+				reqBytes = lowhttp.ReplaceHTTPPacketCookie(reqBytes, k, v)
+			}
+		}
+		r.RequestRaw = reqBytes
+		r.Request = ""
 
 		fallback := newHTTPFuzzerFallback(r, stream)
 		if r.ForceOnlyOneResponse {
@@ -188,7 +203,18 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 				})
 			}
 			nextVar = vars
+			var cookieFromReq = lowhttp.GetHTTPPacketCookies(response.GetRequestRaw())
+			for _, f := range response.RedirectFlows {
+				for k, v := range lowhttp.GetHTTPPacketCookies(f.GetRequest()) {
+					cookieFromReq[k] = v
+				}
+			}
+			for k, v := range lowhttp.GetHTTPPacketCookies(response.GetResponseRaw()) {
+				cookieFromReq[k] = v
+			}
+			nextCookies = cookieFromReq
 		} else {
+			nextCookies = make(map[string]string)
 			if len(reqs) > index+1 {
 				nextVar = reqs[index+1].GetParams()
 			}
