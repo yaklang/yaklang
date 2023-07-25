@@ -632,19 +632,18 @@ func ParseStringUrlToUrlInstance(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
 
-// AppendDefaultPort append `defaultPort` to `raw` string.
-// For `raw` with scheme like: https/wss/http/ws. The raw will be treated as implicit end with port 443/80
-// e.g. AppendDefaultPort("http://127.0.0.1", 8787) = "127.0.0.1:80"
-// AppendDefaultPort("wss://127.0.0.1", 8787) = "127.0.0.1:443"
-func AppendDefaultPort(raw string, defaultPort int) string {
-	var i string
-	host, port, _ := ParseStringToHostPort(raw)
-	if port <= 0 {
-		i = fmt.Sprintf("%v:%v", host, defaultPort)
-	} else {
-		i = HostPort(host, port)
+// AppendDefaultPort returns host:port format.
+// If the port is already specified in the host, it will be returned directly.
+// wss -> 443
+// ws -> 80
+// http -> 80
+// https -> 443
+func AppendDefaultPort(raw string, port int) string {
+	parsedHost, parsedPort, _ := ParseStringToHostPort(raw)
+	if parsedPort > 0 {
+		return HostPort(parsedHost, parsedPort)
 	}
-	return i
+	return HostPort(raw, port)
 }
 
 func ParseStringToHostPort(raw string) (host string, port int, err error) {
