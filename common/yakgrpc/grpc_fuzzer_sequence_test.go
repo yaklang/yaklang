@@ -108,20 +108,22 @@ func TestGRPCMUSTPASS_FuzzerSequence_InheritCookie(t *testing.T) {
 		token           = utils.RandStringBytes(32)
 		verified        = false
 	)
+
+	var token2 = utils.RandStringBytes(100)
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 
-		switch request.RequestURI {
+		switch request.URL.Path {
 		case "/verify":
 			if request.Header.Get("Authorization") == "Bearer "+token {
-				if lowhttp.GetHTTPPacketCookie(raw, "test") == "abc" {
+				if lowhttp.GetHTTPPacketCookie(raw, "test") == token2 {
 					verified = true
 				}
 			}
 
 		case "/abc":
 			redirect302done = true
-			if lowhttp.GetHTTPPacketCookie(raw, "test") == "abc" {
+			if lowhttp.GetHTTPPacketCookie(raw, "test") == token2 {
 				writer.Write([]byte(`{"key": "` + token + `"}`))
 			}
 			return
@@ -129,7 +131,7 @@ func TestGRPCMUSTPASS_FuzzerSequence_InheritCookie(t *testing.T) {
 			writer.Header().Set("Location", "/abc")
 			http.SetCookie(writer, &http.Cookie{
 				Name:  "test",
-				Value: "abc",
+				Value: token2,
 			})
 			writer.WriteHeader(302)
 			writer.Write([]byte("HELLO HTTP2"))
