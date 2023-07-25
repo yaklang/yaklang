@@ -13,8 +13,8 @@
 <body>
 
 <div class="container">
-    <h1 class="mt-4">RSA-OAEP 需要加密提交的表单内容 (密钥来源服务器，响应也加密) </h1>
-    <div class="alert">
+    <h1 class="mt-4">RSA-OAEP 需要加密提交的表单内容 </h1>
+    <div class="alert alert-warning">
         <p>密钥通过服务器加载，您需要前置获取服务器对应的加密密钥</p>
         <p>这个表单的登录信息被加密在响应中，您需要破解加密才能知道是否爆破成功</p>
     </div>
@@ -25,7 +25,7 @@
         </div>
         <div class="mb-3">
             <label for="password" class="form-label">Password</label>
-            <input id="password" class="form-control" type="text">
+            <input id="password" class="form-control" type="password">
         </div>
         <div class="mb-3">
             <label for="age" class="form-label">Age</label>
