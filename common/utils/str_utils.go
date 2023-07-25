@@ -632,19 +632,25 @@ func ParseStringUrlToUrlInstance(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
 
-// AppendDefaultPort append `defaultPort` to `raw` string.
-// For `raw` with scheme like: https/wss/http/ws. The raw will be treated as implicit end with port 443/80
-// e.g. AppendDefaultPort("http://127.0.0.1", 8787) = "127.0.0.1:80"
-// AppendDefaultPort("wss://127.0.0.1", 8787) = "127.0.0.1:443"
-func AppendDefaultPort(raw string, defaultPort int) string {
-	var i string
-	host, port, _ := ParseStringToHostPort(raw)
-	if port <= 0 {
-		i = fmt.Sprintf("%v:%v", host, defaultPort)
+// AppendDefaultPort ignore schema default port and use the port passed in.
+// only [schema://]ip[:port] is supported for raw, no hostname
+func AppendDefaultPort(raw string, port int) string {
+	if strings.Contains(raw, "://") {
+		uri, err := url.ParseRequestURI(raw)
+		if err != nil {
+			return ""
+		}
+		if uri.Port() != "" {
+			return net.JoinHostPort(uri.Hostname(), uri.Port())
+		}
+		return net.JoinHostPort(uri.Hostname(), strconv.Itoa(port))
 	} else {
-		i = HostPort(host, port)
+		pos := strings.LastIndexByte(raw, ':')
+		if pos == -1 {
+			return net.JoinHostPort(raw, strconv.Itoa(port))
+		}
+		return raw
 	}
-	return i
 }
 
 func ParseStringToHostPort(raw string) (host string, port int, err error) {
@@ -680,7 +686,7 @@ func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	portStr = strings.TrimSpace(portStr)
 	portInt64, err := strconv.ParseInt(portStr, 10, 32)
 	if err != nil {
-		return host, 0, errors.Errorf("%s parse port(%s) failed: %s", raw, portStr, err)
+		return "", 0, errors.Errorf("%s parse port(%s) failed: %s", raw, portStr, err)
 	}
 
 	port = int(portInt64)
@@ -1171,7 +1177,6 @@ func GetIPsFromHostWithTimeout(timeout time.Duration, domain string, dnsServers 
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-// RandStringBytes return length `n` alphabet random string
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {

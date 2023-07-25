@@ -138,16 +138,22 @@ func TestGetIPFromHostWithContextAndDNSServers(t *testing.T) {
 	}
 }
 
-func TestHostPort(t *testing.T) {
-	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("127.0.0.1:80", 8787))
-	assert.Equal(t, "127.0.0.1:8787", AppendDefaultPort("127.0.0.1", 8787))
-	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("http://127.0.0.1", 8787))
-	assert.Equal(t, "127.0.0.1:443", AppendDefaultPort("https://127.0.0.1", 8787))
-	assert.Equal(t, "127.0.0.1:7777", AppendDefaultPort("https://127.0.0.1:7777", 8787))
-	assert.Equal(t, "127.0.0.1:80", AppendDefaultPort("ws://127.0.0.1", 8787))
-	assert.Equal(t, "127.0.0.1:443", AppendDefaultPort("wss://127.0.0.1", 8787))
-	assert.Equal(t, ":7777", AppendDefaultPort(":7777", 8787))
-	assert.Equal(t, ":8787", AppendDefaultPort(":8787", 8787))
-	assert.Equal(t, "127.0.0.1:8787", AppendDefaultPort("127.0.0.1", 8787))
-	assert.Equal(t, "yaklang.io:8787", AppendDefaultPort("yaklang.io", 8787))
+func TestAppendDefaultPort(t *testing.T) {
+	type Case struct {
+		Raw  string
+		Port int
+		Res  string
+	}
+	cases := []Case{
+		{"baidu.com", 88, "baidu.com:88"},
+		{"baidu.com:80", 80, "baidu.com:80"},
+		{"http://127.0.0.1", 111, "127.0.0.1:111"},
+		{"http://127.0.0.1:8888", 111, "127.0.0.1:8888"},
+		{"127.0.0.1", 113, "127.0.0.1:113"},
+	}
+	for _, c := range cases {
+		if res := AppendDefaultPort(c.Raw, c.Port); res != c.Res {
+			t.Errorf("expect %s got %s", c.Res, res)
+		}
+	}
 }
