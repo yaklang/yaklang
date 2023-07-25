@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yso"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -34,20 +35,20 @@ const (
 type JavaClassGeneraterOption string
 
 const (
-	JavaClassGeneraterOption_ClassName                 JavaClassGeneraterOption = "ClassName"
-	JavaClassGeneraterOption_IsConstructer             JavaClassGeneraterOption = "IsConstructer"
-	JavaClassGeneraterOption_IsObfuscation             JavaClassGeneraterOption = "IsObfuscation"
-	JavaClassGeneraterOption_Bytes                     JavaClassGeneraterOption = "Bytes"
-	JavaClassGeneraterOption_Command                   JavaClassGeneraterOption = "Command"
-	JavaClassGeneraterOption_Domain                    JavaClassGeneraterOption = "Domain"
-	JavaClassGeneraterOption_Host                      JavaClassGeneraterOption = "Host"
-	JavaClassGeneraterOption_Port                      JavaClassGeneraterOption = "Port"
-	JavaClassGeneraterOption_TcpReverseToken           JavaClassGeneraterOption = "TcpReverseToken"
-	JavaClassGeneraterOption_SpringHeaderKey           JavaClassGeneraterOption = "SpringHeaderKey"
-	JavaClassGeneraterOption_SpringHeaderValue         JavaClassGeneraterOption = "SpringHeaderValue"
-	JavaClassGeneraterOption_SpringParam               JavaClassGeneraterOption = "SpringParam"
-	JavaClassGeneraterOption_IsSpringRuntimeExecAction JavaClassGeneraterOption = "IsSpringRuntimeExec"
-	JavaClassGeneraterOption_IsSpringEchoBody          JavaClassGeneraterOption = "IsSpringEchoBody"
+	JavaClassGeneraterOption_ClassName                 JavaClassGeneraterOption = "className"
+	JavaClassGeneraterOption_IsConstructer             JavaClassGeneraterOption = "isConstructer"
+	JavaClassGeneraterOption_IsObfuscation             JavaClassGeneraterOption = "isObfuscation"
+	JavaClassGeneraterOption_Bytes                     JavaClassGeneraterOption = "bytes"
+	JavaClassGeneraterOption_Command                   JavaClassGeneraterOption = "command"
+	JavaClassGeneraterOption_Domain                    JavaClassGeneraterOption = "domain"
+	JavaClassGeneraterOption_Host                      JavaClassGeneraterOption = "host"
+	JavaClassGeneraterOption_Port                      JavaClassGeneraterOption = "port"
+	JavaClassGeneraterOption_TcpReverseToken           JavaClassGeneraterOption = "tcpReverseToken"
+	JavaClassGeneraterOption_SpringHeaderKey           JavaClassGeneraterOption = "springHeaderKey"
+	JavaClassGeneraterOption_SpringHeaderValue         JavaClassGeneraterOption = "springHeaderValue"
+	JavaClassGeneraterOption_SpringParam               JavaClassGeneraterOption = "springParam"
+	JavaClassGeneraterOption_IsSpringRuntimeExecAction JavaClassGeneraterOption = "isSpringRuntimeExec"
+	JavaClassGeneraterOption_IsSpringEchoBody          JavaClassGeneraterOption = "isSpringEchoBody"
 )
 
 type JavaClassGeneraterOptionTypeVerbose string
@@ -217,10 +218,10 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 	}
 }
 
-func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, isClass bool) (string, map[string]string, string) {
+func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, isClass bool) (string, map[string]any, string) {
 	className := ""
 	optionsCode := []string{}
-	preOptionsCode := make(map[string]string)
+	preOptionsCode := make(map[string]any)
 	expect := ""
 	args := []string{}
 	for _, option := range options {
@@ -264,7 +265,11 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 			}
 		case JavaClassGeneraterOption_Port:
 			if isClass {
-				preOptionsCode[option.Key] = option.Value
+				v, err := strconv.Atoi(option.Value)
+				if err != nil {
+					v = 0
+				}
+				preOptionsCode[option.Key] = v
 			} else {
 				code := fmt.Sprintf("yso.%s(%s)", "tcpReversePort", option.Value)
 				optionsCode = append(optionsCode, code)
@@ -320,37 +325,18 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 	}
 	return className, preOptionsCode, strings.Join(optionsCode, ",")
 }
-func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoCodeResponse, error) {
+func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, map[string]any, error) {
 	log.Infof("%v", req)
 	if req == nil {
-		return nil, utils.Error("request params is nil")
+		return "", nil, utils.Error("request params is nil")
 	}
 	if req.Class == "" {
-		return nil, utils.Error("not set class")
+		return "", nil, utils.Error("not set class")
 	}
 	var gadget string
 	if req.Gadget != "None" {
 		gadget = fmt.Sprintf("Get%sJavaObject", req.Gadget)
 	}
-	//switch JavaSerilizedObjectType(req.Gadget) {
-	//case JavaSerilizedObjectType_CommonsBeanutils1:
-	//	gadget = "GetCommonsBeanutils1JavaObject"
-	//case JavaSerilizedObjectType_CommonsBeanutils2:
-	//	gadget = "GetCommonsBeanutils2JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections1:
-	//	gadget = "GetCommonsCollections1JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections2:
-	//	gadget = "GetCommonsCollections2JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections3:
-	//	gadget = "GetCommonsCollections3JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections4:
-	//	gadget = "GetCommonsCollections4JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections5:
-	//	gadget = "GetCommonsCollections5JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections6:
-	//	gadget = "GetCommonsCollections6JavaObject"
-	//case JavaSerilizedObjectType_CommonsCollections7:
-	//	gadget = "GetCommonsCollections7JavaObject"
 	gadgetCodeTmp := `log.setLevel("info")
 gadgetObj,err = yso.$gadgetFun($options)
 if err {
@@ -454,16 +440,12 @@ println(hexPayload)
 	var code string
 	switch JavaBytesCodeType(req.Class) {
 	case JavaBytesCodeType_FromBytes:
-		base64Bytes, ok := preOptionsCode[string(JavaClassGeneraterOption_Bytes)]
-		if !ok {
-			return nil, utils.Error("not set bytes")
-		}
-		bytesCode := `bytesCode,err =codec.DecodeBase64("%s")
+		bytesCode := `bytesCode,err =codec.DecodeBase64(%s)
 if err != nil {
 	println(err.Error())
 	return
 }`
-		bytesCode = fmt.Sprintf(bytesCode, base64Bytes)
+		bytesCode = fmt.Sprintf(bytesCode, string(JavaClassGeneraterOption_Bytes))
 		if gadget != "" {
 			optionsCode = "yso.useBytesEvilClass(bytesCode)," + optionsCode
 			code = bytesCode + "\n" + utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
@@ -473,62 +455,50 @@ if err != nil {
 			code = bytesCode + "\n" + generateCodeTmp
 		}
 	case JavaBytesCodeType_RuntimeExec:
-		command, ok := preOptionsCode[string(JavaClassGeneraterOption_Command)]
-		if !ok {
-			return nil, utils.Error("not set command")
-		}
+		command := string(JavaClassGeneraterOption_Command)
 		if gadget != "" {
 			if !checkGadgetIsTemplateSupported(req.Gadget) {
 				//if checkIsRuntimeExecGadget(JavaSerilizedObjectType(req.Gadget)) {
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": "\"" + command + "\""})
+				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": command})
 			} else {
-				optionsCode = "yso.useRuntimeExecEvilClass(\"" + command + "\")," + optionsCode
+				optionsCode = "yso.useRuntimeExecEvilClass(" + command + ")," + optionsCode
 				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 			}
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",", command) + optionsCode
+			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateRuntimeExecEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_ProcessImplExec:
-		command, ok := preOptionsCode[string(JavaClassGeneraterOption_Command)]
-		if !ok {
-			return nil, utils.Error("not set command")
-		}
+		command := string(JavaClassGeneraterOption_Command)
 		if gadget != "" {
-			optionsCode = "yso.useProcessImplExecEvilClass(\"" + command + "\")," + optionsCode
+			optionsCode = "yso.useProcessImplExecEvilClass(" + command + ")," + optionsCode
 			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",", command) + optionsCode
+			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateProcessImplExecEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_ProcessBuilderExec:
-		command, ok := preOptionsCode[string(JavaClassGeneraterOption_Command)]
-		if !ok {
-			return nil, utils.Error("not set command")
-		}
+		command := string(JavaClassGeneraterOption_Command)
 		if gadget != "" {
-			optionsCode = "yso.useProcessBuilderExecEvilClass(\"" + command + "\")," + optionsCode
+			optionsCode = "yso.useProcessBuilderExecEvilClass(" + command + ")," + optionsCode
 			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",", command) + optionsCode
+			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateProcessBuilderExecEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_DNSlog:
-		domain, ok := preOptionsCode[string(JavaClassGeneraterOption_Domain)]
-		if !ok {
-			return nil, utils.Error("not set domain")
-		}
+		domain := string(JavaClassGeneraterOption_Domain)
 		if gadget != "" {
 			if !checkGadgetIsTemplateSupported(req.Gadget) {
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": "\"" + domain + "\""})
+				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": "" + domain + ""})
 			} else {
-				optionsCode = "yso.useDNSLogEvilClass(\"" + domain + "\")," + optionsCode
+				optionsCode = "yso.useDNSLogEvilClass(" + domain + ")," + optionsCode
 				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 			}
 
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",", domain) + optionsCode
+			optionsCode = fmt.Sprintf("%s,", domain) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateDNSlogEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_SpringEcho:
@@ -547,50 +517,55 @@ if err != nil {
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateModifyTomcatMaxHeaderSizeEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_TcpReverse:
-		host, ok := preOptionsCode[string(JavaClassGeneraterOption_Host)]
-		if !ok {
-			return nil, utils.Error("not set host")
-		}
-		port, ok := preOptionsCode[string(JavaClassGeneraterOption_Port)]
-		if !ok {
-			return nil, utils.Error("not set port")
-		}
+		host := string(JavaClassGeneraterOption_Host)
+		port := string(JavaClassGeneraterOption_Port)
 		if gadget != "" {
-			optionsCode = "yso.useTcpReverseEvilClass(\"" + host + "\"," + port + ")," + optionsCode
+			optionsCode = "yso.useTcpReverseEvilClass(" + host + "," + port + ")," + optionsCode
 			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",%s,", host, port) + optionsCode
+			optionsCode = fmt.Sprintf("%s,%s,", host, port) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateTcpReverseEvilClassObject", "options": optionsCode})
 		}
 	case JavaBytesCodeType_TcpReverseShell:
-		host, ok := preOptionsCode[string(JavaClassGeneraterOption_Host)]
-		if !ok {
-			return nil, utils.Error("not set host")
-		}
-		port, ok := preOptionsCode[string(JavaClassGeneraterOption_Port)]
-		if !ok {
-			return nil, utils.Error("not set port")
-		}
+		host := string(JavaClassGeneraterOption_Host)
+		port := string(JavaClassGeneraterOption_Port)
 		if gadget != "" {
-			optionsCode = "yso.useTcpReverseShellEvilClass(\"" + host + "\"," + port + ")," + optionsCode
+			optionsCode = "yso.useTcpReverseShellEvilClass(" + host + "," + port + ")," + optionsCode
 			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
 		} else {
-			optionsCode = fmt.Sprintf("\"%s\",%s,", host, port) + optionsCode
+			optionsCode = fmt.Sprintf("%s,%s,", host, port) + optionsCode
 			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateTcpReverseShellEvilClassObject", "options": optionsCode})
 		}
 	default:
-		return nil, utils.Error("not support class")
+		return "", nil, utils.Error("not support class")
 	}
 	if className != "" {
 		code = fmt.Sprintf("className = \"%s\"\n", className) + code
 	}
+	return code, preOptionsCode, nil
+}
+func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoCodeResponse, error) {
+	code, params, err := generateYsoCode(req)
+	if err != nil {
+		return nil, err
+	}
+	paramDefineCode := ""
+	for k, v := range params {
+		switch ret := v.(type) {
+		case string:
+			paramDefineCode += (fmt.Sprintf("%s = \"%s\"\n", k, ret))
+		case int:
+			paramDefineCode += (fmt.Sprintf("%s = %d\n", k, ret))
+		}
+	}
+	code = paramDefineCode + code
 	return &ypb.YsoCodeResponse{Code: code}, nil
 }
 func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
 	if req == nil {
 		return nil, utils.Error("request params is nil")
 	}
-	codeRsp, err := s.GenerateYsoCode(ctx, req)
+	codeRsp, params, err := generateYsoCode(req)
 	if err != nil {
 		return nil, utils.Errorf("GenerateYsoCode error: %v", err)
 	}
@@ -605,12 +580,15 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 	}
 	if req.Gadget == "None" {
 		fileName = fmt.Sprintf("%s.class", className)
-		code = codeRsp.Code + "\nout(classBytes)"
+		code = codeRsp + "\nout(classBytes)"
 	} else {
 		fileName = fmt.Sprintf("%s_%s.ser", req.Gadget, req.Class)
-		code = codeRsp.Code + "\nout(gadgetBytes)"
+		code = codeRsp + "\nout(gadgetBytes)"
 	}
 	engin := yaklang.New()
+	for k, v := range params {
+		engin.SetVar(k, v)
+	}
 	var bytes []byte
 	out := func(b []byte) {
 		bytes = b
