@@ -400,13 +400,15 @@
         const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
         items.forEach(function (item) {
             const alink = item.childNodes[0];
-            let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
-            if (searchItem.indexOf(searchData) !== -1) {
-                item.style.display = "block";
-            } else {
-                item.style.display = "none";
+            if (alink.nodeType === Node.ELEMENT_NODE) {
+                let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+                if (searchItem.indexOf(searchData) !== -1) {
+                    item.style.display = "block";
+                } else {
+                    item.style.display = "none";
+                }
             }
-        })
+        });
         document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
             if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
                 cardWrapper.style.display = "none";
