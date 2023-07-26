@@ -92,6 +92,7 @@ type MixPluginCaller struct {
 	websiteParamsFilter *filter.StringFilter
 
 	runtimeId string
+	proxy     string
 
 	feedbackHandler    func(*ypb.ExecResult) error
 	ordinaryFeedback   func(i interface{}, item ...interface{})
@@ -115,6 +116,19 @@ func (m *MixPluginCaller) SetRuntimeId(s string) {
 	m.runtimeId = s
 	if m.callers != nil {
 		m.callers.runtimeId = s
+	}
+}
+
+func (m *MixPluginCaller) SetProxy(s string) {
+	if s == "" {
+		return
+	}
+	if m == nil {
+		return
+	}
+	m.proxy = s
+	if m.callers != nil {
+		m.callers.proxy = s
 	}
 }
 

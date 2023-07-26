@@ -25,6 +25,7 @@ type FuzzHTTPRequest struct {
 	isHttps                bool
 	source                 string
 	runtimeId              string
+	proxy                  string
 	originRequest          []byte
 	_originRequestInstance *http.Request
 	chunked                bool
@@ -172,9 +173,16 @@ type buildFuzzHTTPRequestConfig struct {
 	IsHttps   bool
 	Source    string
 	RuntimeId string
+	Proxy     string
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
+
+func OptProxy(i string) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.Proxy = i
+	}
+}
 
 func OptHTTPS(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
@@ -385,6 +393,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.isHttps = config.IsHttps
 	req.source = config.Source
 	req.runtimeId = config.RuntimeId
+	req.proxy = config.Proxy
 	req.Opts = opts
 
 	return req, nil
@@ -728,7 +737,7 @@ func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *_httpRe
 	var originOpts []HttpPoolConfigOption
 	originOpts = append(originOpts,
 		WithPoolOpt_Https(req.isHttps), WithPoolOpt_Source(req.source),
-		WithPoolOpt_RuntimeId(req.runtimeId),
+		WithPoolOpt_RuntimeId(req.runtimeId), WithPoolOpt_Proxy(req.proxy),
 	)
 	return _httpPool(f, append(originOpts, opts...)...)
 }
