@@ -7,7 +7,7 @@ import (
 )
 
 func TestExec(t *testing.T) {
-	var testMap = map[string]func(string) []string{
+	var testMap = map[string]BuildInTagFun{
 		"int": func(i string) []string {
 			return []string{i}
 		},
