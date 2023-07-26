@@ -25,7 +25,7 @@ func (s *Server) SetOnlineProfile(ctx context.Context, req *ypb.OnlineProfile) (
 	}
 
 	if proxy != "" {
-		conn, err := utils.GetProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
+		conn, err := utils.GetForceProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
 		if err != nil {
 			if req.IsCompany {
 				return &ypb.Empty{}, nil

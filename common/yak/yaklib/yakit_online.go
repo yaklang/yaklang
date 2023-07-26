@@ -66,7 +66,7 @@ func DownloadOnlineAuthProxy(baseUrl string) error {
 	}
 	proxy := strings.TrimSpace(consts.GetOnlineBaseUrlProxy())
 	if proxy != "" {
-		conn, err := utils.GetProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
+		conn, err := utils.GetForceProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
 		if err != nil {
 			return utils.Errorf("connect to [%s] via proxy[%v] failed: %s", consts.GetOnlineBaseUrl(), proxy, err.Error())
 		}
