@@ -23,10 +23,11 @@ func _xmldumps(v interface{}) []byte {
 
 func _xmlloads(v interface{}) interface{} {
 	var i interface{}
+	var defaultValue = make(map[string]interface{})
 	buf := utils.InterfaceToBytes(v)
 	err := xml.Unmarshal(buf, &i)
 	if err != nil {
-		return nil
+		return defaultValue
 	}
 	return i
 }
