@@ -71,6 +71,8 @@ type BrowserStarter struct {
 	clickElementsExploit func(*rod.Page, string, string) error
 	inputElementsExploit func(*rod.Element) error
 	eventElementsExploit func(*rod.Page, string, string) error
+
+	invalidSuffix []string
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -123,6 +125,11 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	}
 	if starter.browserConfig.proxyAddress != nil {
 		starter.transport.Proxy = http.ProxyURL(starter.browserConfig.proxyAddress)
+	}
+	if len(starter.baseConfig.invalidSuffix) > 0 {
+		starter.invalidSuffix = append(starter.invalidSuffix, starter.baseConfig.invalidSuffix...)
+	} else {
+		starter.invalidSuffix = defaultInvalidSuffix
 	}
 	return &starter
 }

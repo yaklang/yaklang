@@ -39,6 +39,7 @@ type BaseConfig struct {
 	sensitiveWords    []string
 	leakless          string
 	localStorage      map[string]string
+	invalidSuffix     []string
 
 	targetUrl      string
 	ch             chan ReqInfo
@@ -85,6 +86,7 @@ func NewConfig() *Config {
 			ch:                make(chan ReqInfo),
 			leakless:          "default",
 			localStorage:      make(map[string]string),
+			invalidSuffix:     make([]string, 0),
 		},
 	}
 }
@@ -273,6 +275,12 @@ func WithLocalStorage(storage map[string]string) ConfigOpt {
 		for k, v := range storage {
 			config.baseConfig.localStorage[k] = v
 		}
+	}
+}
+
+func WithInvalidSuffix(suffix []string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.invalidSuffix = append(config.baseConfig.invalidSuffix, suffix...)
 	}
 }
 
