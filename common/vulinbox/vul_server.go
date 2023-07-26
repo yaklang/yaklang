@@ -18,9 +18,10 @@ import (
 type VulinServer struct {
 	database *dbm
 	router   *mux.Router
+	wsAgent  wsAgent
+	matcher  matcher
 
-	agentFeedbackChan chan any
-	safeMode          bool
+	safeMode bool
 }
 
 func NewVulinServer(ctx context.Context, port ...int) (string, error) {
