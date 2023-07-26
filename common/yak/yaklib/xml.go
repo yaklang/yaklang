@@ -107,12 +107,12 @@ func _xmldumps(v interface{}) []byte {
 
 	v = StringMap(utils.InterfaceToGeneralMap(v))
 	enc := xml.NewEncoder(&b)
-	enc.Indent("  ", "  ")
+	enc.Indent("", "  ")
 	err := enc.Encode(v)
 	if err != nil {
 		panic(err)
 	}
-	return bytes.TrimSpace(b.Bytes())
+	return b.Bytes()
 }
 
 func _xmlloads(v interface{}) StringMap {
