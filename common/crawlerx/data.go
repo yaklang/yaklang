@@ -70,7 +70,7 @@ var inputStringElementTypes = []string{
 	"text", "password", "textarea", "search",
 }
 
-var invalidSuffix = []string{
+var defaultInvalidSuffix = []string{
 	".js",
 	".css",
 	".xml",
