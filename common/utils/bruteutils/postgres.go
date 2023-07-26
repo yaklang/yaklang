@@ -54,8 +54,8 @@ func postgresqlUnAuthCheck(Host string, Port int) (bool, error) {
 var postgresAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "postgres",
 	DefaultPorts:     "5432",
-	DefaultUsernames: append([]string{"postgres"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
+	DefaultUsernames: []string{"postgres", "root", "admin"},
+	DefaultPasswords: []string{"root", "admin123", "root@123"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 5432)
 
