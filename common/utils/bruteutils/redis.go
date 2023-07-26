@@ -12,8 +12,8 @@ import (
 var redisAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "redis",
 	DefaultPorts:     "6379",
-	DefaultUsernames: []string{"redis"},
-	DefaultPasswords: []string{"root", "admin123", "root@123"},
+	DefaultUsernames: append([]string{"redis"}, CommonUsernames...),
+	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 6379)
 		conn, err := DefaultDailer.Dial("tcp", i.Target)

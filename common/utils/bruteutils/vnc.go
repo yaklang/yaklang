@@ -10,8 +10,8 @@ import (
 var vncAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "vnc",
 	DefaultPorts:     "5900",
-	DefaultUsernames: []string{"admin", "root", "test", "op"},
-	DefaultPasswords: []string{"root", "admin123", "root@123"},
+	DefaultUsernames: append([]string{"vnc"}, CommonUsernames...),
+	DefaultPasswords: CommonPasswords,
 	UnAuthVerify:     nil,
 	BrutePass: func(item *BruteItem) *BruteItemResult {
 		target := fixToTarget(item.Target, 5900)
