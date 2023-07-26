@@ -553,7 +553,7 @@ func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequers
 	for k, v := range params {
 		switch ret := v.(type) {
 		case string:
-			paramDefineCode += (fmt.Sprintf("%s = \"%s\"\n", k, ret))
+			paramDefineCode += (fmt.Sprintf("%s = %s\n", k, strconv.Quote(ret)))
 		case int:
 			paramDefineCode += (fmt.Sprintf("%s = %d\n", k, ret))
 		}
