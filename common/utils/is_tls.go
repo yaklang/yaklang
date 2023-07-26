@@ -52,7 +52,7 @@ func IsTLSService(addr string, proxies ...string) bool {
 
 var proxyDailer = net.Dialer{Timeout: 5 * time.Second}
 
-func GetProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
+func GetForceProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
 	return getProxyConn(target, proxy, connectTimeout)
 }
 func GetProxyConnWithContext(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {

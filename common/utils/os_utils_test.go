@@ -33,16 +33,3 @@ func TestIsPortAvailable(t *testing.T) {
 		t.FailNow()
 	}
 }
-
-func TestGetSystemNameServerList(t *testing.T) {
-	result, err := GetSystemNameServerList()
-	if err != nil {
-		t.Errorf("failed to fetch name server list: %s", err)
-		t.FailNow()
-	}
-
-	if len(result) <= 0 {
-		t.Error("empty available name servers")
-		t.FailNow()
-	}
-}

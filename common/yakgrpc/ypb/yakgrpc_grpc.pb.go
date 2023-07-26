@@ -206,7 +206,7 @@ type YakClient interface {
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -306,7 +306,8 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -348,6 +349,8 @@ type YakClient interface {
 	DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (Yak_DebugPluginClient, error)
 	SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error)
 	GetSystemDefaultDnsServers(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DefaultDnsServerResponse, error)
+	// 诊断网络发生的问题
+	DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkClient, error)
 }
 
 type yakClient struct {
@@ -3589,6 +3592,38 @@ func (c *yakClient) GetSystemDefaultDnsServers(ctx context.Context, in *Empty, o
 	return out, nil
 }
 
+func (c *yakClient) DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], "/ypb.Yak/DiagnoseNetwork", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakDiagnoseNetworkClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_DiagnoseNetworkClient interface {
+	Recv() (*DiagnoseNetworkResponse, error)
+	grpc.ClientStream
+}
+
+type yakDiagnoseNetworkClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakDiagnoseNetworkClient) Recv() (*DiagnoseNetworkResponse, error) {
+	m := new(DiagnoseNetworkResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -3781,7 +3816,7 @@ type YakServer interface {
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -3881,7 +3916,8 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
@@ -3923,6 +3959,8 @@ type YakServer interface {
 	DebugPlugin(*DebugPluginRequest, Yak_DebugPluginServer) error
 	SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error)
 	GetSystemDefaultDnsServers(context.Context, *Empty) (*DefaultDnsServerResponse, error)
+	// 诊断网络发生的问题
+	DiagnoseNetwork(*DiagnoseNetworkRequest, Yak_DiagnoseNetworkServer) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -4709,6 +4747,9 @@ func (UnimplementedYakServer) SmokingEvaluatePlugin(context.Context, *SmokingEva
 }
 func (UnimplementedYakServer) GetSystemDefaultDnsServers(context.Context, *Empty) (*DefaultDnsServerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSystemDefaultDnsServers not implemented")
+}
+func (UnimplementedYakServer) DiagnoseNetwork(*DiagnoseNetworkRequest, Yak_DiagnoseNetworkServer) error {
+	return status.Errorf(codes.Unimplemented, "method DiagnoseNetwork not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -9550,6 +9591,27 @@ func _Yak_GetSystemDefaultDnsServers_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DiagnoseNetwork_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DiagnoseNetworkRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).DiagnoseNetwork(m, &yakDiagnoseNetworkServer{stream})
+}
+
+type Yak_DiagnoseNetworkServer interface {
+	Send(*DiagnoseNetworkResponse) error
+	grpc.ServerStream
+}
+
+type yakDiagnoseNetworkServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakDiagnoseNetworkServer) Send(m *DiagnoseNetworkResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -10642,6 +10704,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "DebugPlugin",
 			Handler:       _Yak_DebugPlugin_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DiagnoseNetwork",
+			Handler:       _Yak_DiagnoseNetwork_Handler,
 			ServerStreams: true,
 		},
 	},

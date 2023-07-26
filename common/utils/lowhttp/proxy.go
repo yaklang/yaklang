@@ -4,5 +4,5 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var GetProxyConn = utils.GetProxyConn
+var GetProxyConn = utils.GetForceProxyConn
 var GetProxyConnWithContext = utils.GetProxyConnWithContext
