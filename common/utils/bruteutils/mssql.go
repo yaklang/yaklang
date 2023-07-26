@@ -16,8 +16,8 @@ import (
 var mssqlAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mssql",
 	DefaultPorts:     "1433",
-	DefaultUsernames: []string{"administrator", "admin", "mssql", "manager"},
-	DefaultPasswords: []string{"root", "admin123", "root@123"},
+	DefaultUsernames: []string{"administrator", "admin", "root", "mssql", "manager", "sa"},
+	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		// connect: connection refused
 		i.Target = appendDefaultPort(i.Target, 1433)
