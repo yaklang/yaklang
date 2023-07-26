@@ -97,7 +97,7 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 		}
 		urlArr := analysisHtmlInfo(originUrl, html)
 		for _, urlStr := range urlArr {
-			if StringSuffixList(urlStr, invalidSuffix) {
+			if StringSuffixList(urlStr, starter.invalidSuffix) {
 				continue
 			}
 			if StringArrayContains(invalidUrl, urlStr) {
