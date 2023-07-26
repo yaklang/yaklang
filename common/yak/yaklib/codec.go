@@ -92,6 +92,13 @@ var CodecExports = map[string]interface{}{
 	"DESECBEncrypt": codec.DESECBEnc,
 	"DESECBDecrypt": codec.DESECBDec,
 
+	"TripleDESEncrypt":    codec.TripleDES_CBCEnc,
+	"TripleDESDecrypt":    codec.TripleDES_CBCDec,
+	"TripleDESCBCEncrypt": codec.TripleDES_CBCEnc,
+	"TripleDESCBCDecrypt": codec.TripleDES_CBCDec,
+	"TripleDESECBEncrypt": codec.TripleDES_ECBEnc,
+	"TripleDESECBDecrypt": codec.TripleDES_ECBDec,
+
 	// sm
 	"Sm3":           codec.SM3,
 	"Sm4CBCEncrypt": codec.SM4CBCEnc,
