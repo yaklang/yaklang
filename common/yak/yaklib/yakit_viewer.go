@@ -3,6 +3,7 @@ package yaklib
 import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -42,10 +43,10 @@ type YakitFixedTableData struct {
 	Data      map[string]interface{} `json:"data"`
 }
 
-func yakitTableData(tableName string, data map[string]interface{}) *YakitFixedTableData {
+func yakitTableData(tableName string, data any) *YakitFixedTableData {
 	tableData := &YakitFixedTableData{
 		TableName: tableName,
-		Data:      data,
+		Data:      utils.InterfaceToGeneralMap(data),
 	}
 	if tableData.Data == nil {
 		tableData.Data = map[string]interface{}{}
