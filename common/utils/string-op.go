@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
@@ -24,14 +25,28 @@ func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {
 	return
 }
 
+// PrettifyListFromStringSplitEx split string using given sep if no sep given sep = []string{",", "|"}
 func PrettifyListFromStringSplitEx(Raw string, sep ...string) (targets []string) {
 	if len(sep) <= 0 {
 		sep = []string{",", "|"}
 	}
-	var targetsRaw []string
-	for _, s := range sep {
-		targetsRaw = append(targetsRaw, strings.Split(Raw, s)...)
+	patternStr := ""
+	for _, v := range sep {
+		if len(v) > 0 {
+			patternStr += regexp.QuoteMeta(string(v[0])) + "|"
+		}
 	}
+	if len(patternStr) > 0 {
+		patternStr = patternStr[:len(patternStr)-1]
+	}
+
+	var targetsRaw []string
+	re, err := regexp.Compile(patternStr)
+	if err != nil {
+		log.Warn(err)
+		return targetsRaw
+	}
+	targetsRaw = re.Split(Raw, -1)
 	for _, tRaw := range targetsRaw {
 		r := strings.TrimSpace(tRaw)
 		if len(r) > 0 {

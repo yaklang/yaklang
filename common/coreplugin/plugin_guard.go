@@ -87,6 +87,18 @@ func init() {
 		OnlineBaseUrl:    "https://www.yaklang.com",
 		OnlineOfficial:   true,
 	}
+
+	codeBytes = GetCorePluginData("Swagger JSON 泄漏")
+	basicXSSPlugin = &yakit.YakScript{
+		ScriptName:     "Swagger JSON 泄漏",
+		Type:           "mitm",
+		Content:        string(codeBytes),
+		Params:         "\"[{\\\"Field\\\":\\\"target\\\",\\\"TypeVerbose\\\":\\\"string\\\",\\\"FieldVerbose\\\":\\\"目标(URL/IP:Port)\\\",\\\"Help\\\":\\\"输入插件的测试目标，进行基础爬虫（最多10个请求）\\\",\\\"Required\\\":true}]\"",
+		Help:           "检查网站是否开放 Swagger JSON 的 API 信息",
+		Author:         "v1ll4n",
+		Tags:           "swagger",
+		OnlineOfficial: true,
+	}
 }
 
 func OverWriteCorePluginToLocal() {

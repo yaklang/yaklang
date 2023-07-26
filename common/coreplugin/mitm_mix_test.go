@@ -295,7 +295,7 @@ proxy = getParam("proxy")
 dump(packet)
 dump(proxy)
 
-rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.https(false))~
+rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.https(true))~
 println(string(rsp))
 sleep(1)
 

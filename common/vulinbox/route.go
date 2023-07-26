@@ -113,6 +113,7 @@ func (s *VulinServer) init() {
 
 	s.registerJSONP()
 	s.registerPostMessageIframeCase()
+	s.registerSensitive()
 
 	// 靶场是否是安全的？
 	if !s.safeMode {

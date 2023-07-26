@@ -23,20 +23,22 @@ func TestGRPCMUSTPASS_Shiro(t *testing.T) {
 		IsHttps:       true,
 	}
 	vul1 := VulInfo{
-		Path: "/shiro/cbc",
+		Path: []string{"/shiro/cbc"},
 		ExpectedResult: map[string]int{
 			"检测到 Shiro(Cookie) 框架使用": 1,
 			"(Shiro 默认 KEY)":         1,
 			"(Shiro Header 回显)":      1,
 		},
+		StrictMode: false,
 	}
 	vul2 := VulInfo{
-		Path: "/shiro/gcm",
+		Path: []string{"/shiro/gcm"},
 		ExpectedResult: map[string]int{
 			"检测到 Shiro(Cookie) 框架使用": 1,
 			"(Shiro 默认 KEY)":         1,
 			"(Shiro Header 回显)":      1,
 		},
+		StrictMode: false,
 	}
 
 	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), "Shiro插件对于低版本shiro检测结果不符合预期")

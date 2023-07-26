@@ -589,9 +589,25 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                         } else {
                             payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(columnNum) + "-- "
                         }
-
-
-                        risk.NewRisk(
+                        rspRisk, err := param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"),fuzz.WithConcurrentLimit(1))
+                        if err == nil{
+                            risk.NewRisk(result.Url, risk.severity("critical"),
+                            risk.title(str.f("Union-Based SQL Injection: [%v:%v]", param.Name(), param.Value())),
+                            risk.titleVerbose(str.f(
+                                "存在基于UNION SQL 注入: [参数名:%v 值:%v]",
+                                param.Name(),
+                                param.Value(),
+                            )),
+                            risk.description("Union-Based SQL 注入是一种常见的 SQL 注入攻击技术，通过在应用程序的查询语句中使用 UNION 操作符来获取数据库中的敏感信息。攻击者利用 UNION 操作符将恶意的 SELECT 查询与正常的查询结果合并，从而泄露数据库的数据。"),
+                            risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+                            risk.type("sqlinjection"),
+                            risk.payload(payload),
+                            risk.parameter(param.Name()),
+                            risk.request(param.Fuzz(payload).FirstHTTPRequestBytes()),
+                            risk.response(rspRisk.ResponseRaw)
+                        )
+                        }else{
+                              risk.NewRisk(
                             result.Url,
                             risk.severity("critical"),
                             risk.title(str.f("Union-Based SQL Injection: [%v:%v]", param.Name(), param.Value())),
@@ -605,7 +621,11 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                             risk.type("sqlinjection"),
                             risk.payload(payload),
                             risk.parameter(param.Name()),
+                            risk.request(param.Fuzz(payload).FirstHTTPRequestBytes())
                         )
+                        }
+
+
                         yakit_output(str.f(
                             "存在基于UNION SQL 注入: [参数名:%v 原值:%v]",
                             param.Name(),
