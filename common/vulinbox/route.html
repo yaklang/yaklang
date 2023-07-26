@@ -183,11 +183,17 @@
                     文件上传与特定文件格式漏洞
                 </div>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=safe">基础文件上传案例</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=nullbyte">图片上传：nullbyte 可绕过</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=mime">图片上传：MIME 类型可绕过</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=cve-2017-15715">图片上传：Apache HTTPD 换行解析漏洞(CVE-2017-15715)</a></li>
-                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=fileheader">图片上传：检查文件头，需配合包含</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=safe">基础文件上传案例</a>
+                    </li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=nullbyte">图片上传：nullbyte
+                        可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=mime">图片上传：MIME
+                        类型可绕过</a></li>
+                    <li class="list-group-item"><a target="_blank" href="/upload/main?case=cve-2017-15715">图片上传：Apache
+                        HTTPD 换行解析漏洞(CVE-2017-15715)</a></li>
+                    <li class="list-group-item"><a target="_blank"
+                                                   href="/upload/main?case=fileheader">图片上传：检查文件头，需配合包含</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -219,7 +225,7 @@
         <div class="col-md-6">
             <div class="card" style="margin-top: 12px">
                 <div class="card-header">
-                    SSRF 参数多种情况的测试
+                    SSRF 与开放重定向
                 </div>
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item"><a target="_blank" href="/ssrf-in-get?url=http://www.baidu.com/">SSRF
@@ -236,6 +242,41 @@
                     <li class="list-group-item"><a target="_blank"
                                                    href='/ssrf-json-in-get?json={"abc":%20123,%20"ref":%20"http://www.baidu.com"}'>SSRF
                         GET参数JSON包含URL</a></li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='redirect/basic?destUrl=/redirect/main'
+                        >完全开放重定向</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='redirect/redirect-hell?destUrl=/redirect/main'
+                        >完全开放重定向(无限重定向)</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='/redirect/js/basic?redUrl=/redirect/main'
+                        >完全开放重定向（JS location.href）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='/redirect/js/basic1?redirect_to=/redirect/main'
+                        >完全开放重定向（JS location.replace）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='/redirect/js/basic2?redirect=/redirect/main'
+                        >完全开放重定向（JS location.assign）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='/redirect/meta/case1?redirect=/redirect/main'
+                        >完全开放重定向（meta 延迟跳转）</a>
+                    </li>
+                    <li class="list-group-item">
+                        <a target="_blank"
+                           href='/redirect/meta/case2?redirect=/redirect/main'
+                        >完全开放重定向（meta）</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -320,7 +361,8 @@
                     验证码场景
                 </div>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><a href='/verification/op' target="_blank">基础验证码拦截的表单提交（无法爆破）</a>
+                    <li class="list-group-item"><a href='/verification/op'
+                                                   target="_blank">基础验证码拦截的表单提交（无法爆破）</a>
                     </li>
                 </ul>
                 <ul class="list-group list-group-flush">
