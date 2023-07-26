@@ -1,16 +1,15 @@
 package yakvm
 
 type Breakpoint struct {
-	On, Disposable       bool
+	On                   bool
 	CodeIndex, LineIndex int
 	ConditionCode        string
 	State                string
 }
 
-func NewBreakPoint(disposable bool, codeIndex, lineIndex int, conditionCode, state string) *Breakpoint {
+func NewBreakPoint(codeIndex, lineIndex int, conditionCode, state string) *Breakpoint {
 	return &Breakpoint{
 		On:            true,
-		Disposable:    disposable,
 		CodeIndex:     codeIndex,
 		LineIndex:     lineIndex,
 		ConditionCode: conditionCode,

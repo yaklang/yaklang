@@ -2,11 +2,12 @@ package yakvm
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"strings"
-	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -266,22 +267,7 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 }
 
 func (g *Debugger) addBreakPoint(disposable bool, codeIndex, lineIndex int, conditionCode, state string) {
-	g.breakPoints = append(g.breakPoints, NewBreakPoint(disposable, codeIndex, lineIndex, conditionCode, state))
-}
-
-func (g *Debugger) removeDisposableBreakPoints(indexs []int) {
-	if len(g.breakPoints) == 0 || len(indexs) == 0 {
-		return
-	}
-	indexs = funk.UniqInt(indexs)
-
-	newBreakpoints := make([]*Breakpoint, 0, len(g.breakPoints)-len(indexs))
-	for index, breakpoint := range g.breakPoints {
-		if !breakpoint.Disposable || !funk.ContainsInt(indexs, index) {
-			newBreakpoints = append(newBreakpoints, g.breakPoints[index])
-		}
-	}
-	g.breakPoints = newBreakpoints
+	g.breakPoints = append(g.breakPoints, NewBreakPoint(codeIndex, lineIndex, conditionCode, state))
 }
 
 func (g *Debugger) SetBreakPoint(disposable bool, lineIndex int) error {
@@ -472,10 +458,9 @@ func (g *Debugger) BreakPointCallback(codeIndex int) {
 	}
 
 	triggered := false
-	removeBreakPointIndex := make([]int, 0)
 
 	// 如果存在于断点列表中，则回调
-	for index, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.breakPoints {
 
 		// 如果断点被禁用则不应该触发
 		if !breakpoint.On {
@@ -507,25 +492,8 @@ func (g *Debugger) BreakPointCallback(codeIndex int) {
 
 			triggered = true
 
-			// 触发临时断点后删除
-			if breakpoint.Disposable {
-				removeBreakPointIndex = append(removeBreakPointIndex, index)
-			}
 			break
 		}
-	}
-
-	if triggered {
-		// 如果已经触发了其他断点，则删除该点上的所有临时断点
-		for index, breakpoint := range g.breakPoints {
-			if breakpoint.CodeIndex == codeIndex && breakpoint.Disposable && breakpoint != g.currentBreakPoint {
-				removeBreakPointIndex = append(removeBreakPointIndex, index)
-			}
-		}
-	}
-
-	if len(removeBreakPointIndex) > 0 {
-		g.removeDisposableBreakPoints(removeBreakPointIndex)
 	}
 
 	if triggered {
@@ -537,11 +505,6 @@ func (g *Debugger) BreakPointCallback(codeIndex int) {
 func (g *Debugger) Callback() {
 	g.Add()
 	defer g.WaitGroupDone()
-
-	// 清空临时断点的描述
-	if g.currentBreakPoint != nil && g.currentBreakPoint.Disposable {
-		g.description = ""
-	}
 
 	// 更新观察表达式
 	if len(g.observeExpressions) > 0 {
