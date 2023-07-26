@@ -1,5 +1,13 @@
 package config
 
+type LeaklessMode int
+
+const (
+	LeaklessDefault LeaklessMode = 0
+	LeaklessOn      LeaklessMode = 1
+	LeaklessOff     LeaklessMode = -1
+)
+
 var usernameKeyword = []string{
 	"username", "admin",
 	"用户名", "账户名", "账号",
