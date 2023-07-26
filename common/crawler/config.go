@@ -275,7 +275,7 @@ func (c *Config) CreateHTTPClient() *http.Client {
 			if len(via) > c.maxRedirectTimes {
 				return utils.Errorf("max redirect times reach: %v", redirectVector)
 			}
-			log.Warnf("redirect: %v", redirectVector)
+			log.Debugf("redirect: %v", redirectVector)
 			return nil
 		},
 	}

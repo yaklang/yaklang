@@ -580,7 +580,7 @@ func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(strin
 					},
 				)
 				if err != nil {
-					log.Errorf("parse form error: %s", err)
+					log.Debugf("parse form error: %s", err)
 					return
 				}
 
