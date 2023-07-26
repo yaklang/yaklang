@@ -251,7 +251,7 @@ func (c *S5Config) HandleS5Request(conn net.Conn) (net.Conn, error) {
 	var actConn net.Conn
 	if downstreamProxy != "" {
 		var err error
-		actConn, err = utils.GetProxyConn(targetAddr, downstreamProxy, proxyConnectionTimeout)
+		actConn, err = utils.GetForceProxyConn(targetAddr, downstreamProxy, proxyConnectionTimeout)
 		if err != nil {
 			return nil, utils.Errorf("downstream fetch conn failed: %s", err)
 		}

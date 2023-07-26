@@ -8,7 +8,7 @@ import (
 )
 
 func TestNetConn(t *testing.T) {
-	conn, err := utils.GetProxyConn("chat.openai.com", "http://127.0.0.1:7890", 10*time.Second)
+	conn, err := utils.GetForceProxyConn("chat.openai.com", "http://127.0.0.1:7890", 10*time.Second)
 	if err != nil {
 		panic(err)
 	}

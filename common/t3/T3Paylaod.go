@@ -58,7 +58,7 @@ func (t *T3Paylaod) Exec(cmd string) (_ string, err error) {
 
 	var conn net.Conn
 	if t.proxy != "" {
-		conn, err = utils2.GetProxyConn(t.addr(), t.proxy, t.timeout)
+		conn, err = utils2.GetForceProxyConn(t.addr(), t.proxy, t.timeout)
 	} else {
 		conn, err = net.DialTimeout("tcp", t.addr(), t.timeout)
 	}
@@ -150,7 +150,7 @@ func (t *T3Paylaod) SendPayload(payload []byte) error {
 	var err error
 	var conn net.Conn
 	if t.proxy != "" {
-		conn, err = utils2.GetProxyConn(t.addr(), t.proxy, t.timeout)
+		conn, err = utils2.GetForceProxyConn(t.addr(), t.proxy, t.timeout)
 	} else {
 		conn, err = net.DialTimeout("tcp", t.addr(), t.timeout)
 	}
