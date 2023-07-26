@@ -16,13 +16,13 @@ var actionMap = make(map[state]func(ctx *DataContext))
 
 func init() {
 	actionMap[stateStart+stateLeftBrace] = func(ctx *DataContext) { // OnTagStart
-		ctx.PushData(ctx.token)
+		ctx.PushData(NewStringNode(ctx.token))
 		ctx.PushToStack(&Tag{})
 	}
 	actionMap[stateRightParen+stateRightBrace] = func(ctx *DataContext) { // OnTagEnd
 		tag, _ := ctx.Pop()
 		if ctx.stack.IsEmpty() {
-			ctx.PushData(tag)
+			ctx.PushData(tag.(Node))
 		}
 	}
 	actionMap[stateEmptyRight+stateRightBrace] = actionMap[stateRightParen+stateRightBrace]
@@ -36,7 +36,7 @@ func init() {
 		}
 	}
 	actionMap[stateEmptyLeft+stateMethod] = func(ctx *DataContext) { // OnMethodStart
-		newMethod := &FuzzTagMethod{}
+		newMethod := &FuzzTagMethod{funTable: ctx.funTable}
 		node := ctx.stack.Peek()
 		switch ret := node.(type) {
 		case *Tag:
@@ -191,7 +191,7 @@ func StringRightBrace() func(ctx *DataContext) bool {
 }
 func CharIdentify() func(ctx *DataContext) bool {
 	return func(ctx *DataContext) bool {
-		ctx.transOk = utils.MatchAllOfRegexp(string(ctx.currentByte), "^[a-zA-Z_][a-zA-Z0-9_:-]*$")
+		ctx.transOk = utils.MatchAllOfRegexp(string(ctx.currentByte), "[a-zA-Z0-9_:-]*")
 		if v, ok := actionMap[ctx.currentState+ctx.toState]; ctx.transOk {
 			if ctx.currentState != ctx.toState {
 				ctx.token = ctx.source[ctx.preIndex:ctx.currentIndex]

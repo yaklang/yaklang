@@ -1,18 +1,9 @@
 package fuzztagx
 
-func ExecuteWithStringHandler(source string, param map[string]func(string) []string) ([]string, error) {
-	res, err := Parse(source)
+func ExecuteWithStringHandler(source string, param map[string]BuildInTagFun) ([]string, error) {
+	res, err := Parse(source, &param)
 	if err != nil {
 		return nil, err
-	}
-	for _, r := range res {
-		if v, ok := r.(*Tag); ok && !v.IsExpTag {
-			for _, node := range v.Nodes {
-				node1 := node.(*FuzzTagMethod)
-				node1.ParseLabel()
-				node1.funTable = param
-			}
-		}
 	}
 	generator := NewGenerator(res)
 	result := []string{}

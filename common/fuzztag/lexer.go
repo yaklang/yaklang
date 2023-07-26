@@ -7,7 +7,7 @@ import (
 
 type FuzzTagLexer struct {
 	Origin      []byte
-	tokens      *utils.Stack
+	tokens      *utils.Stack[any]
 	tokensCache *[]*token
 }
 
@@ -15,7 +15,7 @@ func NewFuzzTagLexer(i interface{}) *FuzzTagLexer {
 
 	lexer := &FuzzTagLexer{
 		Origin: utils.InterfaceToBytes(i),
-		tokens: utils.NewStack(),
+		tokens: utils.NewStack[any](),
 	}
 	lexer.parse()
 	return lexer

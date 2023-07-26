@@ -46,6 +46,10 @@ func DumpResult(data []Node) string {
 }
 func TestParse(t *testing.T) {
 	for _, testCase := range [][2]string{
+		//{
+		//	"{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}",
+		//	"a",
+		//},
 		{
 			"asd{{{ int({{ int(1) }})  }}}}}{}",
 			"asd{ tag{int( tag{int(1)} )} }}}{}",
@@ -64,8 +68,12 @@ func TestParse(t *testing.T) {
 			"{{{int(a)}{{int(a)}}",
 			"{{{int(a)} tag{int(a)} ",
 		},
+		{
+			"{{int({{int(1)}}{{int(2)}})}}",
+			" tag{int( tag{int(1)}  tag{int(2)} )} ",
+		},
 	} {
-		res, err := Parse(testCase[0])
+		res, err := Parse(testCase[0], nil)
 		if err != nil {
 			panic(utils.Errorf("test data [%v] error: %v", testCase[0], err))
 		}
