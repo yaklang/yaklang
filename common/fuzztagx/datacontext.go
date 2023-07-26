@@ -15,6 +15,7 @@ type DataContext struct {
 	currentState state
 	transOk      bool
 	token        string
+	funTable     *map[string]BuildInTagFun
 }
 
 func (d *DataContext) SetIndex(i int) {
@@ -33,6 +34,17 @@ func (d *DataContext) Generate() ([]string, error) {
 	return nil, nil
 }
 func (d *DataContext) PushData(data Node) {
+	switch ret := data.(type) {
+	case *StringNode:
+		if ret.data == "" {
+			return
+		}
+		last := utils.GetLastElement(d.data)
+		if v2, ok := last.(*StringNode); ok {
+			v2.data += ret.data
+			return
+		}
+	}
 	d.data = append(d.data, data)
 }
 

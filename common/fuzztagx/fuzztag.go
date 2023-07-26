@@ -79,22 +79,19 @@ func (f *ExpressionNode) GenerateOne() (string, bool) {
 
 // FuzzTag/ExpressionTag
 type Tag struct {
-	IsExpTag bool
-	Nodes    []Node
+	IsExpTag  bool
+	Nodes     []Node
+	generator *Generator
 }
 
 func (f *Tag) Strings() []string {
 	return nil
 }
 func (f *Tag) GenerateOne() (string, bool) {
-	res := ""
-	for _, node := range f.Nodes {
-		d, err := node.GenerateOne()
-		if err == nil {
-			res += d
-		}
+	if f.generator == nil {
+		f.generator = NewGenerator(f.Nodes)
 	}
-	return res, nil
+	return f.generator.Generate()
 }
 
 // FuzzTagMethod
@@ -105,7 +102,7 @@ type FuzzTagMethod struct {
 	isDyn     bool
 	isRep     bool
 	params    []Node
-	funTable  map[string]func(string2 string) []string
+	funTable  *map[string]BuildInTagFun
 	generator *Generator
 	index     int
 }
@@ -131,32 +128,39 @@ func (f *FuzzTagMethod) ParseLabel() {
 }
 
 func (f *FuzzTagMethod) GenerateOne() (string, bool) {
-	if f.generator == nil {
+	if f.generator == nil { // 未初始化
 		f.generator = NewGenerator(f.params)
+		f.ParseLabel()
 	}
 
-	s, ok := f.GenerateOne()
-	if !ok {
-		return "", false
-	}
-
-	if f.cache == nil {
-		fun, ok := f.funTable[f.name]
-		if !ok {
-			return "", true
+	if f.cache == nil || f.isDyn || f.index >= len(*f.cache) {
+		if f.funTable != nil && *f.funTable != nil {
+			fun, ok := (*f.funTable)[f.name]
+			if !ok {
+				return "", true
+			}
+			s, ok := f.generator.Generate()
+			if !ok {
+				return "", false
+			}
+			result := fun(s)
+			f.cache = &result
+			f.index = 0
+		} else {
+			return "", false
 		}
-		result := fun(s)
-		f.cache = &result
 	}
 
-	if f.index > len(*f.cache) {
+	if f.index >= len(*f.cache) {
 		if !f.isRep {
 			return "", false
 		} else {
 			return utils.GetLastElement(*f.cache), true
 		}
 	}
-	f.index++
+	defer func() {
+		f.index++
+	}()
 	return (*f.cache)[f.index], true
 
 }
@@ -165,10 +169,11 @@ type Generator struct {
 	container []string
 	index     int
 	data      []Node
+	first     bool
 }
 
 func NewGenerator(nodes []Node) *Generator {
-	g := &Generator{data: nodes, container: make([]string, len(nodes))}
+	g := &Generator{data: nodes, container: make([]string, len(nodes)), first: true}
 	for index, d := range g.data {
 		s, _ := d.GenerateOne()
 		g.container[index] = s
@@ -176,7 +181,10 @@ func NewGenerator(nodes []Node) *Generator {
 	return g
 }
 func (g *Generator) Generate() (string, bool) {
-	if g.index == 0 {
+	if g.first {
+		defer func() {
+			g.first = false
+		}()
 		return strings.Join(g.container, ""), true
 	} else {
 		isOk := false
