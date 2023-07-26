@@ -104,13 +104,15 @@ func Escape(s []byte) string {
 
 func _xmldumps(v interface{}) []byte {
 	var b bytes.Buffer
+
+	v = StringMap(utils.InterfaceToGeneralMap(v))
 	enc := xml.NewEncoder(&b)
 	enc.Indent("  ", "  ")
 	err := enc.Encode(v)
 	if err != nil {
 		panic(err)
 	}
-	return b.Bytes()
+	return bytes.TrimSpace(b.Bytes())
 }
 
 func _xmlloads(v interface{}) StringMap {
