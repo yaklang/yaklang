@@ -186,6 +186,9 @@ func initYaklangLib() {
 	// xpath for html
 	yaklang.Import("xpath", htmlquery.Exports)
 
+	// xml
+	yaklang.Import("xml", yaklib.XMLExports)
+
 	// hooks // 负责加载插件中的插件机制
 	yaklang.Import("hook", HooksExports)
 
