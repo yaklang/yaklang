@@ -16,8 +16,8 @@ import (
 var mysqlAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mysql",
 	DefaultPorts:     "3306",
-	DefaultUsernames: append([]string{"mysql", "root", "guest", "op", "ops"}),
-	DefaultPasswords: CommonPasswords,
+	DefaultUsernames: []string{"mysql", "root", "admin"},
+	DefaultPasswords: []string{"root", "123456", "admin123", "root@123"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		res := i.Result()
 
