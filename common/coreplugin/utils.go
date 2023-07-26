@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,6 +15,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -32,9 +34,10 @@ type VulServerInfo struct {
 }
 
 type VulInfo struct {
-	Path           string
+	Path           []string
 	Headers        []*ypb.KVPair
 	ExpectedResult map[string]int
+	StrictMode     bool
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
@@ -77,7 +80,12 @@ func NewLocalClient() (ypb.YakClient, error) {
 	return ypb.NewYakClient(conn), nil
 }
 
+var initDB = sync.Once{}
+
 func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
 	codeBytes := GetCorePluginData(pluginName)
 	if codeBytes == nil {
 		t.Errorf("无法从bindata获取%v", pluginName)
@@ -89,7 +97,7 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 		PluginType: "mitm",
 		Input:      utils.HostPort(host, port),
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-			Path:    []string{vunInfo.Path},
+			Path:    vunInfo.Path,
 			Headers: vunInfo.Headers,
 			IsHttps: vulServer.IsHttps,
 		},
@@ -99,6 +107,7 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 		panic(err)
 	}
 
+	var runtimeId string
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -107,27 +116,56 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 			}
 			log.Warn(err)
 		}
-		if string(exec.Message) != "" {
-			for expected := range vunInfo.ExpectedResult {
-				if strings.Contains(string(exec.Message), expected) {
-					vunInfo.ExpectedResult[expected]--
-					break
+		if runtimeId == "" {
+			runtimeId = exec.RuntimeID
+		}
+	}
+
+	if runtimeId == "" {
+		panic("NO RUNTIME ID SET")
+	}
+
+	var expected = make(map[string]int)
+	for k := range vunInfo.ExpectedResult {
+		expected[k] = 0
+	}
+	risks := yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
+
+	for risk := range risks {
+		match := false
+		riskInfo, _ := json.Marshal(risk)
+		for k := range vunInfo.ExpectedResult {
+			if vunInfo.StrictMode && (risk.TitleVerbose == k || risk.Title == k) {
+				expected[k] = expected[k] + 1
+				match = true
+			} else if !vunInfo.StrictMode {
+				if strings.Contains(string(riskInfo), k) || strings.Contains(risk.TitleVerbose, k) {
+					expected[k] = expected[k] + 1
+					match = true
 				}
 			}
 		}
+		if !match {
+			println(riskInfo)
+		}
 	}
-	for expected, cnt := range vunInfo.ExpectedResult {
-		if cnt != 0 {
-			t.Errorf("`%v` 的预期检测出次数缺少了 %v 次", expected, cnt)
-			return false
+
+	for k, expectedCount := range vunInfo.ExpectedResult {
+		if expected[k] != expectedCount {
+			t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v", k, expectedCount, expected[k])
+			t.FailNow()
 		}
 	}
 	return true
 }
 
-func Must(condition bool, errMsg string) {
+func Must(condition bool, errMsg ...string) {
 	if !condition {
-		panic(errMsg)
+		if len(errMsg) > 0 {
+			panic(strings.Join(errMsg, ", "))
+		} else {
+			panic("TESTCASE FAILED")
+		}
 	}
 }
 

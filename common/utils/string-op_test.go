@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"testing"
 )
@@ -29,4 +30,11 @@ func TestParseStringToVisible(t *testing.T) {
 		res := ParseStringToVisible(string([]byte{byte(i)}))
 		fmt.Printf("%v (0x%02x)\n", res, i)
 	}
+}
+
+func TestPrettifyListFromStringSplit(t *testing.T) {
+	assert.Equal(t, []string{"a", "b", "c", "d", "e", "f", "g"}, PrettifyListFromStringSplitEx("a,b,c|d|e,f|g", ",", "|"))
+	assert.Equal(t, []string{"a", "b", "c", "d", "e", "f", "g"}, PrettifyListFromStringSplitEx("a,b,c d|e,f|g", ",", "|", " "))
+	assert.Equal(t, []string{"a", "b", "c"}, PrettifyListFromStringSplitEx("abc", ""))
+	assert.Equal(t, []string{"a", "b", "c"}, PrettifyListFromStringSplitEx("a b c", " "))
 }

@@ -1,0 +1,677 @@
+{
+  "x-generator": "NSwag v12.0.9.0 (NJsonSchema v9.13.10.0 (Newtonsoft.Json v12.0.0.0))",
+  "swagger": "2.0",
+  "info": {
+    "title": "eConfirmations API",
+    "description": "The eConfirmations API enables you to send eConfirmations data to the Sertifi system.",
+    "version": "v1, v2"
+  },
+  "host": "econfirmations.sertifi.net",
+  "schemes": [
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v2.0/econfirmations/Portals": {
+      "get": {
+        "tags": [
+          "EConfirmationsV2"
+        ],
+        "operationId": "EConfirmationsV2_GetInNetworkPortalsForProvider",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "page",
+            "in": "query",
+            "format": "int32",
+            "default": 1,
+            "x-nullable": false
+          },
+          {
+            "type": "integer",
+            "name": "perPage",
+            "in": "query",
+            "format": "int32",
+            "default": 1000,
+            "x-nullable": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/PortalCollectionOfEConfirmationsPortalV2Dto"
+            }
+          }
+        }
+      }
+    },
+    "/v1.0/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "Health_Get",
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "/v1.0/econfirmations/{propertyId}": {
+      "post": {
+        "tags": [
+          "EConfirmations"
+        ],
+        "operationId": "EConfirmations_Post",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "format": "guid",
+            "x-nullable": false
+          },
+          {
+            "name": "eConfirmationsRequestDto",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/EConfirmationsDTO"
+            },
+            "x-nullable": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/EConfirmationsResponseDTO"
+            }
+          }
+        }
+      }
+    },
+    "/v1.0/econfirmations/Portals": {
+      "get": {
+        "tags": [
+          "EConfirmations"
+        ],
+        "operationId": "EConfirmations_GetInNetworkPortalsForProvider",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "page",
+            "in": "query",
+            "format": "int32",
+            "default": 1,
+            "x-nullable": false
+          },
+          {
+            "type": "integer",
+            "name": "perPage",
+            "in": "query",
+            "format": "int32",
+            "default": 1000,
+            "x-nullable": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/PortalCollectionOfEConfirmationsPortalDTO"
+            }
+          }
+        }
+      }
+    },
+    "/v1.0/econfirmations/portals/search": {
+      "get": {
+        "tags": [
+          "EConfirmations"
+        ],
+        "operationId": "EConfirmations_SearchInNetworkPortalsForProvider",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "PortalName",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PortalURL",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertyAddress",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertyID",
+            "in": "query",
+            "format": "guid",
+            "x-nullable": false
+          },
+          {
+            "type": "string",
+            "name": "StrNumber",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertySupportPhone",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertySupportEmail",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertyFax",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "string",
+            "name": "PropertyGDSCode",
+            "in": "query",
+            "x-nullable": true
+          },
+          {
+            "type": "integer",
+            "name": "Page",
+            "in": "query",
+            "format": "int32",
+            "x-nullable": false
+          },
+          {
+            "type": "integer",
+            "name": "PerPage",
+            "in": "query",
+            "format": "int32",
+            "x-nullable": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/PortalCollectionOfEConfirmationsPortalDTO"
+            }
+          }
+        }
+      }
+    },
+    "/v1.0/econfirmations/{transactionId}": {
+      "get": {
+        "tags": [
+          "EConfirmations"
+        ],
+        "operationId": "EConfirmations_Get",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "format": "guid",
+            "x-nullable": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "x-nullable": true,
+            "description": "",
+            "schema": {
+              "$ref": "#/definitions/EConfirmationsRecordDTO"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "PortalCollectionOfEConfirmationsPortalV2Dto": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PaginationMetaData"
+        },
+        "portals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EConfirmationsPortalV2Dto"
+          }
+        }
+      }
+    },
+    "PaginationMetaData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalNumberOfPortals",
+        "pageSize",
+        "currentPage"
+      ],
+      "properties": {
+        "totalNumberOfPortals": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "currentPage": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "string"
+        },
+        "hasNextPage": {
+          "type": "string"
+        }
+      }
+    },
+    "EConfirmationsPortalV2Dto": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/PortalBaseDto"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "propertyIdentifiers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PortalPropertyIdentifier"
+              }
+            },
+            "propertyStreetAddress": {
+              "type": "string"
+            },
+            "propertyCity": {
+              "type": "string"
+            },
+            "propertyState": {
+              "type": "string"
+            },
+            "propertyPostalCode": {
+              "type": "string"
+            },
+            "propertyCountry": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "PortalPropertyIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "IdentifierType": {
+          "type": "string"
+        },
+        "Value": {
+          "type": "string"
+        }
+      }
+    },
+    "PortalBaseDto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "propertyID"
+      ],
+      "properties": {
+        "portalName": {
+          "type": "string"
+        },
+        "portalURL": {
+          "type": "string"
+        },
+        "propertyID": {
+          "type": "string",
+          "format": "guid"
+        },
+        "strNumber": {
+          "type": "string"
+        },
+        "propertySupportPhone": {
+          "type": "string"
+        },
+        "propertySupportEmail": {
+          "type": "string"
+        },
+        "propertyFax": {
+          "type": "string"
+        }
+      }
+    },
+    "EConfirmationsResponseDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "TransactionId": {
+          "type": "string",
+          "format": "guid"
+        },
+        "Message": {
+          "type": "string"
+        }
+      }
+    },
+    "EConfirmationsDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PaymentInstructions",
+        "Traveler",
+        "ReferenceNumber",
+        "ArrivalDate"
+      ],
+      "properties": {
+        "Card": {
+          "$ref": "#/definitions/Card"
+        },
+        "Company": {
+          "$ref": "#/definitions/CompanyDTO"
+        },
+        "Contact": {
+          "$ref": "#/definitions/ContactDTO"
+        },
+        "PaymentInstructions": {
+          "type": "string",
+          "maxLength": 4000,
+          "minLength": 0
+        },
+        "Traveler": {
+          "$ref": "#/definitions/TravelerDTO"
+        },
+        "OtherFields": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "ReferenceNumber": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 0
+        },
+        "ArrivalDate": {
+          "type": "string",
+          "format": "date-time",
+          "minLength": 1
+        }
+      }
+    },
+    "Card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CardHolderName",
+        "CardNumber",
+        "CardType",
+        "ExpirationDate"
+      ],
+      "properties": {
+        "CardHolderName": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 0
+        },
+        "CardNumber": {
+          "type": "string",
+          "minLength": 1
+        },
+        "CardType": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 0
+        },
+        "ExpirationDate": {
+          "type": "string",
+          "format": "date-time",
+          "minLength": 1
+        },
+        "Token": {
+          "type": "string"
+        }
+      }
+    },
+    "CompanyDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Address": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 0
+        },
+        "Name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 0
+        }
+      }
+    },
+    "ContactDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "EmailAddress"
+      ],
+      "properties": {
+        "PhoneNumber": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 0
+        },
+        "EmailAddress": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 0
+        },
+        "InvoiceEmailAddress": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 0
+        },
+        "SupportEmailAddress": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 0
+        },
+        "SupportPhoneNumber": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 0
+        }
+      }
+    },
+    "TravelerDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "LastName"
+      ],
+      "properties": {
+        "FirstName": {
+          "type": "string",
+          "maxLength": 150,
+          "minLength": 0
+        },
+        "LastName": {
+          "type": "string",
+          "maxLength": 150,
+          "minLength": 0
+        }
+      }
+    },
+    "PortalCollectionOfEConfirmationsPortalDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/PaginationMetaData"
+        },
+        "portals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EConfirmationsPortalDTO"
+          }
+        }
+      }
+    },
+    "EConfirmationsPortalDTO": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/PortalBaseDto"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "propertyAddress": {
+              "type": "string"
+            },
+            "portalGDS": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/EConfirmationsPortalGDSDTO"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "EConfirmationsPortalGDSDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GDSName": {
+          "type": "string"
+        },
+        "Code": {
+          "type": "string"
+        }
+      }
+    },
+    "EConfirmationsRecordDTO": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/EConfirmationsRecordBaseDTO"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Card": {
+              "$ref": "#/definitions/BasicCardInfoDTO"
+            }
+          }
+        }
+      ]
+    },
+    "BasicCardInfoDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ExpirationDate"
+      ],
+      "properties": {
+        "CardHolderName": {
+          "type": "string"
+        },
+        "CardType": {
+          "type": "string"
+        },
+        "ExpirationDate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "EConfirmationsRecordBaseDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ArrivalDate"
+      ],
+      "properties": {
+        "PaymentMethodAccessData": {
+          "$ref": "#/definitions/PaymentMethodAccessDataDTO"
+        },
+        "Company": {
+          "$ref": "#/definitions/CompanyDTO"
+        },
+        "Contact": {
+          "$ref": "#/definitions/ContactDTO"
+        },
+        "PaymentInstructions": {
+          "type": "string"
+        },
+        "Traveler": {
+          "$ref": "#/definitions/TravelerDTO"
+        },
+        "OtherFields": {},
+        "ReferenceNumber": {
+          "type": "string"
+        },
+        "ArrivalDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "CreatedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ProcessedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "TransactionId": {
+          "type": "string"
+        }
+      }
+    },
+    "PaymentMethodAccessDataDTO": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "LastAccessDate": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

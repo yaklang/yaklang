@@ -1,0 +1,91 @@
+swaggerDESC = `
+wagger是一个用于设计、构建、记录和使用RESTful Web服务的工具，它可以生成一个交互式的API控制台，以便开发人员和用户能够理解和使用API。
+
+如果你的Swagger接口被公开暴露，可能存在以下风险：
+
+信息泄露：Swagger会详细列出所有的API端点、输入参数、输出结果和可能的错误代码。如果这些信息被恶意用户获取，他们可能会更容易找到系统的弱点并进行攻击。
+
+未授权访问：如果Swagger接口没有适当的访问控制，那么任何人都可以使用这些API，可能会导致数据泄露、数据篡改或其他安全问题。
+
+滥用API：即使API本身是安全的，恶意用户也可能通过大量调用API来进行拒绝服务（DoS）攻击。
+
+因此，通常来说，你应该在生产环境中禁用Swagger接口，或者至少应该添加适当的访问控制以防止未授权访问。
+`
+
+filter := str.NewFilter()
+check = result => {
+    yakit.Info("executed: %v", result.Url)
+    _, body = poc.Split(result.ResponseRaw)~
+    schema := json.loads(body)
+    isOpenAPI2 = schema["swagger"] == undefined ? false : schema.swagger.Contains("2.")
+    isOpenAPI3 = schema["openapi"] == undefined ? false : schema.openapi.Contains("3")
+    if isOpenAPI2 {
+        yakit.Info("Found Swagger OPENAPI 2.0: %v", result.Url)
+    }
+    if isOpenAPI3 {
+        yakit.Info("Found Swagger OPENAPI 3.0: %v", result.Url)
+    }
+
+    if isOpenAPI2 {
+        risk.NewRisk(
+            result.Url,
+            risk.title("Swagger(OpenAPI 2) on: %v" % result.Url),
+            risk.severity("low"),
+            risk.description(swaggerDESC),
+            risk.type("sensitive-disclosure"),
+            risk.typeVerbose("敏感信息泄漏"),
+            risk.request(result.RequestRaw),
+            risk.response(result.ResponseRaw),
+        )
+    }
+
+    if isOpenAPI3 {
+        risk.NewRisk(
+            result.Url,
+            risk.title("Swagger(OpenAPI 3) on: %v" % result.Url),
+            risk.severity("low"),
+            risk.description(swaggerDESC),
+            risk.type("sensitive-disclosure"),
+            risk.typeVerbose("敏感信息泄漏"),
+            risk.request(result.RequestRaw),
+            risk.response(result.ResponseRaw),
+        )
+    }
+}
+
+# mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    try {
+        freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+        // found swagger/v1/swagger.json
+        for result in freq.FuzzPath("/swagger/{{list(v|V)}}{{int(1-2)}}/swagger.json").Exec()~ {
+            if filter.Exist(result.Url) {
+                continue
+            }
+            filter.Insert(result.Url)
+            check(result)
+        }
+    } catch err {
+        yakit.Error("mirror NewWebsite ERROR: %v", err)
+    }
+}
+
+# mirrorNewWebsitePath 每新出现一个网站路径，关于这个网站路径的第一个请求，将会在这里被传入回调
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+    var payload = ""
+    if freq.GetPath().HasSuffix("/") {
+        payload = `{{list(v1/|v2/)}}swagger.json`
+    } else {
+        payload = `/{{list(v1/|v2/)}}swagger.json`
+    }
+    for result in freq.FuzzPathAppend(payload).Exec()~ {
+        if filter.Exist(result.Url) {
+            continue
+        }
+        filter.Insert(result.Url)
+        check(result)
+    }
+}
+
+
