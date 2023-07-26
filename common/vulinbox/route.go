@@ -14,8 +14,8 @@ import (
 var routeHtml []byte
 
 func (s *VulinServer) init() {
-	if s.agentFeedbackChan == nil {
-		s.agentFeedbackChan = make(chan any, 10000)
+	if s.wsAgent.wChan == nil {
+		s.wsAgent.wChan = make(chan any, 10000)
 	}
 
 	router := s.router
@@ -29,12 +29,7 @@ func (s *VulinServer) init() {
 			log.Errorf("dump request failed: %v", err)
 		}
 		if len(reqRaw) > 0 {
-			select {
-			case s.agentFeedbackChan <- newDataBackAction("http-request", string(reqRaw)):
-				//log.Infof("agentFeedbackHandler: %s", string(reqRaw))
-			default:
-				log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
-			}
+			s.wsAgent.TrySend(NewDataBackAction("http-request", string(reqRaw)))
 		}
 
 		if strings.HasPrefix(request.URL.Path, "/static") {
@@ -59,12 +54,7 @@ func (s *VulinServer) init() {
 				log.Errorf("dump request failed: %v", err)
 			}
 			if len(reqRaw) > 0 {
-				select {
-				case s.agentFeedbackChan <- newDataBackAction("http-request", string(reqRaw)):
-					log.Infof("agentFeedbackHandler: %s", string(reqRaw))
-				default:
-					log.Errorf("agentFeedbackHandler is full, drop request: %s", string(reqRaw))
-				}
+				s.wsAgent.TrySend(NewDataBackAction("http-request", string(reqRaw)))
 			}
 			handler.ServeHTTP(writer, request)
 		})

@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	ActionUDP       = "udp"
-	ActionAck       = "ack"
-	ActionDataback  = "databack"
-	ActionSubscribe = "subscribe"
-	ActionPing      = "ping"
+	ActionUDP         = "udp"
+	ActionAck         = "ack"
+	ActionDataback    = "databack"
+	ActionSubscribe   = "subscribe"
+	ActionUnsubscribe = "unsubscribe"
+	ActionPing        = "ping"
 )
 
 type AgentProtocol struct {
@@ -35,7 +36,7 @@ type DatabackAction struct {
 	Data any    `json:"data"`
 }
 
-func newDataBackAction(tp string, data any) *DatabackAction {
+func NewDataBackAction(tp string, data any) *DatabackAction {
 	return &DatabackAction{
 		AgentProtocol: newAgentProtocol(ActionDataback),
 		Type:          tp,
@@ -51,7 +52,7 @@ type UDPAction struct {
 	WaitTimeout time.Duration  `json:"wait_timeout"`
 }
 
-func newUDPAction(content []byte, target netip.AddrPort) *UDPAction {
+func NewUDPAction(content []byte, target netip.AddrPort) *UDPAction {
 	return &UDPAction{
 		AgentProtocol: newAgentProtocol(ActionUDP),
 		Content:       base64.StdEncoding.EncodeToString(content),
@@ -62,10 +63,10 @@ func newUDPAction(content []byte, target netip.AddrPort) *UDPAction {
 type AckAction struct {
 	AgentProtocol
 	Status string `json:"status"`
-	Data   any    `json:"data"`
+	Data   any    `json:"data,omitempty"`
 }
 
-func newAckAction(id uint32, status string, data any) *AckAction {
+func NewAckAction(id uint32, status string, data any) *AckAction {
 	return &AckAction{
 		AgentProtocol: AgentProtocol{
 			ActionId: id,
@@ -80,7 +81,7 @@ type PingAction struct {
 	AgentProtocol
 }
 
-func newPingAction() *PingAction {
+func NewPingAction() *PingAction {
 	return &PingAction{
 		AgentProtocol: newAgentProtocol(ActionPing),
 	}
@@ -88,25 +89,22 @@ func newPingAction() *PingAction {
 
 type SubscribeAction struct {
 	AgentProtocol
-	Subscribe []string `json:"subscribe"`
+	Type  string   `json:"type"`
+	Rules []string `json:"rules"`
 }
 
-func MessageMux(data []byte, ack func(ack *AckAction)) {
-	ap := utils.MustUnmarshalJson[AgentProtocol](data)
-	var err error
-	var rec any
-	switch ap.Action {
-	case ActionUDP:
-		rec, err = handleUDP(utils.MustUnmarshalJson[UDPAction](data))
-	}
-	if err != nil {
-		ack(newAckAction(ap.ActionId, "error", err))
-		return
-	}
-	ack(newAckAction(ap.ActionId, "ok", rec))
+type UnsubscribeAction struct {
+	AgentProtocol
+	Type  string   `json:"type"`
+	Rules []string `json:"rules"`
 }
 
-func handleUDP(udp *UDPAction) ([]byte, error) {
+func handlePing(_ []byte) (any, error) {
+	return nil, nil
+}
+
+func handleUDP(data []byte) (any, error) {
+	udp := utils.MustUnmarshalJson[UDPAction](data)
 	if udp == nil {
 		return nil, nil
 	}
