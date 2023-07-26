@@ -7,7 +7,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func desEnc(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) cipher.BlockMode) ([]byte, error) {
+func desEnc(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) cipher.BlockMode, isTripleDES bool) ([]byte, error) {
+	var block cipher.Block
+	var err error
 	if iv == nil {
 		iv = make([]byte, 8)
 	} else {
@@ -22,7 +24,12 @@ func desEnc(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) 
 		}
 	}
 
-	block, err := des.NewCipher(key)
+	if isTripleDES {
+		block, err = des.NewTripleDESCipher(key)
+	} else {
+		block, err = des.NewCipher(key)
+	}
+
 	if err != nil {
 		return nil, errors.Errorf("create cipher failed: %s", err)
 	}
@@ -37,7 +44,9 @@ func desEnc(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) 
 	return result, nil
 }
 
-func desDec(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) cipher.BlockMode) ([]byte, error) {
+func desDec(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) cipher.BlockMode, isTripleDES bool) ([]byte, error) {
+	var block cipher.Block
+	var err error
 	if iv == nil {
 		iv = make([]byte, 8)
 	} else {
@@ -52,7 +61,12 @@ func desDec(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) 
 		}
 	}
 
-	block, err := des.NewCipher(key)
+	if isTripleDES {
+		block, err = des.NewTripleDESCipher(key)
+	} else {
+		block, err = des.NewCipher(key)
+	}
+
 	if err != nil {
 		return nil, errors.Errorf("create cipher failed: %s", err)
 	}
@@ -67,15 +81,17 @@ func desDec(key []byte, data []byte, iv []byte, mode func(cipher.Block, []byte) 
 	return result, nil
 }
 
-func DESCBCEnc(key []byte, data []byte, iv []byte) ([]byte, error) {
-	return desEnc(key, data, iv, cipher.NewCBCEncrypter)
+func DESCBCEncEx(key []byte, data []byte, iv []byte, isTripleDES bool) ([]byte, error) {
+	return desEnc(key, data, iv, cipher.NewCBCEncrypter, isTripleDES)
 }
 
-func DESCBCDec(key, data, iv []byte) ([]byte, error) {
-	return desDec(key, data, iv, cipher.NewCBCDecrypter)
+func DESCBCDecEx(key, data, iv []byte, isTripleDES bool) ([]byte, error) {
+	return desDec(key, data, iv, cipher.NewCBCDecrypter, isTripleDES)
 }
 
-func DESECBEnc(key []byte, data []byte) ([]byte, error) {
+func DESECBEncEx(key []byte, data []byte, isTripleDES bool) ([]byte, error) {
+	var block cipher.Block
+	var err error
 	blockSize := 8
 
 	if len(key)%blockSize != 0 {
@@ -85,7 +101,11 @@ func DESECBEnc(key []byte, data []byte) ([]byte, error) {
 		}
 	}
 
-	block, err := des.NewCipher(key)
+	if isTripleDES {
+		block, err = des.NewTripleDESCipher(key)
+	} else {
+		block, err = des.NewCipher(key)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("DES ECB Error: %s", err)
 	}
@@ -100,7 +120,9 @@ func DESECBEnc(key []byte, data []byte) ([]byte, error) {
 	return encrypted, nil
 }
 
-func DESECBDec(key []byte, data []byte) ([]byte, error) {
+func DESECBDecEx(key []byte, data []byte, isTripleDES bool) ([]byte, error) {
+	var block cipher.Block
+	var err error
 	blockSize := 8
 
 	if len(key)%blockSize != 0 {
@@ -110,7 +132,11 @@ func DESECBDec(key []byte, data []byte) ([]byte, error) {
 		}
 	}
 
-	block, err := des.NewCipher(key)
+	if isTripleDES {
+		block, err = des.NewTripleDESCipher(key)
+	} else {
+		block, err = des.NewCipher(key)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("DES ECB Error: %s", err)
 	}
@@ -123,4 +149,36 @@ func DESECBDec(key []byte, data []byte) ([]byte, error) {
 		block.Decrypt(decrypted[bs:be], data[bs:be])
 	}
 	return decrypted, nil
+}
+
+func DESCBCEnc(key []byte, data []byte, iv []byte) ([]byte, error) {
+	return DESCBCEncEx(key, data, iv, false)
+}
+
+func TripleDES_CBCEnc(key []byte, data []byte, iv []byte) ([]byte, error) {
+	return DESCBCEncEx(key, data, iv, true)
+}
+
+func DESCBCDec(key []byte, data []byte, iv []byte) ([]byte, error) {
+	return DESCBCDecEx(key, data, iv, false)
+
+}
+func TripleDES_CBCDec(key []byte, data []byte, iv []byte) ([]byte, error) {
+	return DESCBCDecEx(key, data, iv, true)
+}
+
+func DESECBEnc(key []byte, data []byte) ([]byte, error) {
+	return DESECBEncEx(key, data, false)
+}
+
+func TripleDES_ECBEnc(key []byte, data []byte) ([]byte, error) {
+	return DESECBEncEx(key, data, true)
+}
+
+func DESECBDec(key []byte, data []byte) ([]byte, error) {
+	return DESECBDecEx(key, data, false)
+}
+
+func TripleDES_ECBDec(key []byte, data []byte) ([]byte, error) {
+	return DESECBDecEx(key, data, true)
 }
