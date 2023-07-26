@@ -15,19 +15,9 @@ var ftpAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "ftp",
 	DefaultPorts:     "21",
 	DefaultUsernames: ftpUser,
-	DefaultPasswords: append([]string{
-		"admin", "123456",
-		"root", "password", "123123", "123", "", "1",
-		"qwa123", "12345678", "test", "123qwe!@#", "p@ssw0rd",
-		"123456789", "123321", "1314520", "666666", "88888888",
-		"fuckyou", "000000", "woaini", "qwerty", "1qaz2wsx", "abc123",
-		"abc123456", "1q2w3e4r", "123qwe", "159357", "p@55w0rd", "r00t",
-		"tomcat", "apache", "system", "huawei", "zte",
-	}, GeneratePasswordByUser(ftpUser, []string{
-		"{{param(user)}}{{param(user)}}",
-		"{{param(user)}}", "{{param(user)}}1",
-		"{{param(user)}}!",
-	})...),
+	DefaultPasswords: []string{
+		"admin", "admin123", "root@123", "123456",
+	},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 21)
 		var res = i.Result()

@@ -25,8 +25,8 @@ func snmpV3BruteFactory(name string) *DefaultServiceAuthInfo {
 	return &DefaultServiceAuthInfo{
 		ServiceName:      name,
 		DefaultPorts:     "161",
-		DefaultUsernames: append([]string{"snmp"}, CommonUsernames...),
-		DefaultPasswords: CommonPasswords,
+		DefaultUsernames: []string{"snmp"},
+		DefaultPasswords: []string{"public"},
 		UnAuthVerify:     nil,
 		BrutePass: func(item *BruteItem) *BruteItemResult {
 			return v3Brute(item, alg)

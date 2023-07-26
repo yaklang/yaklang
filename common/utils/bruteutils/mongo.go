@@ -16,8 +16,8 @@ import (
 var mongoAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mongodb",
 	DefaultPorts:     "27017",
-	DefaultUsernames: append([]string{"root", "admin", "mongodb"}, CommonUsernames...),
-	DefaultPasswords: CommonPasswords,
+	DefaultUsernames: []string{"root", "admin", "mongodb"},
+	DefaultPasswords: []string{"root", "admin123", "root@123"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		result := i.Result()
 		i.Target = appendDefaultPort(i.Target, 27017)

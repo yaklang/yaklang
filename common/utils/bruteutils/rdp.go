@@ -35,7 +35,7 @@ func init() {
 var rdpAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "rdp",
 	DefaultPorts:     "3389",
-	DefaultPasswords: append([]string{"123456", "admin", "admin123", "administrator", "guest"}, CommonUsernames...),
+	DefaultPasswords: []string{"123456", "admin", "administrator", "root", "admin123", "123456"},
 	DefaultUsernames: []string{"administrator", "guest", "admin"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		result := i.Result()

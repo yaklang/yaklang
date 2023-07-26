@@ -10,8 +10,8 @@ import (
 var memcachedAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "memcached",
 	DefaultPorts:     "11211",
-	DefaultUsernames: CommonUsernames,
-	DefaultPasswords: CommonPasswords,
+	DefaultUsernames: []string{"root", "admin"},
+	DefaultPasswords: []string{"root", "admin123", "root@123"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		result := i.Result()
 
