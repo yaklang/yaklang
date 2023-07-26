@@ -224,7 +224,10 @@ func _pocOptWithNoRedirect(b bool) PocConfig {
 
 func _pocOptWithProxy(proxies ...string) PocConfig {
 	return func(c *_pocConfig) {
-		c.Proxy = proxies
+		data := utils.StringArrayFilterEmpty(proxies)
+		if len(data) > 0 {
+			c.Proxy = proxies
+		}
 	}
 }
 
@@ -317,6 +320,8 @@ func _pocOptWIthSource(i string) PocConfig {
 		c.Source = i
 	}
 }
+
+var PoCOptWithProxy = _pocOptWithProxy
 
 func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	return func(c *_pocConfig) {

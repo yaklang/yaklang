@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
 	"sync"
 	"time"
 
@@ -27,13 +28,21 @@ type YakFunctionCaller struct {
 	Handler func(args ...interface{})
 }
 
-func FetchFunctionFromSourceCode(ctx context.Context, runtimeId string, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	var fTable = map[string]*YakFunctionCaller{}
 
 	engine := NewScriptEngine(100)
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		BindYakitPluginContextToEngine(id, engine, runtimeId)
+		if id == "" {
+			BindYakitPluginContextToEngine(engine, pluginContext)
+		} else {
+			BindYakitPluginContextToEngine(engine, &YakitPluginContext{
+				PluginName: id,
+				RuntimeId:  pluginContext.RuntimeId,
+				Proxy:      pluginContext.Proxy,
+			})
+		}
 		return nil
 	})
 	engine.HookOsExit()
@@ -49,10 +58,10 @@ func FetchFunctionFromSourceCode(ctx context.Context, runtimeId string, timeout 
 
 	for _, funcName := range functionNames {
 		funcName := funcName
-		switch funcName {
-		case "execNuclei":
-			log.Debugf("in execNuclei: %v", runtimeId)
-		}
+		//switch funcName {
+		//case "execNuclei":
+		//	log.Debugf("in execNuclei: %v", runtimeId)
+		//}
 		raw, ok := ins.GetVar(funcName)
 		if !ok {
 			continue
@@ -101,6 +110,7 @@ type YakToCallerManager struct {
 	dividedContext bool
 	timeout        time.Duration
 	runtimeId      string
+	proxy          string
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -247,7 +257,10 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 	}()
 
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(ctx, y.runtimeId, y.timeout, "", code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, &YakitPluginContext{
+		RuntimeId: y.runtimeId,
+		Proxy:     y.proxy,
+	}, y.timeout, "", code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -437,27 +450,77 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 	y.table.Store(name, callers)
 }
 
-func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeIds ...string) {
+type YakitPluginContext struct {
+	PluginName string
+	RuntimeId  string
+	Proxy      string
+}
+
+func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *YakitPluginContext) {
 	if nIns == nil {
 		return
 	}
+	var pluginName string
 	var runtimeId string
-	if len(runtimeIds) > 0 {
-		runtimeId = runtimeIds[0]
+	var proxy string
+
+	if pluginContext == nil {
+		return
 	}
+
+	runtimeId = pluginContext.RuntimeId
+	pluginName = pluginContext.PluginName
+	proxy = pluginContext.Proxy
+
+	// inject meta vars
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) ([]byte, []byte, error))
 		if ok {
 			return func(raw interface{}, opts ...yaklib.PocConfig) ([]byte, []byte, error) {
-				opts = append(opts, yaklib.PoCOptWithSource(id))
-				opts = append(opts, yaklib.PoCOptWithFromPlugin(id))
+				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
+				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
 				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
 				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
 				return originFunc(raw, opts...)
 			}
 		}
+		log.Errorf("BUG: poc.HTTP 's signature is override")
 		return i
 	})
+	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTPEx", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		if ok {
+			return func(raw interface{}, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
+				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+				return originFunc(raw, opts...)
+			}
+		}
+		log.Errorf("BUG: poc.HTTPEx 's signature is override")
+		return i
+	})
+	for _, method := range []string{"Get", "Post", "Head", "Delete", "Options"} {
+		method := method
+		nIns.GetVM().RegisterMapMemberCallHandler("poc", method, func(i interface{}) interface{} {
+			origin, ok := i.(func(string, ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+			if !ok {
+				log.Errorf("BUG: poc.%v 's signature is override", method)
+				return i
+			}
+			return func(u string, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
+				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+				return origin(u, opts...)
+			}
+		})
+	}
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "Scan", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any) (chan *tools.PocVul, error))
 		if ok {
@@ -465,8 +528,9 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 				if runtimeId != "" {
 					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
 				}
-				opts = append(opts, lowhttp.WithFromPlugin(id))
+				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
+				opts = append(opts, lowhttp.WithProxy(proxy))
 				return originFunc(target, opts...)
 			}
 		}
@@ -477,8 +541,9 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		if ok {
 			return func(target any, opts ...any) {
 				opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
-				opts = append(opts, lowhttp.WithFromPlugin(id))
+				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
+				opts = append(opts, lowhttp.WithProxy(proxy))
 				originFunc(target, opts...)
 			}
 		}
@@ -488,10 +553,11 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		originFunc, ok := i.(func(interface{}, ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error))
 		if ok {
 			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error) {
-				opts = append(opts, mutate.OptSource(id))
+				opts = append(opts, mutate.OptSource(pluginName))
 				if runtimeId != "" {
 					opts = append(opts, mutate.OptRuntimeId(runtimeId))
 				}
+				opts = append(opts, mutate.OptProxy(proxy))
 				return originFunc(i, opts...)
 			}
 		}
@@ -501,7 +567,11 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		originFunc, ok := i.(func(interface{}, ...mutate.BuildFuzzHTTPRequestOption) *mutate.FuzzHTTPRequest)
 		if ok {
 			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) *mutate.FuzzHTTPRequest {
-				opts = append(opts, mutate.OptSource(id))
+				opts = append(opts, mutate.OptSource(pluginName))
+				opts = append(opts, mutate.OptProxy(proxy))
+				if runtimeId != "" {
+					opts = append(opts, mutate.OptRuntimeId(runtimeId))
+				}
 				return originFunc(i, opts...)
 			}
 		}
@@ -511,29 +581,31 @@ func BindYakitPluginContextToEngine(id string, nIns *antlr4yak.Engine, runtimeId
 		originFunc, ok := i.(func(target string, opts ...yakit.RiskParamsOpt))
 		if ok {
 			return func(target string, opts ...yakit.RiskParamsOpt) {
-				opts = append(opts, yakit.WithRiskParam_YakitPluginName(id))
+				opts = append(opts, yakit.WithRiskParam_YakitPluginName(pluginName))
+				if runtimeId != "" {
+					opts = append(opts, yakit.WithRiskParam_RuntimeId(runtimeId))
+				}
 				originFunc(target, opts...)
 			}
 		}
 		return i
 	})
-	if runtimeId != "" {
-		nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
-			origin, ok := i.(func() (*MixPluginCaller, error))
-			if ok {
-				return func() (*MixPluginCaller, error) {
-					manager, err := origin()
-					if err != nil {
-						return nil, err
-					}
-					log.Infof("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
-					manager.SetRuntimeId(runtimeId)
-					return manager, nil
+	nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
+		origin, ok := i.(func() (*MixPluginCaller, error))
+		if ok {
+			return func() (*MixPluginCaller, error) {
+				manager, err := origin()
+				if err != nil {
+					return nil, err
 				}
+				log.Infof("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
+				manager.SetRuntimeId(runtimeId)
+				manager.SetProxy(proxy)
+				return manager, nil
 			}
-			return i
-		})
-	}
+		}
+		return i
+	})
 }
 
 func (y *YakToCallerManager) AddForYakit(
@@ -558,7 +630,11 @@ func (y *YakToCallerManager) AddForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
-		BindYakitPluginContextToEngine(id, engine, y.runtimeId)
+		BindYakitPluginContextToEngine(engine, &YakitPluginContext{
+			PluginName: id,
+			RuntimeId:  y.runtimeId,
+			Proxy:      y.proxy,
+		})
 		return nil
 	}, hooks...)
 }
@@ -573,7 +649,10 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	}()
 
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(ctx, y.runtimeId, y.timeout, id, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, &YakitPluginContext{
+		RuntimeId: y.runtimeId,
+		Proxy:     y.proxy,
+	}, y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
