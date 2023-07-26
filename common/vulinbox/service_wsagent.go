@@ -5,15 +5,91 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"sync"
-	"time"
 )
+
+type EvFunc func([]byte) (any, error)
+
+type wsAgent struct {
+	conn   *websocket.Conn
+	wChan  chan any
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	events map[string]EvFunc
+}
+
+func (a *wsAgent) init(conn *websocket.Conn) {
+	a.ctx, a.cancel = context.WithCancel(context.Background())
+	a.conn = conn
+	a.events = make(map[string]EvFunc)
+	a.wChan = make(chan any, 1000)
+}
+
+func (a *wsAgent) listenLoop() {
+	for {
+		select {
+		case <-a.ctx.Done():
+			return
+		default:
+		}
+		_, m, err := a.conn.ReadMessage()
+		if err != nil {
+			a.cancel()
+			return
+		}
+		go a.messageMux(m)
+	}
+}
+
+func (a *wsAgent) messageMux(data []byte) {
+	ap := utils.MustUnmarshalJson[AgentProtocol](data)
+	if ap == nil || ap.Action == "" || a.events[ap.Action] == nil {
+		return
+	}
+	rec, err := a.events[ap.Action](data)
+	if err != nil {
+		a.TrySend(NewAckAction(ap.ActionId, "error", err))
+		return
+	}
+	a.TrySend(NewAckAction(ap.ActionId, "ok", rec))
+}
+
+func (a *wsAgent) sendLoop() {
+	for v := range a.wChan {
+		err := a.conn.WriteJSON(v)
+		if err != nil {
+			log.Debugf("ws conn from: %v closed", a.conn.LocalAddr())
+			a.cancel()
+			return
+		}
+	}
+}
+
+func (a *wsAgent) run() {
+	go a.listenLoop()
+	go a.sendLoop()
+	<-a.ctx.Done()
+	close(a.wChan)
+}
+
+func (a *wsAgent) TrySend(v any) {
+	select {
+	case a.wChan <- v:
+	default:
+		// channel closed or full, drop it
+	}
+}
+
+func (a *wsAgent) Register(action string, handler EvFunc) {
+	a.events[action] = handler
+}
 
 func (r *VulinServer) registerWSAgent() {
 	router := r.router
-	var wsAgentWrite = r.agentFeedbackChan
 	// wsAgent
 	var upgrader = websocket.Upgrader{}
 	router.HandleFunc("/_/ws", func(writer http.ResponseWriter, request *http.Request) {
@@ -60,53 +136,60 @@ func (r *VulinServer) registerWSAgent() {
 			log.Error(err)
 			return
 		}
-		defer func() {
-			conn.Close()
-		}()
 
-		var wr sync.Mutex
-		ctx, cancel := context.WithCancel(context.Background())
-
-		go func() {
-			defer cancel()
-			for {
-				_, m, err := conn.ReadMessage()
-				if err != nil {
-					return
-				}
-				go MessageMux(m, func(ack *AckAction) {
-					wsAgentWrite <- ack
-				})
-			}
-		}()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case feedback := <-wsAgentWrite:
-				wr.Lock()
-				err := conn.WriteJSON(feedback)
-				wr.Unlock()
-				if err != nil {
-					log.Debugf("ws conn from: %v closed", conn.LocalAddr())
-					cancel()
-					return
-				}
-			case <-time.After(time.Second):
-				log.Debugf("ws conn start to send: %v ping", conn.LocalAddr())
-				wr.Lock()
-				err := conn.WriteJSON(newPingAction())
-				wr.Unlock()
-				if err != nil {
-					log.Debugf("ws conn from: %v closed", conn.LocalAddr())
-					cancel()
-					return
-				}
-				continue
-			}
-		}
+		r.wsAgent.init(conn)
+		r.registerWSAgentEvent()
+		r.wsAgent.run()
 	})
+}
+
+func (r *VulinServer) registerWSAgentEvent() {
+	r.wsAgent.Register("ping", handlePing)
+	r.wsAgent.Register("udp", handleUDP)
+	r.wsAgent.Register("subscribe", r.handleSubscribe)
+	r.wsAgent.Register("unsubscribe", r.handleUnsubscribe)
+}
+
+func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
+	subscribe := utils.MustUnmarshalJson[SubscribeAction](a)
+	if subscribe == nil {
+		return nil, nil
+	}
+	if subscribe.Type != "suricata" {
+		return nil, nil
+	}
+
+	var appendRules []*suricata.Rule
+	for _, v := range subscribe.Rules {
+		rules, err := suricata.Parse(v)
+		if err != nil {
+			return nil, err
+		}
+		appendRules = append(appendRules, rules...)
+	}
+	r.matcher.AddRule(appendRules...)
+	return nil, nil
+}
+
+func (r *VulinServer) handleUnsubscribe(a []byte) (any, error) {
+	unsubscribe := utils.MustUnmarshalJson[UnsubscribeAction](a)
+	if unsubscribe == nil {
+		return nil, nil
+	}
+	if unsubscribe.Type != "suricata" {
+		return nil, nil
+	}
+
+	var removeRules []*suricata.Rule
+	for _, v := range unsubscribe.Rules {
+		rules, err := suricata.Parse(v)
+		if err != nil {
+			return nil, err
+		}
+		removeRules = append(removeRules, rules...)
+	}
+	r.matcher.RemoveRule(removeRules...)
+	return nil, nil
 }
 
 const wspage = `
