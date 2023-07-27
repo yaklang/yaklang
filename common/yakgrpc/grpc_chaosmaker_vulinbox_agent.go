@@ -34,6 +34,7 @@ func RegisterVulinboxAgent(addr string, agent *VulinboxAgentFacade) {
 
 type VulinboxAgentFacade struct {
 	addr         string
+	client       *vulinboxAgentClient.Client
 	closed       bool
 	disconnect   func()
 	requestCount int64
@@ -150,24 +151,18 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 	info := &VulinboxAgentFacade{
 		addr: addr,
 	}
-	disconnectBox, err := vulinboxAgentClient.ConnectEx(addr, func(request []byte) {
-		info.AddRequestCount()
-	}, func() {
-		info.AddPing()
-	}, func() {
+	client, err := vulinboxAgentClient.Connect(addr, vulinboxAgentClient.WithOnClose(func() {
 		info.closed = true
-	})
+	}))
 	if err != nil {
 		return nil, utils.Errorf("connect to remove agent failed: %s", err)
 	}
-	info.disconnect = disconnectBox
+	info.disconnect = client.Disconnect
 	RegisterVulinboxAgent(addr, info)
 
 	return &ypb.IsRemoteAddrAvailableResponse{
-		Addr:         addr,
-		IsAvailable:  true,
-		Status:       "online",
-		PingCount:    info.pingCount,
-		RequestCount: info.requestCount,
+		Addr:        addr,
+		IsAvailable: true,
+		Status:      "online",
 	}, nil
 }

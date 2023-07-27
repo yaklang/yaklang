@@ -2,7 +2,6 @@ package vulinboxAgentClient
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,66 +9,40 @@ import (
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"strings"
 	"sync"
-	"time"
 )
 
-var AckWaitMap sync.Map
+type Client struct {
+	wsClient *lowhttp.WebsocketClient
 
-func WaitNow(id uint32) ([]byte, error) {
-	var msg chan []byte
-	AckWaitMap.Store(id, func(data []byte) error {
-		msg <- data
-		return nil
-	})
-	t := time.NewTimer(time.Second * 10)
-	select {
-	case <-t.C:
-		return nil, errors.New("timeout")
-	case m := <-msg:
-		return m, nil
+	// todo: use ttl map
+	ackWaitMap sync.Map
+	sendBuf    chan []byte
+
+	ctx     context.Context
+	onClose func()
+	cancel  func()
+}
+
+var handshakePacket = []byte(`GET /_/ws/agent HTTP/1.1
+Host: vulinbox:8787
+Connection: Upgrade
+Sec-WebSocket-Key: kpFli2X1YeW53YainWGFzA==
+Sec-WebSocket-Version: 13
+Upgrade: websocket
+User-Agent: FeedbackStreamer/1.0
+
+`)
+
+type Option func(c *Client)
+
+func Connect(addr string, options ...Option) (*Client, error) {
+	var c = &Client{
+		sendBuf: make(chan []byte, 1024),
 	}
-}
-
-func ConnectEx(addr string, handler func(request []byte), onPing func(), onClose func()) (func(), error) {
-	return ConnectRaw(addr, func(bytes []byte) {
-		ap := utils.MustUnmarshalJson[vulinbox.AgentProtocol](bytes)
-		if ap == nil {
-			log.Errorf("cannot unmarshal agent protocol: %v", string(bytes))
-			return
-		}
-		log.Debugf(`vulinbox ws agent fetch message: %v`, ap.Action)
-		switch ap.Action {
-		case vulinbox.ActionAck:
-			if f, ok := AckWaitMap.Load(ap.ActionId); ok {
-				err := f.(func([]byte) error)(bytes)
-				if err != nil {
-					log.Errorf("cannot handle ack: %v", err)
-					return
-				}
-			}
-			log.Error("unkown ack id: %v", ap.ActionId)
-		case vulinbox.ActionDataback:
-			if utils.ExtractMapValueString(bytes, "type") == "http-request" {
-				handler([]byte(utils.ExtractMapValueString(bytes, "data")))
-			}
-		}
-	}, func() {
-		if onClose != nil {
-			onClose()
-		}
-		log.Infof("vulinbox agent: %v is closed", addr)
-	})
-}
-
-func Connect(addr string, handler func(request []byte), onPing ...func()) (func(), error) {
-	return ConnectEx(addr, handler, func() {
-		for _, i := range onPing {
-			i()
-		}
-	}, nil)
-}
-
-func ConnectRaw(addr string, handler func([]byte), onClose func()) (func(), error) {
+	for _, option := range options {
+		option(c)
+	}
+	// prepare addr
 	addr = utils.AppendDefaultPort(addr, 8787)
 	addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
 	addr = strings.ReplaceAll(addr, "[::]", "127.0.0.1")
@@ -82,66 +55,105 @@ func ConnectRaw(addr string, handler func([]byte), onClose func()) (func(), erro
 		isTls = utils.IsTLSService(addr)
 	}
 	log.Info("start to create ws client to connect vulinbox/_/ws/agent")
-	wsPacket := lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /_/ws/agent HTTP/1.1
-Host: vulinbox:8787
-Connection: Upgrade
-Sec-WebSocket-Key: kpFli2X1YeW53YainWGFzA==
-Sec-WebSocket-Version: 13
-Upgrade: websocket
-User-Agent: FeedbackStreamer/1.0
 
-`), "Host", addr)
+	// prepare handshake packet
+	wsPacket := lowhttp.ReplaceHTTPPacketHeader(handshakePacket, "Host", addr)
 	fmt.Println(string(wsPacket))
-	var start = false
-	client, err := lowhttp.NewWebsocketClient(wsPacket, lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
-		if !start {
-			if utils.ExtractMapValueString(bytes, "action") == "ping" {
-				start = true
-			}
-		}
-		handler(bytes)
-	}), lowhttp.WithWebsocketTLS(isTls), lowhttp.WithWebsocketHost(host), lowhttp.WithWebsocketPort(port))
+
+	// connnect
+	c.wsClient, err = lowhttp.NewWebsocketClient(wsPacket,
+		lowhttp.WithWebsocketFromServerHandler(c.MessageMux),
+		lowhttp.WithWebsocketTLS(isTls),
+		lowhttp.WithWebsocketHost(host),
+		lowhttp.WithWebsocketPort(port),
+	)
 	if err != nil {
 		return nil, err
 	}
-	client.StartFromServer()
+
+	// serve
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.wsClient.StartFromServer()
+	go c.sendLoop()
 	log.Info("start to wait for vulinbox ws agent connected")
-	if utils.Spinlock(5, func() bool {
+
+	// test ping
+	ping := vulinbox.NewPingAction()
+	start := false
+	c.Msg().Callback(func(_ []byte) error {
+		start = true
+		return nil
+	}).Send(ping)
+
+	// wait for ack
+	if err := utils.Spinlock(10, func() bool {
 		return start
-	}) != nil {
-		client.Stop()
-		return nil, utils.Errorf("vulinbox ws agent connect timeout")
+	}); err != nil {
+		c.cancel()
+		return nil, fmt.Errorf("wait ack failed: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					client.Stop()
-					return
-				default:
-					ping := vulinbox.NewPingAction()
-					err := client.WriteText(utils.Jsonify(ping))
-					if err != nil {
-						log.Errorf("cannot write ping: %v", err)
-						client.Stop()
-					}
-					_, err = WaitNow(ping.ActionId)
-					if err != nil {
-						log.Errorf("cannot wait ping: %v", err)
-						client.Stop()
-					}
-					time.Sleep(time.Second)
-				}
-			}
-		}()
-		client.Wait()
-		client.Stop()
-		if onClose != nil {
-			onClose()
-		}
-	}()
+
 	log.Info("vulinbox ws agent connected")
-	return cancel, nil
+	return c, nil
+}
+
+func (c *Client) Disconnect() {
+	c.cancel()
+}
+
+func (c *Client) sendLoop() {
+	defer c.onClose()
+	for {
+		select {
+		case <-c.ctx.Done():
+			c.wsClient.Stop()
+			return
+		case msg := <-c.sendBuf:
+			if err := c.wsClient.WriteText(msg); err != nil {
+				log.Errorf("cannot write text: %v", err)
+				c.cancel()
+			}
+		}
+	}
+}
+
+func (c *Client) MessageMux(bytes []byte) {
+	ap := utils.MustUnmarshalJson[vulinbox.AgentProtocol](bytes)
+	if ap == nil {
+		log.Errorf("cannot unmarshal agent protocol: %v", string(bytes))
+		return
+	}
+
+	log.Debugf(`vulinbox ws agent fetch message: %v`, ap.Action)
+
+	switch ap.Action {
+	case vulinbox.ActionAck:
+		f, ok := c.ackWaitMap.Load(ap.ActionId)
+		if !ok {
+			log.Errorf("unkown ack:: %v", ap)
+			return
+		}
+
+		c.ackWaitMap.Delete(ap.ActionId)
+
+		err := f.(func([]byte) error)(bytes)
+		if err != nil {
+			log.Errorf("cannot handle ack: %v", err)
+			return
+		}
+
+	case vulinbox.ActionDataback:
+		databack := utils.MustUnmarshalJson[vulinbox.DatabackAction](bytes)
+		if databack == nil {
+			log.Errorf("cannot unmarshal databack action: %v", string(bytes))
+			return
+		}
+		if databack.Type == "suricata" {
+			if databack.Data != nil {
+				log.Debugf("vulinbox ws agent fetch suricata databack: %v", databack.Data)
+			}
+		} else {
+			log.Debugf("vulinbox ws agent fetch databack: %v", string(bytes))
+		}
+	}
 }

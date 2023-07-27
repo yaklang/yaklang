@@ -33,7 +33,7 @@ func newAgentProtocol(action string) AgentProtocol {
 type DatabackAction struct {
 	AgentProtocol
 	Type string `json:"type"`
-	Data any    `json:"data"`
+	Data any    `json:"data,omitempty"`
 }
 
 func NewDataBackAction(tp string, data any) *DatabackAction {
