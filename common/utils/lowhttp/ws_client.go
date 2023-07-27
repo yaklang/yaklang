@@ -105,6 +105,10 @@ func (c *WebsocketClient) Stop() {
 	if c == nil {
 		return
 	}
+	err := c.WriteClose()
+	if err != nil {
+		log.Errorf("[ws]write close failed: %s", err)
+	}
 	if c.cancel == nil {
 		return
 	}
@@ -128,6 +132,7 @@ func (c *WebsocketClient) StartFromServer() {
 			for {
 				select {
 				case <-c.Context.Done():
+					_ = c.conn.Close()
 					return
 				default:
 				}
@@ -197,6 +202,16 @@ func (c *WebsocketClient) WritePong(r []byte) error {
 		return errors.Wrap(err, "write pong frame failed")
 	}
 
+	if err := c.fw.Flush(); err != nil {
+		return errors.Wrap(err, "flush failed")
+	}
+	return nil
+}
+
+func (c *WebsocketClient) WriteClose() error {
+	if err := c.fw.write(nil, CloseMessage, true); err != nil {
+		return errors.Wrap(err, "write close frame failed")
+	}
 	if err := c.fw.Flush(); err != nil {
 		return errors.Wrap(err, "flush failed")
 	}
