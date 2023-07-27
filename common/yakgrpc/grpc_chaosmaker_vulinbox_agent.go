@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinboxAgentClient"
+	"github.com/yaklang/yaklang/common/vulinboxagentclient"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sort"
 	"sync"
@@ -34,7 +34,7 @@ func RegisterVulinboxAgent(addr string, agent *VulinboxAgentFacade) {
 
 type VulinboxAgentFacade struct {
 	addr         string
-	client       *vulinboxAgentClient.Client
+	client       *vulinboxagentclient.Client
 	closed       bool
 	disconnect   func()
 	requestCount int64
@@ -151,7 +151,7 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 	info := &VulinboxAgentFacade{
 		addr: addr,
 	}
-	client, err := vulinboxAgentClient.Connect(addr, vulinboxAgentClient.WithOnClose(func() {
+	client, err := vulinboxagentclient.Connect(addr, vulinboxagentclient.WithOnClose(func() {
 		info.closed = true
 	}))
 	if err != nil {
