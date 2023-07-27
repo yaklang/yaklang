@@ -117,18 +117,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 				v.panic(vmPanic)
 			}
 		}
-		// if !v.vm.GetConfig().GetStopRecover() {
-		// 	if i := recover(); i != nil {
-		// 		switch ret := i.(type) {
-		// 		case *VMPanic: // 由yaklang产生的panic
-		// 			v.panic(ret)
-		// 		default: // go产生的panic
-		// 			v.panic(NewVMPanic(i))
-		// 		}
-		// 		v.panic(vmPanic)
-		// 	}
 
-		// }
 		scopeBack := v.scope
 		returnVal := v.lastStackValue
 		//执行defer中的代码
@@ -276,20 +265,12 @@ func (v *Frame) execCode(c *Code, debug bool) {
 }
 func (v *Frame) _execCode(c *Code, debug bool) {
 	isNasl := v.vm.GetConfig().vmMode == NASL
-	//if v.codePointer == 40 {
-	//	println()
-	//}
+
 	if v.vm.debugMode && !v.indebuggerEval {
 		debugger := v.vm.debugger
 		debugger.Wait()
-		debugger.BreakPointCallback(v.codePointer)
+		debugger.BreakPointCallback(v)
 	}
-	// defer func() {
-	// 	// 如果debugger想要步过且code确实jmp了,则在其jmp位置设置临时断点
-	// 	// if v.vm.debugMode && v.vm.debugger.nextState != nil && v.vm.debugger.jmpIndex >= 0 {
-	// 	// 	v.vm.debugger.HandleForStepNextJmp(c)
-	// 	// }
-	// }()
 
 	switch c.Opcode {
 	case OpCatchError:

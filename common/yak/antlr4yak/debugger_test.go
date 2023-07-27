@@ -2,13 +2,19 @@ package antlr4yak
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
+	"time"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.Debugger)) {
 	engine := New()
 	engine.ImportLibs(buildinLib)
+	// engine
+	Import("sleep", func(i int) {
+		time.Sleep(time.Duration(i) * time.Second)
+	})
 	engine.SetDebugMode(true)
 	engine.SetDebugInit(debuggerInit)
 	engine.SetDebugCallback(debuggerCallBack)
@@ -18,6 +24,7 @@ func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.D
 func TestDebugger_1(t *testing.T) {
 	code := `a = 1
 dump(a)`
+	in := false
 	init := func(g *yakvm.Debugger) {
 		g.SetNormalBreakPoint(2)
 	}
@@ -25,7 +32,8 @@ dump(a)`
 		if g.Finished() {
 			return
 		}
-		scope := g.VM().CurrentFM().CurrentScope()
+		in = true
+		scope := g.Frame().CurrentScope()
 		v, ok := scope.GetValueByName("a")
 		if !ok {
 			t.Fatal("a not found")
@@ -36,6 +44,40 @@ dump(a)`
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_Async(t *testing.T) {
+	code := `go fn {
+a = 1
+print(2)
+}
+sleep(1)`
+	in := false
+	init := func(g *yakvm.Debugger) {
+		g.SetNormalBreakPoint(3)
+	}
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		scope := g.Frame().CurrentScope()
+		v, ok := scope.GetValueByName("a")
+		if !ok {
+			t.Fatal("a not found")
+		}
+		if v.Int() != 1 {
+			t.Fatal("a != 1 in line 2")
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_ConditonalBreakPoint(t *testing.T) {
@@ -49,12 +91,14 @@ for range 10 {
 			t.Fatal(err)
 		}
 	}
+	in := false
 
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
-		scope := g.VM().CurrentFM().CurrentScope()
+		in = true
+		scope := g.Frame().CurrentScope()
 		v, ok := scope.GetValueByName("a")
 		if !ok {
 			t.Fatal("a not found")
@@ -65,6 +109,9 @@ for range 10 {
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_StepNext(t *testing.T) {
@@ -78,15 +125,17 @@ for range 10 {
 			t.Fatal(err)
 		}
 	}
+	in := false
 
 	next := 0
 	callback := func(g *yakvm.Debugger) {
 		if next > 2 || g.Finished() {
 			return
 		}
+		in = true
 
 		checkA := func(wanted int) {
-			scope := g.VM().CurrentFM().CurrentScope()
+			scope := g.Frame().CurrentScope()
 			v, ok := scope.GetValueByName("a")
 			if !ok {
 				t.Fatal("a not found")
@@ -119,6 +168,9 @@ for range 10 {
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_BreakPoint_In_Function(t *testing.T) {
@@ -134,12 +186,14 @@ test()`
 			t.Fatal(err)
 		}
 	}
+	in := false
 
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
-		scope := g.VM().CurrentFM().CurrentScope()
+		in = true
+		scope := g.Frame().CurrentScope()
 		v, ok := scope.GetValueByName("a")
 		if !ok {
 			t.Fatal("a not found")
@@ -150,6 +204,9 @@ test()`
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_StepIn(t *testing.T) {
@@ -166,12 +223,14 @@ c = 3`
 			t.Fatal(err)
 		}
 	}
+	in := false
 	stepIn := false
 	n := 0
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
+		in = true
 		if !stepIn {
 			g.StepIn()
 			stepIn = true
@@ -182,7 +241,7 @@ c = 3`
 			g.StepNext()
 			n++
 		} else if n == 2 {
-			scope := g.VM().CurrentFM().CurrentScope()
+			scope := g.Frame().CurrentScope()
 			v, ok := scope.GetValueByName("a")
 			if !ok {
 				t.Fatal("a not found")
@@ -194,6 +253,9 @@ c = 3`
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_StepOut(t *testing.T) {
@@ -210,11 +272,13 @@ c = 3`
 			t.Fatal(err)
 		}
 	}
+	in := false
 	stepIn, stepOut := false, false
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
+		in = true
 		if !stepIn {
 			g.StepIn()
 			stepIn = true
@@ -222,7 +286,7 @@ c = 3`
 			g.StepOut()
 			stepOut = true
 		} else {
-			scope := g.VM().CurrentFM().CurrentScope()
+			scope := g.Frame().CurrentScope()
 			v, ok := scope.GetValueByName("a")
 			if !ok {
 				t.Fatal("a not found")
@@ -234,6 +298,9 @@ c = 3`
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
 
 func TestDebugger_Watch(t *testing.T) {
@@ -246,13 +313,15 @@ a = 3`
 			t.Fatal(err)
 		}
 	}
+	in := false
 	n := 0
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
+		in = true
 		n++
-		scope := g.VM().CurrentFM().CurrentScope()
+		scope := g.Frame().CurrentScope()
 		v, ok := scope.GetValueByName("a")
 		if !ok {
 			t.Fatal("a not found")
@@ -263,4 +332,7 @@ a = 3`
 	}
 
 	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
 }
