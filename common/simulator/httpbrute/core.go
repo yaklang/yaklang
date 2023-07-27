@@ -25,14 +25,14 @@ func NewBruteForce(urlStr string, opts ...BruteConfigOpt) *BruteForceCore {
 	for _, opt := range opts {
 		opt(bruteConfig)
 	}
-	core := BruteForceCore{
+	bruteForceCore := BruteForceCore{
 		targetUrl: urlStr,
 		config:    bruteConfig,
 
 		resultChannel:    bruteConfig.resultChannel,
 		similarityDegree: bruteConfig.similarityDegree,
 	}
-	return &core
+	return &bruteForceCore
 }
 
 type BruteForceCore struct {
@@ -313,6 +313,7 @@ func (bruteForce *BruteForceCore) Start() error {
 	if bruteForce.config.proxy != "" {
 		browserModule.SetProxy(bruteForce.config.proxy, bruteForce.config.proxyUsername, bruteForce.config.proxyPassword)
 	}
+	browserModule.SetLeakless(bruteForce.config.leakless)
 	bruteForce.page = browserModule.Create()
 	bruteForce.init()
 	err := bruteForce.elementDetect()
