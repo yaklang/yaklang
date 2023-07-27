@@ -14,13 +14,13 @@ type NodeAttr struct {
 type Node interface {
 	Strings() []string
 	GenerateOne() (string, bool)
+	Reset()
 }
 
 // String
 type StringNode struct {
 	*NodeAttr
-	index int
-	data  string
+	data string
 }
 
 func NewStringNode(s string) *StringNode {
@@ -36,13 +36,15 @@ func (s *StringNode) Strings() []string {
 	return []string{s.data}
 }
 func (s *StringNode) GenerateOne() (string, bool) {
-	ok := true
 	if s.index > 0 {
-		ok = false
+		return "", false
 	} else {
 		s.index++
+		return s.data, true
 	}
-	return s.data, ok
+}
+func (s *StringNode) Reset() {
+	s.index = 0
 }
 
 // Expression
@@ -76,6 +78,9 @@ func (f *ExpressionNode) GenerateOne() (string, bool) {
 		}
 	}
 }
+func (s *ExpressionNode) Reset() {
+	s.index = 0
+}
 
 // FuzzTag/ExpressionTag
 type Tag struct {
@@ -92,6 +97,12 @@ func (f *Tag) GenerateOne() (string, bool) {
 		f.generator = NewGenerator(f.Nodes)
 	}
 	return f.generator.Generate()
+}
+func (s *Tag) Reset() {
+	s.generator = nil
+	for _, node := range s.Nodes {
+		node.Reset()
+	}
 }
 
 // FuzzTagMethod
@@ -132,7 +143,7 @@ func (f *FuzzTagMethod) GenerateOne() (string, bool) {
 		f.generator = NewGenerator(f.params)
 		f.ParseLabel()
 	}
-
+CHECK:
 	if f.cache == nil || f.isDyn || f.index >= len(*f.cache) {
 		if f.funTable != nil && *f.funTable != nil {
 			fun, ok := (*f.funTable)[f.name]
@@ -145,31 +156,42 @@ func (f *FuzzTagMethod) GenerateOne() (string, bool) {
 			}
 			result := fun(s)
 			f.cache = &result
-			f.index = 0
+			if f.index >= len(*f.cache) {
+				f.index = 0
+			}
+			goto CHECK
 		} else {
 			return "", false
 		}
 	}
 
-	if f.index >= len(*f.cache) {
-		if !f.isRep {
-			return "", false
-		} else {
-			return utils.GetLastElement(*f.cache), true
-		}
-	}
+	//if f.index >= len(*f.cache) {
+	//	if !f.isRep {
+	//		return "", false
+	//	} else {
+	//		return utils.GetLastElement(*f.cache), true
+	//	}
+	//}
 	defer func() {
 		f.index++
 	}()
 	return (*f.cache)[f.index], true
 
 }
+func (s *FuzzTagMethod) Reset() {
+	s.generator = nil
+	s.index = 0
+	s.cache = nil
+	for _, param := range s.params {
+		param.Reset()
+	}
+}
 
 type Generator struct {
 	container []string
-	index     int
-	data      []Node
-	first     bool
+	//index     int
+	data  []Node
+	first bool
 }
 
 func NewGenerator(nodes []Node) *Generator {
@@ -188,18 +210,24 @@ func (g *Generator) Generate() (string, bool) {
 		return strings.Join(g.container, ""), true
 	} else {
 		isOk := false
+		i := 0
 		for {
-			if len(g.data) == g.index {
+			if len(g.data) == i {
 				break
 			}
-			s, ok := g.data[g.index].GenerateOne()
+			s, ok := g.data[i].GenerateOne()
 			if !ok {
-				g.index++
+				if i < len(g.data)-1 { // 最后一个元素无法进位
+					g.data[i].Reset()
+					s, _ := g.data[i].GenerateOne()
+					g.container[i] = s
+				}
 			} else {
-				g.container[g.index] = s
+				g.container[i] = s
 				isOk = true
 				break
 			}
+			i++
 		}
 		return strings.Join(g.container, ""), isOk
 	}
