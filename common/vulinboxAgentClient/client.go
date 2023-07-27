@@ -16,7 +16,6 @@ import (
 type Client struct {
 	wsClient *lowhttp.WebsocketClient
 
-	// todo: use ttl map
 	ackWaitMap *ttlcache.Cache
 	sendBuf    chan []byte
 
@@ -70,18 +69,20 @@ func Connect(addr string, options ...Option) (*Client, error) {
 	fmt.Println(string(wsPacket))
 
 	// connnect
+	c.ctx, c.cancel = context.WithCancel(context.Background())
 	c.wsClient, err = lowhttp.NewWebsocketClient(wsPacket,
 		lowhttp.WithWebsocketFromServerHandler(c.MessageMux),
 		lowhttp.WithWebsocketTLS(isTls),
 		lowhttp.WithWebsocketHost(host),
 		lowhttp.WithWebsocketPort(port),
+		lowhttp.WithWebsocketWithContext(c.ctx),
 	)
 	if err != nil {
+		c.cancel()
 		return nil, err
 	}
 
 	// serve
-	c.ctx, c.cancel = context.WithCancel(context.Background())
 	c.wsClient.StartFromServer()
 	go c.sendLoop()
 	log.Info("start to wait for vulinbox ws agent connected")
@@ -116,6 +117,9 @@ func (c *Client) sendLoop() {
 		select {
 		case <-c.ctx.Done():
 			c.wsClient.Stop()
+			return
+		case <-c.wsClient.Context.Done():
+			c.cancel()
 			return
 		case msg := <-c.sendBuf:
 			if err := c.wsClient.WriteText(msg); err != nil {
