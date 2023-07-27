@@ -35,7 +35,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, con
 		if config.CanScanUDP() {
 			blocks = append(blocks, firstBlock)
 		} else if config.CanScanTCP() {
-			log.Infof("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
+			log.Debugf("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
 
 			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
 			result.State = state

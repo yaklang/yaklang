@@ -381,6 +381,8 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	}()
 
 	var delay time.Duration
+
+	log.Infof("(mitm) ready for recv connection from: %v", l.Addr().String())
 	for {
 		if p.Closing() {
 			return nil
@@ -443,6 +445,9 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			}()
 			var ok bool
 			var handledConnection net.Conn
+			utils.Debug(func() {
+				time.Sleep(50 * time.Millisecond)
+			})
 			handledConnection, ok, err = s5config.IsSocks5HandleShake(originConn)
 			if err != nil {
 				removeConns(uidStr, originConn)

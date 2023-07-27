@@ -516,6 +516,21 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			}
 		})
 	}
+	nIns.GetVM().RegisterMapMemberCallHandler("poc", "Do", func(i interface{}) interface{} {
+		origin, ok := i.(func(method string, url string, opt ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		if ok {
+			return func(method string, url string, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
+				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+				return origin(method, url, opts...)
+			}
+		}
+		log.Errorf("BUG: poc.Do 's signature is override")
+		return i
+	})
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "Scan", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any) (chan *tools.PocVul, error))
 		if ok {

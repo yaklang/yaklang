@@ -56,6 +56,9 @@ func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _
 
 	raw, err := peekable.Peek(2)
 	if err != nil {
+		if err == io.EOF {
+			return peekable, false, nil
+		}
 		return nil, false, utils.Errorf("peek failed: %s", err)
 	}
 	if len(raw) != 2 {

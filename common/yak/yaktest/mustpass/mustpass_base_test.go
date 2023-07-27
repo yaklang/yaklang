@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "grammar_test.yak"
+	var debugName = "plugin_inherit_proxy.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
