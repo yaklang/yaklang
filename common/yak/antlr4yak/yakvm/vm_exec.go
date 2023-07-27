@@ -108,8 +108,8 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 		)
 
 		// indebuggerEval就不处理panic了，直接抛出
-		if !v.vm.GetConfig().GetStopRecover() {
-			if ierr = recover(); ierr != nil && !v.indebuggerEval {
+		if !v.vm.GetConfig().GetStopRecover() && !v.indebuggerEval {
+			if ierr = recover(); ierr != nil {
 				if vmPanic, ok = ierr.(*VMPanic); !ok {
 					// go产生的panic需要套一层VMPanic
 					vmPanic = NewVMPanic(ierr)
@@ -117,18 +117,18 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 				v.panic(vmPanic)
 			}
 		}
-		if !v.vm.GetConfig().GetStopRecover() {
-			if i := recover(); i != nil {
-				switch ret := i.(type) {
-				case *VMPanic: // 由yaklang产生的panic
-					v.panic(ret)
-				default: // go产生的panic
-					v.panic(NewVMPanic(i))
-				}
-				v.panic(vmPanic)
-			}
+		// if !v.vm.GetConfig().GetStopRecover() {
+		// 	if i := recover(); i != nil {
+		// 		switch ret := i.(type) {
+		// 		case *VMPanic: // 由yaklang产生的panic
+		// 			v.panic(ret)
+		// 		default: // go产生的panic
+		// 			v.panic(NewVMPanic(i))
+		// 		}
+		// 		v.panic(vmPanic)
+		// 	}
 
-		}
+		// }
 		scopeBack := v.scope
 		returnVal := v.lastStackValue
 		//执行defer中的代码
