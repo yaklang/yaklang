@@ -180,7 +180,20 @@ execNuclei = func(target) {
 `
 
 func (m *MixPluginCaller) SetFeedback(i func(i *ypb.ExecResult) error) {
-	m.feedbackHandler = i
+	feedBack := m.feedbackHandler
+	m.feedbackHandler = func(result *ypb.ExecResult) error {
+		defer func() {
+			err := feedBack(result)
+			if err != nil {
+				log.Errorf("feedback error: %v", err)
+				return
+			}
+		}()
+		if i != nil {
+			return i(result)
+		}
+		return nil
+	}
 	m.ordinaryFeedback = FeedbackFactory(consts.GetGormProjectDatabase(), m.feedbackHandler, false, "")
 
 }
