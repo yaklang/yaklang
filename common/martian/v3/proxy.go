@@ -445,9 +445,10 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			}()
 			var ok bool
 			var handledConnection net.Conn
-			utils.Debug(func() {
-				time.Sleep(50 * time.Millisecond)
-			})
+			//utils.Debug(func() {
+			//	// time.Sleep(50 * time.Millisecond)
+			//})
+			// TODO: s5config.IsSocks5HandleShake May be blocked... why? need more tests
 			handledConnection, ok, err = s5config.IsSocks5HandleShake(originConn)
 			if err != nil {
 				removeConns(uidStr, originConn)
