@@ -286,7 +286,7 @@ a(1, 2, 3)
 
 }
 
-func TestNewExecutor_YakWarpFunctionUnpack(t *testing.T) {
+func TestNewExecutor_YakWrappedFunctionUnpack(t *testing.T) {
 	code := `
 m = {}
 m.v = (a, b) => {}
