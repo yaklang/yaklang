@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Client struct {
@@ -23,6 +24,8 @@ type Client struct {
 	onClose func()
 	cancel  func()
 }
+
+const Expire = 10 * time.Second
 
 var handshakePacket = []byte(`GET /_/ws/agent HTTP/1.1
 Host: vulinbox:8787
@@ -136,7 +139,6 @@ func (c *Client) MessageMux(bytes []byte) {
 	case vulinbox.ActionAck:
 		f, ok := c.ackWaitMap.Get(strconv.Itoa(int(ap.ActionId)))
 		if !ok {
-			log.Errorf("unkown ack:: %v", ap)
 			return
 		}
 
