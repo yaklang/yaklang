@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
+	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net/http"
 	"strings"
 )
@@ -29,7 +30,7 @@ func (s *VulinServer) init() {
 			log.Errorf("dump request failed: %v", err)
 		}
 		if len(reqRaw) > 0 {
-			s.wsAgent.TrySend(NewDataBackAction("http-request", string(reqRaw)))
+			s.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("http-request", string(reqRaw)))
 		}
 
 		if strings.HasPrefix(request.URL.Path, "/static") {
@@ -54,7 +55,7 @@ func (s *VulinServer) init() {
 				log.Errorf("dump request failed: %v", err)
 			}
 			if len(reqRaw) > 0 {
-				s.wsAgent.TrySend(NewDataBackAction("http-request", string(reqRaw)))
+				s.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("http-request", string(reqRaw)))
 			}
 			handler.ServeHTTP(writer, request)
 		})
