@@ -335,6 +335,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
+	if firstReq.GetDownstreamProxy() != "" {
+		mitmPluginCaller.SetProxy(firstReq.GetDownstreamProxy())
+	}
 
 	clearPluginHTTPFlowCache := func() {
 		if mitmPluginCaller != nil {

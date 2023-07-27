@@ -211,13 +211,8 @@ func (y *YakToCallerManager) SetForYakit(
 			case *yaklib.YakitProgress:
 				raw, _ := yaklib.YakitMessageGenerator(ret)
 				if err := caller(&ypb.ExecResult{
-					Hash:       "",
-					OutputJson: "",
-					Raw:        nil,
-					IsMessage:  true,
-					Message:    raw,
-					Id:         0,
-					RuntimeID:  "",
+					IsMessage: true,
+					Message:   raw,
 				}); err != nil {
 					return err
 				}
