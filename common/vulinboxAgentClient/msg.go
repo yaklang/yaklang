@@ -5,10 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strconv"
-	"time"
 )
-
-const Expire = 10 * time.Second
 
 func (c *Client) Msg() *MsgPrepare {
 	return &MsgPrepare{
@@ -33,7 +30,9 @@ func (m *MsgPrepare) Send(data any) {
 	// get ActionId
 	id := reflect.ValueOf(data).Elem().FieldByName("ActionId").Uint()
 
-	m.c.ackWaitMap.Set(strconv.FormatUint(id, 10), m.f)
+	if m.f != nil {
+		m.c.ackWaitMap.Set(strconv.FormatUint(id, 10), m.f)
+	}
 	m.c.Send(data)
 }
 
