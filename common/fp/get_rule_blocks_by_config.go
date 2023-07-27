@@ -85,7 +85,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		//})
 		//panic(strings.Join(result.([]string), "/"))
 		if config.ProbesMax > 0 && config.ProbesMax < len(bestBlocks) {
-			log.Infof("filter probe only[%v] by config ProbeMax, best total: %v", config.ProbesMax, len(bestBlocks))
+			log.Debugf("filter probe only[%v] by config ProbeMax, best total: %v", config.ProbesMax, len(bestBlocks))
 			return emptyBlock, bestBlocks[:config.ProbesMax], true
 		}
 		return emptyBlock, bestBlocks, true
@@ -107,7 +107,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		return true
 	}).([]*RuleBlock)
 	if config.ProbesMax > 0 && config.ProbesMax < len(blocks) {
-		log.Infof("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(blocks))
+		log.Debugf("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(blocks))
 		return emptyBlock, blocks[:config.ProbesMax], false
 	}
 	return

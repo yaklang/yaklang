@@ -78,4 +78,5 @@ var SystemExports = map[string]interface{}{
 	"GetDefaultDNSServers": func() []string {
 		return utils.DefaultDNSServer
 	},
+	"WaitConnect": utils.WaitConnect,
 }

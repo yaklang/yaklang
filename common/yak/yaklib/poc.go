@@ -75,7 +75,9 @@ func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Port != 0 {
 		opts = append(opts, lowhttp.WithPort(c.Port))
 	}
-	opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
+	if c.ForceHttps {
+		opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
+	}
 	opts = append(opts, lowhttp.WithHttp2(c.ForceHttp2))
 	if c.Timeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.Timeout))

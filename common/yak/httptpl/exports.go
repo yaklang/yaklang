@@ -155,6 +155,8 @@ func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowht
 			pocOpt = append(pocOpt, ret)
 		case ConfigOption:
 			configOpt = append(configOpt, ret)
+		default:
+			log.Errorf("unknown option type: %T", ret)
 		}
 	}
 	pocConfig := yaklib.NewDefaultPoCConfig()
