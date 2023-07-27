@@ -10,10 +10,14 @@ if err != nil {
     yakit.Error("build mix plugin caller failed: %s", err)
     die(err)
 }
-
+defer manager.Wait()
 // 这个有必要设置：独立上下文，避免在大并发的时候出现问题
 manager.SetConcurrent(20)
 manager.SetDividedContext(true)
+//manager.SetFeedback(func(c){
+//    dump(c)
+//})
+
 
 scriptNames = str.Split(scriptNameStr, ",")
 
@@ -23,10 +27,9 @@ x.Foreach(scriptNames, func(e){
     if err != nil {
         yakit.Error("load plugin[%v] error: %v", e, err)
     }
-    println(e + " Is Loaded")
+    yakit.Info("%s Is Loaded",e)
 })
 
-defer manager.Wait()
 
 rsp,err = http.Get("http://192.168.3.113:8787/vul/route?group=sql")
 if err != nil {
@@ -36,6 +39,10 @@ if err != nil {
 groups = rsp.Json()
 
 
+packet = `GET /{{params(path)}} HTTP/1.1
+Host: {{params(target)}}
+`
+
 
 tableName = "质量检测"
 columnType = "漏洞类型"
@@ -43,13 +50,26 @@ columnTarget = "测试 Url"
 columnExpectedDetected = "预期检出"
 columnExpectedDetectedValue = "预期数"
 columnRealDetected = "实际检出"
-yakit.EnableTable(tableName, [columnType, columnTarget, columnExpectedDetected, columnRealDetected])
+yakit.EnableTable(tableName, [columnType, columnTarget, columnExpectedDetected,columnExpectedDetectedValue, columnRealDetected])
 
-scan = func() {
 
-for _, v :=range groups[0].VulInfos {
-    path = v.Path
-    for k, res :=range v.ExpectedResult {
+for _, v := range groups[0].VulInfos {
+    path = str.TrimPrefix(v.Path + v.DefaultQuery,"/")
+    target = "127.0.0.1:8787"
+    if v.ExpectedResult == nil {
+        continue
+    }
+    rsp, reqRaw := poc.HTTP(
+            packet,
+            poc.https(false),
+            poc.params({"target": target,"path": path}),
+        )~
+    isHttps = false
+    u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps)~
+    header, body = poc.Split(rsp)~
+    manager.MirrorHTTPFlow(isHttps, u.String(), reqRaw, rsp, body)
+
+    for k, res := range v.ExpectedResult {
         yakit.Output(
          yakit.TableData(
              tableName, {
@@ -58,15 +78,10 @@ for _, v :=range groups[0].VulInfos {
                  columnExpectedDetected: k,
                  columnExpectedDetectedValue: res,
                  columnRealDetected: "yes",
-
                 }
             )
         )
     }
-    sleep(1)
 }
 
 
-}
-
-scan()
