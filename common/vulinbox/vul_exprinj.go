@@ -13,7 +13,7 @@ func (s *VulinServer) registerExprInj() {
 	r := s.router
 	exprGroup := r.PathPrefix("/expr").Name("表达式注入或 SSTI 仿真").Subrouter()
 
-	exprGroup.HandleFunc(`/injection`, func(writer http.ResponseWriter, request *http.Request) {
+	handler := func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		println(string(raw))
 
@@ -49,5 +49,29 @@ func (s *VulinServer) registerExprInj() {
 			buf.WriteByte('\n')
 		}
 		writer.Write(buf.Bytes())
-	}).Name("表达式注入整合")
+	}
+
+	var vuls = []*VulInfo{
+		{
+			Path:         "/injection",
+			DefaultQuery: "a=1",
+			Title:        "表达式注入GET参数基础",
+			Handler:      handler,
+		},
+		{
+			Path:         "/injection",
+			DefaultQuery: "b={\"a\":1}",
+			Title:        "JSON 中表达式注入参数",
+			Handler:      handler,
+		},
+		{
+			Path:         "/injection",
+			DefaultQuery: "c=abc",
+			Title:        "表达式注入GET参数基础（非数字）",
+			Handler:      handler,
+		},
+	}
+	for _, v := range vuls {
+		addRouteWithVulInfo(exprGroup, v)
+	}
 }
