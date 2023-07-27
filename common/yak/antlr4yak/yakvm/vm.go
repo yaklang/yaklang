@@ -2,8 +2,9 @@ package yakvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 type Frame struct {
@@ -116,6 +117,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		scope:         parent.scope,
 		debug:         parent.debug,
 		exitCode:      NoneExit,
+		ctx:           parent.ctx,
 	}
 	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)

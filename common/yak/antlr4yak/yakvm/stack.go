@@ -5,11 +5,19 @@ func (v *Frame) push(i *Value) {
 }
 
 func (v *Frame) peek() *Value {
-	return v.stack.Peek().(*Value)
+	value := v.stack.Peek()
+	if value == nil {
+		return nil
+	}
+	return value.(*Value)
 }
 
 func (v *Frame) peekN(n int) *Value {
-	return v.stack.PeekN(n).(*Value)
+	value := v.stack.PeekN(n)
+	if value == nil {
+		return nil
+	}
+	return value.(*Value)
 }
 
 func (v *Frame) peekNextCode() *Code {
