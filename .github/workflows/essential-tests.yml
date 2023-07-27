@@ -92,3 +92,6 @@ jobs:
 
       - name: Test HostPort  AppendPort
         run: go test -timeout 1m -run TestMUSTPASS ./common/utils -v
+
+      - name: Test Vulinbox agent client
+        run: go test -timeout 1m ./common/vulinboxAgentClient -v
