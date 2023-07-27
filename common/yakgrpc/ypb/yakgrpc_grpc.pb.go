@@ -281,6 +281,7 @@ const (
 	Yak_DebugPlugin_FullMethodName                                = "/ypb.Yak/DebugPlugin"
 	Yak_SmokingEvaluatePlugin_FullMethodName                      = "/ypb.Yak/SmokingEvaluatePlugin"
 	Yak_GetSystemDefaultDnsServers_FullMethodName                 = "/ypb.Yak/GetSystemDefaultDnsServers"
+	Yak_DiagnoseNetwork_FullMethodName                            = "/ypb.Yak/DiagnoseNetwork"
 )
 
 // YakClient is the client API for Yak service.
@@ -476,7 +477,7 @@ type YakClient interface {
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	//Yso
+	// Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -576,8 +577,7 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
-	//
-	//ChaosMakerRule: Bas
+	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -3905,7 +3905,7 @@ func (c *yakClient) GetSystemDefaultDnsServers(ctx context.Context, in *Empty, o
 }
 
 func (c *yakClient) DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (Yak_DiagnoseNetworkClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], "/ypb.Yak/DiagnoseNetwork", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[40], Yak_DiagnoseNetwork_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4129,7 +4129,7 @@ type YakServer interface {
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	//Yso
+	// Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -4229,8 +4229,7 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
-	//
-	//ChaosMakerRule: Bas
+	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)

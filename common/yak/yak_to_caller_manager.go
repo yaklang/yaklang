@@ -630,6 +630,36 @@ func (y *YakToCallerManager) AddForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
+		antlr4engine := engine
+		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
+			switch ret := i.(type) {
+			case *yaklib.YakitProgress:
+				raw, _ := yaklib.YakitMessageGenerator(ret)
+				if err := caller(&ypb.ExecResult{
+					Hash:       "",
+					OutputJson: "",
+					Raw:        nil,
+					IsMessage:  true,
+					Message:    raw,
+					Id:         0,
+					RuntimeID:  "",
+				}); err != nil {
+					return err
+				}
+			case *yaklib.YakitLog:
+				raw, _ := yaklib.YakitMessageGenerator(ret)
+				if raw != nil {
+					if err := caller(&ypb.ExecResult{
+						IsMessage: true,
+						Message:   raw,
+					}); err != nil {
+						return err
+					}
+				}
+
+			}
+			return nil
+		}))
 		engine.SetVar("RUNTIME_ID", y.runtimeId)
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
