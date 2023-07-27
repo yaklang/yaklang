@@ -40,7 +40,11 @@ func (this *Stack) PeekN(n int) interface{} {
 		p = p.prev
 	}
 
-	return p.value
+	if p != nil {
+		return p.value
+	} else {
+		return nil
+	}
 }
 
 // Pop the top item of the stack and return it

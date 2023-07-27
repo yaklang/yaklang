@@ -27,6 +27,9 @@ type Debugger struct {
 	currentBreakPoint *Breakpoint
 	breakPoints       []*Breakpoint // 断点
 	description       string        // 回调时信息
+	frame             *Frame        // 存储当前执行的frame
+	state             string        // 表示当前处于哪个函数
+	lock              sync.Mutex    // 用于BreakPointCallback的同步
 
 	sourceCode                string
 	sourceCodeLines           []string
@@ -177,7 +180,7 @@ func (g *Debugger) InRootState() bool {
 }
 
 func (g *Debugger) StateName() string {
-	frame := g.vm.CurrentFM()
+	frame := g.frame
 	stateName := "global code"
 	if f := frame.GetFunction(); f != nil {
 		stateName = f.GetActualName()
@@ -186,20 +189,35 @@ func (g *Debugger) StateName() string {
 }
 
 func (g *Debugger) State() string {
-	frame := g.vm.CurrentFM()
-	state := ""
+	return g.state
+}
+
+func (g *Debugger) UpdateByFrame(frame *Frame) {
 	if f := frame.GetFunction(); f != nil {
-		state = f.GetUUID()
+		g.state = f.GetUUID()
+	} else {
+		g.state = ""
 	}
-	return state
+	g.frame = frame
 }
 
 func (g *Debugger) Codes() []*Code {
 	return g.codes[g.State()]
 }
 
+func (g *Debugger) CodesInState(state string) []*Code {
+	return g.codes[state]
+}
+
 func (g *Debugger) VM() *VirtualMachine {
 	return g.vm
+}
+func (g *Debugger) Frame() *Frame {
+	frame := g.frame
+	if frame == nil {
+		frame = g.vm.CurrentFM()
+	}
+	return frame
 }
 
 func (g *Debugger) Description() string {
@@ -210,13 +228,17 @@ func (g *Debugger) ResetDescription() {
 	g.description = ""
 }
 
-func (g *Debugger) GetCode(codeIndex int) *Code {
-	return g.Codes()[codeIndex]
+func (g *Debugger) GetCode(state string, codeIndex int) *Code {
+	codes := g.CodesInState(state)
+	if codeIndex < 0 || codeIndex >= len(codes) {
+		return nil
+	}
+	return codes[codeIndex]
 }
 
 func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
 	if codeState, ok := g.linesFirstCodeAndStateMap[lineIndex]; ok {
-		return g.GetCode(codeState.codeIndex), codeState.codeIndex, codeState.state
+		return g.GetCode(codeState.state, codeState.codeIndex), codeState.codeIndex, codeState.state
 	} else {
 		return nil, -1, ""
 	}
@@ -357,42 +379,38 @@ func (g *Debugger) StepOut() error {
 	}
 }
 
-// func (g *Debugger) HandleForStepNextJmp() {
-// 	// g.addBreakPoint(true, g.jmpIndex, code.StartLineNumber, "", g.State())
-// 	g.jmpIndex = -1
-// 	g.nextState = nil
-// 	g.Callback()
-// }
-
 func (g *Debugger) HandleForStepNext() {
-	// g.addBreakPoint(true, codeIndex, g.linePointer, "", state)
 	g.nextState = nil
 	g.Callback()
 }
 
 func (g *Debugger) HandleForStepIn() {
-	// g.addBreakPoint(true, codeIndex, g.linePointer, "", state)
 	g.stepInState = nil
 	g.Callback()
 }
 
 func (g *Debugger) HandleForStepOut() {
-	// g.addBreakPoint(true, codeIndex, g.linePointer, "", state)
 	g.stepOut = false
 	g.Callback()
 }
 
-func (g *Debugger) BreakPointCallback(codeIndex int) {
+func (g *Debugger) BreakPointCallback(frame *Frame) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	codeIndex := frame.codePointer
+	g.UpdateByFrame(frame)
+
 	state := g.State()
-	code := g.GetCode(codeIndex)
+	code := g.GetCode(state, codeIndex)
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
 
 	defer func() {
-		// 如果调用yak函数，则push stepIn栈
-		if code.Opcode == OpCall || code.Opcode == OpAsyncCall {
-			v := g.vm.CurrentFM().peekN(code.Unary)
-			if v.IsYakFunction() {
+		// 如果同步调用yak函数，则push stepIn栈
+		if code.Opcode == OpCall {
+			v := frame.peekN(code.Unary)
+			if v != nil && v.IsYakFunction() {
 				g.stepInStack.Push(NewStepStateWithCodeIndex(codeIndex, state))
 			}
 		}
@@ -522,7 +540,7 @@ func (g *Debugger) Callback() {
 
 func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error) {
 	var err error
-	frame := NewSubFrame(g.VM().CurrentFM())
+	frame := NewSubFrame(g.Frame())
 	frame.EnableDebuggerEval()
 	sym, err := frame.CurrentScope().GetSymTable().GetRoot()
 	if err != nil {

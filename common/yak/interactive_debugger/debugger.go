@@ -2,13 +2,14 @@ package debugger
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type InteractiveDebugger struct {
@@ -283,7 +284,7 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 				}
 				g.DisableBreakpointsInLine(lineNumber)
 			case "p", "print":
-				scope := g.VM().CurrentFM().CurrentScope()
+				scope := g.Frame().CurrentScope()
 				if len(commands) < 2 {
 					scopeKVs := scope.GetAllNameAndValueInAllScopes()
 					if len(scopeKVs) == 0 {
