@@ -12,7 +12,7 @@ func TestGRPCMUSTPASS_Shiro(t *testing.T) {
 		panic(err)
 	}
 
-	_, vulAddr, err := vulinbox.NewVulinServer(context.Background())
+	vulAddr, err := vulinbox.NewVulinServer(context.Background())
 	if err != nil {
 		panic(err)
 	}
