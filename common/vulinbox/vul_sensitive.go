@@ -28,6 +28,7 @@ func (s *VulinServer) registerSensitive() {
 	_sensitive := func(s string) string {
 		return path.Join("/sensitive", s)
 	}
+	_ = _sensitive
 
 	/*
 		swagger demo
@@ -38,28 +39,49 @@ func (s *VulinServer) registerSensitive() {
 
 		{path}?/swagger/index.html
 	*/
-	r.HandleFunc(_sensitive("v1/swagger.json"), func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		writer.Write(GetSensitiveFile("openapi-2.json"))
-	})
-	r.HandleFunc(_sensitive("v2/swagger.json"), func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		writer.Write(GetSensitiveFile("openapi-3.json"))
-	})
-	r.HandleFunc(`/swagger/v1/swagger.json`, func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", `application/json`)
-		writer.Write(GetSensitiveFile("openapi-2.json"))
-	})
-	r.HandleFunc(`/swagger/v2/swagger.json`, func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", `application/json`)
-		writer.Write(GetSensitiveFile("openapi-3.json"))
-	})
-	r.HandleFunc(`/swagger/`, func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", `text/html`)
-		writer.Write(GetSensitiveFile("swagger-ui.html"))
-	})
-	r.HandleFunc(`/swagger/index.html`, func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", `text/html`)
-		writer.Write(GetSensitiveFile("swagger-ui.html"))
+
+	var sensitiveGroup = r.PathPrefix("/sensitive").Name("敏感信息与敏感文件泄漏").Subrouter()
+	var swaggerGroup = r.PathPrefix("/swagger").Name("敏感信息与敏感文件泄漏（Swagger）").Subrouter()
+	var vuls = []*VulInfo{
+		{
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/json")
+				writer.Write(GetSensitiveFile("openapi-2.json"))
+			},
+			Path:         `/v1/swagger.json`,
+			Title:        "OpenAPI 2.0 Swagger 泄漏",
+			RiskDetected: true,
+		},
+		{
+			Path:  `/v2/swagger.json`,
+			Title: "OpenAPI 3.0 Swagger 泄漏",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/json")
+				writer.Write(GetSensitiveFile("openapi-3.json"))
+			},
+			RiskDetected: true,
+		},
+		{
+			Path:  `/`,
+			Title: "Swagger UI 泄漏",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", `text/html`)
+				writer.Write(GetSensitiveFile("swagger-ui.html"))
+			},
+			RiskDetected: true,
+		},
+	}
+	for _, v := range vuls {
+		addRouteWithVulInfo(sensitiveGroup, v)
+		addRouteWithVulInfo(swaggerGroup, v)
+	}
+
+	addRouteWithVulInfo(swaggerGroup, &VulInfo{
+		Path: `/index.html`,
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", `text/html`)
+			writer.Write(GetSensitiveFile("swagger-ui.html"))
+		},
+		RiskDetected: true,
 	})
 }
