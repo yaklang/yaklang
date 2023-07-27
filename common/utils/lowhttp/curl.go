@@ -82,10 +82,10 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 		// cookie
 		if item == "-b" || item == "--cookie" {
 			if index+1 < maxItem {
-				k, v := SplitKV(items[index+1])
-				cookies.SetCookies(fakeU, []*http.Cookie{
-					{Name: k, Value: v},
-				})
+				cookiesList := splitCookies(items[index+1])
+				if len(cookiesList) > 0 {
+					cookies.SetCookies(fakeU, cookiesList)
+				}
 			}
 		}
 
@@ -104,12 +104,8 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 				if strings.ToLower(k) == "referer" {
 					referer = v
 				} else if strings.ToLower(k) == "cookie" {
-					kv := strings.SplitN(v, "=", 2)
-					if len(kv) == 2 {
-						cookies.SetCookies(fakeU, []*http.Cookie{
-							{Name: kv[0], Value: kv[1]},
-						})
-					}
+					cookiesList := splitCookies(v)
+					cookies.SetCookies(fakeU, cookiesList)
 				} else {
 					headers.Add(k, v)
 				}
@@ -317,4 +313,22 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 %v
 %v`, strings.ToUpper(method), urlIns.RequestURI(), headerBuf.String(), body)
 	return FixHTTPRequestOut([]byte(packet)), nil
+}
+
+func splitCookies(s string) []*http.Cookie {
+	kvPairs := strings.Split(s, ";")
+	cookies := make([]*http.Cookie, 0, len(kvPairs))
+
+	for _, kvPair := range kvPairs {
+		kvPair = strings.TrimSpace(kvPair) // 去除字符串的开头和结尾的空格
+		kv := strings.SplitN(kvPair, "=", 2)
+		if len(kv) == 2 {
+			cookies = append(cookies, &http.Cookie{
+				Name:  strings.TrimSpace(kv[0]),
+				Value: strings.TrimSpace(kv[1]),
+			})
+		}
+	}
+
+	return cookies
 }

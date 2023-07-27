@@ -97,8 +97,8 @@ func TestCurlToHTTPRequest2231(t *testing.T) {
 
 func TestCurlToHTTPRequestDataRaw(t *testing.T) {
 	req, err := CurlToHTTPRequest(`curl 'https://api.github.com/_private/browser/stats' \
-  -b 'xxxxx' \
-  -H 'cookie: _octo=222' \
+  -b 'b=xxxxxx;xxx' \
+  -H 'cookie: _octo=222; xxx=333;a=222' \
   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' \
   --data-raw 'abcd' \
   --compressed`)
