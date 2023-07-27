@@ -286,6 +286,17 @@ a(1, 2, 3)
 
 }
 
+func TestNewExecutor_YakWarpFunctionUnpack(t *testing.T) {
+	code := `
+m = {}
+m.v = (a, b) => {}
+m.v("aaa", {})
+`
+	_marshallerTest(code)
+	_formattest(code)
+
+}
+
 func TestNewExecutor(t *testing.T) {
 	code := `
 a = func{
