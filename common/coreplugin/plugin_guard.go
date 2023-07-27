@@ -12,6 +12,7 @@ var heuristicSQLPlugin *yakit.YakScript
 var basicSSTIPlugin *yakit.YakScript
 var shiroKeyPlugin *yakit.YakScript
 var basicXSSPlugin *yakit.YakScript
+var swaggerJSONPlugin *yakit.YakScript
 
 func init() {
 	codeBytes := GetCorePluginData("启发式SQL注入检测")
@@ -89,14 +90,18 @@ func init() {
 	}
 
 	codeBytes = GetCorePluginData("Swagger JSON 泄漏")
-	basicXSSPlugin = &yakit.YakScript{
+	swaggerJSONPlugin = &yakit.YakScript{
 		ScriptName:     "Swagger JSON 泄漏",
 		Type:           "mitm",
 		Content:        string(codeBytes),
 		Params:         "\"[{\\\"Field\\\":\\\"target\\\",\\\"TypeVerbose\\\":\\\"string\\\",\\\"FieldVerbose\\\":\\\"目标(URL/IP:Port)\\\",\\\"Help\\\":\\\"输入插件的测试目标，进行基础爬虫（最多10个请求）\\\",\\\"Required\\\":true}]\"",
 		Help:           "检查网站是否开放 Swagger JSON 的 API 信息",
-		Author:         "v1ll4n",
+		Author:         "V1ll4n",
 		Tags:           "swagger",
+		UserId:         6,
+		Uuid:           uuid.NewV4().String(),
+		HeadImg:        "https://thirdwx.qlogo.cn/mmopen/vi_32/VXssGw0QDiaytOYmU0kTk95CEaFKd0ytlUAYLm26kwJkSVztZAnZBI72f4WwMqMORZP3ib4czXNIyIrKpnEqLPEA/132",
+		OnlineBaseUrl:  "https://www.yaklang.com",
 		OnlineOfficial: true,
 	}
 }
@@ -106,6 +111,7 @@ func OverWriteCorePluginToLocal() {
 	OverWriteYakPlugin("SSTI Expr 服务器模版表达式注入", basicSSTIPlugin)
 	OverWriteYakPlugin("Shiro 指纹识别 + 弱密码检测", shiroKeyPlugin)
 	OverWriteYakPlugin("基础 XSS 检测", basicXSSPlugin)
+	OverWriteYakPlugin("Swagger JSON 泄漏", swaggerJSONPlugin)
 }
 
 func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
