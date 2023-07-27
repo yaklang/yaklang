@@ -1,4 +1,4 @@
-package vulinboxAgentClient
+package vulinboxagentclient
 
 import (
 	"github.com/yaklang/yaklang/common/log"

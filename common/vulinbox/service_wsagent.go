@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net/http"
 	"sync"
 )
@@ -46,16 +47,16 @@ func (a *wsAgent) listenLoop() {
 }
 
 func (a *wsAgent) messageMux(data []byte) {
-	ap := utils.MustUnmarshalJson[AgentProtocol](data)
+	ap := utils.MustUnmarshalJson[vulinboxagentproto.AgentProtocol](data)
 	if ap == nil || ap.Action == "" || a.events[ap.Action] == nil {
 		return
 	}
 	rec, err := a.events[ap.Action](data)
 	if err != nil {
-		a.TrySend(NewAckAction(ap.ActionId, "error", err))
+		a.TrySend(vulinboxagentproto.NewAckAction(ap.ActionId, "error", err))
 		return
 	}
-	a.TrySend(NewAckAction(ap.ActionId, "ok", rec))
+	a.TrySend(vulinboxagentproto.NewAckAction(ap.ActionId, "ok", rec))
 }
 
 func (a *wsAgent) sendLoop() {
@@ -151,7 +152,7 @@ func (r *VulinServer) registerWSAgentEvent() {
 }
 
 func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
-	subscribe := utils.MustUnmarshalJson[SubscribeAction](a)
+	subscribe := utils.MustUnmarshalJson[vulinboxagentproto.SubscribeAction](a)
 	if subscribe == nil {
 		return nil, nil
 	}
@@ -172,7 +173,7 @@ func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
 }
 
 func (r *VulinServer) handleUnsubscribe(a []byte) (any, error) {
-	unsubscribe := utils.MustUnmarshalJson[UnsubscribeAction](a)
+	unsubscribe := utils.MustUnmarshalJson[vulinboxagentproto.UnsubscribeAction](a)
 	if unsubscribe == nil {
 		return nil, nil
 	}

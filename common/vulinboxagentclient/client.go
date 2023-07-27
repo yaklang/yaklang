@@ -1,4 +1,4 @@
-package vulinboxAgentClient
+package vulinboxagentclient
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/vulinbox"
+	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"strconv"
 	"strings"
 	"time"
@@ -88,7 +88,7 @@ func Connect(addr string, options ...Option) (*Client, error) {
 	log.Info("start to wait for vulinbox ws agent connected")
 
 	// test ping
-	ping := vulinbox.NewPingAction()
+	ping := vulinboxagentproto.NewPingAction()
 	start := false
 	c.Msg().Callback(func(_ []byte) error {
 		start = true
@@ -131,7 +131,7 @@ func (c *Client) sendLoop() {
 }
 
 func (c *Client) MessageMux(bytes []byte) {
-	ap := utils.MustUnmarshalJson[vulinbox.AgentProtocol](bytes)
+	ap := utils.MustUnmarshalJson[vulinboxagentproto.AgentProtocol](bytes)
 	if ap == nil {
 		log.Errorf("cannot unmarshal agent protocol: %v", string(bytes))
 		return
@@ -140,7 +140,7 @@ func (c *Client) MessageMux(bytes []byte) {
 	log.Debugf(`vulinbox ws agent fetch message: %v`, ap.Action)
 
 	switch ap.Action {
-	case vulinbox.ActionAck:
+	case vulinboxagentproto.ActionAck:
 		f, ok := c.ackWaitMap.Get(strconv.Itoa(int(ap.ActionId)))
 		if !ok {
 			return
@@ -152,8 +152,8 @@ func (c *Client) MessageMux(bytes []byte) {
 			return
 		}
 
-	case vulinbox.ActionDataback:
-		databack := utils.MustUnmarshalJson[vulinbox.DatabackAction](bytes)
+	case vulinboxagentproto.ActionDataback:
+		databack := utils.MustUnmarshalJson[vulinboxagentproto.DatabackAction](bytes)
 		if databack == nil {
 			log.Errorf("cannot unmarshal databack action: %v", string(bytes))
 			return
