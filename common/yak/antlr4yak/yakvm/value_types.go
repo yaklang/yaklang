@@ -2,31 +2,33 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
-	literalReflectType_Byte           = reflect.TypeOf(byte(0))
-	literalReflectType_Bytes          = reflect.TypeOf([]byte{})
-	literalReflectType_String         = reflect.TypeOf("")
-	literalReflectType_Int            = reflect.TypeOf(0)
-	literalReflectType_Int8           = reflect.TypeOf(int8(0))
-	literalReflectType_Int16          = reflect.TypeOf(int16(0))
-	literalReflectType_Int32          = reflect.TypeOf(int32(0))
-	literalReflectType_Int64          = reflect.TypeOf(int64(0))
-	literalReflectType_Uint           = reflect.TypeOf(uint(0))
-	literalReflectType_Uint8          = reflect.TypeOf(uint8(0))
-	literalReflectType_Uint16         = reflect.TypeOf(uint16(0))
-	literalReflectType_Uint32         = reflect.TypeOf(uint32(0))
-	literalReflectType_Uint64         = reflect.TypeOf(uint64(0))
-	literalReflectType_Float32        = reflect.TypeOf(float32(0.1))
-	literalReflectType_Float64        = reflect.TypeOf(float64(0.1))
-	literalReflectType_Bool           = reflect.TypeOf(false)
-	literalReflectType_Interface      = reflect.TypeOf((*interface{})(nil)).Elem()
-	literalReflectType_YakFunction    = reflect.TypeOf(&Function{})
-	literalReflectType_NativeFunction = reflect.TypeOf(func() {})
+	literalReflectType_Byte              = reflect.TypeOf(byte(0))
+	literalReflectType_Bytes             = reflect.TypeOf([]byte{})
+	literalReflectType_String            = reflect.TypeOf("")
+	literalReflectType_Int               = reflect.TypeOf(0)
+	literalReflectType_Int8              = reflect.TypeOf(int8(0))
+	literalReflectType_Int16             = reflect.TypeOf(int16(0))
+	literalReflectType_Int32             = reflect.TypeOf(int32(0))
+	literalReflectType_Int64             = reflect.TypeOf(int64(0))
+	literalReflectType_Uint              = reflect.TypeOf(uint(0))
+	literalReflectType_Uint8             = reflect.TypeOf(uint8(0))
+	literalReflectType_Uint16            = reflect.TypeOf(uint16(0))
+	literalReflectType_Uint32            = reflect.TypeOf(uint32(0))
+	literalReflectType_Uint64            = reflect.TypeOf(uint64(0))
+	literalReflectType_Float32           = reflect.TypeOf(float32(0.1))
+	literalReflectType_Float64           = reflect.TypeOf(float64(0.1))
+	literalReflectType_Bool              = reflect.TypeOf(false)
+	literalReflectType_Interface         = reflect.TypeOf((*interface{})(nil)).Elem()
+	literalReflectType_YakFunction       = reflect.TypeOf(&Function{})
+	literalReflectType_NativeFunction    = reflect.TypeOf(func() {})
+	literalReflectType_NativeWarpFuntion = reflect.FuncOf([]reflect.Type{reflect.SliceOf(literalReflectType_Interface)}, []reflect.Type{literalReflectType_Interface}, true)
 )
 
 /*
@@ -194,13 +196,15 @@ func GuessValuesKindToBasicType(vals ...*Value) reflect.Kind {
 	return GuessValuesTypeToBasicType(vals...).Kind()
 }
 func (v *Frame) AutoConvertYakValueToNativeValue(val *Value) (reflect.Value, error) {
+	i := (*interface{})(nil)
+
 	if val.Value == nil {
-		return reflect.ValueOf((*interface{})(nil)), nil
+		return reflect.ValueOf(i), nil
 	}
 	refV := reflect.ValueOf(val.Value)
 
 	if val.IsYakFunction() {
-		err := v.AutoConvertReflectValueByType(&refV, reflect.TypeOf(func(...interface{}) interface{} { return nil }))
+		err := v.AutoConvertReflectValueByType(&refV, literalReflectType_NativeWarpFuntion)
 		if err != nil {
 			return reflect.Value{}, err
 		}
@@ -267,10 +271,25 @@ func (v *Frame) AutoConvertReflectValueByType(
 			}
 			f := reflectValue.Interface().(*Function)
 			*reflectValue = reflect.MakeFunc(reflectType, func(args []reflect.Value) []reflect.Value {
-				vmArgs := make([]*Value, len(args))
-				for index, value := range args {
-					vmArgs[index] = NewAutoValue(value.Interface())
+				var vmArgs []*Value
+				// fix: unpack variadic args
+				if reflectType == literalReflectType_NativeWarpFuntion {
+					newArgs, ok := args[0].Interface().([]interface{})
+					if ok {
+						vmArgs = make([]*Value, len(newArgs))
+						for index, value := range newArgs {
+							vmArgs[index] = NewAutoValue(value)
+						}
+					}
 				}
+
+				if vmArgs == nil {
+					vmArgs = make([]*Value, len(args))
+					for index, value := range args {
+						vmArgs[index] = NewAutoValue(value.Interface())
+					}
+				}
+
 				result := v.CallYakFunction(false, f, vmArgs)
 				outCount := reflectType.NumOut()
 				if outCount <= 0 {
