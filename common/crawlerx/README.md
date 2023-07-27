@@ -1,6 +1,34 @@
 # CrawlerX 爬虫模块使用说明
 
-## 代码示例
+## 目录
+
+- [Example](#example)
+- [Data Structure](#data-structure)
+    - [crawlerx.ReqInfo](#crawlerx-reqinfo)
+- [API](#api)
+    - [crawlerx.StartCrawler](#crawlerx-startcrawler)
+    - [crawlerx.browserInfo](#crawlerx-browserinfo)
+    - [crawlerx.maxUrl](#crawlerx-maxurl)
+    - [crawlerx.maxDepth](#crawlerx-maxdepth)
+    - [crawlerx.concurrent](#crawlerx-concurrent)
+    - [crawlerx.blacklist](#crawlerx-blacklist)
+    - [crawlerx.whitelist](#crawlerx-whitelist)
+    - [crawlerx.pageTimeout](#crawlerx-pagetimeout)
+    - [crawlerx.fullTimeout](#crawlerx-fulltimeout)
+    - [crawlerx.extraWaitLoadTime](#crawlerx-extrawaitloadtime)
+    - [crawlerx.formFill](#crawlerx-formfill)
+    - [crawlerx.fileInput](#crawlerx-fileinput)
+    - [crawlerx.headers](#crawlerx-headers)
+    - [crawlerx.rawHeaders](#crawlerx-rawheaders)
+    - [crawlerx.cookies](#crawlerx-cookies)
+    - [crawlerx.rawCookie](#crawlerx-rawcookie)
+    - [crawlerx.scanRangeLevel](#crawlerx-scanrangelevel)
+    - [crawlerx.scanRepeatLevel](#crawlerx-scanrepeatlevel)
+    - [crawlerx.ignoreQueryName](#crawlerx-ignorequeryname)
+    - [crawlerx.sensitiveWords](#crawlerx-sensitivewords)
+    - [crawlerx.leakless](#crawlerx-leakless)
+
+## <span id="example">Example</span>
 
     yakit.AutoInitYakit()
 
@@ -174,9 +202,9 @@
     }
 
 
-## Data Struct
+## <span id="data-structure">Data Structure</span>
 
-### crawlerx.ReqInfo
+### <span id="crawlerx-reqinfo">crawlerx.ReqInfo</span>
 
 爬虫结果数据结构
 
@@ -211,9 +239,9 @@
 
 `func (*ReqInfo) ResponseBody() return(string)` 爬虫结果的返回包body
 
-## API
+## <span id="api">API</span>
 
-### crawlerx.StartCrawler
+### <span id="crawlerx-startcrawler">crawlerx.StartCrawler</span>
 
 设置爬虫参数 开始爬虫任务
 
@@ -236,7 +264,7 @@
 | err | error                 | 错误信息          |
 
 
-### crawlerx.browserInfo
+### <span id="crawlerx-browserinfo">crawlerx.browserInfo</span>
 
 设置浏览器参数
 
@@ -250,7 +278,7 @@
 |------|--------|-------|
 | info | string | 浏览器参数 |
 
-<font size=1>浏览器参数为一个json字符串：
+浏览器参数为一个json字符串：
 
     {
         "ws_address":"",
@@ -263,7 +291,6 @@
 其中ws_address为远程chrome浏览器地址，exe_path为chrome浏览器可执行文件的路径，这两个参数设置一个就可以，不设置则会默认下载chrome浏览器并运行
 
 proxy_address为代理地址，proxy_username和proxy_password分别为代理的用户名和密码（需要则填写）
-</font>
 
 #### 返回值
 
@@ -272,7 +299,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.maxUrl
+### <span id="crawlerx-maxurl">crawlerx.maxUrl</span>
 
 最大爬虫数量设置
 
@@ -293,7 +320,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.maxDepth
+### <span id="crawlerx-maxdepth">crawlerx.maxDepth</span>
 
 设置最大爬取深度
 
@@ -314,7 +341,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.concurrent
+### <span id="crawlerx-concurrent">crawlerx.concurrent</span>
 
 最大浏览器打开页面数量（相当于并行数量）
 
@@ -335,7 +362,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.blackList
+### <span id="crawlerx-blacklist">crawlerx.blackList</span>
 
 爬虫黑名单参数设置
 
@@ -356,7 +383,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.whiteList
+### <span id="crawlerx-whitelist">crawlerx.whiteList</span>
 
 爬虫白名单参数设置
 
@@ -377,7 +404,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.pageTimeout
+### <span id="crawlerx-pagetimeout">crawlerx.pageTimeout</span>
 
 爬虫单页面超时时间设置
 
@@ -398,7 +425,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.fullTimeout
+### <span id="crawlerx-fulltimeout">crawlerx.fullTimeout</span>
 
 爬虫全局超时时间设置
 
@@ -419,7 +446,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.extraWaitLoadTime
+### <span id="crawlerx-extrawaitloadtime">crawlerx.extraWaitLoadTime</span>
 
 设置页面的额外等待时间 因为有些时候通过devtools拿到的页面状态为加载完成 但是实际上页面仍然在渲染部分内容
 此时可以通过该函数进行额外的等待时间的设置
@@ -441,7 +468,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.formFill
+### <span id="crawlerx-formfill">crawlerx.formFill</span>
 
 爬虫表单填写设置
 
@@ -462,7 +489,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.fileInput
+### <span id="crawlerx-fileinput">crawlerx.fileInput</span>
 
 爬虫文件上传设置
 
@@ -476,7 +503,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 |-----------|-------------------|--------|
 | fileInput | map[string]string | 上传文件设置 |
 
-<font size=1>参数map的key为关键词 value为文件路径；当key为default时 value为默认上传文件</font>
+参数map的key为关键词 value为文件路径；当key为default时 value为默认上传文件
 
 #### 返回值
 
@@ -485,7 +512,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.headers
+### <span id="crawlerx-headers">crawlerx.headers</span>
 
 爬虫request的header设置
 
@@ -495,9 +522,9 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 
 #### 参数
 
-| 参数名     | 参数类型               | 参数解释     |
-|---------|--------------------|----------|
-| headers | .map[string]string | header内容 |
+| 参数名     | 参数类型              | 参数解释     |
+|---------|-------------------|----------|
+| headers | map[string]string | header内容 |
 
 #### 返回值
 
@@ -506,7 +533,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.rawHeaders
+### <span id="crawlerx-rawheaders">crawlerx.rawHeaders</span>
 
 爬虫request的header设置
 
@@ -529,7 +556,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.cookies
+### <span id="crawlerx-cookies">crawlerx.cookies</span>
 
 爬虫request的cookie设置
 
@@ -550,7 +577,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.rawCookie
+### <span id="crawlerx-rawcookie">crawlerx.rawCookie</span>
 
 爬虫request的cookie设置
 
@@ -573,7 +600,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.scanRangeLevel
+### <span id="crawlerx-scanrangelevel">crawlerx.scanRangeLevel</span>
 
 爬虫爬取范围
 
@@ -587,11 +614,11 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 |-----------|-------------------------|----------|
 | scanRange | crawlerx.scanRangeLevel | 爬虫爬取范围等级 |
 
-<font size=1>`crawlerx.scanRangeLevel` 包括以下几种：
+`crawlerx.scanRangeLevel` 包括以下几种：
 
 `crawlerx.AllDomainScan` 表示爬取全域名 （默认）
 
-`crawlerx.SubMenuScan` 表示爬取目标URL和子目录</font>
+`crawlerx.SubMenuScan` 表示爬取目标URL和子目录
 
 #### 返回值
 
@@ -600,7 +627,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.scanRepeatLevel
+### <span id="crawlerx-scanrepeatlevel">crawlerx.scanRepeatLevel</span>
 
 爬虫结果重复过滤设置
 
@@ -614,7 +641,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 |------------|----------------------|------------|
 | scanRepeat | crawlerx.repeatLevel | 爬虫结果重复过滤等级 |
 
-<font size=1>`crawlerx.repeatLevel` 包括以下几种：
+`crawlerx.repeatLevel` 包括以下几种：
 
 `crawlerx.UnLimitRepeat` 对page，method，query-name，query-value和post-data敏感
 
@@ -624,7 +651,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 
 `crawlerx.HighRepeatLevel` 对page和method敏感
 
-`crawlerx.ExtremeRepeatLevel` 对page敏感</font>
+`crawlerx.ExtremeRepeatLevel` 对page敏感
 
 #### 返回值
 
@@ -633,7 +660,7 @@ proxy_address为代理地址，proxy_username和proxy_password分别为代理的
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.ignoreQueryName
+### <span id="crawlerx-ignorequeryname">crawlerx.ignoreQueryName</span>
 
 url中的query名称查重忽略设置
 
@@ -647,7 +674,7 @@ url中的query名称查重忽略设置
 |------------|-----------|------------------|
 | queryNames | ...string | 需要跳过查重筛查的query名称 |
 
-<font size=1>例如现在存在如下几个url：
+例如现在存在如下几个url：
 
 - http://xxx.com/abc/def?name=aaa&age=10&token=123456
 
@@ -659,10 +686,10 @@ url中的query名称查重忽略设置
 
     ... ...
     ignore = crawlerx.ignoreQueryName("token")
-    ch = crawlerx.StartCrawler(ignore)
+    ch = crawlerx.StartCrawler(urlStr, ignore)
     ... ...
 
-此时上面两个url在去重检测时会被认为是同一个url，只会对其中一个进行访问</font>
+此时上面两个url在去重检测时会被认为是同一个url，只会对其中一个进行访问
 
 #### 返回值
 
@@ -671,7 +698,7 @@ url中的query名称查重忽略设置
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.sensitiveWords
+### <span id="crawlerx-sensitivewords">crawlerx.sensitiveWords</span>
 
 敏感词设置，遇到元素中存在敏感词则不会进行点击
 
@@ -692,7 +719,7 @@ url中的query名称查重忽略设置
 | r0  | crawlerx.ConfigOpt | 参数设置函数 |
 
 
-### crawlerx.leakless
+### <span id="crawlerx-leakless">crawlerx.leakless</span>
 
 浏览器是否自动进程关闭设置
 浏览器自动进程关闭进行在windows下会报病毒 默认在windows下会关闭 如在windows下开启请关闭相关安全软件
