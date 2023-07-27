@@ -3,19 +3,20 @@ package vulinboxAgentClient
 import (
 	"context"
 	"fmt"
+	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
+	"strconv"
 	"strings"
-	"sync"
 )
 
 type Client struct {
 	wsClient *lowhttp.WebsocketClient
 
 	// todo: use ttl map
-	ackWaitMap sync.Map
+	ackWaitMap *ttlcache.Cache
 	sendBuf    chan []byte
 
 	ctx     context.Context
@@ -36,12 +37,17 @@ User-Agent: FeedbackStreamer/1.0
 type Option func(c *Client)
 
 func Connect(addr string, options ...Option) (*Client, error) {
+	// new client
 	var c = &Client{
-		sendBuf: make(chan []byte, 1024),
+		sendBuf:    make(chan []byte, 1024),
+		ackWaitMap: ttlcache.NewCache(),
 	}
+	c.ackWaitMap.SetTTL(Expire)
+	c.ackWaitMap.SkipTtlExtensionOnHit(true)
 	for _, option := range options {
 		option(c)
 	}
+
 	// prepare addr
 	addr = utils.AppendDefaultPort(addr, 8787)
 	addr = strings.ReplaceAll(addr, "0.0.0.0", "127.0.0.1")
@@ -128,13 +134,11 @@ func (c *Client) MessageMux(bytes []byte) {
 
 	switch ap.Action {
 	case vulinbox.ActionAck:
-		f, ok := c.ackWaitMap.Load(ap.ActionId)
+		f, ok := c.ackWaitMap.Get(strconv.Itoa(int(ap.ActionId)))
 		if !ok {
 			log.Errorf("unkown ack:: %v", ap)
 			return
 		}
-
-		c.ackWaitMap.Delete(ap.ActionId)
 
 		err := f.(func([]byte) error)(bytes)
 		if err != nil {
