@@ -2,6 +2,8 @@
 // @Author bcy2007  2023/6/20 14:54
 package httpbrute
 
+import "github.com/yaklang/yaklang/common/simulator/config"
+
 type BruteConfig struct {
 	usernameList []string
 	passwordList []string
@@ -27,6 +29,7 @@ type BruteConfig struct {
 	similarityDegree float64
 
 	extraWaitLoadTime int
+	leakless          config.LeaklessMode
 }
 
 type BruteConfigOpt func(*BruteConfig)
@@ -49,6 +52,7 @@ func NewBruteConfig() *BruteConfig {
 		resultChannel:      nil,
 		loginDetect:        DefaultChangeMode,
 		similarityDegree:   0.6,
+		leakless:           config.LeaklessDefault,
 	}
 }
 
@@ -158,5 +162,11 @@ func WithLoginDetectMode(detectMode loginDetectMode, degree ...float64) BruteCon
 func WithExtraWaitLoadTime(time int) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.extraWaitLoadTime = time
+	}
+}
+
+func WithLeakless(leakless config.LeaklessMode) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.leakless = leakless
 	}
 }

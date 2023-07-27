@@ -15,7 +15,8 @@ type PageConfig struct {
 	wsAddress string `default:""`
 	exePath   string `default:""`
 
-	ctx context.Context
+	ctx      context.Context
+	leakless LeaklessMode
 }
 
 func (pc *PageConfig) Url() string {
@@ -36,6 +37,10 @@ func (pc *PageConfig) ExePath() string {
 
 func (pageConfig *PageConfig) Context() context.Context {
 	return pageConfig.ctx
+}
+
+func (pageConfig *PageConfig) Leakless() LeaklessMode {
+	return pageConfig.leakless
 }
 
 type ConfigFunc func(config *PageConfig)
@@ -77,5 +82,11 @@ func WithWsAddress(wsAddress string) ConfigFunc {
 func WithExePath(exePath string) ConfigFunc {
 	return func(config *PageConfig) {
 		config.exePath = exePath
+	}
+}
+
+func WithLeakless(leakless LeaklessMode) ConfigFunc {
+	return func(config *PageConfig) {
+		config.leakless = leakless
 	}
 }
