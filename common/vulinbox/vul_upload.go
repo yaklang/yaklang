@@ -27,7 +27,7 @@ var uploadFailed string
 func (s *VulinServer) registerUploadCases() {
 	r := s.router
 
-	r.Handle("/upload/main", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	defaultHandler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var route string
 		switch LoadFromGetParams(request, "case") {
 		case "nullbyte":
@@ -44,7 +44,43 @@ func (s *VulinServer) registerUploadCases() {
 		unsafeTemplateRender(writer, request, string(uploadMain), map[string]any{
 			"action": "/upload/case/" + route,
 		})
-	}))
+	})
+	var uploadGroup = r.PathPrefix("/upload").Name("文件上传案例").Subrouter()
+	var vuls = []*VulInfo{
+		{
+			Title:        "基础文件上传案例",
+			Path:         "/main",
+			DefaultQuery: "case=safe",
+			Handler:      defaultHandler,
+		},
+		{
+			Title:        "图片上传（NullByte 截断类型）绕过",
+			Path:         "/main",
+			DefaultQuery: "case=nullbyte",
+			Handler:      defaultHandler,
+		},
+		{
+			Title:        "图片上传（MIME 类型伪造）绕过",
+			Path:         "/main",
+			DefaultQuery: "case=mime",
+			Handler:      defaultHandler,
+		},
+		{
+			Title:        "CVE-2017-15715：Apache HTTPD 换行解析漏洞",
+			Path:         "/main",
+			DefaultQuery: "case=cve-2017-15715",
+			Handler:      defaultHandler,
+		},
+		{
+			Title:        "图片上传：检查文件头",
+			Path:         "/main",
+			DefaultQuery: "case=fileheader",
+			Handler:      defaultHandler,
+		},
+	}
+	for _, v := range vuls {
+		addRouteWithVulInfo(uploadGroup, v)
+	}
 
 	r.Handle("/upload/case/safe", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		fp, header, err := request.FormFile("filename")

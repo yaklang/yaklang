@@ -28,15 +28,26 @@ var op1Html []byte
 //go:embed success.html
 var secretHtml []byte
 
-func Register(t *mux.Router) {
-	var sessionCacher = ttlcache.NewCache()
+var (
+	sessionCacher = ttlcache.NewCache()
+	defaultPass   = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
+)
+
+const COOKIECONST = "YSESSIONID"
+
+func init() {
 	sessionCacher.SetTTL(30 * time.Minute)
-	var defaultPass = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
 	log.Infof("default pass generated: %v", defaultPass)
+}
+
+func Register(t *mux.Router) (*mux.Router, []string) {
 	verificationGroup := t.PathPrefix("/verification").Name("验证码场景").Subrouter()
 
+	const (
+		ordinaryCase1 = `{"Title":"有验证码拦截的表单提交", "Path":"/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
+		ordinaryCase2 = `{"Title":"有验证码拦截的表单提交（逻辑问题）", "Path":"/bad/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
+	)
 	// 最普通的案例
-	const COOKIECONST = "YSESSIONID"
 	verificationGroup.HandleFunc("/op", func(writer http.ResponseWriter, request *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -93,7 +104,7 @@ func Register(t *mux.Router) {
 			writer.Write(opHtml)
 			return
 		}
-	}).Name("基础验证码拦截的表单提交")
+	}).Name(ordinaryCase1)
 	verificationGroup.HandleFunc("/code", func(writer http.ResponseWriter, request *http.Request) {
 		reqRaw, _ := utils.HttpDumpWithBody(request, true)
 		session := lowhttp.GetHTTPPacketCookie(reqRaw, COOKIECONST)
@@ -207,7 +218,7 @@ func Register(t *mux.Router) {
 			writer.Write(op1Html)
 			return
 		}
-	}).Name("有验证码拦截的表单提交（逻辑问题）")
+	}).Name(ordinaryCase2)
 	verificationGroup.HandleFunc("/bad/code", func(writer http.ResponseWriter, request *http.Request) {
 		reqRaw, _ := utils.HttpDumpWithBody(request, true)
 		session := lowhttp.GetHTTPPacketCookie(reqRaw, COOKIECONST_BAD)
@@ -246,4 +257,7 @@ func Register(t *mux.Router) {
 		}
 		return
 	})
+	return verificationGroup, []string{
+		ordinaryCase1, ordinaryCase2,
+	}
 }

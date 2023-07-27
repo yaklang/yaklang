@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -41,6 +42,22 @@ type VulInfo struct {
 	Headers      []*ypb.KVPair
 	// 具体期望结果
 	ExpectedResult map[string]int
+}
+
+func (v *VulInfo) GetPath() string {
+	if v == nil {
+		return ""
+	}
+	return v.Path
+}
+
+func (v *VulInfo) GetHandler() http.HandlerFunc {
+	if v == nil {
+		return func(writer http.ResponseWriter, request *http.Request) {
+
+		}
+	}
+	return v.Handler
 }
 
 func (s *VulinServer) init() {
@@ -108,6 +125,9 @@ func (s *VulinServer) init() {
 		writer.Header().Set("Content-Type", "text/html; charset=UTF8")
 
 		routesData := s.groupedRoutesCache
+		sort.SliceStable(routesData, func(i, j int) bool {
+			return len(routesData[i].VulInfos) > len(routesData[j].VulInfos)
+		})
 		err = t.Execute(writer, routesData) // pass the data map to the Execute function instead of routesData directly
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -134,7 +154,10 @@ func (s *VulinServer) init() {
 	s.registerUserRoute()
 
 	// 验证码
-	verificationcode.Register(router)
+	subVerificationRouter, vuls := verificationcode.Register(router)
+	for _, v := range vuls {
+		subVerificationRouter.GetRoute(v)
+	}
 
 	s.registerJSONP()
 	s.registerPostMessageIframeCase()
@@ -172,7 +195,10 @@ func (s *VulinServer) genRoute() {
 				var vulnInfo *VulInfo
 				err = json.Unmarshal([]byte(info), &vulnInfo)
 				if err != nil {
-					log.Warnf("unmarshal route info failed: %v", err)
+					r, _ := route.GetPathRegexp()
+					if info != "" {
+						log.Warnf("unmarshal route[%v] info[%v] failed: %v", r, info, err)
+					}
 					return nil
 				}
 				// 一个组中不是所有的路由都有名称，只有需要在前端展示的路由才有名称
@@ -256,6 +282,11 @@ func (s *VulinServer) registerVulRouter() {
 
 	}).Methods(http.MethodGet)
 
+}
+
+type VulInfoIf interface {
+	Path() string
+	Handler() http.HandlerFunc
 }
 
 func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
