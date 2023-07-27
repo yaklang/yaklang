@@ -52,6 +52,11 @@ func (mode *StartMode) SetExePath(exePath string) {
 	configFunc(&mode.config)
 }
 
+func (mode *StartMode) SetLeakless(leakless config.LeaklessMode) {
+	configFunc := config.WithLeakless(leakless)
+	configFunc(&mode.config)
+}
+
 func (mode *StartMode) Test() {
 
 }

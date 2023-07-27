@@ -1,6 +1,7 @@
 package simulator
 
 import (
+	"github.com/yaklang/yaklang/common/simulator/config"
 	"github.com/yaklang/yaklang/common/simulator/httpbrute"
 	"github.com/yaklang/yaklang/common/simulator/simple"
 )
@@ -24,10 +25,15 @@ var Exports = map[string]interface{}{
 	"loginDetectMode":      httpbrute.WithLoginDetectMode,
 	"exePath":              httpbrute.WithExePath,
 	"extraWaitLoadTime":    httpbrute.WithExtraWaitLoadTime,
+	"leaklessStatus":       httpbrute.WithLeakless,
 
 	"urlChangeMode":     httpbrute.UrlChangeMode,
 	"htmlChangeMode":    httpbrute.HtmlChangeMode,
 	"defaultChangeMode": httpbrute.DefaultChangeMode,
+
+	"leaklessDefault": config.LeaklessDefault,
+	"leaklessOn":      config.LeaklessOn,
+	"leaklessOff":     config.LeaklessOff,
 
 	"simple": SimpleExports,
 }

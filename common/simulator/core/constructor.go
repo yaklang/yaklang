@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -184,6 +186,13 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 		if proxy != "" {
 			launch.Proxy(proxy)
 		}
+		if conf.Leakless() == config.LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
+			launch.Leakless(false)
+		} else if conf.Leakless() == config.LeaklessOn {
+			launch.Leakless(true)
+		} else if conf.Leakless() == config.LeaklessOff {
+			launch.Leakless(false)
+		}
 		serviceUrl, header := launch.ClientHeader()
 		client, _ := cdp.StartWithURL(launchCtx, serviceUrl, header)
 		browser = browser.Client(client)
@@ -195,6 +204,13 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 		}
 		if proxy != "" {
 			launch.Proxy(proxy)
+		}
+		if conf.Leakless() == config.LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
+			launch.Leakless(false)
+		} else if conf.Leakless() == config.LeaklessOn {
+			launch.Leakless(true)
+		} else if conf.Leakless() == config.LeaklessOff {
+			launch.Leakless(false)
 		}
 		//launch.Headless(false)
 		controlUrl, _ := launch.Launch()
