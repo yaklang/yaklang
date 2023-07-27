@@ -7,11 +7,16 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
 func (s *VulinServer) registerSSRF() {
 
+	s.router.HandleFunc("/redirect/main", func(writer http.ResponseWriter, request *http.Request) {
+		DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
+	})
 	ssrfGroup := s.router.PathPrefix("/ssrf").Name("SSRF 参数多种情况的测试").Subrouter()
 	ssrfRoutes := []*VulInfo{
 		{
@@ -203,102 +208,132 @@ func (s *VulinServer) registerSSRF() {
 			},
 			RiskDetected: true,
 		},
+
 		{
-			DefaultQuery: "",
-			Path:         "/redirect/main",
-			Title:        "SSRF POST参数是JSON（包含URL）的情况sdfg",
+			DefaultQuery: "destUrl=/redirect/main",
+			Path:         "/redirect/basic",
+			Title:        "完全开放重定向",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
+				var u = LoadFromGetParams(request, "destUrl")
+				if strings.Contains(u, `redirect/basic`) {
+					DefaultRender("<p>forbidden to "+strconv.Quote(u)+"</p>", writer, request)
+					return
+				}
+				writer.Header().Set("Location", u)
+				writer.WriteHeader(302)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "destUrl=/redirect/main",
+			Path:         "/redirect/redirect-hell",
+			Title:        "完全开放重定向(无限重定向)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "destUrl")
+				writer.Header().Set("Location", u)
+				writer.WriteHeader(302)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "redUrl=/redirect/main",
+			Path:         "/redirect/js/basic",
+			Title:        "完全开放重定向（JS location.href）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redUrl")
+				DefaultRender(`
+	<h2>Open Redirect With JS</h2>
+	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
+	<script>
+		setTimeout(function() {
+	
+	window.location.href = `+strconv.Quote(u)+`;
+	
+	}, 3000)
+	</script>
+	`, writer, request)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "redirect_to=/redirect/main",
+			Path:         "/redirect/js/basic1",
+			Title:        "完全开放重定向（JS location.replace）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redirect_to")
+				DefaultRender(`
+	<h2>Open Redirect With JS</h2>
+	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
+	<script>
+		setTimeout(function() {
+	
+	window.location.replace(`+strconv.Quote(u)+`);
+	
+	}, 3000)
+	</script>
+	`, writer, request)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "redirect=/redirect/main",
+			Path:         "/redirect/js/basic2",
+			Title:        "完全开放重定向（JS location.assign）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redirect")
+				DefaultRender(`
+	<h2>Open Redirect With JS</h2>
+	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
+	<script>
+		setTimeout(function() {
+	
+	window.location.assign(`+strconv.Quote(u)+`);
+	
+	}, 3000)
+	</script>
+	`, writer, request)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "redirect=/redirect/main",
+			Path:         "/redirect/meta/case1",
+			Title:        "完全开放重定向（meta 延迟跳转）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redirect")
+				DefaultRenderEx(true, `<!DOCTYPE html>
+	<html>
+	 <head>
+	   <title>Meta(5s) Refresh Example</title>
+	   <meta http-equiv="refresh" content="5;url={{ .url }}">
+	 </head>
+	</html>
+	`, writer, request, map[string]any{
+					"url": strings.Trim(strconv.Quote(u), `"`),
+				})
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "redirect=/redirect/main",
+			Path:         "/redirect/meta/case2",
+			Title:        "完全开放重定向（meta）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redirect")
+				DefaultRenderEx(true, `<!DOCTYPE html>
+	<html>
+	 <head>
+	   <title>Meta Refresh Example</title>
+	   <meta http-equiv="refresh" content="0;url={{ .url }}">
+	 </head>
+	</html>
+	`, writer, request, map[string]any{
+					"url": strings.Trim(strconv.Quote(u), `"`),
+				})
 			},
 			RiskDetected: true,
 		},
 	}
-
-	//	s.router.HandleFunc("/redirect/main", func(writer http.ResponseWriter, request *http.Request) {
-	//		DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
-	//	})
-	//	s.router.HandleFunc("/redirect/basic", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "destUrl")
-	//		if strings.Contains(u, `redirect/basic`) {
-	//			DefaultRender("<p>forbidden to "+strconv.Quote(u)+"</p>", writer, request)
-	//			return
-	//		}
-	//		writer.Header().Set("Location", u)
-	//		writer.WriteHeader(302)
-	//	})
-	//	s.router.HandleFunc("/redirect/redirect-hell", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "destUrl")
-	//		writer.Header().Set("Location", u)
-	//		writer.WriteHeader(302)
-	//	})
-	//	s.router.HandleFunc("/redirect/js/basic", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "redUrl")
-	//		DefaultRender(`
-	//<h2>Open Redirect With JS</h2>
-	//<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
-	//<script>
-	//	setTimeout(function() {
-	//
-	//window.location.href = `+strconv.Quote(u)+`;
-	//
-	//}, 3000)
-	//</script>
-	//`, writer, request)
-	//	})
-	//	s.router.HandleFunc("/redirect/js/basic1", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "redirect_to")
-	//		DefaultRender(`
-	//<h2>Open Redirect With JS</h2>
-	//<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
-	//<script>
-	//	setTimeout(function() {
-	//
-	//window.location.replace(`+strconv.Quote(u)+`);
-	//
-	//}, 3000)
-	//</script>
-	//`, writer, request)
-	//	})
-	//	s.router.HandleFunc("/redirect/js/basic2", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "redirect")
-	//		DefaultRender(`
-	//<h2>Open Redirect With JS</h2>
-	//<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
-	//<script>
-	//	setTimeout(function() {
-	//
-	//window.location.assign(`+strconv.Quote(u)+`);
-	//
-	//}, 3000)
-	//</script>
-	//`, writer, request)
-	//	})
-	//	s.router.HandleFunc("/redirect/meta/case1", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "redirect")
-	//		DefaultRenderEx(true, `<!DOCTYPE html>
-	//<html>
-	//  <head>
-	//    <title>Meta(5s) Refresh Example</title>
-	//    <meta http-equiv="refresh" content="5;url={{ .url }}">
-	//  </head>
-	//</html>
-	//`, writer, request, map[string]any{
-	//			"url": strings.Trim(strconv.Quote(u), `"`),
-	//		})
-	//	})
-	//	s.router.HandleFunc("/redirect/meta/case2", func(writer http.ResponseWriter, request *http.Request) {
-	//		var u = LoadFromGetParams(request, "redirect")
-	//		DefaultRenderEx(true, `<!DOCTYPE html>
-	//<html>
-	//  <head>
-	//    <title>Meta Refresh Example</title>
-	//    <meta http-equiv="refresh" content="0;url={{ .url }}">
-	//  </head>
-	//</html>
-	//`, writer, request, map[string]any{
-	//			"url": strings.Trim(strconv.Quote(u), `"`),
-	//		})
-	//	}).Name("SSRF POST 中 URL 参数(Multipart)")
 
 	for _, v := range ssrfRoutes {
 		addRouteWithVulInfo(ssrfGroup, v)

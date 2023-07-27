@@ -86,14 +86,20 @@
     inputForm.addEventListener("input", function () {
         const searchData = decodeURIComponent(`${inputForm.value.toLowerCase()}`);
         items.forEach(function (item) {
-            const alink = item.childNodes[0];
-            let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
-            if (searchItem.indexOf(searchData) !== -1) {
-                item.style.display = "block";
-            } else {
-                item.style.display = "none";
-            }
-        })
+            item.childNodes.forEach(function (child) {
+                if (child.nodeName.toLowerCase() === 'a') {
+                    const alink = child;
+                    if (alink.nodeType === Node.ELEMENT_NODE) {
+                        let searchItem = (alink.getAttribute("href") + "|" + item.textContent).toLowerCase();
+                        if (searchItem.indexOf(searchData) !== -1) {
+                            item.style.display = "block";
+                        } else {
+                            item.style.display = "none";
+                        }
+                    }
+                }
+            });
+        });
         document.querySelectorAll(".col-md-6").forEach(function (cardWrapper) {
             if (cardWrapper.querySelectorAll(".list-group-item").length === cardWrapper.querySelectorAll(".list-group-item[style='display: none;']").length) {
                 cardWrapper.style.display = "none";
@@ -107,20 +113,5 @@
 <!-- 引入 Bootstrap JavaScript -->
 <script src="/static/js/bootstrap_5.3/popper.min.js"></script>
 <script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
-<!--<script>-->
-<!--    document.addEventListener('DOMContentLoaded', function () {-->
-<!--        const listItems = document.querySelectorAll('.list-group-item');-->
-
-<!--        listItems.forEach(function (listItem) {-->
-<!--            const anchor = listItem.querySelector('a');-->
-
-<!--            if (anchor) {-->
-<!--                listItem.addEventListener('click', function () {-->
-<!--                    anchor.click()-->
-<!--                });-->
-<!--            }-->
-<!--        });-->
-<!--    });-->
-<!--</script>-->
 </body>
 </html>
