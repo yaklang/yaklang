@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func (m *MsgPrepare) Send(data any) {
 	// get ActionId
 	id := reflect.ValueOf(data).Elem().FieldByName("ActionId").Uint()
 
-	m.c.ackWaitMap.Store(uint32(id), m.f)
+	m.c.ackWaitMap.Set(strconv.FormatUint(id, 10), m.f)
 	m.c.Send(data)
 }
 
