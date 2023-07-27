@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type AutoDecodeResult struct {
@@ -83,6 +84,41 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 					Result:      rawStr,
 				})
 				origin = rawStr
+				continue
+			}
+		}
+
+		decodedByBas64, err := DecodeBase64Url(rawStr)
+		if len(decodedByBas64) > 0 && err == nil {
+			if utf8.Valid(decodedByBas64) {
+				results = append(results, &AutoDecodeResult{
+					Type:        "Base64 Decode",
+					TypeVerbose: "Base64 解码",
+					Origin:      origin,
+					Result:      string(decodedByBas64),
+				})
+				origin = rawStr
+				rawStr = string(decodedByBas64)
+				continue
+			}
+
+			decoded, err := GB18030ToUtf8(decodedByBas64)
+			if err == nil && len(decoded) > 0 {
+				results = append(results, &AutoDecodeResult{
+					Type:        "Base64 Decode",
+					TypeVerbose: "Base64 解码（UTF8-Invalid）",
+					Origin:      origin,
+					Result:      EscapeInvalidUTF8Byte(decodedByBas64),
+				})
+				origin = rawStr
+				results = append(results, &AutoDecodeResult{
+					Type:        "GB(K/18030) Decode",
+					TypeVerbose: "GB(K/18030) 解码",
+					Origin:      origin,
+					Result:      EscapeInvalidUTF8Byte(decoded),
+				})
+				origin = rawStr
+				rawStr = string(decoded)
 				continue
 			}
 		}
