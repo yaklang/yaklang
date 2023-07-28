@@ -5,6 +5,13 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,12 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"io"
-	"net"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 //go:embed base-yak-plugin/*
@@ -82,7 +83,7 @@ func NewLocalClient() (ypb.YakClient, error) {
 
 var initDB = sync.Once{}
 
-func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
+func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
 	initDB.Do(func() {
 		yakit.InitialDatabase()
 	})
@@ -92,13 +93,14 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 		return false
 	}
 	host, port, _ := utils.ParseStringToHostPort(vulServer.VulServerAddr)
+
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       string(codeBytes),
 		PluginType: "mitm",
 		Input:      utils.HostPort(host, port),
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-			Path:    vunInfo.Path,
-			Headers: vunInfo.Headers,
+			Path:    vulInfo.Path,
+			Headers: vulInfo.Headers,
 			IsHttps: vulServer.IsHttps,
 		},
 	})
@@ -126,7 +128,7 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 	}
 
 	var expected = make(map[string]int)
-	for k := range vunInfo.ExpectedResult {
+	for k := range vulInfo.ExpectedResult {
 		expected[k] = 0
 	}
 	risks := yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
@@ -134,11 +136,11 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 	for risk := range risks {
 		match := false
 		riskInfo, _ := json.Marshal(risk)
-		for k := range vunInfo.ExpectedResult {
-			if vunInfo.StrictMode && (risk.TitleVerbose == k || risk.Title == k) {
+		for k := range vulInfo.ExpectedResult {
+			if vulInfo.StrictMode && (risk.TitleVerbose == k || risk.Title == k) {
 				expected[k] = expected[k] + 1
 				match = true
-			} else if !vunInfo.StrictMode {
+			} else if !vulInfo.StrictMode {
 				if strings.Contains(string(riskInfo), k) || strings.Contains(risk.TitleVerbose, k) {
 					expected[k] = expected[k] + 1
 					match = true
@@ -150,7 +152,7 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInf
 		}
 	}
 
-	for k, expectedCount := range vunInfo.ExpectedResult {
+	for k, expectedCount := range vulInfo.ExpectedResult {
 		if expected[k] != expectedCount {
 			t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v", k, expectedCount, expected[k])
 			t.FailNow()
