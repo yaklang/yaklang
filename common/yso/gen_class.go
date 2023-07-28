@@ -23,6 +23,8 @@ const (
 	TomcatEchoClass                = "TomcatEchoClass"
 	BytesClass                     = "BytesClass"
 	MultiEchoClass                 = "MultiEchoClass"
+	HeaderEchoClass                = "HeaderEchoClass"
+	SleepClass                     = "SleepClass"
 	//NoneClass                                = "NoneClass"
 )
 
@@ -76,9 +78,10 @@ type ClassConfig struct {
 	IsEchoBody   bool
 	IsExecAction bool
 	//Reverse参数
-	Host  string
-	Port  int
-	Token string
+	Host      string
+	Port      int
+	Token     string
+	SleepTime int
 }
 
 func NewClassConfig(options ...GenClassOptionFun) *ClassConfig {
@@ -434,7 +437,35 @@ func init() {
 			return obj, nil
 		},
 	)
-
+	setClass(SleepClass, "sleep指定时长，用于延时检测gadget", func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
+		obj, err := javaclassparser.Parse(template_class_Sleep)
+		if err != nil {
+			return nil, err
+		}
+		javaClassBuilder := javaclassparser.NewClassObjectBuilder(obj)
+		javaClassBuilder.SetParam("time", strconv.Itoa(cf.SleepTime))
+		if len(javaClassBuilder.GetErrors()) > 0 {
+			log.Error(javaClassBuilder.GetErrors()[0])
+			return nil, javaClassBuilder.GetErrors()[0]
+		}
+		return obj, nil
+	})
+	setClass(HeaderEchoClass, "自动查找Response对象并在header中回显指定内容", func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
+		obj, err := javaclassparser.Parse(template_class_HeaderEcho)
+		if err != nil {
+			return nil, err
+		}
+		javaClassBuilder := javaclassparser.NewClassObjectBuilder(obj)
+		javaClassBuilder.SetParam("aukey", cf.HeaderKeyAu)
+		javaClassBuilder.SetParam("auval", cf.HeaderValAu)
+		javaClassBuilder.SetParam("key", cf.HeaderKey)
+		javaClassBuilder.SetParam("val", cf.HeaderVal)
+		if len(javaClassBuilder.GetErrors()) > 0 {
+			log.Error(javaClassBuilder.GetErrors()[0])
+			return nil, javaClassBuilder.GetErrors()[0]
+		}
+		return obj, nil
+	})
 }
 
 type GenClassOptionFun func(config *ClassConfig)
@@ -622,6 +653,8 @@ func SetHeader(key string, val string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.HeaderKey = key
 		config.HeaderVal = val
+		config.HeaderKeyAu = "Accept-Language"
+		config.HeaderValAu = "zh-CN,zh;q=1.9"
 	}
 }
 func SetParam(val string) GenClassOptionFun {
@@ -756,4 +789,45 @@ func GenMultiEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cla
 	config := NewClassConfig(options...)
 	config.ClassType = MultiEchoClass
 	return config.GenerateClassObject()
+}
+
+// HeaderEchoClass
+func SetClassHeaderEchoTemplate() GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.ClassType = HeaderEchoClass
+	}
+}
+
+func SetHeaderEchoEvilClass() GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.ClassType = HeaderEchoClass
+	}
+}
+func GenHeaderEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	config := NewClassConfig(options...)
+	config.ClassType = HeaderEchoClass
+	return config.GenerateClassObject()
+}
+
+// SleepClass
+func SetClassSleepTemplate() GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.ClassType = SleepClass
+	}
+}
+
+func SetSleepEvilClass() GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.ClassType = SleepClass
+	}
+}
+func GenSleepClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
+	config := NewClassConfig(options...)
+	config.ClassType = SleepClass
+	return config.GenerateClassObject()
+}
+func SetSleepTime(time int) GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.SleepTime = time
+	}
 }
