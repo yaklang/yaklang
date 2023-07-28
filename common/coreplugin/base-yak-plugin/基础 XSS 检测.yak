@@ -59,9 +59,9 @@ specialAttrPayload = func(attrName, verifyRandStr) {
     payload = ""
 
     if attrName == "STYLE" {
-        payload = sprintf("xss: expression(prompt(\"%s\"))", verifyRandStr)
+        payload = sprintf("xss: expression(prompt(`%s`))", verifyRandStr)
     } else {
-        payload = sprintf("prompt('%s')", verifyRandStr)
+        payload = sprintf("prompt(`%s`)", verifyRandStr)
     }
 
     return payload
@@ -97,6 +97,7 @@ xssLog = func(result) {
     risk.NewRisk(
         url,
         risk.title(sprintf("XSS for: %v", url)),
+        risk.titleVerbose(sprintf("检测到xss漏洞: %v", url)),
         risk.details(report),
         risk.description(`XSS 是一种常见的网站安全漏洞，它允许攻击者注入恶意脚本到网页中，然后在其他用户的浏览器上执行。这种攻击发生在用户浏览器端，攻击者可以利用这种漏洞窃取用户信息，如 cookie、session tokens、或其他敏感信息。
 
@@ -161,6 +162,7 @@ Rawfuzz = func(param, fuzzPayload) {
 
     return rsp.Response, reqBody, respBody
 }
+
 
 payloadFuzzTask = func(swg, resultCh, url, param, verifyRandStr, payload) {
     swg.Add()
@@ -284,13 +286,18 @@ paramFuzzTask = func(threads, url, param) {
                     if randStrIndex < 0{
                         break
                     }
-                    chr = string(matchText[randStrIndex])
-                    if chr == "=" {
+                    chr = matchText[randStrIndex]
+                    if chr == '=' {
                         break
-                    } elif chr == "\"" {
-                        quote = "\""
-                    }elif chr == "'" {
-                        quote = "'"
+                    } elif chr == '"' {
+                        quote = `"`
+                        break
+                    } elif chr == '\'' {
+                        quote = `'`
+                        break
+                    } elif chr == '`' {
+                        quote = "`"
+                        break
                     }
                 }
 
@@ -422,9 +429,7 @@ mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
     checkErr(err)
 
     // 获取参数，包含post json、post form、get参数、cookie参数 路径参数（会自动过滤PHPSESSID、_ga、_gid等参数）
-    
-    params = freq.GetCommonParams()
-    
+    params = freq.GetCommonParams()    
 
     if pathDetect {
         pathAppendParams = freq.GetPathAppendParams()
