@@ -37,9 +37,15 @@ for req in reqs {
     go fn {
         defer swg.Done()
         try {
-            println(string(req.RawHTTPRequest))
-            rsp, reqRaw := poc.HTTP(req.RawHTTPRequest, poc.https(req.IsHttps))~
+            rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
+            rsp = rspIns.RawPacket
+            reqRaw = rspIns.RedirectRawPackets[-1].Request
+            println("---------------------")
+            println(string(reqRaw))
+            println(string(rsp))
+            println("---------------------")
             isHttps = req.IsHttps
+
             u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
             header, body = poc.Split(rsp)~
             caller.MirrorHTTPFlow(isHttps, u.String(), reqRaw, rsp, body)
