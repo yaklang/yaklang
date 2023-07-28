@@ -22,3 +22,30 @@ func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 	f.emit(ret)
 	return ret
 }
+
+func (f *Function) emitIf(cond Value) *If {
+	ifssa := &If{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		Cond: cond,
+	}
+	cond.AddUser(ifssa)
+	f.emit(ifssa)
+	return ifssa
+}
+
+func (f *Function) emitJump(to *BasicBlock) *Jump {
+	j := &Jump{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		To: to,
+	}
+	f.currentBlock.AddSucc(to)
+	f.emit(j)
+	return j
+}
+
