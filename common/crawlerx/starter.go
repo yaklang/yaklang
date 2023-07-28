@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -133,23 +132,12 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 
 func (starter *BrowserStarter) startBrowser() error {
 	starter.browser = rod.New()
-	leakless := starter.baseConfig.leakless
 	if starter.browserConfig.wsAddress == "" {
 		launch := launcher.New()
 		if starter.browserConfig.exePath != "" {
 			launch = launch.Bin(starter.browserConfig.exePath)
 		}
-		if starter.browserConfig.proxyAddress != nil {
-			launch = launch.Set(flags.ProxyServer, starter.browserConfig.proxyAddress.String())
-		}
-		launch = launch.NoSandbox(true).Headless(true)
-		if leakless == "default" {
-			if strings.Contains(runtime.GOOS, "windows") {
-				launch = launch.Leakless(false)
-			}
-		} else if leakless == "false" {
-			launch = launch.Leakless(false)
-		}
+		launch = starter.doLauncher(launch)
 		controlUrl, err := launch.Launch()
 		if err != nil {
 			return utils.Errorf(`Launcher launch error: %s`, err)
@@ -162,17 +150,7 @@ func (starter *BrowserStarter) startBrowser() error {
 		}
 		launcherCtx := context.Background()
 		launch = launch.Context(launcherCtx)
-		if starter.browserConfig.proxyAddress != nil {
-			launch = launch.Proxy(starter.browserConfig.proxyAddress.String())
-		}
-		launch = launch.NoSandbox(true).Headless(true)
-		if leakless == "default" {
-			if strings.Contains(runtime.GOOS, "windows") {
-				launch = launch.Leakless(false)
-			}
-		} else if leakless == "false" {
-			launch = launch.Leakless(false)
-		}
+		launch = starter.doLauncher(launch)
 		serviceUrl, header := launch.ClientHeader()
 		client, err := cdp.StartWithURL(launcherCtx, serviceUrl, header)
 		if err != nil {
@@ -194,6 +172,18 @@ func (starter *BrowserStarter) startBrowser() error {
 	starter.pageActionGenerator()
 	starter.pageDetectEventGenerator()
 	return nil
+}
+
+func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launcher {
+	if starter.browserConfig.proxyAddress != nil {
+		l = l.Proxy(starter.browserConfig.proxyAddress.String())
+	}
+	l = l.NoSandbox(true).Headless(true)
+	if (starter.baseConfig.leakless == "default" && strings.Contains(runtime.GOOS, "windows")) ||
+		starter.baseConfig.leakless == "false" {
+		l = l.Leakless(false)
+	}
+	return l
 }
 
 func (starter *BrowserStarter) pageActionGenerator() {
