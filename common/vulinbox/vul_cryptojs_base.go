@@ -51,6 +51,20 @@ func (s *VulinServer) registerCryptoJS() {
 	var isLogined = func(loginUser, loginPass string) bool {
 		return loginUser == username && loginPass == password
 	}
+	var isLoginedFromRaw = func(i any) bool {
+		var params = make(map[string]any)
+		switch i.(type) {
+		case string:
+			params = utils.ParseStringToGeneralMap(i)
+		case []byte:
+			params = utils.ParseStringToGeneralMap(i)
+		default:
+			params = utils.InterfaceToGeneralMap(i)
+		}
+		username := utils.MapGetString(params, "username")
+		password := utils.MapGetString(params, "password")
+		return isLogined(username, password)
+	}
 	var renderLoginSuccess = func(writer http.ResponseWriter, loginUsername, loginPassword string, fallback []byte, success ...[]byte) {
 		if loginUsername != username || loginPassword != password {
 			writer.WriteHeader(403)
@@ -122,8 +136,8 @@ func (s *VulinServer) registerCryptoJS() {
 					"initcode": "var iv = CryptoJS.lib.WordArray.random(128/8);",
 					`extrakv`:  "iv: iv.toString(),",
 					"title":    "AES 加密",
-					"key":      `"abcdabcdabcdabcd"`,
-					"info":     "默认使用 CryptoJS.AES.encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
+					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":     "默认使用 CryptoJS.AES(CBC).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
 					"encrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
 					"decrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
 				})
@@ -138,7 +152,12 @@ func (s *VulinServer) registerCryptoJS() {
 					return
 				}
 				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
-				keyPlain := utils.MapGetString(params, "key")
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
 				dataBase64D := utils.MapGetString(params, "data")
 				ivHex := utils.MapGetString(params, "iv")
 				dataRaw, err := codec.DecodeBase64(dataBase64D)
@@ -148,16 +167,23 @@ func (s *VulinServer) registerCryptoJS() {
 				}
 				ivRaw, err := codec.DecodeHex(ivHex)
 				if err != nil {
-					Failed(writer, request, "decode hex failed: %v", err)
+					Failed(writer, request, "iv decode hex failed: %v", err)
 					return
 				}
-				spew.Dump(dataRaw, ivRaw, keyPlain)
 				dec, err := codec.AESCBCDecrypt([]byte(keyPlain), dataRaw, ivRaw)
 				if err != nil {
 					Failed(writer, request, "decrypt failed: %v", err)
 					return
 				}
-				DefaultRender(`<h1>解密成功{`+string(dec)+`}</h1>`, writer, request)
+				var blocks []string
+				blocks = append(blocks, block("解密前端内容成功", string(dec)))
+				if isLoginedFromRaw(dec) {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(dataBase64D)))
+				}
+
+				DefaultRender(BlockContent(blocks...), writer, request)
 			},
 		},
 		{
