@@ -12,7 +12,7 @@ func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.D
 	engine := New()
 	engine.ImportLibs(buildinLib)
 	// engine
-	Import("sleep", func(i int) {
+	Import("test_debugger_sleep", func(i int) {
 		time.Sleep(time.Duration(i) * time.Second)
 	})
 	engine.SetDebugMode(true)
@@ -54,7 +54,7 @@ func TestDebugger_Async(t *testing.T) {
 a = 1
 print(2)
 }
-sleep(1)`
+test_debugger_sleep(1)`
 	in := false
 	init := func(g *yakvm.Debugger) {
 		g.SetNormalBreakPoint(3)
