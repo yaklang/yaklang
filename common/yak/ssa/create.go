@@ -46,15 +46,17 @@ func (p *Package) NewFunction(name string) *Function {
 	return f
 }
 
-func (f *Function) newBasicBlock(comment string) *BasicBlock {
+func (f *Function) newBasicBlock(name string) *BasicBlock {
 	index := len(f.Blocks)
-	if comment != "" {
-		comment = fmt.Sprintf("%s%d", comment, index)
+	if name != "" {
+		name = fmt.Sprintf("%s%d", name, index)
+	} else {
+		name = fmt.Sprintf("b%d", index)
 	}
 	b := &BasicBlock{
-		Comment: comment,
-		Index:   index,
-		Parent:  f,
+		Name:   name,
+		Index:  index,
+		Parent: f,
 	}
 	f.Blocks = append(f.Blocks, b)
 	return b

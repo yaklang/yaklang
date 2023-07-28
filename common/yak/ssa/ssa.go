@@ -84,8 +84,8 @@ type Function struct {
 
 // implement Value
 type BasicBlock struct {
-	Index   int
-	Comment string
+	Index int
+	Name  string
 	// function
 	Parent *Function
 	// basicblock graph
@@ -244,20 +244,12 @@ func (f *Function) String() string {
 
 func (f *Function) GetUser() []User { return f.user }
 
-func (b BasicBlock) Name() string {
-	if b.Comment != "" {
-		return b.Comment
-	} else {
-		return fmt.Sprintf("b%d", b.Index)
-	}
-}
-
 func (b BasicBlock) String() string {
-	ret := b.Name() + ":"
+	ret := b.Name + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
 		for _, pred := range b.Preds {
-			ret += pred.Name() + " "
+			ret += pred.Name + " "
 		}
 	}
 	return ret
@@ -284,7 +276,7 @@ func (p Phi) StringByFunc(getStr func(Value) string) string {
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
-		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.Name())
+		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.Name)
 	}
 	return ret
 }
@@ -337,7 +329,7 @@ func (i If) String() string {
 	return i.StringByFunc(DefaultValueString)
 }
 func (i If) StringByFunc(getStr func(Value) string) string {
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name(), i.False.Name())
+	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
 }
 
 func (i *If) GetUser() []User { return i.user }
@@ -358,7 +350,7 @@ func (j Jump) String() string {
 }
 
 func (j Jump) StringByFunc(_ func(Value) string) string {
-	return fmt.Sprintf("jump -> %s", j.To.Name())
+	return fmt.Sprintf("jump -> %s", j.To.Name)
 }
 
 func (j *Jump) GetUser() []User { return nil }

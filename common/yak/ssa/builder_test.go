@@ -40,19 +40,19 @@ func CheckProgram(t *testing.T, prog *Program) {
 
 			for i, b := range f.Blocks {
 				if b.Parent != f {
-					t.Fatalf("fatal basic block %s[%d] error pointer to function", b.Comment, i)
+					t.Fatalf("fatal basic block %s[%d] error pointer to function", b.Name, i)
 				}
 
 				// CFG check
 				for _, succ := range b.Succs {
 					if !slices.Contains(succ.Preds, b) {
-						t.Fatalf("fatal block success %s not't have it %s in pred", succ.Comment, b.Comment)
+						t.Fatalf("fatal block success %s not't have it %s in pred", succ.Name, b.Name)
 					}
 				}
 
 				for _, pred := range b.Preds {
 					if !slices.Contains(pred.Succs, b) {
-						t.Fatalf("fatal block pred %s not't have it %s in succs", pred.Comment, b.Comment)
+						t.Fatalf("fatal block pred %s not't have it %s in succs", pred.Name, b.Name)
 					}
 				}
 
