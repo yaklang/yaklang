@@ -1,0 +1,175 @@
+newResult = func( url, reqRaw, respRaw) {
+    return { "url": url,   "reqRaw": reqRaw, "respRaw": respRaw }
+}
+
+//checkErr 检查错误并退出
+checkErr = func(err) {
+    if err != nil {
+        yakit.Output(sprintf("csrf-DETECT error: %s", err))
+        os.Exit(1)
+    }
+}
+
+csrfLog = func(result){
+    url = result.url
+    reqRaw = result.reqRaw
+    respRaw = result.respRaw
+    msg = "This page may contain a form without CSRF protection."
+
+    report = {"message": msg, url:url}
+    yakit.Output(report)
+    risk.NewRisk(
+            url,
+            risk.title(sprintf("csrf for: %v", url)),
+            risk.details(report),
+            risk.type("csrf"),
+            risk.request(reqRaw),
+            risk.response(respRaw),
+            risk.severity("low"),
+    )
+}
+
+corsLog = func(result){
+    url = result.url
+    reqRaw = result.reqRaw
+    respRaw = result.respRaw
+    msg = "CORS configuration insecure"
+
+    report = {"message": msg, url:url}
+    yakit.Output(report)
+    risk.NewRisk(
+            url,
+            risk.title(sprintf("cors unsafe for: %v", url)),
+            risk.details(report),
+            risk.type("cors"),
+            risk.request(reqRaw),
+            risk.response(respRaw),
+            risk.severity("info"),
+    )
+}
+
+csrf_Detect =  func(url,req,rsp,body,ishttps){
+    lowHttpRsp,_,err = poc.HTTPEx(req, [poc.deleteHeader("Cookie"),poc.https(ishttps)]...)
+    checkErr(err)
+    rspWithoutCookie = lowHttpRsp.RedirectRawPackets[0]
+
+    phtml, err = xpath.LoadHTMLDocument(body)
+    checkErr(err)
+    html, err = xpath.LoadHTMLDocument(poc.GetHTTPPacketBody(rspWithoutCookie))
+    checkErr(err)
+    pforms = xpath.Find(phtml,"//form")
+    forms = xpath.Find(html,"//form")
+
+
+
+    dforms = []
+    for pform in pforms{
+        flag = true
+        for form in forms{
+            if formCompare(pform,form){
+                flag = false
+                break
+            }
+        }
+        if flag{
+            dforms.Append(pform)
+        }
+    }
+
+    for form in dforms{
+        formCheck(url,req,rsp,form)
+    }
+
+}
+
+formCompare = func(pform,form){
+    paction = xpath.SelectAttr(pform,"action")
+    action = xpath.SelectAttr(form,"action")
+    if paction != action {
+        return false
+    }
+
+    pinputs = xpath.Find(pform, "//input")
+    inputs = xpath.Find(form, "//input")
+    if len(pinputs) != len(inputs){
+        return false
+    }
+
+    for i = 0; i < len(pinputs);i++ {
+        if xpath.SelectAttr(pinputs[i],"name") != xpath.SelectAttr(inputs[i],"name"){
+            return false
+        }
+    }
+
+    return true
+}
+
+paramBlackList = ["token","csrf","xsrf","tkn"]
+submitBlackList = ["login","register","search","登录","注册","搜索"]
+
+
+formCheck = func(url,req,rsp,form){
+    //检测是否是受js控制的表单 ， 没有action，且有id
+    action = xpath.SelectAttr(form,"action")
+    id = xpath.SelectAttr(form,"id")
+    if action == "" && id != ""{
+        return
+    }
+
+    inputs = xpath.Find(form, "//input")
+
+    for input in inputs{
+        if xpath.SelectAttr(input,"type") != "hidden"{
+            continue
+        }
+        for name in paramBlackList{
+            yakit.Output(xpath.SelectAttr(input,"name"))
+            if str.Contains(xpath.SelectAttr(input,"name"),name){
+                return
+            }
+        }
+    }
+    interHtml =  xpath.OutputHTML(form)
+    for name in submitBlackList{
+        if str.Contains(interHtml,name){
+            return
+        }
+    }
+    csrfLog(newResult(url,req,rsp))
+}
+
+corsCheck = func(ishttps,req,rsp,url){
+    //检查是否为跨域请求以及请求是否有效
+    if poc.GetStatusCodeFromResponse(rsp) != 200 || poc.GetHTTPPacketHeaders(req)["Origin"] == nil {
+        return
+    }
+    headers = poc.GetHTTPPacketHeaders(rsp)
+    if headers["Access-Control-Allow-Origin"] == nil || headers["Content-Length"] == 0 {
+        return
+    }
+    if headers["Access-Control-Allow-Origin"] == "*"{
+        corsLog(newResult(url,req,rsp))
+    }
+
+    domain = str.RandStr(5)+".example.com"
+    lowHttp,_,err = poc.HTTPEx(req, poc.replaceHeader("Origin", domain))
+    checkErr(err)
+    newHeaders = poc.GetHTTPPacketHeaders(lowHttp.RedirectRawPackets.Response[0])
+    if newHeaders["Access-Control-Allow-Origin"] != nil{
+        if str.Contains(newHeaders["Access-Control-Allow-Origin"] ,domain){
+            corsLog(newResult(url,req,rsp))
+        }
+    }
+
+}
+
+mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
+
+    corsCheck(ishttps,req,rsp,url)
+
+    if  len(headers["Content-Type"]) == 0 || !str.Contains(headers["Content-Type"][0],"html"){
+        return
+    }
+
+    csrf_Detect(url, req, rsp, body, ishttps)
+}
