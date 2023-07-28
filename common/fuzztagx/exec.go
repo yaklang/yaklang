@@ -5,7 +5,7 @@ func ExecuteWithStringHandler(source string, param map[string]BuildInTagFun) ([]
 	if err != nil {
 		return nil, err
 	}
-	generator := NewGenerator(res)
+	generator := NewGenerator(&GeneratorContext{}, res)
 	result := []string{}
 	for {
 		s, ok := generator.Generate()
