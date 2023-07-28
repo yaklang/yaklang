@@ -1,12 +1,13 @@
 package xhtml
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var fillings = []string{"%09", "%0a", "%0d", "/+/"}
@@ -91,19 +92,21 @@ func MatchBetween(srcBody interface{}, start string, end string, max int) (int, 
 }
 func RandomUpperAndLower(s string) string {
 	last := _RandomUpperAndLower(s)
-	for last == s {
+	count := 0
+	for last == s && count < 10 {
 		last = _RandomUpperAndLower(s)
+		count++
 	}
 	return last
 }
 func _RandomUpperAndLower(s string) string {
 	bs := []byte(s)
 	for i := 0; i < len(bs); i++ {
-		if bs[i] > 'a' && bs[i] < 'z' {
+		if bs[i] >= 'a' && bs[i] <= 'z' {
 			if rand.Intn(2) == 1 {
 				bs[i] -= uint8(uint8('a') - uint8('A'))
 			}
-		} else if bs[i] > 'A' && bs[i] < 'Z' {
+		} else if bs[i] >= 'A' && bs[i] <= 'Z' {
 			if rand.Intn(2) == 1 {
 				bs[i] += uint8(uint8('a') - uint8('A'))
 			}
