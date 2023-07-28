@@ -84,9 +84,10 @@ func (s *ExpressionNode) Reset() {
 
 // FuzzTag/ExpressionTag
 type Tag struct {
-	IsExpTag  bool
-	Nodes     []Node
-	generator *Generator
+	IsExpTag        bool
+	Nodes           []Node
+	generator       *Generator
+	backpropagation func(s string)
 }
 
 func (f *Tag) Strings() []string {
@@ -107,15 +108,16 @@ func (s *Tag) Reset() {
 
 // FuzzTagMethod
 type FuzzTagMethod struct {
-	cache     *[]string
-	name      string
-	label     string
-	isDyn     bool
-	isRep     bool
-	params    []Node
-	funTable  *map[string]BuildInTagFun
-	generator *Generator
-	index     int
+	cache           *[]string
+	name            string
+	label           string
+	isDyn           bool
+	isRep           bool
+	params          []Node
+	funTable        *map[string]BuildInTagFun
+	generator       *Generator
+	index           int
+	backpropagation func(s string)
 }
 
 func (f *FuzzTagMethod) Strings() []string {
@@ -187,16 +189,33 @@ func (s *FuzzTagMethod) Reset() {
 	}
 }
 
+type GeneratorContext struct {
+}
 type Generator struct {
 	container []string
 	//index     int
 	data  []Node
 	first bool
+	ctx   *GeneratorContext
 }
 
 func NewGenerator(nodes []Node) *Generator {
 	g := &Generator{data: nodes, container: make([]string, len(nodes)), first: true}
 	for index, d := range g.data {
+		switch ret := d.(type) {
+		case *Tag:
+			ret.backpropagation = func(index int) func(s string) {
+				return func(s string) {
+					g.container[index] = s
+				}
+			}(index)
+		case *FuzzTagMethod:
+			ret.backpropagation = func(index int) func(s string) {
+				return func(s string) {
+					g.container[index] = s
+				}
+			}(index)
+		}
 		s, _ := d.GenerateOne()
 		g.container[index] = s
 	}

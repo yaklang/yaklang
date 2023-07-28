@@ -15,7 +15,7 @@ func TestExec(t *testing.T) {
 			return strings.Split(s, "|")
 		},
 	}
-	a, err := ExecuteWithStringHandler(`a{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err := ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
