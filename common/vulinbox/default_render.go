@@ -3,6 +3,7 @@ package vulinbox
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
+	"strings"
 )
 
 const defaultRenderPage = `<!doctype html>
@@ -13,7 +14,20 @@ const defaultRenderPage = `<!doctype html>
     <meta charset="utf-8" />
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+	<style>
+	.code-style {
+		width: 100%; /* 设置宽度 */
+		background-color: #f8f8f8; /* 设置背景颜色 */
+		border: 1px solid #ccc; /* 设置边框 */
+		padding: 10px; /* 设置内边距 */
+		font-family: "Courier New", monospace; /* 设置字体 */
+		white-space: pre-wrap; /* 保留空白和换行 */
+		overflow-x: auto; /* 如果内容超出宽度，显示滚动条 */
+	}
+	</style>
+
     <style type="text/css">
+
     body {
         background-color: #f0f0f2;
         margin: 0;
@@ -61,4 +75,15 @@ func DefaultRenderEx(override bool, innerHtml any, writer http.ResponseWriter, r
 		page = defaultRenderPage
 	}
 	unsafeTemplateRender(writer, request, page, params)
+}
+
+func block(title string, text string) string {
+	raw, _ := unsafeTemplate(`<h2>{{ .title }}</h2> <br> <p class='code-style'>{{ .text }}</p> <br><br>`, map[string]any{
+		"title": title, "text": text,
+	})
+	return string(raw)
+}
+
+func BlockContent(i ...string) string {
+	return strings.Join(i, "<br>")
 }
