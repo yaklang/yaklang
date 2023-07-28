@@ -149,6 +149,7 @@ func (s *VulinServer) init() {
 	s.registerCryptoJS()
 	s.registerCryptoSM()
 	s.registerUploadCases()
+	s.registerFastjson()
 	s.registerCsrf()
 
 	// 业务型
