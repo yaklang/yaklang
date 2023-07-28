@@ -65,7 +65,8 @@ var Exports = map[string]interface{}{
 	"GenerateTcpReverseShellEvilClassObject":           GenTcpReverseShellClassObject,
 	"GenerateTomcatEchoClassObject":                    GenTomcatEchoClassObject,
 	"GenerateMultiEchoClassObject":                     GenMultiEchoClassObject,
-
+	"GenerateHeaderEchoClassObject":                    GenHeaderEchoClassObject,
+	"GenerateSleepClassObject":                         GenSleepClassObject,
 	// bytes class
 	"useBytesEvilClass":         SetBytesEvilClass,
 	"useBytesClass":             SetClassBytes,
@@ -105,7 +106,14 @@ var Exports = map[string]interface{}{
 	// tcp reverse shell template
 	"useTcpReverseShellTemplate":  SetClassTcpReverseShellTemplate,
 	"useTcpReverseShellEvilClass": SetTcpReverseShellEvilClass,
-
+	// header echo template
+	"useHeaderEchoTemplate":  SetClassHeaderEchoTemplate,
+	"useHeaderEchoEvilClass": SetHeaderEchoEvilClass,
+	"useHeaderParam":         SetHeader,
+	// sleep template
+	"useSleepTemplate":  SetClassSleepTemplate,
+	"useSleepEvilClass": SetSleepEvilClass,
+	"useSleepTime":      SetSleepTime,
 	// 其他设置
 	"useConstructorExecutor":       SetConstruct, // 使用构造器执行
 	"evilClassName":                SetClassName, // className
