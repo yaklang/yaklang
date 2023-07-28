@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"html/template"
 	"net/http"
 	"net/http/httputil"
 	"regexp"
 	textTemp "text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func unsafeTemplate(html string, params map[string]any) ([]byte, error) {
@@ -720,7 +721,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 						Name:  "xCname",
 						Value: "UserAdmin",
 					})
-					writer.Header().Set("Location", "/cookie/name?skip=1")
+					writer.Header().Set("Location", "/xss/cookie/name?skip=1")
 					writer.WriteHeader(302)
 					return
 				}
@@ -771,7 +772,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 		{
 			DefaultQuery: "",
 			Path:         "/cookie/b64/name",
-			Title:        "Cookie 中的 XSS（Base64）",
+			Title:        "Cookie 中的 XSS（Base64-json）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, _ := utils.HttpDumpWithBody(request, true)
 				xCname := lowhttp.GetHTTPPacketCookieFirst(raw, "xCnameB64")
@@ -782,7 +783,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 						Name:  "xCnameB64",
 						Value: codec.EncodeBase64("OrdinaryUser"),
 					})
-					writer.Header().Set("Location", "/cookie/b64/name?skip=1")
+					writer.Header().Set("Location", "/xss/cookie/b64/name?skip=1")
 					writer.WriteHeader(302)
 					return
 				}
@@ -847,7 +848,7 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 						Name:  "xCnameB64J",
 						Value: codec.EncodeBase64(utils.Jsonify(map[string]any{"name": "xCnameB64J-OrdinaryUser"})),
 					})
-					writer.Header().Set("Location", "/cookie/b64/json/name?skip=1")
+					writer.Header().Set("Location", "/xss/cookie/b64/json/name?skip=1")
 					writer.WriteHeader(302)
 					return
 				}
