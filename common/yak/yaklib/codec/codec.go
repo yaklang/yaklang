@@ -11,14 +11,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/DataDog/mmh3"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
-	"github.com/saintfish/chardet"
-	"github.com/yaklang/yaklang/common/gmsm/sm3"
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"html"
 	"io"
 	"io/ioutil"
@@ -29,6 +21,15 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/DataDog/mmh3"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/errors"
+	"github.com/saintfish/chardet"
+	"github.com/yaklang/yaklang/common/gmsm/sm3"
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 var QueryUnescape = url.QueryUnescape
@@ -472,19 +473,21 @@ func HTTPChunkedEncode(raw []byte) []byte {
 
 func RandomUpperAndLower(s string) string {
 	last := _RandomUpperAndLower(s)
-	for last == s {
+	count := 0
+	for last == s && count < 10 {
 		last = _RandomUpperAndLower(s)
+		count++
 	}
 	return last
 }
 func _RandomUpperAndLower(s string) string {
 	bs := []byte(s)
 	for i := 0; i < len(bs); i++ {
-		if bs[i] > 'a' && bs[i] < 'z' {
+		if bs[i] >= 'a' && bs[i] <= 'z' {
 			if rand.Intn(2) == 1 {
 				bs[i] -= uint8(uint8('a') - uint8('A'))
 			}
-		} else if bs[i] > 'A' && bs[i] < 'Z' {
+		} else if bs[i] >= 'A' && bs[i] <= 'Z' {
 			if rand.Intn(2) == 1 {
 				bs[i] += uint8(uint8('a') - uint8('A'))
 			}
