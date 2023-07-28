@@ -1,6 +1,9 @@
 package javaclassparser
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type ClassObjectBuilder struct {
 	Errors   []error
@@ -26,5 +29,15 @@ func (c *ClassObjectBuilder) SetValue(old, new string) *ClassObjectBuilder {
 		return c
 	}
 	constant.Value = new
+	return c
+}
+func (c *ClassObjectBuilder) SetParam(k, v string) *ClassObjectBuilder {
+	old := fmt.Sprintf("{{%s}}", k)
+	constant := c.classObj.FindConstStringFromPool(old)
+	if constant == nil {
+		c.NewError("Can't find constant string " + old)
+		return c
+	}
+	constant.Value = v
 	return c
 }
