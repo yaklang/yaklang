@@ -112,6 +112,8 @@ type Phi struct {
 	anInstruction
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	user []User
+	// for build
+	variable string
 }
 
 // implement Value
@@ -276,6 +278,9 @@ func (p Phi) StringByFunc(getStr func(Value) string) string {
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
+		if v == nil {
+			continue
+		}
 		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.Name)
 	}
 	return ret

@@ -520,25 +520,87 @@ if a > 2 {
 }
 d = a + 3
 		`
-		prog := parseSSA(src)
-		CheckProgram(t, prog)
-		// showProg(prog)
 		ir := `
 yak-main
 entry0:
-        %0 = 5 gt 2
-        %1 = If [%0] true -> b2, false -> b3
-done1: <- b2 b3
-        %3 = phi [%4, b2] [%6, b3]
-        %2 = %3 add 3
-b2: <- entry0
-        %4 = 5 add 6
-        %5 = jump -> done1
-b3: <- entry0
-        %6 = 5 add 7
-        %7 = jump -> done1
+	%0 = 5 gt 2
+	%1 = If [%0] true -> true2, false -> false3
+done1: <- true2 false3
+	%3 = phi [%4, true2] [%6, false3]
+	%2 = %3 add 3
+true2: <- entry0
+	%4 = 5 add 6
+	%5 = jump -> done1
+false3: <- entry0
+	%6 = 5 add 7
+	%7 = jump -> done1
 		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
+	// test trivial phi
+
+	// shoud no phi instruction
+	t.Run("Phi_IFelse_notmerge", func(t *testing.T) {
+		src := `
+a = 5 + 3
+if a > 2 {
+	b = a + 7 
+} else {
+	c = a + 6
+}
+d = a + 3
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 add 3
+	%1 = %0 gt 2
+	%2 = If [%1] true -> true2, false -> false3
+done1: <- true2 false3
+	%3 = %0 add 3
+true2: <- entry0
+	%4 = %0 add 7
+	%5 = jump -> done1
+false3: <- entry0
+	%6 = %0 add 6
+	%7 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+	t.Run("Phi_IFelse_notmerge2", func(t *testing.T) {
+		src := `
+a = 5
+if a > 2 {
+	b = a + 7 
+} else {
+	c = a + 6
+}
+d = a + 3
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 gt 2
+	%1 = If [%0] true -> true2, false -> false3
+done1: <- true2 false3
+	%2 = 5 add 3
+true2: <- entry0
+	%3 = 5 add 7
+	%4 = jump -> done1
+false3: <- entry0
+	%5 = 5 add 6
+	%6 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
 }
