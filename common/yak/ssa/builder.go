@@ -135,54 +135,82 @@ func (f *Function) assig(lv string, rvalue Value) {
 	f.wirteVariable(lv, rvalue)
 }
 
-func (f *Function) builBlock(block *yak.BlockContext, done *BasicBlock) *BasicBlock {
-	b := f.newBasicBlock("")
-	f.currentBlock.AddSucc(b)
-	backup := f.currentBlock
-
-	f.currentBlock = b
+func (f *Function) buildBlock(block *yak.BlockContext) {
 	f.buildStatementList(block.StatementList().(*yak.StatementListContext))
-	j := &Jump{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		To: done,
-	}
-	b.AddSucc(done)
-	f.emit(j)
-
-	f.currentBlock = backup
-	return b
 }
 
-func (f *Function) buildIfStmt(state *yak.IfStmtContext) {
+func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
+	// condition
 	cond := f.buildExpressionStatmt(state.Expression(0).(*yak.ExpressionContext))
-
-	ifssa := &If{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		Cond: cond,
+	// if instruction
+	ifssa := f.emitIf(cond)
+	if done == nil {
+		done = f.newBasicBlock("done")
 	}
-	cond.AddUser(ifssa)
-	done := f.newBasicBlock("done")
-	// then block
-	trueBlock := f.builBlock(state.Block(0).(*yak.BlockContext), done)
-	ifssa.True = trueBlock
 
-	elseStmt := state.ElseBlock().(*yak.ElseBlockContext)
-	elseblock := elseStmt.Block()
-	elifstmt := elseStmt.IfStmt()
-	if elseblock != nil {
-		falseBlock := f.builBlock(elseblock.(*yak.BlockContext), done)
-		ifssa.False = falseBlock
-		f.emit(ifssa)
-	} else if elifstmt != nil {
-		//...
+	// create true block
+	trueBlock := f.newBasicBlock("true")
+	ifssa.AddTrue(trueBlock)
+
+	// build true block
+	f.currentBlock = trueBlock
+	f.buildBlock(state.Block(0).(*yak.BlockContext))
+	f.emitJump(done)
+
+	// handler "elif"
+	previf := ifssa
+	// add elif block to prev-if false
+	for index := range state.AllElif() {
+		// create false block
+		if previf.False == nil {
+			previf.AddFalse(f.newBasicBlock("elif"))
+		}
+		// in false block
+		f.currentBlock = previf.False
+		// build condition
+		cond := f.buildExpressionStatmt(state.Expression(index + 1).(*yak.ExpressionContext))
+		// if instruction
+		currentif := f.emitIf(cond)
+		// create true block
+		trueBlock := f.newBasicBlock("true")
+		currentif.AddTrue(trueBlock)
+		// build true block
+		f.currentBlock = trueBlock
+		f.buildBlock(state.Block(index + 1).(*yak.BlockContext))
+		// jump to done
+		f.emitJump(done)
+		// for next elif
+		previf = currentif
+	}
+
+	// hanlder "else" and "else if "
+	iElseStmt := state.ElseBlock()
+	if iElseStmt != nil {
+		elseStmt := iElseStmt.(*yak.ElseBlockContext)
+		elseblock := elseStmt.Block()
+		elifstmt := elseStmt.IfStmt()
+		if elseblock != nil {
+			// "else"
+			// create false block
+			falseBlock := f.newBasicBlock("false")
+			previf.AddFalse(falseBlock)
+
+			// build false block
+			f.currentBlock = falseBlock
+			f.buildBlock(elseblock.(*yak.BlockContext))
+			f.emitJump(done)
+		} else if elifstmt != nil {
+			// "else if"
+			// create elif block
+			elifBlock := f.newBasicBlock("elif")
+			previf.AddFalse(elifBlock)
+
+			// build elif block
+			f.currentBlock = elifBlock
+			f.buildIfStmt(elifstmt.(*yak.IfStmtContext), done)
+		}
 	} else {
-
+		previf.AddFalse(done)
 	}
 	f.currentBlock = done
 }
@@ -202,7 +230,7 @@ func (f *Function) buildStatement(state *yak.StatementContext) {
 		if !ok {
 			return
 		}
-		f.buildIfStmt(s)
+		f.buildIfStmt(s, nil)
 	}
 
 }
