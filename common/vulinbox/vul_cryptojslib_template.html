@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>前端加密登陆- {{.title}}</title>
+
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <script>
+        function handle404(event) {
+            console.error(event.target.src + " not found")
+        }
+    </script>
+    <script src="/static/js/cryptojs_4.0.0/core.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/enc-base64.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/md5.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/evpkdf.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/cipher-core.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/aes.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/pad-pkcs7.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/mode-ecb.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/enc-utf8.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/enc-hex.min.js" onerror="handle404(event)"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="mt-4"> 后端管理登陆 </h1>
+    {{ if .info }}
+    <div class="alert alert-info">
+        {{ .info }}
+    </div>
+    {{ end }}
+    <form id="json-form" class="mt-4">
+        <div class="mb-3">
+            <label for="username" class="form-label">UserName</label>
+            <input id="username" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" class="form-control" type="text">
+        </div>
+        <div class="mb-3">
+            <label for="age" class="form-label">Age</label>
+            <input id="age" class="form-control" type="text">
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <div class="mt-4">
+        <h2>加密前后表单数据</h2>
+    </div>
+    <pre id="input" class="mt-2"></pre>
+    <br>
+    <pre id="encrypt" class="mt-2" style="width: 600px; word-wrap: break-word"></pre>
+</div>
+
+<script>
+    {{ if .initcode }}
+    {{.initcode}}
+    {{ end }}
+
+    function generateKey() {
+        return {{ if .key }} {{ .key}} {{ else }} CryptoJS.enc.Utf8.parse("1234123412341234") {{ end }} // 十六位十六进制数作为密钥
+    }
+
+    const key = generateKey()
+
+    // 解密方法
+    function Decrypt(word) {
+        return {{ if .decrypt }} {{.decrypt}} {{else}} CryptoJS.AES.decrypt(word, key).toString() {{end}}
+    }
+
+    // 加密方法
+    function Encrypt(word) {
+        return {{ if .encrypt }} {{.decrypt}} {{else}} CryptoJS.AES.encrypt(word, key).toString() {{end}}
+
+    }
+
+    function getData() {
+        return {
+            "username": document.getElementById("username").value,
+            "password": document.getElementById("password").value,
+            "age": document.getElementById("age").value,
+        }
+    }
+
+    function outputObj(jsonData) {
+        return {
+            "data": Encrypt(JSON.stringify(jsonData)),
+            "key": key.toString(),
+            {{ if .extrakv }}{{.extrakv}}{{end}}
+        }
+    }
+
+    function submitJSON(event) {
+        event.preventDefault();
+
+        const url = "{{.url}}";
+        let jsonData = getData();
+        let submitResult = JSON.stringify(outputObj(jsonData), null, 2)
+        console.log("key", key)
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: submitResult,
+        })
+            .then(response => response.text())
+            .then(data => {
+                console.log("Success:", data);
+                document.body.innerHTML = data;
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+            });
+    }
+
+    document.getElementById("json-form").addEventListener("change", () => {
+        let jsonData = {
+            "username": document.getElementById("username").value,
+            "password": document.getElementById("password").value,
+            "age": document.getElementById("age").value,
+        };
+        document.getElementById("encrypt").innerHTML = JSON.stringify(outputObj(jsonData), null, 2)
+        document.getElementById("input").innerHTML = JSON.stringify(jsonData, null, 2)
+    })
+    document.getElementById("json-form").addEventListener("submit", submitJSON)
+</script>
+
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+
+</body>
+</html>

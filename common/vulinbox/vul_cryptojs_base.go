@@ -34,6 +34,9 @@ var cryptoRsaKeyFromServerHtmlWithResponse []byte
 //go:embed vul_cryptojs_rsa_and_aes.html
 var cryptoRsaKeyAndAesHtml []byte
 
+//go:embed vul_cryptojslib_template.html
+var cryptoJSlibTemplateHtml string
+
 func (s *VulinServer) registerCryptoJS() {
 	r := s.router
 
@@ -108,10 +111,57 @@ func (s *VulinServer) registerCryptoJS() {
 		onceGenerator.Do(initKey)
 		return handler
 	})
-	cryptoGroup := r.Name("高级场景前端加密").Subrouter()
+	cryptoGroup := r.PathPrefix("/crypto").Name("高级场景前端加密").Subrouter()
 	cryptoRoutes := []*VulInfo{
 		{
-			Path:  "/crypto/js/basic",
+			Path:  "/js/lib/aes",
+			Title: "CryptoJS.AES 前端加密登陆表单",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":      `/crypto/js/lib/aes/handler`,
+					"initcode": "var iv = CryptoJS.lib.WordArray.random(128/8);",
+					`extrakv`:  "iv: iv.toString(),",
+					"title":    "AES 加密",
+					"key":      `"abcdabcdabcdabcd"`,
+					"info":     "默认使用 CryptoJS.AES.encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
+					"encrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
+					"decrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
+				})
+			},
+		},
+		{
+			Path: "/js/lib/aes/handler",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyPlain := utils.MapGetString(params, "key")
+				dataBase64D := utils.MapGetString(params, "data")
+				ivHex := utils.MapGetString(params, "iv")
+				dataRaw, err := codec.DecodeBase64(dataBase64D)
+				if err != nil {
+					Failed(writer, request, "decode base64 failed: %v", err)
+					return
+				}
+				ivRaw, err := codec.DecodeHex(ivHex)
+				if err != nil {
+					Failed(writer, request, "decode hex failed: %v", err)
+					return
+				}
+				spew.Dump(dataRaw, ivRaw, keyPlain)
+				dec, err := codec.AESCBCDecrypt([]byte(keyPlain), dataRaw, ivRaw)
+				if err != nil {
+					Failed(writer, request, "decrypt failed: %v", err)
+					return
+				}
+				DefaultRender(`<h1>解密成功{`+string(dec)+`}</h1>`, writer, request)
+			},
+		},
+		{
+			Path:  "/js/basic",
 			Title: "AES-ECB 加密表单（附密码）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
@@ -189,7 +239,7 @@ func (s *VulinServer) registerCryptoJS() {
 			RiskDetected: true,
 		},
 		{
-			Path:  "/crypto/js/rsa",
+			Path:  "/js/rsa",
 			Title: "RSA：加密表单，附密钥",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
@@ -272,7 +322,7 @@ func (s *VulinServer) registerCryptoJS() {
 			RiskDetected: true,
 		},
 		{
-			Path:  "/crypto/js/rsa/fromserver",
+			Path:  "/js/rsa/fromserver",
 			Title: "RSA：加密表单服务器传输密钥",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
@@ -355,7 +405,7 @@ func (s *VulinServer) registerCryptoJS() {
 			RiskDetected: true,
 		},
 		{
-			Path:  "/crypto/js/rsa/fromserver/response",
+			Path:  "/js/rsa/fromserver/response",
 			Title: "RSA：加密表单服务器传输密钥+响应加密",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
@@ -458,7 +508,7 @@ func (s *VulinServer) registerCryptoJS() {
 			RiskDetected: true,
 		},
 		{
-			Path:  "/crypto/js/rsa/fromserver/response/aes-gcm",
+			Path:  "/js/rsa/fromserver/response/aes-gcm",
 			Title: "前端RSA加密AES密钥，服务器传输",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				var params = make(map[string]interface{})
@@ -599,17 +649,50 @@ func (s *VulinServer) registerCryptoJS() {
 			},
 			RiskDetected: true,
 		},
-
 		{
-			Path: "/crypto/js/rsa/generator",
+			Path: "/js/rsa/generator",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				writer.Write([]byte(`{"ok": true, "publicKey": ` + strconv.Quote(string(pub)) + `, "privateKey": ` + strconv.Quote(string(pri)) + `}`))
 			},
 		},
 	}
-
 	for _, v := range cryptoRoutes {
 		addRouteWithVulInfo(cryptoGroup, v)
 	}
 
+	testHandler := func(writer http.ResponseWriter, request *http.Request) {
+		DefaultRender("<h1>本测试页面会测试针对 /static/js/cryptojs_4.0.0/*.js 文件的导入</h1>\n"+`
+
+<p id='error'>CryptoJS Status</p>	
+<p id='404'></p>	
+
+<script>
+window.onerror = function(message, source, lineno, colno, error) {
+    console.log('An error has occurred: ', message);
+	document.getElementById('error').innerHTML = "CryptoJS ERROR: " + message;
+    return true;
+};
+
+handle404 = function(event) {
+	const p = document.createElement("p")
+	p.innerText = "CryptoJS 404: " + event.target.src
+	document.getElementById('404').appendChild(p)
+}
+</script>
+<script src="/static/js/cryptojs_4.0.0/core.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/enc-base64.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/md5.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/evpkdf.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/cipher-core.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/aes.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/pad-pkcs7.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/mode-ecb.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/enc-utf8.min.js" onerror="handle404(event)"></script>
+<script src="/static/js/cryptojs_4.0.0/enc-hex.min.js" onerror="handle404(event)"></script>
+
+可以观察 Console 
+`, writer, request)
+	}
+	cryptoGroup.HandleFunc("/_test/", testHandler)
+	cryptoGroup.HandleFunc("/", testHandler)
 }
