@@ -63,7 +63,7 @@
     {{ end }}
 
     function generateKey() {
-        return {{ if .key }} {{ .key}} {{ else }} CryptoJS.enc.Utf8.parse("1234123412341234") {{ end }} // 十六位十六进制数作为密钥
+        return {{ if .key }} {{ .key}} {{ else }} CryptoJS.enc.Utf8.parse("1234123412341234").toString() {{ end }} // 十六位十六进制数作为密钥
     }
 
     const key = generateKey()
