@@ -211,6 +211,32 @@ entry0:
 }
 
 func TestIfStmt(t *testing.T) {
+	t.Run("Ifstmt", func(t *testing.T) {
+		src := `
+a = 5
+if a < 2 {
+	b = 6
+	a = a + b 
+}
+d = 1 + 2
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 lt 2
+	%1 = If [%0] true -> true2, false -> done1
+done1: <- true2 entry0
+	%2 = 1 add 2
+true2: <- entry0
+	%3 = 5 add 6
+	%4 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+
 	t.Run("Ifelse_simple", func(t *testing.T) {
 		src := `
 a = 5
@@ -221,23 +247,23 @@ if a > 2 {
 }
 d = 1 + 2
 		`
-		prog := parseSSA(src)
-		CheckProgram(t, prog)
-		// showProg(prog)
 		ir := `
 yak-main
 entry0:
 	%0 = 5 gt 2
-	%1 = If [%0] true -> b2, false -> b3
-done1: <- b2 b3
+	%1 = If [%0] true -> true2, false -> false3
+done1: <- true2 false3
 	%2 = 1 add 2
-b2: <- entry0
+true2: <- entry0
 	%3 = 6 add 4
 	%4 = jump -> done1
-b3: <- entry0
+false3: <- entry0
 	%5 = 7 add 3
 	%6 = jump -> done1
 		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
@@ -257,13 +283,13 @@ d = 1 + 2
 yak-main
 entry0:
 	%0 = 5 gt 2
-	%1 = If [%0] true -> b2, false -> b3
-done1: <- b2 b3
+	%1 = If [%0] true -> true2, false -> false3
+done1: <- true2 false3
 	%2 = 1 add 2
-b2: <- entry0
+true2: <- entry0
 	%3 = 5 add 6
 	%4 = jump -> done1
-b3: <- entry0
+false3: <- entry0
 	%5 = 5 add 7
 	%6 = jump -> done1
 		`
@@ -273,6 +299,211 @@ b3: <- entry0
 		CompareYakMain(t, prog, ir)
 	})
 
+	t.Run("Ifelse_elseif1", func(t *testing.T) {
+		src := `
+a = 5
+if a < 2 {
+	b = 6
+	a = a + b 
+} else if a < 4 {
+	e = a + 9
+} else {
+	c = 7 
+	a = a + c
+}
+d = 1 + 2
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 lt 2
+	%1 = If [%0] true -> true2, false -> elif3
+done1: <- true2 true4 false5
+	%2 = 1 add 2
+true2: <- entry0
+	%3 = 5 add 6
+	%4 = jump -> done1
+elif3: <- entry0
+	%5 = 5 lt 4
+	%6 = If [%5] true -> true4, false -> false5
+true4: <- elif3
+	%7 = 5 add 9
+	%8 = jump -> done1
+false5: <- elif3
+	%9 = 5 add 7
+	%10 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+
+	t.Run("Ifelse_elseif2", func(t *testing.T) {
+		src := `
+a = 5
+if a < 2 {
+	b = 6
+	a = a + b 
+} else if a < 4 {
+	e = a + 9
+} else if a < 6{
+	d = a + 5
+} else if a < 10{
+	d = a + 20
+} else if a < 20 {
+	d = a + 30
+} else {
+	d = a + 40
+}
+d = 1 + 2
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 lt 2
+	%1 = If [%0] true -> true2, false -> elif3
+done1: <- true2 true4 true6 true8 true10 false11
+	%2 = 1 add 2
+true2: <- entry0
+	%3 = 5 add 6
+	%4 = jump -> done1
+elif3: <- entry0
+	%5 = 5 lt 4
+	%6 = If [%5] true -> true4, false -> elif5
+true4: <- elif3
+	%7 = 5 add 9
+	%8 = jump -> done1
+elif5: <- elif3
+	%9 = 5 lt 6
+	%10 = If [%9] true -> true6, false -> elif7
+true6: <- elif5
+	%11 = 5 add 5
+	%12 = jump -> done1
+elif7: <- elif5
+	%13 = 5 lt 10
+	%14 = If [%13] true -> true8, false -> elif9
+true8: <- elif7
+	%15 = 5 add 20
+	%16 = jump -> done1
+elif9: <- elif7
+	%17 = 5 lt 20
+	%18 = If [%17] true -> true10, false -> false11
+true10: <- elif9
+	%19 = 5 add 30
+	%20 = jump -> done1
+false11: <- elif9
+	%21 = 5 add 40
+	%22 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+
+	t.Run("Ifelse_elif1", func(t *testing.T) {
+		src := `
+a = 5
+if a < 2 {
+	b = 6
+	a = a + b 
+} elif a < 4 {
+	e = a + 9
+} else {
+	c = 7 
+	a = a + c
+}
+d = 1 + 2
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 lt 2
+	%1 = If [%0] true -> true2, false -> elif3
+done1: <- true2 true4 false5
+	%2 = 1 add 2
+true2: <- entry0
+	%3 = 5 add 6
+	%4 = jump -> done1
+elif3: <- entry0
+	%5 = 5 lt 4
+	%6 = If [%5] true -> true4, false -> false5
+true4: <- elif3
+	%7 = 5 add 9
+	%8 = jump -> done1
+false5: <- elif3
+	%9 = 5 add 7
+	%10 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+	t.Run("Ifelse_elif2", func(t *testing.T) {
+		src := `
+a = 5
+if a < 2 {
+	b = 6
+	a = a + b 
+} elif a < 4 {
+	e = a + 9
+} elif a < 6 {
+	e = a + 10
+} elif a < 10 {
+	e = a + 20
+} elif a < 20 {
+	e = a + 30
+} else {
+	c = 7 
+	a = a + c
+}
+d = 1 + 2
+		`
+		ir := `
+yak-main
+entry0:
+	%0 = 5 lt 2
+	%1 = If [%0] true -> true2, false -> elif3
+done1: <- true2 true4 true6 true8 true10 false11
+	%2 = 1 add 2
+true2: <- entry0
+	%3 = 5 add 6
+	%4 = jump -> done1
+elif3: <- entry0
+	%5 = 5 lt 4
+	%6 = If [%5] true -> true4, false -> elif5
+true4: <- elif3
+	%7 = 5 add 9
+	%8 = jump -> done1
+elif5: <- elif3
+	%9 = 5 lt 6
+	%10 = If [%9] true -> true6, false -> elif7
+true6: <- elif5
+	%11 = 5 add 10
+	%12 = jump -> done1
+elif7: <- elif5
+	%13 = 5 lt 10
+	%14 = If [%13] true -> true8, false -> elif9
+true8: <- elif7
+	%15 = 5 add 20
+	%16 = jump -> done1
+elif9: <- elif7
+	%17 = 5 lt 20
+	%18 = If [%17] true -> true10, false -> false11
+true10: <- elif9
+	%19 = 5 add 30
+	%20 = jump -> done1
+false11: <- elif9
+	%21 = 5 add 7
+	%22 = jump -> done1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
 }
 
 func TestPhi(t *testing.T) {
