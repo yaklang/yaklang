@@ -118,7 +118,7 @@ func GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t string, size i
 		return nil, nil, utils.Errorf("marshal pubkey failed: %s", err)
 	}
 	err = pem.Encode(&pubBuffer, &pem.Block{
-		Type:  "RSA PUBLIC KEY",
+		Type:  "PUBLIC KEY",
 		Bytes: pubDir,
 	})
 	if err != nil {
