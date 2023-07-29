@@ -47,12 +47,20 @@
     </div>
     {{ end }}
 
-    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#markdownContent" aria-expanded="false" aria-controls="markdownContent">
+    <button class="btn btn-link small" type="button" data-bs-toggle="collapse" data-bs-target="#markdownContent" aria-expanded="false" aria-controls="markdownContent">
         CryptoJS 小技巧与基础设定
     </button>
     <div class="collapse" id="markdownContent">
         <div class="card card-body mt-3" id="help"></div>
     </div>
+
+    <button class="btn btn-link small" type="button" data-bs-toggle="collapse" data-bs-target="#markdownContent-jsrsasign" aria-expanded="false" aria-controls="markdownContent-jsrsasign">
+        前端处理 RSA 常用技术 (jsrsasign)
+    </button>
+    <div class="collapse" id="markdownContent-jsrsasign">
+        <div class="card card-body mt-3" id="help-jsrsasign"></div>
+    </div>
+
     <form id="json-form" class="mt-4">
         <div class="mb-3">
             <label for="username" class="form-label">UserName</label>
@@ -62,7 +70,7 @@
             <label for="password" class="form-label">Password</label>
             <input id="password" class="form-control" type="text">
         </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <button id="submit" type="submit" class="btn btn-primary">Submit</button>
     </form>
 
     <div class="mt-4">
@@ -76,7 +84,7 @@
 <script>
     // Set options
     marked.setOptions({
-        highlight: function(code, language) {
+        highlight: function(code) {
             return hljs.highlightAuto(code).value;
         }
     });
@@ -100,6 +108,18 @@ CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"
 
 在查看网页内容的时候，用户需要注意编码情况，不然会浪费大量不必要的时间`;
     document.getElementById('help').innerHTML = marked.parse(markdownString);
+
+    document.getElementById('help-jsrsasign').innerHTML = marked.parse(`
+# jsrsasign 是前端常用的 RSA 加解密的库
+
+    KEYUTIL.getKey(publicKey).encrypt(...)
+
+即可实现加密，后端解密需要使用 RSA1v15 Decrypt 接口。
+
+注意：jsrsasign 使用 2048 位公钥加密数据不高于 (256-11) 个字节，否则会报错。
+
+`);
+
 </script>
 
 <script>
@@ -122,7 +142,6 @@ CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"
     function Encrypt(word) {
         console.info(word);
         return {{ if .encrypt }} {{.encrypt}} {{else}} CryptoJS.AES.encrypt(word, key).toString() {{end}}
-
     }
 
     function getData() {

@@ -145,24 +145,36 @@ func (s *VulinServer) registerCryptoJS() {
 			},
 		},
 		{
-			Path:  "/sign/hmac/sha256/rsa",
-			Title: "前端验证签名（验签）表单：HMAC-SHA256",
+			Path:  "/sign/rsa/hmacsha256",
+			Title: "前端验证签名（验签）表单：先 HMAC-SHA256 再 RSA",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
-					"url":         `/crypto/sign/hmac/sha256/verify`,
-					`extrakv`:     "username: jsonData.username, password: jsonData.password,",
-					"title":       "HMAC-sha256 验签",
+					"url":     `/crypto/sign/rsa/hmacsha256/verify`,
+					`extrakv`: "username: jsonData.username, password: jsonData.password,",
+					"title":   "先 HMAC-SHA256 再 RSA",
+					"initcode": `
+document.getElementById('submit').disabled = true;
+document.getElementById('submit').innerText = '需等待公钥获取';
+let pubkey;
+setTimeout(function(){
+	fetch('/crypto/js/rsa/public/key').then(async function(rsp) {
+		pubkey = await rsp.text()
+		document.getElementById('submit').disabled = false;
+		document.getElementById('submit').innerText = '提交表单数据';
+		console.info(pubkey)
+	})
+},300)`,
 					"datafield":   "signature",
 					"key":         `CryptoJS.enc.Utf8.parse("1234123412341234")`,
-					"info":        "签名验证（又叫验签或签名）是验证请求参数是否被篡改的一种常见安全手段，验证签名方法主流的有两种，一种是 KEY+哈希算法，例如 HMAC-MD5 / HMAC-SHA256 等，本案例就是这种方法的典型案例。生成签名的规则为：username=*&password=*。在提交和验证的时候需要分别对提交数据进行处理，签名才可以使用和验证",
-					"encrypt":     `CryptoJS.HmacSHA256(word, key.toString(CryptoJS.enc.Utf8)).toString();`,
+					"info":        "签名验证（又叫验签或签名）是验证请求参数是否被篡改的一种常见安全手段，验证签名方法主流的有两种，一种是 KEY+哈希算法，例如 HMAC-MD5 / HMAC-SHA256 等，另一种是使用非对称加密加密 HMAC 的签名信息，本案例就是这种方法的典型案例。生成签名的规则为：username=*&password=*。在提交和验证的时候需要分别对提交数据进行处理，签名才可以使用和验证，这种情况相对来说很复杂",
+					"encrypt":     `KEYUTIL.getKey(pubkey).encrypt(CryptoJS.HmacSHA256(word, key.toString(CryptoJS.enc.Utf8)).toString());`,
 					"decrypt":     `"";`,
 					"jsonhandler": "`username=${jsonData.username}&password=${jsonData.password}`;",
 				})
 			},
 		},
 		{
-			Path: "/sign/hmac/sha256/verify",
+			Path: "/sign/rsa/hmacsha256/verify",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, err := utils.HttpDumpWithBody(request, true)
 				if err != nil {
@@ -178,13 +190,23 @@ func (s *VulinServer) registerCryptoJS() {
 				}
 				_ = keyPlain
 				originSign := utils.MapGetString(params, "signature")
+				originSignDecoded, err := codec.DecodeHex(originSign)
+				if err != nil {
+					Failed(writer, request, "originSign decode hex failed: %v", err)
+					return
+				}
+				siginatureHmacHex, err := tlsutils.PemPkcs1v15Decrypt(pri, []byte(originSignDecoded))
+				if err != nil {
+					Failed(writer, request, "signature decrypt failed: %v", err)
+					return
+				}
 				username := utils.MapGetString(params, "username")
 				password := utils.MapGetString(params, "password")
 				backendCalcOrigin := fmt.Sprintf("username=%v&password=%v", username, password)
 				dataRaw := codec.HmacSha256(keyPlain, backendCalcOrigin)
 				var blocks []string
-				var signFinished = originSign == codec.EncodeToHex(dataRaw)
-				msg := originSign +
+				var signFinished = string(siginatureHmacHex) == codec.EncodeToHex(dataRaw)
+				msg := "RSA -> " + originSign + "\n DECODED HMAC: " + string(siginatureHmacHex) + "\n" +
 					"\n Expect: " + codec.EncodeToHex(dataRaw) +
 					"\n Key: " + string(keyPlain) +
 					"\n OriginData: " + backendCalcOrigin
@@ -807,6 +829,12 @@ func (s *VulinServer) registerCryptoJS() {
 			Path: "/js/rsa/generator",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				writer.Write([]byte(`{"ok": true, "publicKey": ` + strconv.Quote(string(pub)) + `, "privateKey": ` + strconv.Quote(string(pri)) + `}`))
+			},
+		},
+		{
+			Path: "/js/rsa/public/key",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Write(pub)
 			},
 		},
 	}
