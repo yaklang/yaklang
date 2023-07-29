@@ -22,16 +22,18 @@
             console.error(event.target.src + " not found")
         }
     </script>
-    <script src="/static/js/cryptojs_4.0.0/core.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/enc-base64.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/md5.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/evpkdf.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/cipher-core.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/aes.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/pad-pkcs7.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/mode-ecb.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/enc-utf8.min.js" onerror="handle404(event)"></script>
-    <script src="/static/js/cryptojs_4.0.0/enc-hex.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/cryptojs_4.0.0/crypto-js.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/jsrsasign/jsrsasign-all-min.js" onerror="handle404(event)"></script>
+<!--    <script src="/static/js/cryptojs_4.0.0/core.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/enc-base64.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/md5.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/evpkdf.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/cipher-core.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/aes.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/pad-pkcs7.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/mode-ecb.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/enc-utf8.min.js" onerror="handle404(event)"></script>-->
+<!--    <script src="/static/js/cryptojs_4.0.0/enc-hex.min.js" onerror="handle404(event)"></script>-->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/highlightjs/highlight.min.js"></script>
 </head>
@@ -59,10 +61,6 @@
         <div class="mb-3">
             <label for="password" class="form-label">Password</label>
             <input id="password" class="form-control" type="text">
-        </div>
-        <div class="mb-3" style="display: none">
-            <label for="age" class="form-label">Age</label>
-            <input id="age" class="form-control" type="text">
         </div>
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
@@ -122,7 +120,8 @@ CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"
 
     // 加密方法
     function Encrypt(word) {
-        return {{ if .encrypt }} {{.decrypt}} {{else}} CryptoJS.AES.encrypt(word, key).toString() {{end}}
+        console.info(word);
+        return {{ if .encrypt }} {{.encrypt}} {{else}} CryptoJS.AES.encrypt(word, key).toString() {{end}}
 
     }
 
@@ -130,13 +129,13 @@ CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"
         return {
             "username": document.getElementById("username").value,
             "password": document.getElementById("password").value,
-            "age": document.getElementById("age").value,
         }
     }
 
     function outputObj(jsonData) {
+        const word = {{ if .jsonhandler }}{{ .jsonhandler }};{{else}}JSON.stringify(jsonData);{{ end }}
         return {
-            "data": Encrypt(JSON.stringify(jsonData)),
+            "{{ if .datafield }}{{ .datafield }}{{ else }}data{{end}}": Encrypt(word),
             "key": key.toString(),
             {{ if .extrakv }}{{.extrakv}}{{end}}
         }
@@ -170,7 +169,6 @@ CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"
         let jsonData = {
             "username": document.getElementById("username").value,
             "password": document.getElementById("password").value,
-            "age": document.getElementById("age").value,
         };
         document.getElementById("encrypt").innerHTML = JSON.stringify(outputObj(jsonData), null, 2)
         document.getElementById("input").innerHTML = JSON.stringify(jsonData, null, 2)

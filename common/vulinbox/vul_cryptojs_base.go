@@ -125,8 +125,83 @@ func (s *VulinServer) registerCryptoJS() {
 		onceGenerator.Do(initKey)
 		return handler
 	})
-	cryptoGroup := r.PathPrefix("/crypto").Name("高级场景前端加密").Subrouter()
+	cryptoGroup := r.PathPrefix("/crypto").Name("高级前端加解密与验签实战").Subrouter()
 	cryptoRoutes := []*VulInfo{
+		{
+			Path:  "/sign/hmac/sha256",
+			Title: "前端验证签名（验签）表单：HMAC-SHA256",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":         `/crypto/sign/hmac/sha256/verify`,
+					`extrakv`:     "username: jsonData.username, password: jsonData.password,",
+					"title":       "HMAC-sha256 验签",
+					"datafield":   "signature",
+					"key":         `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":        "签名验证（又叫验签或签名）是验证请求参数是否被篡改的一种常见安全手段，验证签名方法主流的有两种，一种是 KEY+哈希算法，例如 HMAC-MD5 / HMAC-SHA256 等，本案例就是这种方法的典型案例。生成签名的规则为：username=*&password=*。在提交和验证的时候需要分别对提交数据进行处理，签名才可以使用和验证",
+					"encrypt":     `CryptoJS.HmacSHA256(word, key.toString(CryptoJS.enc.Utf8)).toString();`,
+					"decrypt":     `"";`,
+					"jsonhandler": "`username=${jsonData.username}&password=${jsonData.password}`;",
+				})
+			},
+		},
+		{
+			Path:  "/sign/hmac/sha256/rsa",
+			Title: "前端验证签名（验签）表单：HMAC-SHA256",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":         `/crypto/sign/hmac/sha256/verify`,
+					`extrakv`:     "username: jsonData.username, password: jsonData.password,",
+					"title":       "HMAC-sha256 验签",
+					"datafield":   "signature",
+					"key":         `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":        "签名验证（又叫验签或签名）是验证请求参数是否被篡改的一种常见安全手段，验证签名方法主流的有两种，一种是 KEY+哈希算法，例如 HMAC-MD5 / HMAC-SHA256 等，本案例就是这种方法的典型案例。生成签名的规则为：username=*&password=*。在提交和验证的时候需要分别对提交数据进行处理，签名才可以使用和验证",
+					"encrypt":     `CryptoJS.HmacSHA256(word, key.toString(CryptoJS.enc.Utf8)).toString();`,
+					"decrypt":     `"";`,
+					"jsonhandler": "`username=${jsonData.username}&password=${jsonData.password}`;",
+				})
+			},
+		},
+		{
+			Path: "/sign/hmac/sha256/verify",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
+				_ = keyPlain
+				originSign := utils.MapGetString(params, "signature")
+				username := utils.MapGetString(params, "username")
+				password := utils.MapGetString(params, "password")
+				backendCalcOrigin := fmt.Sprintf("username=%v&password=%v", username, password)
+				dataRaw := codec.HmacSha256(keyPlain, backendCalcOrigin)
+				var blocks []string
+				var signFinished = originSign == codec.EncodeToHex(dataRaw)
+				msg := originSign +
+					"\n Expect: " + codec.EncodeToHex(dataRaw) +
+					"\n Key: " + string(keyPlain) +
+					"\n OriginData: " + backendCalcOrigin
+				if signFinished {
+					blocks = append(blocks, block("签名验证成功", msg))
+				} else {
+					blocks = append(blocks, block("签名验证失败", msg))
+				}
+				if isLoginedFromRaw(params) && signFinished {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+backendCalcOrigin))
+				}
+
+				DefaultRender(BlockContent(blocks...), writer, request)
+			},
+		},
 		{
 			Path:  "/js/lib/aes/cbc",
 			Title: "CryptoJS.AES(CBC) 前端加密登陆表单",
@@ -139,7 +214,7 @@ func (s *VulinServer) registerCryptoJS() {
 					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
 					"info":     "默认使用 CryptoJS.AES(CBC 需要 IV).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断\n 注意：这种加密方式每一次密文可能都不一样",
 					"encrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
-					"decrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
+					"decrypt":  `CryptoJS.AES.decrypt(word, key, {iv: iv}).toString();`,
 				})
 			},
 		},
@@ -198,8 +273,7 @@ func (s *VulinServer) registerCryptoJS() {
 					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
 					"info":     "CryptoJS.AES(ECB).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
 					"encrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
-					"decrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
-					"markdown": "# h1 \n```\naaaa```",
+					"decrypt":  `CryptoJS.AES.decrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
 				})
 			},
 		},
