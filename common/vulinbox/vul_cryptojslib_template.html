@@ -7,7 +7,16 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>前端加密登陆- {{.title}}</title>
 
+    <style>
+        pre {
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #e8e8e8; /* Change this to your preferred color for inline code */
+        }
+    </style>
+
     <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/highlightjs/default.min.css">
     <script>
         function handle404(event) {
             console.error(event.target.src + " not found")
@@ -23,16 +32,25 @@
     <script src="/static/js/cryptojs_4.0.0/mode-ecb.min.js" onerror="handle404(event)"></script>
     <script src="/static/js/cryptojs_4.0.0/enc-utf8.min.js" onerror="handle404(event)"></script>
     <script src="/static/js/cryptojs_4.0.0/enc-hex.min.js" onerror="handle404(event)"></script>
+    <script src="/static/js/marked.min.js"></script>
+    <script src="/static/js/highlightjs/highlight.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1 class="mt-4"> 后端管理登陆 </h1>
+    <h1 class="mt-4" style="margin-top: 24px"> 后端管理登陆 </h1>
     {{ if .info }}
     <div class="alert alert-info">
         {{ .info }}
     </div>
     {{ end }}
+
+    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#markdownContent" aria-expanded="false" aria-controls="markdownContent">
+        CryptoJS 小技巧与基础设定
+    </button>
+    <div class="collapse" id="markdownContent">
+        <div class="card card-body mt-3" id="help"></div>
+    </div>
     <form id="json-form" class="mt-4">
         <div class="mb-3">
             <label for="username" class="form-label">UserName</label>
@@ -42,7 +60,7 @@
             <label for="password" class="form-label">Password</label>
             <input id="password" class="form-control" type="text">
         </div>
-        <div class="mb-3">
+        <div class="mb-3" style="display: none">
             <label for="age" class="form-label">Age</label>
             <input id="age" class="form-control" type="text">
         </div>
@@ -56,6 +74,35 @@
     <br>
     <pre id="encrypt" class="mt-2" style="width: 600px; word-wrap: break-word"></pre>
 </div>
+
+<script>
+    // Set options
+    marked.setOptions({
+        highlight: function(code, language) {
+            return hljs.highlightAuto(code).value;
+        }
+    });
+
+    const markdownString = `
+## CryptoJS 中的默认编码
+
+CryptoJS 的 key 在没有明确指定编码方式的情况下，默认的 ${"`"}toString${"`"} 方法将输出十六进制 (Hex) 格式的字符串。这是因为 CryptoJS 的 ${"`"}WordArray 对象${"`"}（用于表示二进制数据）的 toString 方法默认使用的编码器是 ${"`"}CryptoJS.enc.Hex${"`"}。
+
+例如，如果你创建了一个 ${"`"}WordArray${"`"} 对象并调用了 toString 方法，你会得到一个十六进制的字符串：
+
+    var key = CryptoJS.enc.Utf8.parse('1234567890123456');
+    console.log(key.toString());  // 输出 "31323334353637383930313233343536"
+
+在上面的例子中，${"`"}"31323334353637383930313233343536"${"`"} 是字符串 ${"`"}"1234567890123456"${"`"} 的 UTF-8 编码的十六进制表示。
+
+如果你想要得到其他格式的字符串，你可以使用其他的编码器，例如 ${"`"}CryptoJS.enc.Base64${"`"} 或 ${"`"}CryptoJS.enc.Utf8${"`"}。例如：
+
+    console.log(key.toString(CryptoJS.enc.Base64));  // 输出 "MTIzNDU2Nzg5MDEyMzQ1Ng=="
+    console.log(key.toString(CryptoJS.enc.Utf8));  // 输出 "1234567890123456"
+
+在查看网页内容的时候，用户需要注意编码情况，不然会浪费大量不必要的时间`;
+    document.getElementById('help').innerHTML = marked.parse(markdownString);
+</script>
 
 <script>
     {{ if .initcode }}

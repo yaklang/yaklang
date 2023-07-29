@@ -128,23 +128,23 @@ func (s *VulinServer) registerCryptoJS() {
 	cryptoGroup := r.PathPrefix("/crypto").Name("高级场景前端加密").Subrouter()
 	cryptoRoutes := []*VulInfo{
 		{
-			Path:  "/js/lib/aes",
-			Title: "CryptoJS.AES 前端加密登陆表单",
+			Path:  "/js/lib/aes/cbc",
+			Title: "CryptoJS.AES(CBC) 前端加密登陆表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
-					"url":      `/crypto/js/lib/aes/handler`,
+					"url":      `/crypto/js/lib/aes/cbc/handler`,
 					"initcode": "var iv = CryptoJS.lib.WordArray.random(128/8);",
 					`extrakv`:  "iv: iv.toString(),",
-					"title":    "AES 加密",
+					"title":    "AES-CBC(4.0.0 默认) 加密",
 					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
-					"info":     "默认使用 CryptoJS.AES(CBC).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
+					"info":     "默认使用 CryptoJS.AES(CBC 需要 IV).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断\n 注意：这种加密方式每一次密文可能都不一样",
 					"encrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
 					"decrypt":  `CryptoJS.AES.encrypt(word, key, {iv: iv}).toString();`,
 				})
 			},
 		},
 		{
-			Path: "/js/lib/aes/handler",
+			Path: "/js/lib/aes/cbc/handler",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				raw, err := utils.HttpDumpWithBody(request, true)
 				if err != nil {
@@ -171,6 +171,60 @@ func (s *VulinServer) registerCryptoJS() {
 					return
 				}
 				dec, err := codec.AESCBCDecrypt([]byte(keyPlain), dataRaw, ivRaw)
+				if err != nil {
+					Failed(writer, request, "decrypt failed: %v", err)
+					return
+				}
+				var blocks []string
+				blocks = append(blocks, block("解密前端内容成功", string(dec)))
+				if isLoginedFromRaw(dec) {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(dataBase64D)))
+				}
+
+				DefaultRender(BlockContent(blocks...), writer, request)
+			},
+		},
+		{
+			Path:  "/js/lib/aes/ecb",
+			Title: "CryptoJS.AES(ECB) 前端加密登陆表单",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				unsafeTemplateRender(writer, request, cryptoJSlibTemplateHtml, map[string]any{
+					"url":      `/crypto/js/lib/aes/ecb/handler`,
+					"initcode": "// ignore:  var iv = CryptoJS.lib.WordArray.random(128/8);",
+					`extrakv`:  "// iv: iv.toString(),",
+					"title":    "AES(ECB PKCS7) 加密",
+					"key":      `CryptoJS.enc.Utf8.parse("1234123412341234")`,
+					"info":     "CryptoJS.AES(ECB).encrypt/decrypt，默认 PKCS7Padding，密钥长度不足16字节，以 NULL 补充，超过16字节，截断",
+					"encrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+					"decrypt":  `CryptoJS.AES.encrypt(word, key, {mode: CryptoJS.mode.ECB}).toString();`,
+					"markdown": "# h1 \n```\naaaa```",
+				})
+			},
+		},
+		{
+			Path: "/js/lib/aes/ecb/handler",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
+				dataBase64D := utils.MapGetString(params, "data")
+				dataRaw, err := codec.DecodeBase64(dataBase64D)
+				if err != nil {
+					Failed(writer, request, "decode base64 failed: %v", err)
+					return
+				}
+				dec, err := codec.AESECBDecrypt([]byte(keyPlain), dataRaw, nil)
 				if err != nil {
 					Failed(writer, request, "decrypt failed: %v", err)
 					return
