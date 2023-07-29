@@ -178,12 +178,14 @@ a = 42
 b = a 
 c = a + b 
 a = c + 23 
+d = a + 1
 		`
 		ir := `
 yak-main
 entry0:
 	%0 = 42 add 42
 	%1 = %0 add 23
+	%2 = %1 add 1
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
@@ -196,6 +198,7 @@ a = 42
 b = a 
 c = a + b + 33
 a = c + 23 
+d = a + 11
 		`
 		ir := `
 yak-main
@@ -203,6 +206,7 @@ entry0:
 	%0 = 42 add 42
 	%1 = %0 add 33
 	%2 = %1 add 23
+	%3 = %2 add 11
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
