@@ -56,7 +56,6 @@ type LowhttpExecConfig struct {
 	RequestSource        string
 	EtcHosts             map[string]string
 	DNSServers           []string
-	DefaultDnsServerType string // system or custom, if DNSServers is empty, use system dns or custom dns, default is system
 	RuntimeId            string
 	FromPlugin           string
 }
@@ -136,7 +135,6 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		Proxy:                nil,
 		RedirectHandler:      nil,
 		SaveHTTPFlow:         consts.GetDefaultSaveHTTPFlowFromEnv(),
-		DefaultDnsServerType: "system",
 	}
 }
 
@@ -587,11 +585,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if retryTimes < 0 {
 		retryTimes = 0
 	}
-	if dnsServers == nil || len(dnsServers) <= 0 {
-		if option.DefaultDnsServerType == "custom" {
-			dnsServers = utils.DefaultDNSServer
-		}
-	}
 
 	// 修正域名的情况
 	var ip string = host
@@ -614,20 +607,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 
 		if ips == "" {
-			if len(dnsServers) == 0 && option.DefaultDnsServerType == "system" { // 未配置dns服务器且默认dns模式是system时使用系统dns
-				timeoutCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
-				defer cancel()
-				servers, _ := net.DefaultResolver.LookupHost(timeoutCtx, host)
-				if len(servers) > 0 {
-					ips = servers[0]
-				}
-			} else {
-				ips = utils.GetFirstIPByDnsWithCache(
-					host,
-					timeout,
-					dnsServers...)
-
-			}
+			ips = utils.GetFirstIPByDnsWithCache(
+				host,
+				timeout,
+				dnsServers...)
 		}
 		traceInfo.DNSTime = time.Since(startDNS)
 		if ips == "" {
