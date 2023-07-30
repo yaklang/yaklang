@@ -92,7 +92,19 @@ func init() {
 	*/
 	log.Debugf(`Yaklang Engine %v Initializing`, yakVersion)
 
-	os.Setenv("GODEBUG", "netdns=go")
+	log.Debugf("net default dns resolver prefer_go: %v strict_errors: %v", net.DefaultResolver.PreferGo, net.DefaultResolver.StrictErrors)
+	if os.Getenv("GODEBUG") != "" {
+		log.Infof("GODEBUG: %s", os.Getenv("GODEBUG"))
+	}
+	net.DefaultResolver.PreferGo = false
+	net.DefaultResolver.StrictErrors = false
+	switch runtime.GOOS {
+	case "linux":
+		// static compile issue for glibc (linux)
+		net.DefaultResolver.PreferGo = true
+		os.Setenv("GODEBUG", "netdns=go")
+	}
+
 	os.Setenv("YAKMODE", "vm")
 
 	if yakVersion == "" {
