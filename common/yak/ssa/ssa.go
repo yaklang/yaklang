@@ -20,6 +20,7 @@ type User interface {
 	String() string
 	GetValue() []Value
 	AddValue(Value)
+	ReplaceValue(Value, Value)
 }
 
 type Instruction interface {
@@ -244,8 +245,6 @@ func (f *Function) String() string {
 	return ret
 }
 
-func (f *Function) GetUser() []User { return f.user }
-
 func (b BasicBlock) String() string {
 	ret := b.Name + ":"
 	if len(b.Preds) != 0 {
@@ -256,12 +255,8 @@ func (b BasicBlock) String() string {
 	}
 	return ret
 }
-func (b *BasicBlock) GetUser() []User { return b.user }
-func (b *BasicBlock) AddUser(u User)  { b.user = append(b.user, u) }
 
 var _ Value = (*BasicBlock)(nil)
-
-// implement user
 
 // implement instruction
 func (a *anInstruction) GetBlock() *BasicBlock { return a.Block }
@@ -286,25 +281,14 @@ func (p Phi) StringByFunc(getStr func(Value) string) string {
 	return ret
 }
 
-func (p *Phi) GetUser() []User { return p.user }
-func (p *Phi) AddUser(u User)  { p.user = append(p.user, u) }
-
 var _ Value = (*Phi)(nil)
-
-func (p *Phi) GetValue() []Value { return p.Edge }
-func (p *Phi) AddValue(v Value)  {}
-
 var _ User = (*Phi)(nil)
-
 var _ Instruction = (*Phi)(nil)
 
 // ----------- Const
 func (c Const) String() string {
 	return c.value.String()
 }
-
-func (c *Const) GetUser() []User { return c.user }
-func (c *Const) AddUser(u User)  { c.user = append(c.user, u) }
 
 var _ Value = (*Const)(nil)
 
@@ -317,16 +301,8 @@ func (b BinOp) StringByFunc(getStr func(Value) string) string {
 	return fmt.Sprintf("%s %s %s", getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
 }
 
-func (b *BinOp) GetUser() []User { return b.user }
-func (b *BinOp) AddUser(u User)  { b.user = append(b.user, u) }
-
 var _ Value = (*BinOp)(nil)
-
-func (b *BinOp) AddValue(v Value)  {}
-func (b *BinOp) GetValue() []Value { return []Value{b.X, b.Y} }
-
 var _ User = (*BinOp)(nil)
-
 var _ Instruction = (*BinOp)(nil)
 
 // ----------- IF
@@ -337,19 +313,11 @@ func (i If) StringByFunc(getStr func(Value) string) string {
 	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
 }
 
-func (i *If) GetUser() []User { return i.user }
-func (i *If) AddUser(u User)  { i.user = append(i.user, u) }
-
 var _ Value = (*If)(nil)
-
-func (i *If) GetValue() []Value { return []Value{i.Cond} }
-func (i *If) AddValue(v Value)  {}
-
 var _ User = (*If)(nil)
-
 var _ Instruction = (*If)(nil)
 
-// ----------- instruction
+// ----------- Jump
 func (j Jump) String() string {
 	return j.StringByFunc(DefaultValueString)
 }
@@ -358,14 +326,6 @@ func (j Jump) StringByFunc(_ func(Value) string) string {
 	return fmt.Sprintf("jump -> %s", j.To.Name)
 }
 
-func (j *Jump) GetUser() []User { return nil }
-func (j *Jump) AddUser(u User)  {}
-
 var _ Value = (*Jump)(nil)
-
-func (j *Jump) GetValue() []Value { return nil }
-func (j *Jump) AddValue(u Value)  {}
-
-var _ Value = (*Jump)(nil)
-
+var _ User = (*Jump)(nil)
 var _ Instruction = (*Jump)(nil)
