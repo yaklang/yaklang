@@ -48,16 +48,3 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 	f.emit(j)
 	return j
 }
-
-func (f *Function) newPhi(block *BasicBlock, variable string) Value {
-	phi := &Phi{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  block,
-		},
-		Edge:     make([]Value, len(block.Preds)),
-		user:     make([]User, 0),
-		variable: variable,
-	}
-	return phi.Build()
-}

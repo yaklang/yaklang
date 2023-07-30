@@ -28,12 +28,14 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 
 func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Value {
 	// if block in sealedBlock
+	var v Value
 	if len(block.Preds) == 1 {
-		return f.readVariableByBlock(variable, block.Preds[0])
+		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
-		v := f.newPhi(block, variable)
-		f.wirteVariableByBlock(variable, v, block)
-		return v
+		phi := NewPhi(f, block, variable)
+		f.wirteVariableByBlock(variable, phi, block)
+		v = phi.Build()
 	}
-	return nil
+	f.wirteVariableByBlock(variable, v, block)
+	return v
 }

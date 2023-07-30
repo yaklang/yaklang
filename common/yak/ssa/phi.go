@@ -56,13 +56,3 @@ func (phi *Phi) triRemoveTrivialPhi() Value {
 
 	return same
 }
-
-func (i *If) AddTrue(t *BasicBlock) {
-	i.True = t
-	i.Block.AddSucc(t)
-}
-
-func (i *If) AddFalse(f *BasicBlock) {
-	i.False = f
-	i.Block.AddSucc(f)
-}

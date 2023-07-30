@@ -607,4 +607,8 @@ false3: <- entry0
 		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
+
+	//TODO: add test for function: `func (phi *Phi) triRemoveTrivialPhi() Value `
 }
+
+//TODO: add loop test for function: `readVariableRecursive`
