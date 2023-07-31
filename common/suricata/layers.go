@@ -47,8 +47,4 @@ type IPLayerRule struct {
 	FragBits   string
 	FragOffset string
 	Tos        string
-
-	// contains
-	IPv4Header bool
-	IPv6Header bool
 }
