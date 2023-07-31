@@ -137,8 +137,8 @@ func GuessValuesTypeToBasicType(vals ...*Value) reflect.Type {
 				last = literalReflectType_Bool
 			} else if i.IsFloat() {
 				last = literalReflectType_Float64
-			} else if i.IsYakFunction() {
-				last = literalReflectType_YakFunction
+			} else if i.Callable() {
+				last = literalReflectType_Interface
 			}
 			continue
 		}

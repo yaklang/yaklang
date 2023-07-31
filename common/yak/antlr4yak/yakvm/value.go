@@ -2,12 +2,13 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Value struct {
@@ -861,11 +862,15 @@ func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 		}
 		callerRefV := reflect.ValueOf(caller.Value)
 		keyRefV := reflect.ValueOf(key.Value)
-		if callerRefV.MapIndex(keyRefV).IsValid() {
-			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())
+		valueRefV := callerRefV.MapIndex(keyRefV)
+		if valueRefV.IsValid() {
+			if refV.CanConvert(valueRefV.Type()) {
+				refV = refV.Convert(valueRefV.Type())
+			} else {
+				panic(fmt.Sprintf("runtime error: cannot convert %v to %v", val, valueRefV.Type()))
+			}
 		}
 		callerRefV.SetMapIndex(keyRefV, refV)
-
 	default:
 		panic("*yakvm.Value.LeftSliceAssignTo not implemented")
 	}
