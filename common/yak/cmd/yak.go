@@ -1177,6 +1177,32 @@ func main() {
 		// CVE 相关命令
 		cveCommand,
 		translatingCommand,
+
+		// chaosmaker
+		{
+			Name: "import-chaosmaker-json",
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "file,f"},
+			},
+			Action: func(c *cli.Context) error {
+				file := utils.GetFirstExistedFile(c.String("file"))
+				if file == "" {
+					return utils.Errorf("file not found: %v", c.String("file"))
+				}
+
+				return chaosmaker.ImportChaosRulesFromFile(consts.GetGormProfileDatabase(), file)
+			},
+		},
+		// chaosmaker
+		{
+			Name: "export-chaosmaker-json",
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "file,f"},
+			},
+			Action: func(c *cli.Context) error {
+				return chaosmaker.ExportChaosRulesToFile(consts.GetGormProfileDatabase(), c.String("file"))
+			},
+		},
 	}
 	app.Commands = append(app.Commands, yak.Subcommands...)
 

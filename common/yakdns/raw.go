@@ -2,12 +2,12 @@ package yakdns
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/miekg/dns"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net"
 	"time"
@@ -51,13 +51,30 @@ var dnsNetDialer = &net.Dialer{
 }
 
 func _exec(server string, domain string, config *ReliableDialConfig) error {
+	if config.RetryTimes <= 0 {
+		config.RetryTimes = 1
+	}
+
+	for i := 0; i < config.RetryTimes; i++ {
+		err := _execWithoutRetry(server, domain, config)
+		if err != nil {
+			log.Warnf("exec dns request failed: %s", err)
+			time.Sleep(time.Duration(i+1) * time.Second)
+			continue
+		}
+		return nil
+	}
+	return utils.Errorf("exec dns request failed")
+}
+
+func _execWithoutRetry(server string, domain string, config *ReliableDialConfig) error {
 	req, err := dnsRequestBytes(dns.TypeA, domain)
 	if err != nil {
 		return err
 	}
 
 	rootCtx := context.Background()
-	udpCtx, udpCancel := context.WithTimeout(rootCtx, 5*time.Second)
+	udpCtx, udpCancel := context.WithTimeout(rootCtx, config.Timeout)
 	defer udpCancel()
 
 	server = utils.AppendDefaultPort(server, 53)
@@ -67,7 +84,7 @@ func _exec(server string, domain string, config *ReliableDialConfig) error {
 	}
 	conn.Write(req)
 	var buf = make([]byte, 512)
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(config.Timeout))
 	n, err := conn.Read(buf)
 	if err != nil && err != io.EOF {
 		log.Warnf("read dns response failed: %s", err)
@@ -85,11 +102,11 @@ func _exec(server string, domain string, config *ReliableDialConfig) error {
 	}
 
 	log.Warnf("no ip found in udp dns response for %v, start to check tcp", domain)
-	if config.NoFallbackTCP {
+	if !config.FallbackTCP {
 		return nil
 	}
 
-	tcpCtx, tcpCancel := context.WithTimeout(rootCtx, 5*time.Second)
+	tcpCtx, tcpCancel := context.WithTimeout(rootCtx, config.Timeout)
 	defer tcpCancel()
 	conn, err = dnsNetDialer.DialContext(tcpCtx, "tcp", server)
 	if err != nil {
@@ -97,7 +114,7 @@ func _exec(server string, domain string, config *ReliableDialConfig) error {
 	}
 	if conn != nil {
 		conn.Write(req)
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(config.Timeout))
 
 		buf = make([]byte, 512)
 		n, err = conn.Read(buf)
@@ -119,22 +136,51 @@ func _exec(server string, domain string, config *ReliableDialConfig) error {
 	return nil
 }
 
-func dohRequest(domain string) ([]string, error) {
-	packet, err := dnsRequestBytes(dns.TypeA, domain)
-	if err != nil {
-		return nil, err
-	}
-	rsp, err := lowhttp.HTTP(
-		lowhttp.WithPacketBytes(lowhttp.ReplaceHTTPPacketQueryParam([]byte(`GET /dns-query HTTP/1.1
-Host: 1.1.1.1
-User-Agent: go-http-client/1.1
-Accept: application/dns-message
+type DoHDNSResponse struct {
+	Status   int  `json:"Status"`
+	TC       bool `json:"TC"`
+	RD       bool `json:"RD"`
+	RA       bool `json:"RA"`
+	AD       bool `json:"AD"`
+	CD       bool `json:"CD"`
+	Question []struct {
+		Name string `json:"name"`
+		Type int    `json:"type"`
+	} `json:"Question"`
+	Answer []struct {
+		Name string `json:"name"`
+		Type int    `json:"type"`
+		TTL  int    `json:"TTL"`
+		Data string `json:"data"`
+	} `json:"Answer"`
+}
 
-`), "dns", codec.EncodeBase64Url(packet))),
+func dohRequest(domain string, dohUrl string, config *ReliableDialConfig) error {
+	log.Debugf("start to request doh: %v to %v", domain, dohUrl)
+	isHttps, req, err := lowhttp.ParseUrlToHttpRequestRaw("GET", dohUrl)
+	if err != nil {
+		return utils.Errorf("parse doh url[%v] failed: %s", dohUrl, err)
+	}
+	req = lowhttp.ReplaceHTTPPacketHeader(req, "Accept", "application/dns-json")
+	req = lowhttp.ReplaceAllHTTPPacketQueryParams(req, map[string]string{
+		"name": domain,
+		"type": "1",
+	})
+	rsp, err := lowhttp.HTTP(
+		lowhttp.WithPacketBytes(req), lowhttp.WithHttps(isHttps), lowhttp.WithVerifyCertificate(true),
+		lowhttp.WithTimeout(config.Timeout),
 	)
 	if err != nil {
-		panic(err)
+		return utils.Errorf("doh request failed: %s", err)
 	}
-	spew.Dump(rsp.RawPacket)
-	return nil, utils.Errorf("not implemented")
+	_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+	var rspObj DoHDNSResponse
+	err = json.Unmarshal(body, &rspObj)
+	if err != nil {
+		log.Errorf("unmarshal doh response failed: %s", err)
+	}
+	for _, a := range rspObj.Answer {
+		config.call("", domain, a.Data, dohUrl, "yakdns.doh", a.TTL)
+	}
+	return nil
 }
