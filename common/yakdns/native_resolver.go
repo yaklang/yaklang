@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
-	"sync"
 )
 
 /*
@@ -19,50 +18,57 @@ var (
 	pureGoResolver  = &net.Resolver{PreferGo: true}
 )
 
+func _execDefault(host string, config *ReliableDNSConfig) []string {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Debugf("net.Resolver panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(config.GetBaseContext(), config.Timeout)
+	defer cancel()
+	result, err := defaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		log.Debugf("default dns resolver lookup failed: %v", err)
+	}
+	if len(result) > 0 {
+		return result
+	}
+	return nil
+}
+
+func _execPureGoDefault(host string, config *ReliableDNSConfig) []string {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Debugf("net.Resolver panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(config.GetBaseContext(), config.Timeout)
+	defer cancel()
+	result, err := pureGoResolver.LookupHost(ctx, host)
+	if err != nil {
+		log.Debugf("default dns resolver lookup failed: %v", err)
+	}
+	if len(result) > 0 {
+		return result
+	}
+	return nil
+}
+
 // nativeLookupHost looks up the given host using the local resolver.
 // It returns a slice of that host's addresses.
-func nativeLookupHost(ctx context.Context, host string) []string {
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-	ctx, cancel := context.WithCancel(ctx)
-	var results = make(chan []string, 3)
-	defer close(results)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			cancel()
-			if err := recover(); err != nil {
-				log.Debugf("net.Resolver panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		result, err := defaultResolver.LookupHost(ctx, host)
-		if err != nil {
-			log.Debugf("default dns resolver lookup failed: %v", err)
-			return
+func nativeLookupHost(host string, config *ReliableDNSConfig) {
+	result := _execDefault(host, config)
+	if len(result) > 0 {
+		for _, ip := range result {
+			config.call("", host, ip, "system-default", "system-default")
 		}
-		results <- result
-	}()
-	go func() {
-		defer wg.Done()
-		defer func() {
-			cancel()
-			if err := recover(); err != nil {
-				log.Errorf("net.Resolver panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		result, err := pureGoResolver.LookupHost(ctx, host)
-		if err != nil {
-			log.Debugf("pure go dns resolver lookup failed: %v", err)
-			return
-		}
-		results <- result
-	}()
-	wg.Wait()
-	results <- nil
-	select {
-	case ret := <-results:
-		return ret
+		return
+	}
+	for _, ip := range _execPureGoDefault(host, config) {
+		config.call("", host, ip, "system-prefergo", "system-prefergo")
 	}
 }

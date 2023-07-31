@@ -1,6 +1,7 @@
 package yakdns
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
@@ -8,9 +9,17 @@ import (
 	"time"
 )
 
+var defaultDoHHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy: nil,
+	},
+	Timeout: 5 * time.Second,
+}
+
 type ReliableDNSConfig struct {
 	Timeout time.Duration
 
+	PreferTCP   bool
 	FallbackTCP bool
 	RetryTimes  int // default 3
 
@@ -27,12 +36,14 @@ type ReliableDNSConfig struct {
 
 	SpecificDNSServers []string
 
+	// ctx
+	BaseContext context.Context
+	cancel      context.CancelFunc
+
 	Callback func(dnsType string, domain string, ip, fromServer, method string)
 
 	mutex *sync.Mutex
 	count int64
-
-	dohHTTPClient *http.Client
 }
 
 type DNSOption func(*ReliableDNSConfig)
@@ -76,8 +87,17 @@ func WithDNSServers(s ...string) DNSOption {
 	}
 }
 
+func WithDNSPreferTCP(b bool) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		config.PreferTCP = b
+	}
+}
+
 func NewDefaultReliableDNSConfig() *ReliableDNSConfig {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &ReliableDNSConfig{
+		BaseContext: ctx,
+		cancel:      cancel,
 		FallbackTCP: false,
 		RetryTimes:  3,
 		Timeout:     5 * time.Second,
@@ -96,13 +116,22 @@ func NewDefaultReliableDNSConfig() *ReliableDNSConfig {
 			"https://8.8.8.8/resolve",
 			"https://8.8.4.4/resolve",
 		},
-		dohHTTPClient: &http.Client{
-			Transport: &http.Transport{
-				Proxy: nil,
-			},
-			Timeout: 5 * time.Second,
-		},
 	}
+}
+
+func WithDNSContext(ctx context.Context) DNSOption {
+	return func(c *ReliableDNSConfig) {
+		c.BaseContext, c.cancel = context.WithCancel(ctx)
+	}
+}
+
+func (r *ReliableDNSConfig) GetBaseContext() context.Context {
+	if r.BaseContext != nil {
+		return r.BaseContext
+	} else {
+		r.BaseContext, r.cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	}
+	return r.BaseContext
 }
 
 func WithDNSFallbackDoH(b bool) DNSOption {
