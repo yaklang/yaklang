@@ -657,8 +657,8 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 
 	// find last map
 	tempParam := originParam
-	splitJsonPath := strings.Split(p.jsonPath, ".")
-	for _, path := range strings.Split(p.jsonPath, ".")[:len(splitJsonPath)-1] {
+	splitJsonPath := strings.Split(strings.TrimPrefix(p.jsonPath, "$."), ".")
+	for _, path := range splitJsonPath[:len(splitJsonPath)-1] {
 		val, ok := tempParam[path]
 		if !ok {
 			return nil, utils.Errorf("no such post-json params: %s", p.jsonPath)
