@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-func atoi(i string) int {
-	parsed, _ := strconv.Atoi(i)
-	return parsed
-}
-
 func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 	if len(ssts) != 1 {
 		return false, ""
@@ -22,12 +17,14 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 
 func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 	var contents []*ContentRule
-	var contentRule *ContentRule
-	for _, param := range i.AllParam() {
-		if param == nil {
+	contentRule := new(ContentRule)
+
+	params := i.AllParam()
+	for i := 0; i < len(params); i++ {
+		if params[i] == nil {
 			continue
 		}
-		paramctx := param.(*parser.ParamContext)
+		paramctx := params[i].(*parser.ParamContext)
 		key := paramctx.Keyword().GetText()
 		if key == "" {
 			continue
@@ -43,6 +40,8 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			vStr = setting.GetText()
 			ssts = setting.AllSingleSetting()
 		}
+
+		var set = true
 
 		switch key {
 		// meta keywords
@@ -71,48 +70,80 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			for _, v := range ssts {
 				rule.Metadata = append(rule.Metadata, v.GetText())
 			}
+		// payload keyword
 		case "file_data", "file.data":
-			rule.ContentRuleConfig.HttpBaseSticky.FileData = true
+			set = setIfNotZero(&contentRule.Modifier, FileData)
 		case "http_content_type", "http.content_type":
-			rule.ContentRuleConfig.HttpBaseSticky.HttpContentType = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPContentType)
 		case "http_content_len", "http.content_len":
-			rule.ContentRuleConfig.HttpBaseSticky.HttpContentLength = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPContentLen)
 		case "http_start", "http.start":
-			rule.ContentRuleConfig.HttpBaseSticky.HttpStart = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPStart)
 		case "http_protocol", "http.protocol":
-			rule.ContentRuleConfig.HttpBaseSticky.HttpProtocol = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPProtocol)
 		case "http_header_names", "http.header_names":
-			rule.ContentRuleConfig.HttpBaseSticky.HttpHeaderNames = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPHeaderNames)
 		case "http_request_line", "http.request_line":
-			rule.ContentRuleConfig.HttpRequestSticky.HttpRequestLine = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPRequestLine)
 		case "http_accept", "http.accept":
-			rule.ContentRuleConfig.HttpRequestSticky.HttpAccept = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPAccept)
 		case "http_accept_enc", "http.accept_enc":
-			rule.ContentRuleConfig.HttpRequestSticky.HttpAcceptEnc = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPAcceptEnc)
 		case "http_referer", "http.referer":
-			rule.ContentRuleConfig.HttpRequestSticky.HttpReferer = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPReferer)
 		case "http_connection", "http.connection":
-			rule.ContentRuleConfig.HttpRequestSticky.HttpConnection = true
+			set = setIfNotZero(&contentRule.Modifier, HTTPConnection)
 		case "http_response_line", "http.response_line":
-			rule.ContentRuleConfig.HttpResponseSticky.HttpResponseLine = true
-		case "content": /* start to handle payload */
-			// content start
-			if contentRule != nil {
-				contents = append(contents, contentRule)
-			}
-			contentRule = &ContentRule{
-				HttpBaseModifier:     &HttpBaseModifierRule{},
-				HttpResponseModifier: &HttpResponseModifierRule{},
-				HttpRequestModifier:  &HttpRequestModifierRule{},
-			}
+			set = setIfNotZero(&contentRule.Modifier, HTTPResponseLine)
+		case "dns_query", "dns.query":
+			set = setIfNotZero(&contentRule.Modifier, DNSQuery)
+		case "http_header", "http.header":
+			set = setIfNotZero(&contentRule.Modifier, HTTPHeader)
+		case "http_raw_header", "http.raw_header":
+			set = setIfNotZero(&contentRule.Modifier, HTTPHeaderRaw)
+		case "http_cookie", "http.cookie":
+			set = setIfNotZero(&contentRule.Modifier, HTTPCookie)
+		case "http_uri", "http.uri":
+			set = setIfNotZero(&contentRule.Modifier, HTTPUri)
+		case "http_raw_uri", "http.raw_uri":
+			set = setIfNotZero(&contentRule.Modifier, HTTPUriRaw)
+		case "http_method", "http.method":
+			set = setIfNotZero(&contentRule.Modifier, HTTPMethod)
+		case "http_user_agent", "http.user_agent":
+			set = setIfNotZero(&contentRule.Modifier, HTTPUserAgent)
+		case "http_host", "http.host":
+			set = setIfNotZero(&contentRule.Modifier, HTTPHost)
+		case "http_raw_host", `http.raw_host`:
+			set = setIfNotZero(&contentRule.Modifier, HTTPHostRaw)
+		case "http_stat_msg", "http.stat_msg":
+			set = setIfNotZero(&contentRule.Modifier, HTTPStatMsg)
+		case "http_stat_code", "http.stat_code":
+			set = setIfNotZero(&contentRule.Modifier, HTTPStatCode)
+		case "http_client_body", "http.client_body":
+			set = setIfNotZero(&contentRule.Modifier, HTTPRequestBody)
+		case "http_server_body", "http.server_body":
+			set = setIfNotZero(&contentRule.Modifier, HTTPResponseBody)
+		case "http_server", "http.server":
+			set = setIfNotZero(&contentRule.Modifier, HTTPServer)
+		case "http_location", "http.location":
+			set = setIfNotZero(&contentRule.Modifier, HTTPLocation)
+		case "ipv4.hdr", "ipv4_hdr":
+			set = setIfNotZero(&contentRule.Modifier, IPv4HDR)
+		case "ipv6.hdr", "ipv6_hdr":
+			set = setIfNotZero(&contentRule.Modifier, IPv6HDR)
+		case "content":
 			neg, content := mustSoloSingleSetting(ssts)
-			contentRule.Negative, contentRule.Content = neg, []byte(UnquoteString(content))
+			if contentRule.Content == nil {
+				contentRule.Content = []byte(unquoteString(content))
+				contentRule.Negative = neg
+			} else {
+				set = false
+			}
 		case "dns.opcode", "dns_opcode":
 			config := rule.ContentRuleConfig.DNS
 			neg, content := mustSoloSingleSetting(ssts)
 			config.OpcodeNegative, config.Opcode = neg, atoi(content)
-		case "dns_query", "dns.query":
-			rule.ContentRuleConfig.DNS.DNSQuery = true
+		// others
 		case "flow":
 			if rule.ContentRuleConfig.Flow == nil {
 				lvstr := strings.ToLower(vStr)
@@ -142,10 +173,6 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			rule.ContentRuleConfig.IPConfig.IPOpts = vStr
 		case "ip_proto":
 			rule.ContentRuleConfig.IPConfig.IPProto = vStr //number or name
-		case "ipv4.hdr", "ipv4_hdr":
-			rule.ContentRuleConfig.IPConfig.IPv4Header = true
-		case "ipv6.hdr", "ipv6_hdr":
-			rule.ContentRuleConfig.IPConfig.IPv6Header = true
 		case "id":
 			rule.ContentRuleConfig.IPConfig.Id = atoi(vStr)
 		case "geoip":
@@ -209,59 +236,25 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "icmp_seq":
 			// icmp_seq:<number>;
 			rule.ContentRuleConfig.IcmpConfig.ICMPSeq = atoi(vStr)
-		}
 
-		if contentRule == nil {
-			continue
-		}
-
-		switch key {
-		case "http_header", "http.header":
-			contentRule.HttpBaseModifier.HttpHeader = true
-		case "http_raw_header", "http.raw_header":
-			contentRule.HttpBaseModifier.HttpRawHeader = true
-		case "http_cookie", "http.cookie":
-			contentRule.HttpBaseModifier.HttpCookie = true
-		case "http_uri", "http.uri":
-			contentRule.HttpRequestModifier.HttpUri = true
-		case "http_raw_uri", "http.raw_uri":
-			contentRule.HttpRequestModifier.HttpRawUri = true
-		case "http_method", "http.method":
-			contentRule.HttpRequestModifier.HttpMethod = true
-		case "http_user_agent", "http.user_agent":
-			contentRule.HttpRequestModifier.HttpUserAgent = true
-		case "http_host", "http.host":
-			contentRule.HttpRequestModifier.HttpHost = true
-		case "http_raw_host", `http.raw_host`:
-			contentRule.HttpRequestModifier.HttpRawHost = true
-		case "http_stat_msg", "http.stat_msg":
-			contentRule.HttpResponseModifier.HttpStatMsg = true
-		case "http_stat_code", "http.stat_code":
-			contentRule.HttpResponseModifier.HttpStatCode = true
-		case "http_server_body", "http.server_body":
-			contentRule.HttpResponseModifier.HttpServerBody = true
-		case "http_server", "http.server":
-			contentRule.HttpResponseModifier.HttpServer = true
-		case "http_location", "http.location":
-			contentRule.HttpResponseModifier.HttpLocation = true
 		case "nocase":
 			contentRule.Nocase = true
 		case "depth":
-			contentRule.Depth = atoi(vStr)
+			contentRule.Depth = atoistar(vStr)
 		case "offset":
-			contentRule.Offset = atoi(vStr)
+			contentRule.Offset = atoistar(vStr)
 		case "startswith":
 			contentRule.StartsWith = true
 		case "endswith":
 			contentRule.EndsWith = true
 		case "distance":
-			contentRule.Distance = atoi(vStr)
+			contentRule.Distance = atoistar(vStr)
 		case "within":
-			contentRule.Within = atoi(vStr)
+			contentRule.Within = atoistar(vStr)
 		case "rawbytes":
 			contentRule.RawBytes = true
 		case "isdataset":
-			contentRule.IsDataSet = atoi(vStr)
+			contentRule.IsDataAt = vStr
 		case "bsize":
 			contentRule.BSize = vStr
 		case "dsize":
@@ -277,12 +270,21 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "rpc":
 			contentRule.RPC = vStr
 		case "replace":
-			contentRule.RPC = UnquoteString(vStr)
+			contentRule.RPC = unquoteString(vStr)
 		case "pcre":
 			contentRule.PCRE, _ = strconv.Unquote(vStr)
 		}
+
+		// conflict, save and match again
+		if !set {
+			contents = append(contents, contentRule)
+			contentRule = new(ContentRule)
+			i--
+		}
+		set = true
 	}
-	if contentRule != nil {
+	if len(contentRule.Content) != 0 {
+		// todo: check if contentRule valid
 		contents = append(contents, contentRule)
 	}
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)

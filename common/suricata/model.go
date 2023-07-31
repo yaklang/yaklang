@@ -13,6 +13,53 @@ import (
 	"time"
 )
 
+type Modifier uint32
+
+const (
+	Default Modifier = iota
+
+	// http req
+	HTTPUri
+	HTTPUriRaw
+	HTTPMethod
+	HTTPRequestLine
+	HTTPRequestBody
+	HTTPUserAgent
+	HTTPHost
+	HTTPHostRaw
+	HTTPAccept
+	HTTPAcceptLang
+	HTTPAcceptEnc
+	HTTPReferer
+
+	// http resp
+	HTTPStatMsg
+	HTTPStatCode
+	HTTPResponseLine
+	HTTPResponseBody
+	HTTPServer
+	HTTPLocation
+
+	// http common
+	HTTPHeader
+	HTTPHeaderRaw
+	HTTPCookie
+	HTTPConnection
+	FileData
+	HTTPContentType
+	HTTPContentLen
+	HTTPStart
+	HTTPProtocol
+	HTTPHeaderNames
+
+	// DNS
+	DNSQuery
+
+	// IP
+	IPv4HDR
+	IPv6HDR
+)
+
 type Rule struct {
 	Raw                string       `json:"raw"`
 	Message            string       `json:"message"`
@@ -35,12 +82,28 @@ type Rule struct {
 	ContentRuleConfig *ContentRuleConfig
 }
 
-func (r *PortRule) GetHighPort() uint32 {
-	return uint32(55000 + rand.Intn(65535-55000))
+func (r *Rule) init() {
+	r.ContentRuleConfig = &ContentRuleConfig{
+		Thresholding: &ThresholdingConfig{},
+		HTTPConfig:   &HTTPConfig{},
+		IPConfig:     &IPLayerRule{},
+		TcpConfig:    &TCPLayerRule{},
+		UdpConfig:    &UDPLayerRule{},
+		IcmpConfig:   &ICMPLayerRule{},
+		ContentRules: nil,
+		DNS: &DNSRule{
+			OpcodeNegative: false,
+			Opcode:         0,
+		},
+	}
 }
 
 func (r *AddressRule) GetLocalIPAddress() string {
 	return utils.GetLocalIPAddress()
+}
+
+func (r *PortRule) GetHighPort() uint32 {
+	return uint32(55000 + rand.Intn(65535-55000))
 }
 
 func (r *PortRule) GetAvailablePort() uint32 {
@@ -76,25 +139,6 @@ func (r *PortRule) GetAvailablePort() uint32 {
 	return r.Rules[rand.Intn(len(r.Rules))].GetAvailablePort()
 }
 
-func (r *Rule) init() {
-	r.ContentRuleConfig = &ContentRuleConfig{
-		Thresholding:       &ThresholdingConfig{},
-		HttpBaseSticky:     &HttpBaseStickyRule{},
-		HttpRequestSticky:  &HttpRequestStickyRule{},
-		HttpResponseSticky: &HttpResponseStickyRule{},
-		IPConfig:           &IPLayerRule{},
-		TcpConfig:          &TCPLayerRule{},
-		UdpConfig:          &UDPLayerRule{},
-		IcmpConfig:         &ICMPLayerRule{},
-		ContentRules:       nil,
-		DNS: &DNSRule{
-			OpcodeNegative: false,
-			Opcode:         0,
-			DNSQuery:       false,
-		},
-	}
-}
-
 type ContentRuleConfig struct {
 	Flow *FlowRule
 
@@ -104,9 +148,7 @@ type ContentRuleConfig struct {
 	DNS *DNSRule
 
 	/* HTTP Config */
-	HttpBaseSticky     *HttpBaseStickyRule
-	HttpRequestSticky  *HttpRequestStickyRule
-	HttpResponseSticky *HttpResponseStickyRule
+	HTTPConfig *HTTPConfig
 
 	/* IP */
 	IPConfig *IPLayerRule
@@ -135,43 +177,33 @@ type ContentRule struct {
 	Content  []byte
 
 	// payload config
-	Nocase      bool // case insensitive
-	Depth       int
-	Offset      int
-	StartsWith  bool
-	EndsWith    bool
-	Distance    int
-	Within      int
-	RawBytes    bool
-	IsDataSet   int
-	BSize       string
-	DSize       string
-	ByteTest    string
-	ByteMath    string
-	ByteJump    string
+	Nocase     bool // case insensitive
+	Depth      *int
+	Offset     *int
+	StartsWith bool
+	EndsWith   bool
+	Distance   *int
+	Within     *int
+	// no effect
+	RawBytes bool
+	IsDataAt string
+	BSize    string
+	DSize    string
+	// won't support
+	ByteTest string
+	// won't support
+	ByteMath string
+	// won't support
+	ByteJump string
+	// won't support
 	ByteExtract string
-	RPC         string // sunrpc call
-	Replace     []byte
-	PCRE        string
+	// won't support
+	RPC string // sunrpc call
+	// won't support
+	Replace []byte
+	PCRE    string
 
-	HttpBaseModifier     *HttpBaseModifierRule
-	HttpResponseModifier *HttpResponseModifierRule
-	HttpRequestModifier  *HttpRequestModifierRule
-}
-
-func fixRules(rules []*ContentRule) []*ContentRule {
-	for _, r := range rules {
-		if r.HttpRequestModifier == nil {
-			r.HttpRequestModifier = &HttpRequestModifierRule{}
-		}
-		if r.HttpResponseModifier == nil {
-			r.HttpResponseModifier = &HttpResponseModifierRule{}
-		}
-		if r.HttpBaseModifier == nil {
-			r.HttpBaseModifier = &HttpBaseModifierRule{}
-		}
-	}
-	return rules
+	Modifier Modifier
 }
 
 func (c *ContentRule) PCREStringGenerator(count int) []*ContentRule {
@@ -221,45 +253,45 @@ func (c *ContentRule) PCREStringGenerator(count int) []*ContentRule {
 				current++
 				switch flag {
 				case 'I':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpUri: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPUri})
 				case 'P', 'Q': // 这个都是针对 body 的，没有啥限制
 					rules = append(rules, &ContentRule{Content: []byte(result)})
 				case 'H':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpBaseModifier: &HttpBaseModifierRule{HttpHeader: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPHeader})
 				case 'D':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpBaseModifier: &HttpBaseModifierRule{HttpRawHeader: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPHeaderRaw})
 				case 'M':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpMethod: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPMethod})
 				case 'V':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpUserAgent: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPUserAgent})
 				case 'W':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpHost: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPHost})
 				case 'C':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpBaseModifier: &HttpBaseModifierRule{HttpCookie: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPCookie})
 				case 'S':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpResponseModifier: &HttpResponseModifierRule{HttpStatCode: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPStatCode})
 				case 'Y':
-					rules = append(rules, &ContentRule{Content: []byte(result), HttpResponseModifier: &HttpResponseModifierRule{HttpStatMsg: true}})
+					rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPStatMsg})
 				default:
 					once.Do(func() {
 						// 如果无法检测的话，针对 URI 这些将是默认选项
 						rules = append(rules, &ContentRule{Content: []byte(result)})
 						if len(result) < 100 {
-							rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpUri: true}})
-							rules = append(rules, &ContentRule{Content: []byte(result), HttpBaseModifier: &HttpBaseModifierRule{HttpHeader: true}})
-							rules = append(rules, &ContentRule{Content: []byte(result), HttpRequestModifier: &HttpRequestModifierRule{HttpUserAgent: true}})
-							rules = append(rules, &ContentRule{Content: []byte(result), HttpBaseModifier: &HttpBaseModifierRule{HttpCookie: true}})
+							rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPUri})
+							rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPHeader})
+							rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPUserAgent})
+							rules = append(rules, &ContentRule{Content: []byte(result), Modifier: HTTPCookie})
 						}
 					})
 
 				}
 
 				if current >= count {
-					return fixRules(rules)
+					return rules
 				}
 			}
 		}
-		return fixRules(rules)
+		return rules
 	case <-ctx.Done():
 		log.Warn("PCRE生成超时 rule:" + c.PCRE)
 	}
