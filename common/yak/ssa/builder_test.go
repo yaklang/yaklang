@@ -611,4 +611,40 @@ false3: <- entry0
 	//TODO: add test for function: `func (phi *Phi) triRemoveTrivialPhi() Value `
 }
 
-//TODO: add loop test for function: `readVariableRecursive`
+// TODO: add loop test for function: `readVariableRecursive`
+func TestLoop(t *testing.T) {
+
+	t.Run("looptest", func(t *testing.T) {
+		code := `
+	a = 10
+	b = a + 1
+	for i=0;i<b;i++ {
+		b = b + i
+	}
+	c = b + 3
+			`
+		ir := `
+yak-main
+entry0:
+	%0 = 10 add 1
+	%1 = jump -> loop.header1
+loop.header1: <- entry0 loop.latch4
+	%4 = phi [0, entry0] [%9, loop.latch4]
+	%5 = phi [%0, entry0] [%6, loop.latch4]
+	%2 = %4 lt %5
+	%3 = If [%2] true -> loop.body2, false -> loop.exit3
+loop.body2: <- loop.header1
+	%6 = %5 add %4
+	%7 = jump -> loop.latch4
+loop.exit3: <- loop.header1
+	%8 = %5 add 3
+loop.latch4: <- loop.body2
+	%9 = %4 add 1
+	%10 = jump -> loop.header1
+		`
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+}
