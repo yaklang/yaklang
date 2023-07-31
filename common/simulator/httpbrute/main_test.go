@@ -3,11 +3,12 @@
 package httpbrute
 
 import (
+	"testing"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/yaklang/yaklang/common/simulator/config"
-	"testing"
-	"time"
 )
 
 func TestHttpBruteForce(t *testing.T) {
@@ -22,6 +23,7 @@ func TestHttpBruteForce(t *testing.T) {
 		WithExePath("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
 		WithExtraWaitLoadTime(500),
 		WithLeakless(config.LeaklessDefault),
+		//WithProxy("localhost:8099"),
 	)
 	ch, _ := HttpBruteForce(urlStr, opts...)
 	for item := range ch {
