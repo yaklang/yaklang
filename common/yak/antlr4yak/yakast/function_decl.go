@@ -2,6 +2,7 @@ package yakast
 
 import (
 	"fmt"
+
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
@@ -105,7 +106,6 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 			fun.SetSourceCode(*y.sourceCodePointer)
 		}
 	}
-	fun.GetSymbolId()
 	if funcName != "" {
 		// 如果函数名存在的话，设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 		fun.SetName(funcName)
@@ -124,15 +124,15 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		TypeVerbose: "anonymous-function",
 		Value:       fun,
 	}
-	// 闭包函数，直接push到栈中
 	if funcName != "" {
-		y.pushLeftRef(fun.GetSymbolId())
-	}
-	y.pushValue(funcVal)
-	// 如果有函数名的话，进行快速赋值
-	if funcName != "" {
+		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
+		y.pushLeftRef(fun.GetSymbolId())
+		y.pushValue(funcVal)
 		y.pushOperator(yakvm.OpFastAssign)
+	} else {
+		// 闭包函数，直接push到栈中
+		y.pushValueWithCopy(funcVal)
 	}
 
 	return nil

@@ -600,7 +600,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 		if c.Op1.IsYakFunction() {
 			fun := c.Op1.Value.(*Function)
+			if c.Unary == 1 {
+				c.Op1.Value = fun.Copy(v.scope)
+			} else if c.Unary == 0 {
 			fun.scope = v.scope
+		}
 		}
 		v.push(c.Op1)
 		return
