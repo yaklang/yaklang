@@ -2,6 +2,8 @@ package mutate
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 type httpParamPositionType string
@@ -18,15 +19,18 @@ var (
 	posMethod              httpParamPositionType = "method"
 	posBody                httpParamPositionType = "body"
 	posGetQuery            httpParamPositionType = "get-query"
+	posGetQueryBase64      httpParamPositionType = "get-query-base64"
 	posGetQueryJson        httpParamPositionType = "get-query-json"
 	posGetQueryBase64Json  httpParamPositionType = "get-query-base64-json"
 	posPath                httpParamPositionType = "path"
 	posHeader              httpParamPositionType = "header"
 	posPostQuery           httpParamPositionType = "post-query"
+	posPostQueryBase64     httpParamPositionType = "post-query-base64"
 	posPostQueryJson       httpParamPositionType = "post-query-json"
 	posPostQueryBase64Json httpParamPositionType = "post-query-base64-json"
 	posPostJson            httpParamPositionType = "post-json"
 	posCookie              httpParamPositionType = "cookie"
+	posCookieBase64        httpParamPositionType = "cookie-base64"
 	posCookieJson          httpParamPositionType = "cookie-json"
 	posCookieBase64Json    httpParamPositionType = "cookie-base64-json"
 	posPathAppend          httpParamPositionType = "path-append"
@@ -41,6 +45,8 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 		return "Body"
 	case posGetQuery:
 		return "GET参数"
+	case posGetQueryBase64:
+		return "GET参数(Base64)"
 	case posGetQueryJson:
 		return "GET参数(JSON)"
 	case posGetQueryBase64Json:
@@ -55,6 +61,8 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 		return "Header"
 	case posPostQuery:
 		return "POST参数"
+	case posPostQueryBase64:
+		return "POST参数(Base64)"
 	case posPostQueryJson:
 		return "POST参数(JSON)"
 	case posPostQueryBase64Json:
@@ -63,6 +71,8 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 		return "JSON-Body参数"
 	case posCookie:
 		return "Cookie参数"
+	case posCookieBase64:
+		return "Cookie参数(Base64)"
 	case posCookieJson:
 		return "Cookie参数(JSON)"
 	case posCookieBase64Json:
@@ -140,7 +150,29 @@ func (p *FuzzHTTPRequestParam) PositionVerbose() string {
 
 func (p *FuzzHTTPRequestParam) Value() interface{} {
 	switch p.typePosition {
-	case posGetQueryJson, posPostJson:
+	case posGetQueryBase64, posPostQueryBase64, posCookieBase64:
+		switch paramOriginValue := p.paramOriginValue.(type) {
+		case []string:
+			if len(paramOriginValue) > 0 {
+				decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
+				if err != nil {
+					break
+				}
+				return utils.InterfaceToStringSlice(decoded)
+			} else {
+				return utils.InterfaceToStringSlice("")
+			}
+		case string:
+			decoded, err := codec.DecodeBase64Url(paramOriginValue)
+			if err != nil {
+				break
+			}
+			return utils.InterfaceToStringSlice(decoded)
+		default:
+			log.Error("unrecognized param value type")
+			return p.paramOriginValue
+		}
+	case posGetQueryJson, posPostJson, posCookieJson:
 		switch paramOriginValue := p.paramOriginValue.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
@@ -195,6 +227,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzGetParams(p.param, i)
 	case posGetQueryJson:
 		return p.origin.FuzzGetJsonPathParams(p.param, p.jsonPath, i)
+	case posGetQueryBase64:
+		return p.origin.FuzzGetBase64Params(p.param, i)
 	case posGetQueryBase64Json:
 		return p.origin.FuzzGetBase64JsonPath(p.param, p.jsonPath, i)
 	case posHeader:
@@ -205,12 +239,16 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzPostJsonParams(p, i)
 	case posCookie:
 		return p.origin.FuzzCookie(p.param, InterfaceToFuzzResults(i))
+	case posCookieBase64:
+		return p.origin.FuzzCookieBase64(p.param, InterfaceToFuzzResults(i))
 	case posCookieJson:
 		return p.origin.FuzzCookieJsonPath(p.param, p.jsonPath, i)
 	case posCookieBase64Json:
 		return p.origin.FuzzCookieBase64JsonPath(p.param, p.jsonPath, i)
 	case posPostQuery:
 		return p.origin.FuzzPostParams(p.param, i)
+	case posPostQueryBase64:
+		return p.origin.FuzzPostBase64Params(p.param, i)
 	case posPostQueryJson:
 		return p.origin.FuzzPostJsonPathParams(p.param, p.jsonPath, i)
 	case posPostQueryBase64Json:

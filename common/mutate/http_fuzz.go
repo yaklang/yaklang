@@ -4,12 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +12,13 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 )
 
 type FuzzHTTPRequest struct {
@@ -52,6 +53,9 @@ type FuzzHTTPRequestIf interface {
 	// 模糊测试 Query 中的字段
 	FuzzGetParams(interface{}, interface{}) FuzzHTTPRequestIf
 
+	// 模糊测试被Base64编码后Query中的字段
+	FuzzGetBase64Params(interface{}, interface{}) FuzzHTTPRequestIf
+
 	// FuzzGetParamJson
 	FuzzGetJsonPathParams(any, string, any) FuzzHTTPRequestIf
 
@@ -60,6 +64,9 @@ type FuzzHTTPRequestIf interface {
 
 	// 模糊测试 PostParam
 	FuzzPostParams(k, v interface{}) FuzzHTTPRequestIf
+
+	// 模糊测试被Base64编码后Post中的字段
+	FuzzPostBase64Params(k, v interface{}) FuzzHTTPRequestIf
 
 	// 测试 PostJson 中的数据
 	FuzzPostJsonParams(k, v interface{}) FuzzHTTPRequestIf
@@ -72,6 +79,9 @@ type FuzzHTTPRequestIf interface {
 
 	// 按键值对测试 Cookie 中的数据
 	FuzzCookie(k, v interface{}) FuzzHTTPRequestIf
+
+	// 模糊测试被Base64编码后Cookie中的字段
+	FuzzCookieBase64(k, v interface{}) FuzzHTTPRequestIf
 
 	// 测试 multipart 携带字段
 	FuzzFormEncoded(k, v interface{}) FuzzHTTPRequestIf
@@ -435,15 +445,25 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64JSON(param[0]); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+		if val, ok := isBase64(param[0]); ok {
+			if val, ok := utils.IsJSON(val); ok {
+				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+					params = append(params, &FuzzHTTPRequestParam{
+						typePosition:     posGetQueryBase64Json,
+						param:            key,
+						paramOriginValue: param,
+						jsonPath:         j,
+						origin:           f,
+					})
+				}
+			} else {
 				params = append(params, &FuzzHTTPRequestParam{
-					typePosition:     posGetQueryBase64Json,
+					typePosition:     posGetQueryBase64,
 					param:            key,
 					paramOriginValue: param,
-					jsonPath:         j,
 					origin:           f,
 				})
+				continue
 			}
 		}
 
@@ -539,15 +559,25 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64JSON(param[0]); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+		if val, ok := isBase64(param[0]); ok {
+			if val, ok := utils.IsJSON(val); ok {
+				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+					params = append(params, &FuzzHTTPRequestParam{
+						typePosition:     posPostQueryBase64Json,
+						param:            key,
+						paramOriginValue: param,
+						jsonPath:         j,
+						origin:           f,
+					})
+				}
+			} else {
 				params = append(params, &FuzzHTTPRequestParam{
-					typePosition:     posPostQueryBase64Json,
+					typePosition:     posPostQueryBase64,
 					param:            key,
 					paramOriginValue: param,
-					jsonPath:         j,
 					origin:           f,
 				})
+				continue
 			}
 		}
 
@@ -586,15 +616,25 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64JSON(k.Value); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+		if val, ok := isBase64(k.Value); ok {
+			if val, ok := utils.IsJSON(val); ok {
+				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+					params = append(params, &FuzzHTTPRequestParam{
+						typePosition:     posCookieBase64Json,
+						param:            k.Name,
+						paramOriginValue: []string{k.Value},
+						jsonPath:         j,
+						origin:           f,
+					})
+				}
+			} else {
 				params = append(params, &FuzzHTTPRequestParam{
-					typePosition:     posCookieBase64Json,
+					typePosition:     posCookieBase64,
 					param:            k.Name,
 					paramOriginValue: []string{k.Value},
-					jsonPath:         j,
 					origin:           f,
 				})
+				continue
 			}
 		}
 
