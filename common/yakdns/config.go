@@ -3,11 +3,12 @@ package yakdns
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
 	"sync"
 	"time"
 )
 
-type ReliableDialConfig struct {
+type ReliableDNSConfig struct {
 	Timeout time.Duration
 
 	FallbackTCP bool
@@ -30,9 +31,13 @@ type ReliableDialConfig struct {
 
 	mutex *sync.Mutex
 	count int64
+
+	dohHTTPClient *http.Client
 }
 
-func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string, ttl ...int) {
+type DNSOption func(*ReliableDNSConfig)
+
+func (r *ReliableDNSConfig) call(dnsType, domain, ip, fromServer, method string, ttl ...int) {
 	var isV6 = utils.IsIPv6(ip)
 	if dnsType == "" {
 		if utils.IsIPv4(ip) {
@@ -51,9 +56,9 @@ func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string
 	}
 
 	if isV6 {
-		v6Cache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
+		ipv6DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
 	} else {
-		cache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
+		ipv4DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
 	}
 
 	r.mutex.Lock()
@@ -65,8 +70,14 @@ func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string
 	}
 }
 
-func NewDefaultReliableDialConfig() *ReliableDialConfig {
-	return &ReliableDialConfig{
+func WithDNSServers(s ...string) DNSOption {
+	return func(c *ReliableDNSConfig) {
+		c.SpecificDNSServers = s
+	}
+}
+
+func NewDefaultReliableDNSConfig() *ReliableDNSConfig {
+	return &ReliableDNSConfig{
 		FallbackTCP: false,
 		RetryTimes:  3,
 		Timeout:     5 * time.Second,
@@ -85,47 +96,59 @@ func NewDefaultReliableDialConfig() *ReliableDialConfig {
 			"https://8.8.8.8/resolve",
 			"https://8.8.4.4/resolve",
 		},
+		dohHTTPClient: &http.Client{
+			Transport: &http.Transport{
+				Proxy: nil,
+			},
+			Timeout: 5 * time.Second,
+		},
 	}
 }
 
-func WithFallbackDoH(b bool) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSFallbackDoH(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.FallbackDoH = b
 	}
 }
 
-func WithPreferDoH(b bool) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSPreferDoH(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.PreferDoH = b
 	}
 }
 
-func WithSpecificDoH(s ...string) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSSpecificDoH(s ...string) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.SpecificDoH = s
 	}
 }
 
-func WithNoFallbackTCP(b bool) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSFallbackTCP(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.FallbackTCP = b
 	}
 }
 
-func WithRetryTimes(i int) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSRetryTimes(i int) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.RetryTimes = i
 	}
 }
 
-func WithDisableSystemResolver(b bool) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSDisableSystemResolver(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.DisableSystemResolver = b
 	}
 }
 
-func WithFallbackSpecificDNS(b bool) func(*ReliableDialConfig) {
-	return func(c *ReliableDialConfig) {
+func WithDNSFallbackSpecificDNS(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
 		c.FallbackSpecificDNS = b
+	}
+}
+
+func WithDNSCallback(cb func(dnsType, domain, ip, fromServer, method string)) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		config.Callback = cb
 	}
 }

@@ -9,11 +9,11 @@ import (
 	"sync"
 )
 
-var v6Cache = ttlcache.NewCache()
-var cache = ttlcache.NewCache()
+var ipv6DNSCache = ttlcache.NewCache()
+var ipv4DNSCache = ttlcache.NewCache()
 
-func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
-	var config = NewDefaultReliableDialConfig()
+func reliableLookupHost(host string, opt ...DNSOption) error {
+	var config = NewDefaultReliableDNSConfig()
 	for _, o := range opt {
 		o(config)
 	}
@@ -26,7 +26,7 @@ func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
 	}
 
 	// ttlcache v4 > v6
-	cachedResult, ok := cache.Get(host)
+	cachedResult, ok := ipv4DNSCache.Get(host)
 	if ok {
 		result, ok := cachedResult.(string)
 		if ok {
@@ -34,7 +34,7 @@ func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
 			return nil
 		}
 	}
-	cachedResult, ok = v6Cache.Get(host)
+	cachedResult, ok = ipv6DNSCache.Get(host)
 	if ok {
 		result, ok := cachedResult.(string)
 		if ok {
@@ -132,4 +132,47 @@ func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
 	}
 
 	return nil
+}
+
+func LookupAll(host string, opt ...DNSOption) []string {
+	var results []string
+	opt = append(opt, WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+		if ip == "" {
+			return
+		}
+		results = append(results, ip)
+	}))
+	err := reliableLookupHost(host, opt...)
+	if err != nil {
+		log.Errorf("reliable lookup host %s failed: %v", host, err)
+	}
+	return results
+}
+
+func LookupFirst(host string, opt ...DNSOption) string {
+	result := make(chan string)
+	opt = append(opt, WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+		if ip == "" {
+			return
+		}
+		select {
+		case result <- ip:
+		default:
+		}
+	}))
+	go func() {
+		err := reliableLookupHost(host, opt...)
+		if err != nil {
+			log.Errorf("reliable lookup host %s failed: %v", host, err)
+		}
+		select {
+		case result <- "":
+		}
+	}()
+
+	select {
+	case resultStr := <-result:
+		defer close(result)
+		return resultStr
+	}
 }
