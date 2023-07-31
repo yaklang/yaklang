@@ -217,9 +217,10 @@ func RequirePortByToken(
 	})
 }
 
-func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
+func RequireDNSLogDomain(addr, mode string) (domain string, token string, _ error) {
 	if addr == "" {
 		addr = consts.GetDefaultPublicReverseServer()
+		//addr = "ns1.cybertunnel.run:64333"
 	}
 	client, conn, err := GetDNSLogClient(addr)
 	if err != nil {
@@ -230,7 +231,7 @@ func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
 	var count = 0
 	for {
 		count++
-		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{})
+		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{Mode: mode})
 		if err != nil {
 			if count > 3 {
 				return "", "", utils.Errorf("require dns domain failed: %s", err)
@@ -246,11 +247,11 @@ func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
 
 }
 
-func QueryExistedDNSLogEvents(addr string, token string) ([]*tpb.DNSLogEvent, error) {
-	return QueryExistedDNSLogEventsEx(addr, token, 10)
+func QueryExistedDNSLogEvents(addr, token, mode string) ([]*tpb.DNSLogEvent, error) {
+	return QueryExistedDNSLogEventsEx(addr, token, mode, 10)
 }
 
-func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+func QueryExistedDNSLogEventsEx(addr, token, mode string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f = 5.0
 	if len(timeout) > 0 {
 		f = timeout[0]
@@ -271,7 +272,7 @@ func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) (
 	var count = 0
 	for {
 		count++
-		rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token})
+		rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token, Mode: mode})
 		if err != nil {
 			if count > 3 {
 				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())

@@ -41,6 +41,15 @@ func Random() string {
 	return list[rand.Intn(len(list))]
 }
 
+func BrokerNames() []string {
+	var names []string
+	brokers.Range(func(key, value interface{}) bool {
+		names = append(names, key.(string))
+		return true
+	})
+	return names
+}
+
 func AvialableBrokers() []string {
 	var a = []string{"*"}
 	brokers.Range(func(key, value any) bool {

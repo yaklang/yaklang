@@ -60,7 +60,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 }
 
 func (s *Server) RequireDNSLogDomain(ctx context.Context, addr *ypb.YakDNSLogBridgeAddr) (*ypb.DNSLogRootDomain, error) {
-	domain, token, err := cybertunnel.RequireDNSLogDomain(addr.GetDNSLogAddr())
+	domain, token, err := cybertunnel.RequireDNSLogDomain(addr.GetDNSLogAddr(), addr.GetDNSMode())
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *Server) RequireDNSLogDomain(ctx context.Context, addr *ypb.YakDNSLogBri
 }
 
 func (s *Server) QueryDNSLogByToken(ctx context.Context, req *ypb.QueryDNSLogByTokenRequest) (*ypb.QueryDNSLogByTokenResponse, error) {
-	events, err := cybertunnel.QueryExistedDNSLogEvents(req.GetDNSLogAddr(), req.GetToken())
+	events, err := cybertunnel.QueryExistedDNSLogEvents(req.GetDNSLogAddr(), req.GetToken(), req.GetDNSMode())
 	if err != nil {
 		return nil, err
 	}

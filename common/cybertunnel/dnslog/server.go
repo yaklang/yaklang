@@ -66,7 +66,7 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 	}
 	var a, _ = dnslogbrokers.Get(params.Mode)
 	if a != nil {
-		domain, token, err := a.Require(30 * time.Second)
+		domain, token, err := a.Require(30*time.Second, "http://192.168.3.113:9999")
 		if err != nil {
 			return nil, utils.Errorf("require[%v] dnslog failed: %s", mode)
 		}
@@ -101,7 +101,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 	if mode != "" {
 		var a, _ = dnslogbrokers.Get(params.Mode)
 		if a != nil {
-			results, err := a.GetResult(params.GetToken(), 30*time.Second)
+			results, err := a.GetResult(params.GetToken(), 30*time.Second, "http://192.168.3.113:9999")
 			if err != nil {
 				return nil, utils.Errorf("require[%v] dnslog failed: %s", a.Name())
 			}

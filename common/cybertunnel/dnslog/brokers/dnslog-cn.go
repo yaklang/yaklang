@@ -51,11 +51,12 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	if token == "" || subdomain == "" {
 		return "", "", utils.Errorf("lowhttp.GetHTTPPacketCookie failed: %v", "cookie or subdomain is empty")
 	}
-
+	log.Infof("dnslog.cn subdomain: %s, token: %s", subdomain, token)
 	return subdomain, token, nil
 }
 
 func (d *dnslogCNBroker) GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
+	log.Infof("dnslog.cn token: %s", token)
 	var r string
 	var samples, _ = mutate.FuzzTagExec(`{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(1000, 9999)}}`)
 	if len(samples) > 0 {
