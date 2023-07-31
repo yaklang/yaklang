@@ -13,13 +13,13 @@ import (
 	"strings"
 )
 
-//go:embed vul_login_jwt_login.html
+//go:embed html/vul_login_jwt_login.html
 var jwtLoginPage []byte
 
-//go:embed vul_login_jwt_profile.html
+//go:embed html/vul_login_jwt_profile.html
 var jwtLoginProfilePage []byte
 
-//go:embed vul_login_login_setjwt.html
+//go:embed html/vul_login_login_setjwt.html
 var jwtLoginProfileSetJWTPage []byte
 
 func (s *VulinServer) registerLoginRoute() {

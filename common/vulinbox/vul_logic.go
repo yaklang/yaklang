@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-//go:embed vul_user_register.html
+//go:embed html/vul_user_register.html
 var registerPage []byte
 
-//go:embed vul_user_login.html
+//go:embed html/vul_user_login.html
 var loginPage []byte
 
-//go:embed vul_user_profile.html
+//go:embed html/vul_user_profile.html
 var profilePage []byte
 
 func (s *VulinServer) registerUserRoute() {
@@ -84,9 +84,9 @@ func (s *VulinServer) registerUserRoute() {
 					return
 				}
 				http.SetCookie(writer, &http.Cookie{
-					Name:  "_cookie",
-					Value: session.Uuid,
-
+					Name:    "_cookie",
+					Value:   session.Uuid,
+					Path:    "/",
 					Expires: time.Now().Add(15 * time.Minute),
 
 					//HttpOnly: true,

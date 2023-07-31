@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-//go:embed vul_sqli.html
+//go:embed html/vul_sqli.html
 var vulInSQLIViewer []byte
 
 func sqliWriter(writer http.ResponseWriter, request *http.Request, data []*VulinUser, str ...string) {
