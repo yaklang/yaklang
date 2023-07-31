@@ -314,9 +314,15 @@ func (bruteForce *BruteForceCore) Start() error {
 		browserModule.SetProxy(bruteForce.config.proxy, bruteForce.config.proxyUsername, bruteForce.config.proxyPassword)
 	}
 	browserModule.SetLeakless(bruteForce.config.leakless)
-	bruteForce.page = browserModule.Create()
+	page, err := browserModule.Create()
+	if page == nil {
+		msg := fmt.Sprintf("bruteforce create page error: %s", err.Error())
+		bruteForce.resultChannel <- &BruteResult{bruteInfo: msg}
+		return utils.Error(err)
+	}
+	bruteForce.page = page
 	bruteForce.init()
-	err := bruteForce.elementDetect()
+	err = bruteForce.elementDetect()
 	if err != nil {
 		msg := fmt.Sprintf("bruteforce element detect error: %s", err.Error())
 		bruteForce.resultChannel <- &BruteResult{bruteInfo: msg}

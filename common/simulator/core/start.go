@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/simulator/config"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/context"
 )
 
@@ -66,12 +67,12 @@ func (startMode *StartMode) Cancel() {
 	startMode.cancel()
 }
 
-func (mode *StartMode) Create() *GeneralPage {
+func (mode *StartMode) Create() (*GeneralPage, error) {
 	page, err := CreatePage(mode.config)
 	if err != nil {
-		log.Errorf("create page error: %s", err)
-		return nil
+		return nil, utils.Errorf("create page error: %s", err)
+
 	}
 	mode.page = page
-	return page
+	return page, nil
 }
