@@ -57,6 +57,13 @@ func NetworkByteOrderUint16ToBytes(i any) []byte {
 	}
 }
 
+func NetworkByteOrderBytesToUint16(r []byte) uint16 {
+	if len(r) < 2 {
+		return 0
+	}
+	return uint16(r[0])<<8 | uint16(r[1])
+}
+
 func NetworkByteOrderUint32ToBytes(i any) []byte {
 	raw, err := strconv.ParseUint(fmt.Sprint(i), 10, 32)
 	if err != nil {

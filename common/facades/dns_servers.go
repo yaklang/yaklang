@@ -64,8 +64,6 @@ func NewDNSServer(domain, dnsLogIP, serveIPRaw string, port int) (*DNSServer, er
 
 	domain = dns.Fqdn(domain)
 	ins := &DNSServer{
-		//ns1Domain: fmt.Sprintf("ns1.%v", domain),
-		//ns2Domain: fmt.Sprintf("ns2.%v", domain),
 		mxDomain:  fmt.Sprintf("mail.%v", domain),
 		dotDomain: fmt.Sprintf(".%v", domain),
 		ipAddr:    ipAddr,
@@ -307,16 +305,26 @@ func (d *DNSServer) Serve(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 		}
-		go d.udpCoreServer.Shutdown()
-		go d.tcpCoreServer.Shutdown()
+
+		if d.udpCoreServer != nil {
+			go d.udpCoreServer.Shutdown()
+		}
+
+		if d.tcpCoreServer != nil {
+			go d.tcpCoreServer.Shutdown()
+		}
 	}()
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
+
+		if d.tcpCoreServer == nil {
+			return
+		}
 		for {
+			log.Infof("enable tcp dnslog server: %v", d.tcpCoreServer.Addr)
 			err := d.tcpCoreServer.ListenAndServe()
-			time.Sleep(time.Second)
 			if err != nil {
 				log.Errorf("error failed (tcp dnslog server): %s", err)
 			}
@@ -325,22 +333,28 @@ func (d *DNSServer) Serve(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			default:
+				time.Sleep(time.Second)
 			}
 		}
 	}()
 	go func() {
 		defer wg.Done()
+
+		if d.udpCoreServer == nil {
+			return
+		}
+
 		for {
+			log.Infof("enable udp dnslog server: %v", d.udpCoreServer.Addr)
 			err := d.udpCoreServer.ListenAndServe()
-			time.Sleep(time.Second)
 			if err != nil {
 				log.Errorf("error failed (tcp dnslog server): %s", err)
 			}
-
 			select {
 			case <-ctx.Done():
 				return
 			default:
+				time.Sleep(time.Second)
 			}
 		}
 	}()
