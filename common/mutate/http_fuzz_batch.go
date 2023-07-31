@@ -1,9 +1,10 @@
 package mutate
 
 import (
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/http"
 )
 
 type FuzzHTTPRequestBatch struct {
@@ -243,6 +244,27 @@ func (f *FuzzHTTPRequestBatch) FuzzGetParams(k, v interface{}) FuzzHTTPRequestIf
 	}
 }
 
+func (f *FuzzHTTPRequestBatch) FuzzGetBase64Params(k, v interface{}) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzGetBase64Params(k, v)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzGetBase64Params(k, v))
+	}
+
+	if len(reqs) <= 0 {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f.fallback,
+			originRequest: f.GetOriginRequest(),
+		}
+	}
+	return &FuzzHTTPRequestBatch{
+		nextFuzzRequests: reqs,
+		originRequest:    f.GetOriginRequest(),
+	}
+}
+
 func (f *FuzzHTTPRequestBatch) FuzzPostRaw(body ...string) FuzzHTTPRequestIf {
 	if len(f.nextFuzzRequests) <= 0 {
 		return f.fallback.FuzzPostRaw(body...)
@@ -271,6 +293,27 @@ func (f *FuzzHTTPRequestBatch) FuzzPostParams(k, v interface{}) FuzzHTTPRequestI
 	var reqs []FuzzHTTPRequestIf
 	for _, req := range f.nextFuzzRequests {
 		reqs = append(reqs, req.FuzzPostParams(k, v))
+	}
+
+	if len(reqs) <= 0 {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f.fallback,
+			originRequest: f.GetOriginRequest(),
+		}
+	}
+	return &FuzzHTTPRequestBatch{
+		nextFuzzRequests: reqs,
+		originRequest:    f.GetOriginRequest(),
+	}
+}
+
+func (f *FuzzHTTPRequestBatch) FuzzPostBase64Params(k, v interface{}) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzPostBase64Params(k, v)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzPostBase64Params(k, v))
 	}
 
 	if len(reqs) <= 0 {
@@ -317,6 +360,27 @@ func (f *FuzzHTTPRequestBatch) FuzzCookie(k, v interface{}) FuzzHTTPRequestIf {
 	var reqs []FuzzHTTPRequestIf
 	for _, req := range f.nextFuzzRequests {
 		reqs = append(reqs, req.FuzzCookie(k, v))
+	}
+
+	if len(reqs) <= 0 {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f.fallback,
+			originRequest: f.GetOriginRequest(),
+		}
+	}
+	return &FuzzHTTPRequestBatch{
+		nextFuzzRequests: reqs,
+		originRequest:    f.GetOriginRequest(),
+	}
+}
+
+func (f *FuzzHTTPRequestBatch) FuzzCookieBase64(k, v interface{}) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzCookieBase64(k, v)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzCookieBase64(k, v))
 	}
 
 	if len(reqs) <= 0 {

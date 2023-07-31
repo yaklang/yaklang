@@ -3,10 +3,12 @@ package mutate
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"net/http/httputil"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -359,6 +361,44 @@ Host: www.baidu.com
 			}
 			expected := fmt.Sprintf("HACKEDPARAM%d", i+1)
 			if !bytes.Contains(raw, []byte(expected)) {
+				test.FailNow(fmt.Sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
+			}
+		}
+	}
+}
+
+func TestFuzzHTTPRequest_GetCommonParamsWithBase64(t *testing.T) {
+	test := assert.New(t)
+	req, err := NewFuzzHTTPRequest(`
+GET /?a=cXdl&b=enhjdg%3D%3D HTTP/1.1
+Host: www.baidu.com
+
+a=cXdl&b=enhjdg%3D%3D
+`)
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+
+	params := req.GetCommonParams()
+	if len(params) != 4 {
+		dump(params)
+		test.FailNow("获取通用参数数量错误", len(params))
+	}
+
+	for _, p := range params {
+		res, err := p.Fuzz("HACKEDPARAM{{i(1-20)}}").Results()
+		if err != nil {
+			test.FailNow("Fuzz failed")
+		}
+		for i, r := range res {
+			raw, err := httputil.DumpRequest(r, true)
+			if err != nil {
+				test.FailNow(err.Error())
+			}
+			expected := codec.EncodeBase64(fmt.Sprintf("HACKEDPARAM%d", i+1))
+			expectedUrlEncoded := codec.QueryEscape(expected)
+			if !bytes.Contains(raw, []byte(expected)) && !bytes.Contains(raw, []byte(expectedUrlEncoded)) {
+				fmt.Printf("debug : %#v\n", p)
 				test.FailNow(fmt.Sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
 			}
 		}
