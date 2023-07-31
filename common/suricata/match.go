@@ -147,7 +147,7 @@ func dnsMatcher(c *matchContext) error {
 		case DNSQuery:
 			c.Attach(newPayloadMatcher(r, dns.(*layers.DNS).Questions[0].Name))
 		case Default:
-			c.Attach(newPayloadMatcher(r, dns.LayerPayload()))
+			c.Attach(newPayloadMatcher(r, dns.LayerContents()))
 		}
 	}
 	return nil
@@ -155,7 +155,7 @@ func dnsMatcher(c *matchContext) error {
 
 func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) error {
 	return func(c *matchContext) error {
-		var buffer []byte
+		buffer := make([]byte, len(content))
 		copy(buffer, content)
 		if r.Nocase {
 			r.Content = bytes.ToLower(r.Content)
@@ -201,29 +201,31 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 
 		// depth & offset
 		// [le,ri]
-		le := 0
-		ri := len(content)
+		if r.Depth != nil || r.Offset != nil {
+			le := 0
+			ri := len(content)
 
-		if r.Offset != nil {
-			le = *r.Offset
-		}
+			if r.Offset != nil {
+				le = *r.Offset
+			}
 
-		if r.Depth != nil {
-			ri = le + *r.Depth - len(r.Content)
-		}
+			if r.Depth != nil {
+				ri = le + *r.Depth - len(r.Content)
+			}
 
-		// [lp,rp)
-		lp := binarySearch(indexes, func(m matched) int {
-			return m.pos - le
-		})
+			// [lp,rp)
+			lp := binarySearch(indexes, func(m matched) int {
+				return m.pos - le
+			})
 
-		rp := binarySearch(indexes, func(m matched) int {
-			return m.pos - ri
-		})
+			rp := binarySearch(indexes, func(m matched) int {
+				return m.pos - ri
+			})
 
-		indexes = indexes[lp:rp]
-		if !c.Must(len(indexes) != 0) {
-			return nil
+			indexes = indexes[lp:rp]
+			if !c.Must(len(indexes) != 0) {
+				return nil
+			}
 		}
 
 		// load prev matches for rel checker
@@ -278,7 +280,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 			if len(strpos) == 1 {
 				// no relative
 				indexes = sliceFilter(indexes, func(m matched) bool {
-					return negIf(neg, m.pos+m.len+pos <= len(content))
+					return negIf(neg, pos <= len(content))
 				})
 			} else {
 				// with reletive
@@ -286,7 +288,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 					return errors.New("isdataat format error")
 				}
 				indexes = sliceFilter(indexes, func(m matched) bool {
-					return negIf(neg, pos < len(content))
+					return negIf(neg, m.pos+m.len+pos < len(content))
 				})
 			}
 			if !c.Must(len(indexes) != 0) {
