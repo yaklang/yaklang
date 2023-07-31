@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/simulator/core"
 	"github.com/yaklang/yaklang/common/simulator/extend"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ type SimulatorCore interface {
 	doBruteForce() error
 }
 
-func NewBruteForce(urlStr string, opts ...BruteConfigOpt) *BruteForceCore {
+func NewBruteForce(urlStr string, opts ...BruteConfigOpt) (*BruteForceCore, error) {
 	bruteConfig := NewBruteConfig()
 	for _, opt := range opts {
 		opt(bruteConfig)
@@ -28,16 +29,29 @@ func NewBruteForce(urlStr string, opts ...BruteConfigOpt) *BruteForceCore {
 	bruteForceCore := BruteForceCore{
 		targetUrl: urlStr,
 		config:    bruteConfig,
+		proxy:     nil,
 
 		resultChannel:    bruteConfig.resultChannel,
 		similarityDegree: bruteConfig.similarityDegree,
 	}
-	return &bruteForceCore
+	if bruteConfig.proxy != "" {
+		proxyUrl, err := url.Parse(bruteConfig.proxy)
+		if err != nil {
+			return nil, utils.Errorf(`parse proxy url error: %v`, err.Error())
+		}
+		if bruteConfig.proxyUsername != "" || bruteConfig.proxyPassword != "" {
+			proxyUser := url.UserPassword(bruteConfig.proxyUsername, bruteConfig.proxyPassword)
+			proxyUrl.User = proxyUser
+		}
+		bruteForceCore.proxy = proxyUrl
+	}
+	return &bruteForceCore, nil
 }
 
 type BruteForceCore struct {
 	targetUrl string
 	config    *BruteConfig
+	proxy     *url.URL
 
 	resultChannel       chan Result
 	captchaDetectModule *extend.CaptchaIdentifier
@@ -56,9 +70,12 @@ type BruteForceCore struct {
 	charCompiler *regexp.Regexp
 }
 
-func (bruteForce *BruteForceCore) init() {
+func (bruteForce *BruteForceCore) init() error {
 	// captcha detect mode init
-	bruteForce.captchaModeInit()
+	err := bruteForce.captchaModeInit()
+	if err != nil {
+		return utils.Errorf(`[bruteforce] captcha mode init error: %v`, err.Error())
+	}
 	// username list & password list init
 	// if list is empty, give them the default value
 	if len(bruteForce.config.usernameList) == 0 {
@@ -68,13 +85,21 @@ func (bruteForce *BruteForceCore) init() {
 		bruteForce.config.passwordList = append(bruteForce.config.passwordList, "admin", "luckyadmin123")
 	}
 	// page origin html string to detect degree of page info change
-	bruteForce.html = bruteForce.page.HTML()
+	html := bruteForce.page.HTML()
+	if html == "" {
+		return utils.Error(`bruteforce target page html blank`)
+	}
+	bruteForce.html = html
 	// solve the problem when there is javascript dialog opened
 	go bruteForce.page.OriginPage().EachEvent(func(e *proto.PageJavascriptDialogOpening) {
 		_ = proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}.Call(bruteForce.page.OriginPage())
 	})()
 	// page origin url which may be not same with target url because of url jump
-	bruteForce.originUrl = bruteForce.page.CurrentURL()
+	originUrl := bruteForce.page.CurrentURL()
+	if originUrl == "" {
+		return utils.Error(`bruteforce target page current url blank`)
+	}
+	bruteForce.originUrl = originUrl
 	// invalid captcha char detect
 	// this must be set because we input char by simulate key press
 	tempCompiler, _ := regexp.Compile(`[^0-9a-zA-Z\-]`)
@@ -90,10 +115,17 @@ func (bruteForce *BruteForceCore) init() {
 	} else {
 		bruteForce.loginDetectFunc = bruteForce.loginDetect
 	}
+	return nil
 }
 
-func (bruteForce *BruteForceCore) captchaModeInit() {
+func (bruteForce *BruteForceCore) captchaModeInit() error {
 	bruteForce.captchaDetectModule = extend.CreateCaptcha()
+	if bruteForce.config.captchaUrl != "" {
+		status, msg := ConnectTest(bruteForce.config.captchaUrl, bruteForce.proxy)
+		if !status {
+			return utils.Errorf(`[bruteforce] captcha url %v connect test error: %v`, bruteForce.config.captchaUrl, msg)
+		}
+	}
 	bruteForce.captchaDetectModule.SetIdentifyUrl(bruteForce.config.captchaUrl)
 	if bruteForce.config.captchaMode != "" {
 		bruteForce.captchaDetectModule.SetIdentifyMode(bruteForce.config.captchaMode)
@@ -105,6 +137,7 @@ func (bruteForce *BruteForceCore) captchaModeInit() {
 		bruteForce.captchaDetectModule.SetRequestStruct(&extend.DDDDCaptcha{})
 		bruteForce.captchaDetectModule.SetResponseStruct(&extend.DDDDResult{})
 	}
+	return nil
 }
 
 func (bruteForce *BruteForceCore) elementDetect() error {
@@ -217,12 +250,12 @@ func (bruteForce *BruteForceCore) doBruteForce() error {
 
 func (bruteForce *BruteForceCore) inputClickTry(username, password string) (bool, error) {
 	bruteForce.page.Refresh()
+	if bruteForce.config.extraWaitLoadTime != 0 {
+		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
+	}
 	bruteForce.usernameElement.Input(username)
 	bruteForce.passwordElement.Input(password)
 	if bruteForce.captchaElement != nil {
-		if bruteForce.config.extraWaitLoadTime != 0 {
-			time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
-		}
 		captchaStr, err := bruteForce.captchaDetectModule.Detect(bruteForce.captchaImgElement)
 		if err != nil {
 			return false, err
@@ -321,7 +354,12 @@ func (bruteForce *BruteForceCore) Start() error {
 		return utils.Error(err)
 	}
 	bruteForce.page = page
-	bruteForce.init()
+	err = bruteForce.init()
+	if err != nil {
+		msg := fmt.Sprintf("bruteforce init error: %s", err.Error())
+		bruteForce.resultChannel <- &BruteResult{bruteInfo: msg}
+		return utils.Error(err)
+	}
 	err = bruteForce.elementDetect()
 	if err != nil {
 		msg := fmt.Sprintf("bruteforce element detect error: %s", err.Error())

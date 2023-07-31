@@ -75,14 +75,14 @@ func CreateElement(element *rod.Element, page *GeneralPage) *GeneralElement {
 
 func (generalElement *GeneralElement) String() string {
 	if generalElement.name == "" {
-		generalElement.name = generalElement.element.Object.Description
-		// result, err := generalElement.element.Eval(GETNAME)
-		// if err != nil {
-		// 	log.Errorf("element doing eval find name error: %s", err)
-		// 	generalElement.name = "unknown"
-		// } else {
-		// 	generalElement.name = result.Value.Str()
-		// }
+		//generalElement.name = generalElement.element.Object.Description
+		result, err := generalElement.element.Eval(GETNAME)
+		if err != nil {
+			//log.Errorf("element %v doing eval find name error: %s", generalElement.element, err)
+			generalElement.name = generalElement.element.Object.Description
+		} else {
+			generalElement.name = result.Value.Str()
+		}
 	}
 	return fmt.Sprintf("<element: %s>", generalElement.name)
 }
@@ -194,7 +194,10 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 			launch.Leakless(false)
 		}
 		serviceUrl, header := launch.ClientHeader()
-		client, _ := cdp.StartWithURL(launchCtx, serviceUrl, header)
+		client, err := cdp.StartWithURL(launchCtx, serviceUrl, header)
+		if err != nil {
+			return nil, utils.Errorf(`connect to the client error: %v`, err)
+		}
 		browser = browser.Client(client)
 	} else {
 		launch := launcher.New()
@@ -213,7 +216,10 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 			launch.Leakless(false)
 		}
 		//launch.Headless(false)
-		controlUrl, _ := launch.Launch()
+		controlUrl, err := launch.Launch()
+		if err != nil {
+			return nil, utils.Errorf(`launcher launch error: %v`, err.Error())
+		}
 		browser = browser.ControlURL(controlUrl)
 	}
 
@@ -234,8 +240,15 @@ func CreatePage(conf config.PageConfig) (*GeneralPage, error) {
 	if err != nil {
 		return nil, utils.Errorf("create page error: %s", err)
 	}
-	rodPage.MustNavigate(conf.Url())
-	rodPage.MustWaitLoad()
+	//rodPage.MustNavigate(conf.Url())
+	err = rodPage.Navigate(conf.Url())
+	if err != nil {
+		return nil, utils.Errorf(`page navigate %s error: %v`, conf.Url(), err.Error())
+	}
+	err = rodPage.WaitLoad()
+	if err != nil {
+		return nil, utils.Errorf(`page wait load error: %v`, err.Error())
+	}
 	page.currentPage = rodPage
 	page.context = conf.Context()
 	page.createWait()
