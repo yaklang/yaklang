@@ -3,6 +3,11 @@ package ssa
 func (f *Function) wirteVariable(variable string, value Value) {
 	f.wirteVariableByBlock(variable, value, f.currentBlock)
 }
+
+func (f *Function) readVariable(variable string) Value {
+	return f.readVariableByBlock(variable, f.currentBlock)
+}
+
 func (f *Function) wirteVariableByBlock(variable string, value Value, block *BasicBlock) {
 	_, ok := f.currentDef[variable]
 	if !ok {
@@ -11,9 +16,6 @@ func (f *Function) wirteVariableByBlock(variable string, value Value, block *Bas
 	f.currentDef[variable][f.currentBlock] = value
 }
 
-func (f *Function) readVariable(variable string) Value {
-	return f.readVariableByBlock(variable, f.currentBlock)
-}
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
 	map2, ok := f.currentDef[variable]
 	if !ok {
@@ -27,9 +29,13 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 }
 
 func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Value {
-	// if block in sealedBlock
 	var v Value
-	if len(block.Preds) == 1 {
+	// if block in sealedBlock
+	if !block.isSealed {
+		phi := NewPhi(f, block, variable)
+		block.inCompletePhi = append(block.inCompletePhi, phi)
+		v = phi
+	} else if len(block.Preds) == 1 {
 		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
 		phi := NewPhi(f, block, variable)
@@ -38,4 +44,11 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 	}
 	f.wirteVariableByBlock(variable, v, block)
 	return v
+}
+
+func (b *BasicBlock) Sealed() {
+	for _, p := range b.inCompletePhi {
+		p.Build()
+	}
+	b.isSealed = true
 }

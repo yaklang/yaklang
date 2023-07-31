@@ -96,6 +96,10 @@ type BasicBlock struct {
 	Instrs []Instruction
 	Phis   []*Phi
 
+	// for build
+	isSealed      bool
+	inCompletePhi []*Phi
+
 	// User
 	user []User
 }
