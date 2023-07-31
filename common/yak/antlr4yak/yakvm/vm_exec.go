@@ -407,8 +407,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if v, ok := rightVal.([]*Value); ok && len(v) > 0 {
 				rightVal = v[0].Value
 			}
-			if _, ok := rightVal.(*Function); ok {
-				rightVal.(*Function).scope = v.CurrentScope()
+			if rv, ok := rightVal.(*Function); ok {
+				if rv.scope == nil {
+					rv.scope = v.CurrentScope()
+				}
 				if val, ok := leftVal.([]*Value); ok && len(val) > 0 {
 					lv, err := val[0].ConvertToLeftValue()
 					if err == nil {
