@@ -2,12 +2,13 @@ package examples
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/simulator/core"
 	"github.com/yaklang/yaklang/common/simulator/extend"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
 )
 
 func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResult, error) {
@@ -30,7 +31,7 @@ func BruteForceModuleV2(urlStr string, configOpts ...ConfigOpt) (*BruteForceResu
 	if config.proxy != "" {
 		pack.SetProxy(config.proxy, config.proxyUser, config.proxyPass)
 	}
-	page := pack.Create()
+	page, _ := pack.Create()
 
 	result := &BruteForceResult{}
 
@@ -254,7 +255,7 @@ func inputClickTry(
 	}
 	err := page.StartListen()
 	if err != nil {
-		log.Info("start listen err: %s", err)
+		log.Infof("start listen err: %s", err)
 	}
 	err = loginElement.Click()
 	if err != nil {
