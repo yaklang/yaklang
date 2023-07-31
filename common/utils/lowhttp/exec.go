@@ -34,6 +34,7 @@ type LowhttpExecConfig struct {
 	Host                 string
 	Port                 int
 	Packet               []byte
+	VerifyCertificate    bool
 	Https                bool
 	ResponseCallback     func(response *LowhttpResponse)
 	Http2                bool
@@ -143,6 +144,12 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.EtcHosts = hosts
+	}
+}
+
+func WithVerifyCertificate(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.VerifyCertificate = b
 	}
 }
 
@@ -740,7 +747,7 @@ RECONNECT:
 			}
 			response.PortIsOpen = true
 
-			conn, err = GetTLSConn(gmTLS, enableHttp2, host, rawConn, timeout)
+			conn, err = GetTLSConn(gmTLS, option.VerifyCertificate, enableHttp2, host, rawConn, timeout)
 			if err != nil {
 				return response, err
 			}
@@ -751,7 +758,7 @@ RECONNECT:
 		}
 	} else {
 		if https {
-			conn, err = GetTLSConn(gmTLS, enableHttp2, host, conn, timeout)
+			conn, err = GetTLSConn(gmTLS, option.VerifyCertificate, enableHttp2, host, conn, timeout)
 			if err != nil {
 				return response, err
 			}
@@ -883,19 +890,25 @@ STATUSCODERETRY:
 	return response, nil
 }
 
-func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
+func GetTLSConn(isGM bool, verify, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
 	var nextProtos []string
 	if enableHttp2 {
 		nextProtos = []string{http2.NextProtoTLS}
 	} else {
 		nextProtos = []string{"http/1.1"}
 	}
+
+	insecureSkipVerify := true
+	if verify {
+		insecureSkipVerify = false
+	}
+
 	if isGM {
 		gmSupport := gmtls.NewGMSupport()
 		gmSupport.EnableMixMode()
 
 		config := &gmtls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: insecureSkipVerify,
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 			MaxVersion:         tls.VersionTLS13,
 			ServerName:         host,
@@ -913,7 +926,7 @@ func GetTLSConn(isGM bool, enableHttp2 bool, host string, rawConn net.Conn, time
 		return tlsConn, nil
 	}
 	config := &tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: insecureSkipVerify,
 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 		MaxVersion:         tls.VersionTLS13,
 		ServerName:         host,

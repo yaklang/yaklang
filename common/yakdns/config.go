@@ -3,12 +3,20 @@ package yakdns
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"sync"
 	"time"
 )
 
 type ReliableDialConfig struct {
-	NoFallbackTCP bool
-	RetryTimes    int // default 3
+	Timeout time.Duration
+
+	FallbackTCP bool
+	RetryTimes  int // default 3
+
+	// DoH config
+	PreferDoH   bool
+	FallbackDoH bool // as backup
+	SpecificDoH []string
 
 	// Disable System Resolver
 	DisableSystemResolver bool
@@ -19,6 +27,9 @@ type ReliableDialConfig struct {
 	SpecificDNSServers []string
 
 	Callback func(dnsType string, domain string, ip, fromServer, method string)
+
+	mutex *sync.Mutex
+	count int64
 }
 
 func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string, ttl ...int) {
@@ -45,6 +56,9 @@ func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string
 		cache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
 	}
 
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.count++
 	log.Infof("dns lookup[%s]-%s: %10s -> %15s %s", dnsType, fromServer, domain, ip, method)
 	if r.Callback != nil {
 		r.Callback(dnsType, domain, ip, fromServer, method)
@@ -53,14 +67,42 @@ func (r *ReliableDialConfig) call(dnsType, domain, ip, fromServer, method string
 
 func NewDefaultReliableDialConfig() *ReliableDialConfig {
 	return &ReliableDialConfig{
-		NoFallbackTCP: false,
-		RetryTimes:    3,
+		FallbackTCP: false,
+		RetryTimes:  3,
+		Timeout:     5 * time.Second,
+		mutex:       new(sync.Mutex),
+		SpecificDoH: []string{
+			// aliyun
+			"https://223.5.5.5/resolve",
+			"https://223.6.6.6/resolve",
+
+			// tencent
+			"https://1.12.12.12/dns-query",
+			"https://120.53.53.53/dns-query",
+
+			// public
+			"https://1.1.1.1/dns-query",
+			"https://8.8.8.8/resolve",
+			"https://8.8.4.4/resolve",
+		},
+	}
+}
+
+func WithFallbackDoH(b bool) func(*ReliableDialConfig) {
+	return func(c *ReliableDialConfig) {
+		c.FallbackDoH = b
+	}
+}
+
+func WithSpecificDoH(s ...string) func(*ReliableDialConfig) {
+	return func(c *ReliableDialConfig) {
+		c.SpecificDoH = s
 	}
 }
 
 func WithNoFallbackTCP(b bool) func(*ReliableDialConfig) {
 	return func(c *ReliableDialConfig) {
-		c.NoFallbackTCP = b
+		c.FallbackTCP = b
 	}
 }
 
