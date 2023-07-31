@@ -19,10 +19,10 @@ import (
 	"text/template"
 )
 
-//go:embed route.html
+//go:embed html/route.html
 var routeHtml []byte
 
-//go:embed auto_route.html
+//go:embed html/auto_route.html
 var autoRouteHtml []byte
 
 type GroupedRoutes struct {
@@ -149,6 +149,7 @@ func (s *VulinServer) init() {
 	s.registerCryptoJS()
 	s.registerCryptoSM()
 	s.registerUploadCases()
+	s.registerCsrf()
 
 	// 业务型
 	s.registerUserRoute()

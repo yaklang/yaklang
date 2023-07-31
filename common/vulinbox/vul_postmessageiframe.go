@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-//go:embed vul_postmessageiframe.html
+//go:embed html/vul_postmessageiframe.html
 var postMessageDemoHtml []byte
 
 func (s *VulinServer) registerPostMessageIframeCase() {

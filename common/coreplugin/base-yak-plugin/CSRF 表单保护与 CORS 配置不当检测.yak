@@ -51,7 +51,7 @@ corsLog = func(result){
 csrf_Detect =  func(url,req,rsp,body,ishttps){
     lowHttpRsp,_,err = poc.HTTPEx(req, [poc.deleteHeader("Cookie"),poc.https(ishttps)]...)
     checkErr(err)
-    rspWithoutCookie = lowHttpRsp.RedirectRawPackets[0]
+    rspWithoutCookie = lowHttpRsp.RedirectRawPackets[0].Response
 
     phtml, err = xpath.LoadHTMLDocument(body)
     checkErr(err)
@@ -167,6 +167,7 @@ mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
 
     corsCheck(ishttps,req,rsp,url)
 
+    headers = poc.GetHTTPPacketHeadersFull(rsp)
     if  len(headers["Content-Type"]) == 0 || !str.Contains(headers["Content-Type"][0],"html"){
         return
     }

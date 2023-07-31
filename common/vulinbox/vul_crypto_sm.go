@@ -15,7 +15,7 @@ import (
 	"unicode/utf8"
 )
 
-//go:embed vul_cryoto_sm_sm4.html
+//go:embed html/vul_cryoto_sm_sm4.html
 var cryptoSM4BasicHtml []byte
 
 func (s *VulinServer) registerCryptoSM() {
