@@ -1,6 +1,7 @@
 package suricata
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
@@ -253,7 +254,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			contentRule.Within = atoistar(vStr)
 		case "rawbytes":
 			contentRule.RawBytes = true
-		case "isdataset":
+		case "isdataat":
 			contentRule.IsDataAt = vStr
 		case "bsize":
 			contentRule.BSize = vStr
@@ -273,6 +274,8 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			contentRule.RPC = unquoteString(vStr)
 		case "pcre":
 			contentRule.PCRE, _ = strconv.Unquote(vStr)
+		default:
+			log.Errorf("unknown content rule params: %s", key)
 		}
 
 		// conflict, save and match again
