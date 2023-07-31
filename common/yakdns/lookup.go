@@ -5,8 +5,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"sync"
+	"time"
 )
 
 var ipv6DNSCache = ttlcache.NewCache()
@@ -45,20 +44,9 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 
 	// handle system resolver
 	if !config.DisableSystemResolver {
-		var results = nativeLookupHost(utils.TimeoutContextSeconds(5), host)
-		if len(results) > 0 {
-			var noContinueExec bool
-			for _, result := range results {
-				result := strings.TrimSpace(result)
-				if result == "" {
-					continue
-				}
-				noContinueExec = true
-				config.call("", host, result, "system", "system")
-			}
-			if noContinueExec {
-				return nil
-			}
+		nativeLookupHost(host, config)
+		if config.count > 0 {
+			return nil
 		}
 	}
 
@@ -103,12 +91,12 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 
 	// handle specific dns servers
 	if len(config.SpecificDNSServers) > 0 {
-		wg := new(sync.WaitGroup)
+		swg := utils.NewSizedWaitGroup(5)
 		for _, customServer := range config.SpecificDNSServers {
 			customServer := customServer
-			wg.Add(1)
+			swg.Add()
 			go func() {
-				defer wg.Done()
+				defer swg.Done()
 				defer func() {
 					if err := recover(); err != nil {
 						log.Errorf("dns server %s panic: %v", customServer, err)
@@ -117,13 +105,13 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 				}()
 				err := _exec(customServer, host, config)
 				if err != nil {
-					log.Errorf("dns server %s lookup failed: %v", customServer, err)
+					log.Debugf("dns server %s lookup failed: %v", customServer, err)
 				}
 			}()
 		}
-		wg.Wait()
+		swg.Wait()
 	} else {
-		log.Warn("no user custom specific dns servers found")
+		log.Info("no user custom specific dns servers found")
 	}
 
 	if config.FallbackDoH && config.count <= 0 && !dohExecuted {
@@ -150,29 +138,32 @@ func LookupAll(host string, opt ...DNSOption) []string {
 }
 
 func LookupFirst(host string, opt ...DNSOption) string {
-	result := make(chan string)
+	start := time.Now()
+	defer func() {
+		log.Debugf("lookup first %s cost %s", host, time.Since(start))
+	}()
+
+	var firstResult string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	opt = append(opt, WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
 		if ip == "" {
 			return
 		}
-		select {
-		case result <- ip:
-		default:
+
+		if firstResult == "" {
+			firstResult = ip
+			cancel()
 		}
-	}))
+	}), WithDNSContext(ctx))
 	go func() {
+		defer cancel()
 		err := reliableLookupHost(host, opt...)
 		if err != nil {
 			log.Errorf("reliable lookup host %s failed: %v", host, err)
 		}
-		select {
-		case result <- "":
-		}
 	}()
-
 	select {
-	case resultStr := <-result:
-		defer close(result)
-		return resultStr
+	case <-ctx.Done():
 	}
+	return firstResult
 }
