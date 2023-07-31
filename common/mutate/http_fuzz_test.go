@@ -329,6 +329,42 @@ Host: www.baidu.com
 	}
 }
 
+func TestFuzzHTTPRequest_GetCommonParamsWithPOSTJSON(t *testing.T) {
+	test := assert.New(t)
+	req, err := NewFuzzHTTPRequest(`
+POST / HTTP/1.1
+Host: www.baidu.com
+
+{"abc": "123", "a": 123, "c":{"q":"123"}}
+`)
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+
+	params := req.GetCommonParams()
+	if len(params) != 4 {
+		dump(params)
+		test.FailNow("获取通用参数数量错误", len(params))
+	}
+
+	for _, p := range params {
+		res, err := p.Fuzz("HACKEDPARAM{{i(1-20)}}").Results()
+		if err != nil {
+			test.FailNow("Fuzz failed")
+		}
+		for i, r := range res {
+			raw, err := httputil.DumpRequest(r, true)
+			if err != nil {
+				test.FailNow(err.Error())
+			}
+			expected := fmt.Sprintf("HACKEDPARAM%d", i+1)
+			if !bytes.Contains(raw, []byte(expected)) {
+				test.FailNow(fmt.Sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
+			}
+		}
+	}
+}
+
 func TestFuzzHTTPRequest_GetCommonParamsForPostJson(t *testing.T) {
 	test := assert.New(t)
 	req, err := NewFuzzHTTPRequest(`
