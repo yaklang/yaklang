@@ -2,17 +2,20 @@ package vulinbox
 
 import (
 	_ "embed"
-	"github.com/xiecat/wsm/lib/utils"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"html/template"
 	"net/http"
-	"strconv"
 )
 
 //go:embed html/vul_csrf_unsafe.html
 var unsafeUpdate []byte
 
 //go:embed html/vul_csrf_safe.html
-var safeUpdateTp []byte
+var safeUpdate []byte
+
+var info = "adminPassword"
 
 func (s *VulinServer) registerCsrf() {
 	var router = s.router
@@ -23,32 +26,11 @@ func (s *VulinServer) registerCsrf() {
 			Path:         "/unsafe",
 			Title:        "没有保护的表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				realUser, err := s.database.Authenticate(writer, request)
-				if err != nil {
-					return
+				cookieCheck(writer, request)
+				data := map[string]string{
+					"Info": info,
 				}
-
-				if request.Method == http.MethodGet {
-					writer.Write(unsafeUpdate)
-					return
-				}
-
-				updateUser := update(writer, request, realUser)
-
-				if updateUser == nil {
-					return
-				}
-
-				err = s.database.UpdateUser(updateUser)
-				if err != nil {
-					writer.WriteHeader(500)
-					return
-				}
-
-				writer.Write(unsafeUpdate)
-				writer.Write([]byte(`<script>alert("修改成功")</script>`))
-				writer.WriteHeader(http.StatusOK)
-
+				updateInfo(writer, request, data, string(unsafeUpdate))
 			},
 		},
 		{
@@ -56,57 +38,20 @@ func (s *VulinServer) registerCsrf() {
 			Path:         "/safe",
 			Title:        "csrf_token保护的表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				realUser, err := s.database.Authenticate(writer, request)
-				if err != nil {
-					return
-				}
-
-				data := struct {
-					Token string
-				}{
-					Token: utils.MD5(realUser.Username + "vulinbox"),
-				}
-
-				tmpl := template.Must(template.New("safeTemplate").Parse(string(safeUpdateTp)))
-				if request.Method == http.MethodGet {
-
-					err := tmpl.Execute(writer, data)
-					if err != nil {
-						writer.WriteHeader(http.StatusInternalServerError)
+				cookieCheck(writer, request)
+				if request.Method == http.MethodPost {
+					token := request.PostFormValue("csrf_token")
+					if token != codec.Md5("confidential_cookie_vulinbox") {
+						writer.Write([]byte("csrf_token check error"))
+						writer.WriteHeader(http.StatusForbidden)
 						return
 					}
-					writer.WriteHeader(http.StatusOK)
-					return
 				}
-
-				csrfToken := request.FormValue("csrf_token")
-
-				if csrfToken != data.Token {
-					writer.Write([]byte("csrf_token error"))
-					writer.WriteHeader(http.StatusBadRequest)
-					return
+				data := map[string]string{
+					"Info":  info,
+					"Token": codec.Md5("confidential_cookie_vulinbox"),
 				}
-
-				updateUser := update(writer, request, realUser)
-
-				if updateUser == nil {
-					return
-				}
-
-				err = s.database.UpdateUser(updateUser)
-				if err != nil {
-					writer.WriteHeader(500)
-					return
-				}
-
-				err = tmpl.Execute(writer, data)
-				if err != nil {
-					writer.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				writer.Write([]byte(`<script>alert("修改成功")</script>`))
-				writer.WriteHeader(http.StatusOK)
-
+				updateInfo(writer, request, data, string(safeUpdate))
 			},
 		},
 	}
@@ -117,20 +62,42 @@ func (s *VulinServer) registerCsrf() {
 
 }
 
-func update(writer http.ResponseWriter, request *http.Request, realUser *VulinUser) *VulinUser {
-	passwd := request.FormValue("password")
-	age := request.FormValue("age")
-	if passwd != "" {
-		realUser.Password = passwd
+func cookieCheck(writer http.ResponseWriter, request *http.Request) {
+	raw, _ := utils.HttpDumpWithBody(request, true)
+	vulCookie := lowhttp.GetHTTPPacketCookieFirst(raw, "vulCookie")
+	if vulCookie == "" {
+		http.SetCookie(writer, &http.Cookie{
+			Name:  "vulCookie",
+			Value: "confidential_cookie",
+		})
+		writer.Header().Set("Location", "/csrf/unsafe")
+		writer.WriteHeader(302)
+		return
 	}
+}
 
-	if age != "" {
-		atoi, err := strconv.Atoi(age)
-		if err != nil {
-			writer.WriteHeader(500)
-			return nil
+func updateInfo(writer http.ResponseWriter, request *http.Request, data map[string]string, tp string) {
+	if request.Method == http.MethodPost {
+		if request.PostFormValue("info") != "" {
+			info = request.PostFormValue("info")
+			data["Info"] = info
+		} else {
+			writer.Write([]byte("缺少参数"))
+			writer.WriteHeader(http.StatusBadRequest)
+			return
 		}
-		realUser.Age = atoi
 	}
-	return realUser
+	tmpl, err := template.New("csrf").Parse(tp)
+	if err != nil {
+		writer.Write([]byte(err.Error()))
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(writer, data)
+	if err != nil {
+		writer.Write([]byte(err.Error()))
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	writer.WriteHeader(http.StatusOK)
 }

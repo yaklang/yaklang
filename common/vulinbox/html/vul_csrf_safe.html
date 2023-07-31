@@ -13,14 +13,13 @@
     <div class="col-md-4">
       <h2 class="text-center mb-4">修改信息</h2>
       <div id="message" style="color: red;"></div>
-      <form id="registerForm" action="/csrf/unsafe" method="POST">
+      <div class="mb-3">
+        <p class="lead">{{.Info}}</p>
+      </div>
+      <form id="registerForm" action="/csrf/safe" method="POST">
         <div class="mb-3">
-          <label for="password" class="form-label">密码</label>
-          <input type="password" class="form-control" id="password" name="password" required>
-        </div>
-        <div class="mb-3">
-          <label for="age" class="form-label">年龄</label>
-          <input type="number" class="form-control" id="age" name="age" min="0" max="120" required>
+          <label for="info" class="form-label">信息</label>
+          <input class="form-control" id="info" name="info" required>
         </div>
           <input class="form-control" name="csrf_token" hidden value="{{.Token}}">
         <button type="submit" class="btn btn-primary w-100">修改</button>
