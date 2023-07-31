@@ -2,8 +2,9 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -72,6 +73,26 @@ func NewFunction(codes []*Code, tbl *SymbolTable) *Function {
 
 func (f *Function) String() string {
 	return fmt.Sprintf("function params[%v] codes[%v]", len(f.paramSymbols), len(f.codes))
+}
+
+func (f *Function) Copy(s *Scope) *Function {
+	newF := &Function{
+		// from f
+		sourceCode:                f.sourceCode,
+		id:                        f.id,
+		name:                      f.name,
+		codes:                     f.codes,
+		anonymousFunctionBindName: f.anonymousFunctionBindName,
+		symbolTable:               f.symbolTable,
+		uuid:                      f.uuid,
+		paramSymbols:              f.paramSymbols,
+		isVariableParameter:       f.isVariableParameter,
+
+		// only this:
+		scope: s,
+	}
+
+	return newF
 }
 
 func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[int]*Value {

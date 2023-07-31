@@ -336,7 +336,12 @@ func (c *Code) String() string {
 	case OpMake:
 	case OpType:
 		buf.WriteString(c.Op1.TypeVerbose)
-	case OpPush, OpPushId, OpPushfuzz:
+	case OpPush:
+		buf.WriteString(c.Op1.String())
+		if c.Unary == 1 {
+			buf.WriteString(" (copy)")
+		}
+	case OpPushId, OpPushfuzz:
 		buf.WriteString(c.Op1.String())
 		// 特殊的 push 用来处理 f 作为 prefix 的前缀 push string
 	case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpIn, OpSendChan:
