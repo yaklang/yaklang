@@ -2,6 +2,7 @@ package yakast
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
@@ -213,6 +214,14 @@ func (s *YakCompiler) pushLeftRef(i int) {
 func (s *YakCompiler) pushValue(i *yakvm.Value) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
+		Op1:    i,
+	})
+}
+
+func (s *YakCompiler) pushValueWithCopy(i *yakvm.Value) {
+	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
+		Opcode: yakvm.OpPush,
+		Unary:  1,
 		Op1:    i,
 	})
 }

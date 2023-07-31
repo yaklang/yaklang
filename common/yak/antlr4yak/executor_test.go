@@ -3119,6 +3119,27 @@ f = () => 1
 	_formattest(code)
 }
 
+func TestNewExecutor_ClosureScopeCopy(t *testing.T) {
+	code := `
+f = () => 0
+set = (a)=>{
+	return () => {
+		return a
+	}
+}
+
+f0 = set(1)
+assert f0() == 1
+
+f1 = set(2)
+assert f1() == 2
+
+assert f0() == 1 // !!
+	`
+	_marshallerTest(code)
+	_formattest(code)
+}
+
 // 测试 assert/字符串索引、拼接/结构体、和map调用成员
 func TestNewExecutor_MemberCall(t *testing.T) {
 	u := &user{
