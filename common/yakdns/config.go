@@ -94,6 +94,12 @@ func WithFallbackDoH(b bool) func(*ReliableDialConfig) {
 	}
 }
 
+func WithPreferDoH(b bool) func(*ReliableDialConfig) {
+	return func(c *ReliableDialConfig) {
+		c.PreferDoH = b
+	}
+}
+
 func WithSpecificDoH(s ...string) func(*ReliableDialConfig) {
 	return func(c *ReliableDialConfig) {
 		c.SpecificDoH = s

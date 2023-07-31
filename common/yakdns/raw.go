@@ -143,11 +143,8 @@ type DoHDNSResponse struct {
 	RA       bool `json:"RA"`
 	AD       bool `json:"AD"`
 	CD       bool `json:"CD"`
-	Question []struct {
-		Name string `json:"name"`
-		Type int    `json:"type"`
-	} `json:"Question"`
-	Answer []struct {
+	Question json.RawMessage
+	Answer   []struct {
 		Name string `json:"name"`
 		Type int    `json:"type"`
 		TTL  int    `json:"TTL"`
@@ -177,6 +174,7 @@ func dohRequest(domain string, dohUrl string, config *ReliableDialConfig) error 
 	var rspObj DoHDNSResponse
 	err = json.Unmarshal(body, &rspObj)
 	if err != nil {
+		println(string(body))
 		log.Errorf("unmarshal doh response failed: %s", err)
 	}
 	for _, a := range rspObj.Answer {
