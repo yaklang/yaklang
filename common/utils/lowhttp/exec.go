@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"net"
@@ -614,10 +615,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 
 		if ips == "" {
-			ips = utils.GetFirstIPByDnsWithCache(
-				host,
-				timeout,
-				dnsServers...)
+			ips = yakdns.LookupFirst(host, yakdns.WithDNSServers(dnsServers...))
+			//ips = utils.GetFirstIPByDnsWithCache(
+			//	host,
+			//	timeout,
+			//	dnsServers...)
 		}
 		traceInfo.DNSTime = time.Since(startDNS)
 		if ips == "" {

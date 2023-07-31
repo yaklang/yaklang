@@ -16,13 +16,13 @@ func TestBASIC(t *testing.T) {
 }
 
 func TestNotExisted(t *testing.T) {
-	reliableLookupHost(utils.RandNumberStringBytes(100)+".com", WithFallbackDoH(true))
+	reliableLookupHost(utils.RandNumberStringBytes(100)+".com", WithDNSFallbackDoH(true))
 }
 
 func TestNotExisted_Prefer(t *testing.T) {
-	reliableLookupHost(utils.RandNumberStringBytes(100)+".com", WithPreferDoH(true))
+	reliableLookupHost(utils.RandNumberStringBytes(100)+".com", WithDNSPreferDoH(true))
 }
 
 func TestNotExisted_Prefer1(t *testing.T) {
-	reliableLookupHost("baidu.com", WithPreferDoH(true), WithDisableSystemResolver(true))
+	reliableLookupHost("baidu.com", WithDNSPreferDoH(true), WithDNSDisableSystemResolver(true))
 }

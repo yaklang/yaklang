@@ -7,9 +7,10 @@ import (
 	"github.com/miekg/dns"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -50,7 +51,7 @@ var dnsNetDialer = &net.Dialer{
 	Timeout: 5,
 }
 
-func _exec(server string, domain string, config *ReliableDialConfig) error {
+func _exec(server string, domain string, config *ReliableDNSConfig) error {
 	if config.RetryTimes <= 0 {
 		config.RetryTimes = 1
 	}
@@ -67,7 +68,7 @@ func _exec(server string, domain string, config *ReliableDialConfig) error {
 	return utils.Errorf("exec dns request failed")
 }
 
-func _execWithoutRetry(server string, domain string, config *ReliableDialConfig) error {
+func _execWithoutRetry(server string, domain string, config *ReliableDNSConfig) error {
 	req, err := dnsRequestBytes(dns.TypeA, domain)
 	if err != nil {
 		return err
@@ -152,25 +153,24 @@ type DoHDNSResponse struct {
 	} `json:"Answer"`
 }
 
-func dohRequest(domain string, dohUrl string, config *ReliableDialConfig) error {
+func dohRequest(domain string, dohUrl string, config *ReliableDNSConfig) error {
 	log.Debugf("start to request doh: %v to %v", domain, dohUrl)
-	isHttps, req, err := lowhttp.ParseUrlToHttpRequestRaw("GET", dohUrl)
+	var val = make(url.Values)
+	val.Set("name", domain)
+	val.Set("type", "1")
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+	defer cancel()
+	reqInstance, err := http.NewRequestWithContext(ctx, "GET", dohUrl, nil)
 	if err != nil {
-		return utils.Errorf("parse doh url[%v] failed: %s", dohUrl, err)
+		return utils.Errorf("build doh request failed: %s", err)
 	}
-	req = lowhttp.ReplaceHTTPPacketHeader(req, "Accept", "application/dns-json")
-	req = lowhttp.ReplaceAllHTTPPacketQueryParams(req, map[string]string{
-		"name": domain,
-		"type": "1",
-	})
-	rsp, err := lowhttp.HTTP(
-		lowhttp.WithPacketBytes(req), lowhttp.WithHttps(isHttps), lowhttp.WithVerifyCertificate(true),
-		lowhttp.WithTimeout(config.Timeout),
-	)
+	reqInstance.URL.RawQuery = val.Encode()
+	reqInstance.Header.Set("Accept", "application/dns-json")
+	rspInstance, err := config.dohHTTPClient.Do(reqInstance)
 	if err != nil {
 		return utils.Errorf("doh request failed: %s", err)
 	}
-	_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+	body, _ := io.ReadAll(rspInstance.Body)
 	var rspObj DoHDNSResponse
 	err = json.Unmarshal(body, &rspObj)
 	if err != nil {
@@ -178,7 +178,7 @@ func dohRequest(domain string, dohUrl string, config *ReliableDialConfig) error 
 		log.Errorf("unmarshal doh response failed: %s", err)
 	}
 	for _, a := range rspObj.Answer {
-		config.call("", domain, a.Data, dohUrl, "yakdns.doh", a.TTL)
+		config.call("A", domain, a.Data, dohUrl, "yakdns.doh", a.TTL)
 	}
 	return nil
 }
