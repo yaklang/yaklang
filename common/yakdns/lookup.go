@@ -62,33 +62,7 @@ func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
 		}
 	}
 
-	// handle specific dns servers
-	if len(config.SpecificDNSServers) > 0 {
-		wg := new(sync.WaitGroup)
-		for _, customServer := range config.SpecificDNSServers {
-			customServer := customServer
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer func() {
-					if err := recover(); err != nil {
-						log.Errorf("dns server %s panic: %v", customServer, err)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-				err := _exec(customServer, host, config)
-				if err != nil {
-					log.Errorf("dns server %s lookup failed: %v", customServer, err)
-				}
-			}()
-		}
-		wg.Wait()
-	} else {
-		log.Warn("no user custom specific dns servers found")
-	}
-
-	if config.FallbackDoH && config.count <= 0 {
-		log.Infof("start to use doh to lookup %s", host)
+	startDoH := func() {
 		if len(config.SpecificDoH) > 0 {
 			swg := utils.NewSizedWaitGroup(5)
 			dohCtx, cancel := context.WithCancel(context.Background())
@@ -115,6 +89,46 @@ func reliableLookupHost(host string, opt ...func(*ReliableDialConfig)) error {
 			}
 			swg.Wait()
 		}
+	}
+
+	var dohExecuted bool
+	if config.PreferDoH {
+		log.Infof("start(prefer) to use doh to lookup %s", host)
+		startDoH()
+		dohExecuted = true
+		if config.count > 0 {
+			return nil
+		}
+	}
+
+	// handle specific dns servers
+	if len(config.SpecificDNSServers) > 0 {
+		wg := new(sync.WaitGroup)
+		for _, customServer := range config.SpecificDNSServers {
+			customServer := customServer
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("dns server %s panic: %v", customServer, err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				err := _exec(customServer, host, config)
+				if err != nil {
+					log.Errorf("dns server %s lookup failed: %v", customServer, err)
+				}
+			}()
+		}
+		wg.Wait()
+	} else {
+		log.Warn("no user custom specific dns servers found")
+	}
+
+	if config.FallbackDoH && config.count <= 0 && !dohExecuted {
+		log.Infof("start(fallback) to use doh to lookup %s", host)
+		startDoH()
 	}
 
 	return nil
