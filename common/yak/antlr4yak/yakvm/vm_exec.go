@@ -203,6 +203,7 @@ func ShowOpcodes(c []*Code) {
 func ShowOpcodesWithSource(src string, c []*Code) {
 	lines := strings.Split(src, "\n")
 	cur := -1
+	funs := make([]*Function, 0)
 	for i, code := range c {
 		if cur < 0 || code.StartLineNumber != cur {
 			cur = code.StartLineNumber
@@ -216,9 +217,13 @@ func ShowOpcodesWithSource(src string, c []*Code) {
 		if code.Opcode == OpPush {
 			v, ok := code.Op1.Value.(*Function)
 			if ok {
-				ShowOpcodesWithSource(src, v.codes)
+				funs = append(funs, v)
 			}
 		}
+	}
+	for _, v := range funs {
+		fmt.Printf("\n\n%s\n", v.GetActualName())
+		ShowOpcodesWithSource(src, v.codes)
 	}
 }
 
@@ -603,8 +608,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if c.Unary == 1 {
 				c.Op1.Value = fun.Copy(v.scope)
 			} else if c.Unary == 0 {
-			fun.scope = v.scope
-		}
+				fun.scope = v.scope
+			}
 		}
 		v.push(c.Op1)
 		return
