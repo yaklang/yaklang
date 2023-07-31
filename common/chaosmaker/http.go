@@ -32,33 +32,16 @@ Host: www.example.com
 				return nil
 			}
 			_ = httpPacket
-			config := originRule.ContentRuleConfig
-			_ = config
-			ch := make(chan *ChaosTraffic)
 
-			var forBoth = config.HttpBaseSticky.HaveBeenSet()
-			var forReq, forRsp bool
-			if !forBoth {
-				forReq = config.HttpRequestSticky.HaveBeenSet()
-				forRsp = config.HttpResponseSticky.HaveBeenSet()
-				if forReq && forBoth {
-					forBoth = true
-				}
-			}
-			if !forReq && !forRsp && !forBoth {
-				forBoth = true
-			}
-			if forBoth {
-				forReq = true
-				forRsp = true
-			}
+			config := originRule.ContentRuleConfig
+			ch := make(chan *ChaosTraffic)
+			var forReq = true
+			var forRsp = true
 
 			// flow control
 			if config.Flow != nil {
-				if (!config.Flow.ToClient && config.Flow.ToServer) || (!config.Flow.ToServer && config.Flow.ToClient) {
-					forReq = config.Flow.ToServer
-					forRsp = config.Flow.ToClient
-				}
+				forReq = config.Flow.ToServer || config.Flow.Established
+				forRsp = config.Flow.ToClient || config.Flow.Established
 			}
 
 			go func() {
@@ -99,28 +82,28 @@ Host: www.example.com
 				REQ_RULES:
 					for _, rule := range rules {
 						content := string(rule.Content)
-						switch ret := rule.HttpBaseModifier; true {
-						case ret.HttpCookie:
+						switch rule.Modifier {
+						case suricata.HTTPCookie:
 							freq.FuzzCookieRaw(content).FirstHTTPRequestBytes()
 							freq.FuzzCookie("admin", content).FirstHTTPRequestBytes()
 							feedback(freq.FuzzCookie("sid", content).FirstHTTPRequestBytes())
-						case ret.HttpHeader:
+						case suricata.HTTPHeader:
 							fallthrough
-						case ret.HttpRawHeader:
+						case suricata.HTTPHeaderRaw:
 							if k, v := lowhttp.SplitHTTPHeader(content); v != "" {
 								feedback(freq.FuzzHTTPHeader(k, v).FirstHTTPRequestBytes())
 							}
 							feedback(freq.FuzzHTTPHeader("X-Test", content).FirstHTTPRequestBytes())
 						}
 
-						switch ret := rule.HttpRequestModifier; true {
-						case ret.HttpHost:
+						switch rule.Modifier {
+						case suricata.HTTPHost:
 							feedback(freq.FuzzHTTPHeader("Host", string(rule.Content)).FirstHTTPRequestBytes())
-						case ret.HttpRawHost:
+						case suricata.HTTPHostRaw:
 							feedback(freq.FuzzHTTPHeader("Host", string(rule.Content)).FirstHTTPRequestBytes())
-						case ret.HttpUserAgent:
+						case suricata.HTTPUserAgent:
 							feedback(freq.FuzzHTTPHeader("User-Agent", string(rule.Content)).FirstHTTPRequestBytes())
-						case ret.HttpRawUri:
+						case suricata.HTTPUriRaw:
 							feedback(freq.FuzzPathAppend("/" + utils.RandStringBytes(10) + content).FirstHTTPRequestBytes())
 							feedback(freq.FuzzPathAppend("/" + content + "/").FirstHTTPRequestBytes())
 							feedback(freq.FuzzPathAppend("/" + content).FirstHTTPRequestBytes())
@@ -128,10 +111,10 @@ Host: www.example.com
 							feedback(freq.FuzzPath("/" + content).FirstHTTPRequestBytes())
 							feedback(freq.FuzzPath(content + " " + "/").FirstHTTPRequestBytes())
 							feedback(freq.FuzzPath("/" + utils.RandStringBytes(10) + content).FirstHTTPRequestBytes())
-						case ret.HttpMethod:
+						case suricata.HTTPMethod:
 							freq = freq.FuzzMethod(string(rule.Content))
 							continue
-						case ret.HttpUri:
+						case suricata.HTTPUri:
 							if rule.PCRE != "" {
 								// 有正则，则以生成的正则为主
 								extraRules = rule.PCREStringGenerator(5)
@@ -211,16 +194,16 @@ Hello
 						}
 						content := string(rule.Content)
 
-						switch ret := rule.HttpBaseModifier; true {
-						case ret.HttpCookie:
+						switch rule.Modifier {
+						case suricata.HTTPCookie:
 							content = strings.ReplaceAll(content, "Set-Cookie: ", "")
 							content = strings.ReplaceAll(content, "Set-Cookie:", "")
 							content = strings.ReplaceAll(content, "Cookie:", "")
 							extraHeader.Add("Set-Cookie", content)
 							continue
-						case ret.HttpHeader:
+						case suricata.HTTPHeader:
 							fallthrough
-						case ret.HttpRawHeader:
+						case suricata.HTTPHeaderRaw:
 							if k, v := lowhttp.SplitHTTPHeader(content); v != "" {
 								extraHeader.Add(k, v)
 							} else {
@@ -233,11 +216,11 @@ Hello
 							extraRules = append(extraRules, ret...)
 						}
 
-						switch ret := rule.HttpResponseModifier; true {
-						case ret.HttpLocation:
+						switch rule.Modifier {
+						case suricata.HTTPLocation:
 							location = `{{list(|/|/admin/|/{{(rs(5,5,2))/|http://|https://|login/}})}}` + location
 							continue
-						case ret.HttpServerBody:
+						case suricata.HTTPResponseBody:
 							if rule.Negative {
 								bodyJson = strings.ReplaceAll(bodyJson, content, "")
 								htmlBody = strings.ReplaceAll(htmlBody, content, "")
@@ -247,20 +230,20 @@ Hello
 								extraContent = append(extraContent, content)
 							}
 							continue
-						case ret.HttpServer:
+						case suricata.HTTPServer:
 							server = content + `{{list(/||1.3.1|1.2.3|{{randstr(4,5,3)}})}}`
 							if strings.HasPrefix(server, "Server: ") {
 								server = server[8:]
 							}
 							continue
-						case ret.HttpStatCode:
+						case suricata.HTTPStatCode:
 							code = content
 							var codeInt, _ = strconv.Atoi(code)
 							if codeInt > 0 {
 								status = http.StatusText(codeInt)
 							}
 							continue
-						case ret.HttpStatMsg:
+						case suricata.HTTPStatMsg:
 							status = content
 							continue
 						}

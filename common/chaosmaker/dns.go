@@ -31,37 +31,15 @@ var dnsHandler = &chaosHandler{
 			Protocol: layers.IPProtocolUDP, // 协议类型
 		}
 
+		// todo: consider dnsRule.OpcodeNegative == true
 		baseDNSLayer.OpCode = layers.DNSOpCode(dnsRule.Opcode)
-
-		baseDNSLayer.QR = !dnsRule.DNSQuery
-
 		if dnsRule.OpcodeNegative && baseDNSLayer.OpCode == layers.DNSOpCode(dnsRule.Opcode) {
 			log.Warn("DNS 规则可能存在错误")
 		} else if !dnsRule.OpcodeNegative && baseDNSLayer.OpCode != layers.DNSOpCode(dnsRule.Opcode) {
 			log.Warn("DNS 规则可能存在错误")
 		}
 
-		toBytes := func(ipLayer *layers.IPv4, udpLayer *layers.UDP, dnsLayer *layers.DNS, payloads ...gopacket.Payload) []byte {
-			var actPayloads []byte
-			if len(payloads) > 0 {
-				for _, p := range payloads {
-					actPayloads = append(actPayloads, p...)
-				}
-			}
-
-			udpLayer.SetNetworkLayerForChecksum(ipLayer)
-
-			buffer := gopacket.NewSerializeBuffer()
-			err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-				FixLengths:       true,
-				ComputeChecksums: true,
-			}, ipLayer, udpLayer, dnsLayer, gopacket.Payload(actPayloads))
-			if err != nil {
-				log.Error(err)
-				return nil
-			}
-			return buffer.Bytes()
-		}
+		baseDNSLayer.QR = true
 
 		ch := make(chan *ChaosTraffic)
 		feedback := func(raw []byte) {
@@ -117,13 +95,35 @@ var dnsHandler = &chaosHandler{
 					Class: layers.DNSClassIN, // 查询类别，表示Internet
 				}
 				baseDNSLayer.Questions = []layers.DNSQuestion{dnsQuestion}
-				feedback(toBytes(baseIPLayer, baseUDPLayer, baseDNSLayer))
+				feedback(encodeDNS(baseIPLayer, baseUDPLayer, baseDNSLayer))
 			}
 
 		}()
 		return ch
 	},
 	MatchBytes: nil,
+}
+
+func encodeDNS(ipLayer *layers.IPv4, udpLayer *layers.UDP, dnsLayer *layers.DNS, payloads ...gopacket.Payload) []byte {
+	var actPayloads []byte
+	if len(payloads) > 0 {
+		for _, p := range payloads {
+			actPayloads = append(actPayloads, p...)
+		}
+	}
+
+	udpLayer.SetNetworkLayerForChecksum(ipLayer)
+
+	buffer := gopacket.NewSerializeBuffer()
+	err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, ipLayer, udpLayer, dnsLayer, gopacket.Payload(actPayloads))
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	return buffer.Bytes()
 }
 
 func init() {
