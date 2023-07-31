@@ -6,15 +6,16 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 			Parent: f,
 			Block:  block,
 		},
-		Edge:     make([]Value, len(block.Preds)),
+		Edge:     make([]Value, 0, len(block.Preds)),
 		user:     make([]User, 0),
 		variable: variable,
 	}
 }
 
 func (phi *Phi) Build() Value {
-	for i, p := range phi.Block.Preds {
-		phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
+	for _, p := range phi.Block.Preds {
+		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
+		phi.Edge = append(phi.Edge, phi.Parent.readVariableByBlock(phi.variable, p))
 	}
 	v := phi.triRemoveTrivialPhi()
 	if v == phi {

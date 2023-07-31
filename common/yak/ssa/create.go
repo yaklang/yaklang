@@ -45,8 +45,14 @@ func (p *Package) NewFunction(name string) *Function {
 	p.funcs = append(p.funcs, f)
 	return f
 }
-
 func (f *Function) newBasicBlock(name string) *BasicBlock {
+	return f.newBasicBlockWithSealed(name, true)
+}
+func (f *Function) newBasicBlockUnSealed(name string) *BasicBlock {
+	return f.newBasicBlockWithSealed(name, false)
+}
+
+func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlock {
 	index := len(f.Blocks)
 	if name != "" {
 		name = fmt.Sprintf("%s%d", name, index)
@@ -54,9 +60,16 @@ func (f *Function) newBasicBlock(name string) *BasicBlock {
 		name = fmt.Sprintf("b%d", index)
 	}
 	b := &BasicBlock{
-		Name:   name,
-		Index:  index,
-		Parent: f,
+		Index:         index,
+		Name:          name,
+		Parent:        f,
+		Preds:         make([]*BasicBlock, 0),
+		Succs:         make([]*BasicBlock, 0),
+		Instrs:        make([]Instruction, 0),
+		Phis:          make([]*Phi, 0),
+		isSealed:      isSealed,
+		inCompletePhi: make([]*Phi, 0),
+		user:          make([]User, 0),
 	}
 	f.Blocks = append(f.Blocks, b)
 	return b
