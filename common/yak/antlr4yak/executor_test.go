@@ -3089,6 +3089,24 @@ assert d.$e == 23
 	_formattest(code)
 }
 
+func TestNewExecutor_ClosureAssignFix(t *testing.T) {
+	code := `
+f = () => 1
+{
+	a = 2
+	f = () => a
+}
+
+{
+	f2 = f
+	assert f() == 2
+	assert f2() == 2
+}
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
+
 // 测试 assert/字符串索引、拼接/结构体、和map调用成员
 func TestNewExecutor_MemberCall(t *testing.T) {
 	u := &user{
