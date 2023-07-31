@@ -1,10 +1,11 @@
 package yakdns
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
 
-func TestDoH(t *testing.T) {
+func TestBASIC(t *testing.T) {
 	reliableLookupHost("baidu.com")
 	reliableLookupHost("baidu.com")
 	reliableLookupHost("baidu.com")
@@ -12,4 +13,8 @@ func TestDoH(t *testing.T) {
 	reliableLookupHost("www.uestc.edu.cn")
 	reliableLookupHost("www.uestc.edu.cn")
 	reliableLookupHost("www.uestc.edu.cn")
+}
+
+func TestNotExisted(t *testing.T) {
+	reliableLookupHost(utils.RandNumberStringBytes(100)+".com", WithFallbackDoH(true))
 }
