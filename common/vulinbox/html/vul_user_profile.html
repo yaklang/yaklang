@@ -89,7 +89,7 @@
         const xhr = new XMLHttpRequest();
 
         // 设置POST请求的目标URL
-        const url = "/user/update";
+        const url = "/logic/user/update";
 
         // 设置请求方法为POST
         xhr.open("POST", url, true);
@@ -128,12 +128,12 @@
         document.cookie = "_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/user/logout", true);
+        xhr.open("GET", "/logic/user/logout", true);
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
                     // 登出成功，重定向到登录页面
-                    window.location.href = "/user/login";
+                    window.location.href = "/logic/user/login";
                 } else {
                     // 登出失败，显示错误消息
                     showNotification("Logout failed: " + xhr.responseText);

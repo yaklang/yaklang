@@ -81,7 +81,7 @@
         const password = document.getElementById('password').value;
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/user/login');
+        xhr.open('POST', '/logic/user/login');
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         xhr.onload = function () {
@@ -89,9 +89,17 @@
                 const response = JSON.parse(xhr.responseText);
                 messageDiv.textContent = response.message;
                 messageDiv.style.color = 'green';
+                let queryString = window.location.search;
+                const params = new URLSearchParams(queryString);
+                let from = params.get("from")
+                if (from !== null) {
+                    window.location.href = from
+                    return
+                }
+
                 if (response.success) {
                     // 登录成功，跳转到用户信息页面
-                    window.location.href = '/user/profile?id=' + response.id;
+                    window.location.href = '/logic/user/profile?id=' + response.id;
                 }
             } else {
                 messageDiv.textContent = 'Login failed: ' + xhr.responseText;
@@ -108,7 +116,7 @@
     // 注册按钮点击事件处理程序
     registerButton.addEventListener('click', function () {
         // 跳转到注册页面
-        window.location.href = '/user/register';
+        window.location.href = '/logic/user/register';
     });
 
     const codeSnippet = document.getElementById("codeSnippet");

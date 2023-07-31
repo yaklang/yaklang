@@ -19,22 +19,22 @@ import (
 	"unicode/utf8"
 )
 
-//go:embed vul_cryptojs_basic.html
+//go:embed html/vul_cryptojs_basic.html
 var cryptoBasicHtml []byte
 
-//go:embed vul_cryptojs_rsa.html
+//go:embed html/vul_cryptojs_rsa.html
 var cryptoRsaHtml []byte
 
-//go:embed vul_cryptojs_rsa_keyfromserver.html
+//go:embed html/vul_cryptojs_rsa_keyfromserver.html
 var cryptoRsaKeyFromServerHtml []byte
 
-//go:embed vul_cryptojs_rsa_keyfromserver_withresponse.html
+//go:embed html/vul_cryptojs_rsa_keyfromserver_withresponse.html
 var cryptoRsaKeyFromServerHtmlWithResponse []byte
 
-//go:embed vul_cryptojs_rsa_and_aes.html
+//go:embed html/vul_cryptojs_rsa_and_aes.html
 var cryptoRsaKeyAndAesHtml []byte
 
-//go:embed vul_cryptojslib_template.html
+//go:embed html/vul_cryptojslib_template.html
 var cryptoJSlibTemplateHtml string
 
 func (s *VulinServer) registerCryptoJS() {

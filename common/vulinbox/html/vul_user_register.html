@@ -51,7 +51,7 @@
         let age = document.getElementById('age').value;
         age = parseInt(age, 10);
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/user/register');
+        xhr.open('POST', '/logic/user/register');
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         xhr.onload = function () {
@@ -76,7 +76,7 @@
     // 返回登录按钮点击事件处理程序
     loginButton.addEventListener('click', function () {
         // 跳转回登录页面
-        window.location.href = '/user/login';
+        window.location.href = '/logic/user/login';
     });
 </script>
 </body>

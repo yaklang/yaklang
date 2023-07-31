@@ -15,13 +15,13 @@ import (
 	"strings"
 )
 
-//go:embed vul_upload_main.html
+//go:embed html/vul_upload_main.html
 var uploadMain []byte
 
-//go:embed vul_upload_result.html
+//go:embed html/vul_upload_result.html
 var uploadResult []byte
 
-//go:embed vul_upload_failed.html
+//go:embed html/vul_upload_failed.html
 var uploadFailed string
 
 func (s *VulinServer) registerUploadCases() {

@@ -24,7 +24,7 @@ func ForceEnsureCookie(writer http.ResponseWriter, r *http.Request, key, val str
 	return false
 }
 
-//go:embed vul_jsonp.html
+//go:embed html/vul_jsonp.html
 var vulJSONPHTML []byte
 
 func (s *VulinServer) registerJSONP() {

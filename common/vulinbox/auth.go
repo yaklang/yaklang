@@ -7,8 +7,14 @@ import (
 func (s *dbm) Authenticate(writer http.ResponseWriter, request *http.Request) (*VulinUser, error) {
 	session, err := request.Cookie("_cookie")
 	if err != nil {
-		writer.WriteHeader(http.StatusUnauthorized)
-		writer.Write([]byte("Unauthorized"))
+		//writer.Header().Set("Location", "/logic/user/login")
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte(`
+<script>
+alert("请先登录");
+window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
+</script>
+`))
 		return nil, err
 	}
 
