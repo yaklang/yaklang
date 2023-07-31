@@ -127,6 +127,33 @@ type Const struct {
 	value constant.Value
 }
 
+var (
+	ConstOne = &Const{
+		user:  []User{},
+		value: constant.MakeInt64(1),
+	}
+)
+
+type LeftValue interface {
+	Assign(Value)
+	GetValue() Value
+}
+
+type Identifier struct {
+	variable string
+	f        *Function
+}
+
+func (i *Identifier) Assign(v Value) {
+	i.f.wirteVariable(i.variable, v)
+}
+
+func (i *Identifier) GetValue() Value {
+	return i.f.readVariable(i.variable)
+}
+
+var _ LeftValue = (*Identifier)(nil)
+
 // control-flow instructions  ----------------------------------------
 // jump / if / return / call / switch
 
