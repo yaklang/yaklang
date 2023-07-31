@@ -296,6 +296,18 @@ m.v("aaa", {})
 	_formattest(code)
 
 }
+func TestNewExecutor_YakWrappedFunctionAssign(t *testing.T) {
+	code := `
+a = {"risk":()=>{}}
+assert typeof(a) == map[string]var
+a.risk = () => {
+	
+}
+`
+	_marshallerTest(code)
+	_formattest(code)
+
+}
 
 func TestNewExecutor(t *testing.T) {
 	code := `
