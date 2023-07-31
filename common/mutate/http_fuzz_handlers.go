@@ -5,6 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -14,12 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/mixer"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -469,7 +470,7 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 	return reqs, nil
 }
 
-func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -478,11 +479,6 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}) ([]*
 	if vals == nil {
 		vals = make(url.Values)
 	}
-
-	//originVals, err := deepCopyUrlValues(vals)
-	//if err != nil {
-	//	return nil, utils.Errorf("copy url.Values failed: %s", err.Error())
-	//}
 
 	keys, values := InterfaceToFuzzResults(key), InterfaceToFuzzResults(value)
 	if len(keys) <= 0 || len(values) <= 0 {
@@ -497,6 +493,10 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}) ([]*
 	for {
 		pairs := mix.Value()
 		key, value := pairs[0], pairs[1]
+		for _, e := range encoded {
+			value = e(value)
+		}
+
 		req.RequestURI = ""
 		newVals, err := deepCopyUrlValues(vals)
 		if err != nil {
@@ -557,7 +557,7 @@ func (f *FuzzHTTPRequest) FuzzPostRaw(body ...string) FuzzHTTPRequestIf {
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
 
-func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -589,6 +589,10 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}) ([]*http.Request, err
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
+		for _, e := range encoded {
+			value = e(value)
+		}
+
 		newVals, _ := deepCopyUrlValues(vals)
 		if newVals != nil {
 			newVals.Set(key, value)
@@ -875,7 +879,7 @@ func (f *FuzzHTTPRequest) FuzzUploadFileName(k, v interface{}) FuzzHTTPRequestIf
 	return r
 }
 
-func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -901,6 +905,9 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}) ([]*http.Request, error) 
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
+		for _, e := range encoded {
+			value = e(value)
+		}
 		newCookie, _ := deepCopySyncMapCookie(cookies)
 		if newCookie == nil {
 			newCookie = new(sync.Map)

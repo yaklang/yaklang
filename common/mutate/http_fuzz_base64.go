@@ -2,15 +2,17 @@ package mutate
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/cartesian"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func isBase64JSON(raw string) (string, bool) {
@@ -19,6 +21,60 @@ func isBase64JSON(raw string) (string, bool) {
 		return raw, false
 	}
 	return utils.IsJSON(string(decoded))
+}
+
+func isBase64(raw string) (string, bool) {
+	decoded, err := codec.DecodeBase64Url(raw)
+	if err != nil {
+		return raw, false
+	}
+	return string(decoded), true
+}
+
+func (f *FuzzHTTPRequest) fuzzGetBase64Params(key interface{}, value interface{}) ([]*http.Request, error) {
+	req, err := f.GetOriginHTTPRequest()
+	if err != nil {
+		return nil, err
+	}
+	vals := req.URL.Query()
+	if vals == nil {
+		vals = make(url.Values)
+	}
+
+	keys, values := InterfaceToFuzzResults(key), InterfaceToFuzzResults(value)
+	if len(keys) <= 0 || len(values) <= 0 {
+		return nil, utils.Errorf("GetQuery key or Values are empty...")
+	}
+	mix, err := mixer.NewMixer(keys, values)
+	if err != nil {
+		return nil, err
+	}
+
+	var reqs []*http.Request
+	for {
+		pairs := mix.Value()
+		key, value := pairs[0], codec.EncodeBase64(pairs[1])
+		req.RequestURI = ""
+		newVals, err := deepCopyUrlValues(vals)
+		if err != nil {
+			continue
+		}
+		newVals.Set(key, value)
+		req.URL.RawQuery = newVals.Encode()
+
+		_req, err := rebuildHTTPRequest(req, 0)
+		if err != nil {
+			continue
+		}
+		req.URL.RawQuery = vals.Encode()
+		reqs = append(reqs, _req)
+
+		err = mix.Next()
+		if err != nil {
+			break
+		}
+	}
+	return reqs, nil
 }
 
 func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
@@ -115,6 +171,39 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 		return nil, utils.Errorf("cartesian.ProductEx: %s", err)
 	}
 	return reqs, nil
+}
+
+func (f *FuzzHTTPRequest) FuzzGetBase64Params(key, val any) FuzzHTTPRequestIf {
+	reqs, err := f.fuzzGetParams(key, val, codec.EncodeBase64)
+	if err != nil {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f,
+			originRequest: f,
+		}
+	}
+	return NewFuzzHTTPRequestBatch(f, reqs...)
+}
+
+func (f *FuzzHTTPRequest) FuzzPostBase64Params(key, val any) FuzzHTTPRequestIf {
+	reqs, err := f.fuzzPostParams(key, val, codec.EncodeBase64)
+	if err != nil {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f,
+			originRequest: f,
+		}
+	}
+	return NewFuzzHTTPRequestBatch(f, reqs...)
+}
+
+func (f *FuzzHTTPRequest) FuzzCookieBase64(key, val any) FuzzHTTPRequestIf {
+	reqs, err := f.fuzzCookie(key, val, codec.EncodeBase64)
+	if err != nil {
+		return &FuzzHTTPRequestBatch{
+			fallback:      f,
+			originRequest: f,
+		}
+	}
+	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
 
 func (f *FuzzHTTPRequest) FuzzGetBase64JsonPath(key any, jsonPath string, val any) FuzzHTTPRequestIf {
