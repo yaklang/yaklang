@@ -22,6 +22,64 @@ func (f *Function) buildStatementList(stmtlist *yak.StatementListContext) {
 	}
 }
 
+
+func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) Value {
+	funcName := ""
+	if name := stmt.FunctionNameDecl(); name != nil {
+		funcName = name.GetText()
+	}
+	newfunc := f.Package.NewFunction(funcName)
+	f.AddAnonymous(newfunc)
+
+	if stmt.EqGt() != nil {
+		if stmt.LParen() != nil && stmt.RParen() != nil {
+			// has param
+			// stmt.FunctionParamDecl()
+			if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
+				newfunc.buildFunctionParamDecl(para)
+			}
+		} else {
+			// only this param
+			newfunc.NewParam(stmt.Identifier().GetText(), true)
+		}
+		if block, ok := stmt.Block().(*yak.BlockContext); ok {
+			// build block
+			newfunc.buildBlock(block)
+		} else if expression, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+			// hanlder expression
+			v := newfunc.buildExpression(expression)
+			newfunc.emitReturn([]Value{v})
+		} else {
+			panic("BUG: arrow function need expression or block at least")
+		}
+	} else {
+		if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
+			newfunc.buildFunctionParamDecl(para)
+		}
+		if block, ok := stmt.Block().(*yak.BlockContext); ok {
+			newfunc.buildBlock(block)
+		}
+	}
+
+	f.emitMakeClosure(newfunc)
+	return newfunc
+}
+
+func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
+	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
+	ids := stmt.AllIdentifier()
+	param := make([]*Parameter, 0, len(ids))
+
+	for _, id := range ids {
+		param = append(param, f.NewParam(id.GetText(), false))
+	}
+	if ellipsis != nil {
+		// handler "..." to array
+		// param[len(ids)-1]
+	}
+	f.Param = param
+}
+
 func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 	if op := stmt.AdditiveBinaryOperator(); op != nil {
 		op0 := f.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
@@ -70,6 +128,11 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 		return f.emitArith(opcode, op0, op1)
 
 	}
+
+	if s, ok := stmt.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
+		return f.buildAnonymouseFunctionDecl(s)
+	}
+
 	return nil
 }
 
