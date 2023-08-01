@@ -6,8 +6,14 @@ func (f *Function) emit(i Instruction) {
 	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
 }
 
+func fixupUseChain(u User) {
+	for _, v := range u.GetValue() {
+		v.AddUser(u)
+	}
+}
+
 func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
-	ret := &BinOp{
+	b := &BinOp{
 		anInstruction: anInstruction{
 			Parent: f,
 			Block:  f.currentBlock,
@@ -17,10 +23,9 @@ func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 		Y:    y,
 		user: []User{},
 	}
-	x.AddUser(ret)
-	y.AddUser(ret)
-	f.emit(ret)
-	return ret
+	fixupUseChain(b)
+	f.emit(b)
+	return b
 }
 
 func (f *Function) emitIf(cond Value) *If {
@@ -31,7 +36,7 @@ func (f *Function) emitIf(cond Value) *If {
 		},
 		Cond: cond,
 	}
-	cond.AddUser(ifssa)
+	fixupUseChain(ifssa)
 	f.emit(ifssa)
 	return ifssa
 }
