@@ -29,6 +29,12 @@ func TestRule_Match(t *testing.T) {
 				// pool.minergate.com dns response
 				{"6afd6158af5c3066d026811b0800450000506d32400040114607c0a80301c0a803120035e5fe003c263300028080000100010000000004706f6f6c096d696e65726761746503636f6d0000010001c00c000100010000003c0004c7109ebe", true},
 			},
+		}, {
+			rule: "alert dns any any -> any any (dns_query;startswith;content:\"pool\";dns_query;content:\"com\";distance:11;)",
+			test: []Test{
+				// pool.minergate.com dns request src 192.168.3.18
+				{"3066d026811b6afd6158af5c08004500004039b5000080117994c0a80312c0a80301d9c60035002cd822000a0100000100000000000004706f6f6c096d696e65726761746503636f6d0000010001", true},
+			},
 		},
 	}
 	for _, v := range cases {

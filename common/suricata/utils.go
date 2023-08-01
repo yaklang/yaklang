@@ -77,36 +77,6 @@ func bytesIndexAll(s []byte, sep []byte) []matched {
 	return indexes
 }
 
-func binarySearch[T any](slice []T, cmp func(T) int) int {
-	if len(slice) == 1 {
-		if cmp(slice[0]) < 0 {
-			return 1
-		}
-		return 0
-	}
-	l := 0
-	r := len(slice)
-	for l < r {
-		mid := (l + r) / 2
-		if cmp(slice[mid]) < 0 {
-			l = mid + 1
-		} else {
-			r = mid
-		}
-	}
-	return l
-}
-
-func sliceFilter[T any](slice []T, filter func(T) bool) []T {
-	var ret []T
-	for _, v := range slice {
-		if filter(v) {
-			ret = append(ret, v)
-		}
-	}
-	return ret
-}
-
 func negIf(flag bool, val bool) bool {
 	if flag {
 		return !val
