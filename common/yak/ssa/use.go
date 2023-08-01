@@ -31,6 +31,15 @@ func (p *Phi) AddValue(v Value)  {}
 func (c *Const) GetUser() []User { return c.user }
 func (c *Const) AddUser(u User)  { c.user = append(c.user, u) }
 
+// ----------- param
+func (p *Parameter) GetUser() []User {
+	return p.user
+}
+
+func (p *Parameter) AddUser(u User) {
+	p.user = append(p.user, u)
+}
+
 // ----------- Jump
 func (j *Jump) ReplaceValue(v Value, to Value) {
 	panic("jump don't use value")
