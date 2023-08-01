@@ -306,6 +306,7 @@ abc`), "Host", utils.HostPort(host, port))),
 						Groups: []string{".key"},
 					},
 				},
+				FuzzerIndex: "1",
 			},
 			{
 				Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /verify HTTP/1.1
@@ -319,12 +320,16 @@ abc`), "Host", utils.HostPort(host, port))),
 				InheritVariables:         true,
 				InheritCookies:           true,
 				ForceFuzz:                true,
+				FuzzerIndex:              "2",
 			},
 		}},
 	)
 	if err != nil {
 		panic(err)
 	}
+
+	var checkFuzzerIndex = false
+	var checkFuzzerIndex2 = false
 	for {
 		resp, err := client.Recv()
 		if err != nil {
@@ -336,6 +341,13 @@ abc`), "Host", utils.HostPort(host, port))),
 		println(string(resp.Response.RequestRaw))
 		println(string(resp.Response.ResponseRaw))
 		println()
+
+		if resp.Request.GetFuzzerIndex() == "1" && resp.Request.GetRequest() == "" && len(resp.Request.GetRequestRaw()) <= 0 {
+			checkFuzzerIndex = true
+		}
+		if resp.Request.GetFuzzerIndex() == "2" && resp.Request.GetRequest() == "" && len(resp.Request.GetRequestRaw()) <= 0 {
+			checkFuzzerIndex2 = true
+		}
 	}
 
 	if !redirect302done {
@@ -344,5 +356,13 @@ abc`), "Host", utils.HostPort(host, port))),
 
 	if !verified {
 		t.Fatal("verified extractor ")
+	}
+
+	if !checkFuzzerIndex {
+		t.Fatal("checkFuzzerIndex failed")
+	}
+
+	if !checkFuzzerIndex2 {
+		t.Fatal("checkFuzzerIndex2 failed")
 	}
 }
