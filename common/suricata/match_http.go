@@ -8,3 +8,10 @@ type HTTPConfig struct {
 	UrilenNum1 int
 	UrilenNum2 int
 }
+
+func httpMatcher(c *matchContext) error {
+	if c.Rule.ContentRuleConfig == nil {
+		return nil
+	}
+	panic("implement me")
+}

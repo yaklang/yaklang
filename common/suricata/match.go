@@ -87,6 +87,8 @@ func matchMutex(c *matchContext) error {
 	switch c.Rule.Protocol {
 	case DNS:
 		c.Attach(ipMatcher, portMatcher, dnsMatcher)
+	case HTTP:
+		c.Attach(ipMatcher, portMatcher, httpMatcher)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
 	}
