@@ -79,7 +79,13 @@ solution = `1. 升级Fastjson版本：如果你的项目中使用了Fastjson，�
 description = `Fastjson反序列化漏洞是一种远程代码执行漏洞，攻击者可以通过构造恶意JSON字符串触发漏洞，进而执行任意代码。该漏洞存在的原因是Fastjson在处理某些特定的JSON字符串时没有正确地检查反序列化的数据，导致攻击者可以在JSON中植入恶意代码。`
 
 // json为空时会误判
-isJson = d =>{return len(json.loads(d)) > 0}
+isJson = d =>{
+    try{
+        return len(json.loads(d)) > 0
+    }catch err{
+        return false
+    }
+}
 getBody = rsp =>{return str.SplitHTTPHeadersAndBodyFromPacket(rsp)[1] }
 dnslogPocs = [`{"@type":"java.net.Inet4Address","val":"{{params(dnslog)}}"}`,`{"@type":"java.net.InetSocketAddress"{"address":,"val":"{{params(dnslog)}}"}`]
 
@@ -94,7 +100,9 @@ expMap = {
 poc_redos = `{"regex":{"$ref":"$[blue rlike '^[a-zA-Z]+(([a-zA-Z ])?[a-zA-Z]*)*$']"},"blue":"aaaaaaaaaaaaaaaaa!"}`
 # mirrorNewWebsitePath 每新出现一个网站路径，关于这个网站路径的第一个请求，将会在这里被传入回调
 mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    originBody = body
     originReq = req
+    originRsp = rsp
     freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
     firstBody = body
     globalInfo = sync.NewMap()
@@ -107,6 +115,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         if ok {
             v.createRisk()
         }
+        yakit.Info("Fastjson 综合检测插件执行结束")
     }
     getCommonWastTime = ()=>{
         v,ok = globalInfo.Load("wastTimes")
@@ -122,7 +131,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
     }
     newRisk = (title,payload,param,levelIndex)=>{
         yakit.Info("发现漏洞风险: %v", title)
-        log.debug("response: %v", string(param.rsp.RequestRaw))
+        log.debug("response: %v", string(param.rsp.ResponseRaw))
         globalInfo.Store("isFastjson",1)
         titleVerbose = title
         version,ok=globalInfo.Load("versionScope")
@@ -157,23 +166,27 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         isFastjsonParam = 0
         if isJson(paramInfo.value){ // 当响应包为json时尝试通过添加字段判断jackson
             hasError = s =>{
-                log.debug("检查body错误值: %v", s)
-                return re.Match("false|500|error", s)
+                s = string(s)
+                log.debug("检测异常响应: %v", s)
+                return re.Match("false|500|error|(Internal Server Error)|(Unrecognized field)", s)
             }
-            commonHasError = hasError(paramInfo.value)
+            commonHasError = hasError(originBody)
+            log.debug("常规请求 body has error: %v",commonHasError)
             data = json.loads(paramInfo.value)
             data[randstr(5)] = randstr(5)
             dataStr = json.dumps(data)
-            log.debug("fastjson payload: %v", dataStr)
+            log.debug("检查 jackson payload: %v", dataStr)
             rsp,err = fuzzParam.fuzz(dataStr)
             if err {
                 yakit.Error("发送 request error: %v", err)
                 return
             }
             body = getBody(rsp.ResponseRaw)
-            if !(!commonHasError && hasError(string(body)) || string(body) != paramInfo.value) { // 由于添加字段导致出现错误或和原本响应包内容发生不同则判断为jackson
+            log.debug("检查 jackson 请求 body: %v",string(body))
+            log.debug("检查 jackson 请求 body has error: %v",hasError(string(body)))
+            // if !commonHasError && hasError(string(body)) || (string(body) != paramInfo.value) { // 由于添加字段导致出现错误或和原本响应包内容发生不同则判断为jackson
+            if !commonHasError && hasError(string(body)) { // 由于添加字段导致出现错误或则判断为jackson
                 isFastjsonParam = -1
-                return
             }
         }
         globalInfo.Store("isFastjson",isFastjsonParam)
@@ -290,11 +303,21 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         allParams.Append(freq.GetGetQueryParams()...)
         allParams.Append(freq.GetCookieParams()...)
         for param in allParams{
-            if isJson(param.Value()){
-                p = param
-                needToFuzzParams.Append({"value":p.Value(),"fuzz":(payload)=>{
+            p = param
+            value = p.Value()
+            log.debug("检测参数 `%v:%v` 是否为json", p.Name(),value)
+            if typeof(value).String() == "[]string"{ // 处理数组参数
+                if len(value) > 0{
+                    value = value[0]
+                }else{
+                    continue
+                }
+            }
+            if isJson(value){
+                log.debug("发现位于 %v 的 json 参数 `%v:%v`", p.Position(),p.Name(),value)
+                needToFuzzParams.Append({"value":value,"fuzz":(payload)=>{
                     return p.Fuzz(payload)
-                },"name":p.name()})
+                },"name":p.name(),"rsp":originRsp})
             }
         }
     }else{ // fuzz body
