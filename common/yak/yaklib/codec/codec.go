@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -102,6 +103,10 @@ func EncodeBase64(i interface{}) string {
 	return base64.StdEncoding.EncodeToString(interfaceToBytes(i))
 }
 
+func EncodeBase32(i interface{}) string {
+	return base32.StdEncoding.EncodeToString(interfaceToBytes(i))
+}
+
 func EncodeBase64Url(i interface{}) string {
 	org := base64.StdEncoding.EncodeToString(interfaceToBytes(i))
 	org = strings.TrimRight(org, "=")
@@ -127,6 +132,18 @@ func DecodeBase64(i string) ([]byte, error) {
 		return base64.StdEncoding.DecodeString(i)
 	}
 	return base64.StdEncoding.DecodeString(i + strings.Repeat("=", padding))
+}
+
+func DecodeBase32(i string) ([]byte, error) {
+	i = strings.TrimSpace(i)
+	i = strings.ReplaceAll(i, "%3d", "=")
+	i = strings.ReplaceAll(i, "%3D", "=")
+
+	padding := 8 - len(i)%8
+	if padding <= 0 || padding == 8 {
+		return base32.StdEncoding.DecodeString(i)
+	}
+	return base32.StdEncoding.DecodeString(i + strings.Repeat("=", padding))
 }
 
 func Md5(i interface{}) string {
