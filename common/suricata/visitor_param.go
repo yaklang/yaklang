@@ -141,10 +141,11 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				set = false
 			}
 		case "dns.opcode", "dns_opcode":
-			config := rule.ContentRuleConfig.DNS
 			neg, content := mustSoloSingleSetting(ssts)
-			config.OpcodeNegative, config.Opcode = neg, atoi(content)
-		// others
+			rule.ContentRuleConfig.DNS = &DNSRule{
+				OpcodeNegative: neg,
+				Opcode:         atoi(content),
+			}
 		case "flow":
 			if rule.ContentRuleConfig.Flow == nil {
 				lvstr := strings.ToLower(vStr)
@@ -155,8 +156,14 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				}
 			}
 		case "ttl":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.TTL = atoi(vStr)
 		case "sameip":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.Sameip = true
 		case "ipopts":
 			/*
@@ -171,18 +178,39 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				satid	Stream Identifier
 				any	any IP options are set
 			*/
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.IPOpts = vStr
 		case "ip_proto":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.IPProto = vStr //number or name
 		case "id":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.Id = atoi(vStr)
 		case "geoip":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.Geoip = vStr
 		case "fragbits":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.FragBits = vStr
 		case "fragoffset":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.FragOffset = vStr
 		case "tos":
+			if rule.ContentRuleConfig.IPConfig == nil {
+				rule.ContentRuleConfig.IPConfig = &IPLayerRule{}
+			}
 			rule.ContentRuleConfig.IPConfig.Tos = vStr
 		case "flags":
 			/*
@@ -194,16 +222,28 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				E: 匹配TCP ECE标志位
 				C: 匹配TCP CWR标志位
 			*/
+			if rule.ContentRuleConfig.TcpConfig == nil {
+				rule.ContentRuleConfig.TcpConfig = &TCPLayerRule{}
+			}
 			rule.ContentRuleConfig.TcpConfig.Flags = vStr
 		case "seq":
+			if rule.ContentRuleConfig.TcpConfig == nil {
+				rule.ContentRuleConfig.TcpConfig = &TCPLayerRule{}
+			}
 			rule.ContentRuleConfig.TcpConfig.Seq = atoi(vStr)
 		case "ack":
+			if rule.ContentRuleConfig.TcpConfig == nil {
+				rule.ContentRuleConfig.TcpConfig = &TCPLayerRule{}
+			}
 			rule.ContentRuleConfig.TcpConfig.Ack = atoi(vStr)
 		case "window":
+			if rule.ContentRuleConfig.TcpConfig == nil {
+				rule.ContentRuleConfig.TcpConfig = &TCPLayerRule{}
+			}
 			neg, content := mustSoloSingleSetting(ssts)
 			rule.ContentRuleConfig.TcpConfig.NegativeWindow, rule.ContentRuleConfig.TcpConfig.Window = neg, atoi(content)
 		case "threshold":
-			config := rule.ContentRuleConfig.Thresholding
+			config := &ThresholdingConfig{}
 			config.Count = atoi(utils.MapGetString(vParams, "count"))
 			config.Track = utils.MapGetString(vParams, "track")
 			switch utils.MapGetString(vParams, "type") {
@@ -216,26 +256,41 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				config.LimitMode = true
 			}
 			config.Seconds = atoi(utils.MapGetString(vParams, "seconds"))
-
+			rule.ContentRuleConfig.Thresholding = config
 		case "udp.hdr":
+			if rule.ContentRuleConfig.UdpConfig != nil {
+				rule.ContentRuleConfig.UdpConfig = &UDPLayerRule{}
+			}
 			rule.ContentRuleConfig.UdpConfig.UDPHeader = true
 		case "icode":
 			/*
 				icode:min<>max;
 				icode:[<|>]<number>;
 			*/
+			if rule.ContentRuleConfig.IcmpConfig == nil {
+				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
+			}
 			rule.ContentRuleConfig.IcmpConfig.ICode = vStr
 		case "itype":
 			/*
 				itype:min<>max;
 				itype:[<|>]<number>;
 			*/
+			if rule.ContentRuleConfig.IcmpConfig == nil {
+				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
+			}
 			rule.ContentRuleConfig.IcmpConfig.IType = vStr
 		case "icmp_id":
 			// icmp_id:<number>
+			if rule.ContentRuleConfig.IcmpConfig == nil {
+				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
+			}
 			rule.ContentRuleConfig.IcmpConfig.ICMPId = atoi(vStr)
 		case "icmp_seq":
 			// icmp_seq:<number>;
+			if rule.ContentRuleConfig.IcmpConfig == nil {
+				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
+			}
 			rule.ContentRuleConfig.IcmpConfig.ICMPSeq = atoi(vStr)
 
 		case "nocase":

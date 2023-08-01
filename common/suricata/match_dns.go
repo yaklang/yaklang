@@ -13,19 +13,19 @@ type DNSRule struct {
 
 // match dns
 func dnsMatcher(c *matchContext) error {
-	if c.Rule.ContentRuleConfig == nil || c.Rule.ContentRuleConfig.DNS == nil {
+	if c.Rule.ContentRuleConfig == nil {
 		return nil
 	}
+
 	dns := c.PK.Layer(layers.LayerTypeDNS)
 	if dns == nil {
 		return fmt.Errorf("dns layer not found")
 	}
-	if c.Rule.ContentRuleConfig.DNS.OpcodeNegative {
-		if !c.Must(utils.Atoi(string(dns.(*layers.DNS).OpCode)) != c.Rule.ContentRuleConfig.DNS.Opcode) {
-			return nil
-		}
-	} else {
-		if !c.Must(utils.Atoi(string(dns.(*layers.DNS).OpCode)) == c.Rule.ContentRuleConfig.DNS.Opcode) {
+
+	if c.Rule.ContentRuleConfig.DNS != nil {
+		if !c.Must(negIf(c.Rule.ContentRuleConfig.DNS.OpcodeNegative,
+			utils.Atoi(string(dns.(*layers.DNS).OpCode)) == c.Rule.ContentRuleConfig.DNS.Opcode,
+		)) {
 			return nil
 		}
 	}

@@ -82,22 +82,6 @@ type Rule struct {
 	ContentRuleConfig *ContentRuleConfig
 }
 
-func (r *Rule) init() {
-	r.ContentRuleConfig = &ContentRuleConfig{
-		Thresholding: &ThresholdingConfig{},
-		HTTPConfig:   &HTTPConfig{},
-		IPConfig:     &IPLayerRule{},
-		TcpConfig:    &TCPLayerRule{},
-		UdpConfig:    &UDPLayerRule{},
-		IcmpConfig:   &ICMPLayerRule{},
-		ContentRules: nil,
-		DNS: &DNSRule{
-			OpcodeNegative: false,
-			Opcode:         0,
-		},
-	}
-}
-
 func (r *AddressRule) GetLocalIPAddress() string {
 	return utils.GetLocalIPAddress()
 }
