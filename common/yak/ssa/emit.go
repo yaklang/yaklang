@@ -66,3 +66,20 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	f.emit(r)
 	return r
 }
+
+func (f *Function) emitMakeClosure(target *Function) *MakeClosure {
+	m := &MakeClosure{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		Fn:       target,
+		Bindings: []Value{},
+		user:     []User{},
+	}
+	// handler binding with target.freeValue
+
+	fixupUseChain(m)
+	f.emit(m)
+	return m
+}

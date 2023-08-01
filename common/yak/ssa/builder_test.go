@@ -87,8 +87,7 @@ func CheckProgram(t *testing.T, prog *Program) {
 func showProg(prog *Program) {
 	for _, pkg := range prog.Packages {
 		for _, f := range pkg.funcs {
-			str := f.String()
-			fmt.Printf("%s\n", str)
+			fmt.Printf("%s\n", f)
 		}
 	}
 }
@@ -168,6 +167,30 @@ func CompareYakMain(t *testing.T, prog *Program, ir string) {
 		},
 	}
 	Compare(t, prog, want)
+}
+
+func CompareYakFunc(t *testing.T, prog *Program, ir []string) {
+	funs := make(map[string]string)
+	for _, ir := range ir {
+		irs := strings.Split(ir, "\n")
+		// set
+		for _, line := range irs {
+			if strings.TrimSpace(line) != "" {
+				funs[line] = ir
+				break
+			}
+		}
+	}
+
+	want := &TestProgram{
+		[]TestPackage{
+			{
+				funs: funs,
+			},
+		},
+	}
+	Compare(t, prog, want)
+
 }
 
 func TestAssignInBasicBlock(t *testing.T) {
@@ -426,5 +449,57 @@ b5: <- loop.exit3
 		CheckProgram(t, prog)
 		showProg(prog)
 		CompareYakMain(t, prog, ir)
+	})
+
+}
+
+func TestClosure(t *testing.T) {
+	t.Run("closure_simple", func(t *testing.T) {
+		code := `
+a = () => {return 11}
+
+func b() {
+	return 12
+}
+
+c = fn() {
+	return 13
+}
+		`
+		ir := []string{
+			`
+yak-main
+entry0:
+	%0 = makeClosure Anonymousfunc1
+	%1 = makeClosure b
+	%2 = makeClosure Anonymousfunc3
+			`,
+
+			`
+Anonymousfunc1
+parent: yak-main
+entry0:
+	%0 = ret 11,
+			`,
+
+			`
+b
+parent: yak-main
+entry0:
+	%0 = ret 12,
+			`,
+
+			`
+Anonymousfunc3
+parent: yak-main
+entry0:
+	%0 = ret 13,
+			`,
+		}
+
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakFunc(t, prog, ir)
 	})
 }

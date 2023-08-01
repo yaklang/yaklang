@@ -1,5 +1,9 @@
 package ssa
 
+func (f *Function) AddAnonymous(anon *Function) {
+	f.AnonFuncs = append(f.AnonFuncs, anon)
+	anon.parent = f
+}
 
 func (f *Function) NewParam(name string, add bool) *Parameter {
 	p := &Parameter{

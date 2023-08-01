@@ -204,6 +204,16 @@ type UnOp struct {
 	X  Value
 }
 
+// special instruction ------------------------------------------
+// makeClosure
+
+type MakeClosure struct {
+	anInstruction
+	Fn       *Function
+	Bindings []Value // for function freeValue
+	user     []User
+}
+
 // implement value
 func (f *Function) String() string {
 	ret := f.name
@@ -387,3 +397,20 @@ var _ Value = (*BinOp)(nil)
 var _ User = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
 
+// ----------- MakeClosure
+func (m MakeClosure) String() string {
+	return m.StringByFunc(DefaultValueString)
+}
+
+func (m MakeClosure) StringByFunc(getStr func(Value) string) string {
+	// fmt.Sprintf("makeClosure %s ")
+	ret := "makeClosure " + m.Fn.name
+	for _, v := range m.Bindings {
+		ret += getStr(v) + ", "
+	}
+	return ret
+}
+
+var _ Value = (*MakeClosure)(nil)
+var _ User = (*MakeClosure)(nil)
+var _ Instruction = (*MakeClosure)(nil)
