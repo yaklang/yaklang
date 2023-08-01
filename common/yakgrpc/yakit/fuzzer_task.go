@@ -31,6 +31,10 @@ type WebFuzzerTask struct {
 	// 原始请求 json+quote
 	RawFuzzTaskRequest string `json:"raw_fuzz_task_request"`
 
+	// 对应前端的组织形式
+	FuzzerIndex    string `json:"fuzzer_index"`
+	FuzzerTabIndex string `json:"fuzzer_tab_index"`
+
 	// HTTP 数据流总量
 	HTTPFlowTotal        int    `json:"http_flow_total"`
 	HTTPFlowSuccessCount int    `json:"http_flow_success_count"`
