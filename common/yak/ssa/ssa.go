@@ -176,8 +176,15 @@ type Return struct {
 type Call struct {
 	anInstruction
 
-	Method *Function
+	// for call function
+	Method *MakeClosure
 	Args   []Value
+
+	// call is a value
+	user []User
+
+	// ~ drop error
+	isDropError bool
 }
 
 type Switch struct {
@@ -332,15 +339,12 @@ func (c Const) String() string {
 
 var _ Value = (*Const)(nil)
 
-
 // ----------- Parameter
 func (p *Parameter) String() string {
 	return p.variable
 }
 
 var _ Value = (*Parameter)(nil)
-
-
 
 // ----------- Jump
 func (j Jump) String() string {
@@ -383,6 +387,27 @@ func (r Return) StringByFunc(getStr func(Value) string) string {
 var _ Value = (*Return)(nil)
 var _ User = (*Return)(nil)
 var _ Instruction = (*Return)(nil)
+
+// ----------- Call
+func (c Call) String() string {
+	return c.StringByFunc(DefaultValueString)
+}
+
+func (c Call) StringByFunc(getStr func(Value) string) string {
+	ret := "call " + getStr(c.Method)
+	if len(c.Args) > 0 {
+		ret += " ("
+		for _, a := range c.Args {
+			ret += getStr(a) + ", "
+		}
+		ret += ")"
+	}
+	return ret
+}
+
+var _ Value = (*Call)(nil)
+var _ User = (*Call)(nil)
+var _ Instruction = (*Call)(nil)
 
 // ----------- BinOp
 func (b BinOp) String() string {
