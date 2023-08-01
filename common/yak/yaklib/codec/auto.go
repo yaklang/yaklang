@@ -3,12 +3,14 @@ package codec
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/asaskevich/govalidator"
+	"html"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/asaskevich/govalidator"
 )
 
 type AutoDecodeResult struct {
@@ -18,8 +20,12 @@ type AutoDecodeResult struct {
 	Result      string
 }
 
-var _jsonUnicodeEncoding = regexp.MustCompile(`(?i)\\u[\dabcdef]{4}`)
+var jsonUnicodeRegexp = regexp.MustCompile(`(?i)\\u[\dabcdef]{4}`)
 var base64Regexp = regexp.MustCompile(`(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})`)
+var urlRegexp = regexp.MustCompile(`%[\da-fA-F]{2}`)
+var htmlEntityRegexp = regexp.MustCompile(`^((&[a-zA-Z]+;)|(&#[a-fA-F0-9]+;))+$`)
+var hexRegexp = regexp.MustCompile(`^\b([0-9A-Fa-f]{2}\s?)+[0-9A-Fa-f]{2}\b$`)
+var base32Regexp = regexp.MustCompile(`^([A-Z2-7]{8})*([A-Z2-7]{8}|[A-Z2-7]{2}([A-Z2-7]{6})*|[A-Z2-7]{4}([A-Z2-7]{4})*|[A-Z2-7]{5}([A-Z2-7]{3})*|[A-Z2-7]{7})(=){0,6}$`)
 
 func AutoDecode(i interface{}) []*AutoDecodeResult {
 	rawBytes := interfaceToBytes(i)
@@ -28,7 +34,8 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	var results []*AutoDecodeResult
 	var origin = rawStr
 	for i := 0; i < 100; i++ {
-		if r, _ := regexp.MatchString(`%[\da-fA-F]{2}`, rawStr); r {
+		// urlencode
+		if r := urlRegexp.MatchString(rawStr); r {
 			rawStr, _ = url.QueryUnescape(rawStr)
 			if rawStr != "" {
 				results = append(results, &AutoDecodeResult{
@@ -42,8 +49,50 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			}
 		}
 
-		if r := _jsonUnicodeEncoding.MatchString(rawStr); r {
-			rawStr = _jsonUnicodeEncoding.ReplaceAllStringFunc(rawStr, func(s string) string {
+		// html entity encode
+		if r := htmlEntityRegexp.MatchString(rawStr); r {
+			rawStr = html.UnescapeString(rawStr)
+			if rawStr != "" {
+				results = append(results, &AutoDecodeResult{
+					Type:        "Html Entity Decode",
+					TypeVerbose: "Html Entity 解码",
+					Origin:      origin,
+					Result:      rawStr,
+				})
+				origin = rawStr
+				continue
+			}
+		}
+
+		// hex
+		if hexRegexp.MatchString(rawStr) {
+			rawStr = hexRegexp.ReplaceAllStringFunc(rawStr, func(s string) string {
+				result, err := DecodeHex(strings.ReplaceAll(s, " ", ""))
+				if err != nil {
+					return s
+				}
+				for _, ch := range []rune(string(result)) {
+					if !strconv.IsPrint(ch) {
+						return s
+					}
+				}
+				return EscapeInvalidUTF8Byte(result)
+			})
+			if rawStr != "" && rawStr != origin {
+				results = append(results, &AutoDecodeResult{
+					Type:        "Hex Decode",
+					TypeVerbose: "Hex 解码",
+					Origin:      origin,
+					Result:      rawStr,
+				})
+				origin = rawStr
+				continue
+			}
+		}
+
+		// json-unicode
+		if r := jsonUnicodeRegexp.MatchString(rawStr); r {
+			rawStr = jsonUnicodeRegexp.ReplaceAllStringFunc(rawStr, func(s string) string {
 				number, err := DecodeHex(strings.TrimLeft(s, "\\u"))
 				if err != nil {
 					return s
@@ -62,8 +111,8 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			}
 		}
 
+		// base64
 		if govalidator.IsBase64(rawStr) {
-			// 解码解到 BASE64
 			rawStr = base64Regexp.ReplaceAllStringFunc(rawStr, func(s string) string {
 				result, err := DecodeBase64(s)
 				if err != nil {
@@ -88,6 +137,33 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			}
 		}
 
+		// base32
+		if base32Regexp.MatchString(rawStr) {
+			rawStr = base32Regexp.ReplaceAllStringFunc(rawStr, func(s string) string {
+				result, err := DecodeBase32(s)
+				if err != nil {
+					return s
+				}
+				for _, ch := range []rune(string(result)) {
+					if !strconv.IsPrint(ch) {
+						return s
+					}
+				}
+				return EscapeInvalidUTF8Byte(result)
+			})
+			if rawStr != "" && rawStr != origin {
+				results = append(results, &AutoDecodeResult{
+					Type:        "Base32 Decode",
+					TypeVerbose: "Base32 解码",
+					Origin:      origin,
+					Result:      rawStr,
+				})
+				origin = rawStr
+				continue
+			}
+		}
+
+		// base64 with urlencode
 		decodedByBas64, err := DecodeBase64Url(rawStr)
 		if len(decodedByBas64) > 0 && err == nil {
 			if utf8.Valid(decodedByBas64) {
@@ -123,7 +199,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			}
 		}
 
-		// base64
+		// jwt
 		if strings.Count(rawStr, ".") > 1 {
 			var blocks = strings.Split(rawStr, ".")
 			var buf bytes.Buffer
