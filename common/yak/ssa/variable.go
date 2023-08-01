@@ -13,7 +13,7 @@ func (f *Function) wirteVariableByBlock(variable string, value Value, block *Bas
 	if !ok {
 		f.currentDef[variable] = make(map[*BasicBlock]Value)
 	}
-	f.currentDef[variable][f.currentBlock] = value
+	f.currentDef[variable][block] = value
 }
 
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
