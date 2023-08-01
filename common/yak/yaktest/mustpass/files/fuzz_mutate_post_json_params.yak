@@ -13,7 +13,7 @@ Host: www.baidu.com
         checkKey = true
     } else if body.Contains(`[map[c:ckey]]__PLACEHOLDER`) {
         checkb = true
-    } else if body.Contains(`[ckey]_PLACEHOLDER`) {
+    } else if body.Contains(`[ckey]__PLACEHOLDER`) {
         checkb0c = true
     }
 }

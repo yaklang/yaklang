@@ -4,7 +4,7 @@ host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 raw = f`GET / HTTP/1.1
 Host: ${host}:${port}
 
-` + `{"abc": "123", "a": 123, "c":{"q":"123"}}`
+` + `{"abc": "123", "a": 123, "c":["123"]}`
 freq = fuzz.MustHTTPRequest(raw)
 params := freq.GetCommonParams()
 if len(params) != 4 {
@@ -20,6 +20,7 @@ for p in params {
     for i, r := range res {
         raw = http.dump(r)~
         raw = string(raw)
+        printf("%s\n", raw)
         expected = sprintf("HACKEDPARAM%d", i+1)
         if !raw.Contains(expected) {
             die(sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
