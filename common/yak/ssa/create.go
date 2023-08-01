@@ -32,17 +32,21 @@ func (prog *Program) NewPackage() {
 func (p *Package) NewFunction(name string) *Function {
 	f := &Function{
 		name:         name,
-		Param:        make([]Value, 0),
+		Package:      p,
 		Blocks:       make([]*BasicBlock, 0),
+		EnterBlock:   nil,
+		ExitBlock:    nil,
 		AnonFuncs:    make([]*Function, 0),
 		parent:       nil,
-		Package:      p,
 		FreeValue:    make([]Value, 0),
 		user:         make([]User, 0),
 		currentBlock: nil,
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 	}
 	p.funcs = append(p.funcs, f)
+
+	enter := f.newBasicBlock("entry")
+	f.currentBlock = enter
 	return f
 }
 func (f *Function) newBasicBlock(name string) *BasicBlock {
