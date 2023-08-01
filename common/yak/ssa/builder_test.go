@@ -207,12 +207,14 @@ d = 1 + 2
 yak-main
 entry0:
 	%0 = 5 lt 2
-	%1 = If [%0] true -> true2, false -> done1
-done1: <- true2 entry0
-	%2 = 1 add 2
-true2: <- entry0
+	%1 = If [%0] true -> if.true2, false -> if.done1
+if.done1: <- if.true2 entry0
+	%2 = jump -> b3
+if.true2: <- entry0
 	%3 = 5 add 6
-	%4 = jump -> done1
+	%4 = jump -> if.done1
+b3: <- if.done1
+	%5 = 1 add 2
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
@@ -243,39 +245,41 @@ d = 1 + 2
 yak-main
 entry0:
 	%0 = 5 lt 2
-	%1 = If [%0] true -> true2, false -> elif3
-done1: <- true2 true4 true6 true8 true10 false11
-	%2 = 1 add 2
-true2: <- entry0
+	%1 = If [%0] true -> if.true2, false -> if.elif3
+if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
+	%2 = jump -> b12
+if.true2: <- entry0
 	%3 = 5 add 6
-	%4 = jump -> done1
-elif3: <- entry0
+	%4 = jump -> if.done1
+if.elif3: <- entry0
 	%5 = 5 lt 4
-	%6 = If [%5] true -> true4, false -> elif5
-true4: <- elif3
+	%6 = If [%5] true -> if.true4, false -> if.elif5
+if.true4: <- if.elif3
 	%7 = 5 add 9
-	%8 = jump -> done1
-elif5: <- elif3
+	%8 = jump -> if.done1
+if.elif5: <- if.elif3
 	%9 = 5 lt 6
-	%10 = If [%9] true -> true6, false -> elif7
-true6: <- elif5
+	%10 = If [%9] true -> if.true6, false -> if.elif7
+if.true6: <- if.elif5
 	%11 = 5 add 5
-	%12 = jump -> done1
-elif7: <- elif5
+	%12 = jump -> if.done1
+if.elif7: <- if.elif5
 	%13 = 5 lt 10
-	%14 = If [%13] true -> true8, false -> elif9
-true8: <- elif7
+	%14 = If [%13] true -> if.true8, false -> if.elif9
+if.true8: <- if.elif7
 	%15 = 5 add 20
-	%16 = jump -> done1
-elif9: <- elif7
+	%16 = jump -> if.done1
+if.elif9: <- if.elif7
 	%17 = 5 lt 20
-	%18 = If [%17] true -> true10, false -> false11
-true10: <- elif9
+	%18 = If [%17] true -> if.true10, false -> if.false11
+if.true10: <- if.elif9
 	%19 = 5 add 30
-	%20 = jump -> done1
-false11: <- elif9
+	%20 = jump -> if.done1
+if.false11: <- if.elif9
 	%21 = 5 add 40
-	%22 = jump -> done1
+	%22 = jump -> if.done1
+b12: <- if.done1
+	%23 = 1 add 2
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
@@ -307,39 +311,41 @@ d = 1 + 2
 yak-main
 entry0:
 	%0 = 5 lt 2
-	%1 = If [%0] true -> true2, false -> elif3
-done1: <- true2 true4 true6 true8 true10 false11
-	%2 = 1 add 2
-true2: <- entry0
+	%1 = If [%0] true -> if.true2, false -> if.elif3
+if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
+	%2 = jump -> b12
+if.true2: <- entry0
 	%3 = 5 add 6
-	%4 = jump -> done1
-elif3: <- entry0
+	%4 = jump -> if.done1
+if.elif3: <- entry0
 	%5 = 5 lt 4
-	%6 = If [%5] true -> true4, false -> elif5
-true4: <- elif3
+	%6 = If [%5] true -> if.true4, false -> if.elif5
+if.true4: <- if.elif3
 	%7 = 5 add 9
-	%8 = jump -> done1
-elif5: <- elif3
+	%8 = jump -> if.done1
+if.elif5: <- if.elif3
 	%9 = 5 lt 6
-	%10 = If [%9] true -> true6, false -> elif7
-true6: <- elif5
+	%10 = If [%9] true -> if.true6, false -> if.elif7
+if.true6: <- if.elif5
 	%11 = 5 add 10
-	%12 = jump -> done1
-elif7: <- elif5
+	%12 = jump -> if.done1
+if.elif7: <- if.elif5
 	%13 = 5 lt 10
-	%14 = If [%13] true -> true8, false -> elif9
-true8: <- elif7
+	%14 = If [%13] true -> if.true8, false -> if.elif9
+if.true8: <- if.elif7
 	%15 = 5 add 20
-	%16 = jump -> done1
-elif9: <- elif7
+	%16 = jump -> if.done1
+if.elif9: <- if.elif7
 	%17 = 5 lt 20
-	%18 = If [%17] true -> true10, false -> false11
-true10: <- elif9
+	%18 = If [%17] true -> if.true10, false -> if.false11
+if.true10: <- if.elif9
 	%19 = 5 add 30
-	%20 = jump -> done1
-false11: <- elif9
+	%20 = jump -> if.done1
+if.false11: <- if.elif9
 	%21 = 5 add 7
-	%22 = jump -> done1
+	%22 = jump -> if.done1
+b12: <- if.done1
+	%23 = 1 add 2
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
