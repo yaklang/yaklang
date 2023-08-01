@@ -10,6 +10,7 @@ func ReplaceValue(v Value, to Value) {
 
 // ----------- Function
 func (f *Function) GetUser() []User { return f.user }
+func (f *Function) AddUser(u User)  { f.user = append(f.user, u) }
 
 // ----------- BasicBlock
 func (b *BasicBlock) GetUser() []User { return b.user }
@@ -30,21 +31,16 @@ func (p *Phi) AddValue(v Value)  {}
 func (c *Const) GetUser() []User { return c.user }
 func (c *Const) AddUser(u User)  { c.user = append(c.user, u) }
 
-// ----------- BinOp
-func (b *BinOp) ReplaceValue(v Value, to Value) {
-	if b.X == v {
-		b.X = to
-	}
-
-	if b.Y == v {
-		b.Y = to
-	}
+// ----------- Jump
+func (j *Jump) ReplaceValue(v Value, to Value) {
+	panic("jump don't use value")
 }
-func (b *BinOp) GetUser() []User { return b.user }
-func (b *BinOp) AddUser(u User)  { b.user = append(b.user, u) }
 
-func (b *BinOp) AddValue(v Value)  {}
-func (b *BinOp) GetValue() []Value { return []Value{b.X, b.Y} }
+func (j *Jump) GetUser() []User { return nil }
+func (j *Jump) AddUser(u User)  {}
+
+func (j *Jump) GetValue() []Value { return nil }
+func (j *Jump) AddValue(u Value)  {}
 
 // ----------- IF
 func (i *If) ReplaceValue(v Value, to Value) {
@@ -61,13 +57,19 @@ func (i *If) AddUser(u User)  { i.user = append(i.user, u) }
 func (i *If) GetValue() []Value { return []Value{i.Cond} }
 func (i *If) AddValue(v Value)  {}
 
-// ----------- Jump
-func (j *Jump) ReplaceValue(v Value, to Value) {
-	panic("jump don't use value")
+
+// ----------- BinOp
+func (b *BinOp) ReplaceValue(v Value, to Value) {
+	if b.X == v {
+		b.X = to
+	}
+
+	if b.Y == v {
+		b.Y = to
+	}
 }
+func (b *BinOp) GetUser() []User { return b.user }
+func (b *BinOp) AddUser(u User)  { b.user = append(b.user, u) }
 
-func (j *Jump) GetUser() []User { return nil }
-func (j *Jump) AddUser(u User)  {}
-
-func (j *Jump) GetValue() []Value { return nil }
-func (j *Jump) AddValue(u Value)  {}
+func (b *BinOp) GetValue() []Value { return []Value{b.X, b.Y} }
+func (b *BinOp) AddValue(v Value)  {}
