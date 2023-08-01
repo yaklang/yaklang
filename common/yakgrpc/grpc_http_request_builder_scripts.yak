@@ -39,7 +39,12 @@ for req in reqs {
         try {
             rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
             rsp = rspIns.RawPacket
+            firstRsp = rspIns.RedirectRawPackets[0].Response
+            firstReq = rspIns.RedirectRawPackets[0].Request
             reqRaw = rspIns.RedirectRawPackets[-1].Request
+            if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
+                reqRaw = firstReq
+            }
             println("---------------------")
             println(string(reqRaw))
             println(string(rsp))

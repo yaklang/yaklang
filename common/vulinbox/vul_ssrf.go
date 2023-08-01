@@ -333,9 +333,36 @@ func (s *VulinServer) registerSSRF() {
 			},
 			RiskDetected: true,
 		},
+		{
+			DefaultQuery: "redirect=/redirect/main",
+			Path:         "/redirect/safe",
+			Title:        "安全的重定向(只重定向path)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				var u = LoadFromGetParams(request, "redirect")
+				DefaultRenderEx(true, `<!DOCTYPE html>
+	<html>
+	 <head>
+	   <title>Meta Refresh Example</title>
+	   <meta http-equiv="refresh" content="0;url={{ .url }}">
+	 </head>
+	</html>
+	`, writer, request, map[string]any{
+					"url": strings.Trim(getPath(u), `"`),
+				})
+			},
+			RiskDetected: true,
+		},
 	}
 
 	for _, v := range ssrfRoutes {
 		addRouteWithVulInfo(ssrfGroup, v)
 	}
+}
+
+func getPath(u string) string {
+	urlInfo, err := url.Parse(u)
+	if err != nil {
+		return ""
+	}
+	return urlInfo.Path
 }
