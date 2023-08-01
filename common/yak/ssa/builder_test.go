@@ -357,7 +357,7 @@ b12: <- if.done1
 // TODO: add loop test for function: `readVariableRecursive`
 func TestLoop(t *testing.T) {
 
-	t.Run("looptest", func(t *testing.T) {
+	t.Run("looptest_normal", func(t *testing.T) {
 		code := `
 	a = 10
 	b = a + 1
@@ -380,14 +380,51 @@ loop.body2: <- loop.header1
 	%6 = %5 add %4
 	%7 = jump -> loop.latch4
 loop.exit3: <- loop.header1
-	%8 = %5 add 3
+	%8 = jump -> b5
 loop.latch4: <- loop.body2
 	%9 = %4 add 1
 	%10 = jump -> loop.header1
+b5: <- loop.exit3
+	%11 = %5 add 3
 		`
 		prog := parseSSA(code)
 		CheckProgram(t, prog)
 		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+
+	t.Run("looptest_noexpression", func(t *testing.T) {
+		code := `
+	a = 10
+	b = a + 1
+	for i=0;;i++ {
+		b = b + i
+	}
+	c = b + 3
+			`
+		ir := `
+yak-main
+entry0:
+	%0 = 10 add 1
+	%1 = jump -> loop.header1
+loop.header1: <- entry0 loop.latch4
+	%3 = phi [0, entry0] [%8, loop.latch4]
+	%4 = phi [%0, entry0] [%5, loop.latch4]
+	%2 = If [true] true -> loop.body2, false -> loop.exit3
+loop.body2: <- loop.header1
+	%5 = %4 add %3
+	%6 = jump -> loop.latch4
+loop.exit3: <- loop.header1
+	%7 = jump -> b5
+loop.latch4: <- loop.body2
+	%8 = %3 add 1
+	%9 = jump -> loop.header1
+b5: <- loop.exit3
+	%10 = %4 add 3
+		`
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 }

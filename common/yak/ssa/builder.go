@@ -268,6 +268,7 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 	endThird = nil
 	// first line, cond
 	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		// if only expression; just build expression in header;  to exit or body
 		f.currentBlock = header
 		cond := f.buildExpression(e)
 		ifssa := f.emitIf(cond)
@@ -275,47 +276,65 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 		ifssa.AddTrue(body)
 	} else if cond, ok := stmt.ForStmtCond().(*yak.ForStmtCondContext); ok {
 		if first, ok := cond.ForFirstExpr().(*yak.ForFirstExprContext); ok {
+			// first expression is initialization, in enter block
 			f.currentBlock = enter
 			f.buildForFirstExpr(first)
 		}
+		var condition Value
 		if expr, ok := cond.Expression().(*yak.ExpressionContext); ok {
+			// build expression in header
 			f.currentBlock = header
-			cond := f.buildExpression(expr)
-			ifssa := f.emitIf(cond)
-			ifssa.AddFalse(exit)
-			ifssa.AddTrue(body)
+			condition = f.buildExpression(expr)
 		} else {
-			// for i=0; ; i++{}
-
+			// not found expression; default is true
+			condition = NewConst(true)
 		}
+		// build if in header end; to exit or body
+		f.currentBlock = header
+		ifssa := f.emitIf(condition)
+		ifssa.AddFalse(exit)
+		ifssa.AddTrue(body)
 
 		if third, ok := cond.ForThirdExpr().(*yak.ForThirdExprContext); ok {
+			// third exprssion in latch block, when loop.body builded
 			endThird = third
 		}
 	}
 
-	//  body
+	//  build body
 	if b, ok := stmt.Block().(*yak.BlockContext); ok {
 		f.currentBlock = body
 		f.buildBlock(b)
 	}
 
 	if endThird != nil {
+		// new latch block for third expression
 		latch := f.newBasicBlock("loop.latch")
 
-		// f.currentBlock = body
+		// jump from body to latch
+		f.currentBlock = body
 		f.emitJump(latch)
 
+		// build third expression
 		f.currentBlock = latch
 		f.buildForThirdExpr(endThird)
+
+		// jump from latch to header
 		f.emitJump(header)
 	} else {
+		// jupm from body to header; when haven't third expression
+		f.currentBlock = body
 		f.emitJump(header)
 	}
+
+	// now header sealed
 	header.Sealed()
 
-	//
+	rest := f.newBasicBlock("")
+	// continue rest code
 	f.currentBlock = exit
+	f.emitJump(rest)
+	f.currentBlock = rest
 }
 
 func (f *Function) buildStatement(stmt *yak.StatementContext) {
