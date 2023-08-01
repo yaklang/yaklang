@@ -66,7 +66,9 @@ type Function struct {
 	Param []Value // function parameters;
 
 	// BasicBlock list
-	Blocks []*BasicBlock
+	Blocks     []*BasicBlock
+	EnterBlock *BasicBlock
+	ExitBlock  *BasicBlock
 
 	// anonymous function in this function
 	AnonFuncs []*Function
