@@ -22,6 +22,22 @@ func (f *Function) buildStatementList(stmtlist *yak.StatementListContext) {
 	}
 }
 
+func (f *Function) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []Value {
+	v := make([]Value, 0)
+	return v
+}
+
+func (f *Function) buildFunctionCall(stmt *yak.FunctionCallContext, v *MakeClosure) Value {
+	var args []Value
+	isDropErr := false
+	if s, ok := stmt.OrdinaryArguments().(*yak.OrdinaryArgumentsContext); ok {
+		args = f.buildOrdinaryArguments(s)
+	}
+	if stmt.Wavy() != nil {
+		isDropErr = true
+	}
+	return f.emitCall(v, args, isDropErr)
+}
 
 func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) Value {
 	funcName := ""
@@ -53,6 +69,7 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 			panic("BUG: arrow function need expression or block at least")
 		}
 	} else {
+		// this global function
 		if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
 			newfunc.buildFunctionParamDecl(para)
 		}
@@ -61,8 +78,11 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 		}
 	}
 
-	f.emitMakeClosure(newfunc)
-	return newfunc
+	closure := f.emitMakeClosure(newfunc)
+	if funcName != "" {
+		f.wirteVariable(funcName, closure)
+	}
+	return closure
 }
 
 func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
@@ -74,7 +94,7 @@ func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 		param = append(param, f.NewParam(id.GetText(), false))
 	}
 	if ellipsis != nil {
-		// handler "..." to array
+		//TODO: handler "..." to array
 		// param[len(ids)-1]
 	}
 	f.Param = param
@@ -127,6 +147,18 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 		}
 		return f.emitArith(opcode, op0, op1)
 
+	}
+
+	if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
+		var v Value
+		if expr, ok := stmt.Expression(0).(*yak.ExpressionContext); ok {
+			v = f.buildExpression(expr)
+		}
+		if fun, ok := v.(*MakeClosure); ok {
+			return f.buildFunctionCall(s, fun)
+		} else {
+			panic("call target is not function object")
+		}
 	}
 
 	if s, ok := stmt.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {

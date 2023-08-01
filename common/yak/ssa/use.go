@@ -81,6 +81,20 @@ func (r *Return) AddUser(u User)  {}
 func (r *Return) GetValue() []Value { return r.Results }
 func (r *Return) AddValue(v Value)  {}
 
+// ----------- Call
+func (c *Call) ReplaceValue(v Value, to Value) {
+	if index := slices.Index(c.Args, v); index > 0 {
+		c.Args[index] = to
+	} else {
+		panic("return not use this value")
+	}
+}
+
+func (c *Call) GetUser() []User { return c.user }
+func (c *Call) AddUser(u User)  { c.user = append(c.user, u) }
+
+func (c *Call) GetValue() []Value { return c.Args }
+func (c *Call) AddValue(v Value)  {}
 
 // ----------- BinOp
 func (b *BinOp) ReplaceValue(v Value, to Value) {

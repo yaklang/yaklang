@@ -77,9 +77,26 @@ func (f *Function) emitMakeClosure(target *Function) *MakeClosure {
 		Bindings: []Value{},
 		user:     []User{},
 	}
-	// handler binding with target.freeValue
+	//TODO: handler binding with target.freeValue
 
 	fixupUseChain(m)
 	f.emit(m)
 	return m
+}
+
+func (f *Function) emitCall(target *MakeClosure, args []Value, isDropError bool) *Call {
+	c := &Call{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		Method:      target,
+		Args:        args,
+		user:        []User{},
+		isDropError: isDropError,
+	}
+
+	fixupUseChain(c)
+	f.emit(c)
+	return c
 }

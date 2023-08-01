@@ -457,22 +457,31 @@ func TestClosure(t *testing.T) {
 	t.Run("closure_simple", func(t *testing.T) {
 		code := `
 a = () => {return 11}
+va = a() + 11
 
 func b() {
 	return 12
 }
+vb = b() + 12
 
 c = fn() {
 	return 13
 }
+vc = c() + 13
 		`
 		ir := []string{
 			`
 yak-main
 entry0:
 	%0 = makeClosure Anonymousfunc1
-	%1 = makeClosure b
-	%2 = makeClosure Anonymousfunc3
+	%1 = call %0
+	%2 = %1 add 11
+	%3 = makeClosure b
+	%4 = call %3
+	%5 = %4 add 12
+	%6 = makeClosure Anonymousfunc3
+	%7 = call %6
+	%8 = %7 add 13
 			`,
 
 			`
