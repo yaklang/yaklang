@@ -62,8 +62,7 @@ type Function struct {
 	// package
 	Package *Package
 
-	// TODO: repleace Value
-	Param []Value // function parameters;
+	Param []*Parameter
 
 	// BasicBlock list
 	Blocks     []*BasicBlock
@@ -134,6 +133,13 @@ func NewConst(i any) *Const {
 		user:  []User{},
 		value: constant.Make(i),
 	}
+}
+
+// parameter
+type Parameter struct {
+	variable string
+	parent   *Function
+	user     []User
 }
 
 // control-flow instructions  ----------------------------------------
@@ -316,6 +322,13 @@ func (c Const) String() string {
 
 var _ Value = (*Const)(nil)
 
+
+// ----------- Parameter
+func (p *Parameter) String() string {
+	return p.variable
+}
+
+var _ Value = (*Parameter)(nil)
 
 
 
