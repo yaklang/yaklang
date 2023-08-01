@@ -90,6 +90,9 @@ jobs:
       - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
         run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
 
+      - name: Test gRPC TestGRPCMUSTPASS_OPEN_REDIRECT
+        run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
+
       - name: Test CVEQuery
         run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
 
