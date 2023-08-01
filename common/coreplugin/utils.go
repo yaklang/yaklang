@@ -35,10 +35,13 @@ type VulServerInfo struct {
 }
 
 type VulInfo struct {
+	Method         string
 	Path           []string
+	Body           []byte
 	Headers        []*ypb.KVPair
 	ExpectedResult map[string]int
 	StrictMode     bool
+	RawHTTPRequest []byte
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
@@ -99,9 +102,13 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		PluginType: "mitm",
 		Input:      utils.HostPort(host, port),
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-			Path:    vulInfo.Path,
-			Headers: vulInfo.Headers,
-			IsHttps: vulServer.IsHttps,
+			Path:             vulInfo.Path,
+			Headers:          vulInfo.Headers,
+			IsHttps:          vulServer.IsHttps,
+			Body:             vulInfo.Body,
+			IsRawHTTPRequest: len(vulInfo.RawHTTPRequest) != 0,
+			RawHTTPRequest:   vulInfo.RawHTTPRequest,
+			Method:           vulInfo.Method,
 		},
 	})
 
