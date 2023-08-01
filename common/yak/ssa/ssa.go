@@ -98,7 +98,7 @@ type BasicBlock struct {
 
 	// for build
 	isSealed      bool
-	inCompletePhi []*Phi
+	inCompletePhi map[string]*Phi // variable -> phi
 
 	// User
 	user []User
