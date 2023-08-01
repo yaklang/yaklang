@@ -3,8 +3,10 @@ package yakgrpc
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"strings"
@@ -247,5 +249,79 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 	defer close(ipPortChannel)
 	defer close(domainChannel)
 	defer close(ipChannel)
+	return nil
+}
+
+func (s *Server) DiagnoseNetworkDNS(req *ypb.DiagnoseNetworkDNSRequest, server ypb.Yak_DiagnoseNetworkDNSServer) error {
+	domain := req.GetDomain()
+	if domain == "" {
+		return utils.Error("domain is empty")
+	}
+	var count int
+	callback := func(dnsType, domain, ip, fromServer string, method string) {
+		count++
+		server.Send(&ypb.DiagnoseNetworkResponse{
+			Title:          domain + ` dns-resolved to ` + ip,
+			DiagnoseType:   "dns",
+			DiagnoseResult: fmt.Sprintf("[%v] -%v  %v %v=> %v", method, fromServer, domain, dnsType, ip),
+		})
+	}
+	info := func(msg string) {
+		server.Send(&ypb.DiagnoseNetworkResponse{
+			Title:          "diagnose-log",
+			DiagnoseType:   "log",
+			LogLevel:       "info",
+			DiagnoseResult: msg,
+		})
+	}
+	info(`start to check system dns resolver, fallbackTCP: false, fallbackDoH: false`)
+
+	var err error
+	err = yakdns.LookupCallback(domain, callback,
+		yakdns.WithDNSDisableSystemResolver(false),
+		yakdns.WithDNSFallbackTCP(false), yakdns.WithDNSPreferTCP(false),
+		yakdns.WithDNSFallbackDoH(false), yakdns.WithDNSPreferDoH(false),
+		yakdns.WithDNSNoCache(true),
+	)
+	if err != nil {
+		log.Errorf("yakdns.Lookup Failed: %s", err)
+	}
+
+	config := yakdns.NewDefaultReliableDNSConfig()
+	if len(config.SpecificDNSServers) > 0 {
+		info("start to check default dns servers: " + strings.Join(config.SpecificDNSServers, ", "))
+		err = yakdns.LookupCallback(domain, callback,
+			yakdns.WithDNSDisableSystemResolver(true),
+			yakdns.WithDNSFallbackTCP(false), yakdns.WithDNSPreferTCP(false),
+			yakdns.WithDNSFallbackDoH(false), yakdns.WithDNSPreferDoH(false),
+			yakdns.WithDNSNoCache(true),
+		)
+		if err != nil {
+			log.Errorf("yakdns.Lookup Failed: %s", err)
+		}
+	} else {
+		info("no backup custom servers found, skip to check default dns servers")
+	}
+
+	if len(config.SpecificDoH) > 0 {
+		info("start to check prefer doh dns servers: " + strings.Join(config.SpecificDoH, ", "))
+		err = yakdns.LookupCallback(domain, callback,
+			yakdns.WithDNSDisableSystemResolver(true),
+			yakdns.WithDNSFallbackTCP(false), yakdns.WithDNSPreferTCP(false),
+			yakdns.WithDNSServers(), yakdns.WithDNSNoCache(true),
+			yakdns.WithDNSFallbackDoH(false), yakdns.WithDNSPreferDoH(true),
+		)
+		if err != nil {
+			log.Errorf("yakdns.Lookup Failed: %s", err)
+		}
+	} else {
+		info("no backup custom doh servers found, skip to check default doh dns servers")
+	}
+
+	if count <= 0 {
+		info("no dns resolved for " + req.GetDomain())
+		return nil
+	}
+
 	return nil
 }

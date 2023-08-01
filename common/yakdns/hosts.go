@@ -22,7 +22,7 @@ func init() {
 }
 
 func AddHost(host string, ip string) {
-	log.Infof("load hostfile: %24s -> %v", host, ip)
+	log.Debugf("load hostfile: %24s -> %v", host, ip)
 	hosts.Store(host, ip)
 }
 

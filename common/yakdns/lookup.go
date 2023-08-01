@@ -24,21 +24,23 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 		return nil
 	}
 
-	// ttlcache v4 > v6
-	cachedResult, ok := ipv4DNSCache.Get(host)
-	if ok {
-		result, ok := cachedResult.(string)
+	if !config.NoCache {
+		// ttlcache v4 > v6
+		cachedResult, ok := ipv4DNSCache.Get(host)
 		if ok {
-			config.call("", host, result, "cache", "cache")
-			return nil
+			result, ok := cachedResult.(string)
+			if ok {
+				config.call("", host, result, "cache", "cache")
+				return nil
+			}
 		}
-	}
-	cachedResult, ok = ipv6DNSCache.Get(host)
-	if ok {
-		result, ok := cachedResult.(string)
+		cachedResult, ok = ipv6DNSCache.Get(host)
 		if ok {
-			config.call("", host, result, "cache", "cache")
-			return nil
+			result, ok := cachedResult.(string)
+			if ok {
+				config.call("", host, result, "cache", "cache")
+				return nil
+			}
 		}
 	}
 
@@ -135,6 +137,13 @@ func LookupAll(host string, opt ...DNSOption) []string {
 		log.Errorf("reliable lookup host %s failed: %v", host, err)
 	}
 	return results
+}
+
+func LookupCallback(host string, h func(dnsType, domain, ip, fromServer string, method string), opt ...DNSOption) error {
+	opt = append(opt, WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+		h(dnsType, domain, ip, fromServer, method)
+	}))
+	return reliableLookupHost(host, opt...)
 }
 
 func LookupFirst(host string, opt ...DNSOption) string {

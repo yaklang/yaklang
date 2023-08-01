@@ -9,6 +9,45 @@ import (
 	"time"
 )
 
+var defaultYakDNSMutex = new(sync.Mutex)
+var defaultYakDNSOptions []DNSOption
+
+var DefaultCustomDNSServers = []string{
+	"223.5.5.5", "223.6.6.6",
+	"120.53.53.53", "1.1.1.1",
+	"8.8.8.8",
+}
+var DefaultCustomDoHServers = []string{
+	// aliyun
+	"https://223.5.5.5/resolve",
+	"https://223.6.6.6/resolve",
+
+	// tencent
+	"https://1.12.12.12/dns-query",
+	"https://120.53.53.53/dns-query",
+
+	// public
+	"https://1.1.1.1/dns-query",
+	"https://8.8.8.8/resolve",
+	"https://8.8.4.4/resolve",
+}
+
+func SetDefaultOptions(opt ...DNSOption) {
+	defaultYakDNSMutex.Lock()
+	defer defaultYakDNSMutex.Unlock()
+
+	defaultYakDNSOptions = opt
+}
+
+func GetDefaultOptions() []DNSOption {
+	defaultYakDNSMutex.Lock()
+	defer defaultYakDNSMutex.Unlock()
+
+	var result = make([]DNSOption, len(defaultYakDNSOptions))
+	copy(result, defaultYakDNSOptions)
+	return result
+}
+
 var defaultDoHHTTPClient = &http.Client{
 	Transport: &http.Transport{
 		Proxy: nil,
@@ -27,6 +66,9 @@ type ReliableDNSConfig struct {
 	PreferDoH   bool
 	FallbackDoH bool // as backup
 	SpecificDoH []string
+
+	// NoCache
+	NoCache bool
 
 	// Disable System Resolver
 	DisableSystemResolver bool
@@ -93,30 +135,29 @@ func WithDNSPreferTCP(b bool) DNSOption {
 	}
 }
 
-func NewDefaultReliableDNSConfig() *ReliableDNSConfig {
+func NewBackupInitilizedReliableDNSConfig() *ReliableDNSConfig {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &ReliableDNSConfig{
-		BaseContext: ctx,
-		cancel:      cancel,
-		FallbackTCP: false,
-		RetryTimes:  3,
-		Timeout:     5 * time.Second,
-		mutex:       new(sync.Mutex),
-		SpecificDoH: []string{
-			// aliyun
-			"https://223.5.5.5/resolve",
-			"https://223.6.6.6/resolve",
-
-			// tencent
-			"https://1.12.12.12/dns-query",
-			"https://120.53.53.53/dns-query",
-
-			// public
-			"https://1.1.1.1/dns-query",
-			"https://8.8.8.8/resolve",
-			"https://8.8.4.4/resolve",
-		},
+	config := &ReliableDNSConfig{
+		BaseContext:        ctx,
+		cancel:             cancel,
+		FallbackTCP:        false,
+		RetryTimes:         3,
+		Timeout:            5 * time.Second,
+		mutex:              new(sync.Mutex),
+		SpecificDoH:        DefaultCustomDoHServers,
+		SpecificDNSServers: DefaultCustomDNSServers,
 	}
+	return config
+}
+
+func NewDefaultReliableDNSConfig() *ReliableDNSConfig {
+	config := NewBackupInitilizedReliableDNSConfig()
+	if ret := GetDefaultOptions(); len(ret) > 0 {
+		for _, o := range ret {
+			o(config)
+		}
+	}
+	return config
 }
 
 func WithDNSContext(ctx context.Context) DNSOption {
@@ -137,6 +178,12 @@ func (r *ReliableDNSConfig) GetBaseContext() context.Context {
 func WithDNSFallbackDoH(b bool) DNSOption {
 	return func(c *ReliableDNSConfig) {
 		c.FallbackDoH = b
+	}
+}
+
+func WithDNSNoCache(b bool) DNSOption {
+	return func(c *ReliableDNSConfig) {
+		c.NoCache = b
 	}
 }
 
