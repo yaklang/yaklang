@@ -142,11 +142,11 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := f.emitArith(yakvm.OpAdd, lvalue.GetValue(), ConstOne)
+		rvalue := f.emitArith(yakvm.OpAdd, lvalue.GetValue(), NewConst(int64(1)))
 		lvalue.Assign(rvalue)
 	} else if stmt.SubSub() != nil { // --
 		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := f.emitArith(yakvm.OpSub, lvalue.GetValue(), ConstOne)
+		rvalue := f.emitArith(yakvm.OpSub, lvalue.GetValue(), NewConst(int64(1)))
 		lvalue.Assign(rvalue)
 	}
 

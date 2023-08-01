@@ -127,12 +127,12 @@ type Const struct {
 	value constant.Value
 }
 
-var (
-	ConstOne = &Const{
+func NewConst(i any) *Const {
+	return &Const{
 		user:  []User{},
-		value: constant.MakeInt64(1),
+		value: constant.Make(i),
 	}
-)
+}
 
 type LeftValue interface {
 	Assign(Value)
