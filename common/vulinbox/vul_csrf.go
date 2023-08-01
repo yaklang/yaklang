@@ -26,7 +26,9 @@ func (s *VulinServer) registerCsrf() {
 			Path:         "/unsafe",
 			Title:        "没有保护的表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				cookieCheck(writer, request)
+				if !cookieCheck(writer, request, "/csrf/unsafe") {
+					return
+				}
 				data := map[string]string{
 					"Info": info,
 				}
@@ -38,7 +40,9 @@ func (s *VulinServer) registerCsrf() {
 			Path:         "/safe",
 			Title:        "csrf_token保护的表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				cookieCheck(writer, request)
+				if !cookieCheck(writer, request, "/csrf/safe") {
+					return
+				}
 				if request.Method == http.MethodPost {
 					token := request.PostFormValue("csrf_token")
 					if token != codec.Md5("confidential_cookie_vulinbox") {
@@ -62,7 +66,7 @@ func (s *VulinServer) registerCsrf() {
 
 }
 
-func cookieCheck(writer http.ResponseWriter, request *http.Request) {
+func cookieCheck(writer http.ResponseWriter, request *http.Request, location string) bool {
 	raw, _ := utils.HttpDumpWithBody(request, true)
 	vulCookie := lowhttp.GetHTTPPacketCookieFirst(raw, "vulCookie")
 	if vulCookie == "" {
@@ -70,10 +74,11 @@ func cookieCheck(writer http.ResponseWriter, request *http.Request) {
 			Name:  "vulCookie",
 			Value: "confidential_cookie",
 		})
-		writer.Header().Set("Location", "/csrf/unsafe")
+		writer.Header().Set("Location", location)
 		writer.WriteHeader(302)
-		return
+		return false
 	}
+	return true
 }
 
 func updateInfo(writer http.ResponseWriter, request *http.Request, data map[string]string, tp string) {

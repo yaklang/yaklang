@@ -30,8 +30,8 @@ func TestGRPCMUSTPASS_CSRF(t *testing.T) {
 			"/csrf/safe",
 		},
 		ExpectedResult: map[string]int{
-			fmt.Sprintf("XSS for: %s/xss/echo?name=admin", vulAddr):           1,
-			fmt.Sprintf("XSS for: %s/xss/replace/nocase?name=admin", vulAddr): 1,
+			fmt.Sprintf("csrf for: %v/csrf/unsafe", vulAddr): 1,
+			fmt.Sprintf("csrf for: %v/csrf/safe", vulAddr):   0,
 		},
 		StrictMode: true,
 	}

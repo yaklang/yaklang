@@ -119,11 +119,10 @@ formCheck = func(url,req,rsp,form){
     inputs = xpath.Find(form, "//input")
 
     for input in inputs{
-        if xpath.SelectAttr(input,"type") != "hidden"{
+        if !xpath.ExistedAttr(input,"hidden"){
             continue
         }
         for name in paramBlackList{
-            yakit.Output(xpath.SelectAttr(input,"name"))
             if str.Contains(xpath.SelectAttr(input,"name"),name){
                 return
             }
@@ -171,6 +170,5 @@ mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
     if  len(headers["Content-Type"]) == 0 || !str.Contains(headers["Content-Type"][0],"html"){
         return
     }
-
     csrf_Detect(url, req, rsp, body, ishttps)
 }
