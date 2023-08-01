@@ -722,3 +722,8 @@ func FixRequestHostAndPort(r *http.Request) {
 	r.Header.Set("Host", r.Host)
 	r.URL.Host = r.Host
 }
+
+// IsResp test if bytesstream is http response
+func IsResp(data []byte) bool {
+	return bytes.HasPrefix(bytes.TrimLeftFunc(data, unicode.IsSpace), []byte("HTTP/"))
+}
