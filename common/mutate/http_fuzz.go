@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -445,7 +446,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(param[0]); ok {
+		if val, ok := isBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{
@@ -463,7 +464,6 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 					paramOriginValue: param,
 					origin:           f,
 				})
-				continue
 			}
 		}
 
@@ -559,7 +559,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(param[0]); ok {
+		if val, ok := isBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{
@@ -577,7 +577,6 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 					paramOriginValue: param,
 					origin:           f,
 				})
-				continue
 			}
 		}
 
@@ -616,7 +615,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(k.Value); ok {
+		if val, ok := isBase64(k.Value); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{
@@ -634,7 +633,6 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 					paramOriginValue: []string{k.Value},
 					origin:           f,
 				})
-				continue
 			}
 		}
 

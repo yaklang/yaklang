@@ -380,7 +380,7 @@ a=cXdl&b=enhjdg%3D%3D
 	}
 
 	params := req.GetCommonParams()
-	if len(params) != 4 {
+	if len(params) != 8 {
 		dump(params)
 		test.FailNow("获取通用参数数量错误", len(params))
 	}
@@ -395,10 +395,10 @@ a=cXdl&b=enhjdg%3D%3D
 			if err != nil {
 				test.FailNow(err.Error())
 			}
-			expected := codec.EncodeBase64(fmt.Sprintf("HACKEDPARAM%d", i+1))
+			rawStr := fmt.Sprintf("HACKEDPARAM%d", i+1)
+			expected := codec.EncodeBase64(rawStr)
 			expectedUrlEncoded := codec.QueryEscape(expected)
-			if !bytes.Contains(raw, []byte(expected)) && !bytes.Contains(raw, []byte(expectedUrlEncoded)) {
-				fmt.Printf("debug : %#v\n", p)
+			if !bytes.Contains(raw, []byte(expected)) && !bytes.Contains(raw, []byte(expectedUrlEncoded)) && !bytes.Contains(raw, []byte(rawStr)) {
 				test.FailNow(fmt.Sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
 			}
 		}
