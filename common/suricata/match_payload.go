@@ -65,7 +65,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 			}
 
 			if r.Depth != nil {
-				ri = le + *r.Depth - len(r.Content)
+				ri = le + *r.Depth - len(r.Content) + 1
 			}
 
 			// [lp,rp)
