@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-func TestRule_Match(t *testing.T) {
-	type Test struct {
-		hex   string
-		match bool
-	}
-	type Case struct {
-		rule string
-		test []Test
-	}
+type Test struct {
+	hex   string
+	match bool
+}
+type Case struct {
+	rule string
+	test []Test
+}
 
+func TestRule_Match(t *testing.T) {
 	cases := []Case{
 		{
 			rule: "alert dns 192.168.3.1 any -> any any (msg:\"Observed DNS Query to public CryptoMining pool Domain (pool.minergate.com)\"; dns_opcode:0; dns_query; content:\"pool.minergate.com\"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017000; rev:1;)",
@@ -55,5 +55,32 @@ func TestRule_Match(t *testing.T) {
 				t.Error("match failed")
 			}
 		}
+	}
+}
+
+func TestRule_Match2(t *testing.T) {
+	v := Case{
+		rule: "alert dns 192.168.3.1 53 -> 192.168.3.18 any (dns_query;content:bai;dns_query;content:ow;distance:2;)",
+		test: []Test{
+			{"6afd6158af5c3066d026811b08004500004c60764000401152c7c0a80301c0a803120035c81200387f0900028080000100010000000003617069076261696d656f7702636e0000010001c00c00010001000002580004514472bd", true},
+		},
+	}
+	rs, err := Parse(v.rule)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	r := rs[0]
+	for _, te := range v.test {
+		bytes, err := hex.DecodeString(te.hex)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if r.Match(bytes) != te.match {
+			spew.Dump(v)
+			t.Error("match failed")
+		}
+
 	}
 }

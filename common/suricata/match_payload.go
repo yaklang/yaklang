@@ -154,6 +154,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 
 		}
 		// todo:bsize dsize
+		c.Value["prevMatch"] = indexes
 		return nil
 	}
 }
