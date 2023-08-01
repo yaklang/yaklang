@@ -74,7 +74,7 @@ func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	}
 	data := r.Raw[rule.GetStart().GetStart():end]
 	ruleIns.Raw = utils.EscapeInvalidUTF8Byte(data)
-	ruleIns.init()
+	ruleIns.ContentRuleConfig = &ContentRuleConfig{}
 
 	/*
 		fill rules protocol src dst info
