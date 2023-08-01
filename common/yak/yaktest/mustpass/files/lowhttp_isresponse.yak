@@ -1,0 +1,2 @@
+assert poc.IsResponse("HTTP/1.1 200 OK\r\n")==true, "isResponse failed"
+assert poc.IsResponse("GET / HTTP/1.1\r\n")==false, "isResponse failed"

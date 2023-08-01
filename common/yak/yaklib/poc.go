@@ -933,4 +933,5 @@ var PoCExports = map[string]interface{}{
 		}
 		return cmd.String()
 	},
+	"IsResponse": lowhttp.IsResp,
 }
