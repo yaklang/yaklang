@@ -334,6 +334,14 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 	f.currentBlock = rest
 }
 
+func (f *Function) buildReturn(stmt *yak.ReturnStmtContext) {
+	if list, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
+		value := f.buildExpressionList(list)
+		f.emitReturn(value)
+	} else {
+		f.emitReturn(nil)
+	}
+}
 func (f *Function) buildStatement(stmt *yak.StatementContext) {
 	if s, ok := stmt.AssignExpressionStmt().(*yak.AssignExpressionStmtContext); ok {
 		f.buildAssignExpressionStmt(s)
@@ -348,6 +356,9 @@ func (f *Function) buildStatement(stmt *yak.StatementContext) {
 		f.buildForStmt(s)
 	}
 
+	if s, ok := stmt.ReturnStmt().(*yak.ReturnStmtContext); ok {
+		f.buildReturn(s)
+	}
 }
 
 func (pkg *Package) build() {

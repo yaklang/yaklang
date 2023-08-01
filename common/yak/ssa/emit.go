@@ -53,3 +53,16 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 	f.emit(j)
 	return j
 }
+
+func (f *Function) emitReturn(vs []Value) *Return {
+	r := &Return{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		Results: vs,
+	}
+	fixupUseChain(r)
+	f.emit(r)
+	return r
+}
