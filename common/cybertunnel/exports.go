@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -80,6 +81,14 @@ func GetClient(ctx context.Context, addr, secret string) (context.Context, tpb.T
 	// create tunnel
 	client := tpb.NewTunnelClient(conn)
 	return ctx, client, conn, nil
+}
+
+func GetSupportDNSLogBrokersName() []string {
+	return dnslogbrokers.BrokerNames()
+}
+
+func GetSupportDNSLogBrokers(mode string) dnslogbrokers.DNSLogBroker {
+	return dnslogbrokers.GetDNSLogBroker(mode)
 }
 
 func GetDNSLogClient(addr string) (tpb.DNSLogClient, *grpc.ClientConn, error) {

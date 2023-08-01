@@ -70,6 +70,16 @@ func (s *Server) RequireDNSLogDomain(ctx context.Context, addr *ypb.YakDNSLogBri
 	}, nil
 }
 
+func (s *Server) QuerySupportedDnsLogPlatforms(ctx context.Context, req *ypb.Empty) (*ypb.QuerySupportedDnsLogPlatformsResponse, error) {
+	platforms := cybertunnel.GetSupportDNSLogBrokersName()
+	if len(platforms) > 0 {
+		return &ypb.QuerySupportedDnsLogPlatformsResponse{
+			Platforms: platforms,
+		}, nil
+	}
+	return nil, fmt.Errorf("no supported dns log platforms")
+}
+
 func (s *Server) QueryDNSLogByToken(ctx context.Context, req *ypb.QueryDNSLogByTokenRequest) (*ypb.QueryDNSLogByTokenResponse, error) {
 	events, err := cybertunnel.QueryExistedDNSLogEvents(req.GetDNSLogAddr(), req.GetToken(), req.GetDNSMode())
 	if err != nil {

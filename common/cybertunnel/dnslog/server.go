@@ -64,11 +64,11 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 	if mode == "*" {
 		mode = dnslogbrokers.Random()
 	}
-	var a, _ = dnslogbrokers.Get(params.Mode)
+	var a, _ = dnslogbrokers.Get(mode)
 	if a != nil {
 		domain, token, err := a.Require(30*time.Second, "http://192.168.3.113:9999")
 		if err != nil {
-			return nil, utils.Errorf("require[%v] dnslog failed: %s", mode)
+			return nil, utils.Errorf("require[%v] dnslog failed: %s", mode, err)
 		}
 		D.tokenToModeCache.Set(token, a.Name())
 		return &tpb.RequireDomainResponse{
@@ -103,7 +103,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 		if a != nil {
 			results, err := a.GetResult(params.GetToken(), 30*time.Second, "http://192.168.3.113:9999")
 			if err != nil {
-				return nil, utils.Errorf("require[%v] dnslog failed: %s", a.Name())
+				return nil, utils.Errorf("require[%v] dnslog failed: %s", a.Name(), err)
 			}
 			return &tpb.QueryExistedDNSLogResponse{
 				Events: results,

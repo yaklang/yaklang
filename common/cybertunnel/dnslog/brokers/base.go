@@ -79,3 +79,16 @@ type DNSLogBroker interface {
 	GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error)
 	Name() string
 }
+
+func GetDNSLogBroker(mode string) DNSLogBroker {
+	switch mode {
+	case defaultDNSLogCN.Name():
+		return defaultDNSLogCN
+	case defaultDigPMBYPASS.Name():
+		return defaultDigPMBYPASS
+	case defaultDigPm1433.Name():
+		return defaultDigPm1433
+	default:
+		return nil
+	}
+}
