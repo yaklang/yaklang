@@ -342,10 +342,21 @@ func (f *Function) buildReturn(stmt *yak.ReturnStmtContext) {
 		f.emitReturn(nil)
 	}
 }
+
+func (f *Function) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {
+	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		f.buildExpression(s)
+	}
+}
+
 func (f *Function) buildStatement(stmt *yak.StatementContext) {
 	if s, ok := stmt.AssignExpressionStmt().(*yak.AssignExpressionStmtContext); ok {
 		f.buildAssignExpressionStmt(s)
 		return
+	}
+
+	if s, ok := stmt.ExpressionStmt().(*yak.ExpressionStmtContext); ok {
+		f.buildExpressionStmt(s)
 	}
 
 	if s, ok := stmt.IfStmt().(*yak.IfStmtContext); ok {
