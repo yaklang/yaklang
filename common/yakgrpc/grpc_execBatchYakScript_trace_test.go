@@ -2,13 +2,15 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
 func init() {
@@ -62,10 +64,12 @@ requests:
 # Enhanced by mp on 2022/05/18
 `)
 	spew.Dump(name)
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
 		ScriptId: name,
 		Params: []*ypb.ExecParamItem{
-			{Key: "target", Value: "https://baidu.com"},
+			{Key: "target", Value: fmt.Sprintf("http://%s:%d", host, port)},
 		},
 	})
 	if err != nil {

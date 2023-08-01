@@ -1,13 +1,12 @@
+host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 var checkKey = false
 var checkb0c = false
 var checkb = false
 
-for result in fuzz.HTTPRequest(`
-GET / HTTP/1.1
-Host: www.baidu.com
+for result in fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${host}:${port}
 
-{"key":"a", "b":[{"c":"ckey"}]}
-`)~.GetPostJsonParams() {
+` + `{"key":"a", "b":[{"c":"ckey"}]}`)~.GetPostJsonParams() {
     body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest()~.Show().GetBody()
     if body.Contains("[a]__PLACEHOLDER") {
         checkKey = true
