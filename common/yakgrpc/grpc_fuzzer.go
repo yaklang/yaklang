@@ -392,7 +392,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		return utils.Errorf("save to web fuzzer to database failed: %s", err)
 	}
 	var taskId = task.ID
-	_ = task
+	task.FuzzerIndex = req.GetFuzzerIndex()
+	task.FuzzerTabIndex = req.GetFuzzerTabIndex()
 	defer func() {
 		if db := s.GetProjectDatabase().Save(task); db.Error != nil {
 			log.Errorf("update web fuzzer task failed: %s", db.Error)
