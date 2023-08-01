@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -646,47 +647,23 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 		rawBody = []byte("{}")
 	}
 
-	var originParam map[string]interface{}
-	_ = json.Unmarshal(bytes.TrimSpace(rawBody), &originParam)
-	if originParam == nil {
-		originParam = make(map[string]interface{})
-	}
-
-	keys, values := InterfaceToFuzzResults(p.param), InterfaceToFuzzResults(originValue)
-	if keys == nil || values == nil {
+	values := InterfaceToFuzzResults(originValue)
+	if values == nil {
 		return nil, utils.Errorf("key or value is empty...")
 	}
 
 	var reqs []*http.Request
 
-	// find last map
-	tempParam := originParam
-	splitJsonPath := strings.Split(strings.TrimPrefix(p.jsonPath, "$."), ".")
-	for _, path := range splitJsonPath[:len(splitJsonPath)-1] {
-		val, ok := tempParam[path]
-		if !ok {
-			return nil, utils.Errorf("no such post-json params: %s", p.jsonPath)
-		}
-		switch v := val.(type) {
-		case map[string]interface{}:
-			tempParam = v
-		default:
-			return nil, utils.Errorf("no such post-json params: %s", p.jsonPath)
-		}
-	}
-
 	err = cartesian.ProductEx([][]string{
-		keys, values,
+		values,
 	}, func(result []string) error {
-		key, value := result[0], result[1]
-		tempParam[key] = value
-		raw, _ := json.Marshal(originParam)
+		value := result[0]
+		raw := jsonpath.ReplaceString(string(rawBody), p.jsonPath, value)
 		_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-		_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
+		_req.Body = io.NopCloser(bytes.NewBufferString(raw))
 		if _req != nil {
 			reqs = append(reqs, _req)
 		}
-		tempParam[key] = originValue
 		return nil
 	})
 	if err != nil {
