@@ -9,7 +9,7 @@ func portMatcher(c *matchContext) error {
 		return nil
 
 	}
-	if !c.Must(c.Rule.DestinationPort.Match(utils.Atoi(flow.Src().String()))) {
+	if !c.Must(c.Rule.DestinationPort.Match(utils.Atoi(flow.Dst().String()))) {
 		return nil
 	}
 	return nil
