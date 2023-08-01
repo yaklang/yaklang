@@ -11,9 +11,6 @@ import (
 
 func (f *Function) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
-	entry := f.newBasicBlock("entry")
-	f.currentBlock = entry
-
 	f.buildStatementList(ast.StatementList().(*yak.StatementListContext))
 }
 
@@ -356,6 +353,10 @@ func (f *Function) buildStatement(stmt *yak.StatementContext) {
 func (pkg *Package) build() {
 	main := pkg.NewFunction("yak-main")
 	main.build(pkg.ast)
+	for _, f := range pkg.funcs {
+		f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+		f.EnterBlock = f.Blocks[0]
+	}
 }
 
 func (pkg *Package) Build() { pkg.buildOnece.Do(pkg.build) }
