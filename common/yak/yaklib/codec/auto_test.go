@@ -1,8 +1,10 @@
 package codec
 
 import (
-	"github.com/davecgh/go-spew/spew"
+	"fmt"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 const test = `
@@ -32,5 +34,26 @@ $(".nav-list").append('<a href="javascript:void(0)" onclick="aria.start()" style
 
 func TestAutoDecode3(t *testing.T) {
 	var result = AutoDecode(test2)
+	spew.Dump(result)
+}
+
+func TestAutoDecodeHTML(t *testing.T) {
+	var result = AutoDecode(`&nbsp;&#47;`)
+	spew.Dump(result)
+}
+
+func TestAutoDecodeHex(t *testing.T) {
+	var result = AutoDecode(`61 62 63`)
+	spew.Dump(result)
+	fmt.Println("--------------------------------")
+	result = AutoDecode(`616263`)
+	spew.Dump(result)
+}
+
+func TestAutoDecodeBase32(t *testing.T) {
+	var result = AutoDecode(`PJ4GG5TH`)
+	spew.Dump(result)
+	fmt.Println("--------------------------------")
+	result = AutoDecode(`OF3WK===`)
 	spew.Dump(result)
 }
