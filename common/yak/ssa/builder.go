@@ -162,12 +162,14 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 	cond := f.buildExpression(state.Expression(0).(*yak.ExpressionContext))
 	// if instruction
 	ifssa := f.emitIf(cond)
+	isOutIf := false
 	if done == nil {
-		done = f.newBasicBlock("done")
+		done = f.newBasicBlock("if.done")
+		isOutIf = true
 	}
 
 	// create true block
-	trueBlock := f.newBasicBlock("true")
+	trueBlock := f.newBasicBlock("if.true")
 	ifssa.AddTrue(trueBlock)
 
 	// build true block
@@ -181,7 +183,7 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 	for index := range state.AllElif() {
 		// create false block
 		if previf.False == nil {
-			previf.AddFalse(f.newBasicBlock("elif"))
+			previf.AddFalse(f.newBasicBlock("if.elif"))
 		}
 		// in false block
 		f.currentBlock = previf.False
@@ -190,7 +192,7 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		// if instruction
 		currentif := f.emitIf(cond)
 		// create true block
-		trueBlock := f.newBasicBlock("true")
+		trueBlock := f.newBasicBlock("if.true")
 		currentif.AddTrue(trueBlock)
 		// build true block
 		f.currentBlock = trueBlock
@@ -206,7 +208,7 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		if elseblock, ok := elseStmt.Block().(*yak.BlockContext); ok {
 			// "else"
 			// create false block
-			falseBlock := f.newBasicBlock("false")
+			falseBlock := f.newBasicBlock("if.false")
 			previf.AddFalse(falseBlock)
 
 			// build false block
@@ -216,7 +218,7 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		} else if elifstmt, ok := elseStmt.IfStmt().(*yak.IfStmtContext); ok {
 			// "else if"
 			// create elif block
-			elifBlock := f.newBasicBlock("elif")
+			elifBlock := f.newBasicBlock("if.elif")
 			previf.AddFalse(elifBlock)
 
 			// build elif block
@@ -227,6 +229,14 @@ func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		previf.AddFalse(done)
 	}
 	f.currentBlock = done
+	if isOutIf {
+		// in exit if; set rest block
+		rest := f.newBasicBlock("")
+		f.emitJump(rest)
+
+		// continue rest code
+		f.currentBlock = rest
+	}
 }
 
 func (f *Function) buildForFirstExpr(state *yak.ForFirstExprContext) {
