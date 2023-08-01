@@ -356,6 +356,24 @@ func (i If) StringByFunc(getStr func(Value) string) string {
 var _ Value = (*If)(nil)
 var _ User = (*If)(nil)
 var _ Instruction = (*If)(nil)
+
+// ----------- Return
+func (r Return) String() string {
+	return r.StringByFunc(DefaultValueString)
+}
+
+func (r Return) StringByFunc(getStr func(Value) string) string {
+	ret := "ret "
+	for _, v := range r.Results {
+		ret += getStr(v) + ", "
+	}
+	return ret
+}
+
+var _ Value = (*Return)(nil)
+var _ User = (*Return)(nil)
+var _ Instruction = (*Return)(nil)
+
 // ----------- BinOp
 func (b BinOp) String() string {
 	return b.StringByFunc(DefaultValueString)
