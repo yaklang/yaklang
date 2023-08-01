@@ -4,12 +4,13 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/vulinbox"
-	"github.com/yaklang/yaklang/common/yak"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/vulinbox"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 var (
@@ -48,7 +49,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "plugin_inherit_proxy.yak"
+	var debugName = "fuzz_mutate_post_json_params.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
