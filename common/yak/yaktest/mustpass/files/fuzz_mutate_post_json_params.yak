@@ -1,0 +1,31 @@
+var checkKey = false
+var checkb0c = false
+var checkb = false
+
+for result in fuzz.HTTPRequest(`
+GET / HTTP/1.1
+Host: www.baidu.com
+
+{"key":"a", "b":[{"c":"ckey"}]}
+`)~.GetPostJsonParams() {
+    body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest()~.Show().GetBody()
+    if body.Contains("[a]__PLACEHOLDER") {
+        checkKey = true
+    } else if body.Contains(`[map[c:ckey]]__PLACEHOLDER`) {
+        checkb = true
+    } else if body.Contains(`[ckey]_PLACEHOLDER`) {
+        checkb0c = true
+    }
+}
+
+if !checkKey {
+    die("BASIC $.key failed")
+}
+
+if !checkb {
+    die(`BASIC $.b failed`)
+}
+
+if !checkb0c {
+    die(`BASIC $.b[0].c failed`)
+}
