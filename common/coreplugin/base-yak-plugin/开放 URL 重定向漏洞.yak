@@ -1,0 +1,321 @@
+newResult = func( url, reqRaw, respRaw, param, payload) {
+    return { "url": url,   "reqRaw": reqRaw, "respRaw": respRaw ,"param" : param, "payload":payload}
+}
+
+//checkErr 检查错误并退出
+checkErr = func(err) {
+    if err != nil {
+        yakit.Output(sprintf("url-redirect-DETECT error: %s", err))
+        os.Exit(1)
+    }
+}
+
+redirectLog = func(result) {
+    url = result.url
+    param = result.param 
+    reqRaw = result.reqRaw  
+    respRaw = result.respRaw
+    payload = result.payload
+    msg = "Found url redirect"
+
+    report = {"message": msg, "param":param}
+    
+    yakit_output(report)
+
+    risk.NewRisk(
+        url,
+        risk.title(sprintf("URL redirect for: %v", url)),
+        risk.details(report),
+        risk.parameter(param),
+        risk.description(`URL重定向漏洞是一种常见的Web安全漏洞，也称为Open Redirect漏洞。它通常发生在Web应用程序中，攻击者可以利用这种漏洞将用户重定向到一个恶意的网站或URL，从而进行钓鱼攻击、诱骗用户下载恶意软件、窃取用户敏感信息、进行社会工程学攻击等。
+
+URL重定向漏洞的原因是Web应用程序没有对用户提供的URL参数进行充分的验证和过滤，导致攻击者可以构造一个恶意的URL，将用户重定向到攻击者控制的网站或URL。攻击者可以在恶意网站上伪造一个与原网站相似的页面，诱骗用户输入敏感信息，如用户名、密码、信用卡号等，或者在网站上植入恶意代码，如下载恶意软件或进行其他攻击行为。`),
+        risk.solution(`输入验证和过滤：Web应用程序应该对输入的URL参数进行验证和过滤，只允许重定向到可信的网站或URL，或者使用白名单机制限制重定向目标。例如，可以验证URL的协议部分是否是http或https，验证主机名是否是可信的域名，验证重定向目标是否在应用程序的域名或子域名下等。
+
+使用短网址服务：使用短网址服务可以避免长URL泄露用户的隐私信息和敏感信息，同时也可以减少URL重定向漏洞的风险。短网址服务可以将长URL转换成短URL，并将短URL映射到原始的URL，用户点击短URL时将会重定向到原始的URL。短网址服务通常会对重定向目标进行验证和过滤，从而减少URL重定向漏洞的风险。
+
+安全编码实践：在开发Web应用程序时，应该时刻保持对安全的关注，并采取适当的安全措施来保护用户的隐私和安全。例如，可以使用安全的编码实践，使用安全的框架和库，定期进行安全审计和漏洞扫描等。`),
+        risk.type("url redirect"),
+        risk.request(reqRaw), 
+        risk.payload(payload),
+        risk.response(respRaw),
+        risk.severity("warning"),
+    )
+    
+}
+
+inlocation = 1
+inrefresh = 2
+inmeta = 3
+inlineScript =  4
+
+paramNameList = ["redirect","redirect_to","redirect_url","url","jump","jump_to","target","to","link","linkto","domain","Out","Dout","go","return","returnTo","logout","register","login","returnUrl","path","redirectURI","redir","returl","share","wap","src","source","u","display","sourceURl","imageURL","linkurl","RedirectUrl","service","redirect_uri","destUrl","oauth_callback","oauth","goto","redirectUrl","callback","return_url","toUrl","ReturnUrl","fromUrl","redUrl","request"]
+
+paramFilter = func (params){
+    if len(params) == 0 {
+        return params
+    }
+    res = []
+    //检查可疑的参数名与传入参数值符合url的名字
+    for param in params{
+        if param.Name() in paramNameList{
+            res.Append(param)
+            continue
+        }
+        value = codec.DecodeUrl(param.Value()[0])
+        if len(re.ExtractURL(value)) > 0 ||  len(re.ExtractPath(value)) > 0{
+            res.Append(param)
+        }
+    }
+    return res
+}
+
+jsAstCheck = func(statements,payload){
+    for stat in statements{
+        typ = js.GetSTType(stat)
+        switch typ{
+            case "ExpressionStatement":
+                if expressionCheck(stat,payload){
+                    return true
+                }
+
+        }
+    }
+    return false
+}
+
+expressionCheck = func(stat,payload){
+    node = stat
+    inerType = js.GetSTType(stat)
+    if inerType == "ExpressionStatement"{
+        inerType = js.GetSTType(stat.Expression)
+        node = stat.Expression
+    }
+    switch inerType {
+        case "CallExpression":
+            if js.GetSTType(node.Callee) == "DotExpression"{
+                if DotExprCheck(node,payload){
+                    return true
+                }
+            }else if js.GetSTType(node.Callee) == "Identifier"{
+                if node.Callee.Name == "setTimeout"{
+                    if js.GetSTType(node.ArgumentList[0]) == "FunctionLiteral"{
+                        if jsAstCheck(node.ArgumentList[0].Body.List,payload){
+                            return true
+                        }
+                    }
+                    if expressionCheck(node.ArgumentList[0],payload){
+                        return true
+                    }
+                }
+
+            }
+        case "AssignExpression":
+            if js.GetSTType(node.Left) == "DotExpression"{
+                if AssignExprCheck(node,payload){
+                    return true
+                }
+            }
+    }
+}
+
+
+
+locationDotCode = ["window.location.replace","window.location.assign"]
+locationAssignCode = ["window.location.href","window.location"]
+DotExprCheck = func(stat,expect){
+    expr = DotExprGeter(stat.Callee)
+    if expr in locationDotCode{
+        urlInfo,_ = str.ParseStringUrlToUrlInstance(stat.ArgumentList[0].Value )
+        // printf("value:[%v]\n",stat.ArgumentList[0].Value)
+        // printf("host:[%v]--expect:[%v]\n",urlInfo.Host,expect)
+        if urlInfo.Host == expect{
+            return true
+        }
+    }
+}
+
+AssignExprCheck = func(stat,expect){
+    expr = DotExprGeter(stat.Left)
+    if expr in locationAssignCode{
+        urlInfo,_ = str.ParseStringUrlToUrlInstance(stat.Right.Value)
+        if urlInfo.Host == expect{
+            return true
+        }
+    }
+}
+
+
+DotExprGeter = func(expr){
+    if js.GetSTType(expr.Left) == "Identifier"{
+        return expr.Left.Name+"."+expr.Identifier.Name
+    }else if js.GetSTType(expr.Left) == "DotExpression"{
+        return DotExprGeter(expr.Left) +"."+ expr.Identifier.Name
+    }else{
+        return ""
+    }
+}
+
+outputPosition  = func(rsp,sig_string){
+    if !str.Contains(string(rsp),sig_string){
+        return 0
+    }
+
+    headers = poc.GetHTTPPacketHeaders(rsp)
+    body = poc.GetHTTPPacketBody(rsp)
+    if str.Contains(headers["Location"],sig_string){
+        return inlocation
+    }
+
+    if str.Contains(headers["Refresh"],sig_string){
+        return inrefresh
+    }
+
+    if str.Contains(headers["Content-Type"],"html"){
+
+        html, err = xpath.LoadHTMLDocument(body)
+        meta = xpath.Find(html, "//meta")
+        scripts = xpath.Find(html, "//script")
+
+        for m in meta {
+            if str.EqualFold(xpath.SelectAttr(m, "http-equiv"), "refresh")&& str.Contains(xpath.SelectAttr(m, "content"),sig_string){
+                return inmeta
+            }
+        }
+
+        for script in scripts{
+            if str.Contains(xpath.InnerText(script),sig_string){
+                return inlineScript
+            }
+        }
+
+    }
+    return 0
+}
+
+makepayload = func (mark,value,host){
+    res = make([]map[string]string,6)
+    domain = host
+    if len(str.ExtractDomain(value)) > 0 {
+        domain = str.ExtractDomain(value)[0]
+    }
+    res[0] = {"payload":sprintf("//%s@%s", domain,mark),"expect":mark}
+    res[1] = {"payload":sprintf("//%s?%s", mark,domain),"expect":mark}
+    res[2] = {"payload":sprintf("//%s.%s", domain,mark),"expect":sprintf("%s.%s", domain,mark)}
+    res[3] = {"payload":sprintf("//%s/%s",mark,domain ),"expect":mark}
+    res[4] = {"payload":sprintf("//%s\\%s", mark,domain),"expect":mark}
+    res[5] = {"payload":sprintf("//%s#%s", mark,domain),"expect":mark}
+    return res
+}
+
+chromeUrlFix = func(url){
+    return str.ReplaceAll(url,"\\","/")
+}
+
+Rawfuzz = func(param, fuzzPayload) {
+    freq = param.Fuzz(fuzzPayload)
+    rsp,err =  freq.ExecFirst()
+    checkErr(err)
+
+    return rsp.ResponseRaw
+}
+headerTask = func(req,param,ishttps,header){
+    payloadDomain = str.RandStr(5) + ".com"
+    pocData = makepayload(payloadDomain,param.Value,poc.GetHTTPPacketHeader(req,"Host"))
+    for data in pocData{
+        respRaw = Rawfuzz(param,data.payload)
+        urlInfo,_ = str.ParseStringUrlToUrlInstance(poc.GetHTTPPacketHeader(respRaw, header))
+        if urlInfo.Host == data.expect{
+            return data.payload
+        }
+    }
+    return nil
+}
+
+metaTask = func(req,param,ishttps){
+    payloadDomain = str.RandStr(5) + ".com"
+    pocData = makepayload(payloadDomain,param.Value,poc.GetHTTPPacketHeader(req,"Host"))
+    for data in pocData{
+        respRaw = Rawfuzz(param,data.payload)
+        body = poc.GetHTTPPacketBody(respRaw)
+        html, err = xpath.LoadHTMLDocument(body)
+        meta = xpath.Find(html, "//meta")
+        for m in meta {
+            if str.EqualFold(xpath.SelectAttr(m, "http-equiv"), "refresh") {
+                content = str.ToLower(xpath.SelectAttr(m, "content"))
+                url = content.SplitN("url=",2)[1]
+                urlInfo,_ = str.ParseStringUrlToUrlInstance(url)
+                if str.EqualFold(urlInfo.Host,data.expect){
+                    return data.payload
+                }
+
+            }
+
+        }
+    }
+
+    return nil
+}
+
+scriptTask = func(req,param,ishttps){
+    payloadDomain = str.RandStr(5) + ".com"
+    pocData = makepayload(payloadDomain,param.Value,poc.GetHTTPPacketHeader(req,"Host"))
+    for data in pocData{
+        respRaw = Rawfuzz(param,data.payload)
+        body = poc.GetHTTPPacketBody(respRaw)
+        html, err = xpath.LoadHTMLDocument(body)
+        scripts = xpath.Find(html, "//script")
+
+        for s in scripts {
+            code = xpath.InnerText(s)
+            ast,err =  js.Parse(code)
+            if jsAstCheck(ast.Body,data.expect){
+                return data.payload
+            }
+        }
+    }
+
+    return nil
+}
+
+
+
+
+open_redirect_Detect = func(url, req, rsp, param, ishttps) {
+    randStr = str.RandStr(10)
+    originValue = param.Value()[0]
+    respRaw= Rawfuzz(param,originValue+randStr)
+    payloadParams = []
+    position = outputPosition(respRaw,originValue+randStr)
+    payload = nil
+    println(position)
+    switch position{
+        case 0:
+            return
+        case inlocation :
+            payload = headerTask(req,param,ishttps,"Location")
+        case inrefresh :
+            payload = headerTask(req,param,ishttps,"Refresh")
+        case inmeta :
+            payload = metaTask(req,param,ishttps)
+        case inlineScript:
+            payload = scriptTask(req,param,ishttps)
+    }
+
+    if payload != nil {
+        redirectLog(newResult( url, req, rsp, param.Name(), payload))
+    }
+}
+
+
+mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
+    dump(req)
+    freq, err = fuzz.HTTPRequest(req, fuzz.https(ishttps))
+    params =  freq.GetGetQueryParams()
+    params = append(params, freq.GetPostParams()...)
+    params = paramFilter(params)
+
+    for param in params{
+        open_redirect_Detect(url, req, rsp,param, ishttps)
+    }
+}

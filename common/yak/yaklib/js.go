@@ -4,6 +4,8 @@ package yaklib
 import (
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/javascript/otto"
+	"github.com/yaklang/yaklang/common/javascript/otto/ast"
+	"github.com/yaklang/yaklang/common/javascript/otto/parser"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -20,8 +22,18 @@ var (
 		"NaNValue":             otto.NaNValue,
 		"TrueValue":            otto.TrueValue,
 		"ASTWalk":              javascript.BasicJavaScriptASTWalker,
+		"Parse":                _Pares,
+		"GetSTType":            javascript.GetStatementType,
 	}
 )
+
+func _Pares(code string) (*ast.Program, error) {
+	JSast, err := parser.ParseFile(nil, "", code, 0)
+	if err != nil {
+		return JSast, err
+	}
+	return JSast, nil
+}
 
 // create vm
 func _jsNewEngine() *otto.Otto {
