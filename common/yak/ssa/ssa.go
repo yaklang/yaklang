@@ -134,26 +134,6 @@ func NewConst(i any) *Const {
 	}
 }
 
-type LeftValue interface {
-	Assign(Value)
-	GetValue() Value
-}
-
-type Identifier struct {
-	variable string
-	f        *Function
-}
-
-func (i *Identifier) Assign(v Value) {
-	i.f.wirteVariable(i.variable, v)
-}
-
-func (i *Identifier) GetValue() Value {
-	return i.f.readVariable(i.variable)
-}
-
-var _ LeftValue = (*Identifier)(nil)
-
 // control-flow instructions  ----------------------------------------
 // jump / if / return / call / switch
 
@@ -218,7 +198,15 @@ type UnOp struct {
 
 // implement value
 func (f *Function) String() string {
-	ret := f.name + "\n"
+	ret := f.name
+	for _, para := range f.Param {
+		ret += para.String() + ", "
+	}
+	ret += "\n"
+
+	if parent := f.parent; parent != nil {
+		ret += "parent: " + parent.name + "\n"
+	}
 
 	instReg := make(map[Instruction]string)
 	regindex := 0
@@ -243,6 +231,7 @@ func (f *Function) String() string {
 		}
 	}
 
+	// print instruction
 	getStr := func(v Value) string {
 		op := ""
 		switch v := v.(type) {
@@ -275,6 +264,8 @@ func (f *Function) String() string {
 	}
 	return ret
 }
+
+var _ Value = (*Function)(nil)
 
 func (b BasicBlock) String() string {
 	ret := b.Name + ":"
@@ -323,30 +314,8 @@ func (c Const) String() string {
 
 var _ Value = (*Const)(nil)
 
-// ----------- BinOp
-func (b BinOp) String() string {
-	return b.StringByFunc(DefaultValueString)
-}
 
-func (b BinOp) StringByFunc(getStr func(Value) string) string {
-	return fmt.Sprintf("%s %s %s", getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
-}
 
-var _ Value = (*BinOp)(nil)
-var _ User = (*BinOp)(nil)
-var _ Instruction = (*BinOp)(nil)
-
-// ----------- IF
-func (i If) String() string {
-	return i.StringByFunc(DefaultValueString)
-}
-func (i If) StringByFunc(getStr func(Value) string) string {
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
-}
-
-var _ Value = (*If)(nil)
-var _ User = (*If)(nil)
-var _ Instruction = (*If)(nil)
 
 // ----------- Jump
 func (j Jump) String() string {
@@ -360,3 +329,28 @@ func (j Jump) StringByFunc(_ func(Value) string) string {
 var _ Value = (*Jump)(nil)
 var _ User = (*Jump)(nil)
 var _ Instruction = (*Jump)(nil)
+
+// ----------- IF
+func (i If) String() string {
+	return i.StringByFunc(DefaultValueString)
+}
+func (i If) StringByFunc(getStr func(Value) string) string {
+	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
+}
+
+var _ Value = (*If)(nil)
+var _ User = (*If)(nil)
+var _ Instruction = (*If)(nil)
+// ----------- BinOp
+func (b BinOp) String() string {
+	return b.StringByFunc(DefaultValueString)
+}
+
+func (b BinOp) StringByFunc(getStr func(Value) string) string {
+	return fmt.Sprintf("%s %s %s", getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
+}
+
+var _ Value = (*BinOp)(nil)
+var _ User = (*BinOp)(nil)
+var _ Instruction = (*BinOp)(nil)
+

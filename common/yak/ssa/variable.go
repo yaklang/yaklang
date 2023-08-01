@@ -1,5 +1,26 @@
 package ssa
 
+// --------------- for assign
+type LeftValue interface {
+	Assign(Value)
+	GetValue() Value
+}
+
+type Identifier struct {
+	variable string
+	f        *Function
+}
+
+func (i *Identifier) Assign(v Value) {
+	i.f.wirteVariable(i.variable, v)
+}
+
+func (i *Identifier) GetValue() Value {
+	return i.f.readVariable(i.variable)
+}
+
+var _ LeftValue = (*Identifier)(nil)
+
 func (f *Function) wirteVariable(variable string, value Value) {
 	f.wirteVariableByBlock(variable, value, f.currentBlock)
 }
