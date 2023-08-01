@@ -11,6 +11,8 @@ var CodecExports = map[string]interface{}{
 	"DecodeHex":         codec.DecodeHex,
 	"EncodeBase64":      codec.EncodeBase64,
 	"DecodeBase64":      codec.DecodeBase64,
+	"EncodeBase32":      codec.EncodeBase32,
+	"DecodeBase32":      codec.DecodeBase32,
 	"EncodeBase64Url":   codec.EncodeBase64Url,
 	"DecodeBase64Url":   codec.DecodeBase64Url,
 	"Sha1":              codec.Sha1,
