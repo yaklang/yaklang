@@ -60,7 +60,7 @@ func TestRule_Match(t *testing.T) {
 
 func TestRule_Match2(t *testing.T) {
 	v := Case{
-		rule: "alert dns 192.168.3.1 53 -> 192.168.3.18 any (dns_query;content:bai;dns_query;content:ow;distance:2;)",
+		rule: "alert dns 192.168.3.1 53 -> 192.168.3.18 51218 (dns_query;content:bai;offset:4;depth:3;dns_query;content:ow;distance:2;within:4;dns_query;content:cn;distance:1;isdataat:!1,relative)",
 		test: []Test{
 			{"6afd6158af5c3066d026811b08004500004c60764000401152c7c0a80301c0a803120035c81200387f0900028080000100010000000003617069076261696d656f7702636e0000010001c00c00010001000002580004514472bd", true},
 		},
