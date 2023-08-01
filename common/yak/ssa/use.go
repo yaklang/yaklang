@@ -97,3 +97,20 @@ func (b *BinOp) AddUser(u User)  { b.user = append(b.user, u) }
 
 func (b *BinOp) GetValue() []Value { return []Value{b.X, b.Y} }
 func (b *BinOp) AddValue(v Value)  {}
+
+// ----------- MakeClosure
+func (m *MakeClosure) ReplaceValue(v Value, to Value) {
+	if index := slices.Index(m.Bindings, v); index > 0 {
+		m.Bindings[index] = to
+	} else {
+		panic("makeclosure not use this value")
+	}
+}
+
+func (m *MakeClosure) GetUser() []User { return m.user }
+func (m *MakeClosure) AddUser(u User)  { m.user = append(m.user, u) }
+
+func (m *MakeClosure) GetValue() []Value { return append(m.Bindings, m.Fn) }
+
+//TODO: this
+func (m *MakeClosure) AddValue(v Value) {}

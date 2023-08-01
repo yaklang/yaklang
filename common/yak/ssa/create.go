@@ -30,6 +30,10 @@ func (prog *Program) NewPackage() {
 }
 
 func (p *Package) NewFunction(name string) *Function {
+	index := len(p.funcs)
+	if name == "" {
+		name = fmt.Sprintf("Anonymousfunc%d", index)
+	}
 	f := &Function{
 		name:         name,
 		Package:      p,
