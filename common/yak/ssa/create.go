@@ -33,6 +33,7 @@ func (p *Package) NewFunction(name string) *Function {
 	f := &Function{
 		name:         name,
 		Package:      p,
+		Param:        make([]*Parameter, 0),
 		Blocks:       make([]*BasicBlock, 0),
 		EnterBlock:   nil,
 		ExitBlock:    nil,
