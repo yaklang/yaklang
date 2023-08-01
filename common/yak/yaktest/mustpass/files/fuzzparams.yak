@@ -1,0 +1,57 @@
+host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
+
+// post-json
+raw = f`GET / HTTP/1.1
+Host: ${host}:${port}
+
+` + `{"abc": "123", "a": 123, "c":{"q":"123"}}`
+freq = fuzz.MustHTTPRequest(raw)
+params := freq.GetCommonParams()
+if len(params) != 4 {
+    dump(params)
+    die(sprintf("获取通用参数数量错误: %s", len(params)))
+}
+
+for p in params {
+    res, err = p.Fuzz("HACKEDPARAM{{i(1-2)}}").Results()
+    if err != nil {
+        die("Fuzz failed")
+    }
+    for i, r := range res {
+        raw = http.dump(r)~
+        raw = string(raw)
+        expected = sprintf("HACKEDPARAM%d", i+1)
+        if !raw.Contains(expected) {
+            die(sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
+        }
+    }
+}
+
+// base64
+raw = f`GET /?a=cXdl&b=enhjdg%3D%3D HTTP/1.1
+Host: ${host}:${port}
+
+a=cXdl&b=enhjdg%3D%3D`
+freq = fuzz.MustHTTPRequest(raw)
+params := freq.GetCommonParams()
+if len(params) != 8 {
+    dump(params)
+    die(sprintf("获取通用参数数量错误: %s", len(params)))
+}
+
+for p in params {
+    res, err = p.Fuzz("HACKEDPARAM{{i(1-2)}}").Results()
+    if err != nil {
+        die("Fuzz failed")
+    }
+    for i, r := range res {
+        raw = http.dump(r)~
+        raw = string(raw)
+        expectedStr = sprintf("HACKEDPARAM%d", i+1)
+        expected = codec.EncodeBase64(expectedStr)
+        expectedUrlEncoded = codec.EscapeQueryUrl(expected)
+        if !raw.Contains(expected) && !raw.Contains(expectedUrlEncoded) &&!raw.Contains(expectedStr) {
+            die(sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
+        }
+    }
+}
