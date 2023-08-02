@@ -2,13 +2,14 @@ package httptpl
 
 import (
 	"fmt"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/mixer"
-	"path"
-	"strings"
-	"time"
 )
 
 type YakTemplate struct {
@@ -31,6 +32,9 @@ type YakTemplate struct {
 	TCPRequestSequences  []*YakNetworkBulkConfig
 	HTTPRequestSequences []*YakRequestBulkConfig
 	Variables            *YakVariables
+
+	// placeHolderMap
+	PlaceHolderMap map[string]string
 }
 
 type YakRequestBulkConfig struct {

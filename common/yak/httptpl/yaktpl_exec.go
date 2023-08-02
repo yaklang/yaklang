@@ -1,15 +1,20 @@
 package httptpl
 
 import (
+	"bytes"
 	"fmt"
+	"regexp"
+	"sync/atomic"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"sync/atomic"
 )
+
+var paramsRegexp = regexp.MustCompile(`(?i)\{\{params\(([a-z_][a-z0-9_]*)\)}}`)
 
 type requestRaw struct {
 	Raw     []byte
@@ -122,7 +127,22 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					params[k] = v
 				}
 			}
-			reqs, err := mutate.FuzzTagExec(req.Raw, mutate.Fuzz_WithParams(params), mutate.Fuzz_WithExtraFuzzTagHandler(
+			raw := req.Raw
+
+			//? 2023-8-2 暂时性解决方案
+			//? 尝试将placHolder替换为params真正的值
+			placeHolderMap := y.PlaceHolderMap
+			if len(placeHolderMap) > 0 {
+				for ph, k := range placeHolderMap {
+					if v, ok := params[k]; ok {
+						raw = bytes.ReplaceAll(raw, []byte(ph), toBytes(v))
+					} else {
+						raw = bytes.ReplaceAll(raw, []byte(ph), []byte(k))
+					}
+				}
+			}
+
+			reqs, err := mutate.FuzzTagExec(raw, mutate.Fuzz_WithExtraFuzzTagHandler(
 				"expr:nucleidsl", func(s string) []string {
 					data, err := NewNucleiDSLYakSandbox().Execute(s, params)
 					if err != nil {
@@ -131,6 +151,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					return []string{toString(data)}
 				}),
 			)
+
 			if err != nil {
 				log.Errorf("cannot mutate request: %v", err)
 				continue
@@ -139,6 +160,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 				log.Error("mutate request failed, empty requests")
 				continue
 			}
+
 			reqRaw := reqs[0]
 			var sufs = []string{fmt.Sprintf("_%v", index+1)}
 			_ = reqRaw
