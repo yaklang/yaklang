@@ -9,6 +9,10 @@ type ThresholdingConfig struct {
 }
 
 func (t *ThresholdingConfig) Repeat() int {
+	if t == nil {
+		return 1
+	}
+
 	if t.Count > 0 {
 		return t.Count
 	}
