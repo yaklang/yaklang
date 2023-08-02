@@ -30,9 +30,16 @@ func (prog *Program) NewPackage() {
 }
 
 func (p *Package) NewFunction(name string) *Function {
+	return p.NewFunctionWithParent(name, nil)
+}
+func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function {
 	index := len(p.funcs)
 	if name == "" {
+		if parent != nil {
+			name = fmt.Sprintf("%s$%d", parent.name, index)
+		} else {
 		name = fmt.Sprintf("Anonymousfunc%d", index)
+	}
 	}
 	f := &Function{
 		name:         name,
@@ -49,7 +56,9 @@ func (p *Package) NewFunction(name string) *Function {
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 	}
 	p.funcs = append(p.funcs, f)
-
+	if parent != nil {
+		parent.AddAnonymous(f)
+	}
 	enter := f.newBasicBlock("entry")
 	f.currentBlock = enter
 	return f

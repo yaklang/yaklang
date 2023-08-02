@@ -53,8 +53,7 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
 	}
-	newfunc := f.Package.NewFunction(funcName)
-	f.AddAnonymous(newfunc)
+	newfunc := f.Package.NewFunctionWithParent(funcName, f)
 
 	if stmt.EqGt() != nil {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
