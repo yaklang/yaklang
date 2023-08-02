@@ -7,6 +7,7 @@ import (
 func ReplaceValue(v Value, to Value) {
 	for _, user := range v.GetUsers() {
 		user.ReplaceValue(v, to)
+		to.AddUser(user)
 	}
 }
 
