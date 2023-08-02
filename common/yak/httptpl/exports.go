@@ -231,7 +231,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 
 		addrs := utils.ParseStringToUrlsWith3W(rawStr)
 		for _, u := range addrs {
-			if !utils.IsHttp(u) {
+			if !utils.IsHttpOrHttpsUrl(u) {
 				continue
 			}
 			u := u

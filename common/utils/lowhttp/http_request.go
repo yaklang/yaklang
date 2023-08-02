@@ -358,8 +358,17 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 		log.Warnf("malformed HTTP version: %v", req.Proto)
 	}
 
-	if !strings.HasPrefix(req.RequestURI, "/") {
-		req.RequestURI = "/" + req.RequestURI
+	if req.Method != "CONNECT" {
+		if !strings.HasPrefix(req.RequestURI, "/") {
+			req.RequestURI = "/" + req.RequestURI
+		}
+	} else {
+		if utils.IsHttpOrHttpsUrl(req.RequestURI) {
+			targetUri, _ := url.Parse(req.RequestURI)
+			if targetUri != nil {
+				req.URL = targetUri
+			}
+		}
 	}
 
 	req.Header = make(http.Header)
@@ -496,13 +505,26 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 		return nil, err
 	}
 
+	if utils.IsHttpOrHttpsUrl(req.RequestURI) {
+		u, _ := url.Parse(req.RequestURI)
+		if u != nil {
+			req.URL = u
+			req.Host = u.Host
+			if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
+				req.RequestURI = u.RequestURI()
+			} else {
+				req.RequestURI = u.Path
+			}
+		}
+	}
+
 	if loadbody {
 		var finalBody, _ = ioutil.ReadAll(req.Body)
 		req.Body = ioutil.NopCloser(bytes.NewBuffer(finalBody))
 	}
 
 	var cache = make(map[string]string)
-	var host string
+	var host = req.Host
 	var cachedHeader = make(map[string][]string)
 	// 这里用来恢复 Req 的大小写
 	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {

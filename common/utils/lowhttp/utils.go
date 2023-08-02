@@ -173,8 +173,21 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 		return nil, utils.Error("no request")
 	}
 
+	if utils.IsHttpOrHttpsUrl(r.RequestURI) {
+		return url.Parse(r.RequestURI)
+	}
+
 	if strings.HasPrefix(r.RequestURI, "http://") || strings.HasPrefix(r.RequestURI, "https://") {
 		return url.Parse(r.RequestURI)
+	}
+
+	if r.URL.Scheme != "" {
+		switch r.URL.Scheme {
+		case "https", "wss", "ssh", "sftp":
+			https = true
+		default:
+			https = false
+		}
 	}
 
 	var raw string
@@ -185,10 +198,12 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 		raw = "http://"
 	}
 
-	//switch strings.ToUpper(r.Method) {
-	//case "CONNECT":
-	//	return nil, utils.Errorf("ignore connect")
-	//}
+	switch strings.ToUpper(r.Method) {
+	case "CONNECT":
+		if utils.IsHttpOrHttpsUrl(r.URL.String()) {
+			return url.Parse(r.URL.String())
+		}
+	}
 
 	var host string
 	if r.Host != "" {
@@ -210,7 +225,12 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	if r.RequestURI != "" {
 		raw += r.RequestURI
 	} else {
-		raw += r.URL.RequestURI()
+		u := r.URL
+		if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
+			raw += u.RequestURI()
+		} else {
+			raw += u.Path
+		}
 	}
 	uIns, err := url.Parse(raw)
 	if err != nil {
@@ -234,7 +254,7 @@ func ParseStringToHTTPResponse(res string) (*http.Response, error) {
 }
 
 func MergeUrlFromHTTPRequest(rawRequest []byte, target string, isHttps bool) string {
-	if utils.IsHttp(target) {
+	if utils.IsHttpOrHttpsUrl(target) {
 		return target
 	}
 
