@@ -23,7 +23,16 @@ func (f *Function) buildStatementList(stmtlist *yak.StatementListContext) {
 }
 
 func (f *Function) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []Value {
-	v := make([]Value, 0)
+	ellipsis := stmt.Ellipsis()
+	allexpre := stmt.AllExpression()
+	v := make([]Value, 0, len(allexpre))
+	for _, expr := range allexpre {
+		v = append(v, f.buildExpression(expr.(*yak.ExpressionContext)))
+	}
+	if ellipsis != nil {
+		//TODO: handler "..." to array
+		// v[len(v)-1]
+	}
 	return v
 }
 

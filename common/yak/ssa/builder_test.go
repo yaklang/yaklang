@@ -457,59 +457,65 @@ b5: <- loop.exit3
 func TestClosure(t *testing.T) {
 	t.Run("closure_simple", func(t *testing.T) {
 		code := `
-a = () => {return 11}
-va = a() + 11
+a = (pa) => {return pa * 11}
+va = a(1) + 11
 
-func b() {
-	return 12
+func b(pb1, pb2) {
+	return 12 + pb1 + pb2
 }
-vb = b() + 12
+vb = b(1, 2) + 12
 
-c = fn() {
-	return 13
+c = fn(pc1, pc2, pc3) {
+	return 13 + pc1 + pc2 * pc3
 }
-vc = c() + 13
+vc = c(1, 2, 3) + 13
 		`
 		ir := []string{
 			`
 yak-main
 entry0:
 	%0 = makeClosure Anonymousfunc1
-	%1 = call %0
+	%1 = call %0 (1)
 	%2 = %1 add 11
 	%3 = makeClosure b
-	%4 = call %3
+	%4 = call %3 (1, 2)
 	%5 = %4 add 12
 	%6 = makeClosure Anonymousfunc3
-	%7 = call %6
+	%7 = call %6 (1, 2, 3)
 	%8 = %7 add 13
 			`,
 
 			`
-Anonymousfunc1
+Anonymousfunc1 pa
 parent: yak-main
 entry0:
-	%0 = ret 11,
+	%0 = pa mul 11
+	%1 = ret %0
 			`,
 
 			`
-b
+b pb1, pb2
 parent: yak-main
 entry0:
-	%0 = ret 12,
+	%0 = 12 add pb1
+	%1 = %0 add pb2
+	%2 = ret %1
 			`,
 
 			`
-Anonymousfunc3
+Anonymousfunc3 pc1, pc2, pc3
 parent: yak-main
 entry0:
-	%0 = ret 13,
+	%0 = 13 add pc1
+	%1 = pc2 mul pc3
+	%2 = %0 add %1
+	%3 = ret %2
 			`,
 		}
 
 		prog := parseSSA(code)
 		CheckProgram(t, prog)
-		// showProg(prog)
+		showProg(prog)
 		CompareYakFunc(t, prog, ir)
 	})
 }
