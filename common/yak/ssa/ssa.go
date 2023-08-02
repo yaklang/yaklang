@@ -385,9 +385,10 @@ func (r Return) String() string {
 
 func (r Return) StringByFunc(getStr func(Value) string) string {
 	ret := "ret "
-	for _, v := range r.Results {
-		ret += getStr(v) + ", "
-	}
+	ret += strings.Join(
+		lo.Map(r.Results, func(v Value, _ int) string { return getStr(v) }),
+		", ",
+	)
 	return ret
 }
 
@@ -404,9 +405,9 @@ func (c Call) StringByFunc(getStr func(Value) string) string {
 	ret := "call " + getStr(c.Method)
 	if len(c.Args) > 0 {
 		ret += " ("
-		for _, a := range c.Args {
-			ret += getStr(a) + ", "
-		}
+		ret += strings.Join(
+			lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
+			", ")
 		ret += ")"
 	}
 	return ret
@@ -437,9 +438,9 @@ func (m MakeClosure) String() string {
 func (m MakeClosure) StringByFunc(getStr func(Value) string) string {
 	// fmt.Sprintf("makeClosure %s ")
 	ret := "makeClosure " + m.Fn.name
-	for _, v := range m.Bindings {
-		ret += getStr(v) + ", "
-	}
+	ret += strings.Join(
+		lo.Map(m.Bindings, func(b Value, _ int) string { return getStr(b) }),
+		", ")
 	return ret
 }
 
