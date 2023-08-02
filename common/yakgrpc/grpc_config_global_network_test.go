@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
@@ -13,11 +14,14 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 		panic(err)
 	}
 
+	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	if err != nil {
 		panic(err)
 	}
 	config.CustomDNSServers = []string{"127.0.0.1"}
+	spew.Dump(config)
 	defer client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
 	if err != nil {
