@@ -2,7 +2,7 @@ mitmProxyPort = os.GetRandomAvailableTCPPort()
 host,port = tcp.MockServe(`HTTP/1.1 200 OK
 Content-Length: 1
 
-a`)
+d`)
 check = false
 go func{
     mitm.Start(mitmProxyPort, mitm.callback((isHttps, url, req, rsp) => {
@@ -23,3 +23,6 @@ Host: localhost
 
 a`, poc.proxy(mitmAddr), poc.host(host), poc.port(port))~
 dump(rsp)
+if string(poc.Split(rsp)[1]) != "d" {
+    die("mitm is not working well (connected to host)")
+}
