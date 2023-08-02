@@ -99,7 +99,7 @@ func (f *Function) emitClosure(target *Function) *Closure {
 	return m
 }
 
-func (f *Function) emitCall(target *MakeClosure, args []Value, isDropError bool) *Call {
+func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call {
 	c := &Call{
 		anInstruction: anInstruction{
 			Parent: f,
