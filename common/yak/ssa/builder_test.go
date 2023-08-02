@@ -176,7 +176,8 @@ func CompareYakFunc(t *testing.T, prog *Program, ir []string) {
 		// set
 		for _, line := range irs {
 			if strings.TrimSpace(line) != "" {
-				funs[line] = ir
+				words := strings.Split(line, " ")
+				funs[words[0]] = ir
 				break
 			}
 		}

@@ -1,5 +1,7 @@
 package ssa
 
+import "fmt"
+
 // --------------- for assign
 type LeftValue interface {
 	Assign(Value)
@@ -40,11 +42,20 @@ func (f *Function) wirteVariableByBlock(variable string, value Value, block *Bas
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
 	map2, ok := f.currentDef[variable]
 	if !ok {
-		return nil
+		// in enter block
+		if para, ok := f.Param[variable]; ok {
+			return para
+		}
+		fmt.Printf("con't found variable %s in map currentDef", variable)
+		panic("")
 	}
 	value, ok := map2[block]
 	if !ok {
-		return f.readVariableRecursive(variable, block)
+		value = f.readVariableRecursive(variable, block)
+	}
+	if value == nil {
+		fmt.Printf("con't found variable %s", variable)
+		panic("")
 	}
 	return value
 }
