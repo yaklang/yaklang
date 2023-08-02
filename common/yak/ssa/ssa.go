@@ -3,10 +3,13 @@ package ssa
 import (
 	"fmt"
 	"go/constant"
+	"strings"
 	"sync"
 
+	"github.com/samber/lo"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"golang.org/x/exp/slices"
 )
 
 type Value interface {
@@ -62,7 +65,7 @@ type Function struct {
 	// package
 	Package *Package
 
-	Param []*Parameter
+	Param map[string]*Parameter
 
 	// BasicBlock list
 	Blocks     []*BasicBlock
@@ -223,10 +226,10 @@ type MakeClosure struct {
 
 // implement value
 func (f *Function) String() string {
-	ret := f.name
-	for _, para := range f.Param {
-		ret += para.String() + ", "
-	}
+	ret := f.name + " "
+	paras := lo.MapToSlice(f.Param, func(key string, _ *Parameter) string { return key })
+	slices.Sort(paras)
+	ret += strings.Join(paras, ", ")
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
@@ -269,6 +272,10 @@ func (f *Function) String() string {
 			}
 		case *Const:
 			op = v.String()
+		case *Parameter:
+			op = v.String()
+		default:
+			panic("unknow value type")
 		}
 		return op
 	}
