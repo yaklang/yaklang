@@ -56,18 +56,26 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 		if para, ok := f.Param[variable]; ok {
 			return para
 		}
-		fmt.Printf("con't found variable %s in map currentDef", variable)
-		panic("")
+		if parent := f.parent; parent != nil {
+			if v := parent.readVariable(variable); v != nil {
+				alloc := parent.emitAlloc(variable)
+				parent.emitStore(alloc, v)
+				parent.wirteVariable(variable, alloc)
+				f.FreeValue = append(f.FreeValue, alloc)
+				load := f.emitLoad(alloc)
+				return load
+			} else {
+				fmt.Printf("con't found variable %s in function %s and parent-function %s", variable, f.name, parent.name)
+			}
+		}
+		return nil
+	} else {
+		value, ok := map2[block]
+		if !ok {
+			value = f.readVariableRecursive(variable, block)
+		}
+		return value
 	}
-	value, ok := map2[block]
-	if !ok {
-		value = f.readVariableRecursive(variable, block)
-	}
-	if value == nil {
-		fmt.Printf("con't found variable %s", variable)
-		panic("")
-	}
-	return value
 }
 
 func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Value {
