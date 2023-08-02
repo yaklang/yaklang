@@ -12,7 +12,8 @@ func (f *Function) NewParam(name string, add bool) *Parameter {
 		user:     []User{},
 	}
 	if add {
-		f.Param = append(f.Param, p)
+		// f.Param = append(f.Param, p)
+		f.Param[name] = p
 	}
 	return p
 }

@@ -88,10 +88,10 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
 	ids := stmt.AllIdentifier()
-	param := make([]*Parameter, 0, len(ids))
+	param := make(map[string]*Parameter, len(ids))
 
 	for _, id := range ids {
-		param = append(param, f.NewParam(id.GetText(), false))
+		param[id.GetText()] = f.NewParam(id.GetText(), false)
 	}
 	if ellipsis != nil {
 		//TODO: handler "..." to array
