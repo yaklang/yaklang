@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"net/url"
 	"os"
 	"strconv"
@@ -279,7 +280,7 @@ func _createRisk(u string, opts ...RiskParamsOpt) *Risk {
 			r.IP = r.Host
 			r.IPInteger, _ = utils.IPv4ToUint64(r.Host)
 		} else {
-			r.IP = utils.GetFirstIPByDnsWithCache(r.Host, 3*time.Second)
+			r.IP = yakdns.LookupFirst(r.Host, yakdns.WithTimeout(3*time.Second))
 		}
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -272,7 +273,7 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 				}
 				return ips[0], nil
 			}
-			return utils.GetFirstIPByDnsWithCache(host, 5*time.Second, opts.DnsServers...), nil
+			return yakdns.LookupFirst(host, yakdns.WithTimeout(5), yakdns.WithDNSServers(opts.DnsServers...)), nil
 		}).DialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,

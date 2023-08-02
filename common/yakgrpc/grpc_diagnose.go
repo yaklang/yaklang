@@ -107,7 +107,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 
 			var lines []string
 			for _, dnsServer := range req.GetDNSServers() {
-				ips := utils.GetIPsFromHostWithTimeout(timeout, domain, []string{dnsServer})
+				ips := yakdns.LookupAll(domain, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServer))
 				for _, i := range ips {
 					if utils.IsIPv4(i) {
 						lines = append(lines, fmt.Sprintf("%v =>    [A]: %v", dnsServer, i))
@@ -123,7 +123,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 				continue
 			}
 			for _, dnsServer := range systemDNS {
-				ips := utils.GetIPsFromHostWithTimeout(timeout, domain, []string{dnsServer})
+				ips := yakdns.LookupAll(domain, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServer))
 				for _, i := range ips {
 					if utils.IsIPv4(i) {
 						lines = append(lines, fmt.Sprintf("SYSTEM: %v =>    [A]: %v", dnsServer, i))

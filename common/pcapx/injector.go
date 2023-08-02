@@ -7,6 +7,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"math/rand"
 	"net"
 	"sync"
@@ -112,7 +113,8 @@ func ParseSrcNDstAddress(src, dst string) (net.IP, net.IP, uint16, uint16, error
 			wg.Done()
 		}()
 		if !utils.IsIPv4(srcHost) && utils.IsValidDomain(srcHost) {
-			targetIP := utils.GetFirstIPFromHostWithTimeout(3*time.Second, srcHost, nil)
+			targetIP := yakdns.LookupFirst(srcHost, yakdns.WithTimeout(3*time.Second))
+
 			if targetIP != "" {
 				srcIP = net.ParseIP(targetIP)
 			}
@@ -129,7 +131,7 @@ func ParseSrcNDstAddress(src, dst string) (net.IP, net.IP, uint16, uint16, error
 			wg.Done()
 		}()
 		if !utils.IsIPv4(dstHost) && utils.IsValidDomain(dstHost) {
-			targetIP := utils.GetFirstIPFromHostWithTimeout(5*time.Second, dstHost, nil)
+			targetIP := yakdns.LookupFirst(dstHost, yakdns.WithTimeout(5*time.Second))
 			if targetIP != "" {
 				dstIP = net.ParseIP(targetIP)
 			}

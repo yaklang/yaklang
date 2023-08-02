@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -76,7 +77,8 @@ func Set(s Settings) error {
 			return utils.Errorf("cannot found port for %s", s.DefaultServer)
 		}
 		if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
-			if addr := utils.GetFirstIPByDnsWithCache(host, 5*time.Second); addr == "" {
+
+			if addr := yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second)); addr == "" {
 				return utils.Errorf("cannot set proxy for %s for (DNSFailed)", s.DefaultServer)
 			}
 		}

@@ -228,3 +228,9 @@ func WithDNSCallback(cb func(dnsType, domain, ip, fromServer, method string)) DN
 		config.Callback = cb
 	}
 }
+
+func WithTimeout(timeout time.Duration) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		config.Timeout = timeout
+	}
+}

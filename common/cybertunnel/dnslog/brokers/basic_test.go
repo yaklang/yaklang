@@ -3,6 +3,7 @@ package dnslogbrokers
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"testing"
 )
 
@@ -12,7 +13,7 @@ func TestDIGPM1(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	utils.GetFirstIPByDnsWithCache(domain, utils.FloatSecondDuration(3))
+	yakdns.LookupFirst(domain, yakdns.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDigPm1433.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -26,7 +27,7 @@ func TestDIGPM2(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	utils.GetFirstIPByDnsWithCache(domain, utils.FloatSecondDuration(3))
+	yakdns.LookupFirst(domain, yakdns.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDigPMBYPASS.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -40,7 +41,7 @@ func TestDNSLOGCN(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(domain, token)
-	utils.GetFirstIPByDnsWithCache(domain, utils.FloatSecondDuration(3))
+	yakdns.LookupFirst(domain, yakdns.WithTimeout(utils.FloatSecondDuration(3)))
 	a, err := defaultDNSLogCN.GetResult(token, utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
