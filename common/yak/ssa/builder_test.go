@@ -65,13 +65,13 @@ func CheckProgram(t *testing.T, prog *Program) {
 					}
 
 					// value-user check
-					for _, value := range inst.GetValue() {
-						if !slices.Contains(value.GetUser(), inst.(User)) {
+					for _, value := range inst.GetValues() {
+						if !slices.Contains(value.GetUsers(), inst.(User)) {
 							t.Fatalf("fatal value %s not't have it %s in user", value, inst)
 						}
 					}
-					for _, user := range inst.GetUser() {
-						if !slices.Contains(user.GetValue(), inst.(Value)) {
+					for _, user := range inst.GetUsers() {
+						if !slices.Contains(user.GetValues(), inst.(Value)) {
 							t.Fatalf("fatal user %s not't have it %s in value", user, inst)
 						}
 					}

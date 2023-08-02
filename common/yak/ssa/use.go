@@ -1,38 +1,40 @@
 package ssa
 
-import "golang.org/x/exp/slices"
+import (
+	"golang.org/x/exp/slices"
+)
 
 func ReplaceValue(v Value, to Value) {
-	for _, user := range v.GetUser() {
+	for _, user := range v.GetUsers() {
 		user.ReplaceValue(v, to)
 	}
 }
 
 // ----------- Function
-func (f *Function) GetUser() []User { return f.user }
-func (f *Function) AddUser(u User)  { f.user = append(f.user, u) }
+func (f *Function) GetUsers() []User { return f.user }
+func (f *Function) AddUser(u User)   { f.user = append(f.user, u) }
 
 // ----------- BasicBlock
-func (b *BasicBlock) GetUser() []User { return b.user }
-func (b *BasicBlock) AddUser(u User)  { b.user = append(b.user, u) }
+func (b *BasicBlock) GetUsers() []User { return b.user }
+func (b *BasicBlock) AddUser(u User)   { b.user = append(b.user, u) }
 
 // ----------- Phi
 func (p *Phi) ReplaceValue(v Value, to Value) {
 	slices.Replace(p.Edge, 0, len(p.Edge), v, to)
 }
 
-func (p *Phi) GetUser() []User { return p.user }
-func (p *Phi) AddUser(u User)  { p.user = append(p.user, u) }
+func (p *Phi) GetUsers() []User { return p.user }
+func (p *Phi) AddUser(u User)   { p.user = append(p.user, u) }
 
-func (p *Phi) GetValue() []Value { return p.Edge }
-func (p *Phi) AddValue(v Value)  {}
+func (p *Phi) GetValues() []Value { return p.Edge }
+func (p *Phi) AddValue(v Value)   {}
 
 // ----------- Const
-func (c *Const) GetUser() []User { return c.user }
-func (c *Const) AddUser(u User)  { c.user = append(c.user, u) }
+func (c *Const) GetUsers() []User { return c.user }
+func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
 
 // ----------- param
-func (p *Parameter) GetUser() []User {
+func (p *Parameter) GetUsers() []User {
 	return p.user
 }
 
@@ -45,11 +47,11 @@ func (j *Jump) ReplaceValue(v Value, to Value) {
 	panic("jump don't use value")
 }
 
-func (j *Jump) GetUser() []User { return nil }
-func (j *Jump) AddUser(u User)  {}
+func (j *Jump) GetUsers() []User { return nil }
+func (j *Jump) AddUser(u User)   {}
 
-func (j *Jump) GetValue() []Value { return nil }
-func (j *Jump) AddValue(u Value)  {}
+func (j *Jump) GetValues() []Value { return nil }
+func (j *Jump) AddValue(u Value)   {}
 
 // ----------- IF
 func (i *If) ReplaceValue(v Value, to Value) {
@@ -60,11 +62,11 @@ func (i *If) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (i *If) GetUser() []User { return i.user }
-func (i *If) AddUser(u User)  { i.user = append(i.user, u) }
+func (i *If) GetUsers() []User { return i.user }
+func (i *If) AddUser(u User)   { i.user = append(i.user, u) }
 
-func (i *If) GetValue() []Value { return []Value{i.Cond} }
-func (i *If) AddValue(v Value)  {}
+func (i *If) GetValues() []Value { return []Value{i.Cond} }
+func (i *If) AddValue(v Value)   {}
 
 // ----------- Return
 func (r *Return) ReplaceValue(v Value, to Value) {
@@ -75,11 +77,11 @@ func (r *Return) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (r *Return) GetUser() []User { return nil }
-func (r *Return) AddUser(u User)  {}
+func (r *Return) GetUsers() []User { return nil }
+func (r *Return) AddUser(u User)   {}
 
-func (r *Return) GetValue() []Value { return r.Results }
-func (r *Return) AddValue(v Value)  {}
+func (r *Return) GetValues() []Value { return r.Results }
+func (r *Return) AddValue(v Value)   {}
 
 // ----------- Call
 func (c *Call) ReplaceValue(v Value, to Value) {
@@ -90,11 +92,11 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (c *Call) GetUser() []User { return c.user }
-func (c *Call) AddUser(u User)  { c.user = append(c.user, u) }
+func (c *Call) GetUsers() []User { return c.user }
+func (c *Call) AddUser(u User)   { c.user = append(c.user, u) }
 
-func (c *Call) GetValue() []Value { return c.Args }
-func (c *Call) AddValue(v Value)  {}
+func (c *Call) GetValues() []Value { return c.Args }
+func (c *Call) AddValue(v Value)   {}
 
 // ----------- BinOp
 func (b *BinOp) ReplaceValue(v Value, to Value) {
@@ -106,11 +108,11 @@ func (b *BinOp) ReplaceValue(v Value, to Value) {
 		b.Y = to
 	}
 }
-func (b *BinOp) GetUser() []User { return b.user }
-func (b *BinOp) AddUser(u User)  { b.user = append(b.user, u) }
+func (b *BinOp) GetUsers() []User { return b.user }
+func (b *BinOp) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *BinOp) GetValue() []Value { return []Value{b.X, b.Y} }
-func (b *BinOp) AddValue(v Value)  {}
+func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
+func (b *BinOp) AddValue(v Value)   {}
 
 // ----------- MakeClosure
 func (m *MakeClosure) ReplaceValue(v Value, to Value) {
@@ -121,10 +123,11 @@ func (m *MakeClosure) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (m *MakeClosure) GetUser() []User { return m.user }
+
+func (m *MakeClosure) GetUsers() []User { return m.user }
 func (m *MakeClosure) AddUser(u User)  { m.user = append(m.user, u) }
 
-func (m *MakeClosure) GetValue() []Value { return append(m.Bindings, m.Fn) }
+func (m *MakeClosure) GetValues() []Value { return append(m.Bindings, m.Fn) }
 
 //TODO: this
 func (m *MakeClosure) AddValue(v Value) {}
