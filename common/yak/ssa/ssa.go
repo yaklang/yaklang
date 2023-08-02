@@ -41,7 +41,18 @@ type Instruction interface {
 }
 
 func DefaultValueString(v Value) string {
-	return v.String()
+	op := ""
+	switch v := v.(type) {
+	case Instruction:
+		op = "t0"
+	case *Const:
+		op = v.String()
+	case *Parameter:
+		op = v.String()
+	default:
+		panic("instruction unknow value type: " + v.String())
+	}
+	return op
 }
 
 type Program struct {
