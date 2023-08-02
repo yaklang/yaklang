@@ -10,37 +10,46 @@ import (
 )
 
 const GLOBAL_NETWORK_CONFIG = "GLOBAL_NETWORK_CONFIG"
+const GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		data := yakit.Get(GLOBAL_NETWORK_CONFIG)
-		if data == "" {
+
+	INIT:
+		if yakit.Get(GLOBAL_NETWORK_CONFIG_INIT) == "" {
 			log.Info("initialize global network config")
 			defaultConfig := getDefaultNetworkConfig()
 			raw, err := json.Marshal(defaultConfig)
 			if err != nil {
 				return err
 			}
+			log.Infof("use config: %v", string(raw))
 			yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
 			loadConfig(defaultConfig)
+			yakit.Set(GLOBAL_NETWORK_CONFIG_INIT, "1")
+			return nil
+		} else {
+			data := yakit.Get(GLOBAL_NETWORK_CONFIG)
+			if data == "" {
+				yakit.Set(GLOBAL_NETWORK_CONFIG_INIT, "")
+				goto INIT
+			}
+			var config ypb.GlobalNetworkConfig
+			err := json.Unmarshal([]byte(data), &config)
+			if err != nil {
+				log.Errorf("unmarshal global network config failed: %s", err)
+				return nil
+			}
+
+			log.Debugf("load global network config from database user config")
+			log.Debugf("disable system dns: %v", config.DisableSystemDNS)
+			log.Debugf("dns fallback tcp: %v", config.DNSFallbackTCP)
+			log.Debugf("dns fallback doh: %v", config.DNSFallbackDoH)
+			log.Debugf("custom dns servers: %v", config.CustomDNSServers)
+			log.Debugf("custom doh servers: %v", config.CustomDoHServers)
+			loadConfig(&config)
 			return nil
 		}
-
-		var config ypb.GlobalNetworkConfig
-		err := json.Unmarshal([]byte(data), &config)
-		if err != nil {
-			log.Errorf("unmarshal global network config failed: %s", err)
-			return nil
-		}
-
-		log.Info("load global network config from database user config")
-		log.Infof("disable system dns: %v", config.DisableSystemDNS)
-		log.Infof("dns fallback tcp: %v", config.DNSFallbackTCP)
-		log.Infof("dns fallback doh: %v", config.DNSFallbackDoH)
-		log.Infof("custom dns servers: %v", config.CustomDNSServers)
-		log.Infof("custom doh servers: %v", config.CustomDoHServers)
-		loadConfig(&config)
-		return nil
 	})
 }
 
@@ -87,7 +96,7 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 		return defaultConfig, nil
 	}
 	var config ypb.GlobalNetworkConfig
-	err := json.Unmarshal([]byte(data), &req)
+	err := json.Unmarshal([]byte(data), &config)
 	if err != nil {
 		return nil, err
 	}
