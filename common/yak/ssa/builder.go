@@ -417,6 +417,9 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 	enter := f.currentBlock
 	header := f.newBasicBlockUnSealed("loop.header")
 	f.emitJump(header)
+	hasLatch := false
+	// jupm from body to header; when haven't third expression
+	next := header
 
 	body := f.newBasicBlock("loop.body")
 	exit := f.newBasicBlock("loop.exit")
@@ -454,34 +457,40 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 		if third, ok := cond.ForThirdExpr().(*yak.ForThirdExprContext); ok {
 			// third exprssion in latch block, when loop.body builded
 			endThird = third
+			// new latch block for third expression
+			latch := f.newBasicBlock("loop.latch")
+			// jump from body to latch
+			next = latch
+			hasLatch = true
 		}
 	}
 
 	//  build body
 	if b, ok := stmt.Block().(*yak.BlockContext); ok {
 		f.currentBlock = body
+
+		f.target = &target{
+			tail:      f.target, // push
+			_break:    exit,
+			_continue: next,
+		}
+
 		f.buildBlock(b) // block can create block
+
+		f.target = f.target.tail // pop
+
 		// f.currentBlock is end block in body
 		body = f.currentBlock
 	}
 
-	if endThird != nil {
-		// new latch block for third expression
-		latch := f.newBasicBlock("loop.latch")
-
-		// jump from body to latch
 		f.currentBlock = body
-		f.emitJump(latch)
+	f.emitJump(next)
 
+	if hasLatch {
 		// build third expression
-		f.currentBlock = latch
+		f.currentBlock = next
 		f.buildForThirdExpr(endThird)
-
 		// jump from latch to header
-		f.emitJump(header)
-	} else {
-		// jupm from body to header; when haven't third expression
-		f.currentBlock = body
 		f.emitJump(header)
 	}
 
@@ -526,6 +535,25 @@ func (f *Function) buildStatement(stmt *yak.StatementContext) {
 
 	if s, ok := stmt.ForStmt().(*yak.ForStmtContext); ok {
 		f.buildForStmt(s)
+	}
+
+	if s, ok := stmt.ForRangeStmt().(*yak.ForRangeStmtContext); ok {
+		f.buildForRangeStmt(s)
+	}
+
+	if _, ok := stmt.ContinueStmt().(*yak.ContinueStmtContext); ok {
+		if c := f.target._continue; c != nil {
+			f.emitJump(c)
+		} else {
+			panic("unexpection continue stmt")
+		}
+	}
+	if _, ok := stmt.BreakStmt().(*yak.BreakStmtContext); ok {
+		if b := f.target._break; b != nil {
+			f.emitJump(b)
+		} else {
+			panic("unexpection break stmt")
+		}
 	}
 
 	if s, ok := stmt.ReturnStmt().(*yak.ReturnStmtContext); ok {
