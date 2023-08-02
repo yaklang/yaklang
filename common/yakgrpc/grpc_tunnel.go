@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
@@ -59,15 +60,26 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 	}, nil
 }
 
-func (s *Server) RequireDNSLogDomain(ctx context.Context, addr *ypb.YakDNSLogBridgeAddr) (*ypb.DNSLogRootDomain, error) {
-	domain, token, err := cybertunnel.RequireDNSLogDomain(addr.GetDNSLogAddr(), addr.GetDNSMode())
-	if err != nil {
-		return nil, err
+func (s *Server) RequireDNSLogDomain(ctx context.Context, params *ypb.YakDNSLogBridgeAddr) (*ypb.DNSLogRootDomain, error) {
+	if params.GetUseLocal() {
+		domain, token, err := cybertunnel.RequireDNSLogDomainByLocal(params.GetDNSMode())
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.DNSLogRootDomain{
+			Domain: domain,
+			Token:  token,
+		}, nil
+	} else {
+		domain, token, err := cybertunnel.RequireDNSLogDomainByRemote(params.GetDNSLogAddr(), params.GetDNSMode())
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.DNSLogRootDomain{
+			Domain: domain,
+			Token:  token,
+		}, nil
 	}
-	return &ypb.DNSLogRootDomain{
-		Domain: domain,
-		Token:  token,
-	}, nil
 }
 
 func (s *Server) QuerySupportedDnsLogPlatforms(ctx context.Context, req *ypb.Empty) (*ypb.QuerySupportedDnsLogPlatformsResponse, error) {
@@ -81,10 +93,17 @@ func (s *Server) QuerySupportedDnsLogPlatforms(ctx context.Context, req *ypb.Emp
 }
 
 func (s *Server) QueryDNSLogByToken(ctx context.Context, req *ypb.QueryDNSLogByTokenRequest) (*ypb.QueryDNSLogByTokenResponse, error) {
-	events, err := cybertunnel.QueryExistedDNSLogEvents(req.GetDNSLogAddr(), req.GetToken(), req.GetDNSMode())
+	var events []*tpb.DNSLogEvent
+	var err error
+	if req.GetUseLocal() {
+		events, err = cybertunnel.QueryExistedDNSLogEventsByLocal(req.GetToken(), req.GetDNSMode())
+	} else {
+		events, err = cybertunnel.QueryExistedDNSLogEvents(req.GetDNSLogAddr(), req.GetToken(), req.GetDNSMode())
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	rsp := &ypb.QueryDNSLogByTokenResponse{}
 	for _, e := range events {
 		rsp.Events = append(rsp.Events, &ypb.DNSLogEvent{

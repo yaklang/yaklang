@@ -87,8 +87,34 @@ func GetSupportDNSLogBrokersName() []string {
 	return dnslogbrokers.BrokerNames()
 }
 
-func GetSupportDNSLogBrokers(mode string) dnslogbrokers.DNSLogBroker {
+func GetSupportDNSLogBroker(mode string) dnslogbrokers.DNSLogBroker {
 	return dnslogbrokers.GetDNSLogBroker(mode)
+}
+
+func RequireDNSLogDomainByLocal(mode string) (domain string, token string, err error) {
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+	broke, err := dnslogbrokers.Get(mode)
+	if err != nil {
+		return "", "", utils.Errorf("get dnslog broker by local failed: %v", err)
+	}
+	var count = 0
+	for {
+		count++
+		domain, token, err := broke.Require(30*time.Second, "http://192.168.3.113:9999")
+		if err != nil {
+			if count > 3 {
+				return "", "", utils.Errorf("require dns domain failed: %s", err)
+			}
+
+			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
+				continue
+			}
+			return "", "", err
+		}
+		return domain, token, nil
+	}
 }
 
 func GetDNSLogClient(addr string) (tpb.DNSLogClient, *grpc.ClientConn, error) {
@@ -226,7 +252,7 @@ func RequirePortByToken(
 	})
 }
 
-func RequireDNSLogDomain(addr, mode string) (domain string, token string, _ error) {
+func RequireDNSLogDomainByRemote(addr, mode string) (domain string, token string, _ error) {
 	if addr == "" {
 		addr = consts.GetDefaultPublicReverseServer()
 		//addr = "ns1.cybertunnel.run:64333"
@@ -294,6 +320,44 @@ func QueryExistedDNSLogEventsEx(addr, token, mode string, timeout ...float64) ([
 			return nil, err
 		}
 		return rsp.Events, nil
+	}
+}
+
+func QueryExistedDNSLogEventsByLocal(token, mode string) ([]*tpb.DNSLogEvent, error) {
+	return QueryExistedDNSLogEventsByLocalEx(token, mode, 10)
+}
+
+func QueryExistedDNSLogEventsByLocalEx(token, mode string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	var f = 5.0
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5
+	}
+
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+
+	var broker, _ = dnslogbrokers.Get(mode)
+
+	var count = 0
+	for {
+		count++
+		results, err := broker.GetResult(token, 30*time.Second, "http://192.168.3.113:9999")
+		if err != nil {
+			if count > 3 {
+				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())
+			}
+
+			reason := strings.ToLower(err.Error())
+			if strings.Contains(reason, "i/o timeout") || strings.Contains(reason, "context deadline exceeded") {
+				continue
+			}
+			return nil, err
+		}
+		return results, nil
 	}
 }
 
