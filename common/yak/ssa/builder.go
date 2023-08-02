@@ -36,7 +36,7 @@ func (f *Function) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []
 	return v
 }
 
-func (f *Function) buildFunctionCall(stmt *yak.FunctionCallContext, v *MakeClosure) Value {
+func (f *Function) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) Value {
 	var args []Value
 	isDropErr := false
 	if s, ok := stmt.OrdinaryArguments().(*yak.OrdinaryArgumentsContext); ok {
@@ -173,10 +173,10 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 		if expr, ok := stmt.Expression(0).(*yak.ExpressionContext); ok {
 			v = f.buildExpression(expr)
 		}
-		if fun, ok := v.(*MakeClosure); ok {
-			return f.buildFunctionCall(s, fun)
+		if v != nil {
+			return f.buildFunctionCall(s, v)
 		} else {
-			panic("call target is not function object")
+			panic("call target is nil")
 		}
 	}
 
