@@ -1,0 +1,25 @@
+mitmProxyPort = os.GetRandomAvailableTCPPort()
+host,port = tcp.MockServe(`HTTP/1.1 200 OK
+Content-Length: 1
+
+a`)
+check = false
+go func{
+    mitm.Start(mitmProxyPort, mitm.callback((isHttps, url, req, rsp) => {
+        check = true
+    }))
+}
+sleep(1)
+mitmAddr := "http://127.0.0.1:" + string(mitmProxyPort)
+
+// url = "http://" + str.HostPort(host, port)
+// rsp, req := poc.Get(url, poc.proxy(mitmAddr))~
+// if !check {
+//     die("proxy is not passed")
+// }
+
+rsp, req = poc.HTTP(`GET / HTTP/1.1
+Host: localhost
+
+a`, poc.proxy(mitmAddr), poc.host(host), poc.port(port))~
+dump(rsp)
