@@ -247,22 +247,9 @@ func (f *Function) String() string {
 
 	// init instReg
 	newName := func() string {
-		ret := fmt.Sprintf("%%%d", regindex)
+		ret := fmt.Sprintf("t%d", regindex)
 		regindex += 1
 		return ret
-	}
-	setInst := func(i Instruction) {
-		if _, ok := instReg[i]; !ok {
-			instReg[i] = newName()
-		}
-	}
-	for _, b := range f.Blocks {
-		for _, i := range b.Instrs {
-			setInst(i)
-		}
-		for _, p := range b.Phis {
-			setInst(p)
-		}
 	}
 
 	// print instruction
@@ -281,13 +268,36 @@ func (f *Function) String() string {
 		case *Parameter:
 			op = v.String()
 		default:
-			panic("unknow value type")
+			panic("instruction unknow value type: " + v.String())
 		}
 		return op
 	}
 
+	if len(f.FreeValue) > 0 {
+		ret += "freeValue: " + strings.Join(
+			lo.Map(f.FreeValue, func(i Value, _ int) string {
+				return getStr(i)
+			}),
+			", ") + "\n"
+	}
+
+	setInst := func(i Instruction) {
+		if _, ok := instReg[i]; !ok {
+			instReg[i] = newName()
+		}
+	}
+
+	for _, b := range f.Blocks {
+		for _, i := range b.Instrs {
+			setInst(i)
+		}
+		for _, p := range b.Phis {
+			setInst(p)
+		}
+	}
+
 	handlerInst := func(i Instruction) string {
-		ret := "\t" + getStr(i) + " = " + i.StringByFunc(getStr) + "\n"
+		ret := "\t" + i.StringByFunc(getStr) + "\n"
 		return ret
 	}
 
@@ -305,7 +315,7 @@ func (f *Function) String() string {
 
 var _ Value = (*Function)(nil)
 
-func (b BasicBlock) String() string {
+func (b *BasicBlock) String() string {
 	ret := b.Name + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
@@ -323,13 +333,12 @@ func (a *anInstruction) GetBlock() *BasicBlock { return a.Block }
 func (a *anInstruction) GetParent() *Function  { return a.Parent }
 
 // ----------- Phi
-func (p Phi) String() string {
+func (p *Phi) String() string {
 	return p.StringByFunc(DefaultValueString)
 }
 
-func (p Phi) StringByFunc(getStr func(Value) string) string {
-	ret := "phi "
-
+func (p *Phi) StringByFunc(getStr func(Value) string) string {
+	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
@@ -360,11 +369,11 @@ func (p *Parameter) String() string {
 var _ Value = (*Parameter)(nil)
 
 // ----------- Jump
-func (j Jump) String() string {
+func (j *Jump) String() string {
 	return j.StringByFunc(DefaultValueString)
 }
 
-func (j Jump) StringByFunc(_ func(Value) string) string {
+func (j *Jump) StringByFunc(_ func(Value) string) string {
 	return fmt.Sprintf("jump -> %s", j.To.Name)
 }
 
@@ -373,10 +382,10 @@ var _ User = (*Jump)(nil)
 var _ Instruction = (*Jump)(nil)
 
 // ----------- IF
-func (i If) String() string {
+func (i *If) String() string {
 	return i.StringByFunc(DefaultValueString)
 }
-func (i If) StringByFunc(getStr func(Value) string) string {
+func (i *If) StringByFunc(getStr func(Value) string) string {
 	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
 }
 
@@ -385,17 +394,18 @@ var _ User = (*If)(nil)
 var _ Instruction = (*If)(nil)
 
 // ----------- Return
-func (r Return) String() string {
+func (r *Return) String() string {
 	return r.StringByFunc(DefaultValueString)
 }
 
-func (r Return) StringByFunc(getStr func(Value) string) string {
-	ret := "ret "
-	ret += strings.Join(
+func (r *Return) StringByFunc(getStr func(Value) string) string {
+	return fmt.Sprintf(
+		"ret %s",
+		strings.Join(
 		lo.Map(r.Results, func(v Value, _ int) string { return getStr(v) }),
 		", ",
+		),
 	)
-	return ret
 }
 
 var _ Value = (*Return)(nil)
@@ -403,20 +413,20 @@ var _ User = (*Return)(nil)
 var _ Instruction = (*Return)(nil)
 
 // ----------- Call
-func (c Call) String() string {
+func (c *Call) String() string {
 	return c.StringByFunc(DefaultValueString)
 }
 
-func (c Call) StringByFunc(getStr func(Value) string) string {
-	ret := "call " + getStr(c.Method)
-	if len(c.Args) > 0 {
-		ret += " ("
-		ret += strings.Join(
+func (c *Call) StringByFunc(getStr func(Value) string) string {
+	return fmt.Sprintf(
+		"%s = call %s (%s)",
+		getStr(c),
+		getStr(c.Method),
+		strings.Join(
 			lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
-			", ")
-		ret += ")"
-	}
-	return ret
+			", ",
+		),
+	)
 }
 
 var _ Value = (*Call)(nil)
@@ -424,12 +434,12 @@ var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
 
 // ----------- BinOp
-func (b BinOp) String() string {
+func (b *BinOp) String() string {
 	return b.StringByFunc(DefaultValueString)
 }
 
-func (b BinOp) StringByFunc(getStr func(Value) string) string {
-	return fmt.Sprintf("%s %s %s", getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
+func (b *BinOp) StringByFunc(getStr func(Value) string) string {
+	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
 }
 
 var _ Value = (*BinOp)(nil)
