@@ -644,7 +644,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 
 		if p.mitm != nil {
-			log.Infof("martian: attempting MITM for connection: %s", req.Host)
+			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
 			res := p.connectResponse(req)
 
 			if err := p.resmod.ModifyResponse(res); err != nil {
@@ -663,7 +663,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				log.Errorf("martian: got error while flushing response back to client: %v", err)
 			}
 
-			log.Infof("martian: completed MITM for connection: %s", req.Host)
+			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
 			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			b := make([]byte, 1)
