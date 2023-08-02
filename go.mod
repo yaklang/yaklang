@@ -91,6 +91,7 @@ require (
 	github.com/paulmach/go.geojson v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
+	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
 	github.com/projectdiscovery/retryabledns v1.0.13
 	github.com/refraction-networking/utls v1.3.2
 	github.com/rocket049/gocui v0.3.2
