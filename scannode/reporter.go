@@ -70,7 +70,7 @@ func (r *ScannerAgentReporter) ReportWeakPassword(result interface{}) error {
 		}
 
 		var targetType = VulnTargetType_Service
-		if utils.IsHttp(ret.Target) {
+		if utils.IsHttpOrHttpsUrl(ret.Target) {
 			targetType = VulnTargetType_Url
 		}
 
