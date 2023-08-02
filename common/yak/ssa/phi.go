@@ -48,7 +48,7 @@ func (phi *Phi) triRemoveTrivialPhi() Value {
 
 	ReplaceValue(phi, same)
 
-	for _, user := range phi.GetUser() {
+	for _, user := range phi.GetUsers() {
 		switch p := user.(type) {
 		case *Phi:
 			p.triRemoveTrivialPhi()
