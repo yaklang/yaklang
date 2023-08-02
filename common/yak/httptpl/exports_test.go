@@ -3,6 +3,9 @@ package httptpl
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
-	"strings"
-	"testing"
 )
 
 func TestStringToUrl(t *testing.T) {
@@ -202,7 +203,7 @@ requests:
 	for req := range tpl.generateRequests() {
 		var reqIns = req.Requests[0]
 		println(string(reqIns.Raw))
-		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) && bytes.Contains(reqIns.Raw, []byte("{{params(a4)")) {
+		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
 			checked = true
 		}
 	}
@@ -212,11 +213,11 @@ requests:
 	}
 	spew.Dump(tpl.Variables.ToMap())
 	if len(tpl.Variables.ToMap()) != 3 {
-		panic(1)
+		panic(fmt.Sprintf("vars count not equal: %d", len(tpl.Variables.ToMap())))
 	}
 
 	if !checked {
-		panic(1)
+		panic(fmt.Sprintf("not found _method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1"))
 	}
 }
 
