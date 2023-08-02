@@ -42,6 +42,49 @@ func (p *Parameter) AddUser(u User) {
 	p.user = append(p.user, u)
 }
 
+// ----------- Alloc
+func (a *Alloc) GetUsers() []User { return a.user }
+func (a *Alloc) AddUser(u User)   { a.user = append(a.user, u) }
+
+func (a *Alloc) GetValues() []Value            { return nil }
+func (a *Alloc) AddValue(_ Value)              {}
+func (a *Alloc) ReplaceValue(_ Value, _ Value) {}
+
+// ----------- Store
+func (s *Store) GetUsers() []User { return nil }
+func (s *Store) AddUser(u User)   {}
+
+func (s *Store) GetValues() []Value { return []Value{s.value, s.alloc} }
+func (s *Store) AddValue(v Value)   {}
+func (s *Store) ReplaceValue(v Value, to Value) {
+	if s.value == v {
+		s.value = to
+	} else if s.alloc == v {
+		if to, ok := to.(*Alloc); ok {
+			s.alloc = to
+		}
+		panic("load replace to value is not alloc")
+	} else {
+		panic("store not use this value")
+	}
+}
+
+// ----------- Load
+func (a *Load) GetUsers() []User { return a.user }
+func (a *Load) AddUser(u User)   { a.user = append(a.user, u) }
+
+func (a *Load) GetValues() []Value { return []Value{a.alloc} }
+func (a *Load) AddValue(_ Value)   {}
+func (a *Load) ReplaceValue(v Value, to Value) {
+	if v == a.alloc {
+		if to, ok := to.(*Alloc); ok {
+			a.alloc = to
+		}
+		panic("load replace to value is not alloc")
+	}
+	panic("load replace v not load target")
+}
+
 // ----------- Jump
 func (j *Jump) ReplaceValue(v Value, to Value) {
 	panic("jump don't use value")

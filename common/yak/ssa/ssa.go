@@ -123,6 +123,8 @@ type anInstruction struct {
 
 // value
 
+// phi
+// instruction
 type Phi struct {
 	anInstruction
 	Edge []Value // edge[i] from phi.Block.Preds[i]
@@ -131,7 +133,8 @@ type Phi struct {
 	variable string
 }
 
-// implement Value
+// const
+// only Value
 type Const struct {
 	user  []User
 	value constant.Value
@@ -145,10 +148,35 @@ func NewConst(i any) *Const {
 }
 
 // parameter
+// only value
 type Parameter struct {
 	variable string
 	parent   *Function
 	user     []User
+}
+
+// memory value
+
+// alloc
+type Alloc struct {
+	anInstruction
+	variable string
+	user     []User
+	v        Value
+}
+
+// store
+type Store struct {
+	anInstruction
+	alloc *Alloc // store to alloc
+	value Value
+}
+
+// load
+type Load struct {
+	anInstruction
+	user  []User
+	alloc *Alloc // load from alloc
 }
 
 // control-flow instructions  ----------------------------------------
@@ -369,6 +397,52 @@ func (p *Parameter) String() string {
 
 var _ Value = (*Parameter)(nil)
 
+// ----------- Alloc
+func (a *Alloc) String() string {
+	return a.StringByFunc(DefaultValueString)
+}
+func (a *Alloc) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf("%s = alloc", Str(a))
+}
+
+var _ Value = (*Alloc)(nil)
+var _ User = (*Alloc)(nil)
+var _ Instruction = (*Alloc)(nil)
+
+// ----------- Store
+
+func (s *Store) String() string {
+	return s.StringByFunc(DefaultValueString)
+}
+func (s *Store) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf(
+		"*%s = %s",
+		Str(s.alloc),
+		Str(s.value),
+	)
+}
+
+var _ Value = (*Store)(nil)
+var _ User = (*Store)(nil)
+var _ Instruction = (*Store)(nil)
+
+// ----------- Load
+
+func (a *Load) String() string {
+	return a.StringByFunc(DefaultValueString)
+}
+func (a *Load) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf(
+		"%s = *%s",
+		Str(a),
+		Str(a.alloc),
+	)
+}
+
+var _ Value = (*Load)(nil)
+var _ User = (*Load)(nil)
+var _ Instruction = (*Load)(nil)
+
 // ----------- Jump
 func (j *Jump) String() string {
 	return j.StringByFunc(DefaultValueString)
@@ -403,8 +477,8 @@ func (r *Return) StringByFunc(getStr func(Value) string) string {
 	return fmt.Sprintf(
 		"ret %s",
 		strings.Join(
-		lo.Map(r.Results, func(v Value, _ int) string { return getStr(v) }),
-		", ",
+			lo.Map(r.Results, func(v Value, _ int) string { return getStr(v) }),
+			", ",
 		),
 	)
 }
@@ -460,7 +534,7 @@ func (m *Closure) StringByFunc(getStr func(Value) string) string {
 		getStr(m),
 		m.Fn.name,
 		strings.Join(
-		lo.Map(m.Bindings, func(b Value, _ int) string { return getStr(b) }),
+			lo.Map(m.Bindings, func(b Value, _ int) string { return getStr(b) }),
 			", ",
 		),
 	)

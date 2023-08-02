@@ -38,8 +38,8 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		if parent != nil {
 			name = fmt.Sprintf("%s$%d", parent.name, index)
 		} else {
-		name = fmt.Sprintf("Anonymousfunc%d", index)
-	}
+			name = fmt.Sprintf("Anonymousfunc%d", index)
+		}
 	}
 	f := &Function{
 		name:         name,
