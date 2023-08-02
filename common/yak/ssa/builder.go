@@ -160,6 +160,14 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 			opcode = yakvm.OpGt
 		case "<":
 			opcode = yakvm.OpLt
+		case "<=":
+			opcode = yakvm.OpLtEq
+		case ">=":
+			opcode = yakvm.OpGtEq
+		case "!=", "<>":
+			opcode = yakvm.OpNotEq
+		case "==":
+			opcode = yakvm.OpEq
 		}
 		return f.emitArith(opcode, op0, op1)
 
@@ -264,7 +272,39 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 		lvalue.Assign(rvalue)
 	}
 
-	// inplace Assign operator
+	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
+		rvalue := f.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
+		var opcode yakvm.OpcodeFlag
+		switch op.GetText() {
+		case "+=":
+			opcode = yakvm.OpAdd
+		case "-=":
+			opcode = yakvm.OpSub
+		case "*=":
+			opcode = yakvm.OpMul
+		case "/=":
+			opcode = yakvm.OpDiv
+		case "%=":
+			opcode = yakvm.OpMod
+		case "<<=":
+			opcode = yakvm.OpShl
+		case ">>=":
+			opcode = yakvm.OpShr
+		case "&=":
+			opcode = yakvm.OpAnd
+		case "&^=":
+			opcode = yakvm.OpAndNot
+		case "|=":
+			opcode = yakvm.OpOr
+		case "^=":
+			opcode = yakvm.OpXor
+
+		}
+		rvalue = f.emitArith(opcode, lvalue.GetValue(), rvalue)
+		lvalue.Assign(rvalue)
+
+	}
 }
 
 func (f *Function) buildBlock(stmt *yak.BlockContext) {
