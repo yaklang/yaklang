@@ -73,17 +73,26 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	return r
 }
 
-func (f *Function) emitMakeClosure(target *Function) *MakeClosure {
-	m := &MakeClosure{
+func (f *Function) emitClosure(target *Function) *Closure {
+	m := &Closure{
 		anInstruction: anInstruction{
 			Parent: f,
 			Block:  f.currentBlock,
 		},
 		Fn:       target,
-		Bindings: []Value{},
-		user:     []User{},
+		Bindings: make([]Value, 0, len(target.FreeValue)),
+		user:     make([]User, 0),
 	}
 	//TODO: handler binding with target.freeValue
+	m.Bindings = append(m.Bindings, target.FreeValue...)
+	// for _, v := range target.FreeValue {
+	// 	m.Bindings = append(m.Bindings, v)
+	// }
+
+	// assert
+	if len(m.Bindings) != len(target.FreeValue) {
+		panic("bingding variable length error")
+	}
 
 	fixupUseChain(m)
 	f.emit(m)
