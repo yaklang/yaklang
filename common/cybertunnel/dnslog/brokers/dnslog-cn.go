@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"time"
 )
 
@@ -22,8 +23,7 @@ func (d *dnslogCNBroker) Require(timeout time.Duration, proxy ...string) (domain
 		r = samples[0]
 	}
 
-	utils.GetFirstIPByDnsWithCache(`dnslog.cn`, 5*time.Second)
-
+	yakdns.LookupFirst(`dnslog.cn`, yakdns.WithTimeout(5*time.Second))
 	packet := []byte(`GET /getdomain.php?t=0.06596369931824886 HTTP/1.1
 Host: dnslog.cn
 Accept: */*

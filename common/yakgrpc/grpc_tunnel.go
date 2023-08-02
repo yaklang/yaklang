@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
 	"strings"
@@ -25,12 +26,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 	if err != nil {
 		return nil, err
 	}
-
-	ipFirst := utils.GetFirstIPFromHostWithTimeout(
-		5*time.Second, p.Domain,
-		[]string{ip.String()},
-	)
-
+	ipFirst := yakdns.LookupFirst(p.Domain, yakdns.WithTimeout(5*time.Second), yakdns.WithDNSServers(ip.String()))
 	var reason []string
 	if ip.String() != ipFirst {
 		reason = append(reason, fmt.Sprintf(
@@ -39,9 +35,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 		))
 	}
 
-	ipFirst = utils.GetFirstIPFromHostWithTimeout(
-		5*time.Second, p.Domain, nil,
-	)
+	ipFirst = yakdns.LookupFirst(p.Domain, yakdns.WithTimeout(5*time.Second))
 	if ip.String() != ipFirst {
 		reason = append(reason, fmt.Sprintf(
 			"dns A for [%v] is %v, tunnel server external ip: %s (ns:default)",

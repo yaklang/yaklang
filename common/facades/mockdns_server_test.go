@@ -3,6 +3,7 @@ package facades
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,8 @@ func TestMockDNSServerDefault(t *testing.T) {
 		}
 		return "1.1.1.1"
 	})
-	var result = utils.GetFirstIPByDnsWithCache(randomStr+".baidu.com", 5*time.Second, a)
+	var result = yakdns.LookupFirst(randomStr+".baidu.com", yakdns.WithTimeout(5*time.Second), yakdns.WithDNSServers(a))
+
 	spew.Dump(result)
 	if !check {
 		panic("GetFirstIPByDnsWithCache failed")

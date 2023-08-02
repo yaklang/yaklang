@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -384,7 +385,7 @@ var (
 	dnsTtlCache = ttlcache.NewCache()
 )
 
-func GetFirstIPByDnsWithCache(domain string, timeout time.Duration, dnsServers ...string) string {
+func _GetFirstIPByDnsWithCache(domain string, timeout time.Duration, dnsServers ...string) string {
 	data, ok := dnsTtlCache.Get(domain)
 	if ok {
 		if raw, _ := data.(string); raw != "" && !IsLoopback(raw) {
@@ -396,7 +397,7 @@ func GetFirstIPByDnsWithCache(domain string, timeout time.Duration, dnsServers .
 	var count = 0
 	for {
 		count++
-		r, err := GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServers)
+		r, err := _GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServers)
 		if err != nil {
 			switch ret := err.(type) {
 			case *net.DNSError:
@@ -949,7 +950,7 @@ func init() {
 	}
 }
 
-func GetIPFromHostWithContextAndDNSServers(
+func _GetIPFromHostWithContextAndDNSServers(
 	timeout time.Duration, domain string, DNSServers []string, cb func(domain string) bool,
 ) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -1132,39 +1133,39 @@ Main:
 	return nil
 }
 
-func GetFirstIPFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) (string, error) {
+func _GetFirstIPFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) (string, error) {
 	var Result string
-	err := GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
+	err := _GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
 		Result = domain
 		return false
 	})
 	return Result, err
 }
 
-func GetIPsFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) ([]string, error) {
+func _GetIPsFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) ([]string, error) {
 	var results []string
-	err := GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
+	err := _GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
 		results = append(results, domain)
 		return true
 	})
 	return results, err
 }
 
-func GetIPsFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServers []string) ([]string, error) {
-	return GetIPsFromHostWithContextE(timeout, domain, dnsServers)
+func _GetIPsFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServers []string) ([]string, error) {
+	return _GetIPsFromHostWithContextE(timeout, domain, dnsServers)
 }
 
-func GetFirstIPFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServres []string) (string, error) {
-	return GetFirstIPFromHostWithContextE(timeout, domain, dnsServres)
+func _GetFirstIPFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServres []string) (string, error) {
+	return _GetFirstIPFromHostWithContextE(timeout, domain, dnsServres)
 }
 
-func GetFirstIPFromHostWithTimeout(timeout time.Duration, domain string, dnsServres []string) string {
-	s, _ := GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServres)
+func _GetFirstIPFromHostWithTimeout(timeout time.Duration, domain string, dnsServres []string) string {
+	s, _ := _GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServres)
 	return s
 }
 
-func GetIPsFromHostWithTimeout(timeout time.Duration, domain string, dnsServers []string) []string {
-	r, _ := GetIPsFromHostWithTimeoutE(timeout, domain, dnsServers)
+func _GetIPsFromHostWithTimeout(timeout time.Duration, domain string, dnsServers []string) []string {
+	r, _ := _GetIPsFromHostWithTimeoutE(timeout, domain, dnsServers)
 	return r
 }
 
@@ -1414,8 +1415,7 @@ func ParseStringToCClassHosts(targets string) string {
 			target = append(target, r)
 			continue
 		}
-
-		ip := GetFirstIPFromHostWithTimeout(5*time.Second, r, nil)
+		ip := yakdns.LookupFirst(r, yakdns.WithTimeout(5*time.Second))
 		if ip != "" && IsIPv4(ip) {
 			netStr, err := IPv4ToCClassNetwork(ip)
 			if err != nil {

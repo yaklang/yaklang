@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strconv"
@@ -899,7 +900,7 @@ func Test_BAK_GRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
 		spew.Dump(domain)
 		return ""
 	})
-	var result = utils.GetFirstIPByDnsWithCache(host, 5*time.Second, dnsServer)
+	var result = yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second), yakdns.WithDNSServers(dnsServer))
 	if result != "" {
 		t.Log("dns resolve failed")
 		t.FailNow()
