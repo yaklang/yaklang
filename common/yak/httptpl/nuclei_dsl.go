@@ -2,9 +2,21 @@ package httptpl
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"math"
+	"math/rand"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-version"
@@ -19,14 +31,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"math"
-	"math/rand"
-	"regexp"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+	"github.com/yaklang/yaklang/common/yso"
 )
 
 var varsOperatorMutex sync.Mutex
@@ -79,6 +84,9 @@ func nc_sort(origin ...interface{}) (ret []interface{}) {
 
 func toString(i interface{}) string {
 	return utils.InterfaceToString(i)
+}
+func toBytes(i interface{}) []byte {
+	return utils.InterfaceToBytes(i)
 }
 func ExtractResultToString(i interface{}) string {
 	return strings.Join(utils.InterfaceToStringSlice(i), ",")
@@ -474,10 +482,7 @@ var nucleiDSLFunctions = map[string]interface{}{
 		log.Error("fetch random ip failed")
 		return "127.0.0.1"
 	},
-	"generate_java_gadget": func(gadget, cmd, encoding string) string {
-		log.Info("nuclei generate java gadget failed")
-		return ""
-	},
+
 	"unix_time": func(offset ...int64) int64 {
 		var offsetInt int64 = 0
 		if len(offset) > 0 {
@@ -608,6 +613,117 @@ var nucleiDSLFunctions = map[string]interface{}{
 		log.Infof("error: aes_gcm not implemented")
 		return ""
 	},
+
+	// yso
+	"generate_java_gadget": func(gadget, cmd, encoding string) (ret string) {
+		var (
+			buf []byte
+			obj *yso.JavaObject
+			err error
+		)
+		defer func() {
+			if err != nil {
+				log.Error(err)
+				ret = ""
+			}
+		}()
+
+		switch gadget {
+		case "dns":
+			if strings.Contains(cmd, "://") {
+				cmd = strings.Split(cmd, "://")[1]
+			}
+			obj, err = yso.GetURLDNSJavaObject(cmd)
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "jdk7u21":
+			obj, err = yso.GetJdk7u21JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "jdk8u20":
+			obj, err = yso.GetJdk8u20JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "commons-collections3.1":
+			obj, err = yso.GetCommonsCollectionsK1JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "commons-collections4.0":
+			obj, err = yso.GetCommonsCollectionsK2JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "groovy1":
+			obj, err = yso.GetGroovy1JavaObject(cmd)
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		}
+
+		ret = gadgetEncodingHelper(buf, encoding)
+		return
+	},
+}
+
+func gadgetEncodingHelper(returnData []byte, encoding string) string {
+	switch encoding {
+	case "raw":
+		return string(returnData)
+	case "hex":
+		return hex.EncodeToString(returnData)
+	case "gzip":
+		buffer := &bytes.Buffer{}
+		writer := gzip.NewWriter(buffer)
+		if _, err := writer.Write(returnData); err != nil {
+			return ""
+		}
+		_ = writer.Close()
+		return buffer.String()
+	case "gzip-base64":
+		buffer := &bytes.Buffer{}
+		writer := gzip.NewWriter(buffer)
+		if _, err := writer.Write(returnData); err != nil {
+			return ""
+		}
+		_ = writer.Close()
+		return urlsafeBase64Encode(buffer.Bytes())
+	case "base64-raw":
+		return base64.StdEncoding.EncodeToString(returnData)
+	default:
+		return urlsafeBase64Encode(returnData)
+	}
+}
+
+func urlsafeBase64Encode(data []byte) string {
+	return strings.ReplaceAll(base64.StdEncoding.EncodeToString(data), "+", "%2B")
 }
 
 func stringNumberToDecimal(input string, prefix string, base int) (int64, error) {
