@@ -267,8 +267,10 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 	// inplace Assign operator
 }
 
-func (f *Function) buildBlock(block *yak.BlockContext) {
-	f.buildStatementList(block.StatementList().(*yak.StatementListContext))
+func (f *Function) buildBlock(stmt *yak.BlockContext) {
+	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
+		f.buildStatementList(s)
+	}
 }
 
 func (f *Function) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
@@ -418,7 +420,9 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 	//  build body
 	if b, ok := stmt.Block().(*yak.BlockContext); ok {
 		f.currentBlock = body
-		f.buildBlock(b)
+		f.buildBlock(b) // block can create block
+		// f.currentBlock is end block in body
+		body = f.currentBlock
 	}
 
 	if endThird != nil {
