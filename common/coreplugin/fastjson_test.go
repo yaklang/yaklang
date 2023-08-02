@@ -26,6 +26,16 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		VulServerAddr: vulAddr,
 		IsHttps:       true,
 	}
+	//wg := sync.WaitGroup{}
+	addFastjsonTestCase := func(vulInfo VulInfo, msg ...string) {
+		//wg.Add(1)
+		//go func() {
+		//	defer wg.Done()
+		//	Must(TestCoreMitmPlug(pluginName, server, vulInfo, client, t), msg...)
+		//}()
+		Must(TestCoreMitmPlug(pluginName, server, vulInfo, client, t), msg...)
+	}
+	//defer wg.Wait()
 	vulInGet := VulInfo{
 		Path: []string{
 			"/fastjson/json-in-query?auth=" + codec.EncodeUrlCode(`{"user":"admin","password":"password"}`) + "&action=login",
@@ -33,9 +43,9 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		ExpectedResult: map[string]int{
 			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
 		},
-		StrictMode: false,
+		StrictMode: true,
 	}
-	Must(TestCoreMitmPlug(pluginName, server, vulInGet, client, t), "Fastjson 综合检测插件检测结果不符合预期")
+
 	vulInForm := VulInfo{
 		Method: "POST",
 		Path: []string{
@@ -51,9 +61,8 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		ExpectedResult: map[string]int{
 			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
 		},
-		StrictMode: false,
+		StrictMode: true,
 	}
-	Must(TestCoreMitmPlug(pluginName, server, vulInForm, client, t), "Fastjson 综合检测插件检测结果不符合预期")
 	vulInBodyJson := VulInfo{
 		Method: "POST",
 		Path: []string{
@@ -71,7 +80,6 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		},
 		StrictMode: true,
 	}
-	Must(TestCoreMitmPlug(pluginName, server, vulInBodyJson, client, t), "Fastjson 综合检测插件检测结果不符合预期")
 	vulInGetServeByJackson := VulInfo{ // 这里不应该检出任何漏洞，并且发包数量应该为 1
 		Method: "GET",
 		Path: []string{
@@ -80,7 +88,10 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		ExpectedResult: map[string]int{},
 		StrictMode:     true,
 	}
-	Must(TestCoreMitmPlug(pluginName, server, vulInGetServeByJackson, client, t), "Fastjson 综合检测插件检测结果不符合预期")
+	addFastjsonTestCase(vulInGet, "Fastjson 综合检测插件对于 json in query 检测结果不符合预期")
+	addFastjsonTestCase(vulInForm, "Fastjson 综合检测插件对于 json in form 检测结果不符合预期")
+	addFastjsonTestCase(vulInBodyJson, "Fastjson 综合检测插件对于 json in body 检测结果不符合预期")
+	addFastjsonTestCase(vulInGetServeByJackson, "Fastjson 综合检测插件对于 Jackson 检测结果不符合预期")
 	// TODO: 需要先修复 fuzz 请求出错后不能获取Duration的问题
 	//vulInGetIntranet := VulInfo{
 	//	Method: "GET",
@@ -112,7 +123,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//}
 	//Must(TestCoreMitmPlug(pluginName, server, vulInGet, client, t), "Fastjson 综合检测插件检测结果不符合预期")
 	// TODO: Authorization Fuzz 需要支持自动解码
-	//vulInGet := VulInfo{
+	//vulInAuthorization := VulInfo{
 	//	Method: "GET",
 	//	Path: []string{
 	//		"/fastjson/json-in-authorization?action=login",
@@ -128,7 +139,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//	},
 	//	StrictMode: true,
 	//}
-	//Must(TestCoreMitmPlug(pluginName, server, vulInGet, client, t), "Fastjson 综合检测插件检测结果不符合预期")
+	//addFastjsonTestCase(vulInAuthorization, "Fastjson 综合检测插件对于 Jackson 检测结果不符合预期")
 }
 func TestFastjson(t *testing.T) {
 	client, err := NewLocalClient()
