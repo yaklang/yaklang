@@ -9,7 +9,6 @@ func Start(url string, opt ...core.ConfigOpt) (chan core.RequestIf, error) {
 	ch := make(chan core.RequestIf)
 	opt = append(opt, core.WithOnRequest(func(req *core.Req) {
 		ch <- req
-		req.IsHttps()
 	}))
 	manager, err := core.NewManager(
 		url,
