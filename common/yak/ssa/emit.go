@@ -10,7 +10,7 @@ func fixupUseChain(u User) {
 	if u == nil {
 		return
 	}
-	for _, v := range u.GetValue() {
+	for _, v := range u.GetValues() {
 		if v == nil {
 			continue
 		}

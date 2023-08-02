@@ -14,22 +14,28 @@ import (
 
 type Value interface {
 	String() string
-	GetUser() []User
+
+	GetUsers() []User
 	AddUser(User)
 }
 
 type User interface {
 	Value
+
 	String() string
-	GetValue() []Value
+
+	GetValues() []Value
 	AddValue(Value)
+
 	ReplaceValue(Value, Value)
 }
 
 type Instruction interface {
 	User
+
 	GetParent() *Function
 	GetBlock() *BasicBlock
+
 	String() string
 	StringByFunc(func(Value) string) string
 }
