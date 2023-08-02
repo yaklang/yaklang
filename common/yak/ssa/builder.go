@@ -87,7 +87,7 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 		}
 	}
 
-	closure := f.emitMakeClosure(newfunc)
+	closure := f.emitClosure(newfunc)
 	if funcName != "" {
 		f.wirteVariable(funcName, closure)
 	}

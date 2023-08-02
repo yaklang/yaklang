@@ -115,7 +115,7 @@ func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
 func (b *BinOp) AddValue(v Value)   {}
 
 // ----------- MakeClosure
-func (m *MakeClosure) ReplaceValue(v Value, to Value) {
+func (m *Closure) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(m.Bindings, v); index > 0 {
 		m.Bindings[index] = to
 	} else {
@@ -123,11 +123,8 @@ func (m *MakeClosure) ReplaceValue(v Value, to Value) {
 	}
 }
 
+func (m *Closure) GetUsers() []User { return m.user }
+func (m *Closure) AddUser(u User)   { m.user = append(m.user, u) }
 
-func (m *MakeClosure) GetUsers() []User { return m.user }
-func (m *MakeClosure) AddUser(u User)  { m.user = append(m.user, u) }
-
-func (m *MakeClosure) GetValues() []Value { return append(m.Bindings, m.Fn) }
-
-//TODO: this
-func (m *MakeClosure) AddValue(v Value) {}
+func (m *Closure) GetValues() []Value { return append(m.Bindings, m.Fn) }
+func (m *Closure) AddValue(v Value)   {}
