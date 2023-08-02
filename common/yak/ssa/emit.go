@@ -115,3 +115,44 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	f.emit(c)
 	return c
 }
+
+func (f *Function) emitAlloc(name string) *Alloc {
+	alloc := &Alloc{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		variable: name,
+		user:     []User{},
+	}
+	f.emit(alloc)
+	return alloc
+}
+
+func (f *Function) emitStore(alloc *Alloc, v Value) *Store {
+	store := &Store{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		alloc: alloc,
+		value: v,
+	}
+	alloc.v = v
+	f.emit(store)
+	fixupUseChain(store)
+	return store
+}
+func (f *Function) emitLoad(alloc *Alloc) Value {
+	load := &Load{
+		anInstruction: anInstruction{
+			Parent: f,
+			Block:  f.currentBlock,
+		},
+		user:  []User{},
+		alloc: alloc,
+	}
+	fixupUseChain(load)
+	f.emit(load)
+	return load
+}
