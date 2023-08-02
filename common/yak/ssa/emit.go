@@ -7,7 +7,13 @@ func (f *Function) emit(i Instruction) {
 }
 
 func fixupUseChain(u User) {
+	if u == nil {
+		return
+	}
 	for _, v := range u.GetValue() {
+		if v == nil {
+			continue
+		}
 		v.AddUser(u)
 	}
 }
