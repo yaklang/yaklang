@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"net"
 	"os"
 	"sync"
@@ -408,7 +409,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		log.Debugf("start to submit synscan for %s ports: %v", target, ports)
 		hostsFilter.Add(target)
 		if !utils.IsIPv4(target) {
-			hostsFilter.Add(utils.GetIPsFromHostWithTimeout(5*time.Second, target, nil)...)
+			hostsFilter.Add(yakdns.LookupAll(target, yakdns.WithTimeout(5*time.Second))...)
 		}
 
 		hostRaw, portRaw, _ := utils.ParseStringToHostPort(target)
@@ -416,7 +417,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 			portsFilter.Add(fmt.Sprint(portRaw))
 			hostsFilter.Add(hostRaw)
 			if !utils.IsIPv4(target) {
-				hostsFilter.Add(utils.GetIPsFromHostWithTimeout(5*time.Second, target, nil)...)
+				hostsFilter.Add(yakdns.LookupAll(target, yakdns.WithTimeout(5*time.Second))...)
 			}
 			_ = scanCenter.SubmitOpenPortScanTask(hostRaw, fmt.Sprint(portRaw), true, true)
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
 	"time"
 )
@@ -66,77 +67,11 @@ func QueryNSEx(client *dns.Client, ctx context.Context, target string, servers [
 }
 
 func QueryIPAll(target string, timeout time.Duration, dnsServers []string) []string {
-	ch := make(chan string, 10)
-
-	go func() {
-		defer close(ch)
-		err := utils.GetIPFromHostWithContextAndDNSServers(
-			timeout, target, dnsServers, func(domain string) bool {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Errorf("callback error for dns query: %v", recover())
-					}
-				}()
-				ch <- domain
-				return true
-			},
-		)
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
-
-	var results []string
-
-	for {
-		select {
-		case str, ok := <-ch:
-			flag := true
-			for _, result := range results {
-				if str == result {
-					flag = false
-				}
-			}
-			if flag {
-				results = append(results, str)
-			}
-			if !ok {
-				return results
-			}
-		case <-time.After(timeout):
-			return results
-		}
-	}
-
+	return yakdns.LookupAll(target, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...))
 }
 
 func QueryIP(target string, timeout time.Duration, dnsServers []string) string {
-	ch := make(chan string, 1)
-	defer close(ch)
-
-	go func() {
-		err := utils.GetIPFromHostWithContextAndDNSServers(
-			timeout, target, dnsServers, func(domain string) bool {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Errorf("callback error for dns query: %v", recover())
-					}
-				}()
-				ch <- domain
-				return false
-			},
-		)
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
-
-	select {
-	case str, _ := <-ch:
-		return str
-	case <-time.After(timeout):
-		return ""
-	}
+	return yakdns.LookupFirst(target, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...))
 }
 
 func QueryTxt(target string, timeout time.Duration, nameServers []string) []string {

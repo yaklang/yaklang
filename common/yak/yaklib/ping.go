@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
 	"time"
 )
@@ -176,7 +177,7 @@ func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 		}
 		return _ping(result, opts...)
 	} else {
-		result := utils.GetFirstIPByDnsWithCache(target, config.dnsTimeout, config.dnsServers...)
+		result := yakdns.LookupFirst(target, yakdns.WithTimeout(config.dnsTimeout), yakdns.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
 			return pingutil.PingAuto(result, config.tcpPingPort, config.timeout)
 		}

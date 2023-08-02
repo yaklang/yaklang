@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"net"
@@ -352,7 +353,7 @@ func (m *MITMProxy) newConnFor(target string, isTls bool, sni string) (net.Conn,
 		originTarget = sni
 	}
 	if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-		host = utils.GetFirstIPByDnsWithCache(host, 5*time.Second)
+		host = yakdns.LookupFirst(host, yakdns.WithTimeout(5))
 		if host == "" {
 			return nil, utils.Errorf("dns error for %v", originTarget)
 		}

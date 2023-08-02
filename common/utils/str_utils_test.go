@@ -4,6 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"testing"
 	"time"
 )
@@ -123,7 +124,7 @@ func TestMUSTPASS_SliceGroup(t *testing.T) {
 }
 
 func TestGetFirstIPFromHostWithTimeout(t *testing.T) {
-	ip := GetFirstIPFromHostWithTimeout(5*time.Second, "baidu.com", nil)
+	ip := yakdns.LookupFirst("baidu.com", yakdns.WithTimeout(5*time.Second))
 	spew.Dump(ip)
 }
 
@@ -132,7 +133,7 @@ func TestParseStringToCClassHosts(t *testing.T) {
 }
 
 func TestGetIPFromHostWithContextAndDNSServers(t *testing.T) {
-	err := GetIPFromHostWithContextAndDNSServers(FloatSecondDuration(1), "xqfunds.com", nil, func(domain string) bool {
+	err := _GetIPFromHostWithContextAndDNSServers(FloatSecondDuration(1), "xqfunds.com", nil, func(domain string) bool {
 		println(domain)
 		return true
 	})

@@ -7,6 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakdns"
 	stdlog "log"
 	"net"
 	"os"
@@ -66,7 +67,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 			r, err = rdpLogin(host, host, "administrator", "", port)
 
 		} else {
-			ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second)
+			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5))
 			r, err = rdpLogin(ip, host, "administrator", "", port)
 		}
 
@@ -104,7 +105,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 			r, err = rdpLogin(host, host, i.Username, i.Password, port)
 
 		} else {
-			ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second)
+			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5))
 			r, err = rdpLogin(ip, host, i.Username, i.Password, port)
 		}
 
