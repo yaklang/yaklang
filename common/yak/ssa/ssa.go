@@ -221,12 +221,13 @@ type UnOp struct {
 }
 
 // special instruction ------------------------------------------
-// makeClosure
 
-type MakeClosure struct {
+// Closure
+// this is a closure function
+type Closure struct {
 	anInstruction
 	Fn       *Function
-	Bindings []Value // for function freeValue
+	Bindings []Value // for function freeValue, capture variable
 	user     []User
 }
 
@@ -447,19 +448,25 @@ var _ User = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
 
 // ----------- MakeClosure
-func (m MakeClosure) String() string {
+func (m *Closure) String() string {
 	return m.StringByFunc(DefaultValueString)
 }
 
-func (m MakeClosure) StringByFunc(getStr func(Value) string) string {
-	// fmt.Sprintf("makeClosure %s ")
-	ret := "makeClosure " + m.Fn.name
-	ret += strings.Join(
+func (m *Closure) StringByFunc(getStr func(Value) string) string {
+	// fmt.Sprintf
+
+	ret := fmt.Sprintf(
+		"%s = Closure %s [%s]",
+		getStr(m),
+		m.Fn.name,
+		strings.Join(
 		lo.Map(m.Bindings, func(b Value, _ int) string { return getStr(b) }),
-		", ")
+			", ",
+		),
+	)
 	return ret
 }
 
-var _ Value = (*MakeClosure)(nil)
-var _ User = (*MakeClosure)(nil)
-var _ Instruction = (*MakeClosure)(nil)
+var _ Value = (*Closure)(nil)
+var _ User = (*Closure)(nil)
+var _ Instruction = (*Closure)(nil)
