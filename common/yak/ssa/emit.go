@@ -19,6 +19,9 @@ func fixupUseChain(u User) {
 }
 
 func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
+	if f.currentBlock.finish {
+		return nil
+	}
 	b := &BinOp{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -35,6 +38,9 @@ func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 }
 
 func (f *Function) emitIf(cond Value) *If {
+	if f.currentBlock.finish {
+		return nil
+	}
 	ifssa := &If{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -44,10 +50,15 @@ func (f *Function) emitIf(cond Value) *If {
 	}
 	fixupUseChain(ifssa)
 	f.emit(ifssa)
+	f.currentBlock.finish = true
 	return ifssa
 }
 
 func (f *Function) emitJump(to *BasicBlock) *Jump {
+	if f.currentBlock.finish {
+		return nil
+	}
+
 	j := &Jump{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -55,12 +66,16 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 		},
 		To: to,
 	}
-	f.currentBlock.AddSucc(to)
 	f.emit(j)
+	f.currentBlock.AddSucc(to)
+	f.currentBlock.finish = true
 	return j
 }
 
 func (f *Function) emitReturn(vs []Value) *Return {
+	if f.currentBlock.finish {
+		return nil
+	}
 	r := &Return{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -70,10 +85,14 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	}
 	fixupUseChain(r)
 	f.emit(r)
+	f.currentBlock.finish = true
 	return r
 }
 
 func (f *Function) emitClosure(target *Function) *Closure {
+	if f.currentBlock.finish {
+		return nil
+	}
 	m := &Closure{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -100,6 +119,9 @@ func (f *Function) emitClosure(target *Function) *Closure {
 }
 
 func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call {
+	if f.currentBlock.finish {
+		return nil
+	}
 	c := &Call{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -117,6 +139,9 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 }
 
 func (f *Function) emitAlloc(name string) *Alloc {
+	if f.currentBlock.finish {
+		return nil
+	}
 	alloc := &Alloc{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -130,6 +155,9 @@ func (f *Function) emitAlloc(name string) *Alloc {
 }
 
 func (f *Function) emitStore(alloc *Alloc, v Value) *Store {
+	if f.currentBlock.finish {
+		return nil
+	}
 	store := &Store{
 		anInstruction: anInstruction{
 			Parent: f,
@@ -144,6 +172,9 @@ func (f *Function) emitStore(alloc *Alloc, v Value) *Store {
 	return store
 }
 func (f *Function) emitLoad(alloc *Alloc) Value {
+	if f.currentBlock.finish {
+		return nil
+	}
 	load := &Load{
 		anInstruction: anInstruction{
 			Parent: f,

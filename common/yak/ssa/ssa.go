@@ -100,6 +100,7 @@ type Function struct {
 	user []User
 
 	// for build
+	target       *target
 	currentBlock *BasicBlock
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variable][block]value
 }
@@ -118,6 +119,7 @@ type BasicBlock struct {
 	Phis   []*Phi
 
 	// for build
+	finish        bool // if emitJump finish!
 	isSealed      bool
 	inCompletePhi map[string]*Phi // variable -> phi
 
@@ -332,6 +334,9 @@ func (f *Function) String() string {
 			setInst(i)
 		}
 		for _, p := range b.Phis {
+			slices.SortFunc(b.Phis, func(p1 *Phi, p2 *Phi) bool {
+				return p1.variable < p2.variable
+			})
 			setInst(p)
 		}
 	}
@@ -378,7 +383,7 @@ func (p *Phi) String() string {
 }
 
 func (p *Phi) StringByFunc(getStr func(Value) string) string {
-	ret := fmt.Sprintf("%s = phi ", getStr(p))
+	ret := fmt.Sprintf("%s = phi[%s] ", getStr(p), p.variable)
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
