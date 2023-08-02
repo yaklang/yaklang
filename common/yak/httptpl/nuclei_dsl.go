@@ -2,16 +2,15 @@ package httptpl
 
 import (
 	"bytes"
-	"compress/gzip"
+	"compress/flate"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/base64"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,7 +18,9 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-version"
+	"github.com/projectdiscovery/gostruct"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -36,6 +37,11 @@ import (
 
 var varsOperatorMutex sync.Mutex
 
+var (
+	publicIP        string
+	PublicIPGetOnce sync.Once
+)
+
 func appendMap(m map[string]interface{}, key string, value interface{}) {
 	varsOperatorMutex.Lock()
 	defer varsOperatorMutex.Unlock()
@@ -50,49 +56,8 @@ func getMap(m map[string]interface{}, key string) (interface{}, bool) {
 	return data, ok
 }
 
-// ns_sort: sort a list of numbers or strings
-func nc_sort(origin ...interface{}) (ret []interface{}) {
-	if len(origin) == 0 {
-		return nil
-	}
-
-	defer func() {
-		if err := recover(); err != nil {
-			ret = origin
-			log.Warnf("sort error: %v", err)
-			return
-		}
-	}()
-	sample := origin[0]
-	switch sample.(type) {
-	case int:
-		sort.SliceStable(origin, func(i, j int) bool {
-			return origin[i].(float64) > origin[j].(float64)
-		})
-	case float64:
-		sort.SliceStable(origin, func(i, j int) bool {
-			return origin[i].(float64) > origin[j].(float64)
-		})
-		return origin
-	case string:
-		sort.SliceStable(origin, func(i, j int) bool {
-			return origin[i].(string) > origin[j].(string)
-		})
-	}
-	return origin
-}
-
-func toString(i interface{}) string {
-	return utils.InterfaceToString(i)
-}
-func toBytes(i interface{}) []byte {
-	return utils.InterfaceToBytes(i)
-}
-func ExtractResultToString(i interface{}) string {
-	return strings.Join(utils.InterfaceToStringSlice(i), ",")
-}
-
 var nucleiDSLFunctions = map[string]interface{}{
+	"index":    _index,
 	"dump":     spew.Dump,
 	"len":      builtin.Len,
 	"to_upper": strings.ToUpper,
@@ -190,6 +155,33 @@ var nucleiDSLFunctions = map[string]interface{}{
 			return ""
 		}
 		return string(raw)
+	},
+	"deflate": func(arg any) any {
+		buffer := &bytes.Buffer{}
+		writer, err := flate.NewWriter(buffer, -1)
+		if err != nil {
+			log.Error(err)
+			return ""
+		}
+		if _, err := writer.Write([]byte(toString(arg))); err != nil {
+			_ = writer.Close()
+			log.Error(err)
+			return ""
+		}
+		_ = writer.Close()
+
+		return buffer.String()
+	},
+	"infalte": func(arg any) any {
+		reader := flate.NewReader(strings.NewReader(toString(arg)))
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			_ = reader.Close()
+			log.Error(err)
+			return ""
+		}
+		_ = reader.Close()
+		return string(data)
 	},
 	"date_time": func(fmtStr string, i interface{}) string {
 		switch ret := i.(type) {
@@ -482,7 +474,82 @@ var nucleiDSLFunctions = map[string]interface{}{
 		log.Error("fetch random ip failed")
 		return "127.0.0.1"
 	},
+	"generate_java_gadget": func(gadget, cmd, encoding string) (ret string) {
+		var (
+			buf []byte
+			obj *yso.JavaObject
+			err error
+		)
+		defer func() {
+			if err != nil {
+				log.Error(err)
+				ret = ""
+			}
+		}()
 
+		switch gadget {
+		case "dns":
+			if strings.Contains(cmd, "://") {
+				cmd = strings.Split(cmd, "://")[1]
+			}
+			obj, err = yso.GetURLDNSJavaObject(cmd)
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "jdk7u21":
+			obj, err = yso.GetJdk7u21JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "jdk8u20":
+			obj, err = yso.GetJdk8u20JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "commons-collections3.1":
+			obj, err = yso.GetCommonsCollectionsK1JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "commons-collections4.0":
+			obj, err = yso.GetCommonsCollectionsK2JavaObject(yso.SetRuntimeExecEvilClass(cmd))
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		case "groovy1":
+			obj, err = yso.GetGroovy1JavaObject(cmd)
+			if err != nil {
+				return
+			}
+			buf, err = yso.ToBytes(obj)
+			if err != nil {
+				return
+			}
+		}
+
+		ret = gadgetEncodingHelper(buf, encoding)
+		return
+	},
 	"unix_time": func(offset ...int64) int64 {
 		var offsetInt int64 = 0
 		if len(offset) > 0 {
@@ -565,6 +632,10 @@ var nucleiDSLFunctions = map[string]interface{}{
 	"to_string": func(i ...interface{}) string {
 		return strings.Join(utils.InterfaceToStringSlice(i), "")
 	},
+	"dec_to_hex": func(d int64) string {
+		hexNum := strconv.FormatInt(d, 16)
+		return toString(hexNum)
+	},
 	"hex_to_dec": func(h string) int {
 		raw, err := stringNumberToDecimal(h, "0x", 16)
 		if err != nil {
@@ -609,151 +680,134 @@ var nucleiDSLFunctions = map[string]interface{}{
 		mode.CryptBlocks(ciphertext, bPlainText)
 		return string(ciphertext)
 	},
-	"aes_gcm": func(data, key, iv string) string {
-		log.Infof("error: aes_gcm not implemented")
-		return ""
+	"aes_gcm": func(key, value string) []byte {
+		c, err := aes.NewCipher([]byte(key))
+		if err != nil {
+			log.Error(err)
+			return []byte{}
+		}
+		gcm, err := cipher.NewGCM(c)
+		if err != nil {
+			log.Error(err)
+			return []byte{}
+		}
+
+		nonce := make([]byte, gcm.NonceSize())
+
+		if _, err = rand.Read(nonce); err != nil {
+			log.Error(err)
+			return []byte{}
+		}
+		data := gcm.Seal(nonce, nonce, []byte(value), nil)
+		return data
 	},
 
-	// yso
-	"generate_java_gadget": func(gadget, cmd, encoding string) (ret string) {
-		var (
-			buf []byte
-			obj *yso.JavaObject
-			err error
-		)
-		defer func() {
+	"generate_jwt": func(args ...interface{}) interface{} {
+		var optionalAlgorithm jwt.SigningMethod
+		var optionalKey []byte = []byte{}
+		var optionalMaxAgeUnix int64
+
+		argSize := len(args)
+
+		if argSize < 1 || argSize > 4 {
+			log.Errorf("invalid number of arguments: %d", argSize)
+			return nil
+		}
+		jsonString := toString(args[0])
+
+		claims := jwt.MapClaims{}
+
+		err := json.Unmarshal([]byte(jsonString), &claims)
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+
+		if argSize > 1 {
+			alg := toString(args[1])
+			optionalAlgorithm = jwt.GetSigningMethod(alg)
+			if alg == "" {
+				optionalAlgorithm = jwt.SigningMethodNone
+			}
+			if optionalAlgorithm == nil {
+				log.Errorf("invalid algorithm: %s", alg)
+				return nil
+			}
+		}
+
+		if argSize > 2 {
+			optionalKey = toBytes(args[2])
+		}
+
+		if argSize > 3 {
+			optionalMaxAgeUnix, err = strconv.ParseInt(toString(args[3]), 10, 64)
 			if err != nil {
 				log.Error(err)
-				ret = ""
+				return nil
 			}
-		}()
-
-		switch gadget {
-		case "dns":
-			if strings.Contains(cmd, "://") {
-				cmd = strings.Split(cmd, "://")[1]
-			}
-			obj, err = yso.GetURLDNSJavaObject(cmd)
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
-		case "jdk7u21":
-			obj, err = yso.GetJdk7u21JavaObject(yso.SetRuntimeExecEvilClass(cmd))
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
-		case "jdk8u20":
-			obj, err = yso.GetJdk8u20JavaObject(yso.SetRuntimeExecEvilClass(cmd))
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
-		case "commons-collections3.1":
-			obj, err = yso.GetCommonsCollectionsK1JavaObject(yso.SetRuntimeExecEvilClass(cmd))
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
-		case "commons-collections4.0":
-			obj, err = yso.GetCommonsCollectionsK2JavaObject(yso.SetRuntimeExecEvilClass(cmd))
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
-		case "groovy1":
-			obj, err = yso.GetGroovy1JavaObject(cmd)
-			if err != nil {
-				return
-			}
-			buf, err = yso.ToBytes(obj)
-			if err != nil {
-				return
-			}
+			claims["exp"] = optionalMaxAgeUnix
 		}
 
-		ret = gadgetEncodingHelper(buf, encoding)
-		return
+		token := jwt.NewWithClaims(optionalAlgorithm, claims)
+		tokenString := ""
+
+		tokenString, err = token.SignedString(optionalKey)
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+		return tokenString
 	},
-}
-
-func gadgetEncodingHelper(returnData []byte, encoding string) string {
-	switch encoding {
-	case "raw":
-		return string(returnData)
-	case "hex":
-		return hex.EncodeToString(returnData)
-	case "gzip":
-		buffer := &bytes.Buffer{}
-		writer := gzip.NewWriter(buffer)
-		if _, err := writer.Write(returnData); err != nil {
+	"json_minify": func(args ...interface{}) interface{} {
+		log.Errorf("json_minify not implemented")
+		return nil
+	},
+	"json_prettify": func(args ...interface{}) interface{} {
+		log.Errorf("json_prettify not implemented")
+		return nil
+	},
+	"ip_format": func(args ...interface{}) interface{} {
+		log.Errorf("ip_format not implemented")
+		return nil
+	},
+	"llm_prompt": func(args ...interface{}) interface{} {
+		log.Errorf("llm_prompt not implemented")
+		return nil
+	},
+	"unpack": func(format, data string) interface{} {
+		// convert flat format into slice (eg. ">I" => [">","I"])
+		var formatParts []string
+		for idx := range format {
+			formatParts = append(formatParts, string(format[idx]))
+		}
+		// the dsl function supports unpacking only one type at a time
+		unpackedData, err := gostruct.UnPack(formatParts, []byte(data))
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+		if len(unpackedData) > 0 {
+			return unpackedData[0]
+		}
+		log.Error("unpack: No result")
+		return nil
+	},
+	"xor": func(args ...interface{}) interface{} {
+		log.Errorf("xor not implemented")
+		return nil
+	},
+	"public_ip": func() string {
+		publicIP := GetPublicIP()
+		log.Error("could not retrieve public ip")
+		if publicIP == "" {
 			return ""
 		}
-		_ = writer.Close()
-		return buffer.String()
-	case "gzip-base64":
-		buffer := &bytes.Buffer{}
-		writer := gzip.NewWriter(buffer)
-		if _, err := writer.Write(returnData); err != nil {
-			return ""
-		}
-		_ = writer.Close()
-		return urlsafeBase64Encode(buffer.Bytes())
-	case "base64-raw":
-		return base64.StdEncoding.EncodeToString(returnData)
-	default:
-		return urlsafeBase64Encode(returnData)
-	}
-}
-
-func urlsafeBase64Encode(data []byte) string {
-	return strings.ReplaceAll(base64.StdEncoding.EncodeToString(data), "+", "%2B")
-}
-
-func stringNumberToDecimal(input string, prefix string, base int) (int64, error) {
-	if strings.HasPrefix(input, prefix) {
-		base = 0
-	}
-	if number, err := strconv.ParseInt(input, base, 64); err == nil {
-		return number, err
-	}
-	return 0, fmt.Errorf("invalid number: %s", input)
-}
-
-func atoi(i string) int {
-	raw, _ := strconv.Atoi(i)
-	return raw
-}
-
-func atof(i string) float64 {
-	raw, _ := strconv.ParseFloat(i, 64)
-	return raw
-}
-
-var defaultDateTimeLayouts = []string{
-	time.RFC3339,
-	"2006-01-02 15:04:05 Z07:00",
-	"2006-01-02 15:04:05",
-	"2006-01-02 15:04 Z07:00",
-	"2006-01-02 15:04",
-	"2006-01-02 Z07:00",
-	"2006-01-02",
+		return publicIP
+	},
+	"jarm": func(args ...interface{}) interface{} {
+		log.Errorf("jarm not implemented")
+		return nil
+	},
 }
 
 func init() {
