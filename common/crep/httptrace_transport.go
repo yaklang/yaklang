@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"net/http"
 	"net/http/httptrace"
 )
@@ -30,6 +31,13 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 		},
 	}))
 	*req = *req.WithContext(context.WithValue(req.Context(), "request-id", fmt.Sprintf("%p", req)))
+
+	if connected := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo); connected != "" {
+		req.Host = connected
+		if req.URL.Host != "" {
+			req.URL.Host = connected
+		}
+	}
 	rsp, err := t.Transport.RoundTrip(req)
 	return rsp, err
 }

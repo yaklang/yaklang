@@ -626,6 +626,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	if req.Method == "CONNECT" {
 		// req auth enable
+		var connectedTo = req.Host
+		if host, port, err := utils.ParseStringToHostPort(req.URL.String()); err == nil {
+			connectedTo = utils.HostPort(host, port)
+		}
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
 
 		if err := p.reqmod.ModifyRequest(req); err != nil {
 			if !strings.Contains(err.Error(), "ignore connect") {
@@ -639,7 +644,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 
 		if p.mitm != nil {
-			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
+			log.Infof("martian: attempting MITM for connection: %s", req.Host)
 			res := p.connectResponse(req)
 
 			if err := p.resmod.ModifyResponse(res); err != nil {
@@ -658,7 +663,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				log.Errorf("martian: got error while flushing response back to client: %v", err)
 			}
 
-			log.Debugf("martian: completed MITM for connection: %s", req.Host)
+			log.Infof("martian: completed MITM for connection: %s", req.Host)
 
 			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			b := make([]byte, 1)
@@ -746,7 +751,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return p.handle(ctx, conn, brw)
 		}
 
-		log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
+		log.Infof("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
 		res, cconn, cerr := p.connect(req)
 		if cerr != nil {
 			log.Errorf("martian: failed to CONNECT: %v", err)
@@ -946,6 +951,15 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 		log.Debugf("martian: skipping round trip due to user manually drop")
 		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
+	}
+
+	val, ok := ctx.Session().Get(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+	if ok {
+		httpctx.SetContextValueInfoFromRequest(
+			req,
+			httpctx.REQUEST_CONTEXT_KEY_ConnectedTo,
+			val,
+		)
 	}
 	return p.roundTripper.RoundTrip(req)
 }
