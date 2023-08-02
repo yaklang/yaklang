@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"go/constant"
 	"strconv"
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -140,9 +139,7 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 	if s := stmt.Literal(); s != nil {
 		// literal
 		i, _ := strconv.ParseInt(s.GetText(), 10, 64)
-		return &Const{
-			value: constant.MakeInt64(i),
-		}
+		return NewConst(int64(i))
 	}
 
 	if s := stmt.Identifier(); s != nil { // 解析变量
@@ -201,7 +198,13 @@ func (f *Function) buildExpressionList(stmt *yak.ExpressionListContext) []Value 
 
 func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
-		return &Identifier{
+		if v := f.readVariable(s.GetText()); v != nil {
+			switch v := v.(type) {
+			case *Alloc:
+				return v
+			}
+		}
+		return &IdentifierLV{
 			variable: s.GetText(),
 			f:        f,
 		}
