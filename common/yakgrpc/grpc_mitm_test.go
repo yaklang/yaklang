@@ -886,7 +886,7 @@ _, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 }
 
 // TestGRPCMUSTPASS_MITM_Drop 测试MITM访问不存在域名后后MITM响应的行为和HTTP History的记录是否符合预期
-func TestGRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
+func Test_BAK_GRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
 		panic(err)
@@ -900,8 +900,10 @@ func TestGRPCMUSTPASS_MITM_HOST_NOT_FOUND(t *testing.T) {
 		return ""
 	})
 	var result = utils.GetFirstIPByDnsWithCache(host, 5*time.Second, dnsServer)
-	spew.Dump(result)
-
+	if result != "" {
+		t.Log("dns resolve failed")
+		t.FailNow()
+	}
 	var (
 		started bool // MITM正常启动（此时MITM开启HTTP2支持
 		pass    bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
@@ -959,14 +961,15 @@ D: 1
 `), tokenRaw, false)
 				params["host"] = "1.1.1.1" // 这里随便指定一个ip避免lowhttp自己dns查询
 				params["port"] = port
-				time.Sleep(time.Second * 3)
-				_, _ = yak.NewScriptEngine(10).ExecuteEx(`
-rsp,req,err := poc.HTTP(getParam("packet"), poc.proxy(getParam("proxy")),poc.host(getParam("host")), poc.port(getParam("port")))
-dump("=============")
-dump(err)
+				_, err := yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req := poc.HTTP(getParam("packet"), poc.proxy(getParam("proxy")))~
 `, params)
+				if err != nil {
+					spew.Dump(err)
+					t.FailNow()
+				}
 				defer cancel()
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * 1)
 				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
 					SearchURL: "/mitm/test/nohost/token/" + token,
 				})
