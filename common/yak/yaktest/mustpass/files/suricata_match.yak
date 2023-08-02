@@ -1,0 +1,15 @@
+data = [
+    [
+        "alert dns 192.168.3.1 53 -> 192.168.3.18 51218 (dns_query;content:bai;offset:4;depth:3;dns_query;content:ow;distance:2;within:4;dns_query;content:cn;distance:1;isdataat:!1,relative;)",
+            "6afd6158af5c3066d026811b08004500004c60764000401152c7c0a80301c0a803120035c81200387f0900028080000100010000000003617069076261696d656f7702636e0000010001c00c00010001000002580004514472bd",
+        true
+    ]
+    ]
+
+for _,c = range data {
+    rules,_ = suricata.ParseSuricata(c[0])
+    assert len(rules)==1 , "rules count wrong"
+    rule = rules[0]
+    stream,_ = codec.DecodeHex(c[1])
+    assert rule.Match(stream)==c[2] , "match wrong"
+}
