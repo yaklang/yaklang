@@ -110,10 +110,21 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 			opcode = yakvm.OpAdd
 		case "-":
 			opcode = yakvm.OpSub
+		}
+		return f.emitArith(opcode, op0, op1)
+	}
+
+	if op := stmt.MultiplicativeBinaryOperator(); op != nil {
+		op0 := f.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
+		op1 := f.buildExpression(stmt.Expression(1).(*yak.ExpressionContext))
+		var opcode yakvm.OpcodeFlag
+		switch op.GetText() {
 		case "*":
 			opcode = yakvm.OpMul
 		case "/":
 			opcode = yakvm.OpDiv
+		case "%":
+			opcode = yakvm.OpMod
 		}
 		return f.emitArith(opcode, op0, op1)
 	}
