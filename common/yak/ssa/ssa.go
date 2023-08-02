@@ -186,7 +186,7 @@ type Call struct {
 	anInstruction
 
 	// for call function
-	Method *MakeClosure
+	Method Value
 	Args   []Value
 
 	// call is a value
