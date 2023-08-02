@@ -8,20 +8,30 @@ type LeftValue interface {
 	GetValue() Value
 }
 
-type Identifier struct {
+type IdentifierLV struct {
 	variable string
 	f        *Function
 }
 
-func (i *Identifier) Assign(v Value) {
+func (i *IdentifierLV) Assign(v Value) {
 	i.f.wirteVariable(i.variable, v)
 }
 
-func (i *Identifier) GetValue() Value {
+func (i *IdentifierLV) GetValue() Value {
 	return i.f.readVariable(i.variable)
 }
 
-var _ LeftValue = (*Identifier)(nil)
+var _ LeftValue = (*IdentifierLV)(nil)
+
+func (a *Alloc) Assign(v Value) {
+	a.Parent.emitStore(a, v)
+}
+
+func (a *Alloc) GetValue() Value {
+	return a.v
+}
+
+var _ LeftValue = (*Alloc)(nil)
 
 func (f *Function) wirteVariable(variable string, value Value) {
 	f.wirteVariableByBlock(variable, value, f.currentBlock)
