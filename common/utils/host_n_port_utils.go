@@ -368,7 +368,7 @@ func IsMac() bool {
 	return runtime.GOOS == "darwin"
 }
 
-func IsHttp(raw string) bool {
+func IsHttpOrHttpsUrl(raw string) bool {
 	return strings.HasPrefix(strings.TrimSpace(raw), "http://") || strings.HasPrefix(strings.TrimSpace(raw), "https://")
 }
 

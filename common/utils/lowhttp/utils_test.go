@@ -158,6 +158,53 @@ aaaaaaaaaaaa` + "\r\n\r\n"))
 	println(string(rap))
 }
 
+func TestConnectExtractedUrl(t *testing.T) {
+	var testcases = []struct {
+		url    string
+		packet string
+	}{
+		{url: "http://baidu.com:11/./a?c=1", packet: "POST /./a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
+		{url: "http://baidu.com:11//a?c=1", packet: "POST //a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
+		{url: "http://baidu.com:11/a?c=1", packet: `POST a?c=1 HTTP/1.1
+Host: baidu.com:11`},
+		{url: "http://baidu.com/a?c=1", packet: `POST a?c=1 HTTP/1.1
+Host: baidu.com`},
+		{url: "http://baidu.com:11/?c=1", packet: `POST ?c=1 HTTP/1.1
+Host: baidu.com:11`},
+		{url: "http://baidu.com:11/", packet: `POST http://baidu.com:11/ HTTP/1.1`},
+		{url: "http://baidu.com:11/", packet: `GET http://baidu.com:11/ HTTP/1.1`},
+		{url: "http://baidu.com:11/c", packet: `GET http://baidu.com:11/c HTTP/1.1`},
+		{url: "http://baidu.com:11", packet: `GET http://baidu.com:11 HTTP/1.1`},
+		{url: "http://baidu.com:11/a?c=1", packet: `GET http://baidu.com:11/a?c=1 HTTP/1.1`},
+		{url: "http://baidu.com:11", packet: `CONNECT http://baidu.com:11 HTTP/1.1`},
+		{url: "http://baidu.com:11", packet: `CONNECT http://baidu.com:11 HTTP/1.1
+Host: www.example.com`},
+		{url: "http://baidu.com", packet: `CONNECT http://baidu.com`},
+		{url: "https://baidu.com", packet: `CONNECT https://baidu.com`},
+		{url: "https://baidu.com/ab", packet: `CONNECT https://baidu.com/ab`},
+		{url: "https://baidu.com:1/ab?a=1", packet: `CONNECT https://baidu.com:1/ab?a=1`},
+	}
+
+	for _, testcase := range testcases {
+		req, err := ParseStringToHttpRequest(testcase.packet)
+		if err != nil {
+			t.FailNow()
+			return
+		}
+		u, err := ExtractURLFromHTTPRequest(req, false)
+		if err != nil {
+			t.Error(err.Error())
+			t.FailNow()
+			return
+		}
+		if u.String() != testcase.url {
+			t.Fatalf("url not match: %s != %s", u.String(), testcase.url)
+		} else {
+			t.Logf("url match: %v == %v", u.String(), testcase.url)
+		}
+	}
+}
+
 func TestParseResponseLine(t *testing.T) {
 	testcases := []struct {
 		line          string
