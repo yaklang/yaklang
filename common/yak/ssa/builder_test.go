@@ -637,4 +637,53 @@ entry0:
 		// showProg(prog)
 		CompareYakFunc(t, prog, ir)
 	})
+
+	t.Run("clousure_param_freevalue", func(t *testing.T) {
+		code := `
+ca = 22
+a = (arg1) =>{
+	b = 1
+	if 1 > 2{
+		b = arg1 + 2
+	}else {
+		b = ca + 2
+	}
+	c = b + 1
+}
+		`
+		ir := []string{
+			`
+yak-main
+entry0:
+	t0 = alloc
+	*t0 = 22
+	t2 = Closure yak-main$1 [t0]
+			`,
+			`
+yak-main$1 arg1
+parent: yak-main
+freeValue: t0
+entry0:
+	t1 = 1 gt 2
+	If [t1] true -> if.true2, false -> if.false3
+if.done1: <- if.true2 if.false3
+	t4 = phi [t5, if.true2] [t8, if.false3]
+	jump -> b4
+if.true2: <- entry0
+	t5 = arg1 add 2
+	jump -> if.done1
+if.false3: <- entry0
+	t7 = *t0
+	t8 = t7 add 2
+	jump -> if.done1
+b4: <- if.done1
+	t10 = t4 add 1
+			`,
+		}
+
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakFunc(t, prog, ir)
+	})
 }
