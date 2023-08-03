@@ -536,11 +536,6 @@ func (f *Function) buildStatement(stmt *yak.StatementContext) {
 	if s, ok := stmt.ForStmt().(*yak.ForStmtContext); ok {
 		f.buildForStmt(s)
 	}
-
-	if s, ok := stmt.ForRangeStmt().(*yak.ForRangeStmtContext); ok {
-		f.buildForRangeStmt(s)
-	}
-
 	if _, ok := stmt.ContinueStmt().(*yak.ContinueStmtContext); ok {
 		if c := f.target._continue; c != nil {
 			f.emitJump(c)
