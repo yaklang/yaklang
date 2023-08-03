@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -18,7 +17,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -1397,44 +1395,6 @@ func ParseStringToRawLines(raw string) []string {
 	return lines
 }
 
-func ParseStringToCClassHosts(targets string) string {
-	var target []string
-	var cclassMap = new(sync.Map)
-	for _, r := range ParseStringToHosts(targets) {
-		if IsIPv4(r) {
-			netStr, err := IPv4ToCClassNetwork(r)
-			if err != nil {
-				target = append(target, r)
-				continue
-			}
-			cclassMap.Store(netStr, nil)
-			continue
-		}
-
-		if IsIPv6(r) {
-			target = append(target, r)
-			continue
-		}
-		ip := yakdns.LookupFirst(r, yakdns.WithTimeout(5*time.Second))
-		if ip != "" && IsIPv4(ip) {
-			netStr, err := IPv4ToCClassNetwork(ip)
-			if err != nil {
-				target = append(target, r)
-				continue
-			}
-			cclassMap.Store(netStr, nil)
-			continue
-		} else {
-			target = append(target, r)
-		}
-	}
-	cclassMap.Range(func(key, value interface{}) bool {
-		s := key.(string)
-		target = append(target, s)
-		return true
-	})
-	return strings.Join(target, ",")
-}
 func Format(raw string, data map[string]string) string {
 	for k, v := range data {
 		raw = strings.ReplaceAll(raw, "$"+k, v)
