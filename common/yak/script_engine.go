@@ -365,7 +365,7 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 						return nil, err
 					}
 					caller.SetFeedback(func(i *ypb.ExecResult) error {
-						yaklib.RawHandlerToExecOutput(client.YakitAutoLog)(i)
+						yaklib.RawHandlerToExecOutput(client.Output)(i)
 						return nil
 					})
 					return caller, nil
@@ -471,7 +471,6 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		engine.SetSourceFilePath(fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_FILENAME", fmt.Sprint(yakAbsFile))
 		engine.SetVar("YAK_DIR", filepath.Dir(fmt.Sprint(yakAbsFile)))
-
 	}
 
 	// getParam 和 param 获取参数内容

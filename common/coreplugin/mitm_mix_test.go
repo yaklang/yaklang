@@ -13,11 +13,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_MITM(t *testing.T) {
-	var client, err = NewLocalClient()
+	var client, err = yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Fatalf("start mitm local client failed: %s", err)
 	}
@@ -169,7 +170,7 @@ risk.DeleteRiskByTarget(vulinboxAddr)
 }
 
 func TestDEBUG_MITM(t *testing.T) {
-	var client, err = NewLocalClient()
+	var client, err = yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Fatalf("start mitm local client failed: %s", err)
 	}

@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/vulinbox"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"testing"
 )
 
 func TestGRPCMUSTPASS_SwaggerJson(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		panic(err)
 	}

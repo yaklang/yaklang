@@ -3,12 +3,13 @@ package coreplugin
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/vulinbox"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
 
 func TestGRPCMUSTPASS_SQL(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		panic(err)
 	}

@@ -102,11 +102,11 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 					Data: fmt.Sprintf("%d", matchCounter),
 				})
 			default:
-				sendLogger.YakitAutoLog(&yaklib.YakitStatusCard{
+				sendLogger.Output(&yaklib.YakitStatusCard{
 					Id:   "已运行",
 					Data: fmt.Sprintf("%ds", int64(time.Now().Sub(start).Seconds())),
 				})
-				sendLogger.YakitAutoLog(&yaklib.YakitStatusCard{
+				sendLogger.Output(&yaklib.YakitStatusCard{
 					Id:   "模拟攻击事件",
 					Data: fmt.Sprintf("%d", trafficCounter),
 				})

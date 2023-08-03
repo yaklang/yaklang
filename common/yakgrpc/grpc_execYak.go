@@ -269,7 +269,7 @@ func (s *Server) ExecWithContext(ctx context.Context, req *ypb.ExecRequest, stre
 	if ctx == nil {
 		ctx = stream.Context()
 	}
-	if req.NoDividedEngine {
+	if req.NoDividedEngine { // 方便调试
 		return s.execRequestInCurrentServerEngine(req, req.ScriptId, ctx, func(result *ypb.ExecResult, _ *yaklib.YakitLog) error {
 			return stream.Send(result)
 		}, &YakOutputStreamerHelperWC{
