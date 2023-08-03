@@ -4,6 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/yakdns"
 	"testing"
 	"time"
@@ -129,7 +130,7 @@ func TestGetFirstIPFromHostWithTimeout(t *testing.T) {
 }
 
 func TestParseStringToCClassHosts(t *testing.T) {
-	spew.Dump(ParseStringToCClassHosts("192.168.1.2,baidu.com,192.168.1.22,www.uestc.edu.cn"))
+	spew.Dump(network.ParseStringToCClassHosts("192.168.1.2,baidu.com,192.168.1.22,www.uestc.edu.cn"))
 }
 
 func TestGetIPFromHostWithContextAndDNSServers(t *testing.T) {

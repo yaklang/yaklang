@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -1000,5 +1002,106 @@ rsp,req := poc.HTTP(getParam("packet"), poc.proxy(getParam("proxy")))~
 
 	if !pass {
 		panic("NO SUCH HOST MITM NOT EXPECTED")
+	}
+}
+func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
+	for _, mitmConfig := range []func(request *ypb.MITMRequest){
+		func(request *ypb.MITMRequest) {},
+		func(request *ypb.MITMRequest) {
+			request.EnableGMTLS = true
+		},
+		func(request *ypb.MITMRequest) {
+			request.EnableHttp2 = true
+		},
+		func(request *ypb.MITMRequest) {
+			request.EnableHttp2 = true
+			request.EnableGMTLS = true
+			request.PreferGMTLS = true
+		},
+		func(request *ypb.MITMRequest) {
+			request.EnableHttp2 = true
+			request.EnableGMTLS = true
+			request.OnlyEnableGMTLS = true
+		},
+	} {
+		client, err := NewLocalClient() // 新建一个 yakit client
+		if err != nil {
+			panic(err)
+		}
+		hostForDns := utils.RandStringBytes(10) + ".com"
+		hostForHost := utils.RandStringBytes(10) + ".com"
+		port1 := utils.GetRandomAvailableTCPPort()
+		dnsServerResloved := false
+		// mock dns server
+		var dnsServer = facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
+			if !dnsServerResloved {
+				dnsServerResloved = true
+			} else {
+				t.Fatal("dns server should only be called once")
+			}
+			return "127.0.0.1"
+		})
+		defer func() {
+			if !dnsServerResloved {
+				t.Fatal("dns server should be called")
+			}
+		}()
+		// mock http server
+		go func() {
+			err = facades.Serve("127.0.0.1", port1, facades.SetHttpResource("/ok", []byte("")))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+		err = utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port1), 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// start mitm server
+		stream, err := client.MITM(context.Background())
+		if err != nil {
+			t.Fatalf("start mitm stream failed: %s", err)
+		}
+		port := utils.GetRandomAvailableTCPPort()
+		mitmAddr := fmt.Sprintf("127.0.0.1:%d", port)
+		request := &ypb.MITMRequest{
+			Host:       "127.0.0.1",
+			Port:       uint32(port),
+			DnsServers: []string{dnsServer},
+			Hosts: []*ypb.KVPair{
+				{
+					Key:   hostForHost,
+					Value: "127.0.0.1",
+				},
+			},
+		}
+		mitmConfig(request)
+		err = stream.Send(request)
+		if err != nil {
+			t.Fatalf("send mitm request failed: %s", err)
+		}
+		// wait mitm server started
+		err = utils.WaitConnect(mitmAddr, 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		transport := &http.Transport{
+			Proxy: func(request *http.Request) (*url.URL, error) {
+				return url.Parse("http://" + mitmAddr)
+			}}
+		c := &http.Client{
+			Transport: transport,
+		}
+		for _, host := range []string{hostForDns, hostForHost} {
+			urlForDns := "http://" + fmt.Sprintf("%s:%d/ok", host, port1)
+			rsp, err := c.Get(urlForDns)
+			if err != nil {
+				t.Fatalf("get url `%v` failed: %s", urlForDns, err)
+			}
+			if rsp.StatusCode != 200 {
+				t.Fatalf("get url `%v` failed: %s", urlForDns, rsp.Status)
+			}
+		}
 	}
 }

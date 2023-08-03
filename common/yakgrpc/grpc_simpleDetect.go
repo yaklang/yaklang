@@ -6,6 +6,7 @@ import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"os"
@@ -50,7 +51,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	allTargets = strings.Trim(allTargets, "\n")
 	hostCount := len(strings.Split(allTargets, "\n"))
 	if reqPortScan.GetEnableCClassScan() {
-		allTargets = utils.ParseStringToCClassHosts(allTargets)
+		allTargets = network.ParseStringToCClassHosts(allTargets)
 	}
 	_, _ = tmpTargetFile.WriteString(allTargets)
 	if len(targets) <= 0 {

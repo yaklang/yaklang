@@ -353,7 +353,7 @@ func (m *MITMProxy) newConnFor(target string, isTls bool, sni string) (net.Conn,
 		originTarget = sni
 	}
 	if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-		host = yakdns.LookupFirst(host, yakdns.WithTimeout(5))
+		host = yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second))
 		if host == "" {
 			return nil, utils.Errorf("dns error for %v", originTarget)
 		}

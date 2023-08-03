@@ -215,16 +215,12 @@ func NewDialer(dialer *net.Dialer, h func(ctx context.Context, network, host str
 	}
 }
 func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
-	}
-	ip, err := d.resolverHandle(ctx, network, host)
+	addr, err := d.resolverHandle(ctx, network, address)
 	if err != nil {
 		return nil, err
 	}
 	//ip := utils.GetFirstIPByDnsWithCache(host, 5*time.Second, d.dnsServers...)
-	conn, err := d.dialer.DialContext(ctx, network, utils.HostPort(ip, port))
+	conn, err := d.dialer.DialContext(ctx, network, addr)
 	if err == nil {
 		return conn, nil
 	}
@@ -250,12 +246,14 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		}
 		certificates = append(certificates, *clientCertificate)
 	}
-
-	t := &http.Transport{
-		Proxy: proxyFunc,
-		DialContext: NewDialer(&net.Dialer{
-			Timeout: time.Duration(opts.DialTimeout) * time.Second,
-		}, func(ctx context.Context, network, host string) (string, error) {
+	dialer := NewDialer(&net.Dialer{
+		Timeout: time.Duration(opts.DialTimeout) * time.Second,
+	}, func(ctx context.Context, network, address string) (string, error) {
+		host, port, err := net.SplitHostPort(address)
+		ip, err := func() (string, error) {
+			if err != nil {
+				return "", err
+			}
 			if v, ok := opts.HostMapping[host]; ok {
 				return v, nil
 			} else if v, ok := lowhttp.GetSystemHostByName(host); ok {
@@ -273,8 +271,13 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 				}
 				return ips[0], nil
 			}
-			return yakdns.LookupFirst(host, yakdns.WithTimeout(5), yakdns.WithDNSServers(opts.DnsServers...)), nil
-		}).DialContext,
+			return yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second), yakdns.WithDNSServers(opts.DnsServers...)), nil
+		}()
+		return utils.HostPort(ip, port), err
+	})
+	t := &http.Transport{
+		Proxy:                 proxyFunc,
+		DialContext:           dialer.DialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,
 		MaxIdleConns:          opts.MaxIdleConns,
@@ -325,81 +328,85 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 	}
 
 	if opts.EnableGMTLS {
-		DialTLSContextForGMOnly := func(ctx context.Context, network, addr string) (net.Conn, error) {
-			dialer := &net.Dialer{}
-			conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-				GMSupport:          &gmtls.GMSupport{},
-				InsecureSkipVerify: true,
-				Certificates:       gmCerts,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return conn, nil
-		}
-		DialTLSContextForGMPrefer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-			dialer := &net.Dialer{}
-			var conn net.Conn
-			var err error
-			conn, err = gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-				GMSupport:          &gmtls.GMSupport{},
-				InsecureSkipVerify: true,
-				Certificates:       gmCerts,
-			})
-			if err == nil {
+		if opts.PreferGM {
+			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				var conn net.Conn
+				var err error
+				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+				if err != nil {
+					return nil, err
+				}
+				addr = ipAddr
+				conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+					GMSupport:          &gmtls.GMSupport{},
+					InsecureSkipVerify: true,
+					Certificates:       gmCerts,
+				})
+				if err == nil {
+					return conn, nil
+				}
+				if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+					return nil, err
+				}
+				conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+					InsecureSkipVerify: true,
+				})
+				if err != nil {
+					return nil, err
+				}
 				return conn, nil
 			}
-			if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
-				return nil, err
-			}
-			conn, err = tls.DialWithDialer(dialer, network, addr, &tls.Config{
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-				InsecureSkipVerify: true,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return conn, nil
-		}
-		DialTLSContextForGMDefault := func(ctx context.Context, network, addr string) (net.Conn, error) {
-			dialer := &net.Dialer{}
-			var conn net.Conn
-			var err error
-			conn, err = tls.DialWithDialer(dialer, network, addr, &tls.Config{
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-				InsecureSkipVerify: true,
-			})
-			if err == nil {
+		} else if opts.OnlyGM {
+			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+				if err != nil {
+					return nil, err
+				}
+				addr = ipAddr
+				conn, err := gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+					GMSupport:          &gmtls.GMSupport{},
+					InsecureSkipVerify: true,
+					Certificates:       gmCerts,
+				})
+				if err != nil {
+					return nil, err
+				}
 				return conn, nil
 			}
-			if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
-				return nil, err
+		} else {
+			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				var conn net.Conn
+				var err error
+				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+				if err != nil {
+					return nil, err
+				}
+				addr = ipAddr
+				conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+					InsecureSkipVerify: true,
+				})
+				if err == nil {
+					return conn, nil
+				}
+				if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+					return nil, err
+				}
+				conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+					GMSupport:          &gmtls.GMSupport{},
+					InsecureSkipVerify: true,
+					Certificates:       gmCerts,
+				})
+				if err != nil {
+					return nil, err
+				}
+				return conn, nil
 			}
-			conn, err = gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-				GMSupport:          &gmtls.GMSupport{},
-				InsecureSkipVerify: true,
-				Certificates:       gmCerts,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return conn, nil
 		}
 
-		for true {
-			if opts.PreferGM {
-				t.DialTLSContext = DialTLSContextForGMPrefer
-				break
-			}
-			if opts.OnlyGM {
-				t.DialTLSContext = DialTLSContextForGMOnly
-				break
-			}
-			t.DialTLSContext = DialTLSContextForGMDefault
-			break
-		}
 	}
 	return t, nil
 }

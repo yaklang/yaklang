@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/utils/suspect"
 	"path/filepath"
 	"strings"
@@ -117,7 +118,7 @@ var (
 		"ParseStringToPorts":              utils.ParseStringToPorts,
 		"ParseStringToUrls":               utils.ParseStringToUrls,
 		"ParseStringToUrlsWith3W":         utils.ParseStringToUrlsWith3W,
-		"ParseStringToCClassHosts":        utils.ParseStringToCClassHosts,
+		"ParseStringToCClassHosts":        network.ParseStringToCClassHosts,
 		"ParseStringUrlToWebsiteRootPath": utils.ParseStringUrlToWebsiteRootPath,
 		"ParseStringUrlToUrlInstance":     utils.ParseStringUrlToUrlInstance,
 		"UrlJoin":                         utils.UrlJoin,
