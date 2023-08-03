@@ -2,6 +2,9 @@ package yakit
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type Risk struct {
@@ -85,32 +86,34 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 	}
 
 	return &ypb.Risk{
-		Hash:            p.Hash,
-		IP:              p.IP,
-		Url:             p.Url,
+		Hash:            strings.ToValidUTF8(p.Hash, "■"),
+		IP:              strings.ToValidUTF8(p.IP, "■"),
+		Url:             strings.ToValidUTF8(p.Url, "■"),
 		Port:            int32(p.Port),
-		Host:            p.Host,
-		Title:           p.Title,
-		TitleVerbose:    p.TitleVerbose,
-		Description:     p.Description,
-		Solution:        p.Solution,
-		RiskType:        p.RiskType,
-		RiskTypeVerbose: p.RiskTypeVerbose,
-		Parameter:       p.Parameter,
-		Payload:         p.Payload,
+		Host:            strings.ToValidUTF8(p.Host, "■"),
+		Title:           strings.ToValidUTF8(p.Title, "■"),
+		TitleVerbose:    strings.ToValidUTF8(p.TitleVerbose, "■"),
+		Description:     strings.ToValidUTF8(p.Description, "■"),
+		Solution:        strings.ToValidUTF8(p.Solution, "■"),
+		RiskType:        strings.ToValidUTF8(p.RiskType, "■"),
+		RiskTypeVerbose: strings.ToValidUTF8(p.RiskTypeVerbose, "■"),
+		Parameter:       strings.ToValidUTF8(p.Parameter, "■"),
+		Payload:         strings.ToValidUTF8(p.Payload, "■"),
 		Details:         details,
-		FromYakScript:   p.FromYakScript,
+		FromYakScript:   strings.ToValidUTF8(p.FromYakScript, "■"),
 		WaitingVerified: p.WaitingVerified,
-		ReverseToken:    p.ReverseToken,
+		ReverseToken:    strings.ToValidUTF8(p.ReverseToken, "■"),
 		Id:              int64(p.ID),
 		CreatedAt:       p.CreatedAt.Unix(),
 		UpdatedAt:       p.UpdatedAt.Unix(),
-		Severity:        p.Severity,
-		Request:         request,
-		Response:        response,
-		RuntimeId:       p.RuntimeId,
-		CVE:             p.CVE,
-		TaskName:        p.TaskName,
+		Severity:        strings.ToValidUTF8(p.Severity, "■"),
+
+		Request:  request,
+		Response: response,
+
+		RuntimeId: strings.ToValidUTF8(p.RuntimeId, "■"),
+		CVE:       strings.ToValidUTF8(p.CVE, "■"),
+		TaskName:  strings.ToValidUTF8(p.TaskName, "■"),
 	}
 }
 
