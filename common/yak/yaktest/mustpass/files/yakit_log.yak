@@ -1,0 +1,6 @@
+caller = hook.NewMixPluginCaller()~
+
+["基础 XSS 检测", "SSRF HTTP Public"].Map(i => {
+    yakit.Info("Loading: %v", i)
+    caller.LoadPlugin(i)
+})
