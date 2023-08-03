@@ -219,7 +219,7 @@ func WithTCPResultCallback(f TCPResultCallback) ConfigOption {
 			config.Callback = func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("httptpl execute result callback failed: %v", err)
+						log.Errorf("(WithCallback) httptpl execute result callback failed: %v", err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()

@@ -325,10 +325,14 @@ func _saveRisk(r *Risk) error {
 		log.Error("empty database")
 		return utils.Errorf("no database connection")
 	}
-	cveData, _ := cveresources.GetCVE(consts.GetGormCVEDatabase().Model(&cveresources.CVE{}), r.CVE)
-	if cveData != nil {
-		r.CveAccessVector = cveData.AccessVector
-		r.CveAccessComplexity = cveData.AccessComplexity
+
+	cveDb := consts.GetGormCVEDatabase()
+	if cveDb != nil {
+		cveData, _ := cveresources.GetCVE(cveDb.Model(&cveresources.CVE{}), r.CVE)
+		if cveData != nil {
+			r.CveAccessVector = cveData.AccessVector
+			r.CveAccessComplexity = cveData.AccessComplexity
+		}
 	}
 	count := 0
 	for {

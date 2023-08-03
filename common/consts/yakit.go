@@ -336,7 +336,7 @@ func GetGormCVEDatabase() *gorm.DB {
 		var err error
 		gormCVEDatabase, err = InitializeCVEDatabase()
 		if err != nil {
-			log.Errorf("initialize cve db failed: %s", err)
+			log.Debugf("initialize cve db failed: %s", err)
 		}
 	}
 	return gormCVEDatabase
@@ -347,7 +347,7 @@ func GetGormCVEDescriptionDatabase() *gorm.DB {
 		var err error
 		gormCVEDescDatabase, err = InitializeCVEDescriptionDatabase()
 		if err != nil {
-			log.Errorf("initialize cve db failed: %s", err)
+			log.Debugf("initialize cve db failed: %s", err)
 		}
 	}
 	return gormCVEDescDatabase
