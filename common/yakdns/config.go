@@ -118,7 +118,7 @@ func (r *ReliableDNSConfig) call(dnsType, domain, ip, fromServer, method string,
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.count++
-	log.Infof("dns lookup[%s]-%s: %10s -> %15s %s", dnsType, fromServer, domain, ip, method)
+	log.Debugf("dns lookup[%s]-%s: %10s -> %15s %s", dnsType, fromServer, domain, ip, method)
 	if r.Callback != nil {
 		r.Callback(dnsType, domain, ip, fromServer, method)
 	}

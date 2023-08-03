@@ -3,6 +3,7 @@ package crep
 import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"net/http"
@@ -31,8 +32,10 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 	}))
 
 	if connected := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo); connected != "" {
+		log.Debugf("origin %v => %v", req.Host, connected)
 		req.Host = connected
 		if req.URL.Host != "" {
+			log.Debugf("origin %v => %v", req.URL.Host, connected)
 			req.URL.Host = connected
 		}
 	}
