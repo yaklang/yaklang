@@ -5,21 +5,15 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"strings"
-	"sync"
-	"testing"
-	"time"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
+	"sync"
 	"testing"
-	"google.golang.org/grpc"
 )
 
 //go:embed base-yak-plugin/*
@@ -45,8 +39,10 @@ type VulInfo struct {
 	RawHTTPRequest []byte
 	Id             string
 }
+
 var initDB = sync.Once{}
-func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vunInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
+
+func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
 	initDB.Do(func() {
 		yakit.InitialDatabase()
 	})

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		return nil, errors.New("not found record")
 	}
 	yaklang.Import("risk", yaklib.RiskExports)
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		panic(err)
 	}
@@ -188,7 +189,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//addFastjsonTestCase(vulInAuthorization, "Fastjson 综合检测插件对于 Jackson 检测结果不符合预期")
 }
 func TestFastjson(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		panic(err)
 	}
