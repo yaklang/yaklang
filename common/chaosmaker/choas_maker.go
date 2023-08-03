@@ -90,6 +90,8 @@ func (c *ChaosMaker) generate(r *ChaosMakerRule) (chan *ChaosTraffic, error) {
 		//}
 		close(ch)
 		return ch, nil
+	case "icmp":
+		return nil, utils.Error("icmp not implemented")
 	default:
 		return nil, utils.Errorf("unknown rule type: %s", r.RuleType)
 	}
