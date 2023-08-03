@@ -20,6 +20,11 @@ var udpHandler = &chaosHandler{
 			return nil
 		}
 
+		if rule.ContentRuleConfig.UdpConfig == nil {
+			log.Errorf("[BUG]: not prepared udp config from: %v", rule.Raw)
+			return nil
+		}
+
 		var toServer bool
 		var toClient bool
 
