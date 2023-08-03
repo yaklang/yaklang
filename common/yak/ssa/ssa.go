@@ -333,10 +333,10 @@ func (f *Function) String() string {
 		for _, i := range b.Instrs {
 			setInst(i)
 		}
+		slices.SortFunc(b.Phis, func(p1 *Phi, p2 *Phi) bool {
+			return p1.variable < p2.variable
+		})
 		for _, p := range b.Phis {
-			slices.SortFunc(b.Phis, func(p1 *Phi, p2 *Phi) bool {
-				return p1.variable < p2.variable
-			})
 			setInst(p)
 		}
 	}
@@ -383,7 +383,7 @@ func (p *Phi) String() string {
 }
 
 func (p *Phi) StringByFunc(getStr func(Value) string) string {
-	ret := fmt.Sprintf("%s = phi[%s] ", getStr(p), p.variable)
+	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
