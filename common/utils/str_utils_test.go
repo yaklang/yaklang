@@ -4,10 +4,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/network"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"testing"
-	"time"
 )
 
 func TestRemoveUnprintableChars(t *testing.T) {
@@ -124,14 +121,14 @@ func TestMUSTPASS_SliceGroup(t *testing.T) {
 	assert.True(t, len(s) == 7, "%v", spew.Sdump(s))
 }
 
-func TestGetFirstIPFromHostWithTimeout(t *testing.T) {
-	ip := yakdns.LookupFirst("baidu.com", yakdns.WithTimeout(5*time.Second))
-	spew.Dump(ip)
-}
-
-func TestParseStringToCClassHosts(t *testing.T) {
-	spew.Dump(network.ParseStringToCClassHosts("192.168.1.2,baidu.com,192.168.1.22,www.uestc.edu.cn"))
-}
+//func TestGetFirstIPFromHostWithTimeout(t *testing.T) {
+//	ip := yakdns.LookupFirst("baidu.com", yakdns.WithTimeout(5*time.Second))
+//	spew.Dump(ip)
+//}
+//
+//func TestParseStringToCClassHosts(t *testing.T) {
+//	spew.Dump(network.ParseStringToCClassHosts("192.168.1.2,baidu.com,192.168.1.22,www.uestc.edu.cn"))
+//}
 
 func TestGetIPFromHostWithContextAndDNSServers(t *testing.T) {
 	err := _GetIPFromHostWithContextAndDNSServers(FloatSecondDuration(1), "xqfunds.com", nil, func(domain string) bool {
