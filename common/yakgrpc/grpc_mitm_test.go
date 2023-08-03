@@ -15,8 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakdns"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -1004,7 +1002,45 @@ rsp,req := poc.HTTP(getParam("packet"), poc.proxy(getParam("proxy")))~
 		panic("NO SUCH HOST MITM NOT EXPECTED")
 	}
 }
+
 func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+
+	port1 := utils.GetRandomAvailableTCPPort()
+
+	// mock http server
+	go func() {
+		err = facades.Serve("127.0.0.1", port1, facades.SetHttpResource("/ok", []byte("")))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	err = utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port1), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostForDns := utils.RandStringBytes(10) + ".com"
+	hostForHost := utils.RandStringBytes(10) + ".com"
+	dnsServerResloved := false
+	// mock dns server
+	var dnsServer = facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
+		if !dnsServerResloved {
+			dnsServerResloved = true
+		} else {
+			t.Fatal("dns server should only be called once")
+		}
+		return "127.0.0.1"
+	})
+	defer func() {
+		if !dnsServerResloved {
+			t.Fatal("dns server should be called")
+		}
+	}()
+
 	for _, mitmConfig := range []func(request *ypb.MITMRequest){
 		func(request *ypb.MITMRequest) {},
 		func(request *ypb.MITMRequest) {
@@ -1024,41 +1060,11 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 			request.OnlyEnableGMTLS = true
 		},
 	} {
-		client, err := NewLocalClient() // 新建一个 yakit client
-		if err != nil {
-			panic(err)
-		}
-		hostForDns := utils.RandStringBytes(10) + ".com"
-		hostForHost := utils.RandStringBytes(10) + ".com"
-		port1 := utils.GetRandomAvailableTCPPort()
-		dnsServerResloved := false
-		// mock dns server
-		var dnsServer = facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
-			if !dnsServerResloved {
-				dnsServerResloved = true
-			} else {
-				t.Fatal("dns server should only be called once")
-			}
-			return "127.0.0.1"
-		})
-		defer func() {
-			if !dnsServerResloved {
-				t.Fatal("dns server should be called")
-			}
-		}()
-		// mock http server
-		go func() {
-			err = facades.Serve("127.0.0.1", port1, facades.SetHttpResource("/ok", []byte("")))
-			if err != nil {
-				t.Fatal(err)
-			}
-		}()
-		err = utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port1), 5)
-		if err != nil {
-			t.Fatal(err)
-		}
 		// start mitm server
-		stream, err := client.MITM(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		stream, err := client.MITM(ctx)
 		if err != nil {
 			t.Fatalf("start mitm stream failed: %s", err)
 		}
@@ -1086,21 +1092,27 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		transport := &http.Transport{
-			Proxy: func(request *http.Request) (*url.URL, error) {
-				return url.Parse("http://" + mitmAddr)
-			}}
-		c := &http.Client{
-			Transport: transport,
-		}
-		for _, host := range []string{hostForDns, hostForHost} {
-			urlForDns := "http://" + fmt.Sprintf("%s:%d/ok", host, port1)
-			rsp, err := c.Get(urlForDns)
+		for {
+			msg, err := stream.Recv()
 			if err != nil {
-				t.Fatalf("get url `%v` failed: %s", urlForDns, err)
+				break
 			}
-			if rsp.StatusCode != 200 {
-				t.Fatalf("get url `%v` failed: %s", urlForDns, rsp.Status)
+			msgStr := string(msg.GetMessage().GetMessage())
+			if strings.Contains(msgStr, `starting mitm server`) {
+				for _, host := range []string{hostForDns, hostForHost} {
+					urlForDns := "http://" + fmt.Sprintf("%s:%d/ok", host, port1)
+					_, err := yak.Execute(
+						`rsp, req := poc.Get(urlForDns, poc.proxy(proxy))~; println(string(rsp.RawPacket))`,
+						map[string]interface{}{
+							"urlForDns": urlForDns,
+							"proxy":     "http://" + mitmAddr,
+						},
+					)
+					if err != nil {
+						t.Fatalf("get url `%v` failed: %s", urlForDns, err)
+					}
+				}
+				cancel()
 			}
 		}
 	}

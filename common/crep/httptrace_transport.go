@@ -1,7 +1,6 @@
 package crep
 
 import (
-	"context"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/utils"
@@ -30,7 +29,6 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 			}
 		},
 	}))
-	*req = *req.WithContext(context.WithValue(req.Context(), "request-id", fmt.Sprintf("%p", req)))
 
 	if connected := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo); connected != "" {
 		req.Host = connected

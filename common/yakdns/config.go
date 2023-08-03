@@ -57,6 +57,7 @@ var defaultDoHHTTPClient = &http.Client{
 
 type ReliableDNSConfig struct {
 	Timeout time.Duration
+	Hosts   map[string]string
 
 	PreferTCP   bool
 	FallbackTCP bool
@@ -232,5 +233,11 @@ func WithDNSCallback(cb func(dnsType, domain, ip, fromServer, method string)) DN
 func WithTimeout(timeout time.Duration) DNSOption {
 	return func(config *ReliableDNSConfig) {
 		config.Timeout = timeout
+	}
+}
+
+func WithTemporaryHosts(i map[string]string) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		config.Hosts = i
 	}
 }

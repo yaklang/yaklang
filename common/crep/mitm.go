@@ -526,14 +526,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			}
 		}()
 
-		/**
-		mirror below, no modify packet!
-		*/
-		rspP := fmt.Sprintf("%p", rsp)
-		reqP := utils.InterfaceToString(rsp.Request.Context().Value("request-id"))
-
-		log.Debugf("request-id: [%v]   -->   response-id: [%v] ", reqP, rspP)
-
 		if m.responseMirrorWithInstance != nil {
 			if len(responseBytes) <= 0 {
 				var err error
