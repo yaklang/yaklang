@@ -135,6 +135,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	placeHolderMap := map[string]string{
 		ph: "reverse_url",
 	}
+	yakTemp.PlaceHolderMap = placeHolderMap
 	tagsToPlaceHolderMap := make(map[string]string, 0)
 
 	for _, interactshTag := range []string{nucleiReverseTag, `{{interactsh}}`, `{{interactsh_url}}`, `interactsh`} {
@@ -202,10 +203,11 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 				return nil, utils.Error("nuclei template `network` is not slice")
 			}
 			// network means tcp packets...
-			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret))
+			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret), tagsToPlaceHolderMap)
 			if err != nil {
 				return nil, utils.Errorf("parse network bulk failed: %v", err)
 			}
+
 			return yakTemp, nil
 		} else if utils.MapGetFirstRaw(mid, "workflows") != nil {
 			return nil, utils.Error("yakit nuclei cannot support workflows now~")
@@ -315,7 +317,6 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	})
 
 	yakTemp.HTTPRequestSequences = reqSeq
-	yakTemp.PlaceHolderMap = placeHolderMap
 	return yakTemp, nil
 }
 
