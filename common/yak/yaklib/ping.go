@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
+	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
@@ -97,7 +98,7 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 	}
 
 	if config.scanCClass {
-		target = utils.ParseStringToCClassHosts(target)
+		target = network.ParseStringToCClassHosts(target)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

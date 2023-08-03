@@ -67,7 +67,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 			r, err = rdpLogin(host, host, "administrator", "", port)
 
 		} else {
-			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5))
+			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second))
 			r, err = rdpLogin(ip, host, "administrator", "", port)
 		}
 
@@ -105,7 +105,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 			r, err = rdpLogin(host, host, i.Username, i.Password, port)
 
 		} else {
-			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5))
+			ip := yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second))
 			r, err = rdpLogin(ip, host, i.Username, i.Password, port)
 		}
 

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"os"
@@ -31,7 +32,7 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	targets := append(targetsLine, targetsLineFromFile...)
 	var allTargets = strings.Join(targets, ",")
 	if req.GetEnableCClassScan() {
-		allTargets = utils.ParseStringToCClassHosts(allTargets)
+		allTargets = network.ParseStringToCClassHosts(allTargets)
 	}
 	_, _ = tmpTargetFile.WriteString(allTargets)
 	if len(targets) <= 0 {
