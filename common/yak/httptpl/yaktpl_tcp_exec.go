@@ -2,17 +2,17 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type NucleiTcpResponse struct {
@@ -142,7 +142,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 
 func (y *YakNetworkBulkConfig) Execute(
 	config *Config,
-	vars map[string]interface{}, lowhttpConfig *lowhttp.LowhttpExecConfig,
+	vars map[string]interface{}, placeHolderMap map[string]string, lowhttpConfig *lowhttp.LowhttpExecConfig,
 	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
@@ -150,15 +150,14 @@ func (y *YakNetworkBulkConfig) Execute(
 	}
 
 	for _, host := range y.Hosts {
-		hosts, err := mutate.FuzzTagExec(host, mutate.Fuzz_WithParams(vars))
-		if err != nil {
-			log.Errorf("YakNetworkBulkConfig mutate.FuzzTagExec(host) failed: %s", err)
-			continue
+		//? 2023-8-2 暂时性解决方案 fix host
+		if len(placeHolderMap) > 0 {
+			for ph, k := range placeHolderMap {
+				if v, ok := vars[k]; ok {
+					host = strings.ReplaceAll(host, ph, toString(v))
+				}
+			}
 		}
-		if len(hosts) <= 0 {
-			continue
-		}
-		host := hosts[0]
 		host = utils.ExtractHostPort(host)
 
 		defaultHost, defaultPort, _ := utils.ParseStringToHostPort(host)
