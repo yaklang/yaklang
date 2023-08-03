@@ -675,16 +675,21 @@ RECONNECT:
 	if conn == nil {
 		// no proxy
 
+		var extraDNS []yakdns.DNSOption
+		if len(dnsServers) > 0 {
+			extraDNS = append(extraDNS, yakdns.WithDNSServers(dnsServers...), yakdns.WithDNSDisableSystemResolver(true))
+		}
+		if dnsHosts != nil && len(dnsHosts) > 0 {
+			extraDNS = append(extraDNS, yakdns.WithTemporaryHosts(dnsHosts))
+		}
+
 		// DNS Resolve
 		// ATTENTION: DO DNS AFTER PROXY CONN!
 		var ip = host
 		var addr string
 		startDNS := time.Now()
 		if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-			var ips = yakdns.LookupFirst(host,
-				yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...),
-				yakdns.WithTemporaryHosts(dnsHosts),
-			)
+			var ips = yakdns.LookupFirst(host, extraDNS...)
 			traceInfo.DNSTime = time.Since(startDNS)
 			if ips == "" {
 				return response, utils.Errorf("[%vms] dns failed for querying: %s", traceInfo.DNSTime.Milliseconds(), host)
