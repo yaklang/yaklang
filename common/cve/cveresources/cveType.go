@@ -393,6 +393,10 @@ func YieldCVEs(db *gorm.DB, ctx context.Context) chan *CVE {
 }
 
 func GetCVE(db *gorm.DB, id string) (*CVE, error) {
+	if db == nil {
+		return nil, utils.Errorf("db is nil")
+	}
+
 	var req CVE
 	if db := db.Model(&CVE{}).Where("cve = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get CVE failed: %s", db.Error)
