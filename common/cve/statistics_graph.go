@@ -12,12 +12,14 @@ import (
 )
 
 type Graph struct {
-	Name        string    `json:"name"`
-	NameVerbose string    `json:"name_verbose"`
-	Type        string    `json:"type"`
-	TypeVerbose string    `json:"type_verbose"`
-	Data        []*KVPair `json:"data"`
-	Reason      string    `json:"reason"` // 如果数据为空的时候，展示原因
+	Name            string    `json:"name"`
+	NameVerbose     string    `json:"name_verbose"`
+	Type            string    `json:"type"`
+	TypeVerbose     string    `json:"type_verbose"`
+	Data            []*KVPair `json:"data"`
+	Reason          string    `json:"reason"` // 如果数据为空的时候，展示原因
+	ComplexityGroup string    `json:"complexity_group"`
+	AccessVector    string    `json:"access_vector"`
 }
 
 func severityVerbose(i string) string {
@@ -187,17 +189,20 @@ func (s *Statistics) ToGraphs() []*Graph {
 			Value:      count,
 			ShowValue:  count,
 			KeyVerbose: complexityVerbose(key),
+			JumpLink:   key,
 		})
 	}
 	sort.SliceStable(pairs, func(i, j int) bool {
 		return pairs[i].Value > pairs[i].Value
 	})
 	g = &Graph{
-		Name:        "network-attack-complexity-analysis",
-		NameVerbose: "漏洞利用复杂度统计(可联网攻击)",
-		Type:        "general",
-		TypeVerbose: "通用KV",
-		Data:        pairs,
+		Name:            "network-attack-complexity-analysis",
+		NameVerbose:     "漏洞利用复杂度统计(可联网攻击)",
+		Type:            "general",
+		TypeVerbose:     "通用KV",
+		Data:            pairs,
+		AccessVector:    "NETWORK",
+		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
 	}
 	graphs = append(graphs, g)
 
@@ -209,17 +214,20 @@ func (s *Statistics) ToGraphs() []*Graph {
 			Value:      count,
 			ShowValue:  count,
 			KeyVerbose: complexityVerbose(key),
+			JumpLink:   key,
 		})
 	}
 	sort.SliceStable(pairs, func(i, j int) bool {
 		return pairs[i].Value > pairs[i].Value
 	})
 	g = &Graph{
-		Name:        "local-attack-complexity-analysis",
-		NameVerbose: "漏洞利用复杂度统计(仅本地攻击)",
-		Type:        "general",
-		TypeVerbose: "通用KV",
-		Data:        pairs,
+		Name:            "local-attack-complexity-analysis",
+		NameVerbose:     "漏洞利用复杂度统计(仅本地攻击)",
+		Type:            "general",
+		TypeVerbose:     "通用KV",
+		Data:            pairs,
+		AccessVector:    "LOCAL",
+		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
 	}
 	graphs = append(graphs, g)
 
@@ -231,17 +239,19 @@ func (s *Statistics) ToGraphs() []*Graph {
 			Value:      count,
 			ShowValue:  count,
 			KeyVerbose: complexityVerbose(key),
+			JumpLink:   key,
 		})
 	}
 	sort.SliceStable(pairs, func(i, j int) bool {
 		return pairs[i].Value > pairs[i].Value
 	})
 	g = &Graph{
-		Name:        "access-complexity-analysis",
-		NameVerbose: "漏洞利用复杂度统计",
-		Type:        "general",
-		TypeVerbose: "通用KV",
-		Data:        pairs,
+		Name:            "access-complexity-analysis",
+		NameVerbose:     "漏洞利用复杂度统计",
+		Type:            "general",
+		TypeVerbose:     "通用KV",
+		Data:            pairs,
+		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
 	}
 	graphs = append(graphs, g)
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
@@ -324,7 +325,11 @@ func _saveRisk(r *Risk) error {
 		log.Error("empty database")
 		return utils.Errorf("no database connection")
 	}
-
+	cveData, _ := cveresources.GetCVE(consts.GetGormCVEDatabase().Model(&cveresources.CVE{}), r.CVE)
+	if cveData != nil {
+		r.CveAccessVector = cveData.AccessVector
+		r.CveAccessComplexity = cveData.AccessComplexity
+	}
 	count := 0
 	for {
 		count++
