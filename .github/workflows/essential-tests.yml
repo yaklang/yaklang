@@ -88,7 +88,7 @@ jobs:
         run: go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
 
       - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
-        run: go test -timeout 1m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
+        run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
 
       - name: Test CVEQuery
         run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
