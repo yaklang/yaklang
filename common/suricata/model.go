@@ -184,8 +184,19 @@ type ContentRule struct {
 	// won't support
 	RPC string // sunrpc call
 	// won't support
-	Replace []byte
-	PCRE    string
+	Replace     []byte
+	PCRE        string
+	FastPattern bool
+
+	// e.g set,bihinder3
+	FlowBits     string
+	FlowInt      string
+	XBits        string
+	NoAlert      bool
+	Base64Decode string
+	Base64Data   bool
+
+	ExtraFlags []string
 
 	Modifier Modifier
 }

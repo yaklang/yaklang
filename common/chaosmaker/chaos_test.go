@@ -19,6 +19,7 @@ type ruleTest struct {
 	id           string
 }
 
+// test table
 var rules = []*ruleTest{
 	{
 		rule:         `alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,

@@ -20,6 +20,13 @@ var dnsHandler = &chaosHandler{
 		}
 
 		dnsRule := rule.ContentRuleConfig.DNS
+		if dnsRule == nil {
+			/*
+				func (r *dnsRule) GetOpcode() { if r == nil {return ...} }
+			*/
+			log.Errorf("[BUG]: not prepared dns config from: %v", rule.Raw)
+			return nil
+		}
 
 		var baseUDPLayer = &layers.UDP{}
 		var baseDNSLayer = &layers.DNS{}
