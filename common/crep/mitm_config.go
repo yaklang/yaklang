@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/martian/v3"
@@ -24,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -228,7 +226,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 }
 
 func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
-	proxyFunc := http.ProxyFromEnvironment
+	var proxyFunc func(r *http.Request) (*url.URL, error) // := http.ProxyFromEnvironment
 	if opts.Proxy != "" {
 		parsedURL, err := url.Parse(opts.Proxy)
 		if err != nil {
@@ -246,38 +244,20 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		}
 		certificates = append(certificates, *clientCertificate)
 	}
-	dialer := NewDialer(&net.Dialer{
-		Timeout: time.Duration(opts.DialTimeout) * time.Second,
-	}, func(ctx context.Context, network, address string) (string, error) {
-		host, port, err := net.SplitHostPort(address)
-		ip, err := func() (string, error) {
-			if err != nil {
-				return "", err
-			}
-			if v, ok := opts.HostMapping[host]; ok {
-				return v, nil
-			} else if v, ok := lowhttp.GetSystemHostByName(host); ok {
-				return v, nil
-			}
-			if len(opts.DnsServers) == 0 { // 未指定dns服务器默认使用系统dns解析
-				timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.DnsResolveTimeout)*time.Second)
-				defer cancel()
-				ips, err := net.DefaultResolver.LookupHost(timeoutCtx, host)
-				if err != nil {
-					return "", err
-				}
-				if len(ips) == 0 {
-					return "", errors.New("resolve host failed")
-				}
-				return ips[0], nil
-			}
-			return yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second), yakdns.WithDNSServers(opts.DnsServers...)), nil
-		}()
-		return utils.HostPort(ip, port), err
-	})
+
+	var extraDNSOpt []yakdns.DNSOption
+	if len(opts.DnsServers) > 0 {
+		extraDNSOpt = append(extraDNSOpt, yakdns.WithDNSServers(opts.DnsServers...), yakdns.WithDNSDisableSystemResolver(true))
+	}
+	for host, ip := range opts.HostMapping {
+		yakdns.AddHost(host, ip)
+	}
+	var dialContext = yakdns.NewDialContextFunc(
+		time.Duration(opts.DialTimeout)*time.Second,
+		extraDNSOpt...)
 	t := &http.Transport{
 		Proxy:                 proxyFunc,
-		DialContext:           dialer.DialContext,
+		DialContext:           dialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,
 		MaxIdleConns:          opts.MaxIdleConns,
@@ -328,85 +308,90 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 	}
 
 	if opts.EnableGMTLS {
-		if opts.PreferGM {
-			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				var conn net.Conn
-				var err error
-				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
-				if err != nil {
-					return nil, err
-				}
-				addr = ipAddr
-				conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
-					GMSupport:          &gmtls.GMSupport{},
-					InsecureSkipVerify: true,
-					Certificates:       gmCerts,
-				})
-				if err == nil {
-					return conn, nil
-				}
-				if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
-					return nil, err
-				}
-				conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
-					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-					MaxVersion:         tls.VersionTLS13,
-					InsecureSkipVerify: true,
-				})
-				if err != nil {
-					return nil, err
-				}
-				return conn, nil
-			}
-		} else if opts.OnlyGM {
-			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
-				if err != nil {
-					return nil, err
-				}
-				addr = ipAddr
-				conn, err := gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
-					GMSupport:          &gmtls.GMSupport{},
-					InsecureSkipVerify: true,
-					Certificates:       gmCerts,
-				})
-				if err != nil {
-					return nil, err
-				}
-				return conn, nil
-			}
-		} else {
-			t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				var conn net.Conn
-				var err error
-				ipAddr, err := dialer.resolverHandle(ctx, network, addr)
-				if err != nil {
-					return nil, err
-				}
-				addr = ipAddr
-				conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
-					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-					MaxVersion:         tls.VersionTLS13,
-					InsecureSkipVerify: true,
-				})
-				if err == nil {
-					return conn, nil
-				}
-				if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
-					return nil, err
-				}
-				conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
-					GMSupport:          &gmtls.GMSupport{},
-					InsecureSkipVerify: true,
-					Certificates:       gmCerts,
-				})
-				if err != nil {
-					return nil, err
-				}
-				return conn, nil
-			}
-		}
-
+		var gmDialCtx = yakdns.NewDialGMTLSContextFunc(
+			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
+			extraDNSOpt...)
+		t.DialContext = dialContext
+		t.DialTLSContext = gmDialCtx
+		//if opts.PreferGM {
+		//
+		//	//t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		//	//	var conn net.Conn
+		//	//	var err error
+		//	//	ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+		//	//	if err != nil {
+		//	//		return nil, err
+		//	//	}
+		//	//	addr = ipAddr
+		//	//	conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+		//	//		GMSupport:          &gmtls.GMSupport{},
+		//	//		InsecureSkipVerify: true,
+		//	//		Certificates:       gmCerts,
+		//	//	})
+		//	//	if err == nil {
+		//	//		return conn, nil
+		//	//	}
+		//	//	if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+		//	//		return nil, err
+		//	//	}
+		//	//	conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
+		//	//		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+		//	//		MaxVersion:         tls.VersionTLS13,
+		//	//		InsecureSkipVerify: true,
+		//	//	})
+		//	//	if err != nil {
+		//	//		return nil, err
+		//	//	}
+		//	//	return conn, nil
+		//	//}
+		//} else if opts.OnlyGM {
+		//	t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		//		ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		addr = ipAddr
+		//		conn, err := gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+		//			GMSupport:          &gmtls.GMSupport{},
+		//			InsecureSkipVerify: true,
+		//			Certificates:       gmCerts,
+		//		})
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		return conn, nil
+		//	}
+		//} else {
+		//	t.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		//		var conn net.Conn
+		//		var err error
+		//		ipAddr, err := dialer.resolverHandle(ctx, network, addr)
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		addr = ipAddr
+		//		conn, err = tls.DialWithDialer(dialer.dialer, network, addr, &tls.Config{
+		//			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+		//			MaxVersion:         tls.VersionTLS13,
+		//			InsecureSkipVerify: true,
+		//		})
+		//		if err == nil {
+		//			return conn, nil
+		//		}
+		//		if err != nil && !strings.Contains(err.Error(), "protocol version not supported") {
+		//			return nil, err
+		//		}
+		//		conn, err = gmtls.DialWithDialer(dialer.dialer, network, addr, &gmtls.Config{
+		//			GMSupport:          &gmtls.GMSupport{},
+		//			InsecureSkipVerify: true,
+		//			Certificates:       gmCerts,
+		//		})
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		return conn, nil
+		//	}
+		//}
 	}
 	return t, nil
 }
