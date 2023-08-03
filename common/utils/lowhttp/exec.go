@@ -585,6 +585,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if port <= 0 {
 		return response, utils.Errorf("empty port...")
 	}
+	var originAddr = utils.HostPort(host, port)
 
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -594,43 +595,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		retryTimes = 0
 	}
 
-	// 修正域名的情况
-	var ip string = host
 	response.TraceInfo.AvailableDNSServers = dnsServers
 	response.RuntimeId = option.RuntimeId
 	response.FromPlugin = option.FromPlugin
-	startDNS := time.Now()
-	if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-		var ips string
-		if dnsHosts != nil {
-			raw, ok := dnsHosts[host]
-			if ok {
-				ips = raw
-			} else {
-				raw2, ok2 := GetSystemHostByName(host)
-				if ok2 {
-					ips = raw2
-				}
-			}
-		}
-
-		if ips == "" {
-			ips = yakdns.LookupFirst(host, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...))
-		}
-		traceInfo.DNSTime = time.Since(startDNS)
-		if ips == "" {
-			return response, utils.Errorf("[%vms] dns failed for querying: %s", traceInfo.DNSTime.Milliseconds(), host)
-		}
-		ip = ips
-	}
-
-	var targetAddr string
-	if ip != host {
-		targetAddr = utils.HostPort(ip, port)
-	} else {
-		targetAddr = utils.HostPort(host, port)
-	}
-	response.RemoteAddr = utils.HostPort(ip, port)
 
 	// 修复CRLF
 	r = FixHTTPPacketCRLF(r, noFixContentLength)
@@ -671,7 +638,7 @@ RECONNECT:
 		// retry when timeout
 		for retry = 0; retry <= retryTimes; retry++ {
 			start := time.Now()
-			proxyConnIns, err = GetProxyConnWithContext(ctx, targetAddr, proxyUrl, timeout)
+			proxyConnIns, err = GetProxyConnWithContext(ctx, originAddr, proxyUrl, timeout)
 			traceInfo.ConnTime = time.Since(start)
 
 			if err == nil || !isErrorTimeout(err) {
@@ -706,6 +673,29 @@ RECONNECT:
 	response.Https = https
 
 	if conn == nil {
+		// no proxy
+
+		// DNS Resolve
+		// ATTENTION: DO DNS AFTER PROXY CONN!
+		var ip = host
+		var addr string
+		startDNS := time.Now()
+		if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
+			var ips = yakdns.LookupFirst(host,
+				yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...),
+				yakdns.WithTemporaryHosts(dnsHosts),
+			)
+			traceInfo.DNSTime = time.Since(startDNS)
+			if ips == "" {
+				return response, utils.Errorf("[%vms] dns failed for querying: %s", traceInfo.DNSTime.Milliseconds(), host)
+			}
+			ip = ips
+			addr = utils.HostPort(ip, port)
+		} else {
+			addr = utils.HostPort(host, port)
+		}
+		response.RemoteAddr = addr
+
 		switch https {
 		case false:
 			// retry when timeout
@@ -749,12 +739,9 @@ RECONNECT:
 			if err != nil {
 				return response, err
 			}
-			//conn, err = tls.DialWithDialer(tcpDailer, "tcp", utils.HostPort(ip, port))
-			//if err != nil {
-			//	return nil, utils.Errorf("tls dial %v failed: %s", utils.HostPort(ip, port), err)
-			//}
 		}
 	} else {
+		response.RemoteAddr = conn.RemoteAddr().String()
 		if https {
 			conn, err = GetTLSConn(gmTLS, option.VerifyCertificate, enableHttp2, host, conn, timeout)
 			if err != nil {
