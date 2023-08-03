@@ -13,6 +13,7 @@ type KVPair struct {
 	ShowValue  int    `json:"show_value"`
 	KeyVerbose string `json:"key_verbose"`
 	Detail     string `json:"detail"`
+	JumpLink   string `json:"jump_link"`
 }
 
 func NewStatistics(source string) *Statistics {
