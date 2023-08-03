@@ -123,9 +123,9 @@ func ParseNucleiTag(raw string) []*NucleiTagData {
 	return data
 }
 
-func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
-	if strings.Contains(raw, "{{") {
-		raw = ExpandPreprocessor(raw)
+func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error) {
+	if strings.Contains(tplRaw, "{{") {
+		tplRaw = ExpandPreprocessor(tplRaw)
 	}
 
 	yakTemp := &YakTemplate{}
@@ -135,42 +135,51 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 	placeHolderMap := map[string]string{
 		ph: "reverse_url",
 	}
+	tagsToPlaceHolderMap := make(map[string]string, 0)
+
 	for _, interactshTag := range []string{nucleiReverseTag, `{{interactsh}}`, `{{interactsh_url}}`, `interactsh`} {
 		if !yakTemp.ReverseConnectionNeed {
-			yakTemp.ReverseConnectionNeed = strings.Contains(raw, interactshTag)
+			yakTemp.ReverseConnectionNeed = strings.Contains(tplRaw, interactshTag)
 		}
 	}
 	if yakTemp.ReverseConnectionNeed {
-		raw = strings.ReplaceAll(raw, nucleiReverseTag, ph)
+		tplRaw = strings.ReplaceAll(tplRaw, nucleiReverseTag, ph)
 	}
 
 	// other vars
-	replaceNucleiTags := func(nucleiTags, paramsKey string) {
+	registerNucleiTags := func(nucleiTags, paramsKey string) string {
 		ph := GetPlaceHolderMap()
 		placeHolderMap[ph] = paramsKey
-		raw = strings.ReplaceAll(raw, nucleiTags, ph)
+		tagsToPlaceHolderMap[nucleiTags] = ph
+		return ph
 	}
-	replaceNucleiTags(`{{BaseURL}}`, "__base_url__")
-	replaceNucleiTags(`{{BaseUrl}}`, "__base_url__")
-	replaceNucleiTags(`{{RootURL}}`, "__root_url__")
-	replaceNucleiTags(`{{RootUrl}}`, "__root_url__")
-	replaceNucleiTags(`{{Hostname}}`, "__hostname__")
-	replaceNucleiTags(`{{Host}}`, "__host__")
-	replaceNucleiTags(`{{Port}}`, "__port__")
-	replaceNucleiTags(`{{Path}}`, "__path__")
-	replaceNucleiTags(`{{File}}`, "__file__")
-	replaceNucleiTags(`{{Schema}}`, "__schema__")
-	if variableRegexp.MatchString(raw) {
-		raw = variableRegexp.ReplaceAllStringFunc(raw, func(s string) string {
+	replaceNucleiTags := func(r, nucleiTags, paramsKey string) string {
+		ph := registerNucleiTags(nucleiTags, paramsKey)
+		r = strings.ReplaceAll(r, nucleiTags, ph)
+		return r
+	}
+	tplRaw = replaceNucleiTags(tplRaw, `{{BaseURL}}`, "__base_url__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{BaseUrl}}`, "__base_url__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{RootURL}}`, "__root_url__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{RootUrl}}`, "__root_url__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{Hostname}}`, "__hostname__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{Host}}`, "__host__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{Port}}`, "__port__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{Path}}`, "__path__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{File}}`, "__file__")
+	tplRaw = replaceNucleiTags(tplRaw, `{{Schema}}`, "__schema__")
+	if variableRegexp.MatchString(tplRaw) {
+		tplRaw = variableRegexp.ReplaceAllStringFunc(tplRaw, func(s string) string {
 			paramsKey := strings.Trim(s, "{}")
 			ph := GetPlaceHolderMap()
 			placeHolderMap[ph] = paramsKey
+			tagsToPlaceHolderMap[s] = ph
 			return ph
 		})
 	}
 
 	var mid = map[string]interface{}{}
-	err := yaml.Unmarshal([]byte(raw), &mid)
+	err := yaml.Unmarshal([]byte(tplRaw), &mid)
 	if err != nil {
 		return nil, utils.Errorf("unmarshal nuclei template failed: %v", err)
 	}
@@ -204,7 +213,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 			return nil, utils.Errorf("nuclei template `headless(crawler)` is not supported (*)")
 		} else {
 			log.Warnf("-----------------NUCLEI FORMATTER CANNOT FIX--------------------")
-			fmt.Println(raw)
+			fmt.Println(tplRaw)
 			return nil, utils.Errorf("nuclei template requests is not slice")
 		}
 	}
@@ -260,14 +269,17 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 			paths := utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
 			for _, path := range paths {
 				var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", method, path)
-				if strings.HasPrefix(path, "{{BaseURL}}") {
-					if len(path) > 11 && path[11] == '/' {
-						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", "{{params(__path_trim_end_slash__)}}"))
+				baseURLph := tagsToPlaceHolderMap["{{BaseURL}}"]
+				if strings.HasPrefix(path, baseURLph) {
+					if strings.HasPrefix(path, fmt.Sprintf("%s/", baseURLph)) {
+						ph = registerNucleiTags("{{EndSlashBaseURL}}", "__path_trim_end_slash__")
+						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{BaseURL}}"], ph))
 					} else {
-						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", "{{params(__path__)}}"))
+						ph = tagsToPlaceHolderMap["{{BaseURL}}"]
+						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", ph))
 					}
-				} else if strings.HasPrefix(path, "{{RootURL}}") {
-					firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{RootURL}}", ""))
+				} else if strings.HasPrefix(path, tagsToPlaceHolderMap["{{RootURL}}"]) {
+					firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{RootURL}}"], ""))
 				}
 				firstLine = nucleiFormatToFuzzTagMode(firstLine)
 
@@ -279,7 +291,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(raw string) (*YakTemplate, error) {
 				_, hostOk1 := headers["Host"]
 				_, hostOk2 := headers["host"]
 				if !hostOk1 && !hostOk2 {
-					lines = append(lines, "Host: {{params(__hostname__)}}")
+					lines = append(lines, "Host: "+tagsToPlaceHolderMap["{{Hostname}}"])
 				}
 				for k, v := range headers {
 					lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatToFuzzTagMode(utils.InterfaceToString(v))))
