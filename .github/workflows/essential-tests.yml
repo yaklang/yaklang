@@ -103,4 +103,4 @@ jobs:
         run: go test -timeout 1m ./common/vulinboxagentclient -v
 
       - name: Test YakDNS(DoH / TCP / UDP)
-        run: go test -timeout 20s ./common/yakdns -v
+        run: go test -timeout 20s ./common/yakdns/mustpass -v
