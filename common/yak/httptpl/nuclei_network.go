@@ -35,7 +35,7 @@ func buildNetworkRequests(inputs []*YakTcpInput, hosts []string) *YakNetworkBulk
 	}
 }
 
-func parseNetworkBulk(ret []any) ([]*YakNetworkBulkConfig, error) {
+func parseNetworkBulk(ret []any, tagsToPlaceHolderMap map[string]string) ([]*YakNetworkBulkConfig, error) {
 	var confs []*YakNetworkBulkConfig
 	for _, i := range utils.InterfaceToSliceInterface(ret) {
 		data := utils.InterfaceToGeneralMap(i)

@@ -295,7 +295,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					opt(lowhttpConfig)
 				}
 
-				err := tcpReq.Execute(config, p, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
+				err := tcpReq.Execute(config, p, y.PlaceHolderMap, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
 					config.ExecuteTCPResultCallback(y, tcpReq, response, matched, extractorResults)
 					if config.Debug || config.DebugResponse {
