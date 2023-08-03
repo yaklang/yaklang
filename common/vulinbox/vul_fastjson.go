@@ -7,7 +7,6 @@ import (
 	"fmt"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"net/http"
 	"regexp"
@@ -19,6 +18,8 @@ import (
 var fastjson_loginPage []byte
 
 type JsonParser func(data string) (map[string]any, error)
+
+var DnsRecord = []string{}
 
 func generateFastjsonParser(version string) JsonParser {
 	if version == "intranet" { // 内网版本，不能成功解析 payload 中的 dnslog 且解析超时
@@ -39,7 +40,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var dnslog string
 	// 查找dnslog
-	re, err := regexp.Compile(`\w+\.((\.dnslog\.cn)|(\.ceye\.io)|(\.vcap\.me)|(\.vcap\.io)|(\.xip\.io)|(\.burpcollaborator\.net)|(dnstunnel\.run))`)
+	re, err := regexp.Compile(`\w+((\.dnslog\.cn)|(\.ceye\.io)|(\.vcap\.me)|(\.vcap\.io)|(\.xip\.io)|(\.burpcollaborator\.net)|(dnstunnel\.run))`)
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +51,9 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 			dnslog = forceDnslog[0]
 		}
 	}
-
-	yakdns.LookupFirst(dnslog, yakdns.WithTimeout(5*time.Second))
+	if dnslog != "" {
+		DnsRecord = append(DnsRecord, dnslog)
+	}
 	var js map[string]any
 	err = json.Unmarshal([]byte(data), &js)
 	if err != nil {

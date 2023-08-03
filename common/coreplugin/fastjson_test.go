@@ -2,14 +2,49 @@ package coreplugin
 
 import (
 	"context"
+	"errors"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
+	domainMap := map[string]string{}
+	yaklib.RiskExports["NewDNSLogDomain"] = func() (string, string, error) {
+		token := utils.RandStringBytes(10)
+		domainMap[token] = token + ".dnslog.cn"
+		return token + ".dnslog.cn", token, nil
+	}
+	yaklib.RiskExports["CheckDNSLogByToken"] = func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+		t := 0.0
+		if len(timeout) > 0 {
+			t = timeout[0]
+		}
+		if v, ok := domainMap[token]; ok {
+			res := []*tpb.DNSLogEvent{}
+			for _, domain := range vulinbox.DnsRecord {
+				if strings.HasSuffix(domain, v) {
+					res = append(res, &tpb.DNSLogEvent{
+						Domain: domain,
+					})
+				}
+			}
+			if len(res) == 0 {
+				time.Sleep(utils.FloatSecondDuration(t))
+			}
+			return res, nil
+		}
+		return nil, errors.New("not found record")
+	}
+	yaklang.Import("risk", yaklib.RiskExports)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
