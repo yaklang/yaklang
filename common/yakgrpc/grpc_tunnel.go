@@ -98,7 +98,7 @@ func (s *Server) RequireDNSLogDomainByScript(ctx context.Context, req *ypb.Requi
 		if err != nil {
 			return nil, utils.Errorf("execute file %s code failed: %s", req.GetScriptName(), err.Error())
 		}
-		result, err := engine.CallYakFunction(context.Background(), "require", []interface{}{})
+		result, err := engine.CallYakFunction(context.Background(), "requireDomain", []interface{}{})
 		if err != nil {
 			return nil, utils.Errorf("import %v' s handle failed: %s", req.GetScriptName(), err)
 		}
@@ -169,7 +169,7 @@ func (s *Server) QueryDNSLogTokenByScript(ctx context.Context, req *ypb.RequireD
 		if err != nil {
 			return nil, utils.Errorf("execute file %s code failed: %s", req.GetScriptName(), err.Error())
 		}
-		result, err := engine.CallYakFunction(context.Background(), "getResult", []interface{}{req.GetToken()})
+		result, err := engine.CallYakFunction(context.Background(), "getResults", []interface{}{req.GetToken()})
 		if err != nil {
 			return nil, utils.Errorf("import %v' s handle failed: %s", req.GetScriptName(), err)
 		}
