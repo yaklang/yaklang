@@ -48,8 +48,7 @@ func _failed(msg ...interface{}) {
 }
 func yakitOutputHelper(i interface{}) {
 	if yakitClientInstance != nil {
-		level, data := MarshalYakitOutput(i)
-		yakitClientInstance.YakitLog(level, data)
+		yakitClientInstance.Output(i)
 	}
 }
 func _diewith(err interface{}) {
