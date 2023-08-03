@@ -156,6 +156,7 @@ const (
 	REPORT_ITEM_TYPE_MARKDOWN             = "markdown"
 	REPORT_ITEM_TYPE_DIVIDER              = "divider"
 	REPORT_ITEM_TYPE_TABLE                = "json-table"
+	REPORT_ITEM_SEARCH_TYPE_TABLE         = "search-json-table"
 	REPORT_ITEM_TYPE_PIE_GRAPH            = "pie-graph"
 	REPORT_ITEM_TYPE_VERTICAL_BAR_GRAPH   = "vertical-bar-graph"
 	REPORT_ITEM_TYPE_HORIZONTAL_BAR_GRAPH = "horizontal-bar-graph"
@@ -320,6 +321,36 @@ func (r *Report) Table(i interface{}, raw ...interface{}) {
 	}
 	r.append(&ReportItem{
 		Type:    REPORT_ITEM_TYPE_TABLE,
+		Content: string(rawBytes),
+	})
+}
+
+func (r *Report) SearchTable(i interface{}, raw ...interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("create table failed: %s", err)
+		}
+	}()
+	headers := funk.Map(i, func(result interface{}) string {
+		return utils.InterfaceToString(result)
+	}).([]string)
+	var data = make([][]string, len(raw))
+	for index, rawIns := range raw {
+		dataRow := funk.Map(rawIns, func(row interface{}) string {
+			return utils.InterfaceToString(row)
+		}).([]string)
+		data[index] = dataRow
+	}
+	rawBytes, err := json.Marshal(map[string]interface{}{
+		"header": headers,
+		"data":   data,
+	})
+	if err != nil {
+		log.Errorf("marshal bytes failed: %s", err)
+		return
+	}
+	r.append(&ReportItem{
+		Type:    REPORT_ITEM_SEARCH_TYPE_TABLE,
 		Content: string(rawBytes),
 	})
 }
