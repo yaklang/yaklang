@@ -7,6 +7,7 @@ import (
 	"fmt"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"net/http"
 	"regexp"
@@ -50,7 +51,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		}
 	}
 
-	utils2.GetFirstIPByDnsWithCache(dnslog, 5*time.Second)
+	yakdns.LookupFirst(dnslog, yakdns.WithTimeout(5*time.Second))
 	var js map[string]any
 	err = json.Unmarshal([]byte(data), &js)
 	if err != nil {
