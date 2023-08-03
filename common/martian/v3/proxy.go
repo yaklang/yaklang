@@ -630,6 +630,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		if host, port, err := utils.ParseStringToHostPort(req.URL.String()); err == nil {
 			connectedTo = utils.HostPort(host, port)
 		}
+		if req.URL.Scheme == "https" {
+			connectedTo = strings.TrimSuffix(connectedTo, ":443")
+		}
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
 
 		if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -955,10 +958,17 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 
 	val, ok := ctx.Session().Get(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	if ok {
+		// If we have a connected to value, then we should set it on the request
+		connected := fmt.Sprint(val)
+		if req.URL != nil {
+			if req.URL.Scheme == "https" {
+				connected = strings.TrimSuffix(connected, ":443")
+			}
+		}
 		httpctx.SetContextValueInfoFromRequest(
 			req,
 			httpctx.REQUEST_CONTEXT_KEY_ConnectedTo,
-			val,
+			connected,
 		)
 	}
 	return p.roundTripper.RoundTrip(req)
