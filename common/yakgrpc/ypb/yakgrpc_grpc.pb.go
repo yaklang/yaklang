@@ -188,7 +188,9 @@ const (
 	Yak_SetYakBridgeLogServer_FullMethodName                      = "/ypb.Yak/SetYakBridgeLogServer"
 	Yak_GetCurrentYakBridgeLogServer_FullMethodName               = "/ypb.Yak/GetCurrentYakBridgeLogServer"
 	Yak_RequireDNSLogDomain_FullMethodName                        = "/ypb.Yak/RequireDNSLogDomain"
+	Yak_RequireDNSLogDomainByScript_FullMethodName                = "/ypb.Yak/RequireDNSLogDomainByScript"
 	Yak_QueryDNSLogByToken_FullMethodName                         = "/ypb.Yak/QueryDNSLogByToken"
+	Yak_QueryDNSLogTokenByScript_FullMethodName                   = "/ypb.Yak/QueryDNSLogTokenByScript"
 	Yak_RequireICMPRandomLength_FullMethodName                    = "/ypb.Yak/RequireICMPRandomLength"
 	Yak_QueryICMPTrigger_FullMethodName                           = "/ypb.Yak/QueryICMPTrigger"
 	Yak_RequireRandomPortToken_FullMethodName                     = "/ypb.Yak/RequireRandomPortToken"
@@ -495,7 +497,9 @@ type YakClient interface {
 	SetYakBridgeLogServer(ctx context.Context, in *YakDNSLogBridgeAddr, opts ...grpc.CallOption) (*Empty, error)
 	GetCurrentYakBridgeLogServer(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakDNSLogBridgeAddr, error)
 	RequireDNSLogDomain(ctx context.Context, in *YakDNSLogBridgeAddr, opts ...grpc.CallOption) (*DNSLogRootDomain, error)
+	RequireDNSLogDomainByScript(ctx context.Context, in *RequireDNSLogDomainByScriptRequest, opts ...grpc.CallOption) (*DNSLogRootDomain, error)
 	QueryDNSLogByToken(ctx context.Context, in *QueryDNSLogByTokenRequest, opts ...grpc.CallOption) (*QueryDNSLogByTokenResponse, error)
+	QueryDNSLogTokenByScript(ctx context.Context, in *RequireDNSLogDomainByScriptRequest, opts ...grpc.CallOption) (*QueryDNSLogByTokenResponse, error)
 	RequireICMPRandomLength(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RequireICMPRandomLengthResponse, error)
 	QueryICMPTrigger(ctx context.Context, in *QueryICMPTriggerRequest, opts ...grpc.CallOption) (*QueryICMPTriggerResponse, error)
 	RequireRandomPortToken(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RandomPortInfo, error)
@@ -2668,9 +2672,27 @@ func (c *yakClient) RequireDNSLogDomain(ctx context.Context, in *YakDNSLogBridge
 	return out, nil
 }
 
+func (c *yakClient) RequireDNSLogDomainByScript(ctx context.Context, in *RequireDNSLogDomainByScriptRequest, opts ...grpc.CallOption) (*DNSLogRootDomain, error) {
+	out := new(DNSLogRootDomain)
+	err := c.cc.Invoke(ctx, Yak_RequireDNSLogDomainByScript_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) QueryDNSLogByToken(ctx context.Context, in *QueryDNSLogByTokenRequest, opts ...grpc.CallOption) (*QueryDNSLogByTokenResponse, error) {
 	out := new(QueryDNSLogByTokenResponse)
 	err := c.cc.Invoke(ctx, Yak_QueryDNSLogByToken_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryDNSLogTokenByScript(ctx context.Context, in *RequireDNSLogDomainByScriptRequest, opts ...grpc.CallOption) (*QueryDNSLogByTokenResponse, error) {
+	out := new(QueryDNSLogByTokenResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryDNSLogTokenByScript_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4231,7 +4253,9 @@ type YakServer interface {
 	SetYakBridgeLogServer(context.Context, *YakDNSLogBridgeAddr) (*Empty, error)
 	GetCurrentYakBridgeLogServer(context.Context, *Empty) (*YakDNSLogBridgeAddr, error)
 	RequireDNSLogDomain(context.Context, *YakDNSLogBridgeAddr) (*DNSLogRootDomain, error)
+	RequireDNSLogDomainByScript(context.Context, *RequireDNSLogDomainByScriptRequest) (*DNSLogRootDomain, error)
 	QueryDNSLogByToken(context.Context, *QueryDNSLogByTokenRequest) (*QueryDNSLogByTokenResponse, error)
+	QueryDNSLogTokenByScript(context.Context, *RequireDNSLogDomainByScriptRequest) (*QueryDNSLogByTokenResponse, error)
 	RequireICMPRandomLength(context.Context, *Empty) (*RequireICMPRandomLengthResponse, error)
 	QueryICMPTrigger(context.Context, *QueryICMPTriggerRequest) (*QueryICMPTriggerResponse, error)
 	RequireRandomPortToken(context.Context, *Empty) (*RandomPortInfo, error)
@@ -4885,8 +4909,14 @@ func (UnimplementedYakServer) GetCurrentYakBridgeLogServer(context.Context, *Emp
 func (UnimplementedYakServer) RequireDNSLogDomain(context.Context, *YakDNSLogBridgeAddr) (*DNSLogRootDomain, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequireDNSLogDomain not implemented")
 }
+func (UnimplementedYakServer) RequireDNSLogDomainByScript(context.Context, *RequireDNSLogDomainByScriptRequest) (*DNSLogRootDomain, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequireDNSLogDomainByScript not implemented")
+}
 func (UnimplementedYakServer) QueryDNSLogByToken(context.Context, *QueryDNSLogByTokenRequest) (*QueryDNSLogByTokenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryDNSLogByToken not implemented")
+}
+func (UnimplementedYakServer) QueryDNSLogTokenByScript(context.Context, *RequireDNSLogDomainByScriptRequest) (*QueryDNSLogByTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryDNSLogTokenByScript not implemented")
 }
 func (UnimplementedYakServer) RequireICMPRandomLength(context.Context, *Empty) (*RequireICMPRandomLengthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequireICMPRandomLength not implemented")
@@ -8326,6 +8356,24 @@ func _Yak_RequireDNSLogDomain_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_RequireDNSLogDomainByScript_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequireDNSLogDomainByScriptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RequireDNSLogDomainByScript(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_RequireDNSLogDomainByScript_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RequireDNSLogDomainByScript(ctx, req.(*RequireDNSLogDomainByScriptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_QueryDNSLogByToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryDNSLogByTokenRequest)
 	if err := dec(in); err != nil {
@@ -8340,6 +8388,24 @@ func _Yak_QueryDNSLogByToken_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).QueryDNSLogByToken(ctx, req.(*QueryDNSLogByTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryDNSLogTokenByScript_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequireDNSLogDomainByScriptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryDNSLogTokenByScript(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryDNSLogTokenByScript_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryDNSLogTokenByScript(ctx, req.(*RequireDNSLogDomainByScriptRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -10792,8 +10858,16 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_RequireDNSLogDomain_Handler,
 		},
 		{
+			MethodName: "RequireDNSLogDomainByScript",
+			Handler:    _Yak_RequireDNSLogDomainByScript_Handler,
+		},
+		{
 			MethodName: "QueryDNSLogByToken",
 			Handler:    _Yak_QueryDNSLogByToken_Handler,
+		},
+		{
+			MethodName: "QueryDNSLogTokenByScript",
+			Handler:    _Yak_QueryDNSLogTokenByScript_Handler,
 		},
 		{
 			MethodName: "RequireICMPRandomLength",

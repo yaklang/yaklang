@@ -3,11 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
 	"strings"
@@ -82,6 +85,38 @@ func (s *Server) RequireDNSLogDomain(ctx context.Context, params *ypb.YakDNSLogB
 	}
 }
 
+func (s *Server) RequireDNSLogDomainByScript(ctx context.Context, req *ypb.RequireDNSLogDomainByScriptRequest) (*ypb.DNSLogRootDomain, error) {
+	if req.GetScriptName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), req.GetScriptName())
+		if err != nil {
+			return nil, err
+		}
+
+		engine, err := yak.NewScriptEngine(1000).ExecuteEx(script.Content, map[string]interface{}{
+			"YAK_FILENAME": req.GetScriptName(),
+		})
+		if err != nil {
+			return nil, utils.Errorf("execute file %s code failed: %s", req.GetScriptName(), err.Error())
+		}
+		result, err := engine.CallYakFunction(context.Background(), "require", []interface{}{})
+		if err != nil {
+			return nil, utils.Errorf("import %v' s handle failed: %s", req.GetScriptName(), err)
+		}
+		spew.Dump(result)
+		log.Infof("import %v' s handle success", result)
+		var domain, token string
+		domain = utils.InterfaceToStringSlice(result)[0]
+		token = utils.InterfaceToStringSlice(result)[1]
+		return &ypb.DNSLogRootDomain{
+			Domain: domain,
+			Token:  token,
+		}, nil
+
+	} else {
+		return nil, utils.Error("script name is empty")
+	}
+}
+
 func (s *Server) QuerySupportedDnsLogPlatforms(ctx context.Context, req *ypb.Empty) (*ypb.QuerySupportedDnsLogPlatformsResponse, error) {
 	platforms := cybertunnel.GetSupportDNSLogBrokersName()
 	if len(platforms) > 0 {
@@ -102,6 +137,64 @@ func (s *Server) QueryDNSLogByToken(ctx context.Context, req *ypb.QueryDNSLogByT
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	rsp := &ypb.QueryDNSLogByTokenResponse{}
+	for _, e := range events {
+		rsp.Events = append(rsp.Events, &ypb.DNSLogEvent{
+			DNSType:    e.Type,
+			Token:      e.GetToken(),
+			Domain:     e.GetDomain(),
+			RemoteAddr: e.RemoteAddr,
+			RemoteIP:   e.RemoteIP,
+			RemotePort: e.GetRemotePort(),
+			Raw:        e.GetRaw(),
+			Timestamp:  e.GetTimestamp(),
+		})
+	}
+	return rsp, nil
+}
+
+func (s *Server) QueryDNSLogTokenByScript(ctx context.Context, req *ypb.RequireDNSLogDomainByScriptRequest) (*ypb.QueryDNSLogByTokenResponse, error) {
+	var events []*tpb.DNSLogEvent
+	if req.GetScriptName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), req.GetScriptName())
+		if err != nil {
+			return nil, err
+		}
+
+		engine, err := yak.NewScriptEngine(1000).ExecuteEx(script.Content, map[string]interface{}{
+			"YAK_FILENAME": req.GetScriptName(),
+		})
+		if err != nil {
+			return nil, utils.Errorf("execute file %s code failed: %s", req.GetScriptName(), err.Error())
+		}
+		result, err := engine.CallYakFunction(context.Background(), "getResult", []interface{}{req.GetToken()})
+		if err != nil {
+			return nil, utils.Errorf("import %v' s handle failed: %s", req.GetScriptName(), err)
+		}
+		for _, v := range utils.InterfaceToSliceInterface(result) {
+			event := utils.InterfaceToMapInterface(v)
+			var ts int64
+			t, err := time.Parse(time.RFC3339, utils.MapGetString(event, "Timestamp"))
+			if err != nil {
+				log.Errorf(`time.Parse(time.RFC3339, utils.MapGetString(params, "time")) err: %v`, err)
+			}
+			if !t.IsZero() {
+				ts = t.Unix()
+			}
+			var raw = []byte(spew.Sdump(event))
+			e := &tpb.DNSLogEvent{
+				Type:       utils.MapGetString(event, "Type"),
+				Token:      utils.MapGetString(event, "Token"),
+				Domain:     utils.MapGetString(event, "Domain"),
+				RemoteAddr: utils.MapGetString(event, "RemoteAddr"),
+				RemoteIP:   utils.MapGetString(event, "RemoteIP"),
+				Raw:        raw,
+				Timestamp:  ts,
+			}
+			events = append(events, e)
+		}
 	}
 
 	rsp := &ypb.QueryDNSLogByTokenResponse{}
