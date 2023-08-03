@@ -24,10 +24,11 @@ var tcpHandler = &chaosHandler{
 			return nil
 		}
 
-		if rule.ContentRuleConfig.TcpConfig == nil {
-			return nil
-		}
 		tcpConfig := rule.ContentRuleConfig.TcpConfig
+		if rule.ContentRuleConfig.TcpConfig == nil {
+			tcpConfig = &suricata.TCPLayerRule{}
+		}
+
 		var toServer, toClient bool
 		if rule.ContentRuleConfig.Flow != nil {
 			toServer = rule.ContentRuleConfig.Flow.ToServer
