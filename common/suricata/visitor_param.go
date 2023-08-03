@@ -1,6 +1,7 @@
 package suricata
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -329,8 +330,30 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			contentRule.RPC = unquoteString(vStr)
 		case "pcre":
 			contentRule.PCRE, _ = strconv.Unquote(vStr)
+		case "fast_pattern":
+			contentRule.FastPattern = true
+		case "flowbits":
+			contentRule.FlowBits = vStr
+		case "noalert":
+			contentRule.NoAlert = true
+		case "base64_decode":
+			contentRule.Base64Decode = vStr
+		case "base64_data":
+			contentRule.Base64Data = true
+		case "flowint":
+			contentRule.FlowInt = vStr
+		case "xbits":
+			contentRule.XBits = vStr
+		case "app-layer-event":
+			contentRule.ExtraFlags = append(contentRule.ExtraFlags, fmt.Sprintf("%v:%v", key, vStr))
 		default:
-			log.Errorf("unknown content rule params: %s", key)
+			// fallback
+			contentRule.ExtraFlags = append(contentRule.ExtraFlags, fmt.Sprintf("%v:%v", key, vStr))
+			if key != "metad" {
+				log.Errorf("unknown content rule params: %s\n%v\n\n", key, rule.Raw)
+			} else {
+				log.Errorf("BAD RULE:\n\n%v\n\n", rule.Raw)
+			}
 		}
 
 		// conflict, save and match again
