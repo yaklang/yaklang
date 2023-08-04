@@ -198,11 +198,8 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 		raw = "http://"
 	}
 
-	switch strings.ToUpper(r.Method) {
-	case "CONNECT":
-		if utils.IsHttpOrHttpsUrl(r.URL.String()) {
-			return url.Parse(r.URL.String())
-		}
+	if strings.ToUpper(r.Method) == "CONNECT" {
+		return r.URL, nil
 	}
 
 	var host string
