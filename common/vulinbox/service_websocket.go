@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-//go:embed ws_jquery.min.js
+//go:embed static/js/ws_jquery.min.js
 var jquery214 []byte
 
 //go:embed html/ws_websocket_index.html
