@@ -26,8 +26,11 @@ type ReqInfo interface {
 }
 
 type RequestResult struct {
-	request  *rod.HijackRequest
-	response *rod.HijackResponse
+	//request  *rod.HijackRequest
+	//response *rod.HijackResponse
+
+	request  HijackRequest
+	response HijackResponse
 	from     string
 }
 
