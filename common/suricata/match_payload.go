@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"strconv"
 	"strings"
 )
@@ -156,6 +159,41 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 		}
 		// todo:bsize dsize
 		c.Value["prevMatch"] = indexes
+		return nil
+	}
+}
+
+// untested
+func newFileDataMatcher(r *ContentRule, request *http.Request) func(c *matchContext) error {
+	return func(c *matchContext) error {
+		// 10 MB
+		err := request.ParseMultipartForm(10 << 20)
+		if !c.Must(err == nil) {
+			return nil
+		}
+		var files []*multipart.FileHeader
+		for _, v := range request.MultipartForm.File {
+			files = append(files, v...)
+		}
+		for _, f := range files {
+			file, err := f.Open()
+			if !c.Must(err == nil) {
+				return nil
+			}
+			all, err := io.ReadAll(file)
+			if !c.Must(err == nil) {
+				return nil
+			}
+			c.Attach(newPayloadMatcher(r, all))
+			c.Recover()
+			if err := c.Next(); err == nil {
+				return err
+			}
+			if !c.rejected {
+				return nil
+			}
+		}
+		c.Reject()
 		return nil
 	}
 }
