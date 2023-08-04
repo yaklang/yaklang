@@ -40,7 +40,7 @@ func severityVerbose(i string) string {
 func complexityVerbose(s string) string {
 	switch s {
 	case "HIGH":
-		return "利用难度大"
+		return "利用难度高"
 	case "LOW":
 		return "利用难度低"
 	case "MIDDLE":
@@ -152,7 +152,7 @@ func (s *Statistics) ToGraphs() []*Graph {
 	})
 	g = &Graph{
 		Name:        "cwe-analysis",
-		NameVerbose: "漏洞类型大致分布",
+		NameVerbose: "合规漏洞类型大致分布",
 		Type:        "nightingle-rose",
 		TypeVerbose: "南丁格尔玫瑰图",
 		Data:        pairs,
@@ -174,8 +174,8 @@ func (s *Statistics) ToGraphs() []*Graph {
 	})
 	g = &Graph{
 		Name:        "access-vector-analysis",
-		NameVerbose: "漏洞攻击路径统计",
-		Type:        "general",
+		NameVerbose: "合规漏洞攻击路径统计",
+		Type:        "card",
 		TypeVerbose: "通用KV",
 		Data:        pairs,
 	}
@@ -197,12 +197,12 @@ func (s *Statistics) ToGraphs() []*Graph {
 	})
 	g = &Graph{
 		Name:            "network-attack-complexity-analysis",
-		NameVerbose:     "漏洞利用复杂度统计(可联网攻击)",
+		NameVerbose:     "合规漏洞利用复杂度统计(可联网攻击)",
 		Type:            "general",
 		TypeVerbose:     "通用KV",
 		Data:            pairs,
 		AccessVector:    "NETWORK",
-		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
+		ComplexityGroup: strings.Join([]string{"未知/无数据", "利用难度低", "利用难度高"}, ","),
 	}
 	graphs = append(graphs, g)
 
@@ -222,12 +222,12 @@ func (s *Statistics) ToGraphs() []*Graph {
 	})
 	g = &Graph{
 		Name:            "local-attack-complexity-analysis",
-		NameVerbose:     "漏洞利用复杂度统计(仅本地攻击)",
+		NameVerbose:     "合规漏洞利用复杂度统计(仅本地攻击)",
 		Type:            "general",
 		TypeVerbose:     "通用KV",
 		Data:            pairs,
 		AccessVector:    "LOCAL",
-		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
+		ComplexityGroup: strings.Join([]string{"未知/无数据", "利用难度低", "利用难度高"}, ","),
 	}
 	graphs = append(graphs, g)
 
@@ -247,11 +247,11 @@ func (s *Statistics) ToGraphs() []*Graph {
 	})
 	g = &Graph{
 		Name:            "access-complexity-analysis",
-		NameVerbose:     "漏洞利用复杂度统计",
+		NameVerbose:     "合规漏洞利用复杂度统计",
 		Type:            "general",
 		TypeVerbose:     "通用KV",
 		Data:            pairs,
-		ComplexityGroup: strings.Join([]string{"利用难度大", "利用难度低", "有一定漏洞利用难度", "未知/无数据"}, ","),
+		ComplexityGroup: strings.Join([]string{"未知/无数据", "利用难度低", "利用难度高"}, ","),
 	}
 	graphs = append(graphs, g)
 
@@ -269,11 +269,12 @@ func (s *Statistics) ToGraphs() []*Graph {
 		return pairs[i].Value > pairs[i].Value
 	})
 	g = &Graph{
-		Name:        "severtiy-analysis",
-		NameVerbose: "漏洞严重程度统计",
-		Type:        "general",
-		TypeVerbose: "通用KV",
-		Data:        pairs,
+		Name:            "severtiy-analysis",
+		NameVerbose:     "合规漏洞严重程度统计",
+		Type:            "general",
+		TypeVerbose:     "通用KV",
+		Data:            pairs,
+		ComplexityGroup: strings.Join([]string{"严重", "高危", "中危", "低危"}, ","),
 	}
 	graphs = append(graphs, g)
 
