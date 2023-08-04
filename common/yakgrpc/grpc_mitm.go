@@ -1086,6 +1086,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					extName = "." + extName
 				}
 			}
+			if strings.ToUpper(method) == "CONNECT" {
+				urlStr = hostname
+			}
+
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_Url, urlStr)
 		}
 		mitmPluginCaller.CallHijackRequest(isHttps, urlStr,
