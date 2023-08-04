@@ -19,6 +19,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 
 		// pcre not implement yet, temporarily skip
 		if len(content) == 0 {
+			c.Reject()
 			return nil
 		}
 
