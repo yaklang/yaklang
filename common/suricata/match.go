@@ -24,6 +24,10 @@ type matched struct {
 	len int
 }
 
+// 如果你需要额外参数，请使用闭包构造 Handler；
+// 如果你需要上下文，请使用 c.Value 传递；
+// 当且仅当你觉的规则解析出错的时候返回 error；
+// 其他错误请使用 c.Reject() 后马上 return nil；
 type matchHandler func(*matchContext) error
 
 type matchContext struct {
@@ -41,6 +45,10 @@ type matchContext struct {
 
 func (c *matchContext) Reject() {
 	c.rejected = true
+}
+
+func (c *matchContext) Recover() {
+	c.rejected = false
 }
 
 func (c *matchContext) Attach(handler ...matchHandler) {
