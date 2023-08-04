@@ -37,7 +37,7 @@ type BrowserStarter struct {
 	urlCheck   map[string]func(string) bool
 	banList    *tools.StringCountFilter
 
-	requestAfterRepeat func(*rod.HijackRequest) string
+	requestAfterRepeat func(HijackRequest) string
 	urlAfterRepeat     func(string) string
 	elementCheck       func(*rod.Element) bool
 
@@ -390,6 +390,7 @@ running:
 			err = p.Navigate(urlStr)
 			if urlStr == starter.baseUrl && len(starter.baseConfig.localStorage) > 0 {
 				log.Infof(`do local storage on %s`, urlStr)
+				p.WaitLoad()
 				for key, value := range starter.baseConfig.localStorage {
 					setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
 					_, err := p.EvalOnNewDocument(setStorageJS)

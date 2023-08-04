@@ -89,7 +89,6 @@ func GetFileTmpName(preString string, rand int) string {
 }
 
 func GetRandomString(n int) string {
-	rand.Seed(time.Now().UnixNano())
 	str := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	bytes := []byte(str)
 	var result []byte

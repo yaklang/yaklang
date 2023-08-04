@@ -3,7 +3,7 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod"
+	"fmt"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -27,7 +27,7 @@ func repeatCheckFunctionGenerate(pageVisitFilter *tools.StringCountFilter) func(
 	}
 }
 
-func repeatCheckGenerator(level repeatLevel, extraParams ...string) func(*rod.HijackRequest) string {
+func repeatCheckGenerator(level repeatLevel, extraParams ...string) func(HijackRequest) string {
 	switch level {
 	case extremeLevel:
 		return extremeLevelRepeatCheckGenerator()
@@ -79,44 +79,44 @@ func urlRepeatCheckGenerator(level repeatLevel, extraParams ...string) func(stri
 	}
 }
 
-func extremeLevelRepeatCheckGenerator() func(*rod.HijackRequest) string {
-	return func(request *rod.HijackRequest) string {
+func extremeLevelRepeatCheckGenerator() func(HijackRequest) string {
+	return func(request HijackRequest) string {
 		parsed := request.URL()
 		return getUrlPage(parsed)
 	}
 }
 
-func highLevelRepeatCheckGenerator() func(*rod.HijackRequest) string {
-	return func(request *rod.HijackRequest) string {
+func highLevelRepeatCheckGenerator() func(HijackRequest) string {
+	return func(request HijackRequest) string {
 		parsed := request.URL()
 		return request.Method() + " " + getUrlPage(parsed)
 	}
 }
 
-func midLevelRepeatCheckGenerator(extraParams ...string) func(*rod.HijackRequest) string {
+func midLevelRepeatCheckGenerator(extraParams ...string) func(HijackRequest) string {
 	checkF := doCheck(extraParams...)
-	return func(request *rod.HijackRequest) string {
+	return func(request HijackRequest) string {
 		parsed := request.URL()
 		return request.Method() + " " + getUrlQueryName(parsed, checkF)
 	}
 }
 
-func lowLevelRepeatCheckGenerator(extraParams ...string) func(*rod.HijackRequest) string {
+func lowLevelRepeatCheckGenerator(extraParams ...string) func(HijackRequest) string {
 	if len(extraParams) == 0 {
-		return func(request *rod.HijackRequest) string {
+		return func(request HijackRequest) string {
 			return request.Method() + " " + request.URL().String()
 		}
 	}
 	checkF := doCheck(extraParams...)
-	return func(request *rod.HijackRequest) string {
+	return func(request HijackRequest) string {
 		parsed := request.URL()
 		return request.Method() + " " + getUrlQueryValue(parsed, checkF)
 	}
 }
 
-func unLimitLevelRepeatCheckGenerator(extraParams ...string) func(*rod.HijackRequest) string {
+func unLimitLevelRepeatCheckGenerator(extraParams ...string) func(HijackRequest) string {
 	if len(extraParams) == 0 {
-		return func(request *rod.HijackRequest) string {
+		return func(request HijackRequest) string {
 			result := request.Method() + " " + request.URL().String()
 			if request.Body() != "" {
 				result += " " + request.Body()
@@ -125,7 +125,7 @@ func unLimitLevelRepeatCheckGenerator(extraParams ...string) func(*rod.HijackReq
 		}
 	}
 	checkF := doCheck(extraParams...)
-	return func(request *rod.HijackRequest) string {
+	return func(request HijackRequest) string {
 		parsed := request.URL()
 		result := request.Method() + " " + getUrlQueryValue(parsed, checkF)
 		if request.Body() != "" {
@@ -218,37 +218,74 @@ func getUrlPage(url *u.URL) string {
 }
 
 func getUrlQueryName(url *u.URL, check func(string) bool) string {
-	query := url.Query()
-	var queryStr string
-	for k := range query {
-		if check(k) {
+	if url.RawQuery == "" {
+		return getUrlPage(url)
+	}
+	query, _ := GetSortedQuery(url.RawQuery)
+	queryLength := len(query)
+	queryItems := make([]string, 0)
+	for i := 0; i < queryLength-1; i += 2 {
+		if check(query[i]) {
 			continue
 		}
-		queryStr += k + "&"
+		queryItems = append(queryItems, query[i])
 	}
-	if queryStr != "" {
-		queryStr = "?" + queryStr[:len(queryStr)-1]
-	}
-	return getUrlPage(url) + queryStr
+	return getUrlPage(url) + "?" + strings.Join(queryItems, "&")
 }
 
 func getUrlQueryValue(url *u.URL, check func(string) bool) string {
-	query := url.Query()
-	var queryStr string
-	for k, v := range query {
-		if check(k) {
+	if url.RawQuery == "" {
+		return getUrlPage(url)
+	}
+	query, _ := GetSortedQuery(url.RawQuery)
+	queryLength := len(query)
+	queryItems := make([]string, 0)
+	for i := 0; i < queryLength-1; i += 2 {
+		if check(query[i]) {
 			continue
 		}
-		queryStr += k + "=" + v[0] + "&"
+		queryItems = append(queryItems, query[i]+"="+query[i+1])
 	}
-	if queryStr != "" {
-		queryStr = "?" + queryStr[:len(queryStr)-1]
-	}
-	return getUrlPage(url) + queryStr
+	return getUrlPage(url) + "?" + strings.Join(queryItems, "&")
 }
 
 func extraUrlCheck(extraSuffix []string) func(string) bool {
 	return func(urlStr string) bool {
 		return StringSuffixList(urlStr, extraSuffix)
 	}
+}
+
+func GetSortedQuery(rawQuery string) (query []string, err error) {
+	query = make([]string, 0)
+	if rawQuery == "" {
+		return
+	}
+	for rawQuery != "" {
+		var key string
+		key, rawQuery, _ = strings.Cut(rawQuery, "&")
+		if strings.Contains(key, ";") {
+			err = fmt.Errorf("invalid semicolon separator in query")
+			continue
+		}
+		if key == "" {
+			continue
+		}
+		key, value, _ := strings.Cut(key, "=")
+		key, err1 := u.QueryUnescape(key)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		value, err1 = u.QueryUnescape(value)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		query = append(query, key, value)
+	}
+	return
 }
