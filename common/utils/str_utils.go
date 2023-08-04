@@ -572,6 +572,47 @@ func InterfaceToBytesSlice(i interface{}) [][]byte {
 	return result
 }
 
+func InterfaceToBoolean(i any) bool {
+	if i == nil {
+		return false
+	}
+	switch ret := i.(type) {
+	case bool:
+		return ret
+	default:
+		a, _ := strconv.ParseBool(InterfaceToString(i))
+		return a
+	}
+}
+
+func InterfaceToInt(i any) int {
+	if i == nil {
+		return 0
+	}
+	switch ret := i.(type) {
+	case int:
+		return ret
+	case int64:
+		return int(ret)
+	case int32:
+		return int(ret)
+	case int16:
+		return int(ret)
+	case int8:
+		return int(ret)
+	case uint:
+		return int(ret)
+	case uint64:
+		return int(ret)
+	case uint32:
+		return int(ret)
+	case uint16:
+		return int(ret)
+	default:
+		return Atoi(InterfaceToString(i))
+	}
+}
+
 func InterfaceToMap(i interface{}) map[string][]string {
 	var finalResult = make(map[string][]string)
 	var res = make(map[string]interface{})

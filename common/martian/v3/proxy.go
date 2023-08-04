@@ -633,6 +633,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		if req.URL.Scheme == "https" {
 			connectedTo = strings.TrimSuffix(connectedTo, ":443")
 		}
+
+		var parsedConnectedToHost, parsedConnectedToPort, _ = utils.ParseStringToHostPort(connectedTo)
+		if parsedConnectedToHost == "" {
+			parsedConnectedToHost = connectedTo
+		}
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
 
 		if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -680,9 +686,21 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			buf := make([]byte, brw.Reader.Buffered())
 			brw.Read(buf)
 
+			isHttps := b[0] == 0x16
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
+			if parsedConnectedToPort == 0 {
+				if isHttps {
+					ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, 443)
+				} else {
+					ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, 80)
+				}
+			} else {
+				ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+			}
+
 			// 22 is the TLS handshake.
 			// https://tools.ietf.org/html/rfc5246#section-6.2.1
-			if b[0] == 22 {
+			if isHttps {
 				/* update lib from official martian to add support for intercepting and analysing *h2* request */
 				/* also fix bug from *martian* since they did not respect server side ALPN */
 				var rawConn net.Conn
@@ -956,21 +974,15 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
 	}
 
-	val, ok := ctx.Session().Get(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
-	if ok {
-		// If we have a connected to value, then we should set it on the request
-		connected := fmt.Sprint(val)
-		if req.URL != nil {
-			if req.URL.Scheme == "https" {
-				connected = strings.TrimSuffix(connected, ":443")
-			}
-		}
-		httpctx.SetContextValueInfoFromRequest(
-			req,
-			httpctx.REQUEST_CONTEXT_KEY_ConnectedTo,
-			connected,
-		)
+	https := ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps)
+	httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps, https)
+
+	inherit := func(i string) {
+		httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
 	}
+	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	return p.roundTripper.RoundTrip(req)
 }
 

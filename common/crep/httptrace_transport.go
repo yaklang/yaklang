@@ -31,12 +31,22 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 		},
 	}))
 
-	if connected := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo); connected != "" {
-		log.Debugf("origin %v => %v", req.Host, connected)
-		req.Host = connected
-		if req.URL.Host != "" {
-			log.Debugf("origin %v => %v", req.URL.Host, connected)
-			req.URL.Host = connected
+	https := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps)
+	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
+		var noModified = false
+		if (connectedPort == 80 && !https) || (connectedPort == 443 && https) {
+			noModified = true
+		}
+		if !noModified {
+			connected := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+			if connected != "" {
+				log.Debugf("origin %v => %v", req.Host, connected)
+				req.Host = connected
+				if req.URL.Host != "" {
+					log.Debugf("origin %v => %v", req.URL.Host, connected)
+					req.URL.Host = connected
+				}
+			}
 		}
 	}
 	rsp, err := t.Transport.RoundTrip(req)
