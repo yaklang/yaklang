@@ -107,7 +107,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			set = setIfNotZero(&contentRule.Modifier, HTTPCookie)
 		case "http_uri", "http.uri":
 			set = setIfNotZero(&contentRule.Modifier, HTTPUri)
-		case "http_raw_uri", "http.raw_uri":
+		case "http_raw_uri", "http.uri.raw":
 			set = setIfNotZero(&contentRule.Modifier, HTTPUriRaw)
 		case "http_method", "http.method":
 			set = setIfNotZero(&contentRule.Modifier, HTTPMethod)
