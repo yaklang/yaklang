@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//go:embed vul_fastjson.html
+//go:embed html/vul_fastjson.html
 var fastjson_loginPage []byte
 
 type JsonParser func(data string) (map[string]any, error)
