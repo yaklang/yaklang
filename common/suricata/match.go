@@ -27,9 +27,8 @@ type matched struct {
 type matchHandler func(*matchContext) error
 
 type matchContext struct {
-	rejected  bool
-	recovered bool
-	pos       int
+	rejected bool
+	pos      int
 
 	Value             map[string]any
 	ContentMatchCache []matched
@@ -57,13 +56,14 @@ func (c *matchContext) Insert(handler ...matchHandler) {
 }
 
 func (c *matchContext) Next() error {
+	c.pos++
+	defer func() { c.pos-- }()
 	if c.rejected || c.pos >= len(c.workflow) {
 		return nil
 	}
 	if err := c.workflow[c.pos](c); err != nil {
 		return err
 	}
-	c.pos++
 	return c.Next()
 }
 
@@ -80,6 +80,7 @@ func newMatchCtx(pk gopacket.Packet, r *Rule, hs ...matchHandler) *matchContext 
 		PK:       pk,
 		Rule:     r,
 		workflow: hs,
+		pos:      -1,
 	}
 }
 
