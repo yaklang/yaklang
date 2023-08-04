@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"net/http"
 	"sync"
@@ -36,6 +37,39 @@ type Context struct {
 	skipRoundTrip bool
 	skipLogging   bool
 	apiRequest    bool
+}
+
+func (c *Context) GetSessionBoolValue(i string) bool {
+	if c == nil {
+		return false
+	}
+	if c.Session() != nil {
+		i, _ := c.Session().Get(i)
+		return utils.InterfaceToBoolean(i)
+	}
+	return false
+}
+
+func (c *Context) GetSessionStringValue(i string) string {
+	if c == nil {
+		return ""
+	}
+	if c.Session() != nil {
+		i, _ := c.Session().Get(i)
+		return utils.InterfaceToString(i)
+	}
+	return ""
+}
+
+func (c *Context) GetSessionIntValue(i string) int {
+	if c == nil {
+		return 0
+	}
+	if c.Session() != nil {
+		i, _ := c.Session().Get(i)
+		return utils.InterfaceToInt(i)
+	}
+	return 0
 }
 
 // Session provides information and storage about a connection.

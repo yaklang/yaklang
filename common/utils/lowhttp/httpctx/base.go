@@ -151,4 +151,6 @@ const (
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
+	REQUEST_CONTEXT_KEY_ConnectedToPort              = "connectedToPort"
+	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
 )

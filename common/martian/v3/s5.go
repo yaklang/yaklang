@@ -247,7 +247,7 @@ func (c *S5Config) HandleS5Request(conn net.Conn) (net.Conn, error) {
 	addrBytesRaw = append(addrBytesRaw, portsBytes...)
 
 	targetAddr := utils.HostPort(targetHost, targetPort)
-	log.Infof("socks5 connection recv from[%v] to [%v]", conn.RemoteAddr(), targetAddr)
+	log.Debugf("socks5 connection recv from[%v] to [%v]", conn.RemoteAddr(), targetAddr)
 
 	downstreamProxy := c.DownstreamHTTPProxy
 	var proxyConnectionTimeout = 30 * time.Second
