@@ -3,8 +3,8 @@ package systemproxy
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -78,7 +78,7 @@ func Set(s Settings) error {
 		}
 		if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
 
-			if addr := yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second)); addr == "" {
+			if addr := netx.LookupFirst(host, netx.WithTimeout(5*time.Second)); addr == "" {
 				return utils.Errorf("cannot set proxy for %s for (DNSFailed)", s.DefaultServer)
 			}
 		}

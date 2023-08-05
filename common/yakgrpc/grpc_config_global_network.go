@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakdns"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -61,7 +61,7 @@ func getDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		DNSFallbackDoH:   false,
 		CustomDoHServers: nil,
 	}
-	config := yakdns.NewBackupInitilizedReliableDNSConfig()
+	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
 	defaultConfig.CustomDNSServers = config.SpecificDNSServers
 	defaultConfig.DNSFallbackDoH = config.FallbackDoH
@@ -75,12 +75,12 @@ func loadConfig(c *ypb.GlobalNetworkConfig) {
 		return
 	}
 
-	yakdns.SetDefaultOptions(
-		yakdns.WithDNSFallbackDoH(c.DNSFallbackDoH),
-		yakdns.WithDNSFallbackTCP(c.DNSFallbackTCP),
-		yakdns.WithDNSDisableSystemResolver(c.DisableSystemDNS),
-		yakdns.WithDNSSpecificDoH(c.CustomDoHServers...),
-		yakdns.WithDNSServers(c.CustomDNSServers...),
+	netx.SetDefaultOptions(
+		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
+		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
+		netx.WithDNSDisableSystemResolver(c.DisableSystemDNS),
+		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
+		netx.WithDNSServers(c.CustomDNSServers...),
 	)
 }
 

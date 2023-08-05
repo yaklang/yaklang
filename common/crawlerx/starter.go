@@ -11,7 +11,7 @@ import (
 	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
-	"net"
+	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"runtime"
 	"strings"
@@ -112,11 +112,8 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	starter.urlAfterRepeat = urlRepeatCheckGenerator(baseConfig.scanRepeat, baseConfig.ignoreParams...)
 	starter.counter = tools.NewCounter(starter.concurrent)
 	starter.transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		DialContext:           netx.NewDialContextFunc(30 * time.Second),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,

@@ -2,6 +2,7 @@ package synscan
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
@@ -86,17 +87,15 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 			}
 			go func() {
 				defer swg.Done()
-				addrs := utils.DomainToIP(dstTarget, 3*time.Second)
-				if len(addrs) > 0 {
-					for _, ip := range addrs {
-						if dstIp := net.ParseIP(ip); dstIp != nil {
-							layers, loopback, err := s.createSynTCP(dstIp, i.port, nil, s.defaultGatewayIp.String())
-							if err != nil {
-								log.Warnf("cannot create syn-tcp packet for %s:%v: %v", dstIp.String(), i.port, err)
-								continue
-							}
-							s.inject(loopback, layers...)
+				ip := netx.LookupFirst(dstTarget)
+				if ip != "" {
+					if dstIp := net.ParseIP(ip); dstIp != nil {
+						layers, loopback, err := s.createSynTCP(dstIp, i.port, nil, s.defaultGatewayIp.String())
+						if err != nil {
+							log.Warnf("cannot create syn-tcp packet for %s:%v: %v", dstIp.String(), i.port, err)
+							return
 						}
+						s.inject(loopback, layers...)
 					}
 				} else {
 					log.Warnf("cannot query dns for %v", dstTarget)

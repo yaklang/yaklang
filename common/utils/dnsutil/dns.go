@@ -6,10 +6,28 @@ import (
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
 	"time"
+)
+
+var (
+	DefaultDNSClient = dns.Client{
+		Timeout:      5 * time.Second,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+	DefaultDNSConn   = dns.Dial
+	DefaultDNSServer = []string{
+		"223.5.5.5",       // ali
+		"119.29.29.29",    // tencent
+		"180.76.76.76",    // baidu
+		"114.114.114.114", // dianxin
+		"1.1.1.1",         // cf
+		//"8.8.8.8",
+	}
 )
 
 func qualifyDomain(domain string) string {
@@ -67,11 +85,11 @@ func QueryNSEx(client *dns.Client, ctx context.Context, target string, servers [
 }
 
 func QueryIPAll(target string, timeout time.Duration, dnsServers []string) []string {
-	return yakdns.LookupAll(target, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...))
+	return netx.LookupAll(target, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServers...))
 }
 
 func QueryIP(target string, timeout time.Duration, dnsServers []string) string {
-	return yakdns.LookupFirst(target, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(dnsServers...))
+	return netx.LookupFirst(target, netx.WithTimeout(timeout), netx.WithDNSServers(dnsServers...))
 }
 
 func QueryTxt(target string, timeout time.Duration, nameServers []string) []string {

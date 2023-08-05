@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -241,9 +241,7 @@ func (c *Config) CreateHTTPClient() *http.Client {
 		// 设置最大平行连接数
 		MaxConnsPerHost: c.concurrent,
 		// 设置超时
-		DialContext: (&net.Dialer{
-			Timeout: c.connectTimeout,
-		}).DialContext,
+		DialContext: netx.NewDialContextFunc(c.connectTimeout),
 		// 设置 HTTP 响应获取超时
 		ResponseHeaderTimeout: c.responseTimeout,
 		// 使用自定义的 tlsConfig 进行 TCP 连接

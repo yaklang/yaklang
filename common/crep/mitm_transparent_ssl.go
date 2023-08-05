@@ -7,9 +7,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"net"
@@ -145,7 +145,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		log.Infof("start to handle dns items for %v", host)
 		cachedTarget, ok := m.dnsCache.Load(host)
 		if !ok {
-			target := yakdns.LookupFirst(host, yakdns.WithTimeout(timeout), yakdns.WithDNSServers(m.DNSServers...))
+			target := netx.LookupFirst(host, netx.WithTimeout(timeout), netx.WithDNSServers(m.DNSServers...))
 			if target == "" {
 				//httpConn.Write(fallbackHttpFrame)
 				return utils.Errorf("cannot query dns host[%s]", host)

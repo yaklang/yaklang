@@ -1,15 +1,14 @@
-package utils
+package netx
 
 import (
 	"bufio"
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/socksproxy"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"net/http"
@@ -18,39 +17,6 @@ import (
 	"strings"
 	"time"
 )
-
-var isTlsCached = ttlcache.NewCache()
-
-func IsTLSService(addr string, proxies ...string) bool {
-	result, ok := isTlsCached.Get(addr)
-	if ok {
-		return result.(bool)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := GetAutoProxyConn(addr, strings.Join(proxies, ","), 5*time.Second)
-	if err == nil {
-		defer conn.Close()
-		host, _, _ := ParseStringToHostPort(addr)
-		loopBack := IsLoopback(host)
-		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionSSL30, ServerName: host})
-		if err = tlsConn.HandshakeContext(ctx); err != nil {
-			if !loopBack {
-				isTlsCached.SetWithTTL(addr, false, 30*time.Second)
-			}
-			return false
-		}
-		if !loopBack {
-			isTlsCached.SetWithTTL(addr, true, 30*time.Second)
-		}
-		return true
-	}
-	return false
-}
-
-var proxyDailer = net.Dialer{Timeout: 5 * time.Second}
 
 func GetForceProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
 	return getProxyConn(target, proxy, connectTimeout)
@@ -68,7 +34,7 @@ func GetAutoProxyConn(target string, proxy string, connectTimeout time.Duration)
 		return getProxyConn(target, proxy, connectTimeout)
 	}
 
-	return net.DialTimeout("tcp", target, connectTimeout)
+	return NewDialContextFunc(connectTimeout)(context.Background(), "tcp", target)
 }
 
 func GetAutoProxyConnEx(target string, proxies []string, connectTimeout time.Duration) (net.Conn, error) {
@@ -88,7 +54,7 @@ func GetAutoProxyConnEx(target string, proxies []string, connectTimeout time.Dur
 
 func GetAutoProxyConnWithTLS(target string, proxy string, connectTimeout time.Duration, c *tls.Config) (net.Conn, error) {
 	if c == nil {
-		c = NewDefaultTLSConfig()
+		c = utils.NewDefaultTLSConfig()
 	}
 	if proxy != "" {
 		return getProxyConnTLS(target, proxy, connectTimeout, c)
@@ -104,7 +70,7 @@ func GetAutoProxyConnWithTLS(target string, proxy string, connectTimeout time.Du
 
 func GetAutoProxyConnWithGMTLS(target string, proxy string, connectTimeout time.Duration, c *gmtls.Config) (net.Conn, error) {
 	if c == nil {
-		c = NewDefaultGMTLSConfig()
+		c = utils.NewDefaultGMTLSConfig()
 	}
 	if proxy != "" {
 		return getProxyConnGMTLS(target, proxy, connectTimeout, c)
@@ -124,7 +90,7 @@ func FixProxy(i string) string {
 	}
 
 	if !strings.Contains(i, "://") {
-		var host, port, _ = ParseStringToHostPort(i)
+		var host, port, _ = utils.ParseStringToHostPort(i)
 		host = strings.Trim(host, `"' \r\n:`)
 		if host != "" && port > 0 {
 			return fmt.Sprintf("http://%v:%v", host, port)
@@ -148,17 +114,6 @@ func GetProxyFromEnv() string {
 	return ""
 }
 
-func DisableProxyFromCurrentEnv() {
-	for _, k := range []string{
-		"HTTP_PROXY", "http_proxy",
-		"HTTPS_PROXY", "https_proxy",
-		"all_proxy", "all_proxy",
-		"proxy", "proxy",
-	} {
-		os.Setenv(k, "")
-	}
-}
-
 func TCPConnect(target string, timeout time.Duration, proxies ...string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: timeout}
 	if len(proxies) <= 0 {
@@ -173,7 +128,7 @@ func TCPConnect(target string, timeout time.Duration, proxies ...string) (net.Co
 		}
 		return conn, nil
 	}
-	return nil, Errorf("connect: %v failed: no proxy available", target)
+	return nil, utils.Errorf("connect: %v failed: no proxy available", target)
 }
 
 func getProxyConnTLS(target string, proxy string, connectTimeout time.Duration, tlsConfig *tls.Config) (net.Conn, error) {
@@ -212,25 +167,24 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	tcpDailer := &net.Dialer{Timeout: connectTimeout}
 	proxy = strings.ToLower(proxy)
-	host, port, _ := ParseStringToHostPort(proxy)
+	host, port, _ := utils.ParseStringToHostPort(proxy)
 	if host == "" || port <= 0 {
-		return nil, Errorf("proxy need host:port... at least[%v]", proxy)
+		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
 	}
 
-	proxyAddr := HostPort(host, port)
+	proxyAddr := utils.HostPort(host, port)
 	switch true {
 	case strings.HasPrefix(proxy, "https://"):
 		urlIns, err := url.Parse(proxy)
 		if err != nil {
-			return nil, Errorf("parse proxy url failed: %s", err)
+			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
-		conn, err := tcpDailer.DialContext(ctx, "tcp", proxyAddr)
+		conn, err := DialContext(ctx, "tcp", proxyAddr)
 		if err != nil {
 			return nil, err
 		}
-		conn = tls.Client(conn, NewDefaultTLSConfig())
+		conn = tls.Client(conn, utils.NewDefaultTLSConfig())
 		if urlIns.User != nil && urlIns.User.String() != "" {
 			// 有密码
 			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
@@ -241,28 +195,28 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 		if readHTTP200(conn) {
 			return conn, nil
 		}
-		return nil, Errorf("connect proxy(https) [%s] failed", proxy)
+		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
 	case strings.HasPrefix(proxy, "socks://"):
 		fallthrough
 	case strings.HasPrefix(proxy, "socks5://"):
 		fallthrough
 	case strings.HasPrefix(proxy, "s5://"):
 		username, password := parseProxyCredential(proxy)
-		conn, err := socksproxy.DialSocksProxy(socksproxy.SOCKS5, proxyAddr, username, password)("tcp", target)
+		conn, err := DialSocksProxy(SOCKS5, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case strings.HasPrefix(proxy, "s4://") || strings.HasPrefix(proxy, "socks4://"):
 		username, password := parseProxyCredential(proxy)
-		conn, err := socksproxy.DialSocksProxy(socksproxy.SOCKS4, proxyAddr, username, password)("tcp", target)
+		conn, err := DialSocksProxy(SOCKS4, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case strings.HasPrefix(proxy, "s4a://") || strings.HasPrefix(proxy, "socks4a://"):
 		username, password := parseProxyCredential(proxy)
-		conn, err := socksproxy.DialSocksProxy(socksproxy.SOCKS4A, proxyAddr, username, password)("tcp", target)
+		conn, err := DialSocksProxy(SOCKS4A, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
@@ -272,10 +226,10 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 	default:
 		urlIns, err := url.Parse(proxy)
 		if err != nil {
-			return nil, Errorf("parse proxy url failed: %s", err)
+			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
 
-		conn, err := tcpDailer.DialContext(ctx, "tcp", proxyAddr)
+		conn, err := DialContext(ctx, "tcp", proxyAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -289,9 +243,9 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 			return conn, nil
 		}
 		if err != nil {
-			return nil, Errorf("connect proxy(http) [%s] failed: %s", proxy, err)
+			return nil, utils.Errorf("connect proxy(http) [%s] failed: %s", proxy, err)
 		}
-		return nil, Errorf("connect proxy(http) [%s] failed", proxy)
+		return nil, utils.Errorf("connect proxy(http) [%s] failed", proxy)
 	}
 }
 

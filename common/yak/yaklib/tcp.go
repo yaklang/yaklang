@@ -84,22 +84,16 @@ func (t *tcpConnection) RecvStringTimeout(seconds float64) (string, error) {
 }
 
 type _tcpDialer struct {
-	net.Dialer
-
 	tlsConfig *tls.Config
 	proxy     string
 	timeout   time.Duration
+	localAddr *net.TCPAddr
 }
 
 type dialerOpt func(d *_tcpDialer)
 
 func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnection, error) {
-
-	dialer := net.Dialer{
-		Timeout:   10 * time.Second,
-		LocalAddr: nil,
-	}
-	tcpDialer := &_tcpDialer{Dialer: dialer}
+	tcpDialer := &_tcpDialer{}
 	for _, opt := range opts {
 		opt(tcpDialer)
 	}
@@ -108,9 +102,9 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 	var err error
 	addr := utils.HostPort(fmt.Sprint(host), port)
 	if tcpDialer.tlsConfig == nil {
-		conn, err = utils.GetAutoProxyConn(addr, tcpDialer.proxy, tcpDialer.Timeout)
+		conn, err = utils.GetAutoProxyConn(addr, tcpDialer.proxy, tcpDialer.timeout)
 	} else {
-		conn, err = utils.GetAutoProxyConnWithTLS(addr, tcpDialer.proxy, tcpDialer.Timeout, tcpDialer.tlsConfig)
+		conn, err = utils.GetAutoProxyConnWithTLS(addr, tcpDialer.proxy, tcpDialer.timeout, tcpDialer.tlsConfig)
 	}
 	if err != nil {
 		return nil, err
@@ -120,7 +114,7 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 
 func _tcpTimeout(i float64) dialerOpt {
 	return func(d *_tcpDialer) {
-		d.Timeout = _floatSeconds(i)
+		d.timeout = _floatSeconds(i)
 	}
 }
 
@@ -132,7 +126,7 @@ func _tcpLocalAddr(i interface{}) dialerOpt {
 	}
 
 	return func(d *_tcpDialer) {
-		d.LocalAddr = &net.TCPAddr{
+		d.localAddr = &net.TCPAddr{
 			IP:   net.ParseIP(host),
 			Port: port,
 		}

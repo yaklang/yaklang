@@ -1,10 +1,9 @@
-package socksproxy
+package netx
 
 import (
 	"bytes"
 	"errors"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"net/url"
 	"strconv"
@@ -50,7 +49,7 @@ func (c *config) readAll(conn net.Conn) (resp []byte, err error) {
 }
 
 func lookupIPv4(host string) (net.IP, error) {
-	ipStr := netx.LookupFirst(host)
+	ipStr := LookupFirst(host)
 	if ipStr == "" {
 		return nil, fmt.Errorf("host not found: %s", host)
 	}

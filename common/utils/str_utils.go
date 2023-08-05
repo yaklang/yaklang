@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -17,16 +16,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gobwas/glob"
-	"github.com/miekg/dns"
 	"github.com/pkg/errors"
-	"github.com/projectdiscovery/retryabledns"
-	"github.com/projectdiscovery/retryabledns/hostsfile"
 )
 
 func ExtractStrContextByKeyword(raw []byte, res []string) []string {
@@ -379,46 +373,8 @@ func portOnly(hostport string) string {
 	return hostport[colon+len(":"):]
 }
 
-var (
-	dnsTtlCache = ttlcache.NewCache()
-)
-
-func _GetFirstIPByDnsWithCache(domain string, timeout time.Duration, dnsServers ...string) string {
-	data, ok := dnsTtlCache.Get(domain)
-	if ok {
-		if raw, _ := data.(string); raw != "" && !IsLoopback(raw) {
-			dnsTtlCache.SetWithTTL(domain, raw, 30*time.Second)
-			return raw
-		}
-	}
-
-	var count = 0
-	for {
-		count++
-		r, err := _GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServers)
-		if err != nil {
-			switch ret := err.(type) {
-			case *net.DNSError:
-				if !ret.Temporary() {
-					// not a temporary error, return
-					return ""
-				}
-			}
-			log.Errorf("get ip from host %s error: %s", domain, err.Error())
-		}
-		if r == "" {
-			if count >= 5 {
-				return ""
-			}
-			continue
-		}
-		dnsTtlCache.SetWithTTL(domain, r, 30*time.Second)
-		return r
-	}
-}
-
 func InterfaceToBytes(i interface{}) (result []byte) {
-	var bytes []byte
+	var b []byte
 	defer func() {
 		if err := recover(); err != nil {
 			result = []byte(fmt.Sprintf("%v", i))
@@ -433,11 +389,11 @@ func InterfaceToBytes(i interface{}) (result []byte) {
 	case nil:
 		return []byte{}
 	case string:
-		bytes = []byte(s)
+		b = []byte(s)
 	case []byte:
-		bytes = s[0:]
+		b = s[0:]
 	case bool:
-		bytes = []byte(strconv.FormatBool(s))
+		b = []byte(strconv.FormatBool(s))
 	case float64:
 		return []byte(strconv.FormatFloat(s, 'f', -1, 64))
 	case float32:
@@ -473,10 +429,10 @@ func InterfaceToBytes(i interface{}) (result []byte) {
 	//	}
 	//	return []byte(fmt.Sprintf("%v", i))
 	default:
-		bytes = []byte(fmt.Sprintf("%v", i))
+		b = []byte(fmt.Sprintf("%v", i))
 	}
 
-	return bytes
+	return b
 }
 
 func InterfaceToString(i interface{}) string {
@@ -717,7 +673,7 @@ func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	}
 
 	portStr = strings.TrimSpace(portStr)
-	portInt64, err := strconv.ParseInt(portStr, 10, 32)
+	portInt64, err := strconv.ParseInt(portStr, 10, 64)
 	if err != nil {
 		return host, 0, errors.Errorf("%s parse port(%s) failed: %s", raw, portStr, err)
 	}
@@ -919,46 +875,6 @@ func SliceGroup(origin []string, groupSize int) [][]string {
 	return result
 }
 
-func DomainToIP(domain string, timeout time.Duration) []string {
-	if net.ParseIP(FixForParseIP(domain)) == nil {
-		// 不是 IP 尝试 dns 查询下
-		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		rets, err := net.DefaultResolver.LookupIPAddr(ctx, domain)
-		if err != nil {
-			return nil
-		}
-
-		var addrs []string
-		for _, i := range rets {
-			addrs = append(addrs, i.String())
-		}
-		return addrs
-	} else {
-		return []string{domain}
-	}
-}
-
-var (
-	DefaultDNSClient = dns.Client{
-		Timeout:      5 * time.Second,
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-	}
-	RetryableDNSClient = &retryabledns.Client{
-		TCPFallback: true,
-	}
-	DefaultDNSConn   = dns.Dial
-	DefaultDNSServer = []string{
-		"223.5.5.5",       // ali
-		"119.29.29.29",    // tencent
-		"180.76.76.76",    // baidu
-		"114.114.114.114", // dianxin
-		"1.1.1.1",         // cf
-		//"8.8.8.8",
-	}
-)
-
 func ToNsServer(server string) string {
 	// 如果 server 只是一个 IP 则需要把端口加上
 	ip := net.ParseIP(server)
@@ -978,234 +894,6 @@ func ToNsServer(server string) string {
 	}
 	server += ":53"
 	return server
-}
-
-var hostsRecords map[string][]string
-
-func init() {
-	raw, _ := hostsfile.ParseDefault()
-	if raw != nil {
-		hostsRecords = raw
-	}
-}
-
-func _GetIPFromHostWithContextAndDNSServers(
-	timeout time.Duration, domain string, DNSServers []string, cb func(domain string) bool,
-) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	DNSClient := DefaultDNSClient
-	DNSClient.Timeout = timeout
-	DNSClient.DialTimeout = timeout
-	DNSClient.ReadTimeout = timeout
-	DNSClient.WriteTimeout = timeout
-	if strings.TrimSpace(domain) == "" {
-		return Error("empty domain input")
-	}
-	//ctx, cancel := context.WithCancel(ctx)
-	//defer cancel()
-	if cb == nil {
-		return Errorf("callback cannot be empty")
-	}
-
-	if records, ok := hostsRecords[domain]; ok {
-		for _, r := range records {
-			if cb(r) {
-				continue
-			} else {
-				return nil
-			}
-		}
-	}
-
-	var finalError error
-	nativeDNS := func() bool {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Error(err)
-			}
-		}()
-
-		if domain == "" {
-			return false
-		}
-
-		ips, err := net.DefaultResolver.LookupIPAddr(ctx, strings.TrimRight(domain, "."))
-		if err != nil {
-			switch retErr := err.(type) {
-			case *net.DNSError:
-				if retErr.IsNotFound {
-					finalError = retErr
-					return false
-				}
-			default:
-				log.Errorf("default resolver parse failed: %s", err)
-			}
-			return false
-		}
-		for _, i := range ips {
-			if cb(i.String()) {
-				continue
-			} else {
-				return true
-			}
-		}
-		if len(ips) <= 0 {
-			return false
-		}
-		return true
-	}
-
-	if DNSServers == nil {
-		addrs, _ := net.DefaultResolver.LookupHost(ctx, strings.Trim(domain, "."))
-		if len(addrs) > 0 {
-			for _, domain := range addrs {
-				if cb != nil {
-					if !cb(domain) {
-						return nil
-					}
-				}
-			}
-			return nil
-		}
-		DNSServers = DefaultDNSServer
-	}
-
-	var (
-		errs []error
-	)
-
-	haveResult := NewBool(false)
-	callback := func(domain string) bool {
-		haveResult.Set()
-		return cb(domain)
-	}
-
-	if !strings.HasSuffix(domain, ".") {
-		domain = domain + "."
-	}
-Main:
-	for _, qType := range []uint16{dns.TypeA, dns.TypeAAAA} {
-		var typeRaw = "A/AAAA"
-		switch qType {
-		case dns.TypeAAAA:
-			typeRaw = "AAAA"
-		case dns.TypeA:
-			typeRaw = "A"
-		}
-		for _, server := range DNSServers {
-			switch typeRaw {
-			case "A":
-				data, err := RetryableDNSClient.A(domain)
-				if err != nil {
-					errs = append(errs, Errorf("DNS(%v)[%v] Err: %v", server, typeRaw, err))
-					continue
-				}
-				for _, record := range data.A {
-					if callback(record) {
-						continue
-					} else {
-						break Main
-					}
-				}
-			case "AAAA":
-				data, err := RetryableDNSClient.AAAA(domain)
-				if err != nil {
-					errs = append(errs, Errorf("DNS(%v)[%v] Err: %v", server, typeRaw, err))
-					continue
-				}
-				for _, record := range data.AAAA {
-					if callback(record) {
-						continue
-					} else {
-						break Main
-					}
-				}
-			}
-
-			server = ToNsServer(server)
-			m := dns.Msg{}
-			m.SetQuestion(domain, qType)
-			rsp, _, err := DNSClient.Exchange(&m, server)
-			if err != nil {
-				//log.Errorf("query dns failed: %s", err)
-				errs = append(errs, Errorf("DNS(%v)[%v] Err: %v", server, typeRaw, err))
-				continue
-			}
-
-			for _, ans := range rsp.Answer {
-				switch record := ans.(type) {
-				case *dns.A:
-					if record.A.String() != "" {
-						if callback(record.A.String()) {
-							continue
-						} else {
-							break Main
-						}
-					}
-				case *dns.AAAA:
-					if record.AAAA.String() != "" {
-						if callback(record.AAAA.String()) {
-							continue
-						} else {
-							break Main
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if !haveResult.IsSet() {
-		if nativeDNS() {
-			return nil
-		}
-
-		if finalError != nil {
-			return finalError
-		}
-		return Errorf("empty results: QueryErrors: \n"+
-			"%v"+
-			"\n", spew.Sdump(errs))
-	}
-
-	return nil
-}
-
-func _GetFirstIPFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) (string, error) {
-	var Result string
-	err := _GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
-		Result = domain
-		return false
-	})
-	return Result, err
-}
-
-func _GetIPsFromHostWithContextE(timeout time.Duration, domain string, DNSServers []string) ([]string, error) {
-	var results []string
-	err := _GetIPFromHostWithContextAndDNSServers(timeout, domain, DNSServers, func(domain string) bool {
-		results = append(results, domain)
-		return true
-	})
-	return results, err
-}
-
-func _GetIPsFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServers []string) ([]string, error) {
-	return _GetIPsFromHostWithContextE(timeout, domain, dnsServers)
-}
-
-func _GetFirstIPFromHostWithTimeoutE(timeout time.Duration, domain string, dnsServres []string) (string, error) {
-	return _GetFirstIPFromHostWithContextE(timeout, domain, dnsServres)
-}
-
-func _GetFirstIPFromHostWithTimeout(timeout time.Duration, domain string, dnsServres []string) string {
-	s, _ := _GetFirstIPFromHostWithTimeoutE(timeout, domain, dnsServres)
-	return s
-}
-
-func _GetIPsFromHostWithTimeout(timeout time.Duration, domain string, dnsServers []string) []string {
-	r, _ := _GetIPsFromHostWithTimeoutE(timeout, domain, dnsServers)
-	return r
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
