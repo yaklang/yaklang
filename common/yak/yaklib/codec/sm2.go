@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	"github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 import (
@@ -29,13 +30,29 @@ func GenerateSM2PrivateKeyPEM() ([]byte, []byte, error) {
 }
 
 func GenerateSM2PrivateKeyHEX() ([]byte, []byte, error) {
-	pkey, err := sm2.GenerateKey(cryptoRand.Reader)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "sm2.GenerateKey(cryptoRand.Reader)")
+	for i := 0; i < 10; i++ {
+		pkey, err := sm2.GenerateKey(cryptoRand.Reader)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "sm2.GenerateKey(cryptoRand.Reader)")
+		}
+		pKeyBytes := []byte(x509.WritePrivateKeyToHex(pkey))
+		pubKeyBytes := []byte(x509.WritePublicKeyToHex(pkey.Public().(*sm2.PublicKey)))
+
+		data, err := SM2EncryptC1C2C3(pubKeyBytes, []byte("abc"))
+		if err != nil {
+			continue
+		}
+		decData, err := SM2DecryptC1C2C3(pKeyBytes, data)
+		if err != nil {
+			continue
+		}
+		if string(decData) != "abc" {
+			continue
+		}
+		return pKeyBytes, pubKeyBytes, nil
 	}
-	pKeyBytes := []byte(x509.WritePrivateKeyToHex(pkey))
-	pubKeyBytes := []byte(x509.WritePublicKeyToHex(pkey.Public().(*sm2.PublicKey)))
-	return pKeyBytes, pubKeyBytes, nil
+
+	return nil, nil, utils.Error("generate sm2 private key failed")
 }
 
 func SM2EncryptC1C2C3(pubKey []byte, data []byte) ([]byte, error) {
