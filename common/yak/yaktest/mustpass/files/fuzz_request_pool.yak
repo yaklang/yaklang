@@ -1,0 +1,5 @@
+for result in fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${getParam("VULINBOX_ADDR")}
+`)~.FuzzPostJsonParams("data", `{{int(1-10)}}`).Show().Exec()~ {
+    dump(result)
+}

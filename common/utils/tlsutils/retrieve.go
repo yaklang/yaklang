@@ -37,7 +37,6 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 	}
 
 	conn, err := netx.DialTCPTimeout(10*time.Second, utils.HostPort(host, port), netx.GetProxyFromEnv())
-	//conn, err := net.DialTimeout("tcp", utils.HostPort(host, port), 5*time.Second)
 	if err != nil {
 		return nil, err
 	}

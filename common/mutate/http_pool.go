@@ -5,18 +5,13 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/crawler"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net"
 	"net/http"
-	"net/http/httptrace"
 	"reflect"
 	"strings"
 	"sync"
@@ -357,9 +352,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 		for _, e := range ret {
 			res := []byte(e.Result)
 			results = append(results, res)
-			//utils.Debug(func() {
-			//	log.Infof("hash: %v payloads: %v", codec.Sha256(res), e.Payloads)
-			//})
 			payloadsTable.Store(codec.Sha256(res), e.Payloads)
 		}
 		opts = append(opts, _httpPool_inner_payload(payloadsTable))
@@ -376,179 +368,19 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			defer func() { wg.(*utils.SizedWaitGroup).Done() }()
 		}
 
-		if config.UseRawMode || config.Host != "" {
-			var results [][]byte
-			for _, e := range ret {
-				res, err := utils.HttpDumpWithBody(e, true)
-				if err != nil {
-					return nil, err
-				}
-				results = append(results, res)
-			}
-			return _httpPool(results, opts...)
+		if !config.UseRawMode {
+			log.Warnf("do not use golang native http.Client, it's not recommended")
+			config.UseRawMode = true
 		}
-
-		// 配置 HTTP 客户端
-		client := utils.NewDefaultHTTPClient()
-		if config.PerRequestTimeout > 0 {
-			client.Timeout = config.PerRequestTimeout
-		}
-		var err error
-		if config.Proxies != nil {
-			httpTr := client.Transport.(*http.Transport)
-			httpTr.Proxy, err = crawler.RoundRobinProxySwitcher(config.Proxies...)
+		var results [][]byte
+		for _, e := range ret {
+			res, err := utils.HttpDumpWithBody(e, true)
 			if err != nil {
-				log.Errorf("set proxy[%v] failed: %s", config.Proxies, err)
+				return nil, err
 			}
+			results = append(results, res)
 		}
-		results := make(chan *_httpResult, len(ret))
-
-		// 开始进行数据包发送
-		go func() {
-			defer close(results)
-
-			//delayer := utils.NewDelayWaiter()
-			delayer, _ := utils.NewFloatSecondsDelayWaiter(config.DelayMinSeconds, config.DelayMaxSeconds)
-
-			swg := utils.NewSizedWaitGroup(config.Size)
-			for _, rawRequest := range ret {
-				if config.Ctx != nil {
-					select {
-					case <-config.Ctx.Done():
-						return
-					default:
-					}
-				}
-				// 防止对原始请求进行修改，所以这里需要进行深拷贝
-				rawRequestRaw, err := utils.HttpDumpWithBody(rawRequest, true)
-				if err != nil {
-					log.Errorf("dump request failed: %s", err)
-					continue
-				}
-				targetRequest, err := lowhttp.ParseStringToHttpRequest(string(rawRequestRaw))
-				if err != nil {
-					log.Errorf("parse request failed: %s", err)
-					continue
-				}
-				requestRaw, err := utils.HttpDumpWithBody(targetRequest, true)
-				if err != nil {
-					log.Errorf("marshal http.Request failed: %s", err)
-				}
-				targetRequest.URL.Scheme = rawRequest.URL.Scheme
-				swg.Add()
-				go func() {
-					defer func() {
-						if delayer != nil {
-							delayer.Wait()
-						}
-						swg.Done()
-					}()
-					defer func() {
-						if err := recover(); err != nil {
-							log.Error(err)
-						}
-					}()
-
-					var (
-						https                    bool
-						raw                      []byte
-						rspIns                   *http.Response
-						err                      error
-						duration, serverDuration time.Duration
-					)
-
-					if config.IsHttps {
-						https = config.IsHttps
-					}
-					if targetRequest.URL.Scheme == "https" {
-						https = true
-					}
-					if config.IsGmTLS {
-						https = true
-						httpTr := client.Transport.(*http.Transport)
-						httpTr.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-							dialer := &net.Dialer{}
-							conn, err := gmtls.DialWithDialer(dialer, network, addr, &gmtls.Config{
-								GMSupport:          &gmtls.GMSupport{},
-								InsecureSkipVerify: true,
-							})
-							if err != nil {
-								return nil, err
-							}
-							ctx, _ = context.WithTimeout(ctx, 30*time.Second)
-							return ctxio.NewConn(ctx, conn), nil
-						}
-					}
-
-					url, err := lowhttp.ExtractURLFromHTTPRequest(targetRequest, https)
-					if err != nil {
-						log.Errorf("parse request 'url failed: %s, enable debug loglevel for more info", err)
-						return
-					}
-					targetRequest.URL = url
-
-					log.Infof("start to send to %v (http.client mode)", url.String())
-					var ac *http.Request
-					ac, err = utils.FixHTTPRequestForHTTPDo(targetRequest)
-					if err != nil {
-						log.Errorf("%v", err)
-						return
-					}
-					utils.Debug(func() {
-						raw, _ := utils.HttpDumpWithBody(targetRequest, true)
-						log.Debugf("request old: \n%v", string(raw))
-
-						raw, _ = utils.HttpDumpWithBody(ac, true)
-						log.Debugf("request new: \n%v", string(raw))
-					})
-					// start := time.Now()
-					var (
-						connDone time.Time
-					)
-					trace := &httptrace.ClientTrace{
-						ConnectDone: func(network, addr string, err error) {
-							connDone = time.Now()
-						},
-
-						GotFirstResponseByte: func() {
-							serverDuration = time.Since(connDone)
-						},
-					}
-					ac = ac.WithContext(httptrace.WithClientTrace(ac.Context(), trace))
-					start := time.Now()
-					rspIns, err = client.Do(ac)
-					duration = time.Since(start)
-
-					if rspIns != nil {
-						raw, _ = utils.HttpDumpWithBody(rspIns, true)
-					}
-
-					ret := &_httpResult{
-						Source:           config.Source,
-						Url:              url.String(),
-						Request:          targetRequest,
-						Error:            err,
-						RequestRaw:       requestRaw,
-						ResponseRaw:      raw,
-						Response:         rspIns,
-						DurationMs:       duration.Milliseconds(),
-						ServerDurationMs: serverDuration.Milliseconds(),
-						Timestamp:        time.Now().Unix(),
-					}
-					if ret.Response == nil && raw != nil {
-						ret.Response, err = http.ReadResponse(bufio.NewReader(bytes.NewBuffer(raw)), targetRequest)
-						if err != nil {
-							log.Errorf("parse bytes to response failed: %s", err)
-						}
-					}
-					results <- ret
-				}()
-			}
-
-			swg.Wait()
-		}()
-
-		return results, nil
+		return _httpPool(results, opts...)
 	case FuzzHTTPRequestIf:
 		reqs, err := ret.Results()
 		if err != nil {
@@ -592,6 +424,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 		if config.Size <= 0 {
 			config.Size = 50
 		}
+
 		results := make(chan *_httpResult, len(ret))
 
 		go func() {
@@ -599,6 +432,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			defer func() {
 				if e := recover(); e != nil {
 					log.Error(e)
+					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
 			delayer, _ := utils.NewFloatSecondsDelayWaiter(config.DelayMinSeconds, config.DelayMaxSeconds)

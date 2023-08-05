@@ -49,7 +49,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "mock_weblogic.yak"
+	var debugName = "fuzz_request_pool.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
