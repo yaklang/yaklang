@@ -570,6 +570,17 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		}
 	}()
 
+	if !utils.IsHttpOrHttpsUrl(u) {
+		host, port, _ := utils.ParseStringToHostPort(u)
+		if host == "" {
+			host = u
+		}
+		if port == 443 {
+			u = fmt.Sprintf("https://%s", host)
+		} else {
+			u = fmt.Sprintf("http://%s", host)
+		}
+	}
 	m.callers.CallByName(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
 	urlObj, err := url.Parse(u)
 	if err != nil {
