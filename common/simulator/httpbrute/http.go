@@ -5,8 +5,8 @@ package httpbrute
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -14,11 +14,8 @@ import (
 
 func ConnectTest(urlStr string, proxy *url.URL) (bool, string) {
 	transport := http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: (&net.Dialer{
-			Timeout:   15 * time.Second,
-			KeepAlive: 15 * time.Second,
-		}).DialContext,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		DialContext:           netx.NewDialContextFunc(15 * time.Second),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,

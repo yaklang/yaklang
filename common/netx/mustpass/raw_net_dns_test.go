@@ -4,8 +4,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"net/http"
 	"strings"
 	"testing"
@@ -22,9 +22,9 @@ func TestBASIC_SPECIFIC_DNS(t *testing.T) {
 
 	time.Sleep(time.Second)
 	var start = time.Now()
-	var result = yakdns.LookupFirst(domain,
-		yakdns.WithDNSDisableSystemResolver(true),
-		yakdns.WithDNSServers(addr), yakdns.WithDNSFallbackTCP(false))
+	var result = netx.LookupFirst(domain,
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(false))
 	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
 	if time.Now().Sub(start).Milliseconds() > 300 {
 		t.Errorf("LookupFirst %s cost %s", domain, time.Since(start))
@@ -48,10 +48,10 @@ func TestBASIC_SPECIFIC_TCP_FALLBACK_DNS(t *testing.T) {
 
 	time.Sleep(time.Second)
 	var start = time.Now()
-	var result = yakdns.LookupFirst(domain,
-		yakdns.WithDNSDisableSystemResolver(true),
-		yakdns.WithDNSServers(addr), yakdns.WithDNSFallbackTCP(true),
-		yakdns.WithDNSPreferTCP(true),
+	var result = netx.LookupFirst(domain,
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(true),
+		netx.WithDNSPreferTCP(true),
 	)
 	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
 	if time.Now().Sub(start).Milliseconds() > 300 {
@@ -72,11 +72,11 @@ func TestNotExisted_OnlyDoH(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	token := utils.RandStringBytes(20)
 	_ = token
-	var a = yakdns.LookupFirst(
+	var a = netx.LookupFirst(
 		strings.ToLower(token)+".com",
-		yakdns.WithDNSPreferDoH(true),
-		yakdns.WithDNSDisableSystemResolver(true),
-		yakdns.WithDNSSpecificDoH("http://"+utils.HostPort(host, port)+"/dns-query"),
+		netx.WithDNSPreferDoH(true),
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSSpecificDoH("http://"+utils.HostPort(host, port)+"/dns-query"),
 	)
 	if a != "1.2.3.4" {
 		t.Errorf("DoH Failed")

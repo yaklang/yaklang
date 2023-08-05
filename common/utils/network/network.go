@@ -1,8 +1,8 @@
 package network
 
 import (
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +26,7 @@ func ParseStringToCClassHosts(targets string) string {
 			target = append(target, r)
 			continue
 		}
-		ip := yakdns.LookupFirst(r, yakdns.WithTimeout(5*time.Second))
+		ip := netx.LookupFirst(r, netx.WithTimeout(5*time.Second))
 		if ip != "" && utils.IsIPv4(ip) {
 			netStr, err := utils.IPv4ToCClassNetwork(ip)
 			if err != nil {

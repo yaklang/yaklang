@@ -10,9 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"net"
@@ -675,12 +675,12 @@ RECONNECT:
 	if conn == nil {
 		// no proxy
 
-		var extraDNS []yakdns.DNSOption
+		var extraDNS []netx.DNSOption
 		if len(dnsServers) > 0 {
-			extraDNS = append(extraDNS, yakdns.WithDNSServers(dnsServers...), yakdns.WithDNSDisableSystemResolver(true))
+			extraDNS = append(extraDNS, netx.WithDNSServers(dnsServers...), netx.WithDNSDisableSystemResolver(true))
 		}
 		if dnsHosts != nil && len(dnsHosts) > 0 {
-			extraDNS = append(extraDNS, yakdns.WithTemporaryHosts(dnsHosts))
+			extraDNS = append(extraDNS, netx.WithTemporaryHosts(dnsHosts))
 		}
 
 		// DNS Resolve
@@ -689,7 +689,7 @@ RECONNECT:
 		var addr string
 		startDNS := time.Now()
 		if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-			var ips = yakdns.LookupFirst(host, extraDNS...)
+			var ips = netx.LookupFirst(host, extraDNS...)
 			traceInfo.DNSTime = time.Since(startDNS)
 			if ips == "" {
 				return response, utils.Errorf("[%vms] dns failed for querying: %s", traceInfo.DNSTime.Milliseconds(), host)

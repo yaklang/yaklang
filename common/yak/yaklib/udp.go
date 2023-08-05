@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/regen"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -133,7 +133,7 @@ func (t *udpConn) SendTo(i interface{}, target string) error {
 	}
 
 	if !utils.IsIPv4(host) {
-		host = yakdns.LookupFirst(host, yakdns.WithTimeout(t.GetTimeout()))
+		host = netx.LookupFirst(host, netx.WithTimeout(t.GetTimeout()))
 		if host == "" {
 			return utils.Errorf("cannot found ip by %v", host)
 		}
