@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -20,7 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -206,7 +206,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
 			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
 		}
-		conn, err := net.DialTimeout("tcp", utils.HostPort(host, port), 5*time.Second)
+		conn, err := netx.DialTimeoutWithoutProxy(5*time.Second, "tcp", utils.HostPort(host, port))
 		if err != nil {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "代理不通（Proxy Cannot be connected）"))
 			return utils.Errorf("proxy cannot be connected: %v", proxyUrl.String())
