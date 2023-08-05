@@ -736,8 +736,9 @@ func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
 	}
 
 	var (
-		started bool // MITM正常启动（此时MITM开启HTTP2支持
-		h2Test  bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
+		started         bool // MITM正常启动（此时MITM开启HTTP2支持
+		h2Test          bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
+		h2serverHandled int
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -747,6 +748,8 @@ func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
 
 	/* H2 */
 	h2Host, h2Port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+		h2serverHandled++
+		spew.Dump(req)
 		return req
 	})
 	h2Addr := utils.HostPort(h2Host, h2Port)
@@ -882,6 +885,10 @@ _, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 
 	if !h2Test {
 		panic("H2 TEST FAILED")
+	}
+
+	if h2serverHandled <= 0 {
+		panic("H2 SERVER NOT HANDLED")
 	}
 }
 
