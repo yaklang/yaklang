@@ -162,15 +162,6 @@ func NewProxy() *Proxy {
 	return proxy
 }
 
-// SetHTTPTransport sets the http.RoundTripper of the proxy.
-func (p *Proxy) SetHTTPTransport(rt *http.Transport) {
-	p.roundTripper = rt
-	tr := rt
-	tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-	tr.Proxy = http.ProxyURL(p.proxyURL)
-	tr.DialContext = p.dial
-}
-
 // SetRoundTripper sets the http.RoundTripper of the proxy.
 func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	p.roundTripper = rt
@@ -633,7 +624,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 
 		var parsedConnectedToHost, parsedConnectedToPort, _ = utils.ParseStringToHostPort(connectedTo)
-		if parsedConnectedToHost == "" {
+		if parsedConnectedToPort <= 0 {
 			parsedConnectedToHost = connectedTo
 		}
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
@@ -688,70 +679,115 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
 			if parsedConnectedToPort == 0 {
 				if isHttps {
-					ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, 443)
+					parsedConnectedToPort = 443
 				} else {
-					ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, 80)
+					parsedConnectedToPort = 80
 				}
-			} else {
-				ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 			}
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 
 			// 22 is the TLS handshake.
 			// https://tools.ietf.org/html/rfc5246#section-6.2.1
 			if isHttps {
-				/* update lib from official martian to add support for intercepting and analysing *h2* request */
-				/* also fix bug from *martian* since they did not respect server side ALPN */
-				var rawConn net.Conn
-				var err error
-				//check if target server support h2 if not we will degrade to use http/1.1
-				rawConn, err = p.handshakeWithTarget(req)
-				if err != nil {
-					return fmt.Errorf("fail to connect to %v: %w", req.URL, err)
+				var serverUseH2 bool
+				if p.http2 {
+					// does remote server use h2?
+					defaultTLSConfig := utils.NewDefaultTLSConfig()
+					defaultTLSConfig.NextProtos = []string{"h2"}
+					var proxyStr string
+					if p.proxyURL != nil {
+						proxyStr = p.proxyURL.String()
+					}
+					netConn, _ := netx.DialTLSTimeout(5*time.Second, utils.HostPort(parsedConnectedToHost, parsedConnectedToPort), defaultTLSConfig, proxyStr)
+					if netConn != nil {
+						switch ret := netConn.(type) {
+						case *tls.Conn:
+							if ret.ConnectionState().NegotiatedProtocol == "h2" {
+								serverUseH2 = true
+							}
+						}
+						netConn.Close()
+					}
 				}
 
-				_, ok := rawConn.(*tls.Conn)
+				// fallback: 最普通的情况，没有任何 http2 支持
+				// do as ordinary https server and use *tls.Conn
+				tlsConfig := p.mitm.TLSForHost(req.Host, p.http2 && serverUseH2)
+				tlsconn := tls.Server(&peekedConn{
+					Conn: conn,
+					r:    io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn),
+				}, tlsConfig)
+				if err := tlsconn.Handshake(); err != nil {
+					p.mitm.HandshakeErrorCallback(req, err)
+					return err
+				}
+				nextProto := tlsconn.ConnectionState().NegotiatedProtocol
+				log.Infof("connect from broswer: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
+				var nconn net.Conn = tlsconn
 
-				if !ok { // target server is GM TLS
-					// omit HTTP/2 with GM for now
-					tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
-					if err := tlsconn.Handshake(); err != nil {
-						p.mitm.HandshakeErrorCallback(req, err)
-						return err
-					}
-					var nconn net.Conn
-					nconn = tlsconn
-					brw.Writer.Reset(nconn)
-					brw.Reader.Reset(nconn)
-					// -> Client Connection <- is none HTTP2 HTTPS connection
-					return p.handle(ctx, nconn, brw)
+				if nextProto == "h2" {
+					return p.proxyH2(p.closing, tlsconn, req.URL)
 				}
 
-				sc := rawConn.(*tls.Conn)
+				brw.Writer.Reset(nconn)
+				brw.Reader.Reset(nconn)
+				// -> Client Connection <- is none HTTP2 HTTPS connection
+				return p.handle(ctx, nconn, brw)
 
-				if sc.ConnectionState().NegotiatedProtocol == "h2" && p.http2 { //server support h2
-					cc := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, true))
-					if err := cc.Handshake(); err != nil {
-						p.mitm.HandshakeErrorCallback(req, err)
-						return err
-					}
-
-					if cc.ConnectionState().NegotiatedProtocol == "h2" { //browser also want h2 then proxy with h2
-						// -> Client Connection <- is HTTP2 HTTPS connection (P.S no support for h2c all http2 is https)
-						return p.proxyH2(p.closing, cc, req.URL)
-					}
-				} else { //server not support h2 so we completely disable h2 support to handle using previous version of martian
-					tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
-					if err := tlsconn.Handshake(); err != nil {
-						p.mitm.HandshakeErrorCallback(req, err)
-						return err
-					}
-					var nconn net.Conn
-					nconn = tlsconn
-					brw.Writer.Reset(nconn)
-					brw.Reader.Reset(nconn)
-					// -> Client Connection <- is none HTTP2 HTTPS connection
-					return p.handle(ctx, nconn, brw)
-				}
+				///* update lib from official martian to add support for intercepting and analysing *h2* request */
+				///* also fix bug from *martian* since they did not respect server side ALPN */
+				//var rawConn net.Conn
+				//var err error
+				//
+				////check if target server support h2 if not we will degrade to use http/1.1
+				//rawConn, err = p.handshakeWithTarget(req)
+				//if err != nil {
+				//	return fmt.Errorf("fail to connect to %v: %w", req.URL, err)
+				//}
+				//_, ok := rawConn.(*tls.Conn)
+				//
+				//if !ok {
+				//	// target server is GM TLS
+				//	// omit HTTP/2 with GM for now
+				//	tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
+				//	if err := tlsconn.Handshake(); err != nil {
+				//		p.mitm.HandshakeErrorCallback(req, err)
+				//		return err
+				//	}
+				//	var nconn net.Conn
+				//	nconn = tlsconn
+				//	brw.Writer.Reset(nconn)
+				//	brw.Reader.Reset(nconn)
+				//	// -> Client Connection <- is none HTTP2 HTTPS connection
+				//	return p.handle(ctx, nconn, brw)
+				//}
+				//
+				//sc := rawConn.(*tls.Conn)
+				//
+				//if sc.ConnectionState().NegotiatedProtocol == "h2" && p.http2 { //server support h2
+				//	cc := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, true))
+				//	if err := cc.Handshake(); err != nil {
+				//		p.mitm.HandshakeErrorCallback(req, err)
+				//		return err
+				//	}
+				//
+				//	if cc.ConnectionState().NegotiatedProtocol == "h2" { //browser also want h2 then proxy with h2
+				//		// -> Client Connection <- is HTTP2 HTTPS connection (P.S no support for h2c all http2 is https)
+				//		return p.proxyH2(p.closing, cc, req.URL)
+				//	}
+				//} else { //server not support h2 so we completely disable h2 support to handle using previous version of martian
+				//	tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
+				//	if err := tlsconn.Handshake(); err != nil {
+				//		p.mitm.HandshakeErrorCallback(req, err)
+				//		return err
+				//	}
+				//	var nconn net.Conn
+				//	nconn = tlsconn
+				//	brw.Writer.Reset(nconn)
+				//	brw.Reader.Reset(nconn)
+				//	// -> Client Connection <- is none HTTP2 HTTPS connection
+				//	return p.handle(ctx, nconn, brw)
+				//}
 			}
 			// -> Client Connection <- is plain HTTP connection
 			// Prepend the previously read data to be read again by http.ReadRequest.
@@ -1053,7 +1089,6 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 	proxyToServer := http.Client{
 		Transport: tr,
 	}
-
 	handler := makeNewH2Handler(p.reqmod, p.resmod, &proxyToServer, url.Host)
 	proxyClientConfig := &lowhttp2.ServeConnOpts{Handler: handler}
 	proxyClient.ServeConn(cc, proxyClientConfig)

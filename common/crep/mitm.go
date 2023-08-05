@@ -208,7 +208,6 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	}
 
 	originHttpTransport := m.httpTransport
-
 	m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
 	if m.proxyAuth != nil {
@@ -572,7 +571,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	proxy := martian.NewProxy()
 	server := &MITMServer{
 		proxy:                    proxy,
-		DNSServers:               []string{"8.8.8.8", "114.114.114.114"},
+		DNSServers:               make([]string, 0),
 		dnsCache:                 new(sync.Map),
 		HostMapping:              make(map[string]string),
 		hijackedMaxContentLength: 10 * 1000 * 1000,
