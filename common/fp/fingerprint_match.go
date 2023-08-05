@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"math"
 	"net"
@@ -77,21 +78,16 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	ip := net.ParseIP(utils2.FixForParseIP(host))
 	if ip == nil {
 		log.Debugf("found host:%s is a domain, resolve it to ip", host)
-		dnsCtx, _ := context.WithTimeout(ctx, config.ProbeTimeout)
-		ips, err := net.DefaultResolver.LookupIPAddr(dnsCtx, host)
-		if err != nil {
-			dataErr := errors.Errorf("resolve %s failed: %s", host, err)
+		ipStr := netx.LookupFirst(host, netx.WithTimeout(config.ProbeTimeout))
+		if ipStr == "" {
+			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
 			result.Reason = dataErr.Error()
 			return result, nil
-		}
-
-		if len(ips) >= 1 {
-			ip = ips[0].IP
-			//if len(ips) > 1 {
-			//	log.Infof("resolve host[%s] for multi ip addrs[%#v], use first: %s", host, ips, ip.String())
-			//}
 		} else {
-			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
+			ip = net.ParseIP(ipStr)
+		}
+		if ip == nil {
+			dataErr := errors.Errorf("resolve %s failed: %s", host, "invalid ip addr: "+ipStr)
 			result.Reason = dataErr.Error()
 			return result, nil
 		}

@@ -1,4 +1,4 @@
-package yakdns
+package netx
 
 import (
 	"context"

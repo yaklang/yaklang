@@ -10,9 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"io"
 	"io/ioutil"
 	"net"
@@ -353,7 +353,7 @@ func (m *MITMProxy) newConnFor(target string, isTls bool, sni string) (net.Conn,
 		originTarget = sni
 	}
 	if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-		host = yakdns.LookupFirst(host, yakdns.WithTimeout(5*time.Second))
+		host = netx.LookupFirst(host, netx.WithTimeout(5*time.Second))
 		if host == "" {
 			return nil, utils.Errorf("dns error for %v", originTarget)
 		}

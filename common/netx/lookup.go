@@ -1,4 +1,4 @@
-package yakdns
+package netx
 
 import (
 	"context"
@@ -205,6 +205,16 @@ func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx conte
 		}
 		return net.DialTimeout(network, utils.HostPort(newHost, port), timeout)
 	}
+}
+
+var defaultDialContextFunc = NewDialContextFunc(30 * time.Second)
+
+func DialTimeout(timeout time.Duration, network, addr string) (net.Conn, error) {
+	return defaultDialContextFunc(utils.TimeoutContext(timeout), network, addr)
+}
+
+func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return defaultDialContextFunc(ctx, network, addr)
 }
 
 func NewDialGMTLSContextFunc(preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {

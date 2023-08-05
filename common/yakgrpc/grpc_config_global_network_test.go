@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yakdns"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -28,7 +28,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 		panic(err)
 	}
 	check := false
-	for _, i := range yakdns.NewDefaultReliableDNSConfig().SpecificDNSServers {
+	for _, i := range netx.NewDefaultReliableDNSConfig().SpecificDNSServers {
 		if !check {
 			if i == "127.0.0.1" {
 				check = true
@@ -40,7 +40,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	}
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	check = false
-	for _, i := range yakdns.NewDefaultReliableDNSConfig().SpecificDNSServers {
+	for _, i := range netx.NewDefaultReliableDNSConfig().SpecificDNSServers {
 		if !check {
 			if i == "127.0.0.1" {
 				check = true

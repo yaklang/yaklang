@@ -6,10 +6,10 @@ import (
 	"github.com/google/gopacket/routing"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"github.com/yaklang/yaklang/common/utils/netutil/routewrapper"
-	"github.com/yaklang/yaklang/common/yakdns"
 	"net"
 	"os/exec"
 	"runtime"
@@ -76,7 +76,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 	if !utils.IsIPv4(target) && !utils.IsIPv6(target) {
 		// 针对域名，先去解析一下
 		log.Infof("fetching %v 's address for %s", target, timeout.String())
-		addr = yakdns.LookupFirst(target, yakdns.WithTimeout(timeout))
+		addr = netx.LookupFirst(target, netx.WithTimeout(timeout))
 		if addr == "" {
 			err = errors.Errorf("cannot found domain[%s]'s ip address", target)
 			return nil, nil, nil, err

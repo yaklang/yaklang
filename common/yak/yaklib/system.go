@@ -1,25 +1,19 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/privileged"
-	"net"
 	"os"
 	"runtime"
 )
 
 func lookupHost(i string) []string {
-	var result, _ = net.LookupHost(i)
-	return result
+	return netx.LookupAll(i)
 }
 
 func lookupIP(i string) []string {
-	var result, _ = net.LookupIP(i)
-	var res []string
-	for _, o := range result {
-		res = append(res, o.String())
-	}
-	return res
+	return netx.LookupAll(i)
 }
 
 var SystemExports = map[string]interface{}{
@@ -76,7 +70,7 @@ var SystemExports = map[string]interface{}{
 	"ARCH":         runtime.GOARCH,
 	"IsPrivileged": privileged.GetIsPrivileged(),
 	"GetDefaultDNSServers": func() []string {
-		return utils.DefaultDNSServer
+		return netx.NewDefaultReliableDNSConfig().SpecificDNSServers
 	},
 	"WaitConnect": utils.WaitConnect,
 }
