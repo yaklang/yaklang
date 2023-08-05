@@ -171,7 +171,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 			warning("ProxyToAddr is empty. (specific a host to test proxy)")
 			return
 		}
-		conn, err := netx.GetForceProxyConn(req.GetProxyToAddr(), proxy, timeout)
+		conn, err := netx.DialTCPTimeoutForceProxy(timeout, req.GetProxyToAddr(), proxy)
 		if err != nil {
 			warning("Get proxy connection failed: " + err.Error())
 			return
