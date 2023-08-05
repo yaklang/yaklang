@@ -1,13 +1,13 @@
 package vulinbox
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -30,7 +30,11 @@ func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Re
 	}
 	var extraInfo string
 	if len(str) > 0 {
-		extraInfo = `<pre>` + strconv.Quote(strings.Join(str, "")) + `</pre> <br>`
+		var buf bytes.Buffer
+		for _, s := range str {
+			buf.WriteString(`<pre>` + strconv.Quote(s) + "</pre> <br>")
+		}
+		extraInfo = buf.String()
 	}
 	var debugstyle string
 	if !enableDebug {
@@ -253,15 +257,15 @@ func (s *VulinServer) registerSQLinj() {
 				db := s.database.db
 				var name = LoadFromGetParams(request, "name")
 				msg := `select * from vulin_users where username LIKE '%` + name + `%';`
+				var users []*VulinUser
 				db = db.Raw(msg)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, msg, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, msg, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, msg)
@@ -278,14 +282,14 @@ func (s *VulinServer) registerSQLinj() {
 				var name = LoadFromGetParams(request, "name")
 				var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
 				db = db.Raw(rowStr)
+				var users []*VulinUser
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -299,17 +303,17 @@ func (s *VulinServer) registerSQLinj() {
 			Title:        "参数编码字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
+				var users []*VulinUser
 				var name = LoadFromGetBase64Params(request, "nameb64")
 				var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -323,16 +327,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var name = LoadFromGetBase64JSONParam(request, "data", "nameb64j")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -347,16 +351,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var limit = LoadFromGetParams(request, "limit")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') LIMIT ` + limit + `;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -370,16 +374,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + ` LIMIT 5;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -393,16 +397,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + `, created_at LIMIT 5;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -416,16 +420,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "order")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY created_at desc, username ` + data + `;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -439,16 +443,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + data + ` desc LIMIT 5;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -463,15 +467,15 @@ func (s *VulinServer) registerSQLinj() {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "` desc" + ` LIMIT 5;`
+				var users []*VulinUser
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
@@ -485,16 +489,16 @@ func (s *VulinServer) registerSQLinj() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				db := s.database.db
 				var data = LoadFromGetParams(request, "orderby")
+				var users []*VulinUser
 				var rowStr = `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "`,created_at" + ` LIMIT 5;`
 				db = db.Raw(rowStr)
 				if db.Error != nil {
-					Failed(writer, request, db.Error.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
 					return
 				}
-				var users []*VulinUser
 				err := db.Scan(&users).Error
 				if err != nil {
-					Failed(writer, request, err.Error())
+					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
 					return
 				}
 				sqliWriterEx(true, writer, request, users, rowStr)
