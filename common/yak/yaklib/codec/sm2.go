@@ -5,7 +5,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	"github.com/yaklang/yaklang/common/gmsm/x509"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 import (
@@ -52,7 +51,7 @@ func GenerateSM2PrivateKeyHEX() ([]byte, []byte, error) {
 		return pKeyBytes, pubKeyBytes, nil
 	}
 
-	return nil, nil, utils.Error("generate sm2 private key failed")
+	return nil, nil, errors.New("generate sm2 private key failed")
 }
 
 func SM2EncryptC1C2C3(pubKey []byte, data []byte) ([]byte, error) {
