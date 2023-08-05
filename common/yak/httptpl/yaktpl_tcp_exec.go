@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"strconv"
 	"strings"
@@ -181,7 +182,7 @@ func (y *YakNetworkBulkConfig) Execute(
 		if config.Debug || config.DebugRequest {
 			log.Infof("YakNetworkBulkConfig to target: %v", target)
 		}
-		conn, err := utils.GetAutoProxyConnEx(target, lowhttpConfig.Proxy, lowhttpConfig.Timeout)
+		conn, err := netx.DialTCPTimeout(lowhttpConfig.Timeout, target, lowhttpConfig.Proxy...)
 		if err != nil {
 			log.Errorf("get conn[%v] failed: %s", target, err)
 			continue

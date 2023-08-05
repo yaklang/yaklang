@@ -43,12 +43,12 @@ func formatDomain(target string) string {
 
 func QueryNS(target string, timeout time.Duration, nameServers []string) []string {
 	if nameServers == nil {
-		nameServers = utils.DefaultDNSServer
+		nameServers = DefaultDNSServer
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	servers, err := QueryNSEx(&utils.DefaultDNSClient, ctx, target, nameServers)
+	servers, err := QueryNSEx(&DefaultDNSClient, ctx, target, nameServers)
 	if err != nil {
 		log.Error(err.Error())
 		return nil
@@ -94,12 +94,12 @@ func QueryIP(target string, timeout time.Duration, dnsServers []string) string {
 
 func QueryTxt(target string, timeout time.Duration, nameServers []string) []string {
 	if nameServers == nil {
-		nameServers = utils.DefaultDNSServer
+		nameServers = DefaultDNSServer
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	servers, err := QueryTxTEx(&utils.DefaultDNSClient, ctx, target, nameServers)
+	servers, err := QueryTxTEx(&DefaultDNSClient, ctx, target, nameServers)
 	if err != nil {
 		log.Error(err.Error())
 		return nil
@@ -135,7 +135,7 @@ func QueryTxTEx(client *dns.Client, ctx context.Context, target string, servers 
 
 func QueryAXFR(target string, timeout time.Duration, nameServers []string) []string {
 	if nameServers == nil {
-		nameServers = utils.DefaultDNSServer
+		nameServers = DefaultDNSServer
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -157,7 +157,7 @@ func QueryAXFREx(ctx context.Context, target string, servers []string) ([]string
 	var results []string
 	for _, server := range servers {
 		server = utils.ToNsServer(server)
-		cn, err := utils.DefaultDNSConn("tcp", server)
+		cn, err := DefaultDNSConn("tcp", server)
 		if err != nil {
 			continue
 		}

@@ -5,8 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -19,69 +17,52 @@ import (
 )
 
 func GetForceProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return getProxyConn(target, proxy, connectTimeout)
-}
-func GetProxyConnWithContext(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return getProxyConnWithContext(ctx, target, proxy, connectTimeout)
+	return getConnForceProxy(target, proxy, connectTimeout)
 }
 
-func GetAutoProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	if proxy != "" {
-		return getProxyConn(target, proxy, connectTimeout)
-	}
-	proxy = GetProxyFromEnv()
-	if proxy != "" {
-		return getProxyConn(target, proxy, connectTimeout)
-	}
-
-	return NewDialContextFunc(connectTimeout)(context.Background(), "tcp", target)
+func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string) (net.Conn, error) {
+	return connectForceProxy(nil, target, proxy, timeout)
 }
 
-func GetAutoProxyConnEx(target string, proxies []string, connectTimeout time.Duration) (net.Conn, error) {
-	if len(proxies) <= 0 {
-		return GetAutoProxyConn(target, "", connectTimeout)
+func GetForceProxyConnContext(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
+	return connectForceProxy(ctx, target, proxy, connectTimeout)
+}
+
+func DialTimeout(connectTimeout time.Duration, target string, proxy ...string) (net.Conn, error) {
+	if len(proxy) <= 0 {
+		return DialTimeoutWithoutProxy(connectTimeout, "tcp", target)
 	}
-	for _, proxy := range proxies {
-		conn, err := GetAutoProxyConn(target, proxy, connectTimeout)
-		if err != nil {
-			log.Infof("peek proxy [%v] to connect [%v] failed: %s", proxy, target, err)
-			continue
+	if len(proxy) > 0 {
+		proxy = utils.StringArrayFilterEmpty(proxy)
+		if len(proxy) > 0 {
+			for _, p := range proxy {
+				conn, err := DialTCPTimeoutForceProxy(connectTimeout, target, p)
+				if err != nil {
+					log.Infof("DialTimeoutForceProxy %s %s not available: %v", target, p, err)
+					continue
+				}
+				return conn, nil
+			}
+			return nil, utils.Errorf("DialTimeoutForceProxy %s %v all not available", target, proxy)
 		}
-		return conn, nil
 	}
-	return nil, fmt.Errorf("all proxies[%v] failed", spew.Sdump(proxies))
+	return DialTimeoutWithoutProxy(connectTimeout, "tcp", target)
 }
 
-func GetAutoProxyConnWithTLS(target string, proxy string, connectTimeout time.Duration, c *tls.Config) (net.Conn, error) {
-	if c == nil {
-		c = utils.NewDefaultTLSConfig()
+func DialTLSTimeout(timeout time.Duration, target string, tlsConfig any, proxy ...string) (net.Conn, error) {
+	plainConn, err := DialTimeout(timeout, target, proxy...)
+	if err != nil {
+		return nil, err
 	}
-	if proxy != "" {
-		return getProxyConnTLS(target, proxy, connectTimeout, c)
+	if tlsConfig == nil {
+		tlsConfig = utils.NewDefaultTLSConfig()
 	}
-	proxy = GetProxyFromEnv()
-	if proxy != "" {
-		return getProxyConnTLS(target, proxy, connectTimeout, c)
+	conn, err := UpgradeToTLSConnection(plainConn, utils.ExtractHost(target), tlsConfig)
+	if err != nil {
+		plainConn.Close()
+		return nil, err
 	}
-
-	d := &net.Dialer{Timeout: connectTimeout}
-	return tls.DialWithDialer(d, "tcp", target, c)
-}
-
-func GetAutoProxyConnWithGMTLS(target string, proxy string, connectTimeout time.Duration, c *gmtls.Config) (net.Conn, error) {
-	if c == nil {
-		c = utils.NewDefaultGMTLSConfig()
-	}
-	if proxy != "" {
-		return getProxyConnGMTLS(target, proxy, connectTimeout, c)
-	}
-	proxy = GetProxyFromEnv()
-	if proxy != "" {
-		return getProxyConnGMTLS(target, proxy, connectTimeout, c)
-	}
-
-	d := &net.Dialer{Timeout: connectTimeout}
-	return gmtls.DialWithDialer(d, "tcp", target, c)
+	return conn, nil
 }
 
 func FixProxy(i string) string {
@@ -114,59 +95,32 @@ func GetProxyFromEnv() string {
 	return ""
 }
 
-func TCPConnect(target string, timeout time.Duration, proxies ...string) (net.Conn, error) {
-	dialer := &net.Dialer{Timeout: timeout}
+func DialTCPTimeout(timeout time.Duration, target string, proxies ...string) (net.Conn, error) {
+	proxies = utils.StringArrayFilterEmpty(proxies)
 	if len(proxies) <= 0 {
-		return dialer.Dial("tcp", target)
+		return DialTimeoutWithoutProxy(timeout, "tcp", target)
 	}
 
 	for _, proxy := range proxies {
-		conn, err := getProxyConn(target, proxy, timeout)
+		conn, err := getConnForceProxy(target, proxy, timeout)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
 			continue
 		}
 		return conn, nil
 	}
-	return nil, utils.Errorf("connect: %v failed: no proxy available", target)
+	return nil, utils.Errorf("connect: %v failed: no proxy available (in %v)", target, proxies)
 }
 
-func getProxyConnTLS(target string, proxy string, connectTimeout time.Duration, tlsConfig *tls.Config) (net.Conn, error) {
-	conn, err := getProxyConn(target, proxy, connectTimeout)
-	if err != nil {
-		return nil, err
-	}
-	var tlsConn = tls.Client(conn, tlsConfig)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-	defer cancel()
-	err = tlsConn.HandshakeContext(timeoutCtx)
-	if err != nil {
-		return nil, err
-	}
-	return tlsConn, nil
+func getConnForceProxy(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
+	return connectForceProxy(context.Background(), target, proxy, connectTimeout)
 }
-
-func getProxyConnGMTLS(target string, proxy string, connectTimeout time.Duration, tlsConfig *gmtls.Config) (net.Conn, error) {
-	conn, err := getProxyConn(target, proxy, connectTimeout)
-	if err != nil {
-		return nil, err
-	}
-	var tlsConn = gmtls.Client(conn, tlsConfig)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-	defer cancel()
-	err = tlsConn.HandshakeContext(timeoutCtx)
-	if err != nil {
-		return nil, err
-	}
-	return tlsConn, nil
-}
-func getProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return getProxyConnWithContext(context.Background(), target, proxy, connectTimeout)
-}
-func getProxyConnWithContext(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
+func connectForceProxy(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, _ = context.WithTimeout(ctx, connectTimeout)
+
 	proxy = strings.ToLower(proxy)
 	host, port, _ := utils.ParseStringToHostPort(proxy)
 	if host == "" || port <= 0 {
@@ -180,7 +134,7 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 		if err != nil {
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
-		conn, err := DialContext(ctx, "tcp", proxyAddr)
+		conn, err := DialTLSContextWithoutProxy(ctx, "tcp", proxyAddr, utils.NewDefaultTLSConfig())
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +183,7 @@ func getProxyConnWithContext(ctx context.Context, target string, proxy string, c
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
 
-		conn, err := DialContext(ctx, "tcp", proxyAddr)
+		conn, err := DialContextWithoutProxy(ctx, "tcp", proxyAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -286,4 +240,4 @@ func generateHTTPProxyConnectWithCredential(target string, cred string) []byte {
 	))
 }
 
-var userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36"
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36"

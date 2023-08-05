@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 		host = addr
 	}
 
-	conn, err := utils.GetAutoProxyConn(utils.HostPort(host, port), utils.GetProxyFromEnv(), 5*time.Second)
+	conn, err := netx.DialTCPTimeout(10*time.Second, utils.HostPort(host, port), netx.GetProxyFromEnv())
 	//conn, err := net.DialTimeout("tcp", utils.HostPort(host, port), 5*time.Second)
 	if err != nil {
 		return nil, err

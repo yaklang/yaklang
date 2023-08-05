@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -25,7 +26,7 @@ func (s *Server) SetOnlineProfile(ctx context.Context, req *ypb.OnlineProfile) (
 	}
 
 	if proxy != "" {
-		conn, err := utils.GetForceProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
+		conn, err := netx.DialTCPTimeoutForceProxy(10*time.Second, utils.HostPort(host, port), proxy)
 		if err != nil {
 			if req.IsCompany {
 				return &ypb.Empty{}, nil

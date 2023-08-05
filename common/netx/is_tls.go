@@ -5,11 +5,11 @@ import (
 	"crypto/tls"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 	"time"
 )
 
 var isTlsCached = ttlcache.NewCache()
+
 func IsTLSService(addr string, proxies ...string) bool {
 	result, ok := isTlsCached.Get(addr)
 	if ok {
@@ -19,7 +19,7 @@ func IsTLSService(addr string, proxies ...string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, err := GetAutoProxyConn(addr, strings.Join(proxies, ","), 5*time.Second)
+	conn, err := DialTCPTimeout(5*time.Second, addr, proxies...)
 	if err == nil {
 		defer conn.Close()
 		host, _, _ := utils.ParseStringToHostPort(addr)

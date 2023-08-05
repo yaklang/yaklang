@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
@@ -294,8 +295,8 @@ func PostParams(i interface{}) HttpOption {
 }
 
 func Do(req *YakHttpRequest) (*http.Response, error) {
-	if req.proxies != nil && utils.GetProxyFromEnv() != "" {
-		yakHttpConfig_Proxy(utils.GetProxyFromEnv())(req)
+	if req.proxies != nil && netx.GetProxyFromEnv() != "" {
+		yakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
 	}
 
 	var client *http.Client
@@ -422,8 +423,8 @@ func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, e
 	for _, opt := range options {
 		opt(req)
 	}
-	if req.proxies == nil && utils.GetProxyFromEnv() != "" {
-		yakHttpConfig_Proxy(utils.GetProxyFromEnv())(req)
+	if req.proxies == nil && netx.GetProxyFromEnv() != "" {
+		yakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
 	}
 
 	// client复用，实现会话管理

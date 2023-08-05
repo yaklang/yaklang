@@ -49,7 +49,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 			return res
 		}
 		conn.Close()
-		//if utils.IsTLSService(i.Target) {
+		//if netx.IsTLSService(i.Target) {
 		//	rdpTLSCache.Set(i.Target, true)
 		//}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
@@ -60,7 +61,7 @@ func Connect(addr string, options ...Option) (*Client, error) {
 	}
 	var isTls = port == 443
 	if !isTls {
-		isTls = utils.IsTLSService(addr)
+		isTls = netx.IsTLSService(addr)
 	}
 	log.Info("start to create ws client to connect vulinbox/_/ws/agent")
 

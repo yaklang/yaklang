@@ -64,29 +64,6 @@ func GetExtraDNSServers() []string {
 	return utils.RemoveRepeatStringSlice(utils.PrettifyListFromStringSplited(os.Getenv(CONST_YAK_EXTRA_DNS_SERVERS), ","))
 }
 
-func RefreshDNSServer() {
-	servers := GetExtraDNSServers()
-	if ShouldOverrideDNSDefaultServers() {
-		utils.DefaultDNSServer = GetExtraDNSServers()
-	} else {
-		if len(servers) > 0 {
-			utils.DefaultDNSServer = append(servers, utils.DefaultDNSServer...)
-		}
-	}
-}
-
-func ShouldOverrideDNSDefaultServers() bool {
-	b, err := strconv.ParseBool(os.Getenv(CONST_YAK_OVERRIDE_DNS_SERVERS))
-	if err != nil {
-		b = false
-	}
-	if b && GetExtraDNSServers() != nil {
-		return true
-	} else {
-		return false
-	}
-}
-
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME_RECOVERED = "yakit-profile-plugin.db"

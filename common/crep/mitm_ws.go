@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
@@ -111,12 +112,11 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	switch strings.ToLower(scheme) {
 	case "https", "wss":
 		logger.Infof("building websocket tls tunnel to %s", addr)
-		//remoteConn, err = tls.DialWithDialer(dialer, "tcp", addr, w.TR.TLSClientConfig)
-		remoteConn, err = utils.GetAutoProxyConnWithTLS(addr, w.ProxyStr, 30*time.Second, w.TR.TLSClientConfig)
+		remoteConn, err = netx.DialTLSTimeout(30*time.Second, addr, w.TR.TLSClientConfig, w.ProxyStr)
 		break
 	default:
 		logger.Infof("building websocket tunnel to %s", addr)
-		remoteConn, err = utils.GetAutoProxyConn(addr, w.ProxyStr, 30*time.Second)
+		remoteConn, err = netx.DialTCPTimeout(30*time.Second, addr, w.ProxyStr)
 	}
 	if err != nil {
 		logger.Error(err)

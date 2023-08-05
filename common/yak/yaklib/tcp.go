@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
@@ -102,9 +103,9 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 	var err error
 	addr := utils.HostPort(fmt.Sprint(host), port)
 	if tcpDialer.tlsConfig == nil {
-		conn, err = utils.GetAutoProxyConn(addr, tcpDialer.proxy, tcpDialer.timeout)
+		conn, err = netx.DialTLSTimeout(tcpDialer.timeout, addr, tcpDialer.tlsConfig, tcpDialer.proxy)
 	} else {
-		conn, err = utils.GetAutoProxyConnWithTLS(addr, tcpDialer.proxy, tcpDialer.timeout, tcpDialer.tlsConfig)
+		conn, err = netx.DialTCPTimeout(tcpDialer.timeout, addr, tcpDialer.proxy)
 	}
 	if err != nil {
 		return nil, err

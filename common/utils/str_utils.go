@@ -250,6 +250,7 @@ func IntLargerZeroOr(s ...int) int {
 func StringArrayFilterEmpty(array []string) []string {
 	var ret []string
 	for _, a := range array {
+		a = strings.TrimSpace(a)
 		if a == "" {
 			continue
 		}

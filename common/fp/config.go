@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"io/ioutil"
@@ -164,8 +165,8 @@ func NewConfig(options ...ConfigOption) *Config {
 	for _, p := range options {
 		p(config)
 	}
-	if len(config.Proxies) <= 0 && utils.GetProxyFromEnv() != "" {
-		WithProxy(utils.GetProxyFromEnv())(config)
+	if len(config.Proxies) <= 0 && netx.GetProxyFromEnv() != "" {
+		WithProxy(netx.GetProxyFromEnv())(config)
 	}
 
 	config.lazyInit()
