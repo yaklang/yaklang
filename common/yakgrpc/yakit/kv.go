@@ -204,7 +204,7 @@ func RefreshProcessEnv(db *gorm.DB) {
 	}
 
 	// 刷新 DNS 服务器
-	consts.RefreshDNSServer()
+	// consts.RefreshDNSServer()
 }
 
 func SetKey(db *gorm.DB, key interface{}, value interface{}) error {

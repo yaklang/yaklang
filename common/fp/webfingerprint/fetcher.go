@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
@@ -29,7 +30,7 @@ func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host str
 
 	portInt, _ := strconv.Atoi(fmt.Sprint(port))
 	target := utils.HostPort(host, port)
-	isTls := utils.IsTLSService(target)
+	isTls := netx.IsTLSService(target)
 
 	var redirectResponse []struct {
 		Url     *url.URL

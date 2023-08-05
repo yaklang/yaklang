@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"regexp"
@@ -121,7 +122,7 @@ var tomcat = &DefaultServiceAuthInfo{
 			return result
 		}
 		addr := utils.HostPort(host, port)
-		isTls := utils.IsTLSService(addr)
+		isTls := netx.IsTLSService(addr)
 		if isTls {
 			tomcatTlsTTLcache.Set(addr, true)
 		}

@@ -638,7 +638,7 @@ RECONNECT:
 		// retry when timeout
 		for retry = 0; retry <= retryTimes; retry++ {
 			start := time.Now()
-			proxyConnIns, err = GetProxyConnWithContext(ctx, originAddr, proxyUrl, timeout)
+			proxyConnIns, err = netx.DialTCPTimeoutForceProxy(timeout, originAddr, proxyUrl)
 			traceInfo.ConnTime = time.Since(start)
 
 			if err == nil || !isErrorTimeout(err) {

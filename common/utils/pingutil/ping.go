@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sync"
@@ -54,7 +55,7 @@ func PingAuto(ip string, defaultTcpPort string, timeout time.Duration, proxies .
 		addr := utils.HostPort(ip, port)
 		go func() {
 			defer swg.Done()
-			conn, err := utils.TCPConnect(addr, timeout, proxies...)
+			conn, err := netx.DialTCPTimeout(timeout, addr, proxies...)
 			//conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err != nil {
 				if utils.MatchAnyOfRegexp(err, `(?i)i/?o\s+timeout`) {

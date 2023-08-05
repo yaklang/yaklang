@@ -3,6 +3,7 @@ package suspect
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
@@ -22,7 +23,7 @@ var GuessExports = map[string]interface{}{
 	"IsAlNum": func(i interface{}) bool {
 		return utils.MatchAllOfRegexp(i, `[a-zA-Z0-9]+`)
 	},
-	"IsTLSServer": utils.IsTLSService,
+	"IsTLSServer": netx.IsTLSService,
 	"IsHttpURL":   IsFullURL,
 	"IsUrlPath":   IsURLPath,
 	"IsHtmlResponse": func(i interface{}) bool {

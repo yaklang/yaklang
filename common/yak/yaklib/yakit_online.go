@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -66,7 +67,7 @@ func DownloadOnlineAuthProxy(baseUrl string) error {
 	}
 	proxy := strings.TrimSpace(consts.GetOnlineBaseUrlProxy())
 	if proxy != "" {
-		conn, err := utils.GetForceProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
+		conn, err := netx.GetForceProxyConn(utils.HostPort(host, port), proxy, 10*time.Second)
 		if err != nil {
 			return utils.Errorf("connect to [%s] via proxy[%v] failed: %s", consts.GetOnlineBaseUrl(), proxy, err.Error())
 		}

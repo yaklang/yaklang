@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
@@ -225,8 +226,8 @@ func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
 		opt(config)
 	}
 
-	if len(config.proxies) <= 0 && utils.GetProxyFromEnv() != "" {
-		config.proxies = append(config.proxies, utils.GetProxyFromEnv())
+	if len(config.proxies) <= 0 && netx.GetProxyFromEnv() != "" {
+		config.proxies = append(config.proxies, netx.GetProxyFromEnv())
 	}
 
 	var c = &Crawler{

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
@@ -375,7 +376,7 @@ func init() {
 			}
 			var conn net.Conn
 
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
+			conn, err := netx.DialTCPTimeout(time.Duration(timeout)*time.Second, utils.HostPort(engine.host, port), engine.proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -547,12 +548,12 @@ func init() {
 			if timeout == 0 {
 				timeout = 5000
 			}
-			if utils.IsTLSService(adderss) {
+			if netx.IsTLSService(adderss) {
 				n = utils2.OPENVAS_ENCAPS_SSLv2
 			} else {
 				n = utils2.OPENVAS_ENCAPS_IP
 			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(timeout)*time.Millisecond, engine.proxies...)
+			conn, err := netx.DialTCPTimeout(time.Duration(timeout)*time.Second, utils.HostPort(engine.host, port), engine.proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -1537,7 +1538,7 @@ func init() {
 			if port == -1 {
 				return nil, fmt.Errorf("port is invalid")
 			}
-			conn, err := utils.TCPConnect(fmt.Sprintf("%s:%d", engine.host, port), time.Duration(3)*time.Second, engine.proxies...)
+			conn, err := netx.DialTCPTimeout(time.Duration(5)*time.Second, utils.HostPort(engine.host, port), engine.proxies...)
 			if err != nil {
 				return nil, fmt.Errorf("connect pop3 server error：%s", err)
 			}

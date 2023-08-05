@@ -382,7 +382,7 @@ func (m *MITMProxy) newConnFor(target string, isTls bool, sni string) (net.Conn,
 		}
 	}
 
-	conn, err := utils.TCPConnect(addr, m.config.Timeout, m.config.DownstreamProxy...)
+	conn, err := netx.DialTCPTimeout(m.config.Timeout, addr, m.config.DownstreamProxy...)
 	if err != nil {
 		return nil, utils.Errorf("dial remote[%v] failed: %s", addr, err)
 	}

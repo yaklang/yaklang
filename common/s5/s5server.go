@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io"
@@ -226,18 +227,10 @@ func (c *S5Config) HandleS5Request(conn net.Conn) (net.Conn, error) {
 	downstreamProxy := c.DownstreamHTTPProxy
 	var proxyConnectionTimeout = 30 * time.Second
 	var actConn net.Conn
-	if downstreamProxy != "" {
-		var err error
-		actConn, err = utils.GetForceProxyConn(targetAddr, downstreamProxy, proxyConnectionTimeout)
-		if err != nil {
-			return nil, utils.Errorf("downstream fetch conn failed: %s", err)
-		}
-	} else {
-		var err error
-		actConn, err = net.DialTimeout("tcp", targetAddr, proxyConnectionTimeout)
-		if err != nil {
-			return nil, utils.Errorf("dial target failed: %s", err)
-		}
+	var err error
+	actConn, err = netx.DialTCPTimeout(proxyConnectionTimeout, targetAddr, downstreamProxy)
+	if err != nil {
+		return nil, err
 	}
 	if actConn == nil {
 		return nil, utils.Error("BUG: act conn is nil")
