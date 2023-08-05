@@ -28,6 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -35,9 +36,7 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,7 +45,6 @@ import (
 	"github.com/yaklang/yaklang/common/martian/v3/mitm"
 	"github.com/yaklang/yaklang/common/martian/v3/nosigpipe"
 	"github.com/yaklang/yaklang/common/martian/v3/proxyutil"
-	"github.com/yaklang/yaklang/common/martian/v3/trafficshape"
 )
 
 var errClose = errors.New("closing connection")
@@ -707,7 +705,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				var err error
 				//check if target server support h2 if not we will degrade to use http/1.1
 				rawConn, err = p.handshakeWithTarget(req)
-
 				if err != nil {
 					return fmt.Errorf("fail to connect to %v: %w", req.URL, err)
 				}
@@ -723,11 +720,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 					}
 					var nconn net.Conn
 					nconn = tlsconn
-					// If the original connection is a traffic shaped connection, wrap the tls
-					// connection inside a traffic shaped connection too.
-					if ptsconn, ok := conn.(*trafficshape.Conn); ok {
-						nconn = ptsconn.Listener.GetTrafficShapedConn(tlsconn)
-					}
 					brw.Writer.Reset(nconn)
 					brw.Reader.Reset(nconn)
 					// -> Client Connection <- is none HTTP2 HTTPS connection
@@ -755,11 +747,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 					}
 					var nconn net.Conn
 					nconn = tlsconn
-					// If the original connection is a traffic shaped connection, wrap the tls
-					// connection inside a traffic shaped connection too.
-					if ptsconn, ok := conn.(*trafficshape.Conn); ok {
-						nconn = ptsconn.Listener.GetTrafficShapedConn(tlsconn)
-					}
 					brw.Writer.Reset(nconn)
 					brw.Reader.Reset(nconn)
 					// -> Client Connection <- is none HTTP2 HTTPS connection
@@ -890,51 +877,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing = errClose
 	}
 
-	// Check if conn is a traffic shaped connection.
-	if ptsconn, ok := conn.(*trafficshape.Conn); ok {
-		ptsconn.Context = &trafficshape.Context{}
-		// Check if the request URL matches any URLRegex in Shapes. If so, set the connections's Context
-		// with the required information, so that the Write() method of the Conn has access to it.
-		for urlregex, buckets := range ptsconn.LocalBuckets {
-			if match, _ := regexp.MatchString(urlregex, req.URL.String()); match {
-				if rangeStart := proxyutil.GetRangeStart(res); rangeStart > -1 {
-					dump, err := httputil.DumpResponse(res, false)
-					if err != nil {
-						return err
-					}
-					ptsconn.Context = &trafficshape.Context{
-						Shaping:            true,
-						Buckets:            buckets,
-						GlobalBucket:       ptsconn.GlobalBuckets[urlregex],
-						URLRegex:           urlregex,
-						RangeStart:         rangeStart,
-						ByteOffset:         rangeStart,
-						HeaderLen:          int64(len(dump)),
-						HeaderBytesWritten: 0,
-					}
-					// Get the next action to perform, if there.
-					ptsconn.Context.NextActionInfo = ptsconn.GetNextActionFromByte(rangeStart)
-					// Check if response lies in a throttled byte range.
-					ptsconn.Context.ThrottleContext = ptsconn.GetCurrentThrottle(rangeStart)
-					if ptsconn.Context.ThrottleContext.ThrottleNow {
-						ptsconn.Context.Buckets.WriteBucket.SetCapacity(
-							ptsconn.Context.ThrottleContext.Bandwidth)
-					}
-					log.Infof(
-						"trafficshape: Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
-						req.URL, rangeStart, urlregex)
-				}
-				break
-			}
-		}
-	}
-
 	err = res.Write(brw)
 	if err != nil {
 		log.Errorf("martian: got error while writing response back to client: %v", err)
-		if _, ok := err.(*trafficshape.ErrForceClose); ok {
-			closing = errClose
-		}
 	}
 	//Handle proxy getting stuck when upstream stops responding midway
 	//see https://github.com/google/martian/pull/349
@@ -945,9 +890,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	err = brw.Flush()
 	if err != nil {
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
-		if _, ok := err.(*trafficshape.ErrForceClose); ok {
-			closing = errClose
-		}
 	}
 	return closing
 }
@@ -1034,64 +976,39 @@ func (p *Proxy) connectResponse(req *http.Request) *http.Response {
 func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 	var rawConn net.Conn
 	var err error
-
-	vanillaTLS := func() {
-		rawConn, err = tls.Dial("tcp", req.URL.Host, &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			NextProtos:         []string{"h2", "http/1.1"},
-			ServerName:         utils.ExtractHost(req.URL.Host),
-		})
-
+	var proxyUrl string
+	var gmConfig = &gmtls.Config{
+		InsecureSkipVerify: true,
+		GMSupport:          &gmtls.GMSupport{},
+		ServerName:         utils.ExtractHost(req.URL.Host),
 	}
-	vanillaTLSWithProxy := func() {
-		rawConn, err = utils.GetAutoProxyConnWithTLS(req.URL.Host, p.proxyURL.String(), time.Second*10, &tls.Config{
+
+	if p.proxyURL != nil {
+		proxyUrl = p.proxyURL.String()
+	}
+	vanillaTLS := func() {
+		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 			MaxVersion:         tls.VersionTLS13,
 			NextProtos:         []string{"h2", "http/1.1"},
 			ServerName:         utils.ExtractHost(req.URL.Host),
-		})
+		}, proxyUrl)
 	}
 	gmTLS := func() {
-		rawConn, err = gmtls.Dial("tcp", req.URL.Host, &gmtls.Config{
-			InsecureSkipVerify: true,
-			GMSupport:          &gmtls.GMSupport{},
-			ServerName:         utils.ExtractHost(req.URL.Host),
-		})
-	}
-	gmTLSWithProxy := func() {
-		rawConn, err = utils.GetAutoProxyConnWithGMTLS(req.URL.Host, p.proxyURL.String(), time.Second*10, &gmtls.Config{
-			InsecureSkipVerify: true,
-			GMSupport:          &gmtls.GMSupport{},
-			ServerName:         utils.ExtractHost(req.URL.Host),
-		})
+		rawConn, err = netx.DialTLSTimeout(time.Second*10, req.URL.Host, gmConfig, proxyUrl)
 	}
 	var taskGroup []func()
 
 	// when not enable gmTLS
 	if !p.gmTLS {
-		if p.proxyURL != nil {
-			taskGroup = append(taskGroup, vanillaTLSWithProxy)
-		} else {
+		taskGroup = append(taskGroup, vanillaTLS)
+	} else {
+		// when enable gmTLS add another func
+		if !p.gmTLSOnly {
 			taskGroup = append(taskGroup, vanillaTLS)
 		}
-	}
-
-	// when enable gmTLS add another func
-	if p.gmTLS {
-		if p.proxyURL != nil {
-			if !p.gmTLSOnly {
-				taskGroup = append(taskGroup, vanillaTLSWithProxy)
-			}
-			taskGroup = append(taskGroup, gmTLSWithProxy)
-		} else {
-			if !p.gmTLSOnly {
-				taskGroup = append(taskGroup, vanillaTLS)
-			}
-			taskGroup = append(taskGroup, gmTLS)
-		}
+		taskGroup = append(taskGroup, gmTLS)
 	}
 
 	// handle gmPrefer option
@@ -1130,25 +1047,9 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 	var tr http.RoundTripper
 
 	tr = p.roundTripper
-
-	if tr == nil {
-		// 永远不应该执行到这里
-		newTr := &http.Transport{TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			NextProtos:         []string{"h2"},
-		}}
-		if p.proxyURL != nil {
-			newTr.Proxy = http.ProxyURL(p.proxyURL)
-		}
-		tr = newTr
-	}
-
 	proxyClient := lowhttp2.Server{
 		PermitProhibitedCipherSuites: true,
 	}
-
 	proxyToServer := http.Client{
 		Transport: tr,
 	}

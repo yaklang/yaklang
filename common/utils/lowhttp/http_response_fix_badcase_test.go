@@ -33,26 +33,6 @@ func _mockHTTP(rsp []byte) (string, int) {
 	return host, port
 }
 
-func _fetchRawResponse(request []byte, addr string, tls bool) []byte {
-	var conn net.Conn
-	var err error
-	if tls {
-		conn, err = utils.GetAutoProxyConnWithTLS(addr, "", time.Second, utils.NewDefaultTLSConfig())
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		conn, err = utils.GetAutoProxyConn(addr, "", time.Second)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	conn.Write(FixHTTPPacketCRLF(request, false))
-	rsp := utils.StableReaderEx(conn, time.Second, 655350)
-	return rsp
-}
-
 func TestSendHTTPRequestRaw_WIREDJS(t *testing.T) {
 	var hexRsp string
 	//	rsp := _fetchRawResponse([]byte(`GET /attachment/cache/sys_function_7a682d434e.js?rand=1002174686 HTTP/1.1

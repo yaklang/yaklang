@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
@@ -223,8 +224,8 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	for _, p := range opt {
 		p(config)
 	}
-	if config.Proxy == "" && utils.GetProxyFromEnv() != "" {
-		config.Proxy = utils.GetProxyFromEnv()
+	if config.Proxy == "" && netx.GetProxyFromEnv() != "" {
+		config.Proxy = netx.GetProxyFromEnv()
 	}
 
 	var port = config.Port
@@ -263,12 +264,12 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	var addr = utils.HostPort(host, port)
 	var conn net.Conn
 	if config.TLS {
-		conn, err = utils.GetAutoProxyConnWithTLS(addr, config.Proxy, 10*time.Second, nil)
+		conn, err = netx.DialTLSTimeout(10*time.Second, addr, nil, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial tls-conn failed: %s", err)
 		}
 	} else {
-		conn, err = utils.GetAutoProxyConn(addr, config.Proxy, 10*time.Second)
+		conn, err = netx.DialTCPTimeout(10*time.Second, addr, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial conn failed: %s", err)
 		}

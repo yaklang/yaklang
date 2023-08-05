@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sync"
@@ -12,8 +13,7 @@ import (
 )
 
 func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout time.Duration) (net.Conn, error) {
-	proxy = utils2.StringArrayFilterEmpty(proxy)
-	return utils2.TCPConnect(utils2.HostPort(host, port), timeout, proxy...)
+	return netx.DialTCPTimeout(timeout, utils2.HostPort(host, port), proxy...)
 }
 
 func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, config *Config) (*MatchResult, error) {

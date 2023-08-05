@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -57,11 +58,7 @@ func (t *T3Paylaod) Exec(cmd string) (_ string, err error) {
 	}()
 
 	var conn net.Conn
-	if t.proxy != "" {
-		conn, err = utils2.GetForceProxyConn(t.addr(), t.proxy, t.timeout)
-	} else {
-		conn, err = net.DialTimeout("tcp", t.addr(), t.timeout)
-	}
+	conn, err = netx.DialTCPTimeout(t.timeout, t.addr(), t.proxy)
 	if err != nil {
 		return "", err
 	}
@@ -149,12 +146,7 @@ func (t *T3Paylaod) SendPayload(payload []byte) error {
 	t.debug("Send payload...")
 	var err error
 	var conn net.Conn
-	if t.proxy != "" {
-		conn, err = utils2.GetForceProxyConn(t.addr(), t.proxy, t.timeout)
-	} else {
-		conn, err = net.DialTimeout("tcp", t.addr(), t.timeout)
-	}
-	//conn, err := net.DialTimeout("tcp", addr, t.timeout)
+	conn, err = netx.DialTCPTimeout(t.timeout, t.addr(), t.proxy)
 	if err != nil {
 		return err
 	}

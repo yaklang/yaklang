@@ -284,6 +284,7 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 
 	if opts.EnableGMTLS {
 		var gmDialCtx = netx.NewDialGMTLSContextFunc(
+			true,
 			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
 			extraDNSOpt...)
 		t.DialContext = dialContext

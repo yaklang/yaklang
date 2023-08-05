@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"net/http/httputil"
 	"reflect"
@@ -546,8 +547,8 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
 		opt(config)
 	}
 
-	if len(config.Proxy) <= 0 && utils.GetProxyFromEnv() != "" {
-		config.Proxy = append(config.Proxy, utils.GetProxyFromEnv())
+	if len(config.Proxy) <= 0 && netx.GetProxyFromEnv() != "" {
+		config.Proxy = append(config.Proxy, netx.GetProxyFromEnv())
 	}
 
 	host, port, err := utils.ParseStringToHostPort(urlStr)
@@ -620,8 +621,8 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 	// 根据config修改packet
 	packet = fixPacketByConfig(packet, config)
 
-	if len(config.Proxy) <= 0 && utils.GetProxyFromEnv() != "" {
-		config.Proxy = append(config.Proxy, utils.GetProxyFromEnv())
+	if len(config.Proxy) <= 0 && netx.GetProxyFromEnv() != "" {
+		config.Proxy = append(config.Proxy, netx.GetProxyFromEnv())
 	}
 
 	// 最先应该修复数据包

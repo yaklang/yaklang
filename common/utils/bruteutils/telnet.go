@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 23)
 
-		conn, err := utils.GetAutoProxyConnEx(i.Target, nil, CommonTimeoutDuration)
+		conn, err := netx.DialTCPTimeout(CommonTimeoutDuration, i.Target)
 		if err != nil {
 			log.Debugf("telnet:\\\\%v conn failed: %s", i.Target, err)
 			res := i.Result()
@@ -96,7 +97,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 		mutex.Lock()
 		defer mutex.Unlock()
 
-		var conn, err = utils.GetAutoProxyConnEx(target, nil, CommonTimeoutDuration)
+		var conn, err = netx.DialTCPTimeout(CommonTimeoutDuration, target)
 		if err != nil {
 			log.Errorf("get auto proxy conn ex failed: %s", err)
 			if utils.MatchAnyOfRegexp(err.Error(), `(?i)timeout`) {
