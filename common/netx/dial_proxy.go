@@ -16,16 +16,8 @@ import (
 	"time"
 )
 
-func GetForceProxyConn(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return getConnForceProxy(target, proxy, connectTimeout)
-}
-
 func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string) (net.Conn, error) {
 	return connectForceProxy(nil, target, proxy, timeout)
-}
-
-func GetForceProxyConnContext(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
-	return connectForceProxy(ctx, target, proxy, connectTimeout)
 }
 
 func DialTimeout(connectTimeout time.Duration, target string, proxy ...string) (net.Conn, error) {
@@ -227,7 +219,7 @@ func readHTTP200(c net.Conn) bool {
 func generateHTTPProxyConnect(target string) []byte {
 	return []byte(fmt.Sprintf(
 		"CONNECT %v HTTP/1.1\r\nHost: %v\r\nUser-Agent: %v\r\nConnection: keep-alive\r\nProxy-Connection: keep-alive\r\n\r\n",
-		target, target, userAgent,
+		target, target, DefaultUserAgent,
 	))
 }
 
@@ -236,8 +228,8 @@ func generateHTTPProxyConnectWithCredential(target string, cred string) []byte {
 		"CONNECT %v HTTP/1.1\r\nHost: %v\r\nUser-Agent: %v\r\n"+
 			fmt.Sprintf("Proxy-Authorization: Basic %v\r\n", codec.EncodeBase64(cred))+
 			"Connection: keep-alive\r\nProxy-Connection: keep-alive\r\n\r\n",
-		target, target, userAgent,
+		target, target, DefaultUserAgent,
 	))
 }
 
-const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36"
+const DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36"
