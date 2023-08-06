@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/refraction-networking/utls"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"net/http"
 	"strings"
@@ -258,27 +259,7 @@ func ParseJA3ToClientHelloSpec(str string) (*tls.ClientHelloSpec, error) {
 func GetTransportByClientHelloSpec(spec *tls.ClientHelloSpec) *http.Transport {
 	return &http.Transport{
 		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			conn, err := net.Dial(network, addr)
-			if err != nil {
-				println("Error creating connection #123", err)
-				return nil, err
-			}
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			config := &tls.Config{ServerName: host}
-			uconn := tls.UClient(conn, config, tls.HelloCustom)
-			if err := uconn.ApplyPreset(spec); err != nil {
-				return nil, err
-			}
-			if err := uconn.Handshake(); err != nil {
-				return nil, err
-			}
-			return uconn, nil
-		},
-		DialTLS: func(network, addr string) (net.Conn, error) {
-			conn, err := net.Dial(network, addr)
+			conn, err := netx.DialContextWithoutProxy(ctx, network, addr)
 			if err != nil {
 				println("Error creating connection #123", err)
 				return nil, err

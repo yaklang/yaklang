@@ -7,10 +7,12 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 var tunnelContexts = new(sync.Map)
@@ -83,7 +85,7 @@ func (c *channelContext) run(ctx context.Context) {
 				// dial
 				// 创建一个新的 connection
 				addr := utils.HostPort(c.localHost, c.localPort)
-				osConn, err := net.Dial("tcp", addr)
+				osConn, err := netx.DialTCPTimeout(10*time.Second, addr)
 				if err != nil {
 					panic(fmt.Sprintf("cannot dial to %v, reason: %v", addr, err))
 				}

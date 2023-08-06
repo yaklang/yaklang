@@ -6,9 +6,9 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"net"
 	"text/template"
 	"time"
 )
@@ -1270,7 +1270,7 @@ func send(addr string) {
 	//dstJVMID := []byte("\xac\xed\x00\x05\x73\x72\x00\x13\x77\x65\x62\x6c\x6f\x67\x69\x63\x2e\x72\x6a\x76\x6d\x2e\x4a\x56\x4d\x49\x44\xdc\x49\xc2\x3e\xde\x12\x1e\x2a\x0c\x00\x00\x78\x70\x77\x11\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x78")
 	header := "t3 7.0.0.0\nAS:10\nHL:19\n\n"
 	//header := "t3 12.2.1\nAS:255\nHL:19\nMS:10000000\n\n"
-	conn, err := net.Dial("tcp", addr)
+	conn, err := netx.DialTCPTimeout(10*time.Second, addr)
 	if err != nil {
 		fmt.Printf("conn server failed, err:%v\n", err)
 		return
