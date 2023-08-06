@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	stdlog "log"
-	"net"
 	"os"
 	//"github.com/shadow1ng/fscan/common"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
@@ -42,7 +41,7 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		result := i.Result()
 		i.Target = appendDefaultPort(i.Target, 3389)
 
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true
@@ -190,7 +189,7 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 }
 
 func (g *rdpClient) Login(domain, user, pwd string) error {
-	conn, err := net.DialTimeout("tcp", g.Host, 5*time.Second)
+	conn, err := netx.DialTCPTimeout(5*time.Second, "tcp", g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}

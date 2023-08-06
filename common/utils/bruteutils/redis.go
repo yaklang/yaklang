@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ var redisAuth = &DefaultServiceAuthInfo{
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 6379)
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true

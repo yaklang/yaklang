@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dnsutil"
-	"net"
 	"strings"
 	"time"
 )
@@ -32,10 +32,7 @@ func (s *SubdomainScanner) ZoneTransfer(ctx context.Context, target string) {
 
 		// 这里有点复杂 AXFR
 		// https://github.com/OWASP/Amass/blob/9ccc0c034eafca74a621ac6850d130f1faad5fa7/resolvers/zone.go#L64
-		d := &net.Dialer{
-			Timeout: 10 * time.Second,
-		}
-		conn, err := d.Dial("tcp", utils.ToNsServer(nameserver))
+		conn, err := netx.DialTCPTimeout(10*time.Second, "tcp", utils.ToNsServer(nameserver))
 		if err != nil {
 			log.Infof("failed to setup TCP connection with the dns server: %s: %s", utils.ToNsServer(nameserver), err)
 			continue

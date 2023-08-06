@@ -3,9 +3,9 @@ package bruteutils
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net"
 	"strings"
 	"time"
 
@@ -22,7 +22,7 @@ var mongoAuth = &DefaultServiceAuthInfo{
 		result := i.Result()
 		i.Target = appendDefaultPort(i.Target, 27017)
 
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true
@@ -31,7 +31,22 @@ var mongoAuth = &DefaultServiceAuthInfo{
 		conn.Close()
 
 		host, port, _ := utils.ParseStringToHostPort(i.Target)
-		bytes := lowhttp.FetchBannerFromHostPort(utils.TimeoutContextSeconds(5), host, port, 4096, true, false, false)
+		forceHttps := strings.Contains(fmt.Sprint(port), "443")
+		addr := fmt.Sprintf("%s:%d", host, port)
+
+		rspIns, _ := lowhttp.HTTP(
+			lowhttp.WithRequest(fmt.Sprintf(`GET / HTTP/1.1
+Host: %v
+User-Agent: %v
+
+`, addr, netx.DefaultUserAgent)),
+			lowhttp.WithHttps(forceHttps),
+		)
+
+		var bytes []byte
+		if rspIns != nil {
+			bytes = rspIns.RawPacket
+		}
 
 		// 指纹识别验证
 		if !utils.IContains(string(bytes), "It looks like you are trying to access MongoDB over HTTP on the native driver port.") {
@@ -83,7 +98,7 @@ func MongodbUnauth(host string, port int) (flag bool, err error) {
 	senddata := []byte{58, 0, 0, 0, 167, 65, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 255, 255, 255, 255, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0}
 	getlogdata := []byte{72, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 33, 0, 0, 0, 2, 103, 101, 116, 76, 111, 103, 0, 16, 0, 0, 0, 115, 116, 97, 114, 116, 117, 112, 87, 97, 114, 110, 105, 110, 103, 115, 0, 0}
 	realhost := fmt.Sprintf("%s:%v", host, port)
-	conn, err := net.DialTimeout("tcp", realhost, time.Duration(timeoutSeconds)*time.Second)
+	conn, err := netx.DialTCPTimeout(time.Duration(timeoutSeconds)*time.Second, realhost)
 	defer func() {
 		if conn != nil {
 			conn.Close()

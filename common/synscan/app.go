@@ -3,6 +3,7 @@ package synscan
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strconv"
@@ -117,14 +118,11 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 	defer func() {
 		s.tmpTargetForDetectMAC = ""
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	go func() {
-		var d net.Dialer
 		if dstPort == 0 {
 			dstPort = 22
 		}
-		conn, _ := d.DialContext(ctx, "tcp", net.JoinHostPort(target, strconv.Itoa(dstPort)))
+		conn, _ := netx.DialTCPTimeout(10*time.Second, net.JoinHostPort(target, strconv.Itoa(dstPort)))
 		defer func() {
 			if conn != nil {
 				_ = conn.Close()

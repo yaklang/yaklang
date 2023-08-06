@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"strconv"
@@ -24,7 +25,7 @@ var mssqlAuth = &DefaultServiceAuthInfo{
 
 		result := i.Result()
 
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			result.Finished = true
 			return result

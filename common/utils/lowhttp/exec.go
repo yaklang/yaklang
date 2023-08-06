@@ -666,10 +666,6 @@ RECONNECT:
 		defer proxyConn.Close()
 	}
 
-	var tcpDailer = &net.Dialer{
-		Timeout: timeout,
-	}
-
 	response.Https = https
 
 	if conn == nil {
@@ -706,8 +702,7 @@ RECONNECT:
 			// retry when timeout
 			for retry = 0; retry <= retryTimes; retry++ {
 				start := time.Now()
-				conn, err = tcpDailer.DialContext(ctx, "tcp", utils.HostPort(ip, port))
-				//conn, err = tcpDailer.Dial("tcp", utils.HostPort(ip, port))
+				conn, err = netx.DialContextWithoutProxy(ctx, "tcp", utils.HostPort(ip, port))
 				traceInfo.ConnTime = time.Since(start)
 
 				if err == nil || !isErrorTimeout(err) {
@@ -725,7 +720,7 @@ RECONNECT:
 			// retry when timeout
 			for retry = 0; retry <= retryTimes; retry++ {
 				start := time.Now()
-				rawConn, err = tcpDailer.Dial("tcp", utils.HostPort(ip, port))
+				rawConn, err = netx.DialContextWithoutProxy(ctx, "tcp", utils.HostPort(ip, port))
 				traceInfo.ConnTime = time.Since(start)
 
 				if err == nil || !isErrorTimeout(err) {

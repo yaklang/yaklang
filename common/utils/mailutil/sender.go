@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/netx"
 	"gopkg.in/gomail.v2"
 	"net"
 	"net/smtp"
@@ -108,32 +109,17 @@ func (s *SMTPMailSender) GetAuthClient(ctx context.Context) (net.Conn, *smtp.Cli
 		conn net.Conn
 		err  error
 		addr = fmt.Sprintf("%s:%v", s.config.Server, s.config.Port)
-		ddl  time.Time
-		ok   bool
 	)
-
-	ddl, ok = ctx.Deadline()
-	if !ok {
-		ddl = time.Now().Add(10 * time.Second)
-	}
-
-	dialer := &net.Dialer{
-		Deadline: ddl,
-	}
-
 	if s.config.ConnectSSL {
-		conn, err = tls.DialWithDialer(
-			dialer, "tcp", addr,
-			&tls.Config{InsecureSkipVerify: true,
-				MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion: tls.VersionTLS13,
-				ServerName: s.config.Server},
-		)
+		conn, err = netx.DialTLSTimeout(10*time.Second, addr, &tls.Config{InsecureSkipVerify: true,
+			MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion: tls.VersionTLS13,
+			ServerName: s.config.Server})
 		if err != nil {
 			return nil, nil, errors.Errorf("tls dial failed:  %s", err)
 		}
 	} else {
-		conn, err = dialer.DialContext(ctx, "tcp", addr)
+		conn, err = netx.DialTCPTimeout(10*time.Second, addr)
 		if err != nil {
 			return nil, nil, errors.Errorf("dial failed: %s", err)
 		}
