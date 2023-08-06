@@ -3,12 +3,15 @@ package bruteutils
 import (
 	"github.com/jlaffaye/ftp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"time"
 )
 
 var ftpUser = []string{
 	"ftp", "www", "anonymous", "admin", "root", "db", "wwwroot", "data", "web",
 }
+
+const defaultTimeout = 10 * time.Second
 
 // https://github.com/lowliness9/pocs-collection/tree/e22f0b4075a39ff217547613698991dca3273b30/poc-xunfeng
 var ftpAuth = &DefaultServiceAuthInfo{
@@ -32,7 +35,7 @@ var ftpAuth = &DefaultServiceAuthInfo{
 		i.Target = appendDefaultPort(i.Target, 21)
 		var res = i.Result()
 
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			res.Finished = true
 			return res

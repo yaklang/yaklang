@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"strconv"
@@ -23,7 +24,7 @@ var mysqlAuth = &DefaultServiceAuthInfo{
 
 		// 208.97.164.65
 		i.Target = appendDefaultPort(i.Target, 3306)
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			res.Finished = true
 			return res

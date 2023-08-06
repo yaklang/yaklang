@@ -155,10 +155,7 @@ func NewProxy() *Proxy {
 		ctxCache:         ttlcache.NewCache(),
 	}
 	proxy.ctxCache.SetTTL(5 * time.Minute)
-	proxy.SetDialContext((&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).DialContext)
+	proxy.SetDialContext(netx.NewDialContextFunc(30 * time.Second))
 	return proxy
 }
 

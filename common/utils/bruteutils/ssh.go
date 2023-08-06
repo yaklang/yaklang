@@ -2,15 +2,13 @@ package bruteutils
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/ssh"
-	"net"
 	"strconv"
 	"strings"
 	"time"
 )
-
-var DefaultDailer = &net.Dialer{Timeout: 5 * time.Second}
 
 var sshAuth = &DefaultServiceAuthInfo{
 	ServiceName:  "ssh",
@@ -25,7 +23,7 @@ var sshAuth = &DefaultServiceAuthInfo{
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 22)
 
-		conn, err := DefaultDailer.Dial("tcp", i.Target)
+		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
 		if err != nil {
 			log.Errorf("ssh:\\\\%v conn failed: %s", i.Target, err)
 			res := i.Result()

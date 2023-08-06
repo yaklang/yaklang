@@ -202,7 +202,6 @@ func StartPostgres(pgdir string) error {
 		case <-ticker:
 			count++
 			conn, err := gorm.Open("postgres", param)
-			//conn, err := net.Dial("tcp", "127.0.0.1:5432")
 			if err != nil {
 				log.Warningf("try %v times... waiting for the postgres starting up...", err)
 				continue

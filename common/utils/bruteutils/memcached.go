@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"time"
 )
@@ -17,7 +18,7 @@ var memcachedAuth = &DefaultServiceAuthInfo{
 
 		// 66.71.179.114
 		target := appendDefaultPort(i.Target, 11211)
-		conn, err := DefaultDailer.Dial("tcp", target)
+		conn, err := netx.DialTCPTimeout(defaultTimeout, target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true

@@ -3,9 +3,9 @@ package extrafp
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
 	"strconv"
 	"time"
 )
@@ -40,7 +40,7 @@ func RDPVersion(addr string, timeout time.Duration) (_ string, _ []string, final
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
-	conn, err := net.DialTimeout("tcp", addr, timeout)
+	conn, err := netx.DialTCPTimeout(timeout, addr)
 	if err != nil {
 		return "", nil, utils.Errorf("rdp to addr failed: %s", err)
 	}

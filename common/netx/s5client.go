@@ -139,7 +139,7 @@ RECON:
 	proxy := cfg.Host
 
 	// dial TCP
-	conn, err := net.DialTimeout("tcp", proxy, cfg.Timeout)
+	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	proxy := cfg.Host
 
 	// dial TCP
-	conn, err := net.DialTimeout("tcp", proxy, cfg.Timeout)
+	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
 	if err != nil {
 		return nil, err
 	}
