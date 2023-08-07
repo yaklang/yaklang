@@ -131,6 +131,22 @@ func (e *ScriptEngine) LoadFamilys(familys ...string) {
 		}
 	}
 }
+func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	var scripts []*yakit.NaslScript
+	if db := db.Where(conditions).Find(&scripts); db.Error != nil {
+		log.Errorf("load scripts with conditions error: %v", db.Error)
+	}
+	for _, script := range scripts {
+		if _, ok := e.excludeScripts[script.OID]; ok {
+			continue
+		}
+		e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
+	}
+}
 func (e *ScriptEngine) ScanTarget(target string) error {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {

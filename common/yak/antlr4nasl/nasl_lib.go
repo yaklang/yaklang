@@ -776,7 +776,11 @@ func init() {
 			return s, nil
 		},
 		"raw_string": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return string(params.getParamByNumber(0, 0x00).Bytes()), nil
+			hexs := []byte{}
+			forEachParams(params, func(value *yakvm.Value) {
+				hexs = append(hexs, byte(value.Int()))
+			})
+			return string(hexs), nil
 		},
 		"strcat": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := ""
@@ -804,8 +808,13 @@ func init() {
 			return codec.EncodeToHex(params.getParamByNumber(0).Value), nil
 		},
 		"strstr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `strstr` is not implement"))
-			return nil, nil
+			a := params.getParamByNumber(0, "").String()
+			b := params.getParamByNumber(1, "").String()
+			index := strings.Index(a, b)
+			if index == -1 {
+				return nil, nil
+			}
+			return a[index:], nil
 		},
 		"ereg": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			pattern := params.getParamByName("pattern").String()
@@ -872,18 +881,22 @@ func init() {
 		},
 		"substr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			str := params.getParamByNumber(0, "").String()
-			start := params.getParamByNumber(1, 0).Int()
-			end := params.getParamByNumber(2, 0).Int()
+			start := params.getParamByNumber(1, -1).Int()
+			end := params.getParamByNumber(2, -1).Int()
+			if start < 0 && end < 0 {
+				return nil, utils.Errorf("invalid scope")
+			}
 			if start < 0 {
-				start = 0
+				return str[:end], nil
 			}
 			if end < 0 {
-				end = 0
+				return str[start:], nil
 			}
-			if start > end {
-				start = end
+			if start <= end {
+				return str[start:end], nil
+			} else {
+				return nil, utils.Errorf("end must less than start")
 			}
-			return str[start:end], nil
 		},
 		"insstr": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `insstr` is not implement"))
@@ -1927,9 +1940,16 @@ func init() {
 				} else {
 					res, err = m(engine, params)
 				}
-				paramstr := fmt.Sprintf("%v", params)
+				paramstr := ""
+				for _, v := range params.listParams {
+					paramstr += fmt.Sprintf("%v,", v)
+				}
+				for k, v := range params.mapParams {
+					paramstr += fmt.Sprintf("%s=%v,", k, v)
+				}
+
 				if err != nil {
-					log.Errorf("call build in function `%s(%s)` error: %v", name, paramstr, err)
+					log.Errorf("call build in function `%s(%v)` error in script `%v`: %v", name, paramstr, engine.scriptObj.OriginFileName, err)
 					return res
 				}
 				du := time.Now().Sub(timeStart).Seconds()

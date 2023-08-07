@@ -1,6 +1,7 @@
 package yaktest
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -85,4 +86,33 @@ if err{
 		},
 	}
 	Run("测试初始化NaslScript到数据库", t, cases...)
+}
+func TestCommonScan(t *testing.T) {
+	scanCode := `
+proxy = ""
+naslScanHandle = (target)=>{
+    opts = [nasl.family("")]
+    if proxy != nil && proxy != ""{
+        opts.Append(nasl.proxy(proxy))
+    }
+	opts.Append(nasl.riskHandle((risk)=>{
+		log.info("found risk: %v", risk)
+	}))
+	//opts.Append(nasl.conditions({
+	//	"family": "Web Servers",
+	//	"category": "ACT_GATHER_INFO",
+	//}))
+	opts.Append(nasl.plugin("mssqlserver_detect.nasl"))
+    kbs ,err = nasl.ScanTarget(target,opts...)
+    if err{
+        log.error("%v", err)
+    }
+}
+
+naslScanHandle("136.233.183.242:1433")
+`
+	err := yaklang.New().SafeEval(context.Background(), scanCode)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

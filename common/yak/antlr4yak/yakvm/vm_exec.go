@@ -622,6 +622,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			id := c.Unary
+			name, ok := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
+			if ok && name == "_FCT_ANON_ARGS" {
+				if val, ok := v.contextData["argument"]; ok {
+					v.push(NewAutoValue(val.(*vm.NaslArray)))
+					return
+				}
+			}
 			//尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if !ok {
@@ -1160,6 +1167,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						}
 					}
 				}
+				naslArray, err := vm.NewNaslArray([]any{})
+				if err != nil {
+					panic(utils.Errorf("NewNaslArray error: %s", err.Error()))
+				}
+				for index, v := range args {
+					naslArray.AddEleToList(index, v.Value)
+				}
+				v.contextData["argument"] = naslArray
 				val := idValue.Call(v, false, args...)
 				if idValue.GetExtraInfo("getOne") != nil {
 					refVal := reflect.ValueOf(val)
