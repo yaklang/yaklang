@@ -19,7 +19,7 @@ type StructHelper struct {
 }
 
 func (s *StructHelper) Show() {
-	println(s.String())
+	fmt.Println(s.String())
 }
 
 func (s *StructHelper) String() string {

@@ -553,6 +553,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 		}
+		for _, p := range req.GetParams() {
+			extractorResults = append(extractorResults, &ypb.KVPair{Key: p.GetKey(), Value: p.GetValue()})
+		}
 
 		var httpTPLmatchersResult bool
 		if haveHTTPTplMatcher && result.LowhttpResponse != nil {
