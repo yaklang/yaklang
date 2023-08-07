@@ -2,9 +2,11 @@ package spacengine
 
 import (
 	fmt "fmt"
+	"strings"
+
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
@@ -18,98 +20,126 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 
 		var nextFinished bool
 		var count int
-		var page = 0
-		for range make([]int, maxPage) {
-			page++
+		for page := 0; page < maxPage; page++ {
 			if nextFinished {
 				break
 			}
 
 			log.Infof("start to query quake api for: %v", filter)
-			rsp, err := quakeClient.QueryNext(filter)
+			size := 10
+			if maxRecord-count < 10 {
+				size = maxRecord - count
+			}
+			result, err := quakeClient.QueryNext(page*10, size, filter)
 			if err != nil {
 				log.Errorf("quake client query next failed: %s", err)
 				break
 			}
+			data := result.Get("data").Array()
 
-			for _, d := range rsp {
-				log.Infof("quake fetch: %v", utils.HostPort(d.IP, d.Port))
+			for _, d := range data {
+				ip, port := d.Get("ip").String(), int(d.Get("port").Int())
+				log.Infof("quake fetch: %v", utils.HostPort(ip, port))
 
-				var serviceProvider = d.Location.Isp
-				if d.Location.Isp != d.Org {
-					serviceProvider = fmt.Sprintf("%v[%v]", d.Location.Isp, d.Org)
+				rService := d.Get("service")
+				rLocation := d.Get("location")
+				rComponents := d.Get("components").Array()
+
+				isp, org := rLocation.Get("isp").String(), d.Get("org").String()
+				serviceProvider := isp
+				if isp != org {
+					serviceProvider = fmt.Sprintf("%v[%v]", isp, org)
 				}
 				serviceProvider = ServiceProviderToChineseName(serviceProvider)
 
 				var lat, lng float64
-				if len(d.Location.Gps) == 2 {
-					lat, lng = d.Location.Gps[0], d.Location.Gps[1]
+				gps := rLocation.Get("gps").Array()
+				if len(gps) == 2 {
+					lat, lng = gps[0].Float(), gps[1].Float()
 				}
 
-				var host = d.Hostname
+				var host = d.Get("hostname").String()
 				if host == "" {
-					host = d.IP
+					host = d.Get("ip").String()
 				}
 				var isTls bool
-				if len(d.Service.TLSJarm.JarmAns) > 0 || d.Service.TLS.HandshakeLog.ServerHello.Version.Name != "" {
+
+				if len(rService.Get("tls-jarm.jarm_ans").Array()) > 0 || rService.Get("tls.handshake_log.server_hello.version.name").String() != "" {
 					isTls = true
 				}
 
 				var fps []string
-				if d.OsName != "" {
-					if d.OsVersion != "" {
-						fps = append(fps, fmt.Sprintf("%v[%v]", d.OsName, d.OsVersion))
+				osName, osVersion := d.Get("os_name").String(), d.Get("os_version").String()
+
+				if osName != "" {
+					if osVersion != "" {
+						fps = append(fps, fmt.Sprintf("%v[%v]", osName, osVersion))
 					} else {
-						fps = append(fps, d.OsName)
+						fps = append(fps, osName)
 					}
 				}
-				for _, value := range d.Components {
-					fps = append(fps, value.ProductCatalog...)
+
+				for _, c := range rComponents {
+					c.Get("product_catalog").ForEach(func(_, value gjson.Result) bool {
+						fps = append(fps, value.String())
+						return true
+					})
+
 					var names []string
-					if value.ProductVendor != "" {
-						names = append(names, value.ProductVendor)
+					productVendor := c.Get("product_vendor").String()
+					if productVendor != "" {
+						names = append(names, productVendor)
 					}
-					if value.ProductNameEn != "" {
-						names = append(names, value.ProductNameEn)
+					product_name_en := c.Get("product_name_en").String()
+
+					if product_name_en != "" {
+						names = append(names, product_name_en)
 					}
 
 					if len(names) > 0 {
-						if value.Version != "" {
-							fps = append(fps, fmt.Sprintf("%v[%v]", strings.Join(names, "_"), value.Version))
+						version := c.Get("version").String()
+						if version != "" {
+							fps = append(fps, fmt.Sprintf("%v[%v]", strings.Join(names, "_"), version))
 						} else {
 							fps = append(fps, strings.Join(names, "_"))
 						}
 					}
 				}
-				if d.Service.Name != "" {
-					fps = append(fps, d.Service.Name)
+
+				serviceName := rService.Get("name").String()
+				if serviceName != "" {
+					fps = append(fps, serviceName)
 				}
-				if d.Service.Product != "" {
-					if d.Service.Version != "" {
-						fps = append(fps, fmt.Sprintf("%v[%v]", d.Service.Product, d.Service.Version))
+				serviceProduct := rService.Get("product").String()
+				serviceVersion := rService.Get("version").String()
+
+				if serviceProduct != "" {
+					if serviceVersion != "" {
+						fps = append(fps, fmt.Sprintf("%v[%v]", serviceProduct, serviceVersion))
 					} else {
-						fps = append(fps, d.Service.Product)
+						fps = append(fps, serviceProduct)
 					}
 				}
 				fps = utils.RemoveRepeatStringSlice(fps)
+				country, province, city := rLocation.Get("country_cn").String(), rLocation.Get("province_cn").String(), rLocation.Get("city_cn").String()
 				ch <- &NetSpaceEngineResult{
-					Addr:            utils.HostPort(d.IP, d.Port),
+					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "quake",
 					Latitude:        lat,
 					Longitude:       lng,
-					HtmlTitle:       d.Service.HTTP.Title,
-					Domains:         d.Hostname,
-					Province:        d.Location.ProvinceCn,
+					HtmlTitle:       rService.Get("http.title").String(),
+					Domains:         host,
+					Province:        province,
 					Url:             "",
 					ConfirmHttps:    isTls,
 					Host:            host,
-					City:            d.Location.CityCn,
-					Asn:             fmt.Sprint(d.Asn),
-					Location:        strings.Join([]string{d.Location.CountryCn, d.Location.ProvinceCn, d.Location.CityCn}, "/"),
+					City:            city,
+					Asn:             d.Get("asn").String(),
+					Location:        strings.Join([]string{country, province, city}, "/"),
 					ServiceProvider: serviceProvider,
 					FromFilter:      filter,
 					Fingerprints:    strings.Join(fps, "/"),
-					Banner:          utils.ParseStringToVisible(d.Service.Banner),
+					Banner:          utils.ParseStringToVisible(rService.Get("banner").String()),
 				}
 
 				count++
