@@ -8,9 +8,8 @@ on:
       - '.github/workflows/essential-tests.yml'
 
 jobs:
-
-  test:
-    name: Test
+  test_lowhttp:
+    name: Tests lowhttp with retry
     runs-on: ubuntu-20.04
 
     steps:
@@ -32,8 +31,9 @@ jobs:
         run: |
           go mod vendor && go run common/yak/cmd/yak.go --help
 
-      - name: Test Start
-        run: go test -timeout 1m ./common/jsonextractor -v
+      - name: Test ${{ matrix.name }}
+        run: |
+          ${{ matrix.run }}
 
       - name: Run tests lowhttp with retry
         uses: nick-fields/retry@v2
@@ -41,69 +41,102 @@ jobs:
           max_attempts: 3
           timeout_minutes: 1
           command: go test -timeout 1m ./common/utils/lowhttp -v
+          
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        include:
+         - name: Start
+           run: go test -timeout 1m ./common/jsonextractor -v
+           
+         - name: Codec
+           run: go test -timeout 1m ./common/yak/yaklib/codec -v
+           
+         - name: CartesianProduct
+           run: go test -timeout 1m ./common/yak/cartesian -v
+           
+         - name: JsonPath
+           run: go test -timeout 1m ./common/jsonpath -v
+           
+         - name: TestDomainExtract
+           run: go test -timeout 1m ./common/domainextractor -v
+           
+         - name: Test HttpTpl(YakTemplate)
+           run: go test -timeout 1m ./common/yak/httptpl -v
+           
+         - name: Test Fuzz/Mutate
+           run: go test -timeout 1m ./common/mutate_tests ./common/fuzztag -v
+           
+         - name: Test MustPass - full yak scripts
+           run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
 
-      - name: Test Codec
-        run: go test -timeout 1m ./common/yak/yaklib/codec -v
+         - name: Test PeekableConn
+           run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
 
-      - name: Test CartesianProduct
-        run: go test -timeout 1m ./common/yak/cartesian -v
+         - name: Test gRPC MUSTPASS
+           run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
 
-      - name: Test JsonPath
-        run: go test -timeout 1m ./common/jsonpath -v
+         - name: Test gRPC MUSTPASS-PLUGIN-SQL
+           run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
 
-      - name: TestDomainExtract
-        run: go test -timeout 1m ./common/domainextractor -v
+         - name: Test gRPC MUSTPASS-PLUGIN-MITM
+           run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
 
-      - name: Test HttpTpl(YakTemplate)
-        run: go test -timeout 1m ./common/yak/httptpl -v
+         - name: Test gRPC MUSTPASS-PLUGIN-SSTI
+           run: go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
 
-      - name: Test Fuzz/Mutate
-        run: go test -timeout 1m ./common/mutate_tests ./common/fuzztag -v
+         - name: Test gRPC MUSTPASS-PLUGIN-XSS
+           run: go test -timeout 2m -run TestGRPCMUSTPASS_XSS ./common/coreplugin -v
 
-      - name: Test MustPass - full yak scripts
-        run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
+         - name: Test gRPC MUSTPASS-PLUGIN-Shiro
+           run: go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
 
-      - name: Test PeekableConn
-        run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
+         - name: Test gRPC MUSTPASS-PLUGIN-CSRF
+           run: go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
 
-      - name: Test gRPC MUSTPASS
-        run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
+         - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
+           run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-SQL
-        run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
+         - name: Test gRPC TestGRPCMUSTPASS_OPEN_REDIRECT
+           run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-MITM
-        run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
+         - name: Test CVEQuery
+           run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-SSTI
-        run: go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
+         - name: Test Sca
+           run: go test -timeout 1m ./common/sca/... -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-XSS
-        run: go test -timeout 2m -run TestGRPCMUSTPASS_XSS ./common/coreplugin -v
+         - name: Test HostPort  AppendPort
+           run: go test -timeout 1m -run TestMUSTPASS ./common/utils -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-Shiro
-        run: go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
+         - name: Test Vulinbox agent client
+           run: go test -timeout 1m ./common/vulinboxagentclient -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-CSRF
-        run: go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
+         - name: Test YakDNS(DoH / TCP / UDP)
+           run: go test -timeout 20s ./common/netx/mustpass -v
 
-      - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
-        run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.20.3
+        id: go
 
-      - name: Test gRPC TestGRPCMUSTPASS_OPEN_REDIRECT
-        run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
 
-      - name: Test CVEQuery
-        run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
+      - name: Dependence
+        run: |
+          sudo apt-get update
+          sudo apt-get install libpcap-dev=1.9.1-3
 
-      - name: Test Sca
-        run: go test -timeout 1m ./common/sca/... -v
+      - name: Init Vendor
+        run: |
+          go mod vendor && go run common/yak/cmd/yak.go --help
 
-      - name: Test HostPort  AppendPort
-        run: go test -timeout 1m -run TestMUSTPASS ./common/utils -v
+      - name: ${{ matrix.name }}
+        run: |
+          ${{ matrix.run }}
 
-      - name: Test Vulinbox agent client
-        run: go test -timeout 1m ./common/vulinboxagentclient -v
-
-      - name: Test YakDNS(DoH / TCP / UDP)
-        run: go test -timeout 20s ./common/netx/mustpass -v
