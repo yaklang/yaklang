@@ -40,6 +40,13 @@ var testcases = []Case{
 			{"6afd6158af5c3066d026811b08004500004c60764000401152c7c0a80301c0a803120035c81200387f0900028080000100010000000003617069076261696d656f7702636e0000010001c00c00010001000002580004514472bd", true},
 		},
 	}, {
+		// Multiple Buffer Matching
+		rule: "alert dns 192.168.3.1 53 -> 192.168.3.18 51218 (dns_query;content:bai;offset:4;depth:3;content:ow;distance:2;within:4;content:cn;distance:1;isdataat:!1,relative;aaa;)",
+		test: []Test{
+			{"6afd6158af5c3066d026811b08004500004c60764000401152c7c0a80301c0a803120035c81200387f0900028080000100010000000003617069076261696d656f7702636e0000010001c00c00010001000002580004514472bd", true},
+		},
+	},
+	{
 		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Host|0d 0a|User-Agent|0d 0a|Accept-Encoding|0d 0a 0d 0a|\";http.header_names;)",
 		test: []Test{
 			// curl http://baimeow.cn
