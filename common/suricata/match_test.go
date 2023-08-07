@@ -47,13 +47,13 @@ var testcases = []Case{
 		},
 	},
 	{
-		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Host|0d 0a|User-Agent|0d 0a|Accept-Encoding|0d 0a 0d 0a|\";http.header_names;)",
+		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Accept-Encoding|0d 0a|Host|0d 0a|User-Agent|0d 0a 0d 0a|\";http.header_names;)",
 		test: []Test{
 			// curl http://baimeow.cn
 			{"3066d026811b6afd6158af5c0800450000c2866340008006f9e4c0a80312dde4d84e1a750050a3a72252fab0b8745018040193350000474554202f20485454502f312e310d0a486f73743a206261696d656f772e636e0d0a557365722d4167656e743a204d6f7a696c6c612f352e30202857696e646f7773204e543b2057696e646f7773204e542031302e303b207a682d434e292057696e646f7773506f7765725368656c6c2f352e312e32323632312e313737380d0a4163636570742d456e636f64696e673a20677a69700d0a0d0a", true},
 		},
 	}, {
-		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Host|0d 0a|User-Agent|0d 0a|Accept-Encoding|0d 0a 0d 0a|\";http.header_names;)",
+		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Accept-Encoding|0d 0a|Host|0d 0a|User-Agent|0d 0a 0d 0a|\";http.header_names;)",
 		test: []Test{
 			{"3066d026811b6afd6158af5c0800450000c2866340008006f9e4c0a80312dde4d84e1a750050a3a72252fab0b8745018040193350000474554202f20485454502f312e310d0a486f73743a206261696d656f772e636e0d0a557365722d4167656e743a204d6f7a696c6c612f352e30202857696e646f7773204e543b2057696e646f7773204e542031302e303b207a682d434e292057696e646f7773506f7765725368656c6c2f352e312e32323632312e313737380d0a4163636570742d456e636f64696e673a20677a69700d0a0d0a", true},
 		},
@@ -75,7 +75,7 @@ func TestMUSTPASS_Match(t *testing.T) {
 				return
 			}
 			if r.Match(bytes) != te.match {
-				spew.Dump(v, te)
+				spew.Dump(r, te)
 				t.Error("match failed")
 			}
 		}
