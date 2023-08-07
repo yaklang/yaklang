@@ -79,7 +79,7 @@ func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (ch
 		opt(config)
 	}
 
-	return spacengine2.HunterQuery(name, key, filter, config.maxPage, config.maxRecord)
+	return spacengine2.HunterQuery(name, key, filter, config.maxPage, config.pageSize, config.maxRecord)
 }
 
 func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
@@ -98,7 +98,7 @@ func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (cha
 		config.pageSize = 10000
 	}
 
-	return spacengine2.FofaQuery(email, key, filter, config.pageSize, config.maxPage, config.maxRecord)
+	return spacengine2.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord)
 }
 
 func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {

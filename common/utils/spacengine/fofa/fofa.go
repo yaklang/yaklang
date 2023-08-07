@@ -1,50 +1,24 @@
-// Copyright (c) 2016 baimaohui
-
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-
-// Package fofa implements some fofa-api utility functions.
 package fofa
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/buger/jsonparser"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
-	"strings"
+	"net/url"
+
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // Fofa a fofa client can be used to make queries
 type Fofa struct {
-	email []byte
-	key   []byte
+	email string
+	key   string
 	*http.Client
-}
-
-// Result represents a record of the query results
-// contain domain host  ip  port title country city
-type result struct {
-	Domain  string `json:"domain,omitempty"`
-	Host    string `json:"host,omitempty"`
-	IP      string `json:"ip,omitempty"`
-	Port    string `json:"port,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Country string `json:"country,omitempty"`
-	City    string `json:"city,omitempty"`
 }
 
 // User struct for fofa user
@@ -56,11 +30,9 @@ type User struct {
 	Err    string `json:"errmsg,omitempty"`
 }
 
-// Results fofa result set
-type Results []result
-
 const (
-	defaultAPIUrl = "https://fofa.info/api/v1/search/all?"
+	defaultAPIUrl      = "https://fofa.info/api/v1/search/all"
+	defaultUserInfoUrl = "https://fofa.info/api/v1/info/my"
 )
 
 var (
@@ -68,8 +40,7 @@ var (
 	errFofaReplyNoData      = errors.New("No Data In Fofa Reply")
 )
 
-// NewFofaClient create a fofa client
-func NewFofaClient(email, key []byte) *Fofa {
+func NewFofaClient(email, key string) *Fofa {
 
 	transCfg := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -84,10 +55,14 @@ func NewFofaClient(email, key []byte) *Fofa {
 	}
 }
 
-// Get overwrite http.Get
-func (ff *Fofa) Get(u string) ([]byte, error) {
+func (ff *Fofa) Get(urlStr string, val url.Values) ([]byte, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	u.RawQuery = val.Encode()
 
-	body, err := ff.Client.Get(u)
+	body, err := ff.Client.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -99,77 +74,43 @@ func (ff *Fofa) Get(u string) ([]byte, error) {
 	return content, nil
 }
 
-// QueryAsJSON make a fofa query and return json data as result
-// echo 'domain="nosec.org"' | base64 - | xargs -I{}
-// curl "https://fofa.info/api/v1/search/all?email=${FOFA_EMAIL}&key=${FOFA_KEY}&qbase64={}"
-// host title ip domain port country city
-func (ff *Fofa) QueryAsJSON(page uint, pageSize uint, args ...[]byte) ([]byte, error) {
+func (ff *Fofa) QueryAsJSON(page, pageSize int, args ...string) ([]byte, error) {
 	var (
-		query  = []byte(nil)
-		fields = []byte("domain,host,ip,port,title,country,city")
-		q      = []byte(nil)
+		query  = ""
+		fields = "host,title,ip,domain,port,country,city"
 	)
 	switch {
-	case len(args) == 1 || (len(args) == 2 && args[1] == nil):
+	case len(args) == 1:
 		query = args[0]
 	case len(args) == 2:
 		query = args[0]
 		fields = args[1]
 	}
-
-	q = []byte(base64.StdEncoding.EncodeToString(query))
-	q = bytes.Join([][]byte{[]byte(defaultAPIUrl),
-		[]byte("email="), ff.email,
-		[]byte("&key="), ff.key,
-		[]byte("&qbase64="), q,
-		[]byte("&fields="), fields,
-		[]byte("&page="), []byte(strconv.Itoa(int(page))),
-		[]byte("&size="), []byte(strconv.Itoa(int(pageSize))),
-	}, []byte(""))
-	fmt.Printf("%s\n", q)
-	content, err := ff.Get(string(q))
+	val := url.Values{}
+	val.Set("email", ff.email)
+	val.Set("key", ff.key)
+	val.Set("qbase64", codec.EncodeBase64(query))
+	val.Set("fields", fields)
+	val.Set("page", fmt.Sprint(page))
+	val.Set("size", fmt.Sprint(pageSize))
+	content, err := ff.Get(defaultAPIUrl, val)
 	if err != nil {
 		return nil, err
 	}
-	errmsg, err := jsonparser.GetString(content, "errmsg")
-	if err == nil {
+	errmsg := gjson.GetBytes(content, "errmsg").String()
+	if errmsg != "" {
 		err = errors.New(errmsg)
-	} else {
-		err = nil
 	}
-	return content, err
+	return content, nil
 }
 
-// QueryAsArray make a fofa query and
-// return array data as result
-// echo 'domain="nosec.org"' | base64 - | xargs -I{}
-// curl "https://fofa.info/api/v1/search/all?email=${FOFA_EMAIL}&key=${FOFA_KEY}&qbase64={}"
-func (ff *Fofa) QueryAsArray(page uint, pageSize uint, args ...[]byte) (result Results, err error) {
-
-	var content []byte
-
-	content, err = ff.QueryAsJSON(page, pageSize, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	errmsg, err := jsonparser.GetString(content, "errmsg")
-	// err equals to nil on error
-	if err == nil {
-		return nil, errors.New(errmsg)
-	}
-
-	err = json.Unmarshal(content, &result)
-
-	return
-}
-
-// UserInfo get user information
 func (ff *Fofa) UserInfo() (user *User, err error) {
 	user = new(User)
-	queryStr := strings.Join([]string{"https://fofa.info/api/v1/info/my?email=", string(ff.email), "&key=", string(ff.key)}, "")
+	val := url.Values{}
+	val.Set("email", ff.email)
+	val.Set("key", ff.key)
 
-	content, err := ff.Get(queryStr)
+	content, err := ff.Get(defaultUserInfoUrl, val)
 
 	if err != nil {
 		return nil, err
@@ -188,24 +129,6 @@ func (ff *Fofa) UserInfo() (user *User, err error) {
 
 func (u *User) String() string {
 	data, err := json.Marshal(u)
-	if err != nil {
-		log.Fatalf("json marshal failed. err: %s\n", err)
-		return ""
-	}
-	return string(data)
-}
-
-func (r *result) String() string {
-	data, err := json.Marshal(r)
-	if err != nil {
-		log.Fatalf("json marshal failed. err: %s\n", err)
-		return ""
-	}
-	return string(data)
-}
-
-func (r *Results) String() string {
-	data, err := json.Marshal(r)
 	if err != nil {
 		log.Fatalf("json marshal failed. err: %s\n", err)
 		return ""

@@ -2,90 +2,104 @@ package spacengine
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/hunter"
-	"strings"
-	"time"
 )
 
-func resultToSpacengineList(filter string, h *hunter.HunterResult) []*NetSpaceEngineResult {
-	var results = make([]*NetSpaceEngineResult, len(h.Data.Arr))
-	for index, result := range h.Data.Arr {
+func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngineResult {
+	rData := result.Get("data.arr").Array()
+	var results = make([]*NetSpaceEngineResult, len(rData))
+	for index, d := range rData {
 		isTls := false
-		if utils.MatchAnyOfSubString(strings.ToLower(fmt.Sprint(result.Protocol)+fmt.Sprint(result.BaseProtocol)), "https", "tls") {
+		dataMap := d.Map()
+		webTitle := dataMap["web_title"].String()
+		company := dataMap["company"].String()
+		os := dataMap["os"].String()
+		banner := dataMap["banner"].String()
+		url := dataMap["url"].String()
+		protocol, baseProtocol := dataMap["protocol"].String(), dataMap["base_protocol"].String()
+		isp := dataMap["isp"].String()
+		country, province, city := dataMap["country"].String(), dataMap["province"].String(), dataMap["city"].String()
+		components := dataMap["component"].Array()
+
+		if utils.MatchAnyOfSubString(strings.ToLower(fmt.Sprintf("%s%s", protocol, baseProtocol)), "https", "tls") {
 			isTls = true
 		}
 
-		var host = result.IP
-		if result.Domain != "" {
-			host = result.Domain
-		}
+		host, domain := dataMap["ip"].String(), dataMap["domain"].String()
 
+		if domain != "" {
+			host = domain
+		}
 		var locations []string
-		if result.Country != "" {
-			locations = append(locations, result.Country)
+
+		if country != "" {
+			locations = append(locations, country)
 		}
-		if result.Province != "" {
-			locations = append(locations, result.Province)
+		if province != "" {
+			locations = append(locations, province)
 		}
-		if result.City != "" {
-			locations = append(locations, result.City)
+		if city != "" {
+			locations = append(locations, city)
 		}
-		if result.Company != "" {
-			locations = append(locations, result.Company)
+		if company != "" {
+			locations = append(locations, company)
 		}
 		var fps []string
-		if result.Os != "" {
-			fps = append(fps, result.Os)
+		if os != "" {
+			fps = append(fps, os)
 		}
-		for _, c := range result.Component {
-			if c.Version != "" {
-				fps = append(fps, fmt.Sprintf("%v[%v]", c.Name, c.Version))
+		for _, c := range components {
+			version, name := c.Get("version").String(), c.Get("name").String()
+			if version != "" {
+				fps = append(fps, fmt.Sprintf("%v[%v]", name, version))
 			} else {
-				fps = append(fps, c.Name)
+				fps = append(fps, name)
 			}
 		}
 		fps = utils.RemoveRepeatStringSlice(fps)
 
 		results[index] = &NetSpaceEngineResult{
-			Addr:            utils.HostPort(result.IP, result.Port),
+			Addr:            utils.HostPort(host, host),
 			FromEngine:      "hunter",
-			HtmlTitle:       result.WebTitle,
-			Domains:         result.Domain,
-			Province:        result.Province,
-			Url:             result.URL,
+			HtmlTitle:       webTitle,
+			Domains:         domain,
+			Province:        province,
+			Url:             url,
 			ConfirmHttps:    isTls,
 			Host:            host,
-			City:            result.City,
-			Asn:             result.BaseProtocol,
+			City:            city,
+			Asn:             baseProtocol,
 			Location:        strings.Join(locations, "/"),
-			ServiceProvider: result.Isp,
+			ServiceProvider: isp,
 			FromFilter:      filter,
 			Fingerprints:    strings.Join(fps, "/"),
-			Banner:          utils.ParseStringToVisible(result.Banner),
+			Banner:          utils.ParseStringToVisible(banner),
 		}
 	}
 
 	return results
 }
 
-func HunterQuery(name, key, query string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
+func HunterQuery(name, key, query string, maxPage, pageSize, maxRecord int) (chan *NetSpaceEngineResult, error) {
 	ch := make(chan *NetSpaceEngineResult)
 	go func() {
 		defer close(ch)
 
 		var nextFinished bool
 		var count int
-		var page int
-		for range make([]int, maxPage) {
-			page++
+		for page := 1; page <= maxPage; page++ {
 			if nextFinished {
 				break
 			}
 
-			log.Infof("Start to query quake hunter for %v", query)
-			result, err := hunter.HunterQuery(name, key, query, page, 10)
+			log.Infof("Start to query hunter for %v", query)
+			result, err := hunter.HunterQuery(name, key, query, page, pageSize)
 			if err != nil {
 				log.Errorf("hunter client query next failed: %s", err)
 				break
@@ -96,10 +110,13 @@ func HunterQuery(name, key, query string, maxPage, maxRecord int) (chan *NetSpac
 				count++
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
+					break
 				}
 			}
 
-			time.Sleep(3 * time.Second)
+			if !nextFinished {
+				time.Sleep(3 * time.Second)
+			}
 		}
 	}()
 	return ch, nil

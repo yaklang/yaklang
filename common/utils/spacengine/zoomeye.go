@@ -2,65 +2,80 @@ package spacengine
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/zoomeye"
-	"strconv"
-	"strings"
-	"time"
 )
 
-func zoomeyeResultToSpacengineList(filter string, z *zoomeye.ZoomeyeResult) []*NetSpaceEngineResult {
-	var results = make([]*NetSpaceEngineResult, len(z.Matches))
-	for index, result := range z.Matches {
+func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngineResult {
+	rData := result.Get("matches").Array()
+
+	var results = make([]*NetSpaceEngineResult, len(rData))
+	for index, d := range rData {
+		dataMap := d.Map()
+		rGeoInfo := dataMap["geoinfo"]
+		rPortInfo := dataMap["portinfo"]
+		rProtocol := dataMap["protocol"]
+
 		isTls := false
-		if utils.MatchAnyOfSubString(strings.ToLower(fmt.Sprint(result.Protocol)+fmt.Sprint(result.Protocol.Application)), "https", "tls") {
+		protocol := ""
+		host, port := dataMap["ip"].String(), rPortInfo.Get("port").Int()
+		asn, isp := rGeoInfo.Get("asn").String(), rGeoInfo.Get("isp").String()
+		continent, country, city := rGeoInfo.Get("continent.names.zh-CN").String(), rGeoInfo.Get("country.names.zh-CN").String(), rGeoInfo.Get("city.names.zh-CN").String()
+		os := rPortInfo.Get("os").String()
+		app, version := rPortInfo.Get("app").String(), rPortInfo.Get("version").String()
+		latitule, longitude := rGeoInfo.Get("location.lat").Float(), rGeoInfo.Get("location.lon").Float()
+		banner := rPortInfo.Get("banner").String()
+
+		if rProtocol.Exists() {
+			protocol = dataMap["protocol"].Str
+		}
+
+		if utils.MatchAnyOfSubString(strings.ToLower(protocol), "https", "tls") {
 			isTls = true
 		}
 
-		var host = result.IP
-
 		var locations []string
-		if result.Geoinfo.Continent.Names.ZhCN != "" {
-			locations = append(locations, result.Geoinfo.Continent.Names.ZhCN)
+		if continent != "" {
+			locations = append(locations, continent)
 		}
-		if result.Geoinfo.Country.Names.ZhCN != "" {
-			locations = append(locations, result.Geoinfo.Country.Names.ZhCN)
+		if country != "" {
+			locations = append(locations, country)
 		}
-		if result.Geoinfo.City.Names.ZhCN != "" {
-			locations = append(locations, result.Geoinfo.City.Names.ZhCN)
+		if city != "" {
+			locations = append(locations, city)
 		}
 
 		var fps []string
-		if result.Portinfo.Os != "" {
-			fps = append(fps, result.Portinfo.Os)
+		if os != "" {
+			fps = append(fps, os)
 		}
 
-		if result.Portinfo.Version != "" {
-			fps = append(fps, fmt.Sprintf("%v[%v]", result.Portinfo.App, result.Portinfo.Version))
+		if version != "" {
+			fps = append(fps, fmt.Sprintf("%v[%v]", app, version))
 		} else {
-			fps = append(fps, result.Portinfo.App)
+			fps = append(fps, app)
 		}
 		fps = utils.RemoveRepeatStringSlice(fps)
 
-		var latitule, longitude float64
-		latitule, _ = strconv.ParseFloat(result.Geoinfo.Location.Lat, 64)
-		longitude, _ = strconv.ParseFloat(result.Geoinfo.Location.Lon, 64)
-
 		results[index] = &NetSpaceEngineResult{
-			Addr:            utils.HostPort(result.IP, result.Portinfo.Port),
+			Addr:            utils.HostPort(host, port),
 			FromEngine:      "zoomeye",
 			Latitude:        latitule,
 			Longitude:       longitude,
 			ConfirmHttps:    isTls,
 			Host:            host,
-			City:            result.Geoinfo.City.Names.ZhCN,
-			Asn:             result.Geoinfo.Asn,
+			City:            city,
+			Asn:             asn,
 			Location:        strings.Join(locations, "/"),
-			ServiceProvider: result.Geoinfo.Isp,
+			ServiceProvider: isp,
 			FromFilter:      filter,
 			Fingerprints:    strings.Join(fps, "/"),
-			Banner:          utils.ParseStringToVisible(result.Portinfo.Banner),
+			Banner:          utils.ParseStringToVisible(banner),
 		}
 	}
 
@@ -75,9 +90,7 @@ func ZoomeyeQuery(key, query string, maxPage, maxRecord int) (chan *NetSpaceEngi
 
 		var nextFinished bool
 		var count int
-		var page int
-		for range make([]int, maxPage) {
-			page++
+		for page := 1; page <= maxPage; page++ {
 			if nextFinished {
 				break
 			}
@@ -97,7 +110,9 @@ func ZoomeyeQuery(key, query string, maxPage, maxRecord int) (chan *NetSpaceEngi
 				}
 			}
 
-			time.Sleep(3 * time.Second)
+			if !nextFinished {
+				time.Sleep(3 * time.Second)
+			}
 		}
 	}()
 	return ch, nil
