@@ -5,20 +5,26 @@ import (
 )
 
 func TestGenerateSM2PrivateKey(t *testing.T) {
-	pri, pub, err := GenerateSM2PrivateKeyHEX()
-	if err != nil {
-		panic(err)
-	}
+	var (
+		decrypt    []byte
+		pri, pub   []byte
+		data       []byte
+		err        error
+		textOrigin = "abcasdf"
+	)
 
-	textOrigin := "abcasdf"
-	data, err := SM2EncryptC1C2C3(pub, []byte(textOrigin))
-	if err != nil {
-		panic("enc c1c2c3 error")
-	}
-
-	var decrypt []byte
-	count := 0
 	for {
+		pri, pub, err = GenerateSM2PrivateKeyHEX()
+		if err != nil {
+			panic(err)
+		}
+
+		data, err := SM2EncryptC1C2C3(pub, []byte(textOrigin))
+		if err != nil {
+			panic("enc c1c2c3 error")
+		}
+
+		count := 0
 		count++
 		decrypt, err = SM2DecryptC1C2C3(pri, data)
 		if err != nil {
