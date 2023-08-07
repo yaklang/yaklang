@@ -51,6 +51,7 @@ type Frame struct {
 	// hijacks map[sha1(libName, memberName)]func(any)any
 	hijackMapMemberCallHandlers sync.Map
 	ctx                         context.Context
+	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
 }
 
 func (v *Frame) SetOriginCode(s string) {
@@ -118,6 +119,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		debug:         parent.debug,
 		exitCode:      NoneExit,
 		ctx:           parent.ctx,
+		contextData:   parent.contextData,
 	}
 	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
@@ -142,6 +144,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		scope:         vm.rootScope,
 		debug:         false,
 		exitCode:      NoneExit,
+		contextData:   make(map[string]interface{}),
 	}
 	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
 		for k, v := range v1 {

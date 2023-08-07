@@ -15,7 +15,8 @@ type NaslScriptConfig struct {
 	plugin     []string
 	family     []string
 	proxies    []string
-	riskHandle func(risk interface{})
+	riskHandle func(risk any)
+	conditions map[string]any
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -24,7 +25,7 @@ func NewNaslScriptConfig() *NaslScriptConfig {
 
 type NaslScriptConfigOptFunc func(c *NaslScriptConfig)
 
-var Exports = map[string]interface{}{
+var Exports = map[string]any{
 	"UpdateDatabase": func(p string) {
 		saveScript := func(path string) {
 			if !strings.HasSuffix(path, ".nasl") {
@@ -96,13 +97,25 @@ var Exports = map[string]interface{}{
 		}
 		return nil
 	},
-	"QueryAllScript": func() []*NaslScriptInfo {
+	"QueryAllScript": func(script ...any) []*NaslScriptInfo {
+		queryCondition := map[string]any{}
+		if len(script) > 0 {
+			for k, v := range utils.InterfaceToMapInterface(script[0]) {
+				if utils.StringArrayContains([]string{"origin_file_name", "cve", "script_name", "category", "family"}, k) {
+					queryCondition[k] = v
+				} else {
+					log.Warnf("not allow query field %s", k)
+				}
+			}
+		}
 		db := consts.GetGormProfileDatabase()
 		if db == nil {
 			return nil
 		}
+
 		var scripts []*yakit.NaslScript
-		if db := db.Find(&scripts); db.Error != nil {
+		if db := db.Where(queryCondition).Find(&scripts); db.Error != nil {
+			log.Errorf("cannot query script: %s", db.Error.Error())
 			return nil
 		}
 		var ret []*NaslScriptInfo
@@ -111,25 +124,29 @@ var Exports = map[string]interface{}{
 		}
 		return ret
 	},
-	"ScanTarget": func(target string, opts ...NaslScriptConfigOptFunc) (map[string]interface{}, error) {
+	"ScanTarget": func(target string, opts ...NaslScriptConfigOptFunc) (map[string]any, error) {
 		config := NewNaslScriptConfig()
 		for _, opt := range opts {
 			opt(config)
 		}
 		engine := NewScriptEngine()
+		engine.Debug(true)
 		engine.LoadScriptsFromDb(config.plugin...)
 		engine.LoadFamilys(config.family...)
-
+		if config.conditions != nil {
+			engine.LoadWithConditions(config.conditions)
+		}
+		log.Infof("Loaded script total: %v", len(engine.scripts))
 		engine.proxies = config.proxies
 		riskHandle := config.riskHandle
 		engine.AddEngineHooks(func(engine *Engine) {
-			engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (any, error) {
 				scriptObj := engine.scriptObj
 				app := params.getParamByName("app", "").String()
 				version := params.getParamByName("version", "").String()
 				install := params.getParamByName("install", "").String()
 				cpe := params.getParamByName("cpe", "").String()
-				concluded := params.getParamByName("concluded", "").String()
+				concluded := params.getParamByName("concluded", "__empty__").String()
 				if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
 					return origin(engine, params)
 				}
@@ -159,7 +176,7 @@ var Exports = map[string]interface{}{
 					yakit.WithRiskParam_YakitPluginName(source),
 					yakit.WithRiskParam_Description(summary),
 					yakit.WithRiskParam_Solution(solution),
-					yakit.WithRiskParam_Details(map[string]interface{}{
+					yakit.WithRiskParam_Details(map[string]any{
 						"app":       app,
 						"version":   version,
 						"install":   install,
@@ -218,7 +235,7 @@ var Exports = map[string]interface{}{
 			c.family = append(c.family, family)
 		}
 	},
-	"riskHandle": func(f func(interface{})) NaslScriptConfigOptFunc {
+	"riskHandle": func(f func(any)) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
 			c.riskHandle = f
 		}
@@ -226,6 +243,21 @@ var Exports = map[string]interface{}{
 	"proxy": func(proxy ...string) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
 			c.proxies = proxy
+		}
+	},
+	"conditions": func(script ...any) NaslScriptConfigOptFunc {
+		queryCondition := map[string]any{}
+		if len(script) > 0 {
+			for k, v := range utils.InterfaceToMapInterface(script[0]) {
+				if utils.StringArrayContains([]string{"origin_file_name", "cve", "script_name", "category", "family"}, k) {
+					queryCondition[k] = v
+				} else {
+					log.Warnf("not allow query field %s", k)
+				}
+			}
+		}
+		return func(c *NaslScriptConfig) {
+			c.conditions = queryCondition
 		}
 	},
 }
