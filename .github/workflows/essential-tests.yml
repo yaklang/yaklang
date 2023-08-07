@@ -119,22 +119,22 @@ jobs:
 
     steps:
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: ^1.20.3
+          go-version-file: './go.mod'
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Dependence
         run: |
           sudo apt-get update
           sudo apt-get install libpcap-dev=1.9.1-3
 
-      - name: Init Vendor
+      - name: Init
         run: |
-          go mod vendor && go run common/yak/cmd/yak.go --help
+          go mod tidy && go run common/yak/cmd/yak.go --help
 
       - name: ${{ matrix.name }}
         run: |
