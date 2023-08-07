@@ -20,6 +20,7 @@ l, list [linenum]              : display the source code around current line or 
 la                             : display all source code
 so [linenum]                   : show current line opcodes
 sao                            : show all opcodes
+stack                          : show stack trace
 h, help                        : show help info
 exit                           : exit debugger
 

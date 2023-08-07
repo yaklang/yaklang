@@ -66,6 +66,13 @@ func (this *Stack) Push(value interface{}) {
 	this.length++
 }
 
+// break: get all stack value and callback
+func (this *Stack) GetAll(callback func(any)) {
+	for p := this.top; p != nil; p = p.prev {
+		callback(p.value)
+	}
+}
+
 // CreateShadowStack creates a shadow stack, which can be used to restore the stack to its current state.
 // dont pop the top item of the stack.
 func (this *Stack) CreateShadowStack() func() {
