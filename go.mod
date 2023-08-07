@@ -20,7 +20,6 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/atotto/clipboard v0.1.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
-	github.com/buger/jsonparser v1.1.1
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
@@ -92,7 +91,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
-	github.com/projectdiscovery/retryabledns v1.0.13
 	github.com/refraction-networking/utls v1.3.2
 	github.com/rocket049/gocui v0.3.2
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
@@ -132,13 +130,11 @@ require (
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/aquasecurity/go-pep440-version v0.0.0-20210121094942-22b2f8951d46 // indirect
 	github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492 // indirect
-	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
@@ -162,7 +158,6 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/gomodule/redigo v1.8.4 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
-	github.com/gorilla/css v1.0.0 // indirect
 	github.com/goxjs/gl v0.0.0-20210104184919-e3fafc6f8f2a // indirect
 	github.com/goxjs/glfw v0.0.0-20191126052801-d2efb5f20838 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -189,7 +184,6 @@ require (
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
 	github.com/mdlayher/ethernet v0.0.0-20190313224307-5b5fc417d966 // indirect
 	github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d // indirect
-	github.com/microcosm-cc/bluemonday v1.0.19 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/nsf/termbox-go v0.0.0-20191229070316-58d4fcbce2a7 // indirect
@@ -199,12 +193,6 @@ require (
 	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/projectdiscovery/blackrock v0.0.0-20210415162320-b38689ae3a2e // indirect
-	github.com/projectdiscovery/fileutil v0.0.0-20220705195237-01becc2a8963 // indirect
-	github.com/projectdiscovery/iputil v0.0.0-20220620153941-036d511e4097 // indirect
-	github.com/projectdiscovery/mapcidr v1.0.0 // indirect
-	github.com/projectdiscovery/retryablehttp-go v1.0.3-0.20220506110515-811d938bd26d // indirect
-	github.com/projectdiscovery/stringsutil v0.0.0-20220612082425-0037ce9f89f3 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
