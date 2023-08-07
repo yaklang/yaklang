@@ -719,7 +719,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 					return err
 				}
 				nextProto := tlsconn.ConnectionState().NegotiatedProtocol
-				log.Infof("connect from broswer: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
+				log.Debugf("connect from browser: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
 				var nconn net.Conn = tlsconn
 
 				if nextProto == "h2" {
