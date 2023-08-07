@@ -222,10 +222,7 @@ func (s *VulinServer) registerUploadCases() {
 
 		var serverExt string
 		var fileSystemExt string
-		writeFile, after, ok := strings.Cut(fn, "\x0a")
-		if ok {
-			writeFile = fn
-		}
+		writeFile, after, _ := strings.Cut(fn, "\x0a")
 		fileSystemExt = filepath.Ext(writeFile)
 		if after != "" {
 			serverExt = after
