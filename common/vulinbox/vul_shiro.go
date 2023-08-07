@@ -4,15 +4,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"math/rand"
-	"net/http"
-	"strings"
-	"time"
 )
 
 var keyList = []string{
@@ -56,9 +57,9 @@ var keyList = []string{
 	"f/SY5TIve5WWzT4aQlABJA==",
 	"bya2HkYo57u6fWh5theAWw==",
 	"WuB+y2gcHRnY2Lg9+Aqmqg==",
-	"kPv59vyqzj00x11LXJZTjJ2UHW48jzHN",
+	// "kPv59vyqzj00x11LXJZTjJ2UHW48jzHN",
 	"3qDVdLawoIr1xFd6ietnwg==",
-	"ZWvohmPdUsAWT3=KpPqda",
+	// "ZWvohmPdUsAWT3=KpPqda",
 	"YI1+nBV//m7ELrIyDHm6DQ==",
 	"6Zm+6I2j5Y+R5aS+5ZOlAA==",
 	"2A2V+RFLUs+eTA3Kpr+dag==",
@@ -98,7 +99,7 @@ var keyList = []string{
 	"MzVeSkYyWTI2OFVLZjRzZg==",
 	"empodDEyMwAAAAAAAAAAAA==",
 	"A7UzJgh1+EWj5oBFi+mSgw==",
-	"YTM0NZomIzI2OTsmIzM0NTueYQ==",
+	// "YTM0NZomIzI2OTsmIzM0NTueYQ==",
 	"c2hpcm9fYmF0aXMzMgAAAA==",
 	"i45FVt72K2kLgvFrJtoZRw==",
 	"U3BAbW5nQmxhZGUAAAAAAA==",
