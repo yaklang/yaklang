@@ -51,6 +51,10 @@ func (c *matchContext) Recover() {
 	c.rejected = false
 }
 
+func (c *matchContext) IsRejected() bool {
+	return c.rejected
+}
+
 func (c *matchContext) Attach(handler ...matchHandler) {
 	c.workflow = append(c.workflow, handler...)
 }
@@ -65,7 +69,10 @@ func (c *matchContext) Insert(handler ...matchHandler) {
 
 func (c *matchContext) Next() error {
 	c.pos++
-	defer func() { c.pos-- }()
+	defer func() {
+		c.workflow = c.workflow[:c.pos]
+		c.pos--
+	}()
 	if c.rejected || c.pos >= len(c.workflow) {
 		return nil
 	}
