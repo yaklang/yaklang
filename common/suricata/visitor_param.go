@@ -19,6 +19,7 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 
 func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 	var contents []*ContentRule
+	var MultipleBufferMatching Modifier
 	contentRule := new(ContentRule)
 
 	params := i.AllParam()
@@ -44,7 +45,6 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		}
 
 		var set = true
-		var MultipleBufferMatching Modifier
 
 		switch key {
 		// meta keywords
@@ -358,26 +358,23 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		}
 
 		// conflict, save current and match with new empty rule
-		if !set {
-			if MultipleBufferMatching != Default {
-				switch contentRule.Modifier {
-				case DNSQuery, FileData, HTTPHeader:
-					MultipleBufferMatching = contentRule.Modifier
-				case Default:
-					contentRule.Modifier = MultipleBufferMatching
-				default:
-					MultipleBufferMatching = Default
-				}
+		if !set || i == len(params)-1 {
+			switch contentRule.Modifier {
+			case DNSQuery, FileData, HTTPHeader:
+				MultipleBufferMatching = contentRule.Modifier
+			case Default:
+				contentRule.Modifier = MultipleBufferMatching
+			default:
+				MultipleBufferMatching = Default
 			}
 			contents = append(contents, contentRule)
 			contentRule = new(ContentRule)
+		}
+
+		if !set {
 			i--
 		}
 		set = true
-	}
-	if len(contentRule.Content) != 0 {
-		// todo: check if contentRule valid
-		contents = append(contents, contentRule)
 	}
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)
 }
