@@ -5,7 +5,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,13 +20,13 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 		}
 
 		// pcre not implement yet, temporarily skip
-		if len(content) == 0 {
+		if len(buffer) == 0 {
 			c.Reject()
 			return nil
 		}
 
 		// match all
-		indexes := bytesIndexAll(content, r.Content)
+		indexes := bytesIndexAll(buffer, r.Content)
 		if !c.Must(len(indexes) > 0) {
 			return nil
 		}
@@ -43,7 +42,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 
 		// special options endswith
 		if r.EndsWith {
-			targetPos := len(content) - len(r.Content)
+			targetPos := len(buffer) - len(r.Content)
 			// depth is valid in endswith
 			if r.Depth != nil {
 				targetPos = *r.Depth - len(r.Content)
@@ -62,7 +61,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 		// [le,ri]
 		if r.Depth != nil || r.Offset != nil {
 			le := 0
-			ri := len(content)
+			ri := len(buffer)
 
 			if r.Offset != nil {
 				le = *r.Offset
@@ -138,7 +137,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 			if len(strpos) == 1 {
 				// no relative
 				indexes = slices.DeleteFunc(indexes, func(m matched) bool {
-					return negIf(neg, pos >= len(content))
+					return negIf(neg, pos >= len(buffer))
 				})
 			} else {
 				// with reletive
@@ -146,7 +145,7 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 					return errors.New("isdataat format error")
 				}
 				indexes = slices.DeleteFunc(indexes, func(m matched) bool {
-					return negIf(neg, m.pos+m.len+pos > len(content))
+					return negIf(neg, m.pos+m.len+pos > len(buffer))
 				})
 			}
 			if !c.Must(len(indexes) != 0) {
@@ -164,32 +163,51 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 }
 
 // untested
-func newFileDataMatcher(r *ContentRule, request *http.Request) func(c *matchContext) error {
+func newFileDataMatcher[T *http.Request | *http.Response](r *ContentRule, data T) func(c *matchContext) error {
 	return func(c *matchContext) error {
 		// 10 MB
-		err := request.ParseMultipartForm(10 << 20)
-		if !c.Must(err == nil) {
-			return nil
+		var data any = data
+		var files []io.Reader
+
+		switch data := data.(type) {
+		case *http.Request:
+			err := data.ParseMultipartForm(10 << 20)
+			if !c.Must(err == nil) {
+				return nil
+			}
+			for _, v := range data.MultipartForm.File {
+				for _, f := range v {
+					file, err := f.Open()
+					if err != nil {
+						continue
+					}
+					defer file.Close()
+					files = append(files, file)
+				}
+			}
+		case *http.Response:
+			ctype := data.Header.Get("Content-Type")
+			if !c.Must(strings.HasPrefix(ctype, "application/octet-stream") ||
+				strings.HasPrefix(ctype, "application/pdf") ||
+				strings.HasPrefix(ctype, "image/") ||
+				strings.HasPrefix(ctype, "audio/") ||
+				strings.HasPrefix(ctype, "video/")) {
+				return nil
+			}
+			files = append(files, data.Body)
 		}
-		var files []*multipart.FileHeader
-		for _, v := range request.MultipartForm.File {
-			files = append(files, v...)
-		}
+
 		for _, f := range files {
-			file, err := f.Open()
+			all, err := io.ReadAll(f)
 			if !c.Must(err == nil) {
 				return nil
 			}
-			all, err := io.ReadAll(file)
-			if !c.Must(err == nil) {
-				return nil
-			}
-			c.Attach(newPayloadMatcher(r, all))
+			c.Insert(newPayloadMatcher(r, all))
 			c.Recover()
 			if err := c.Next(); err == nil {
 				return err
 			}
-			if !c.rejected {
+			if !c.IsRejected() {
 				return nil
 			}
 		}
