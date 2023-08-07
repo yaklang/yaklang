@@ -132,13 +132,18 @@ func httpReqMatcher(c *matchContext) error {
 			c.Attach(newPayloadMatcher(r, []byte(request.Header.Get("Referer"))))
 		case HTTPHeader:
 			var bb bytes.Buffer
-			for k, v := range request.Header {
+			var strs []string
+			for k := range request.Header {
+				strs = append(strs, k)
+			}
+			sort.Strings(strs)
+			for _, k := range strs {
 				bb.WriteString(k)
 				bb.WriteString(": ")
-				bb.WriteString(v[0])
-				for i := 1; i < len(v); i++ {
+				bb.WriteString(request.Header[k][0])
+				for i := 1; i < len(request.Header[k]); i++ {
 					bb.WriteString(", ")
-					bb.WriteString(v[i])
+					bb.WriteString(request.Header[k][i])
 				}
 				bb.WriteString("\r\n")
 			}
@@ -170,7 +175,12 @@ func httpReqMatcher(c *matchContext) error {
 			c.Attach(newPayloadMatcher(r, []byte(request.Proto)))
 		case HTTPHeaderNames:
 			var bb bytes.Buffer
+			var names []string
 			for k := range request.Header {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+			for _, k := range names {
 				bb.WriteString("\r\n")
 				bb.WriteString(k)
 			}
@@ -264,7 +274,12 @@ func httpResMatcher(c *matchContext) error {
 			c.Attach(newPayloadMatcher(r, []byte(response.Proto)))
 		case HTTPHeaderNames:
 			var bb bytes.Buffer
+			var names []string
 			for k := range response.Header {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+			for _, k := range names {
 				bb.WriteString("\r\n")
 				bb.WriteString(k)
 			}
