@@ -310,6 +310,11 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 						fmt.Printf("Interactive debugger print variable error: no such variable: %s\n", varName)
 					}
 				}
+			case "stack":
+				// get all stackTrace
+				for _, st := range g.GetStackTrace() {
+					fmt.Printf("line %d in %s\n", st.Line, st.Name)
+				}
 			default:
 				fmt.Printf("Unknown command: %s\n", commands[0])
 			}
