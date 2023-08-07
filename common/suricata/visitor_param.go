@@ -44,6 +44,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		}
 
 		var set = true
+		var MultipleBufferMatching Modifier
 
 		switch key {
 		// meta keywords
@@ -356,8 +357,18 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 		}
 
-		// conflict, save and match again
+		// conflict, save current and match with new empty rule
 		if !set {
+			if MultipleBufferMatching != Default {
+				switch contentRule.Modifier {
+				case DNSQuery, FileData, HTTPHeader:
+					MultipleBufferMatching = contentRule.Modifier
+				case Default:
+					contentRule.Modifier = MultipleBufferMatching
+				default:
+					MultipleBufferMatching = Default
+				}
+			}
 			contents = append(contents, contentRule)
 			contentRule = new(ContentRule)
 			i--
