@@ -38,7 +38,7 @@ func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	return yakvm.NewBoolValue(_eq(value, value2).False())
 }
 
-func _init() {
+func init() {
 	yakvm.ImportNaslUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		b := op.True()
 		return &yakvm.Value{
@@ -462,6 +462,14 @@ func _init() {
 				v := op1.Float64() - op2.Float64()
 				return &yakvm.Value{
 					TypeVerbose: "float64",
+					Value:       v,
+					Literal:     fmt.Sprint(v),
+				}
+			} else if op2.IsString() && op1.IsString() {
+				index := strings.Index(op1.String(), op2.String())
+				v := op1.String()[:index] + op1.String()[index+len(op2.String()):]
+				return &yakvm.Value{
+					TypeVerbose: "string",
 					Value:       v,
 					Literal:     fmt.Sprint(v),
 				}

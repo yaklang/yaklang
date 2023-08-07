@@ -26,7 +26,8 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 				panic("iterableValue.Value is nil")
 			}
 			if index == nil {
-				panic("call get_array_elem error: index is nil")
+				return nil
+				//panic("call get_array_elem error: index is nil")
 			}
 			i, ok := index.(int)
 			if ok {

@@ -6,6 +6,7 @@ import (
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"testing"
 )
 
@@ -305,4 +306,53 @@ func TestEgrep(t *testing.T) {
 a = egrep( pattern:"^User-Agent:.+", string:"User-Agent: aaa", icase:TRUE );
 dump(a);
 `)
+}
+
+func TestStrStr(t *testing.T) {
+	DebugExec(`
+assert(strstr("asdfasdCVE 2023","CVE ") == "CVE 2023","strstr error");
+`)
+}
+
+func TestSubString(t *testing.T) {
+	DebugExec(`
+assert("aaa<b>aaa"-"<b>" == "aaaaaa","sub string error");
+`)
+}
+func TestMapElement(t *testing.T) {
+	DebugExec(`
+array = make_array("a",1);
+assert(array[NULL] == NULL,"array[NULL] != NULL");
+`)
+}
+
+func TestMkword(t *testing.T) {
+	DebugExec(`
+function mkword(){
+	return _FCT_ANON_ARGS[0];
+}
+dump(mkword(100));
+assert(mkword(100) == 100,"mkword error");
+`)
+}
+
+func TestGetword(t *testing.T) {
+	code := `
+include("byte_func.inc");
+buf = getBuf();
+assert(getword( blob:buf, pos:0) == 1,"getword error");
+assert(getword( blob:buf, pos:2) == 2,"getword error");
+`
+	engine := New()
+	engine.InitBuildInLib()
+	engine.vm.ImportLibs(map[string]interface{}{
+		"__function__getBuf": func() any {
+			res, _ := codec.DecodeHex("00010002")
+			return res
+		},
+	})
+	err := engine.Eval(code)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

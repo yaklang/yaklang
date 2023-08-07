@@ -422,3 +422,37 @@ func MergeGeneralMap(ms ...map[string]any) map[string]any {
 	}
 	return res
 }
+
+func MapToStruct(input map[string]interface{}, output interface{}) error {
+	outputValue := reflect.ValueOf(output)
+	if outputValue.Kind() != reflect.Ptr || outputValue.IsNil() {
+		return fmt.Errorf("output must be a non-nil pointer to a struct")
+	}
+
+	outputType := outputValue.Elem().Type()
+
+	for i := 0; i < outputType.NumField(); i++ {
+		field := outputType.Field(i)
+		fieldName := field.Tag.Get("json")
+
+		if fieldName == "" {
+			fieldName = field.Name
+		}
+
+		value, ok := input[fieldName]
+		if !ok {
+			continue
+		}
+
+		fieldValue := outputValue.Elem().FieldByName(field.Name)
+		if !fieldValue.IsValid() {
+			continue
+		}
+
+		if fieldValue.CanSet() {
+			fieldValue.Set(reflect.ValueOf(value))
+		}
+	}
+
+	return nil
+}
