@@ -137,7 +137,7 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 type fuzzerSequenceFlow struct {
 	hijack func(request *ypb.FuzzerRequest) *ypb.FuzzerRequest
 	origin *ypb.FuzzerRequest
-	next   *ypb.FuzzerRequest
+	next   *fuzzerSequenceFlow
 }
 
 func NewFuzzerSequenceFlow(request *ypb.FuzzerRequest) *fuzzerSequenceFlow {
@@ -199,10 +199,13 @@ func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFl
 	fallback := newHTTPFuzzerFallback(req, stream)
 	if f.next != nil {
 		var swg = utils.NewSizedWaitGroup(int(flowMax))
-
+		var originRequest = f.next.origin
 		fallback.onEveryResponse = func(response *ypb.FuzzerResponse) {
+			/*
+				copy fuzzer request
+			*/
 			var copiedReq = ypb.FuzzerRequest{}
-			var raw, err = json.Marshal(f.next)
+			var raw, err = json.Marshal(originRequest)
 			if err != nil {
 				log.Errorf("json marshal ypb.FuzzerRequest failed: %s", err)
 				return
@@ -216,7 +219,9 @@ func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFl
 			go func() {
 				defer wg.Done()
 				swg.Add()
-				err := s.execFlow(flowMax, wg, NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response), stream)
+				flow := NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response)
+				flow.next = f.next.next
+				err := s.execFlow(flowMax, wg, flow, stream)
 				swg.Done()
 				if err != nil {
 					log.Errorf("execFlow: %v", err)
@@ -265,7 +270,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 				firstFlow = flow
 			}
 			if lastFlow != nil {
-				lastFlow.next = i
+				lastFlow.next = flow
 			}
 			lastFlow = flow
 		}

@@ -90,7 +90,7 @@ abc`), "Host", utils.HostPort(host, port))),
 		if resp == nil {
 			break
 		}
-		println(string(resp.Response.RequestRaw))
+		_ = string(resp.Response.RequestRaw)
 	}
 
 	if !redirect302done {
@@ -167,6 +167,104 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 	if count != 100+10 {
 		t.Fatal("Fuzztag COUNT: " + fmt.Sprint(count) + " failed")
+	}
+}
+
+func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag2(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
+		return
+	})
+
+	client, err := c.HTTPFuzzerSequence(
+		utils.TimeoutContextSeconds(1000),
+		&ypb.FuzzerRequests{
+			Concurrent: 1,
+			Requests: []*ypb.FuzzerRequest{
+				{
+					FuzzerIndex: "a",
+					Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /aa={{int(1-3)}} HTTP/1.1
+Host: www.example.com
+
+abc`), "Host", utils.HostPort(host, port))),
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					RedirectTimes:            3,
+					ForceFuzz:                true,
+					Extractors: []*ypb.HTTPResponseExtractor{
+						{
+							Name:   "test",
+							Type:   "json",
+							Scope:  "body",
+							Groups: []string{`.path`},
+						},
+					},
+				},
+				{
+					Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /verify?a={{param(test)}}/{{int(1-3)}} HTTP/1.1
+Host: www.example.com
+Authorization: Bearer {{params(test)}}
+
+abc`), "Host", utils.HostPort(host, port))),
+					FuzzerIndex:              "b",
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					RedirectTimes:            3,
+					InheritVariables:         true,
+					ForceFuzz:                true,
+				},
+				{
+					Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /verify?a={{param(test)}}/{{int(1-3)}} HTTP/1.1
+Host: www.example.com
+Authorization: Bearer {{params(test)}}
+
+abc`), "Host", utils.HostPort(host, port))),
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					FuzzerIndex:              "c",
+					RedirectTimes:            3,
+					InheritVariables:         true,
+					ForceFuzz:                true,
+				},
+			}},
+	)
+	if err != nil {
+		panic(err)
+	}
+	var a int
+	var b int
+	var cCount int
+	for {
+		resp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if resp == nil {
+			break
+		}
+		switch resp.Request.GetFuzzerIndex() {
+		case "a":
+			a++
+		case "b":
+			b++
+		case "c":
+			cCount++
+		}
+	}
+	t.Logf("\n\nA: %v\nB: %v \nC: %v", a, b, cCount)
+	if a != 3 {
+		t.Fatal("A failed")
+	}
+	if b != 9 {
+		t.Fatal("B failed")
+	}
+	if cCount != 27 {
+		t.Fatal("C failed")
 	}
 }
 
