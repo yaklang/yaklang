@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	log "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -177,6 +180,77 @@ func (m *MatchResult) GetHtmlTitle() string {
 
 func (m *MatchResult) GetServiceName() string {
 	return m.getServiceName()
+}
+
+func (m *MatchResult) GetResponseRaw() []byte {
+	if m.Fingerprint == nil {
+		return nil
+	}
+	if len(m.Fingerprint.HttpFlows) > 0 {
+		var flow, err = lo.Last(m.Fingerprint.HttpFlows)
+		if err != nil {
+			return nil
+		}
+		return lowhttp.ReplaceHTTPPacketBodyFast(flow.ResponseHeader, flow.ResponseBody)
+	}
+
+	return nil
+}
+
+func (m *MatchResult) GetRequestRaw() (bool, []byte) {
+	if m.Fingerprint == nil {
+		return false, nil
+	}
+	if len(m.Fingerprint.HttpFlows) > 0 {
+		var flow, err = lo.Last(m.Fingerprint.HttpFlows)
+		if err != nil {
+			return false, nil
+		}
+		return flow.IsHTTPS, lowhttp.ReplaceHTTPPacketBodyFast(flow.RequestHeader, flow.RequestBody)
+	}
+
+	return false, nil
+}
+
+func (m *MatchResult) GetFuzzRequest() *mutate.FuzzHTTPRequest {
+	urls := utils2.ParseStringToUrls(m.Target)
+	if !m.IsOpen() && len(urls) > 0 {
+		https, reqs, err := lowhttp.ParseUrlToHttpRequestRaw("GET", urls[0])
+		if err != nil {
+			return nil
+		}
+		freq, _ := mutate.NewFuzzHTTPRequest(reqs, mutate.OptHTTPS(https))
+		if freq != nil {
+			return freq
+		}
+		return nil
+	}
+
+	var freq *mutate.FuzzHTTPRequest
+	var err error
+	https, reqBytes := m.GetRequestRaw()
+	if reqBytes != nil {
+		freq, _ = mutate.NewFuzzHTTPRequest(reqBytes, mutate.OptHTTPS(https))
+		if freq != nil {
+			return freq
+		}
+	}
+
+	var targetUrl string
+	if netx.IsTLSService(m.Target) {
+		targetUrl = fmt.Sprintf("https://%v", m.Target)
+	} else {
+		targetUrl = fmt.Sprintf("http://%v", m.Target)
+	}
+	https, reqs, err := lowhttp.ParseUrlToHttpRequestRaw("GET", targetUrl)
+	if err != nil {
+		return nil
+	}
+	freq, _ = mutate.NewFuzzHTTPRequest(reqs, mutate.OptHTTPS(https))
+	if freq != nil {
+		return freq
+	}
+	return nil
 }
 
 func (m *MatchResult) getServiceName() string {
