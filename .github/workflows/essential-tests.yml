@@ -7,61 +7,30 @@ on:
       - 'common/**'
       - '.github/workflows/essential-tests.yml'
 
-jobs:
-  test_lowhttp:
-    name: Tests lowhttp with retry
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v2
-        with:
-          go-version: ^1.20.3
-        id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
-
-      - name: Dependence
-        run: |
-          sudo apt-get update
-          sudo apt-get install libpcap-dev=1.9.1-3
-
-      - name: Init Vendor
-        run: |
-          go mod vendor && go run common/yak/cmd/yak.go --help
-
-      - name: Test ${{ matrix.name }}
-        run: |
-          ${{ matrix.run }}
-
-      - name: Run tests lowhttp with retry
-        uses: nick-fields/retry@v2
-        with:
-          max_attempts: 3
-          timeout_minutes: 1
-          command: go test -timeout 1m ./common/utils/lowhttp -v
-          
+jobs:     
   test:
     name: ${{ matrix.name }}
     runs-on: ubuntu-20.04
     strategy:
       matrix:
         include:
-         - name: Start
+         - name: Test Start
            run: go test -timeout 1m ./common/jsonextractor -v
            
-         - name: Codec
+         - name: Test Codec
            run: go test -timeout 1m ./common/yak/yaklib/codec -v
            
-         - name: CartesianProduct
+         - name: Tesy CartesianProduct
            run: go test -timeout 1m ./common/yak/cartesian -v
            
-         - name: JsonPath
+         - name: Test JsonPath
            run: go test -timeout 1m ./common/jsonpath -v
            
-         - name: TestDomainExtract
+         - name: Test DomainExtract
            run: go test -timeout 1m ./common/domainextractor -v
+
+         - name: Test lowhttp
+           run: go test -timeout 1m ./common/utils/lowhttp -v
            
          - name: Test HttpTpl(YakTemplate)
            run: go test -timeout 1m ./common/yak/httptpl -v
