@@ -42,7 +42,8 @@ type Frame struct {
 
 	// debug: 打开之后将会输出很多调试信息
 	debug          bool
-	indebuggerEval bool // 在debugger中执行代码
+	indebuggerEval bool   // 在debugger中执行代码
+	ThreadID       uint64 // 当前线程的ID
 	// panic
 	panics   []*VMPanic
 	tryStack *vmstack.Stack

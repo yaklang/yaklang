@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -295,6 +296,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		if c.Op1 != nil {
 			wavy = c.Op1.Bool()
 		}
+		// 增加线程ID
+		atomic.AddUint64(&v.vm.ThreadIDCount, 1)
+
 		args := v.popArgN(c.Unary)
 		callableValue := v.pop()
 		v.asyncCall(callableValue, wavy, args)
