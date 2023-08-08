@@ -90,7 +90,7 @@ if err{
 func TestCommonScan(t *testing.T) {
 	scanCode := `
 proxy = ""
-naslScanHandle = (target)=>{
+naslScanHandle = (hosts,ports)=>{
     opts = [nasl.family("")]
     if proxy != nil && proxy != ""{
         opts.Append(nasl.proxy(proxy))
@@ -103,13 +103,13 @@ naslScanHandle = (target)=>{
 	//	"category": "ACT_GATHER_INFO",
 	//}))
 	opts.Append(nasl.plugin("mssqlserver_detect.nasl"))
-    kbs ,err = nasl.ScanTarget(target,opts...)
+    kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)
     }
 }
 
-naslScanHandle("136.233.183.242:1433")
+naslScanHandle("175.111.120.131","U:161")
 `
 	err := yaklang.New().SafeEval(context.Background(), scanCode)
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -152,7 +151,13 @@ func (e *ScriptEngine) ScanTarget(target string) error {
 	if err != nil {
 		return err
 	}
-	return e.Scan(host, strconv.Itoa(port))
+	var portStr string
+	if port < 0 {
+		portStr = fmt.Sprintf("U:%d", -port)
+	} else {
+		portStr = fmt.Sprint(port)
+	}
+	return e.Scan(host, portStr)
 }
 func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	//忽略了循环依赖
@@ -198,7 +203,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 			fingerprint := result.Fingerprint
 			openPorts = append(openPorts, result.Port)
 			portInfos = append(portInfos, result)
-			e.Kbs.SetKB(fmt.Sprintf("Ports/tcp/%d", result.Port), 1)
+			e.Kbs.SetKB(fmt.Sprintf("Ports/%s/%d", result.GetProto(), result.Port), 1)
 			if fingerprint.ServiceName != "" {
 				var serverName string
 				if fingerprint.ServiceName == "http" {

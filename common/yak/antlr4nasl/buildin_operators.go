@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
 	"reflect"
@@ -40,6 +41,14 @@ func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 
 func init() {
 	yakvm.ImportNaslUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
+		if v, ok := op.Value.(*vm.NaslArray); ok {
+			b := len(v.Num_elt) != 0 || len(v.Hash_elt) != 0
+			return &yakvm.Value{
+				TypeVerbose: "bool",
+				Value:       !b,
+				Literal:     fmt.Sprint(!b),
+			}
+		}
 		b := op.True()
 		return &yakvm.Value{
 			TypeVerbose: "bool",

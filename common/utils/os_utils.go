@@ -85,7 +85,7 @@ func IsPortAvailableWithUDP(host string, p int) bool {
 	addr := fmt.Sprintf("%s:%v", host, p)
 	lis, err := net.ListenPacket("udp", addr)
 	if err != nil {
-		log.Infof("%s is unavailable: %s", addr, err)
+		log.Errorf("%s is unavailable: %s", addr, err)
 		return false
 	}
 	defer func() {
