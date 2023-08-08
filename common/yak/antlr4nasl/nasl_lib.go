@@ -323,7 +323,11 @@ func init() {
 			if strings.Contains(name, "*") {
 				return engine.Kbs.GetKBByPattern(name), nil
 			} else {
-				return []interface{}{engine.Kbs.GetKB(name)}, nil
+				res, _ := vm.NewNaslArray(nil)
+				if v := engine.Kbs.GetKB(name); v != nil {
+					res.AddEleToList(0, v)
+				}
+				return res, nil
 			}
 		},
 		"security_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -665,11 +669,15 @@ func init() {
 			return nil, nil
 		},
 		"get_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//name, err := os.Hostname()
-			//if err != nil {
-			//	return "", err
-			//}
-			return engine.host, nil
+			names, err := net.LookupAddr(engine.host)
+			if err != nil {
+				return nil, err
+			}
+			var name string
+			if len(names) > 0 {
+				name = names[0]
+			}
+			return name, nil
 		},
 		"get_host_names": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `get_host_names` is not implement"))
@@ -712,11 +720,24 @@ func init() {
 			return false, nil
 		},
 		"get_tcp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return utils.IsPortAvailable(engine.host, params.getParamByNumber(0, 0).Int()), nil
+			port := params.getParamByNumber(0, 0).Int()
+			isOpen := engine.Kbs.GetKB(fmt.Sprintf("Ports/%d", port))
+			if v, ok := isOpen.(int); ok && v == 1 {
+				return true, nil
+			}
+			isOpen = engine.Kbs.GetKB(fmt.Sprintf("Ports/tcp/%d", port))
+			if v, ok := isOpen.(int); ok && v == 1 {
+				return true, nil
+			}
+			return false, nil
 		},
 		"get_udp_port_state": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByNumber(0, 0).Int()
-			return utils.IsPortAvailableWithUDP(engine.host, port), nil
+			isOpen := engine.Kbs.GetKB(fmt.Sprintf("Ports/udp/%d", port))
+			if v, ok := isOpen.(int); ok && v == 1 {
+				return true, nil
+			}
+			return false, nil
 		},
 		"scanner_add_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			port := params.getParamByName("port", -1).Int()
@@ -1922,6 +1943,18 @@ func init() {
 		},
 		"ssh_get_port": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return nil, nil
+		},
+		"in_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			search := params.getParamByName("search", "").String()
+			iArray := params.getParamByName("array", nil).Value
+			var array *vm.NaslArray
+			if v, ok := iArray.(*vm.NaslArray); ok {
+				array = v
+			} else {
+				panic("param array is not an array")
+			}
+			_, ok := array.Hash_elt[search]
+			return ok, nil
 		},
 	}
 	for name, method := range naslLib {
