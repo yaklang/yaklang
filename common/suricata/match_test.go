@@ -47,15 +47,16 @@ var testcases = []Case{
 		},
 	},
 	{
-		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Accept-Encoding|0d 0a|Host|0d 0a|User-Agent|0d 0a 0d 0a|\";http.header_names;)",
+		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";http.user_agent;endswith;content:\"|0d 0a|Accept-Encoding|0d 0a|Host|0d 0a|User-Agent|0d 0a 0d 0a|\";http.header_names;)",
 		test: []Test{
 			// curl http://baimeow.cn
 			{"3066d026811b6afd6158af5c0800450000c2866340008006f9e4c0a80312dde4d84e1a750050a3a72252fab0b8745018040193350000474554202f20485454502f312e310d0a486f73743a206261696d656f772e636e0d0a557365722d4167656e743a204d6f7a696c6c612f352e30202857696e646f7773204e543b2057696e646f7773204e542031302e303b207a682d434e292057696e646f7773506f7765725368656c6c2f352e312e32323632312e313737380d0a4163636570742d456e636f64696e673a20677a69700d0a0d0a", true},
 		},
 	}, {
-		rule: "alert http any any -> any any (msg:httptest;content:\"/\";http.uri;content:\"/\";http.uri.raw;content:GET;http.method;content:HTTP/1.1;http.protocol;content:\"GET / HTTP/1.1|0d 0a|\";http.request_line;content:\"Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.22621.1778\";endswith;content:\"|0d 0a|Accept-Encoding|0d 0a|Host|0d 0a|User-Agent|0d 0a 0d 0a|\";http.header_names;)",
+		rule: "alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;content:2023;http.header;distance:1;",
 		test: []Test{
-			{"3066d026811b6afd6158af5c0800450000c2866340008006f9e4c0a80312dde4d84e1a750050a3a72252fab0b8745018040193350000474554202f20485454502f312e310d0a486f73743a206261696d656f772e636e0d0a557365722d4167656e743a204d6f7a696c6c612f352e30202857696e646f7773204e543b2057696e646f7773204e542031302e303b207a682d434e292057696e646f7773506f7765725368656c6c2f352e312e32323632312e313737380d0a4163636570742d456e636f64696e673a20677a69700d0a0d0a", true},
+			// 302 redirect
+			{"6afd6158af5c3066d026811b0800450001276ec7400036065b1cdde4d84ec0a8031200501a75fab0b874a3a722ec50180ffe576d0000485454502f312e312033303220466f756e640d0a4c6f636174696f6e3a2068747470733a2f2f6261696d656f772e636e2f0d0a436f6e74656e742d4c656e6774683a20300d0a582d4e57532d4c4f472d555549443a20393433363237373032323431383037313837350d0a436f6e6e656374696f6e3a206b6565702d616c6976650d0a5365727665723a20534c540d0a446174653a205468752c2030332041756720323032332030393a35383a333520474d540d0a582d43616368652d4c6f6f6b75703a2052657475726e204469726563746c790d0a5374726963742d5472616e73706f72742d53656375726974793a206d61782d6167653d313b0d0a0d0a", true},
 		},
 	},
 }
@@ -105,5 +106,46 @@ func TestRule_Match2(t *testing.T) {
 			spew.Dump(v)
 			t.Error("match failed")
 		}
+	}
+}
+
+func TestMUSTPASS_FastPattern(t *testing.T) {
+	res1 := testing.Benchmark(BenchmarkRule_Match)
+	res2 := testing.Benchmark(BenchmarkRule_Match_FastPattern)
+	t.Logf("normal pattern: %s\n", res1.String())
+	t.Logf("fast pattern: %s\n", res2.String())
+	if res1.NsPerOp() < res2.NsPerOp() {
+		t.Error("fast pattern is slower than normal pattern")
+	}
+}
+
+func BenchmarkRule_Match(b *testing.B) {
+	rule := "alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;content:2024;http.header;distance:1;"
+	rs, err := Parse(rule)
+	if err != nil {
+		b.Error(err)
+		return
+	}
+	r := rs[0]
+	bytes, _ := hex.DecodeString("6afd6158af5c3066d026811b0800450001276ec7400036065b1cdde4d84ec0a8031200501a75fab0b874a3a722ec50180ffe576d0000485454502f312e312033303220466f756e640d0a4c6f636174696f6e3a2068747470733a2f2f6261696d656f772e636e2f0d0a436f6e74656e742d4c656e6774683a20300d0a582d4e57532d4c4f472d555549443a20393433363237373032323431383037313837350d0a436f6e6e656374696f6e3a206b6565702d616c6976650d0a5365727665723a20534c540d0a446174653a205468752c2030332041756720323032332030393a35383a333520474d540d0a582d43616368652d4c6f6f6b75703a2052657475726e204469726563746c790d0a5374726963742d5472616e73706f72742d53656375726974793a206d61782d6167653d313b0d0a0d0a")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Match(bytes)
+	}
+	b.StopTimer()
+}
+
+func BenchmarkRule_Match_FastPattern(b *testing.B) {
+	rule := "alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;content:2024;http.header;fast_pattern;distance:1;"
+	rs, err := Parse(rule)
+	if err != nil {
+		b.Error(err)
+		return
+	}
+	r := rs[0]
+	bytes, _ := hex.DecodeString("6afd6158af5c3066d026811b0800450001276ec7400036065b1cdde4d84ec0a8031200501a75fab0b874a3a722ec50180ffe576d0000485454502f312e312033303220466f756e640d0a4c6f636174696f6e3a2068747470733a2f2f6261696d656f772e636e2f0d0a436f6e74656e742d4c656e6774683a20300d0a582d4e57532d4c4f472d555549443a20393433363237373032323431383037313837350d0a436f6e6e656374696f6e3a206b6565702d616c6976650d0a5365727665723a20534c540d0a446174653a205468752c2030332041756720323032332030393a35383a333520474d540d0a582d43616368652d4c6f6f6b75703a2052657475726e204469726563746c790d0a5374726963742d5472616e73706f72742d53656375726974793a206d61782d6167653d313b0d0a0d0a")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Match(bytes)
 	}
 }
