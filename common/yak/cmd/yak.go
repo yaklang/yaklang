@@ -6,6 +6,19 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/chaosmaker"
@@ -33,18 +46,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/scannode"
-	"io"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
-	"os/exec"
-	"path"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"sync"
-	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
@@ -1201,6 +1202,24 @@ func main() {
 			},
 			Action: func(c *cli.Context) error {
 				return chaosmaker.ExportChaosRulesToFile(consts.GetGormProfileDatabase(), c.String("file"))
+			},
+		},
+
+		// dap
+		{
+			Name:  "dap",
+			Usage: "启动dap服务器以调试脚本",
+			Flags: []cli.Flag{
+				cli.StringFlag{Name: "host"},
+			},
+			Action: func(c *cli.Context) error {
+				host := c.String("host")
+				if host == "" {
+					host = ":0"
+				}
+				// todo: start dap server
+
+				return nil
 			},
 		},
 	}
