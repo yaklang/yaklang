@@ -85,11 +85,10 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 		}
 	}
 
-	closure := f.emitClosure(newfunc)
 	if funcName != "" {
-		f.wirteVariable(funcName, closure)
+		f.writeVariable(funcName, newfunc)
 	}
-	return closure
+	return newfunc
 }
 
 func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
@@ -208,8 +207,8 @@ func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValu
 	if s := stmt.Identifier(); s != nil {
 		if v := f.readVariable(s.GetText()); v != nil {
 			switch v := v.(type) {
-			case *Alloc:
-				return v
+			case *Parameter:
+			default:
 			}
 		}
 		return &IdentifierLV{
