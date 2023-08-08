@@ -337,7 +337,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 								v2.AddEleToArray(v1[1].String(), arg2.Value)
 								assignOk = true
 							} else {
-								panic("nasl array index must be int or string")
+								panic("nasl array index must be int or string, but got " + v1[1].TypeVerbose)
 							}
 						}
 					}
@@ -1491,7 +1491,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				} else if k.IsInt() {
 					array.AddEleToList(k.Int(), v.Value)
 				} else {
-					panic("nasl array index must be int or string")
+					panic("nasl array index must be int or string, but got " + k.Type().String())
 				}
 			}
 			v.push(NewAutoValue(array))
