@@ -140,3 +140,75 @@ func (b *BinOp) RemoveUser(u User) { removeUser(b.user, u) }
 func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
 func (b *BinOp) AddValue(v Value)   {}
 
+// ----------- Interface
+func (i *Interface) ReplaceValue(v, to Value) {
+	if i.Cap == v {
+		i.Cap = to
+	} else if i.Len == v {
+		i.Len = v
+	} else {
+		panic("interface not use this value")
+	}
+}
+
+func (i *Interface) GetUsers() []User { return i.users }
+func (i *Interface) AddUser(u User) {
+	i.users = append(i.users, u)
+	if f, ok := u.(*Field); ok {
+		// important !
+		i.field[f.Key] = f
+	}
+}
+
+func (i *Interface) RemoveUser(u User) {
+	removeUser(i.users, u)
+	// removeUser(i.field, u)
+	if f, ok := u.(*Field); ok {
+		delete(i.field, f.Key)
+	}
+}
+
+func (i *Interface) GetValues() []Value { return []Value{i.Cap, i.Len} }
+func (i *Interface) AddValue(_ Value)   {}
+
+// ----------- Field
+func (f *Field) ReplaceValue(v, to Value) {
+	if index := slices.Index(f.update, v); index > 0 {
+		f.update[index] = to
+	} else {
+		panic("field not use this value")
+	}
+}
+
+func (f *Field) GetUsers() []User  { return f.users }
+func (f *Field) AddUser(u User)    { f.users = append(f.users, u) }
+func (f *Field) RemoveUser(u User) { removeUser(f.users, u) }
+
+func (f *Field) GetValues() []Value { return append(f.update, f.I) }
+func (f *Field) AddValue(v Value) {
+	if s, ok := v.(*Update); ok {
+		f.update = append(f.update, s)
+	}
+}
+
+// ----------- Update
+func (s *Update) ReplaceValue(v, to Value) {
+	if s.value == v {
+		s.value = to
+	} else {
+		panic("update not use this value")
+	}
+}
+
+func (s *Update) GetUsers() []User { return []User{s.address} }
+func (s *Update) AddUser(u User)   {}
+func (s *Update) RemoveUser(u User) {
+	if s.address == u {
+		s.address = nil
+	} else {
+		panic("update not have this user")
+	}
+}
+
+func (s *Update) GetValues() []Value { return []Value{s.value} }
+func (s *Update) AddValue(_ Value)   {}
