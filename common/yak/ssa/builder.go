@@ -84,6 +84,7 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 			newfunc.buildBlock(block)
 		}
 	}
+	newfunc.Finish()
 
 	if funcName != "" {
 		f.writeVariable(funcName, newfunc)
@@ -559,10 +560,7 @@ func (f *Function) buildStatement(stmt *yak.StatementContext) {
 func (pkg *Package) build() {
 	main := pkg.NewFunction("yak-main")
 	main.build(pkg.ast)
-	for _, f := range pkg.funcs {
-		f.ExitBlock = f.Blocks[len(f.Blocks)-1]
-		f.EnterBlock = f.Blocks[0]
-	}
+	main.Finish()
 }
 
 func (pkg *Package) Build() { pkg.buildOnece.Do(pkg.build) }
