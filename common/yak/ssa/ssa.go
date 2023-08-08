@@ -12,6 +12,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	ConstMap = make(map[any]*Const)
+)
+
 type Value interface {
 	String() string
 
@@ -154,10 +158,17 @@ type Const struct {
 }
 
 func NewConst(i any) *Const {
-	return &Const{
+	c, ok := ConstMap[i]
+	if !ok {
+		c = &Const{
 		user:  []User{},
 		value: constant.Make(i),
 	}
+		// const should same
+		// assert newConst(1) ==newConst(1)
+		ConstMap[i] = c
+	}
+	return c
 }
 
 // parameter
