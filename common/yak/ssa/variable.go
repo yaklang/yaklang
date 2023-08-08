@@ -21,15 +21,9 @@ func (i *IdentifierLV) GetValue() Value {
 
 var _ LeftValue = (*IdentifierLV)(nil)
 
-func (a *Alloc) Assign(v Value) {
-	a.Parent.emitStore(a, v)
-}
 
-func (a *Alloc) GetValue() Value {
-	return a.v
-}
 
-var _ LeftValue = (*Alloc)(nil)
+
 
 func (f *Function) wirteVariable(variable string, value Value) {
 	f.wirteVariableByBlock(variable, value, f.currentBlock)
@@ -63,12 +57,13 @@ func (f *Function) readVariableInParamAndFV(variable string) Value {
 	}
 	if parent := f.parent; parent != nil {
 		if v := parent.readVariable(variable); v != nil {
-			alloc := parent.emitAlloc(variable)
-			parent.emitStore(alloc, v)
-			parent.wirteVariable(variable, alloc)
-			f.FreeValue = append(f.FreeValue, alloc)
-			load := f.emitLoad(alloc)
-			return load
+			freevalue := &Parameter{
+				variable:    variable,
+				Func:        f,
+				isFreevalue: true,
+				user:        []User{},
+			}
+			return freevalue
 			// } else {
 			// 	fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.name, parent.name)
 		}

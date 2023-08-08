@@ -89,34 +89,7 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	return r
 }
 
-func (f *Function) emitClosure(target *Function) *Closure {
-	if f.currentBlock.finish {
-		return nil
-	}
-	m := &Closure{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		Fn:       target,
-		Bindings: make([]Value, 0, len(target.FreeValue)),
-		user:     make([]User, 0),
-	}
-	//TODO: handler binding with target.freeValue
-	m.Bindings = append(m.Bindings, target.FreeValue...)
-	// for _, v := range target.FreeValue {
-	// 	m.Bindings = append(m.Bindings, v)
-	// }
 
-	// assert
-	if len(m.Bindings) != len(target.FreeValue) {
-		panic("bingding variable length error")
-	}
-
-	fixupUseChain(m)
-	f.emit(m)
-	return m
-}
 
 func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call {
 	if f.currentBlock.finish {
@@ -138,52 +111,3 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	return c
 }
 
-func (f *Function) emitAlloc(name string) *Alloc {
-	if f.currentBlock.finish {
-		return nil
-	}
-	alloc := &Alloc{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		variable: name,
-		user:     []User{},
-	}
-	f.emit(alloc)
-	return alloc
-}
-
-func (f *Function) emitStore(alloc *Alloc, v Value) *Store {
-	if f.currentBlock.finish {
-		return nil
-	}
-	store := &Store{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		alloc: alloc,
-		value: v,
-	}
-	alloc.v = v
-	f.emit(store)
-	fixupUseChain(store)
-	return store
-}
-func (f *Function) emitLoad(alloc *Alloc) Value {
-	if f.currentBlock.finish {
-		return nil
-	}
-	load := &Load{
-		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
-		},
-		user:  []User{},
-		alloc: alloc,
-	}
-	fixupUseChain(load)
-	f.emit(load)
-	return load
-}
