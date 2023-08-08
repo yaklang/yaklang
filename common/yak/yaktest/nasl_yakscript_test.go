@@ -102,7 +102,7 @@ naslScanHandle = (hosts,ports)=>{
 	//	"family": "Web Servers",
 	//	"category": "ACT_GATHER_INFO",
 	//}))
-	opts.Append(nasl.plugin("mssqlserver_detect.nasl"))
+	opts.Append(nasl.plugin("。mssqlserver_detect.nasl"))
     kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)
@@ -110,6 +110,21 @@ naslScanHandle = (hosts,ports)=>{
 }
 
 naslScanHandle("175.111.120.131","U:161")
+`
+	err := yaklang.New().SafeEval(context.Background(), scanCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+func TestScanByMixCaller(t *testing.T) {
+	scanCode := `
+res = servicescan.Scan("175.111.120.131","U:161")~
+manager = hook.NewMixPluginCaller()~
+manager.LoadPlugin("__NaslScript__mssqlserver_detect.nasl")
+for i in res{
+	manager.HandleServiceScanResult(i)
+}
+manager.Wait()
 `
 	err := yaklang.New().SafeEval(context.Background(), scanCode)
 	if err != nil {
