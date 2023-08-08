@@ -532,61 +532,142 @@ b11: <- loop.exit3
 func TestClosure(t *testing.T) {
 	t.Run("closure_simple", func(t *testing.T) {
 		code := `
-ca = 33
-a = (pa) => {return pa * 11 + ca}
+ca = 11
+// freevalue ca
+a = (arg1) =>{
+	// test cfg in closure function
+	b = 1
+	if 1 > 2{
+		b = arg1 + 2
+	}else {
+		b = ca + 2
+	}
+	c = b + 1
+}
+// call a (1) [11]
+b = a(1)
+// call a (2) [11]
+b = a(2)
+ca = 22
+// call a (2) [22]
+b = a(3)
 
-// ca = 33
-va = a(1) 
+// "ca" is Const-Value,because closure(a) not modify "ca"
+d = ca + b 
+if b {
+	ca = 12
+}else {
+	ca = 13 
+}
+// this is phi-instruction 
+// ca = phi(12, 13)
+c = ca + b
 
-ca = 44
-va = a(1)
+// "cadd" is field-value, because closure(add) modify "cadd"
+cadd = 0
+// field[cadd]
+add = () => {cadd ++}
+// call add() [field_cadd]
+add()
+e = cadd + 1
 
+va = 11
 c = fn(pc1, pc2, pc3) {
-	return 13 + a(va) + pc2 * pc3
+	// modify global.ca, this ca is field
+	// update [field ca]
+	ca = 55
+	// call a (va) []
+	// xx add field_ca
+	return 13 + a(va) + pc2 * pc3 + ca 
 }
 vc = c(1, 2, 3) + 13
+
+d = fn(pc1, pc2, pc3) {
+	// not modify global.ca
+	ca := 55
+	// call a (va) []
+	return 13 + a(va) + pc2 * pc3 + ca
+}
+vd = d(1, 2, 3) + 13
 		`
 		ir := []string{
 			`
 yak-main
 entry0:
-	t0 = alloc
-	*t0 = 33
-	t2 = Closure yak-main$1 [t0]
-	t3 = call t2 (1)
-	*t0 = 44
-	t5 = call t2 (1)
-	t6 = alloc
-	*t6 = t2
-	t8 = alloc
-	*t8 = t5
-	t10 = Closure yak-main$2 [t6, t8]
-	t11 = call t10 (1, 2, 3)
-	t12 = t11 add 13
+        t0 = call yak-main$1 (1) [11]
+        t1 = call yak-main$1 (2) [11]
+        t2 = call yak-main$1 (3) [22]
+        t3 = 22 add t2
+        If [t2] true -> if.true2, false -> if.false3
+if.done1: <- if.true2 if.false3 
+        t6 = phi [12, if.true2] [13, if.false3] 
+        jump -> b4
+if.true2: <- entry0 
+        jump -> if.done1
+if.false3: <- entry0 
+        jump -> if.done1
+b4: <- if.done1
+        t9 = t6 add t2
+        t10 = yak-main-symbol field[cadd]
+        t11 = call yak-main$2 () [t10]
+        t12 = t10 add 1
+        t13 = yak-main-symbol field[ca]
+        t14 = call yak-main$3 (1, 2, 3) [t13, yak-main$1, 11]
+        t15 = t14 add 13
+        t16 = call yak-main$4 (1, 2, 3) [yak-main$1, 11]
+        t17 = t16 add 13
 			`,
 			`
-yak-main$1 pa
+yak-main$1 arg1
+parent: yak-main
+freeValue: ca
+entry0:
+        t0 = 1 gt 2
+        If [t0] true -> if.true2, false -> if.false3
+if.done1: <- if.true2 if.false3
+        t3 = phi [t4, if.true2] [t6, if.false3]
+        jump -> b4
+if.true2: <- entry0
+        t4 = arg1 add 2
+        jump -> if.done1
+if.false3: <- entry0
+        t6 = ca add 2
+        jump -> if.done1
+b4: <- if.done1
+        t8 = t3 add 1
+			`,
+			`
+yak-main$2
 parent: yak-main
 freeValue: t0
 entry0:
-	t1 = pa mul 11
-	t2 = *t0
-	t3 = t1 add t2
-	ret t3
-
+        t1 = t0 add 1
+        update [t0] = t1
 			`,
 			`
-yak-main$2 pc1, pc2, pc3
+yak-main$3 pc1, pc2, pc3
 parent: yak-main
-freeValue: t0, t1
+freeValue: t0, a, va
 entry0:
-	t2 = *t0
-	t3 = *t1
-	t4 = call t2 (t3)
-	t5 = 13 add t4
-	t6 = pc2 mul pc3
-	t7 = t5 add t6
-	ret t7
+        update [t0] = 55
+        t2 = call a (va) []
+        t3 = 13 add t2
+        t4 = pc2 mul pc3
+        t5 = t3 add t4
+        t6 = t5 add t0
+        ret t6
+			`,
+			`
+yak-main$4 pc1, pc2, pc3
+parent: yak-main
+freeValue: a, va
+entry0:
+        t0 = call a (va) []
+        t1 = 13 add t0
+        t2 = pc2 mul pc3
+        t3 = t1 add t2
+        t4 = t3 add 55
+        ret t4
 			`,
 		}
 
@@ -599,36 +680,87 @@ entry0:
 	t.Run("closure_factor", func(t *testing.T) {
 		code := `
 set = (a)=>{
+	// freevalue a
 	return () => {
 		return a
 	}
 }
+c = 12
+
+// freevalue c
+set2  = (a) =>{
+	// freevalue a,c
+	return () => {
+		return a + c
+	}
+}
+// call set (1) []
 f0 = set(1)
-f1 = set(2)
+// call set2 (2) [12(c)]
+f1 = set2(2)
+// call f0 () []
+// call f1 () [12(c)]
+fret = f0() + f1()
+
+c = 13
+// call f1 () [13(c)]
+f1()
+
+// freevalue: f1
+call = (b) => {
+	// call f1 () [] // 这里是捕获的,可能会改变，没办法分析
+	return b + f1()
+}
+// call call() [f1(f1)]
+call()
 		`
 		ir := []string{
 			`
 yak-main
 entry0:
-	t0 = Closure yak-main$1 []
-	t1 = call t0 (1)
-	t2 = call t0 (2)
+        t0 = call yak-main$1 (1) []
+        t1 = call yak-main$3 (2) [12]
+        t2 = call t0 () []
+        t3 = call t1 () [12]
+        t4 = t2 add t3
+        t5 = call t1 () [13]
+        t6 = call yak-main$5 () [t1]
 `,
 			`
 yak-main$1 a
 parent: yak-main
 entry0:
-	t0 = alloc
-	*t0 = a
-	t2 = Closure yak-main$1$2 [t0]
-	ret t2
+        ret yak-main$1$2
 `,
 			`
 yak-main$1$2
 parent: yak-main$1
-freeValue: t0
+freeValue: a
 entry0:
-	t1 = *t0
+        ret a
+`,
+			`
+yak-main$3 a
+parent: yak-main
+freeValue: c
+entry0:
+        ret yak-main$3$4
+`,
+			`
+yak-main$3$4
+parent: yak-main$3
+freeValue: a, c
+entry0:
+        t0 = a add c
+        ret t0
+`,
+			`
+yak-main$5 b
+parent: yak-main
+freeValue: f1
+entry0:
+        t0 = call f1 () [] 
+        t1 = b add t0
 	ret t1
 `,
 		}
@@ -638,52 +770,4 @@ entry0:
 		CompareYakFunc(t, prog, ir)
 	})
 
-	t.Run("clousure_param_freevalue", func(t *testing.T) {
-		code := `
-ca = 22
-a = (arg1) =>{
-	b = 1
-	if 1 > 2{
-		b = arg1 + 2
-	}else {
-		b = ca + 2
-	}
-	c = b + 1
-}
-		`
-		ir := []string{
-			`
-yak-main
-entry0:
-	t0 = alloc
-	*t0 = 22
-	t2 = Closure yak-main$1 [t0]
-			`,
-			`
-yak-main$1 arg1
-parent: yak-main
-freeValue: t0
-entry0:
-	t1 = 1 gt 2
-	If [t1] true -> if.true2, false -> if.false3
-if.done1: <- if.true2 if.false3
-	t4 = phi [t5, if.true2] [t8, if.false3]
-	jump -> b4
-if.true2: <- entry0
-	t5 = arg1 add 2
-	jump -> if.done1
-if.false3: <- entry0
-	t7 = *t0
-	t8 = t7 add 2
-	jump -> if.done1
-b4: <- if.done1
-	t10 = t4 add 1
-			`,
-		}
-
-		prog := parseSSA(code)
-		CheckProgram(t, prog)
-		// showProg(prog)
-		CompareYakFunc(t, prog, ir)
-	})
 }
