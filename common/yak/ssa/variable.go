@@ -1,5 +1,9 @@
 package ssa
 
+import (
+	"fmt"
+)
+
 // --------------- for assign
 type LeftValue interface {
 	Assign(Value, *Function)
@@ -22,8 +26,17 @@ func (i *IdentifierLV) GetValue(f *Function) Value {
 
 var _ LeftValue = (*IdentifierLV)(nil)
 
+// --------------- point variable to value `f.symbol[variable]value`
+// --------------- it's memory address, not SSA value
+func (field *Field) Assign(v Value, f *Function) {
+	f.emitUpdate(field, v)
+}
 
+func (f *Field) GetValue(_ *Function) Value {
+	return f
+}
 
+var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` hanlder, read && write
 func (f *Function) writeVariable(variable string, value Value) {
