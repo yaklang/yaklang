@@ -507,8 +507,8 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 
 func (f *Function) buildReturn(stmt *yak.ReturnStmtContext) {
 	if list, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
-		value := f.buildExpressionList(list)
-		f.emitReturn(value)
+		values := f.buildExpressionList(list)
+		f.emitReturn(values)
 	} else {
 		f.emitReturn(nil)
 	}
