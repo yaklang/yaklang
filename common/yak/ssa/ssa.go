@@ -227,6 +227,10 @@ type Call struct {
 	// call is a value
 	user []User
 
+	binding []Value
+
+	// caller
+	caller Value
 	// ~ drop error
 	isDropError bool
 }
@@ -351,6 +355,8 @@ func (f *Function) String() string {
 			op = v.String()
 		case *Parameter:
 			op = v.String()
+		case *Function:
+			op = v.name
 		default:
 			panic("instruction unknow value type: " + v.String())
 		}
@@ -507,11 +513,17 @@ func (c *Call) String() string {
 
 func (c *Call) StringByFunc(getStr func(Value) string) string {
 	return fmt.Sprintf(
-		"%s = call %s (%s)",
+		"%s = call %s (%s) [%s]",
 		getStr(c),
 		getStr(c.Method),
 		strings.Join(
 			lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
+			", ",
+		),
+		strings.Join(
+			lo.Map(c.binding, func(v Value, _ int) string {
+				return getStr(v)
+			}),
 			", ",
 		),
 	)
