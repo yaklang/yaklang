@@ -77,7 +77,9 @@ func (this *Stack) GetAll(callback func(any)) {
 // dont pop the top item of the stack.
 func (this *Stack) CreateShadowStack() func() {
 	top := this.top
+	length := this.length
 	return func() {
 		this.top = top
+		this.length = length
 	}
 }
