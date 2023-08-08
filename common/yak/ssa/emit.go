@@ -1,6 +1,11 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+import (
+	"fmt"
+	"go/types"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+)
 
 func (f *Function) emit(i Instruction) {
 	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
@@ -193,6 +198,51 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	return c
 }
 
+func (f *Function) emitInterface(parentI *Interface, typ types.Type, low, high, max, Len, Cap Value) *Interface {
+	var ITyp InterfaceType
+
+	switch typ.(type) {
+	case *types.Slice:
+		ITyp = InterfaceSlice
+	case *types.Map:
+		ITyp = InterfaceMap
+	case *types.Struct:
+		ITyp = InterfaceStruct
+	default:
+		panic("emit interface unknow type")
+	}
+	i := &Interface{
+		anInstruction: anInstruction{
+			Func:  f,
+			Block: f.currentBlock,
+			typ:   typ,
+		},
+		parentI: parentI,
+		ITyp:    ITyp,
+		low:     low,
+		high:    high,
+		max:     max,
+		field:   make(map[Value]*Field, 0),
+		Len:     Len,
+		Cap:     Cap,
+		users:   make([]User, 0),
+	}
+
+	f.emit(i)
+	fixupUseChain(i)
+	return i
+}
+
+func (f *Function) emitInterfaceBuild(typ types.Type, Len, Cap Value) *Interface {
+	return f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
+}
+func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
+	return f.emitInterface(i, i.typ, low, high, max, nil, nil)
+}
+
+func (f *Function) emitField(i *Interface, key Value) *Field {
+	return f.getFieldWithCreate(i, key, true)
+}
 
 func (f *Function) emitUpdate(address User, v Value) *Update {
 	//use-value-chain: address -> update -> value

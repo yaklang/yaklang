@@ -106,7 +106,7 @@ type TestPackage struct {
 	funs map[string]string
 }
 
-func CompareIR(t *testing.T, got, want string) {
+func CompareIR(t *testing.T, got, want, fun string) {
 	gotLines := strings.Split(got, "\n")
 	wantLines := strings.Split(want, "\n")
 	var cleanGot, cleanWant []string
@@ -129,11 +129,11 @@ func CompareIR(t *testing.T, got, want string) {
 		}
 	}
 	if len(cleanGot) != len(cleanWant) {
-		t.Fatalf("IR comparison error: got %d lines, want %d lines", len(cleanGot), len(cleanWant))
+		t.Fatalf("IR comparison func [%s] error: got %d lines, want %d lines", fun, len(cleanGot), len(cleanWant))
 	}
 	for i := range cleanGot {
 		if cleanGot[i] != cleanWant[i] {
-			t.Fatalf("IR comparison error: line %d\ngot:\n%s\nwant:\n%s", i+1, cleanGot[i], cleanWant[i])
+			t.Fatalf("IR comparison func [%s] error: line %d\ngot:\n%s\nwant:\n%s", fun, i+1, cleanGot[i], cleanWant[i])
 		}
 	}
 }
@@ -155,7 +155,7 @@ func Compare(t *testing.T, prog *Program, want *TestProgram) {
 				t.Fatalf("con't get this function in want: %s", f.name)
 			}
 			got := f.String()
-			CompareIR(t, got, want)
+			CompareIR(t, got, want, f.name)
 		}
 	}
 
@@ -199,7 +199,7 @@ func CompareYakFunc(t *testing.T, prog *Program, ir []string) {
 
 }
 
-func TestAssignInBasicBlock(t *testing.T) {
+func TestBasicBlock(t *testing.T) {
 	t.Run("Assign_InChained_OnBlock", func(t *testing.T) {
 		src := `
 a = 42 
@@ -221,6 +221,27 @@ entry0:
 		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
+
+	t.Run("Assign_Make_Slice", func(t *testing.T) {
+		src := `
+a1 = [1, 2, 3]
+a2 = [1, "2"]
+
+b1 = make([]int, 1)
+b2 = make([]int, 0)
+
+b1[1] = 1 
+b2 = b1[1]
+b  = b1[1] + 2
+c  = b2 + 2
+b1[1] += 1
+		`
+		prog := parseSSA(src)
+		CheckProgram(t, prog)
+		showProg(prog)
+		// CompareYakMain(t, prog, ir)
+	})
+
 }
 
 func TestIfStmt(t *testing.T) {
@@ -385,7 +406,6 @@ b12: <- if.done1
 	})
 }
 
-// TODO: add loop test for function: `readVariableRecursive`
 func TestLoop(t *testing.T) {
 
 	t.Run("looptest_normal", func(t *testing.T) {
@@ -592,7 +612,7 @@ vd = d(1, 2, 3) + 13
 		`
 		ir := []string{
 			`
-yak-main
+yak-main 
 entry0:
         t0 = call yak-main$1 (1) [11]
         t1 = call yak-main$1 (2) [11]
@@ -716,7 +736,7 @@ call()
 		`
 		ir := []string{
 			`
-yak-main
+yak-main 
 entry0:
         t0 = call yak-main$1 (1) []
         t1 = call yak-main$3 (2) [12]
@@ -761,7 +781,7 @@ freeValue: f1
 entry0:
         t0 = call f1 () [] 
         t1 = b add t0
-	ret t1
+        ret t1
 `,
 		}
 		prog := parseSSA(code)
