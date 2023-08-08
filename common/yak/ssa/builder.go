@@ -206,7 +206,10 @@ func (f *Function) buildExpressionList(stmt *yak.ExpressionListContext) []Value 
 func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
 		if v := f.readVariable(s.GetText()); v != nil {
-			switch v.(type) {
+			// when v exist
+			switch v := v.(type) {
+			case *Field:
+				return v
 			case *Parameter:
 			default:
 			}
