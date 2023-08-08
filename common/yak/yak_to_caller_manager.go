@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +31,6 @@ type YakFunctionCaller struct {
 
 func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	var fTable = map[string]*YakFunctionCaller{}
-
 	engine := NewScriptEngine(100)
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
@@ -689,6 +689,13 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	}()
 
 	var engine *antlr4yak.Engine
+
+	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
+		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
+			v.(func(...any))(id)
+			return nil
+		}
+	}
 	cTable, err := FetchFunctionFromSourceCode(ctx, &YakitPluginContext{
 		RuntimeId: y.runtimeId,
 		Proxy:     y.proxy,
@@ -712,7 +719,30 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	if err != nil {
 		return utils.Errorf(err.Error())
 	}
-
+	// 对于nasl插件还需要提取加载函数
+	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
+		f := func(name string) {
+			if strings.HasPrefix(name, "__NaslScript__") {
+				name = name[len("__NaslScript__"):]
+			} else {
+				log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, "nasl script name must start with __NaslScript__")
+				return
+			}
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, err)
+					fmt.Println()
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			engine.CallYakFunction(ctx, HOOK_LoadNaslScriptByNameFunc, []any{name})
+			if err != nil {
+				log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+			}
+		}
+		f(id)
+		y.table.Store(HOOK_LoadNaslScriptByNameFunc, f)
+	}
 	if y.table == nil {
 		y.table = new(sync.Map)
 	}
