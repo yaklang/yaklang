@@ -70,27 +70,6 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 	return f.readVariableRecursive(variable, block)
 }
 
-func (f *Function) readVariableInParamAndFV(variable string) Value {
-	// in enter block
-	if para, ok := f.Param[variable]; ok {
-		return para
-	}
-	if parent := f.parent; parent != nil {
-		if v := parent.readVariable(variable); v != nil {
-			freevalue := &Parameter{
-				variable:    variable,
-				Func:        f,
-				isFreevalue: true,
-				user:        []User{},
-			}
-			return freevalue
-			// } else {
-			// 	fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.name, parent.name)
-		}
-	}
-	return nil
-}
-
 func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Value {
 	var v Value
 	// if block in sealedBlock
@@ -100,7 +79,6 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 		v = phi
 	} else if len(block.Preds) == 0 {
 		// this is enter block  in this function
-		v = f.readVariableInParamAndFV(variable)
 	} else if len(block.Preds) == 1 {
 		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
