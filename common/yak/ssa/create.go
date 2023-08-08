@@ -59,8 +59,16 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		},
 		currentBlock: nil,
 		currentDef:   make(map[string]map[*BasicBlock]Value),
+		symbol: &Interface{
+			anInstruction: anInstruction{},
+			ITyp:          InterfaceGlobal,
+			// I:     parent.symbol,
+			field: make(map[Value]*Field),
+			users: []User{},
+		},
 	}
 	p.funcs = append(p.funcs, f)
+	f.symbol.Func = f
 	if parent != nil {
 		parent.AddAnonymous(f)
 	}
