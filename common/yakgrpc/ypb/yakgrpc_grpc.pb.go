@@ -110,6 +110,7 @@ type YakClient interface {
 	HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnalysisMaterial, opts ...grpc.CallOption) (*HTTPRequestAnalysis, error)
 	// 编码解码
 	Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error)
+	PacketPrettifyHelper(ctx context.Context, in *PacketPrettifyHelperRequest, opts ...grpc.CallOption) (*PacketPrettifyHelperResponse, error)
 	// Payload 相关接口
 	QueryPayload(ctx context.Context, in *QueryPayloadRequest, opts ...grpc.CallOption) (*QueryPayloadResponse, error)
 	DeletePayloadByGroup(ctx context.Context, in *DeletePayloadByGroupRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -1363,6 +1364,15 @@ func (c *yakClient) HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnal
 func (c *yakClient) Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error) {
 	out := new(CodecResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/Codec", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) PacketPrettifyHelper(ctx context.Context, in *PacketPrettifyHelperRequest, opts ...grpc.CallOption) (*PacketPrettifyHelperResponse, error) {
+	out := new(PacketPrettifyHelperResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/PacketPrettifyHelper", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3826,6 +3836,7 @@ type YakServer interface {
 	HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error)
 	// 编码解码
 	Codec(context.Context, *CodecRequest) (*CodecResponse, error)
+	PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error)
 	// Payload 相关接口
 	QueryPayload(context.Context, *QueryPayloadRequest) (*QueryPayloadResponse, error)
 	DeletePayloadByGroup(context.Context, *DeletePayloadByGroupRequest) (*Empty, error)
@@ -4307,6 +4318,9 @@ func (UnimplementedYakServer) HTTPRequestAnalyzer(context.Context, *HTTPRequestA
 }
 func (UnimplementedYakServer) Codec(context.Context, *CodecRequest) (*CodecResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Codec not implemented")
+}
+func (UnimplementedYakServer) PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PacketPrettifyHelper not implemented")
 }
 func (UnimplementedYakServer) QueryPayload(context.Context, *QueryPayloadRequest) (*QueryPayloadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPayload not implemented")
@@ -6320,6 +6334,24 @@ func _Yak_Codec_Handler(srv interface{}, ctx context.Context, dec func(interface
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).Codec(ctx, req.(*CodecRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_PacketPrettifyHelper_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PacketPrettifyHelperRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).PacketPrettifyHelper(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/PacketPrettifyHelper",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).PacketPrettifyHelper(ctx, req.(*PacketPrettifyHelperRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -10110,6 +10142,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Codec",
 			Handler:    _Yak_Codec_Handler,
+		},
+		{
+			MethodName: "PacketPrettifyHelper",
+			Handler:    _Yak_PacketPrettifyHelper_Handler,
 		},
 		{
 			MethodName: "QueryPayload",

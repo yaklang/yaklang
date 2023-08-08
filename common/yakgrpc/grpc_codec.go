@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -32,6 +33,37 @@ func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*y
 		}
 	}).([]*ypb.AutoDecodeResult)
 	return &ypb.AutoDecodeResponse{Results: results}, nil
+}
+
+func (s *Server) PacketPrettifyHelper(ctx context.Context, req *ypb.PacketPrettifyHelperRequest) (*ypb.PacketPrettifyHelperResponse, error) {
+	ret := req.GetPacket()
+	if len(ret) <= 0 {
+		return nil, utils.Error("empty packet")
+	}
+
+	if req.GetSetReplaceBody() {
+		ret = lowhttp.ReplaceHTTPPacketBody(ret, []byte(req.GetBody()), false)
+	}
+
+	header, body := lowhttp.SplitHTTPPacketFast(ret)
+	var (
+		isImage   bool
+		imgHeader string // `data:image/gif;base64,...`
+	)
+	ty, _ := filetype.Match(body)
+	if t := ty.MIME.Value; strings.HasPrefix(ty.MIME.Value, "image/") {
+		isImage = true
+		imgHeader = `<img src=` + strconv.Quote(fmt.Sprintf("data:%s;base64,%s", t, codec.EncodeBase64(body))) + " />"
+	}
+
+	contentType := lowhttp.GetHTTPPacketContentType([]byte(header))
+	return &ypb.PacketPrettifyHelperResponse{
+		Packet:       ret,
+		ContentType:  utils.EscapeInvalidUTF8Byte([]byte(contentType)),
+		IsImage:      isImage,
+		ImageHtmlTag: []byte(imgHeader),
+		Body:         body,
+	}, nil
 }
 
 func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecResponse, error) {
