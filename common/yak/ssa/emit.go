@@ -115,3 +115,19 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	return c
 }
 
+
+func (f *Function) emitUpdate(address User, v Value) *Update {
+	//use-value-chain: address -> update -> value
+	s := &Update{
+		anInstruction: anInstruction{
+			Func:  f,
+			Block: f.currentBlock,
+			typ:   nil,
+		},
+		value:   v,
+		address: address,
+	}
+	f.emit(s)
+	fixupUseChain(s)
+	return s
+}
