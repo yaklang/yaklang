@@ -2,11 +2,23 @@ package ssa
 
 import (
 	"fmt"
+	"go/types"
 	"strconv"
+	"strings"
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
+
+var (
+	basicTypes = make(map[string]*types.Basic)
+)
+
+func init() {
+	for _, basic := range types.Typ {
+		basicTypes[basic.Name()] = basic
+	}
+}
 
 func (f *Function) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
@@ -104,8 +116,125 @@ func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 		// param[len(ids)-1]
 	}
 }
+func (f *Function) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) types.Type {
+	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
+		if eleTyp := f.buildTypeLiteral(s); eleTyp != nil {
+			return types.NewSlice(eleTyp)
+		}
+	}
+	return nil
+}
+func (f *Function) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) types.Type {
+	// key
+	var keyTyp types.Type
+	var valueTyp types.Type
+	if s, ok := stmt.TypeLiteral(0).(*yak.TypeLiteralContext); ok {
+		keyTyp = f.buildTypeLiteral(s)
+	}
 
-func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
+	// value
+	if s, ok := stmt.TypeLiteral(1).(*yak.TypeLiteralContext); ok {
+		valueTyp = f.buildTypeLiteral(s)
+	}
+	if keyTyp != nil && valueTyp != nil {
+		return types.NewMap(keyTyp, valueTyp)
+	}
+
+	return nil
+}
+
+func (f *Function) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
+	text := stmt.GetText()
+	if b, ok := basicTypes[text]; ok {
+		return b
+	}
+
+	if s, ok := stmt.SliceTypeLiteral().(*yak.SliceTypeLiteralContext); ok {
+		return f.buildSliceTypeLiteral(s)
+	}
+
+	if strings.HasPrefix(text, "map") {
+		if s, ok := stmt.MapTypeLiteral().(*yak.MapTypeLiteralContext); ok {
+			return f.buildMapTypeLiteral(s)
+		}
+	}
+
+	if strings.HasPrefix(text, "chan") {
+		if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
+			if typ := f.buildTypeLiteral(s); typ != nil {
+				return types.NewChan(types.SendRecv, typ)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (f *Function) buildExpressionListMultiline(stmt *yak.ExpressionListMultilineContext) []Value {
+	allexpr := stmt.AllExpression()
+	exprs := make([]Value, 0, len(allexpr))
+	for _, expr := range allexpr {
+		if expr, ok := expr.(*yak.ExpressionContext); ok {
+			exprs = append(exprs, f.buildExpression(expr))
+		}
+	}
+	return exprs
+}
+
+func (f *Function) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
+	var typ types.Type
+	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
+		typ = f.buildTypeLiteral(s)
+	}
+	if typ == nil {
+		panic("")
+	}
+
+	var exprs []Value
+	if s, ok := stmt.ExpressionListMultiline().(*yak.ExpressionListMultilineContext); ok {
+		exprs = f.buildExpressionListMultiline(s)
+	}
+	zero := NewConst(int64(0))
+	switch typ.(type) {
+	case *types.Slice:
+		// fmt.Printf("debug %s %v %d\n", "make slice", typ, num)
+		if len(exprs) == 0 {
+			return f.emitInterfaceBuild(typ, zero, zero)
+		} else if len(exprs) == 1 {
+			return f.emitInterfaceBuild(typ, exprs[0], exprs[0])
+		} else if len(exprs) == 2 {
+			return f.emitInterfaceBuild(typ, exprs[0], exprs[1])
+		} else {
+			panic("make slice expression error!")
+		}
+	case *types.Map:
+		fmt.Printf("debug %v\n", "make map")
+	case *types.Chan:
+		fmt.Printf("debug %v\n", "make chan")
+	default:
+		panic("make unknow type")
+	}
+	return nil
+}
+
+func (f *Function) buildSliceCall(stmt *yak.SliceCallContext) []Value {
+	exprs := stmt.AllExpression()
+	values := make([]Value, len(exprs))
+	if len(exprs) == 0 {
+		panic("slicecall expression is zero")
+	}
+	if len(exprs) > 3 {
+		panic("slicecall expression too much")
+	}
+	for i, expr := range exprs {
+		if s, ok := expr.(*yak.ExpressionContext); ok {
+			values[i] = f.buildExpression(s)
+		}
+	}
+	return values
+}
+
+func (f *Function) buildExpression(stmt *yak.ExpressionContext) Value {
 	if op := stmt.AdditiveBinaryOperator(); op != nil {
 		op0 := f.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
 		op1 := f.buildExpression(stmt.Expression(1).(*yak.ExpressionContext))
@@ -147,9 +276,9 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 		} else if f.CanBuildFreeValue(text) {
 			return f.BuildFreeValue(text)
 		}
-			fmt.Printf("debug undefine value: %v\n", s.GetText())
-			panic("undefine value")
-		}
+		fmt.Printf("debug undefine value: %v\n", s.GetText())
+		panic("undefine value")
+	}
 
 	if op := stmt.ComparisonBinaryOperator(); op != nil {
 		op0 := f.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
@@ -170,7 +299,32 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 			opcode = yakvm.OpEq
 		}
 		return f.emitArith(opcode, op0, op1)
+	}
 
+	if s, ok := stmt.MakeExpression().(*yak.MakeExpressionContext); ok {
+		return f.buildMakeExpression(s)
+	}
+
+	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
+		var expr *Interface
+		if s, ok := stmt.Expression(0).(*yak.ExpressionContext); ok {
+			if v, ok := f.buildExpression(s).(*Interface); ok {
+				expr = v
+			}
+		}
+		if expr == nil {
+			panic("expression slice need expression")
+		}
+		keys := f.buildSliceCall(s)
+		if len(keys) == 1 {
+			return f.emitField(expr, keys[0])
+		} else if len(keys) == 2 {
+			return f.emitInterfaceSlice(expr, keys[0], keys[1], nil)
+		} else if len(keys) == 3 {
+			return f.emitInterfaceSlice(expr, keys[0], keys[1], keys[2])
+		} else {
+			panic("")
+		}
 	}
 
 	if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
@@ -204,6 +358,13 @@ func (f *Function) buildExpressionList(stmt *yak.ExpressionListContext) []Value 
 	return values
 }
 
+func (f *Function) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) Value {
+	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		return f.buildExpression(s)
+	}
+	return nil
+}
+
 func (f *Function) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
 		if v := f.readVariable(s.GetText()); v != nil {
@@ -224,6 +385,23 @@ func (f *Function) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressio
 		return &IdentifierLV{
 			variable: s.GetText(),
 		}
+	}
+	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		expr := f.buildExpression(s)
+		if expr == nil {
+			panic("leftexpression expression is nil")
+		}
+
+		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
+			index := f.buildLeftSliceCall(s)
+			if expr, ok := expr.(*Interface); ok {
+				return f.emitField(expr, index)
+			} else {
+				panic("leftexprssion exprssion is not interface")
+			}
+		}
+
+		// leftMemberCall
 	}
 	return nil
 }
