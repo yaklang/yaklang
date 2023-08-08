@@ -204,7 +204,7 @@ func (f *Function) buildExpressionList(stmt *yak.ExpressionListContext) []Value 
 	return values
 }
 
-func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValue {
+func (f *Function) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
 		if v := f.readVariable(s.GetText()); v != nil {
 			// when v exist
@@ -214,6 +214,12 @@ func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValu
 			case *Parameter:
 			default:
 			}
+		} else if !forceAssign && f.CanBuildFreeValue(s.GetText()) {
+			field := f.parent.newField(s.GetText())
+			f.FreeValues = append(f.FreeValues, field)
+			f.parent.writeVariable(s.GetText(), field)
+			f.writeVariable(s.GetText(), field)
+			return field
 		}
 		return &IdentifierLV{
 			variable: s.GetText(),
@@ -221,13 +227,13 @@ func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValu
 	}
 	return nil
 }
-func (f *Function) buildLeftExpressionList(stmt *yak.LeftExpressionListContext) []LeftValue {
+func (f *Function) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []LeftValue {
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
 	values := make([]LeftValue, valueLen)
 	for i, e := range exprs {
 		if e, ok := e.(*yak.LeftExpressionContext); ok {
-			values[i] = f.buildLeftExpression(e)
+			values[i] = f.buildLeftExpression(forceAssign, e)
 		}
 	}
 	return values
@@ -253,7 +259,7 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 		// left
 		var lvalues []LeftValue
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			lvalues = f.buildLeftExpressionList(li)
+			lvalues = f.buildLeftExpressionList(op2 != nil, li)
 		}
 
 		// assign
@@ -265,18 +271,18 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 	}
 
 	if stmt.PlusPlus() != nil { // ++
-		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
+		lvalue := f.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		rvalue := f.emitArith(yakvm.OpAdd, lvalue.GetValue(f), NewConst(int64(1)))
 		lvalue.Assign(rvalue, f)
 	} else if stmt.SubSub() != nil { // --
-		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
+		lvalue := f.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		rvalue := f.emitArith(yakvm.OpSub, lvalue.GetValue(f), NewConst(int64(1)))
 		lvalue.Assign(rvalue, f)
 	}
 
 	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
 		rvalue := f.buildExpression(stmt.Expression().(*yak.ExpressionContext))
-		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
+		lvalue := f.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		var opcode yakvm.OpcodeFlag
 		switch op.GetText() {
 		case "+=":
