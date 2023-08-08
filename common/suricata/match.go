@@ -11,6 +11,18 @@ import (
 func (r *Rule) Match(flow []byte) bool {
 	pk := gopacket.NewPacket(flow, layers.LayerTypeEthernet, gopacket.NoCopy)
 	matcher := newMatchCtx(pk, r, matchMutex)
+	// prefilter
+	if r.ContentRuleConfig != nil && r.ContentRuleConfig.PrefilterRule != nil {
+		switch r.Protocol {
+		case HTTP:
+			matcher.Insert(httpHandler)
+		case DNS:
+			matcher.Insert(dnsMatcher)
+		default:
+			log.Errorf("prefilter not support protocol: %s", r.Protocol)
+		}
+	}
+	// match
 	err := matcher.Next()
 	if err != nil {
 		log.Errorf("match flow failed: %s", err.Error())
@@ -104,7 +116,7 @@ func matchMutex(c *matchContext) error {
 	case DNS:
 		c.Attach(ipMatcher, portMatcher, dnsMatcher)
 	case HTTP:
-		c.Attach(ipMatcher, portMatcher, httpMatcher)
+		c.Attach(ipMatcher, portMatcher, httpHandler)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
 	}

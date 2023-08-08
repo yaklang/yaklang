@@ -148,6 +148,10 @@ type ContentRuleConfig struct {
 
 	/* Payload Match */
 	ContentRules []*ContentRule
+
+	// PrefilterRule is a contentRuleConfig with no more than single config.
+	// not implement yet
+	PrefilterRule *ContentRuleConfig
 }
 
 type FlowRule struct {

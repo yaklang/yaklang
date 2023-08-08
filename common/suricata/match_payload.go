@@ -163,12 +163,10 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 }
 
 // untested
-func newFileDataMatcher[T *http.Request | *http.Response](r *ContentRule, data T) func(c *matchContext) error {
+func newFileDataMatcher(r *ContentRule, data any) func(c *matchContext) error {
 	return func(c *matchContext) error {
 		// 10 MB
-		var data any = data
 		var files []io.Reader
-
 		switch data := data.(type) {
 		case *http.Request:
 			err := data.ParseMultipartForm(10 << 20)
@@ -181,7 +179,6 @@ func newFileDataMatcher[T *http.Request | *http.Response](r *ContentRule, data T
 					if err != nil {
 						continue
 					}
-					defer file.Close()
 					files = append(files, file)
 				}
 			}
@@ -195,6 +192,12 @@ func newFileDataMatcher[T *http.Request | *http.Response](r *ContentRule, data T
 				return nil
 			}
 			files = append(files, data.Body)
+		case nil:
+			c.Reject()
+			return nil
+		default:
+			c.Reject()
+			return errors.New("unknown type for filedata matcher")
 		}
 
 		for _, f := range files {
