@@ -98,3 +98,45 @@ func (b *BasicBlock) Sealed() {
 	}
 	b.isSealed = true
 }
+
+// --------------- `f.freevalue`
+
+func (f *Function) BuildFreeValue(variable string) Value {
+	// for parent := f.parent; parent != nil; parent = parent.parent {
+	var build func(*Function) Value
+	build = func(fun *Function) Value {
+		if fun == nil {
+			fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.name, fun.name)
+			return nil
+		}
+		if v := fun.readVariable(variable); v != nil {
+			return v
+		} else {
+			if v := build(fun.parent); v != nil {
+				freevalue := &Parameter{
+					variable:    variable,
+					Func:        fun,
+					user:        []User{},
+					isFreevalue: true,
+				}
+				fun.FreeValues = append(fun.FreeValues, freevalue)
+				fun.writeVariable(variable, freevalue)
+				return freevalue
+			} else {
+				return nil
+			}
+		}
+	}
+
+	return build(f)
+}
+
+func (f *Function) CanBuildFreeValue(variable string) bool {
+	for parent := f.parent; parent != nil; parent = parent.parent {
+		if v := parent.readVariable(variable); v != nil {
+			return true
+		}
+	}
+	return false
+}
+
