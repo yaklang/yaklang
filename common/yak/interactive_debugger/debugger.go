@@ -134,8 +134,8 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 					}
 				}
 				showOpcodes := make([]*yakvm.Code, 0)
-				_, startCodeIndex, _ := g.GetLineFirstCode(lineNumber)
-				for _, code := range g.Codes() {
+				_, startCodeIndex, state := g.GetLineFirstCode(lineNumber)
+				for _, code := range g.CodesInState(state) {
 					if code.StartLineNumber == lineNumber {
 						showOpcodes = append(showOpcodes, code)
 					}
