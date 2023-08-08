@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"go/constant"
+	"go/types"
 	"strings"
 	"sync"
 
@@ -137,6 +138,8 @@ type anInstruction struct {
 	Func *Function
 	// basicblock
 	Block *BasicBlock
+	// type
+	typ types.Type
 }
 
 // value
