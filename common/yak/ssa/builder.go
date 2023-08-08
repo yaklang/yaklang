@@ -63,7 +63,7 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 			}
 		} else {
 			// only this param
-			newfunc.NewParam(stmt.Identifier().GetText(), true)
+			newfunc.NewParam(stmt.Identifier().GetText())
 		}
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			// build block
@@ -94,16 +94,14 @@ func (f *Function) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCo
 func (f *Function) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
 	ids := stmt.AllIdentifier()
-	param := make(map[string]*Parameter, len(ids))
 
 	for _, id := range ids {
-		param[id.GetText()] = f.NewParam(id.GetText(), false)
+		f.NewParam(id.GetText())
 	}
 	if ellipsis != nil {
 		//TODO: handler "..." to array
 		// param[len(ids)-1]
 	}
-	f.Param = param
 }
 
 func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {

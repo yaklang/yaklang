@@ -12,15 +12,15 @@ func (f *Function) AddAnonymous(anon *Function) {
 	anon.parent = f
 }
 
-func (f *Function) NewParam(name string, add bool) *Parameter {
+func (f *Function) NewParam(name string) {
 	p := &Parameter{
 		variable: name,
 		Func:     f,
 		user:     []User{},
 	}
-	if add {
-		// f.Param = append(f.Param, p)
-		f.Param[name] = p
+	f.Param = append(f.Param, p)
+	f.writeVariable(name, p)
 	}
-	return p
-}
+
+
+
