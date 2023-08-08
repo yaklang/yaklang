@@ -140,13 +140,15 @@ func (f *Function) buildExpression(stmt *yak.ExpressionContext) (ret Value) {
 	}
 
 	if s := stmt.Identifier(); s != nil { // 解析变量
-		ret := f.readVariable(s.GetText())
-		if ret == nil {
+		text := s.GetText()
+		if ret := f.readVariable(text); ret != nil {
+			return ret
+		} else if f.CanBuildFreeValue(text) {
+			return f.BuildFreeValue(text)
+		}
 			fmt.Printf("debug undefine value: %v\n", s.GetText())
 			panic("undefine value")
 		}
-		return ret
-	}
 
 	if op := stmt.ComparisonBinaryOperator(); op != nil {
 		op0 := f.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
