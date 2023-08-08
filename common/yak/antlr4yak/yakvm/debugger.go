@@ -41,10 +41,10 @@ type Debugger struct {
 
 	// 用于步过，步入，步出
 	jmpIndex    int
+	stepOut     bool
 	nextState   *StepStack
 	stepInState *StepStack
-	stepOut     bool
-	StackTrace  *vmstack.Stack
+	StackTraces map[uint64]*vmstack.Stack
 
 	// 观察断点
 	observeBreakPointExpressions map[string]*Value
@@ -73,10 +73,11 @@ type StackTrace struct {
 }
 
 func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, callback func(*Debugger)) *Debugger {
+
 	debugger := &Debugger{
 		finished:                     false,
 		jmpIndex:                     -1,
-		StackTrace:                   vmstack.New(),
+		StackTraces:                  map[uint64]*vmstack.Stack{vm.ThreadIDCount: vmstack.New()},
 		vm:                           vm,
 		wg:                           sync.WaitGroup{},
 		initFunc:                     init,
@@ -212,6 +213,22 @@ func (g *Debugger) UpdateByFrame(frame *Frame) {
 	g.frame = frame
 }
 
+func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
+	var (
+		st *vmstack.Stack
+		ok bool
+	)
+	if st, ok = g.StackTraces[g.frame.ThreadID]; !ok {
+		st = vmstack.New()
+		g.StackTraces[g.frame.ThreadID] = st
+	}
+	return st
+}
+
+func (g *Debugger) CurrentThreadID() uint64 {
+	return g.frame.ThreadID
+}
+
 func (g *Debugger) Codes() []*Code {
 	return g.codes[g.State()]
 }
@@ -255,37 +272,40 @@ func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
 	}
 }
 
-func (g *Debugger) GetStackTrace() []StackTrace {
-	recoverStack := g.StackTrace.CreateShadowStack()
+func (g *Debugger) GetStackTraces() [][]StackTrace {
+	stackTrace := g.CurrentStackTrace()
+
+	recoverStack := stackTrace.CreateShadowStack()
 	defer recoverStack()
 	if g.linePointer == 0 {
 		return nil
 	}
-	g.StackTrace.Push(NewStepStackWithCodeIndex(
+	stackTrace.Push(NewStepStackWithCodeIndex(
 		g.GetCode(g.state, g.codePointer),
 		g.linePointer,
 		g.State(),
 		g.StateName(),
 	))
-
-	ret := make([]StackTrace, g.StackTrace.Len())
-	index := 0
-
-	g.StackTrace.GetAll(func(i any) {
-		if stepStack, ok := i.(*StepStack); ok {
-			if stepStack.code != nil {
-				ret[index] = StackTrace{
-					ID:        index,
-					Name:      stepStack.stateName,
-					Line:      stepStack.code.StartLineNumber,
-					Column:    stepStack.code.StartColumnNumber,
-					EndLine:   stepStack.code.EndLineNumber,
-					EndColumn: stepStack.code.EndColumnNumber,
+	ret := make([][]StackTrace, len(g.StackTraces))
+	for index, stack := range g.StackTraces {
+		ret[index] = make([]StackTrace, stack.Len())
+		id := 0
+		stack.GetAll(func(i any) {
+			if stepStack, ok := i.(*StepStack); ok {
+				if stepStack.code != nil {
+					ret[index][id] = StackTrace{
+						ID:        id,
+						Name:      stepStack.stateName,
+						Line:      stepStack.code.StartLineNumber,
+						Column:    stepStack.code.StartColumnNumber,
+						EndLine:   stepStack.code.EndLineNumber,
+						EndColumn: stepStack.code.EndColumnNumber,
+					}
+					id++
 				}
 			}
-		}
-		index++
-	})
+		})
+	}
 
 	return ret
 }
@@ -417,7 +437,8 @@ func (g *Debugger) StepIn() error {
 }
 
 func (g *Debugger) StepOut() error {
-	if g.StackTrace.Len() > 0 {
+	stackTrace := g.CurrentStackTrace()
+	if stackTrace != nil && stackTrace.Len() > 0 {
 		g.stepOut = true
 		return nil
 	} else {
@@ -456,13 +477,27 @@ func (g *Debugger) BreakPointCallback(frame *Frame) {
 		// 如果同步调用yak函数，则push stepIn栈
 		if code.Opcode == OpCall {
 			v := frame.peekN(code.Unary)
-			if v != nil && v.IsYakFunction() {
-				g.StackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName))
+			if v != nil && v.Callable() {
+				stackTrace := g.CurrentStackTrace()
+				if stackTrace != nil {
+					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName))
+				}
 			}
 		}
 	}()
 
-	// 如果stepNext, stepIn, stepOut, 则一直运行直到触发回调
+	defer func() {
+		if r := recover(); r != nil {
+			if rerr, ok := r.(error); ok {
+				g.description = fmt.Sprintf("Runtime error: %v", rerr)
+			} else {
+				g.description = fmt.Sprintf("Runtime error: %v", r)
+			}
+			g.Callback()
+		}
+	}()
+
+	// 步进
 	if g.nextState != nil {
 		// 如果debugger想要步过且出现了jmp,则回调
 		if g.jmpIndex == codeIndex {
@@ -478,6 +513,7 @@ func (g *Debugger) BreakPointCallback(frame *Frame) {
 		return
 	}
 
+	// 步入
 	if g.stepInState != nil {
 		// 如果debugger想要步进且state不同，则回调
 		if g.stepInState.state != state {
@@ -490,19 +526,19 @@ func (g *Debugger) BreakPointCallback(frame *Frame) {
 		return
 	}
 
-	// pop stepIn栈
-	if g.StackTrace.Len() > 0 {
-		stepStack := g.StackTrace.Peek().(*StepStack)
-
+	// 步出
+	stackTrace := g.CurrentStackTrace()
+	if stackTrace != nil && stackTrace.Len() > 0 {
+		stepStack := stackTrace.Peek().(*StepStack)
+		// pop stepIn栈
 		if stepStack.state == state && g.codePointer > stepStack.codeIndex {
-			g.StackTrace.Pop()
+			stackTrace.Pop()
 			// 如果debugger想要步出且执行到了call后面的opcode，则应该回调
 			if g.stepOut {
 				g.HandleForStepOut()
 			}
 		}
 	}
-
 	if g.stepOut {
 		return
 	}
