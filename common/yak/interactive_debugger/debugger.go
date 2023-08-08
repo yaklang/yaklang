@@ -312,8 +312,16 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 				}
 			case "stack":
 				// get all stackTrace
-				for _, st := range g.GetStackTrace() {
-					fmt.Printf("line %d in %s\n", st.Line, st.Name)
+				for tid, st := range g.GetStackTraces() {
+					fmt.Printf("Goroutine %d\n", tid)
+					if len(st) > 0 {
+						for _, t := range st {
+							fmt.Printf("  line %d in %s\n", t.Line, t.Name)
+						}
+					} else {
+						fmt.Println("  no stack trace")
+					}
+					fmt.Println()
 				}
 			default:
 				fmt.Printf("Unknown command: %s\n", commands[0])
