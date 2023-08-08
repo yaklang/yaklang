@@ -87,7 +87,7 @@ jobs:
             run: go test -timeout 20s ./common/netx/mustpass -v
 
           - name: Test Suricata Match
-            run: go test -timeout 20s -run TestMUSTPASS_Match ./common/suricata -v
+            run: go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
 
     steps:
       - name: Check out code into the Go module directory
