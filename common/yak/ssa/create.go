@@ -44,13 +44,13 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	f := &Function{
 		name:       name,
 		Package:    p,
-		Param:      make(map[string]*Parameter),
+		Param:      make([]*Parameter, 0),
 		Blocks:     make([]*BasicBlock, 0),
 		EnterBlock: nil,
 		ExitBlock:  nil,
 		AnonFuncs:  make([]*Function, 0),
 		parent:     nil,
-		FreeValue:  make([]Value, 0),
+		FreeValues: make([]Value, 0),
 		user:       make([]User, 0),
 		target: &target{
 			tail:      nil,

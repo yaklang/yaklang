@@ -88,7 +88,7 @@ type Function struct {
 	// package
 	Package *Package
 
-	Param map[string]*Parameter
+	Param []*Parameter
 
 	// BasicBlock list
 	Blocks     []*BasicBlock
@@ -99,8 +99,8 @@ type Function struct {
 	AnonFuncs []*Function
 
 	// if this function is anonFunc
-	parent    *Function // parent function if anonymous function; nil if global function.
-	FreeValue []Value   // the value
+	parent *Function // parent function if anonymous function; nil if global function.
+	FreeValues []Value    // the value, captured variable form parent-function,
 
 	// User
 	user []User
@@ -311,9 +311,9 @@ type Update struct {
 // implement value
 func (f *Function) String() string {
 	ret := f.name + " "
-	paras := lo.MapToSlice(f.Param, func(key string, _ *Parameter) string { return key })
-	slices.Sort(paras)
-	ret += strings.Join(paras, ", ")
+	ret += strings.Join(
+		lo.Map(f.Param, func(item *Parameter, _ int) string { return item.variable }),
+		", ")
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
@@ -351,11 +351,12 @@ func (f *Function) String() string {
 		return op
 	}
 
-	if len(f.FreeValue) > 0 {
+	if len(f.FreeValues) > 0 {
 		ret += "freeValue: " + strings.Join(
-			lo.Map(f.FreeValue, func(i Value, _ int) string {
-				return getStr(i)
+			lo.Map(f.FreeValues, func(key Value, _ int) string {
+				return getStr(key)
 			}),
+			// f.FreeValue,
 			", ") + "\n"
 	}
 
