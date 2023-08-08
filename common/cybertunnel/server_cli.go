@@ -2,7 +2,6 @@ package cybertunnel
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"os"
 	"syscall"
@@ -232,11 +231,10 @@ func GetTunnelServerCommandCli() *cli.App {
 		}
 
 		if c.Bool("dnslog") {
-			domain := c.String("domain")
-			if domain == "" {
-				domain = consts.GetDefaultPublicReverseServer()
+			if c.String("domain") == "" {
+				return utils.Error("empty dnslog domain config")
 			}
-			dnslogServer, err := dnslog.NewDNSLogServer(domain, c.String("public-ip"))
+			dnslogServer, err := dnslog.NewDNSLogServer(c.String("domain"), c.String("public-ip"))
 			if err != nil {
 				return utils.Errorf("serve dns log failed: %s", err)
 			}

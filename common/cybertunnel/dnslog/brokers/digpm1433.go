@@ -21,7 +21,7 @@ func (c *digpm1433Broker) Name() string {
 var defaultDigPm1433 = &digpm1433Broker{}
 
 func init() {
-	register(defaultDigPm1433)
+	//register(defaultDigPm1433)
 }
 
 func (s *digpm1433Broker) GetResult(token string, du time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {

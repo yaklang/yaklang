@@ -21,7 +21,7 @@ func (c *digpmByPassBroker) Name() string {
 var defaultDigPMBYPASS = &digpmByPassBroker{}
 
 func init() {
-	register(defaultDigPMBYPASS)
+	//register(defaultDigPMBYPASS)
 }
 
 func (s *digpmByPassBroker) GetResult(token string, du time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {

@@ -91,13 +91,13 @@ func GetSupportDNSLogBroker(mode string) dnslogbrokers.DNSLogBroker {
 	return dnslogbrokers.GetDNSLogBroker(mode)
 }
 
-func RequireDNSLogDomainByLocal(mode string) (domain string, token string, err error) {
+func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
 	if mode == "*" {
 		mode = dnslogbrokers.Random()
 	}
 	broke, err := dnslogbrokers.Get(mode)
 	if err != nil {
-		return "", "", utils.Errorf("get dnslog broker by local failed: %v", err)
+		return "", "", "", utils.Errorf("get dnslog broker by local failed: %v", err)
 	}
 	var count = 0
 	for {
@@ -105,15 +105,15 @@ func RequireDNSLogDomainByLocal(mode string) (domain string, token string, err e
 		domain, token, err := broke.Require(30*time.Second, "http://192.168.3.113:9999")
 		if err != nil {
 			if count > 3 {
-				return "", "", utils.Errorf("require dns domain failed: %s", err)
+				return "", "", "", utils.Errorf("require dns domain failed: %s", err)
 			}
 
 			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
 				continue
 			}
-			return "", "", err
+			return "", "", "", err
 		}
-		return domain, token, nil
+		return domain, token, mode, nil
 	}
 }
 
@@ -252,14 +252,13 @@ func RequirePortByToken(
 	})
 }
 
-func RequireDNSLogDomainByRemote(addr, mode string) (domain string, token string, _ error) {
+func RequireDNSLogDomainByRemote(addr, mode string) (string, string, string, error) {
 	if addr == "" {
 		addr = consts.GetDefaultPublicReverseServer()
-		//addr = "ns1.cybertunnel.run:64333"
 	}
 	client, conn, err := GetDNSLogClient(addr)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer conn.Close()
 
@@ -269,15 +268,15 @@ func RequireDNSLogDomainByRemote(addr, mode string) (domain string, token string
 		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{Mode: mode})
 		if err != nil {
 			if count > 3 {
-				return "", "", utils.Errorf("require dns domain failed: %s", err)
+				return "", "", "", utils.Errorf("require dns domain failed: %s", err)
 			}
 
 			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
 				continue
 			}
-			return "", "", err
+			return "", "", "", err
 		}
-		return rsp.Domain, rsp.Token, nil
+		return rsp.Domain, rsp.Token, rsp.Mode, nil
 	}
 
 }

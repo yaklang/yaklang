@@ -472,7 +472,7 @@ func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token strin
 	var counter = 0
 	for {
 		counter++
-		domain, token, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
+		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
 		if err != nil {
 			select {
 			case <-ctx.Done():
@@ -492,7 +492,7 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 	var counter = 0
 	for {
 		counter++
-		domain, token, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
+		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
 		if err != nil {
 			if counter > 10 {
 				return "", "", err

@@ -183,6 +183,7 @@ func initYaklangLib() {
 	yaklang.Import("csrf", yaklib.CSRFExports)
 	yaklang.Import("risk", yaklib.RiskExports)
 	yaklang.Import("report", yakit.ReportExports)
+	yaklang.Import("dnslog", DNSLogExports)
 
 	// xpath for html
 	yaklang.Import("xpath", htmlquery.Exports)
@@ -285,6 +286,8 @@ type ScriptEngine struct {
 	debug         bool
 	debugInit     func(*yakvm.Debugger)
 	debugCallback func(*yakvm.Debugger)
+
+	Yaklib YaklibInterface
 }
 
 func (s *ScriptEngine) GetTaskByTaskID(id string) (*Task, error) {
@@ -663,4 +666,19 @@ func (s *ScriptEngine) SetCryptoKey(key []byte) error {
 	}
 	s.cryptoKey = key
 	return nil
+}
+
+type YaklibInterface interface {
+	RegisterLogHook()
+	RegisterLogConsoleHook()
+	RegisterAlertHook()
+	RegisterFailedHook()
+	RegisterFinishHook()
+	RegisterOutputHook()
+	UnregisterLogHook()
+	UnregisterLogConsoleHook()
+	UnregisterAlertHook()
+	UnregisterFailedHook()
+	UnregisterFinishHook()
+	UnregisterOutputHook()
 }

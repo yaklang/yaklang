@@ -66,7 +66,7 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 
 func (s *Server) RequireDNSLogDomain(ctx context.Context, params *ypb.YakDNSLogBridgeAddr) (*ypb.DNSLogRootDomain, error) {
 	if params.GetUseLocal() {
-		domain, token, err := cybertunnel.RequireDNSLogDomainByLocal(params.GetDNSMode())
+		domain, token, _, err := cybertunnel.RequireDNSLogDomainByLocal(params.GetDNSMode())
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (s *Server) RequireDNSLogDomain(ctx context.Context, params *ypb.YakDNSLogB
 			Token:  token,
 		}, nil
 	} else {
-		domain, token, err := cybertunnel.RequireDNSLogDomainByRemote(params.GetDNSLogAddr(), params.GetDNSMode())
+		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(params.GetDNSLogAddr(), params.GetDNSMode())
 		if err != nil {
 			return nil, err
 		}
@@ -103,8 +103,6 @@ func (s *Server) RequireDNSLogDomainByScript(ctx context.Context, req *ypb.Requi
 		if err != nil {
 			return nil, utils.Errorf("import %v' s handle failed: %s", req.GetScriptName(), err)
 		}
-		spew.Dump(result)
-		log.Infof("import %v' s handle success", result)
 		var domain, token string
 		domain = utils.InterfaceToStringSlice(result)[0]
 		token = utils.InterfaceToStringSlice(result)[1]

@@ -82,6 +82,7 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 	return &tpb.RequireDomainResponse{
 		Domain: fmt.Sprintf("%v.%v", token, D.domain),
 		Token:  token,
+		Mode:   "default",
 	}, nil
 }
 
