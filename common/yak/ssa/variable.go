@@ -46,7 +46,7 @@ func (f *Function) writeVariable(variable string, value Value) {
 func (f *Function) readVariable(variable string) Value {
 	if f.currentBlock != nil {
 		// for building function
-	return f.readVariableByBlock(variable, f.currentBlock)
+		return f.readVariableByBlock(variable, f.currentBlock)
 	} else {
 		// for finish function
 		return f.readVariableByBlock(variable, f.ExitBlock)
@@ -140,3 +140,52 @@ func (f *Function) CanBuildFreeValue(variable string) bool {
 	return false
 }
 
+// --------------- `f.symbol` hanlder, read && write
+
+func (f *Function) getFieldWithCreate(i *Interface, key Value, create bool) *Field {
+	if field, ok := i.field[key]; ok {
+		return field
+
+	} else if parent := f.parent; parent != nil {
+		// find in parent
+		if field := parent.readField(key.String()); field != nil {
+			return field
+		}
+	}
+
+	if create {
+		field := &Field{
+			anInstruction: anInstruction{
+				Func:  f,
+				Block: f.currentBlock,
+				typ:   i.typ,
+			},
+			Key:    key,
+			I:      i,
+			update: make([]Value, 0),
+			users:  make([]User, 0),
+		}
+
+		f.emit(field)
+		fixupUseChain(field)
+		return field
+	} else {
+		return nil
+	}
+}
+func (f *Function) readField(key string) *Field {
+	return f.getFieldWithCreate(f.symbol, NewConst(key), false)
+}
+func (f *Function) newField(key string) *Field {
+	return f.getFieldWithCreate(f.symbol, NewConst(key), true)
+}
+
+func (f *Function) writeField(key string, v Value) {
+	field := f.getFieldWithCreate(f.symbol, NewConst(key), true)
+	if field == nil {
+		panic(fmt.Sprintf("writeField: %s not found", key))
+	}
+	if field.GetLastValue() != v {
+		f.emitUpdate(field, v)
+	}
+}
