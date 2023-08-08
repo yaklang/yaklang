@@ -381,7 +381,7 @@ var _ Instruction = (*Phi)(nil)
 
 // ----------- Const
 func (c Const) String() string {
-	return c.value.String()
+	return strings.Trim(c.value.String(), "\"")
 }
 
 var _ Value = (*Const)(nil)
