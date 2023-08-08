@@ -2,21 +2,22 @@ package ssa
 
 // --------------- for assign
 type LeftValue interface {
-	Assign(Value)
-	GetValue() Value
+	Assign(Value, *Function)
+	GetValue(*Function) Value
 }
 
+// --------------- only point variable to value with `f.currentDef`
+// --------------- is SSA value
 type IdentifierLV struct {
 	variable string
-	f        *Function
 }
 
-func (i *IdentifierLV) Assign(v Value) {
-	i.f.wirteVariable(i.variable, v)
+func (i *IdentifierLV) Assign(v Value, f *Function) {
+	f.writeVariable(i.variable, v)
 }
 
-func (i *IdentifierLV) GetValue() Value {
-	return i.f.readVariable(i.variable)
+func (i *IdentifierLV) GetValue(f *Function) Value {
+	return f.readVariable(i.variable)
 }
 
 var _ LeftValue = (*IdentifierLV)(nil)
@@ -24,16 +25,22 @@ var _ LeftValue = (*IdentifierLV)(nil)
 
 
 
-
-func (f *Function) wirteVariable(variable string, value Value) {
-	f.wirteVariableByBlock(variable, value, f.currentBlock)
+// --------------- `f.currentDef` hanlder, read && write
+func (f *Function) writeVariable(variable string, value Value) {
+	f.writeVariableByBlock(variable, value, f.currentBlock)
 }
 
 func (f *Function) readVariable(variable string) Value {
+	if f.currentBlock != nil {
+		// for building function
 	return f.readVariableByBlock(variable, f.currentBlock)
+	} else {
+		// for finish function
+		return f.readVariableByBlock(variable, f.ExitBlock)
+	}
 }
 
-func (f *Function) wirteVariableByBlock(variable string, value Value, block *BasicBlock) {
+func (f *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
 	_, ok := f.currentDef[variable]
 	if !ok {
 		f.currentDef[variable] = make(map[*BasicBlock]Value)
@@ -85,11 +92,11 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
 		phi := NewPhi(f, block, variable)
-		f.wirteVariableByBlock(variable, phi, block)
+		f.writeVariableByBlock(variable, phi, block)
 		v = phi.Build()
 	}
 	if v != nil {
-		f.wirteVariableByBlock(variable, v, block)
+		f.writeVariableByBlock(variable, v, block)
 	}
 	return v
 }

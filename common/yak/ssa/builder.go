@@ -206,14 +206,13 @@ func (f *Function) buildExpressionList(stmt *yak.ExpressionListContext) []Value 
 func (f *Function) buildLeftExpression(stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
 		if v := f.readVariable(s.GetText()); v != nil {
-			switch v := v.(type) {
+			switch v.(type) {
 			case *Parameter:
 			default:
 			}
 		}
 		return &IdentifierLV{
 			variable: s.GetText(),
-			f:        f,
 		}
 	}
 	return nil
@@ -256,19 +255,19 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 		// assign
 		if len(rvalues) == len(lvalues) {
 			for i := range rvalues {
-				lvalues[i].Assign(rvalues[i])
+				lvalues[i].Assign(rvalues[i], f)
 			}
 		}
 	}
 
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := f.emitArith(yakvm.OpAdd, lvalue.GetValue(), NewConst(int64(1)))
-		lvalue.Assign(rvalue)
+		rvalue := f.emitArith(yakvm.OpAdd, lvalue.GetValue(f), NewConst(int64(1)))
+		lvalue.Assign(rvalue, f)
 	} else if stmt.SubSub() != nil { // --
 		lvalue := f.buildLeftExpression(stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := f.emitArith(yakvm.OpSub, lvalue.GetValue(), NewConst(int64(1)))
-		lvalue.Assign(rvalue)
+		rvalue := f.emitArith(yakvm.OpSub, lvalue.GetValue(f), NewConst(int64(1)))
+		lvalue.Assign(rvalue, f)
 	}
 
 	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
@@ -300,9 +299,8 @@ func (f *Function) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 			opcode = yakvm.OpXor
 
 		}
-		rvalue = f.emitArith(opcode, lvalue.GetValue(), rvalue)
-		lvalue.Assign(rvalue)
-
+		rvalue = f.emitArith(opcode, lvalue.GetValue(f), rvalue)
+		lvalue.Assign(rvalue, f)
 	}
 }
 
@@ -482,7 +480,7 @@ func (f *Function) buildForStmt(stmt *yak.ForStmtContext) {
 		body = f.currentBlock
 	}
 
-		f.currentBlock = body
+	f.currentBlock = body
 	f.emitJump(next)
 
 	if hasLatch {
