@@ -2,13 +2,14 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type cliExtraParams struct {
@@ -51,6 +52,10 @@ func init() {
 		fileSuffix := path.Ext(filename)
 		cliName = strings.TrimSuffix(filename, fileSuffix)
 	}
+}
+
+func InjectArgs(args []string) {
+	Args = args
 }
 
 func (param *cliExtraParams) foundArgsIndex() int {
