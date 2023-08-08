@@ -21,6 +21,7 @@ type Value interface {
 
 	GetUsers() []User
 	AddUser(User)
+	RemoveUser(User)
 }
 
 type User interface {
