@@ -10,6 +10,7 @@ type target struct {
 func (f *Function) AddAnonymous(anon *Function) {
 	f.AnonFuncs = append(f.AnonFuncs, anon)
 	anon.parent = f
+	anon.symbol.parentI = f.symbol
 }
 
 func (f *Function) NewParam(name string) {

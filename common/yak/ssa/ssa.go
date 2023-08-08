@@ -101,6 +101,7 @@ type Function struct {
 	// if this function is anonFunc
 	parent *Function // parent function if anonymous function; nil if global function.
 	FreeValues []Value    // the value, captured variable form parent-function,
+	symbol     *Interface // for function symbol table
 
 	// User
 	user []User
@@ -335,6 +336,11 @@ func (f *Function) String() string {
 		op := ""
 		switch v := v.(type) {
 		case Instruction:
+			if i, ok := v.(*Interface); ok {
+				if i.ITyp == InterfaceGlobal {
+					return i.Func.name + "-symbol"
+				}
+			}
 			if name, ok := instReg[v]; ok {
 				op = name
 			} else {
