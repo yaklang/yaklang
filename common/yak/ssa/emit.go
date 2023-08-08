@@ -11,10 +11,14 @@ func fixupUseChain(u User) {
 		return
 	}
 	for _, v := range u.GetValues() {
-		if v == nil {
-			continue
+		if v != nil {
+			v.AddUser(u)
 		}
-		v.AddUser(u)
+	}
+	for _, user := range u.GetUsers() {
+		if user != nil {
+			user.AddValue(u)
+		}
 	}
 }
 
