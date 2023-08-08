@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -151,6 +152,9 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	}
 
 	if req.GetProbeMax() > 0 {
+		probeMax := strconv.Itoa(int(req.GetProbeMax()))
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-max", Value: probeMax})
+	} else {
 		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-max", Value: "3"})
 	}
 
