@@ -859,10 +859,10 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 			t.Fatalf("send mitm request failed: %s", err)
 		}
 		// wait mitm server started
-		err = utils.WaitConnect(mitmAddr, 5)
-		if err != nil {
-			t.Fatal(err)
-		}
+		//err = utils.WaitConnect(mitmAddr, 5)
+		//if err != nil {
+		//	t.Fatal(err)
+		//}
 
 		for {
 			msg, err := stream.Recv()

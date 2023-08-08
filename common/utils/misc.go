@@ -28,7 +28,7 @@ func WaitConnect(addr string, timeout float64) error {
 	}()
 
 	select {
-	case <-time.After(time.Duration(timeout) * time.Second):
+	case <-time.After(FloatSecondDuration(timeout)):
 		cancle()
 		//println("超时")
 		return errors.New("Connection attempt timed out")
