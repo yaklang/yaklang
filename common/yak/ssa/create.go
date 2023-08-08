@@ -105,3 +105,9 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 	f.Blocks = append(f.Blocks, b)
 	return b
 }
+
+func (f *Function) Finish() {
+	f.currentBlock = nil
+	f.EnterBlock = f.Blocks[0]
+	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+}
