@@ -3,8 +3,8 @@ package ssa
 func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 	return &Phi{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  block,
+			Func:  f,
+			Block: block,
 		},
 		Edge:     make([]Value, 0, len(block.Preds)),
 		user:     make([]User, 0),
@@ -15,7 +15,7 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 func (phi *Phi) Build() Value {
 	for _, p := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
-		phi.Edge = append(phi.Edge, phi.Parent.readVariableByBlock(phi.variable, p))
+		phi.Edge = append(phi.Edge, phi.Func.readVariableByBlock(phi.variable, p))
 	}
 	v := phi.triRemoveTrivialPhi()
 	if v == phi {
