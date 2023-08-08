@@ -24,8 +24,8 @@ func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 	}
 	b := &BinOp{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
+			Func:  f,
+			Block: f.currentBlock,
 		},
 		Op:   op,
 		X:    x,
@@ -43,8 +43,8 @@ func (f *Function) emitIf(cond Value) *If {
 	}
 	ifssa := &If{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
+			Func:  f,
+			Block: f.currentBlock,
 		},
 		Cond: cond,
 	}
@@ -61,8 +61,8 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 
 	j := &Jump{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
+			Func:  f,
+			Block: f.currentBlock,
 		},
 		To: to,
 	}
@@ -78,8 +78,8 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	}
 	r := &Return{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
+			Func:  f,
+			Block: f.currentBlock,
 		},
 		Results: vs,
 	}
@@ -97,8 +97,8 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	}
 	c := &Call{
 		anInstruction: anInstruction{
-			Parent: f,
-			Block:  f.currentBlock,
+			Func:  f,
+			Block: f.currentBlock,
 		},
 		Method:      target,
 		Args:        args,

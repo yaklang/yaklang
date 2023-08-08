@@ -134,7 +134,7 @@ type BasicBlock struct {
 
 type anInstruction struct {
 	// function
-	Parent *Function
+	Func *Function
 	// basicblock
 	Block *BasicBlock
 }
@@ -175,9 +175,11 @@ func NewConst(i any) *Const {
 // parameter
 // only value
 type Parameter struct {
-	variable string
-	parent   *Function
-	user     []User
+	variable    string
+	Func        *Function
+	isFreevalue bool
+
+	user []User
 }
 
 // control-flow instructions  ----------------------------------------
@@ -353,7 +355,7 @@ var _ Value = (*BasicBlock)(nil)
 
 // implement instruction
 func (a *anInstruction) GetBlock() *BasicBlock { return a.Block }
-func (a *anInstruction) GetParent() *Function  { return a.Parent }
+func (a *anInstruction) GetParent() *Function  { return a.Func }
 
 // ----------- Phi
 func (p *Phi) String() string {
