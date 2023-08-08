@@ -52,6 +52,7 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/golang/snappy v0.0.4
 	github.com/google/go-containerregistry v0.15.2
+	github.com/google/go-dap v0.10.0
 	github.com/google/gopacket v1.1.19
 	github.com/google/gxui v0.0.0-20151028112939-f85e0a97b3a4
 	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
