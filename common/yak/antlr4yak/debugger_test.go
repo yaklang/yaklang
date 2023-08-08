@@ -2,6 +2,7 @@ package antlr4yak
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,11 +11,15 @@ import (
 
 func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.Debugger)) {
 	engine := New()
-	engine.ImportLibs(buildinLib)
 	// engine
 	Import("test_debugger_sleep", func(i int) {
 		time.Sleep(time.Duration(i) * time.Second)
 	})
+	Import("println", func(i ...interface{}) {
+		fmt.Println(i...)
+	})
+
+	engine.ImportLibs(buildinLib)
 	engine.SetDebugMode(true)
 	engine.SetDebugInit(debuggerInit)
 	engine.SetDebugCallback(debuggerCallBack)
@@ -328,6 +333,53 @@ a = 3`
 		}
 		if v.Int() != n {
 			t.Fatalf("a != %d", n)
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_StackTrace(t *testing.T) {
+	code := `go fn {
+	for {
+		x = 1	
+		test_debugger_sleep(3)
+	}
+}
+
+test_debugger_sleep(1)
+
+c = func(v) {
+	x = v
+	d(v)
+}
+
+d = func(v) {
+x = v
+}
+
+a = 1
+b = 2
+c(a+b)
+`
+	init := func(g *yakvm.Debugger) {
+		err := g.SetNormalBreakPoint(16)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		sts := g.GetStackTraces()
+		if len(sts) < 2 {
+			t.Fatal("goroutine 1 stack trace not found")
 		}
 	}
 
