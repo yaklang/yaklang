@@ -252,6 +252,59 @@ type UnOp struct {
 }
 
 // special instruction ------------------------------------------
+
+type InterfaceType int
+
+const (
+	InterfaceSlice = iota
+	InterfaceStruct
+	InterfaceMap
+	InterfaceGlobal
+)
+
+// instruction + value + user
+type Interface struct {
+	anInstruction
+
+	ITyp InterfaceType
+	// when slice
+	low, high, max Value
+
+	parentI *Interface // parent interface
+
+	// field
+	field map[Value]*Field // field.key->field
+
+	// when slice or map
+	Len, Cap Value
+
+	users []User
+}
+
+// instruction
+type Field struct {
+	anInstruction
+
+	// field
+	Key Value
+	I   *Interface
+
+	update []Value // value
+
+	users []User
+
+	//TODO:map[users]update
+	// i can add the map[users]update,
+	// to point what update value when user use this field
+
+}
+
+type Update struct {
+	anInstruction
+	value   Value
+	address User
+}
+
 // implement value
 func (f *Function) String() string {
 	ret := f.name + " "
@@ -471,3 +524,55 @@ var _ Value = (*BinOp)(nil)
 var _ User = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
 
+// ----------- Interface
+func (i *Interface) String() string {
+	return i.StringByFunc(DefaultValueString)
+}
+
+func (i *Interface) StringByFunc(Str func(Value) string) string {
+	if i.ITyp == InterfaceGlobal {
+		return i.Func.name + "-symbol"
+	} else {
+		return fmt.Sprintf(
+			"%s = Interface %s [%s, %s]",
+			Str(i), i.typ, Str(i.Len), Str(i.Cap),
+		)
+	}
+}
+
+var _ Value = (*Interface)(nil)
+var _ User = (*Interface)(nil)
+var _ Instruction = (*Interface)(nil)
+
+// ----------- Field
+func (f *Field) String() string {
+	return f.StringByFunc(DefaultValueString)
+}
+
+func (f *Field) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf(
+		"%s = %s field[%s]",
+		Str(f), Str(f.I), Str(f.Key),
+	)
+}
+
+var _ Value = (*Field)(nil)
+var _ User = (*Field)(nil)
+var _ Instruction = (*Field)(nil)
+
+// ----------- Update
+
+func (s *Update) String() string {
+	return s.StringByFunc(DefaultValueString)
+}
+
+func (s *Update) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf(
+		"update [%s] = %s",
+		Str(s.address), Str(s.value),
+	)
+}
+
+var _ Value = (*Update)(nil)
+var _ User = (*Update)(nil)
+var _ Instruction = (*Update)(nil)
