@@ -21,7 +21,9 @@ func (f *Function) NewParam(name string) {
 	}
 	f.Param = append(f.Param, p)
 	f.writeVariable(name, p)
-	}
+}
 
-
-
+func (f *Function) ReturnValue() []Value {
+	ret := f.ExitBlock.LastInst().(*Return)
+	return ret.Results
+}
