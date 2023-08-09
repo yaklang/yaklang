@@ -102,7 +102,7 @@ naslScanHandle = (hosts,ports)=>{
 	//	"family": "Web Servers",
 	//	"category": "ACT_GATHER_INFO",
 	//}))
-	opts.Append(nasl.plugin("。mssqlserver_detect.nasl"))
+	opts.Append(nasl.plugin("mssqlserver_detect.nasl"))
     kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)

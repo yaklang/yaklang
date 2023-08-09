@@ -151,13 +151,7 @@ func (e *ScriptEngine) ScanTarget(target string) error {
 	if err != nil {
 		return err
 	}
-	var portStr string
-	if port < 0 {
-		portStr = fmt.Sprintf("U:%d", -port)
-	} else {
-		portStr = fmt.Sprint(port)
-	}
-	return e.Scan(host, portStr)
+	return e.Scan(host, fmt.Sprint(port))
 }
 func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	//忽略了循环依赖

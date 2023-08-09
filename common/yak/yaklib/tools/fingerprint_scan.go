@@ -46,7 +46,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	go func() {
 		swg := utils.NewSizedWaitGroup(concurrent)
 		var portsInt = utils.ParseStringToPorts(port)
-		if len(portsInt) <= 0 {
+		for _, p := range portsInt {
 			for _, hRaw := range utils.ParseStringToHosts(host) {
 				h := utils.ExtractHost(hRaw)
 				if h != hRaw {
@@ -55,18 +55,25 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 						swg.Add()
 						go func() {
 							defer swg.Done()
+							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
 							addr := utils.HostPort(buildinHost, buildinPort)
 							if filter.Exist(addr) {
 								return
 							}
 							filter.Insert(addr)
-							log.Infof("start task to scan: [%s]", addr)
+							log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
 							result, err := matcher.MatchWithContext(ctx, buildinHost, buildinPort)
 							if err != nil {
-								if strings.Contains(fmt.Sprint(err), "excludeHosts/Ports") {
-									return
+								if len(portsInt) <= 0 {
+									if strings.Contains(fmt.Sprint(err), "excludeHosts/Ports") {
+										return
+									}
+								} else {
+									if strings.Contains(fmt.Sprint(err), "filtered by servicescan") {
+										return
+									}
 								}
-								log.Errorf("failed to scan %s: %s", addr, err)
+								log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(buildinHost, portWithoutProto), err)
 								return
 							}
 
@@ -74,59 +81,29 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 						}()
 					}
 				}
-			}
-		} else {
-			for _, p := range portsInt {
-				for _, hRaw := range utils.ParseStringToHosts(host) {
-					h := utils.ExtractHost(hRaw)
-					if h != hRaw {
-						buildinHost, buildinPort, _ := utils.ParseStringToHostPort(hRaw)
-						if buildinPort > 0 {
-							swg.Add()
-							go func() {
-								defer swg.Done()
-								addr := utils.HostPort(buildinHost, buildinPort)
-								if filter.Exist(addr) {
-									return
-								}
-								filter.Insert(addr)
-								log.Infof("start task to scan: [%s]", addr)
-								result, err := matcher.MatchWithContext(ctx, buildinHost, buildinPort)
-								if err != nil {
-									if strings.Contains(fmt.Sprint(err), "filtered by servicescan") {
-										return
-									}
-									log.Errorf("failed to scan %s: %s", addr, err)
-									return
-								}
 
-								outC <- result
-							}()
-						}
+				swg.Add()
+				rawPort := p
+				rawHost := h
+				proto, portWithoutProto := utils.ParsePortToProtoPort(p) // 这里将协议和端口分开，便于后面打印日志
+				go func() {
+					defer swg.Done()
+
+					addr := utils.HostPort(rawHost, rawPort)
+					if filter.Exist(addr) {
+						return
+					}
+					filter.Insert(addr)
+
+					log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
+					result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
+					if err != nil {
+						log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
+						return
 					}
 
-					swg.Add()
-					rawPort := p
-					rawHost := h
-					go func() {
-						defer swg.Done()
-
-						addr := utils.HostPort(rawHost, rawPort)
-						if filter.Exist(addr) {
-							return
-						}
-						filter.Insert(addr)
-
-						log.Infof("start task to scan: [%s]", utils.HostPort(rawHost, rawPort))
-						result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
-						if err != nil {
-							log.Errorf("failed to scan %s: %s", utils.HostPort(rawHost, rawPort), err)
-							return
-						}
-
-						outC <- result
-					}()
-				}
+					outC <- result
+				}()
 			}
 		}
 		go func() {
@@ -269,13 +246,14 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			swg.Add()
 			rawPort := synRes.Port
 			rawHost := synRes.Host
+			proto, portWithoutProto := utils.ParsePortToProtoPort(rawPort) // 这里将协议和端口分开，便于后面打印日志
 			go func() {
 				defer swg.Done()
 
-				log.Infof("start task to scan: [%s]", utils.HostPort(rawHost, rawPort))
+				log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 				result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
 				if err != nil {
-					log.Errorf("failed to scan %s: %s", utils.HostPort(rawHost, rawPort), err)
+					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return
 				}
 

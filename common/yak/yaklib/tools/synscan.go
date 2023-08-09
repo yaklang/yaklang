@@ -439,10 +439,16 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	return nil
 }
 
+// getFilteredPorts 去重、去除udp端口
 func getFilteredPorts(ports string, config *_yakPortScanConfig) []int {
 	var filteredPorts []int
 
 	for _, p := range utils.ParseStringToPorts(ports) {
+		proto, p := utils.ParsePortToProtoPort(p)
+		if proto == "udp" {
+			log.Errorf("UDP port is not supported in synscan, please use 'servicescan' to scan UDP port: %v", p)
+			continue
+		}
 		if config.IsFiltered("", p) {
 			continue
 		}
