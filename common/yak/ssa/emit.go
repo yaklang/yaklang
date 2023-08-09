@@ -7,10 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-func (f *Function) emit(i Instruction) {
-	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
-}
-
 func fixupUseChain(u User) {
 	if u == nil {
 		return
@@ -25,6 +21,10 @@ func fixupUseChain(u User) {
 			user.AddValue(u)
 		}
 	}
+}
+
+func (f *Function) emit(i Instruction) {
+	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
 }
 
 func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {

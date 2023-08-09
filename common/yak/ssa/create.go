@@ -42,21 +42,16 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		name:       name,
-		Package:    p,
-		Param:      make([]*Parameter, 0),
-		Blocks:     make([]*BasicBlock, 0),
-		EnterBlock: nil,
-		ExitBlock:  nil,
-		AnonFuncs:  make([]*Function, 0),
-		parent:     nil,
-		FreeValues: make([]Value, 0),
-		user:       make([]User, 0),
-		target: &target{
-			tail:      nil,
-			_break:    nil,
-			_continue: nil,
-		},
+		name:         name,
+		Package:      p,
+		Param:        make([]*Parameter, 0),
+		Blocks:       make([]*BasicBlock, 0),
+		EnterBlock:   nil,
+		ExitBlock:    nil,
+		AnonFuncs:    make([]*Function, 0),
+		parent:       nil,
+		FreeValues:   make([]Value, 0),
+		user:         make([]User, 0),
 		currentBlock: nil,
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		symbol: &Interface{

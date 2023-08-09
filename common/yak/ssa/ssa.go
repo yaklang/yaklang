@@ -107,8 +107,7 @@ type Function struct {
 	user []User
 
 	// for build
-	target       *target
-	currentBlock *BasicBlock
+	currentBlock *BasicBlock                      // current block to build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variable][block]value
 }
 
