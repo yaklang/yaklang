@@ -54,7 +54,7 @@ func init() {
 	}
 }
 
-func InjectArgs(args []string) {
+func InjectCliArgs(args []string) {
 	Args = args
 }
 
