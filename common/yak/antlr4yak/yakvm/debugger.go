@@ -167,6 +167,11 @@ func (g *Debugger) Finished() bool {
 	return g.finished
 }
 
+func (g *Debugger) SetFinished() {
+	g.description = "The program is finished"
+	g.finished = true
+}
+
 func (g *Debugger) CurrentCodeIndex() int {
 	return g.codePointer
 }
