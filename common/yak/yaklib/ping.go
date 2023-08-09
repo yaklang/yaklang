@@ -88,7 +88,7 @@ func _pingConfigOpt_cancel(f func()) _pingConfigOpt {
 func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult {
 	config := &_pingConfig{
 		dnsTimeout: 5 * time.Second,
-		timeout:    10 * time.Second,
+		timeout:    5 * time.Second,
 		scanCClass: false,
 		concurrent: 50,
 	}
@@ -156,14 +156,15 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 	config := &_pingConfig{
 		dnsTimeout: time.Second * 5,
-		timeout:    10 * time.Second,
+		timeout:    5 * time.Second,
+		proxies:    []string{},
 	}
 	for _, r := range opts {
 		r(config)
 	}
 
 	if utils.IsIPv4(target) || utils.IsIPv6(target) {
-		return pingutil.PingAuto(target, config.tcpPingPort, config.timeout)
+		return pingutil.PingAuto(target, config.tcpPingPort, config.timeout, config.proxies...)
 	} else if strings.HasPrefix(
 		target, "https://") || strings.HasPrefix(
 		target, "http://") {
@@ -180,7 +181,7 @@ func _ping(target string, opts ..._pingConfigOpt) *pingutil.PingResult {
 	} else {
 		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			return pingutil.PingAuto(result, config.tcpPingPort, config.timeout)
+			return pingutil.PingAuto(result, config.tcpPingPort, config.timeout, config.proxies...)
 		}
 		return &pingutil.PingResult{
 			IP:     target,

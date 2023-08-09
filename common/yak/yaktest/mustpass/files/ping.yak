@@ -1,0 +1,8 @@
+for res in ping.Scan(
+    "127.0.0.1/24",
+    ping.tcpPingPorts("65424"), // make sure the port is filtered
+)~ {
+    if (res.Ok) {
+        println(f"${res.IP} is alive")
+    }
+}
