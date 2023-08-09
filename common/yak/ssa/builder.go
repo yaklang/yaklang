@@ -102,7 +102,14 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 		}
 	}
 
-	//TODO: fallthrough stmt
+	if _, ok := stmt.FallthroughStmt().(*yak.FallthroughStmtContext); ok {
+		if _fall := b.target._fallthrough; _fall != nil {
+			b.emitJump(_fall)
+		} else {
+			panic("unexpection fallthrough stmt")
+		}
+
+	}
 	//TODO: include stmt
 	//TODO: defer stmt
 	//TODO: go stmt
@@ -325,6 +332,11 @@ func (b *builder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 				_break:    nil,
 				_continue: nil,
 			}
+			if i == len(allcase)-1 {
+				b.target._fallthrough = defaultb
+			} else {
+				b.target._fallthrough = handlers[i+1]
+			}
 			b.currentBlock = handlers[i]
 			b.buildStatementList(stmtlist)
 			b.emitJump(done)
@@ -338,6 +350,7 @@ func (b *builder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 				tail:         b.target,
 				_break:       nil,
 				_continue:    nil,
+				_fallthrough: nil,
 			}
 			b.currentBlock = defaultb
 			b.buildStatementList(stmtlist)
@@ -648,8 +661,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		} else if b.CanBuildFreeValue(text) {
 			return b.BuildFreeValue(text)
 		}
-		fmt.Printf("debug undefine value: %v\n", s.GetText())
-		panic("undefine value")
+		panic(fmt.Sprintf("undefine value %v", s.GetText()))
 	}
 
 	getExpr := func(index int) Value {
