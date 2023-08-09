@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"time"
 )
@@ -21,6 +21,16 @@ type CustomDNSLog struct {
 	token      string
 	isLocal    bool
 	timeout    float64
+}
+
+type IEngine interface {
+	ExecuteEx(code string, params map[string]interface{}) (*antlr4yak.Engine, error)
+}
+
+var EngineInterface IEngine
+
+func SetEngineInterface(engine IEngine) {
+	EngineInterface = engine
 }
 
 func NewCustomDNSLog(opts ..._dnslogConfigOpt) *CustomDNSLog {
@@ -141,7 +151,7 @@ func customGet(name string) (string, string, string, error) {
 		return "", "", "", err
 	}
 
-	engine, err := yak.NewScriptEngine(1000).ExecuteEx(script.Content, map[string]interface{}{
+	engine, err := EngineInterface.ExecuteEx(script.Content, map[string]interface{}{
 		"YAK_FILENAME": name,
 	})
 	if err != nil {
@@ -165,7 +175,7 @@ func customCheck(name, token, mode string, timeout ...float64) ([]*tpb.DNSLogEve
 		return nil, err
 	}
 
-	engine, err := yak.NewScriptEngine(1000).ExecuteEx(script.Content, map[string]interface{}{
+	engine, err := EngineInterface.ExecuteEx(script.Content, map[string]interface{}{
 		"YAK_FILENAME": name,
 	})
 	if err != nil {
@@ -192,13 +202,18 @@ func customCheck(name, token, mode string, timeout ...float64) ([]*tpb.DNSLogEve
 	return events, nil
 }
 
+func queryCustomScript() {
+
+}
+
 var DNSLogExports = map[string]interface{}{
-	"NewCustomDNSLog": NewCustomDNSLog,
-	"LookupFirst":     netx.LookupFirst,
-	"random":          randomDNSLogPlatforms,
-	"mode":            setMode,
-	"local":           setLocal,
-	"script":          setScript,
+	"NewCustomDNSLog":   NewCustomDNSLog,
+	"QueryCustomScript": queryCustomScript,
+	"LookupFirst":       netx.LookupFirst,
+	"random":            randomDNSLogPlatforms,
+	"mode":              setMode,
+	"local":             setLocal,
+	"script":            setScript,
 }
 
 type _dnslogConfig struct {

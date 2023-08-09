@@ -44,6 +44,7 @@ import (
 	debugger "github.com/yaklang/yaklang/common/yak/interactive_debugger"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakdocument"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -147,6 +148,7 @@ func init() {
 			log.Warnf("initialize database failed: %s", err)
 		}
 	}
+	yaklib.SetEngineInterface(yak.NewScriptEngine(1000))
 	yak.SetNaslExports(antlr4nasl.Exports)
 	yak.InitYaklangLib()
 }
