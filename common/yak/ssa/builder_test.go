@@ -576,6 +576,7 @@ b4: <- if.done1
 			`
 yak-main$1 arg1
 parent: yak-main
+pos:   4:4   -  13:0  : (arg1)=>{
 freeValue: ca
 entry0:
         t0 = 1 gt 2
@@ -595,6 +596,7 @@ b4: <- if.done1
 			`
 yak-main$2
 parent: yak-main
+pos:  36:6   -  36:20 : ()=>{cadd++}
 freeValue: t0
 entry0:
         t1 = t0 add 1
@@ -603,6 +605,7 @@ entry0:
 			`
 yak-main$3 pc1, pc2, pc3
 parent: yak-main
+pos:  42:4   -  49:0  : fn(pc1,pc2,pc3){
 freeValue: t0, a, va
 entry0:
         update [t0] = 55
@@ -616,6 +619,7 @@ entry0:
 			`
 yak-main$4 pc1, pc2, pc3
 parent: yak-main
+pos:  52:4   -  57:0  : fn(pc1,pc2,pc3){
 freeValue: a, va
 entry0:
         t0 = call a (va) []
@@ -685,12 +689,14 @@ entry0:
 			`
 yak-main$1 a
 parent: yak-main
+pos:   2:6   -   7:0  : (a)=>{
 entry0:
         ret yak-main$1$2
 `,
 			`
 yak-main$1$2
 parent: yak-main$1
+pos:   4:8   -   6:1  : ()=>{
 freeValue: a
 entry0:
         ret a
@@ -698,6 +704,7 @@ entry0:
 			`
 yak-main$3 a
 parent: yak-main
+pos:  11:8   -  16:0  : (a)=>{
 freeValue: c
 entry0:
         ret yak-main$3$4
@@ -705,6 +712,7 @@ entry0:
 			`
 yak-main$3$4
 parent: yak-main$3
+pos:  13:8   -  15:1  : ()=>{
 freeValue: a, c
 entry0:
         t0 = a add c
@@ -713,6 +721,7 @@ entry0:
 			`
 yak-main$5 b
 parent: yak-main
+pos:  30:7   -  33:0  : (b)=>{
 freeValue: f1
 entry0:
         t0 = call f1 () [] 

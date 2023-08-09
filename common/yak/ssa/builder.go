@@ -34,6 +34,9 @@ func (b *builder) build(ast *yak.YaklangParser) {
 
 // statement list
 func (b *builder) buildStatementList(stmtlist *yak.StatementListContext) {
+	recover := b.SetRange(stmtlist.BaseParserRuleContext)
+	defer recover()
+
 	for _, stmt := range stmtlist.AllStatement() {
 		if stmt, ok := stmt.(*yak.StatementContext); ok {
 			b.buildStatement(stmt)
@@ -42,6 +45,8 @@ func (b *builder) buildStatementList(stmtlist *yak.StatementListContext) {
 }
 
 func (b *builder) buildStatement(stmt *yak.StatementContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	//TODO: decalear Variable Expression
 
 	// assign Expression
@@ -107,6 +112,8 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 
 // expression stmt
 func (b *builder) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		b.buildExpression(s)
 	}
@@ -114,6 +121,8 @@ func (b *builder) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {
 
 // assign expression stmt
 func (b *builder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	s := stmt.AssignExpression()
 	if s == nil {
 		return
@@ -128,6 +137,8 @@ func (b *builder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtContex
 // TODO: go stmt
 // return stmt
 func (b *builder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if list, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
 		values := b.buildExpressionList(list)
 		b.emitReturn(values)
@@ -138,6 +149,8 @@ func (b *builder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
 
 // for stmt
 func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	//	    ...enter...
 	//	    // for first expre in here
 	//      jump loop.header
@@ -237,6 +250,8 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 
 // for first expr
 func (b *builder) buildForFirstExpr(stmt *yak.ForFirstExprContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
 		b.buildAssignExpression(ae)
 	}
@@ -247,6 +262,8 @@ func (b *builder) buildForFirstExpr(stmt *yak.ForFirstExprContext) {
 
 // for third expr
 func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
 		b.buildAssignExpression(ae)
 	}
@@ -261,6 +278,8 @@ func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
 
 // if stmt
 func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	//	    ...enter...
 	//      // if stmt cond in here
 	//      If [cond] true -> if.true, false -> if.elif
@@ -315,21 +334,23 @@ func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
 		b.currentBlock = previf.False
 		// build condition
 		if condstmt, ok := stmt.Expression(index + 1).(*yak.ExpressionContext); ok {
+			recover := b.SetRange(condstmt.BaseParserRuleContext)
 			cond := b.buildExpression(condstmt)
-		// if instruction
-		currentif := b.emitIf(cond)
-		// create true block
-		trueBlock := b.newBasicBlock("if.true")
-		currentif.AddTrue(trueBlock)
-		// build true block
-		b.currentBlock = trueBlock
+			// if instruction
+			currentif := b.emitIf(cond)
+			// create true block
+			trueBlock := b.newBasicBlock("if.true")
+			currentif.AddTrue(trueBlock)
+			// build true block
+			b.currentBlock = trueBlock
 			if blockstmt, ok := stmt.Block(index + 1).(*yak.BlockContext); ok {
 				b.buildBlock(blockstmt)
 			}
-		// jump to done
-		b.emitJump(done)
-		// for next elif
-		previf = currentif
+			// jump to done
+			b.emitJump(done)
+			// for next elif
+			previf = currentif
+			recover()
 		}
 	}
 
@@ -371,6 +392,8 @@ func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
 
 // block
 func (b *builder) buildBlock(stmt *yak.BlockContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(s)
 	}
@@ -378,6 +401,8 @@ func (b *builder) buildBlock(stmt *yak.BlockContext) {
 
 // assign expression
 func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
 		var rvalues []Value
@@ -447,6 +472,8 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 
 // left expression list
 func (b *builder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []LeftValue {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
 	values := make([]LeftValue, valueLen)
@@ -460,6 +487,8 @@ func (b *builder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpres
 
 // left  expression
 func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) LeftValue {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if s := stmt.Identifier(); s != nil {
 		if v := b.readVariable(s.GetText()); v != nil {
 			// when v exist
@@ -504,6 +533,8 @@ func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 
 // left slice call
 func (b *builder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		return b.buildExpression(s)
 	}
@@ -512,6 +543,8 @@ func (b *builder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) Value {
 
 // expression
 func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	//TODO: typeliteral expression
 
 	// literal
@@ -664,6 +697,8 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 
 // make expression
 func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	var typ types.Type
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		typ = b.buildTypeLiteral(s)
@@ -701,6 +736,8 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 
 // type literal
 func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	text := stmt.GetText()
 	// var type name
 	if b, ok := basicTypes[text]; ok {
@@ -733,6 +770,8 @@ func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
 
 // slice type literal
 func (b *builder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) types.Type {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
 			return types.NewSlice(eleTyp)
@@ -743,6 +782,8 @@ func (b *builder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) types
 
 // map type literal
 func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) types.Type {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	// key
 	var keyTyp types.Type
 	var valueTyp types.Type
@@ -765,6 +806,8 @@ func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) types.Typ
 
 // anonymous function decl
 func (b *builder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	funcName := ""
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
@@ -816,6 +859,8 @@ func (b *builder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclCon
 
 // function param decl
 func (b *builder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
 	ids := stmt.AllIdentifier()
 
@@ -830,6 +875,8 @@ func (b *builder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 
 // function call
 func (b *builder) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) Value {
+	// recover := b.SetRange(stmt.BaseParserRuleContext)
+	// defer recover()
 	var args []Value
 	isDropErr := false
 	if s, ok := stmt.OrdinaryArguments().(*yak.OrdinaryArgumentsContext); ok {
@@ -843,6 +890,8 @@ func (b *builder) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) Valu
 
 // ordinary argument
 func (b *builder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	ellipsis := stmt.Ellipsis()
 	allexpre := stmt.AllExpression()
 	v := make([]Value, 0, len(allexpre))
@@ -860,6 +909,8 @@ func (b *builder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []V
 
 // slice call
 func (b *builder) buildSliceCall(stmt *yak.SliceCallContext) []Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	exprs := stmt.AllExpression()
 	values := make([]Value, len(exprs))
 	if len(exprs) == 0 {
@@ -880,6 +931,8 @@ func (b *builder) buildSliceCall(stmt *yak.SliceCallContext) []Value {
 
 // expression list
 func (b *builder) buildExpressionList(stmt *yak.ExpressionListContext) []Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	exprs := stmt.AllExpression()
 	valueLen := len(exprs)
 	values := make([]Value, valueLen)
@@ -893,6 +946,8 @@ func (b *builder) buildExpressionList(stmt *yak.ExpressionListContext) []Value {
 
 // expression list multiline
 func (b *builder) buildExpressionListMultiline(stmt *yak.ExpressionListMultilineContext) []Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
 	allexpr := stmt.AllExpression()
 	exprs := make([]Value, 0, len(allexpr))
 	for _, expr := range allexpr {
