@@ -29,25 +29,30 @@ type HTTPConfig struct {
 	UrilenNum2 int
 }
 
-func httpHandler(c *matchContext) error {
+func httpIniter(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return nil
 	}
 
+	// read payload
 	httpraw := c.PK.ApplicationLayer().LayerContents()
 	if !c.Must(len(httpraw) != 0) {
 		return nil
 	}
 
-	// spliter
-	spliter := newHTTPSpliter(c.PK)
-	if spliter == nil {
+	// buffer provider
+	provider := newHTTPBufferProvider(c.PK)
+	if provider == nil {
 		return errors.New("parse httpraw as http request failed")
 	}
 	// prefilter
 	if c.Rule.ContentRuleConfig.PrefilterRule != nil {
 		// keyword prefilter not implement yet
 	}
+
+	// register buffer provider
+	c.SetBufferProvider(provider.Get)
+
 	// fast pattern
 	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *ContentRule) bool {
 		return rule.FastPattern
@@ -56,9 +61,9 @@ func httpHandler(c *matchContext) error {
 		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
 		if fastPatternRule.Modifier == FileData {
 			// filedata has its individual matcher
-			c.Attach(newFileDataMatcher(fastPatternRule, spliter.GetParsed()))
+			c.Attach(newFileDataMatcher(fastPatternRule, provider.Parsed()))
 		} else {
-			c.Attach(newPayloadMatcher(fastPatternCopy(fastPatternRule), spliter.Get(fastPatternRule.Modifier)))
+			c.Attach(newPayloadMatcher(fastPatternCopy(fastPatternRule), fastPatternRule.Modifier))
 		}
 		err := c.Next()
 		if c.IsRejected() {
@@ -67,21 +72,22 @@ func httpHandler(c *matchContext) error {
 	}
 	// beside payload matcher
 	var err error
-	if spliter.GetRequest() != nil {
-		err = httpReqMatcher(c, spliter)
+	if provider.GetRequest() != nil {
+		err = httpReqMatcher(c, provider)
 	} else {
-		err = httpResMatcher(c, spliter)
+		err = httpResMatcher(c, provider)
 	}
 	if c.IsRejected() {
 		return err
 	}
-	// loop
+
+	// payload match
 	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
 		if r.Modifier == FileData {
 			// filedata has its individual matcher
-			c.Attach(newFileDataMatcher(r, spliter.GetResponse()))
+			c.Attach(newFileDataMatcher(r, provider.GetResponse()))
 		} else {
-			c.Attach(newPayloadMatcher(r, spliter.Get(r.Modifier)))
+			c.Attach(newPayloadMatcher(r, r.Modifier))
 		}
 		err := c.Next()
 		if c.IsRejected() {
@@ -91,7 +97,7 @@ func httpHandler(c *matchContext) error {
 	return nil
 }
 
-func httpReqMatcher(c *matchContext, spliter *httpSpliter) error {
+func httpReqMatcher(c *matchContext, spliter *httpProvider) error {
 	if cf := c.Rule.ContentRuleConfig.HTTPConfig; cf != nil {
 		if cf.Uricontent != "" {
 			log.Errorf("uricontent has been deprecated and not implemented yet")
@@ -121,11 +127,11 @@ func httpReqMatcher(c *matchContext, spliter *httpSpliter) error {
 	return nil
 }
 
-func httpResMatcher(c *matchContext, spliter *httpSpliter) error {
+func httpResMatcher(c *matchContext, spliter *httpProvider) error {
 	return nil
 }
 
-type httpSpliter struct {
+type httpProvider struct {
 	PK gopacket.Packet
 
 	// cache
@@ -135,7 +141,7 @@ type httpSpliter struct {
 }
 
 // if success, return value not nil
-func newHTTPSpliter(pk gopacket.Packet) *httpSpliter {
+func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
 	payload := pk.ApplicationLayer().LayerContents()
 	if lowhttp.IsResp(payload) {
 		res, err := lowhttp.ParseBytesToHTTPResponse(payload)
@@ -143,7 +149,7 @@ func newHTTPSpliter(pk gopacket.Packet) *httpSpliter {
 			log.Errorf("parse httpraw as http response failed: %s", err.Error())
 			return nil
 		}
-		return &httpSpliter{
+		return &httpProvider{
 			PK:  pk,
 			res: res,
 			raw: payload,
@@ -154,34 +160,34 @@ func newHTTPSpliter(pk gopacket.Packet) *httpSpliter {
 		log.Errorf("parse httpraw as http request failed: %s", err.Error())
 		return nil
 	}
-	return &httpSpliter{
+	return &httpProvider{
 		PK:  pk,
 		req: request,
 		raw: payload,
 	}
 }
 
-func (h *httpSpliter) GetRaw() []byte {
+func (h *httpProvider) GetRaw() []byte {
 	return h.raw
 }
 
-func (h *httpSpliter) GetParsed() any {
+func (h *httpProvider) Parsed() any {
 	if h.req != nil {
 		return h.req
 	}
 	return h.res
 }
 
-func (h *httpSpliter) GetRequest() *http.Request {
+func (h *httpProvider) GetRequest() *http.Request {
 	return h.req
 }
 
-func (h *httpSpliter) GetResponse() *http.Response {
+func (h *httpProvider) GetResponse() *http.Response {
 	return h.res
 }
 
 // Get part of http.
-func (h *httpSpliter) Get(modi Modifier) []byte {
+func (h *httpProvider) Get(modi Modifier) []byte {
 	if h.req != nil {
 		return h.getReq(modi)
 	}
@@ -191,7 +197,7 @@ func (h *httpSpliter) Get(modi Modifier) []byte {
 	return nil
 }
 
-func (h *httpSpliter) getReq(modi Modifier) []byte {
+func (h *httpProvider) getReq(modi Modifier) []byte {
 	switch modi {
 	case HTTPUri:
 		return []byte(h.req.URL.Path)
@@ -304,7 +310,7 @@ func (h *httpSpliter) getReq(modi Modifier) []byte {
 	return nil
 }
 
-func (h *httpSpliter) getRes(modi Modifier) []byte {
+func (h *httpProvider) getRes(modi Modifier) []byte {
 	switch modi {
 	case HTTPStatMsg:
 		ss := strings.SplitN(h.res.Status, " ", 2)
