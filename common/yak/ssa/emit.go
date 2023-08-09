@@ -82,6 +82,23 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 	return j
 }
 
+func (f *Function) emitSwitch(cond Value, defaultb *BasicBlock, label []switchlabel) *Switch {
+	if f.currentBlock.finish {
+		return nil
+	}
+
+	sw := &Switch{
+		anInstruction: f.newAnInstuction(),
+		cond:          cond,
+		defaultBlock:  defaultb,
+		label:         label,
+	}
+	fixupUseChain(sw)
+	f.emit(sw)
+	f.currentBlock.finish = true
+	return sw
+}
+
 func (f *Function) emitReturn(vs []Value) *Return {
 	if f.currentBlock.finish {
 		return nil

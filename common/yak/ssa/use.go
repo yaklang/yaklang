@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 )
 
@@ -121,6 +122,31 @@ func (c *Call) RemoveUser(u User) { removeUser(c.user, u) }
 
 func (c *Call) GetValues() []Value { return c.Args }
 func (c *Call) AddValue(v Value)   {}
+
+// ----------- Switch
+func (sw *Switch) ReplaceValue(v Value, to Value) {
+	if sw.cond == v {
+		sw.cond = to
+	}
+	for _, c := range sw.label {
+		if c.value == v {
+			c.value = to
+		}
+	}
+}
+
+func (sw *Switch) GetUsers() []User  { return nil }
+func (sw *Switch) AddUser(u User)    {}
+func (sw *Switch) RemoveUser(u User) {}
+func (sw *Switch) GetValues() []Value {
+	return append(
+		lo.Map(sw.label,
+			func(label switchlabel, _ int) Value { return label.value },
+		),
+		sw.cond,
+	)
+}
+func (sw *Switch) AddValue(v Value) {}
 
 // ----------- BinOp
 func (b *BinOp) ReplaceValue(v Value, to Value) {
