@@ -485,6 +485,40 @@ b11: <- loop.exit3
 
 }
 
+func TestSwitch(t *testing.T) {
+	t.Run("switch_simple", func(t *testing.T) {
+		code := `
+a = 2
+switch a {
+case 1, 2:
+case 3:
+case 4:
+default:
+}
+	`
+		ir := `
+yak-main 
+entry0:
+                switch 2 default:[switch.default2] {1:switch.handler3, 2:switch.handler3, 3:switch.handler4, 4:switch.handler5} 
+switch.done1: <- switch.handler4 switch.default2
+                jump -> b6
+switch.default2: <- entry0 switch.handler5
+                jump -> switch.done1
+switch.handler3: <- entry0
+                jump -> switch.done1
+switch.handler4: <- entry0 switch.handler3
+                jump -> switch.done1
+switch.handler5: <- entry0
+                jump -> switch.done1
+b6: <- switch.done1
+	`
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
+	})
+}
+
 func TestClosure(t *testing.T) {
 	t.Run("closure_simple", func(t *testing.T) {
 		code := `

@@ -251,10 +251,17 @@ type Call struct {
 	isDropError bool
 }
 
+type switchlabel struct {
+	value Value
+	dest  *BasicBlock
+}
 type Switch struct {
 	anInstruction
 
-	cond Value
+	cond         Value
+	defaultBlock *BasicBlock
+
+	label []switchlabel
 }
 
 // data-flow instructions  ----------------------------------------
@@ -605,6 +612,29 @@ func (c *Call) StringByFunc(getStr func(Value) string) string {
 var _ Value = (*Call)(nil)
 var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
+
+// ----------- Switch
+func (sw *Switch) String() string {
+	return sw.StringByFunc(DefaultValueString)
+}
+
+func (sw *Switch) StringByFunc(Str func(Value) string) string {
+	return fmt.Sprintf(
+		"switch %s default:[%s] {%s}",
+		Str(sw.cond),
+		sw.defaultBlock.Name,
+		strings.Join(
+			lo.Map(sw.label, func(label switchlabel, _ int) string {
+				return fmt.Sprintf("%s:%s", Str(label.value), label.dest.Name)
+			}),
+			", ",
+		),
+	)
+}
+
+var _ Value = (*Switch)(nil)
+var _ User = (*Switch)(nil)
+var _ Instruction = (*Switch)(nil)
 
 // ----------- BinOp
 func (b *BinOp) String() string {
