@@ -91,7 +91,7 @@ func showProg(prog *Program) string {
 	ret := ""
 	for _, pkg := range prog.Packages {
 		for _, f := range pkg.funcs {
-			ret += f.String()
+			ret += f.DisAsm(DisAsmWithoutSource)
 		}
 	}
 	fmt.Println(ret)
