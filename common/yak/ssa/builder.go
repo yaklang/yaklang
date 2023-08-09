@@ -730,7 +730,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 	}
 	//TODO: unary operator expression
 
-	// //TODO: 二元运算（位运算全面优先于数字运算，数字运算全面优先于高级逻辑运算）
+	// 二元运算（位运算全面优先于数字运算，数字运算全面优先于高级逻辑运算）
 	// | expression bitBinaryOperator ws* expression
 
 	// // 普通数学运算 done
@@ -738,18 +738,13 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 	// | expression additiveBinaryOperator ws* expression
 	// | expression comparisonBinaryOperator ws* expression
 
-	// //TODO: 高级逻辑
-	// | expression '&&' ws* expression
-	// | expression '||' ws* expression
-	// | expression 'not'? 'in' expression
-	// | expression '<-' expression
-	// | expression '?' ws* expression ws* ':' ws* expression
-	// ;
-
 	type op interface {
 		GetText() string
 	}
 	getBinaryOp := func() op {
+		if op := stmt.BitBinaryOperator(); op != nil {
+			return op
+		}
 		if op := stmt.AdditiveBinaryOperator(); op != nil {
 			return op
 		}
@@ -770,6 +765,20 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		}
 		var opcode yakvm.OpcodeFlag
 		switch op.GetText() {
+		// BitBinaryOperator
+		case "<<":
+			opcode = yakvm.OpShl
+		case ">>":
+			opcode = yakvm.OpShr
+		case "&":
+			opcode = yakvm.OpAnd
+		case "&^":
+			opcode = yakvm.OpAndNot
+		case "|":
+			opcode = yakvm.OpOr
+		case "^":
+			opcode = yakvm.OpXor
+
 		// AdditiveBinaryOperator
 		case "+":
 			opcode = yakvm.OpAdd
@@ -800,6 +809,15 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		}
 		return b.emitArith(opcode, op0, op1)
 	}
+
+	// //TODO: 高级逻辑
+	// | expression '&&' ws* expression
+	// | expression '||' ws* expression
+	// | expression 'not'? 'in' expression
+	// | expression '<-' expression
+	// | expression '?' ws* expression ws* ':' ws* expression
+	// ;
+
 	return nil
 }
 
