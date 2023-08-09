@@ -57,23 +57,24 @@ func atoistar(i string) *int {
 }
 
 // find all index of sub in s
-func bytesIndexAll(s []byte, sep []byte) []matched {
+func bytesIndexAll(s []byte, sep []byte, nocase bool) []matched {
+	var cmp func([]byte, []byte) bool
+	if nocase {
+		cmp = bytes.EqualFold
+	} else {
+		cmp = bytes.EqualFold
+	}
+
 	var indexes []matched
-	for {
-		pos := bytes.Index(s, sep)
-		if pos == -1 {
-			break
-		}
-		indexes = append(indexes, matched{
-			pos: pos,
-			len: len(sep),
-		})
-		if pos+1 < len(s) {
-			s = s[pos+1:]
-		} else {
-			break
+	for i := 0; i < len(s)-len(sep)+1; i++ {
+		if cmp(s[i:i+len(sep)], sep) {
+			indexes = append(indexes, matched{
+				pos: i,
+				len: len(sep),
+			})
 		}
 	}
+
 	return indexes
 }
 

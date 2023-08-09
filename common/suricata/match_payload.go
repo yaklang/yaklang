@@ -1,32 +1,26 @@
 package suricata
 
 import (
-	"bytes"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 )
 
-func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) error {
+func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
+	if r.PCRE != "" {
+		// pcre match
+		return newPCREMatch(r)
+	}
 	return func(c *matchContext) error {
-		buffer := make([]byte, len(content))
-		copy(buffer, content)
-		if r.Nocase {
-			r.Content = bytes.ToLower(r.Content)
-			buffer = bytes.ToLower(buffer)
-		}
-
-		// pcre not implement yet, temporarily skip
-		if len(buffer) == 0 {
-			c.Reject()
+		if len(r.Content) == 0 {
 			return nil
 		}
 
-		// match all
-		indexes := bytesIndexAll(buffer, r.Content)
+		var indexes []matched
+		buffer := c.GetBuffer(modifier)
+
+		indexes = bytesIndexAll(buffer, r.Content, r.Nocase)
 		if !c.Must(len(indexes) > 0) {
 			return nil
 		}
@@ -158,63 +152,6 @@ func newPayloadMatcher(r *ContentRule, content []byte) func(c *matchContext) err
 		}
 		// todo:bsize dsize
 		c.Value["prevMatch"] = indexes
-		return nil
-	}
-}
-
-// untested
-func newFileDataMatcher(r *ContentRule, data any) func(c *matchContext) error {
-	return func(c *matchContext) error {
-		// 10 MB
-		var files []io.Reader
-		switch data := data.(type) {
-		case *http.Request:
-			err := data.ParseMultipartForm(10 << 20)
-			if !c.Must(err == nil) {
-				return nil
-			}
-			for _, v := range data.MultipartForm.File {
-				for _, f := range v {
-					file, err := f.Open()
-					if err != nil {
-						continue
-					}
-					files = append(files, file)
-				}
-			}
-		case *http.Response:
-			ctype := data.Header.Get("Content-Type")
-			if !c.Must(strings.HasPrefix(ctype, "application/octet-stream") ||
-				strings.HasPrefix(ctype, "application/pdf") ||
-				strings.HasPrefix(ctype, "image/") ||
-				strings.HasPrefix(ctype, "audio/") ||
-				strings.HasPrefix(ctype, "video/")) {
-				return nil
-			}
-			files = append(files, data.Body)
-		case nil:
-			c.Reject()
-			return nil
-		default:
-			c.Reject()
-			return errors.New("unknown type for filedata matcher")
-		}
-
-		for _, f := range files {
-			all, err := io.ReadAll(f)
-			if !c.Must(err == nil) {
-				return nil
-			}
-			c.Insert(newPayloadMatcher(r, all))
-			c.Recover()
-			if err := c.Next(); err == nil {
-				return err
-			}
-			if !c.IsRejected() {
-				return nil
-			}
-		}
-		c.Reject()
 		return nil
 	}
 }
