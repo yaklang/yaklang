@@ -224,9 +224,6 @@ entry0:
 
 	t.Run("Assign_Make_Slice", func(t *testing.T) {
 		src := `
-a1 = [1, 2, 3]
-a2 = [1, "2"]
-
 b1 = make([]int, 1)
 b2 = make([]int, 0)
 
@@ -236,10 +233,22 @@ b  = b1[1] + 2
 c  = b2 + 2
 b1[1] += 1
 		`
+		ir := `
+yak-main
+entry0:
+	t0 = Interface []int [1, 1]
+	t1 = Interface []int [0, 0]
+	t2 = t0 field[1]
+	update [t2] = 1
+	t4 = t2 add 2
+	t5 = t2 add 2
+	t6 = t2 add 1
+	update [t2] = t6
+		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		showProg(prog)
-		// CompareYakMain(t, prog, ir)
+		// showProg(prog)
+		CompareYakMain(t, prog, ir)
 	})
 
 }
