@@ -139,9 +139,9 @@ func ParseStringToPorts(ports string) []int {
 
 	for _, raw := range strings.Split(ports, ",") {
 		raw = strings.TrimSpace(raw)
-		udpMultiplier := 1
+		proto := "tcp"
 		if strings.Contains(raw, "U:") {
-			udpMultiplier = -1
+			proto = "udp"
 			raw = strings.TrimPrefix(raw, "U:")
 		}
 
@@ -172,21 +172,34 @@ func ParseStringToPorts(ports string) []int {
 			}
 
 			for i := low; i <= high; i++ {
-				lports = append(lports, int(i)*udpMultiplier)
+				port := int(i)
+				if proto == "udp" {
+					port <<= 12
+				}
+				lports = append(lports, port)
 			}
 		} else {
 			port, err := strconv.ParseInt(raw, 10, 64)
 			if err != nil {
 				continue
 			}
-			lports = append(lports, int(port)*udpMultiplier)
+			p := int(port)
+			if proto == "udp" {
+				p <<= 12
+			}
+			lports = append(lports, p)
 		}
 	}
 
 	sort.Ints(lports)
 	return lports
 }
-
+func ParsePortToProtoPort(port int) (string, int) {
+	if port > 65535 {
+		return "udp", port >> 12
+	}
+	return "tcp", port
+}
 func SplitHostsToPrivateAndPublic(hosts ...string) (privs, pub []string) {
 	for _, host := range ParseStringToHosts(strings.Join(hosts, ",")) {
 		if IsPrivateIP(net.ParseIP(FixForParseIP(host))) {
@@ -419,7 +432,12 @@ func IsProtobuf(raw []byte) bool {
 func HostPort(host string, port interface{}) string {
 	return fmt.Sprintf("%v:%v", ParseHostToAddrString(host), port)
 }
-
+func ProtoHostPort(proto string, host string, port int) string {
+	if proto == "udp" {
+		port = port << 12
+	}
+	return HostPort(host, port)
+}
 func FixForParseIP(host string) string {
 	// 如果传入了 [::] 给 net.ParseIP 则会失败...
 	// 所以这里要特殊处理一下

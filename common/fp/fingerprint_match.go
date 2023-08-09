@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"math"
 	"net"
 	"strings"
 )
@@ -19,11 +18,7 @@ func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result 
 
 func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, options ...ConfigOption) (result *MatchResult, err error) {
 	host = utils2.ExtractHost(host)
-	isUDPPort := false
-	if port < 0 {
-		port = int(math.Abs(float64(port)))
-		isUDPPort = true
-	}
+	proto, port := utils2.ParsePortToProtoPort(port)
 	addr := utils2.HostPort(host, port)
 
 	if f.Config.IsFiltered(host, port) {
@@ -45,7 +40,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		config = f.Config
 	}
 
-	if isUDPPort {
+	if proto == "udp" {
 		config.TransportProtos = []TransportProto{UDP}
 	}
 

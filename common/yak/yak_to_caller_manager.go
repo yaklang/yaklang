@@ -56,7 +56,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 
 func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	var fTable = map[string]*YakFunctionCaller{}
-	engine := NewScriptEngine(100)
+	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		if id == "" {
