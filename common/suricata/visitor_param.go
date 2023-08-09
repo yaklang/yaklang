@@ -357,7 +357,18 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 		}
 
-		// conflict, save current and match with new empty rule
+		// pcre is individual
+		if contentRule.PCRE != "" {
+			pcre := contentRule.PCRE
+			contentRule.PCRE = ""
+			contents = append(contents, contentRule, &ContentRule{
+				PCRE: pcre,
+			})
+			contentRule = new(ContentRule)
+			continue
+		}
+
+		// conflict, save current and turn to new empty rule
 		if !set || i == len(params)-1 {
 			switch contentRule.Modifier {
 			case DNSQuery, FileData, HTTPHeader:
@@ -374,7 +385,9 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		if !set {
 			i--
 		}
+
 		set = true
 	}
+
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)
 }

@@ -12,7 +12,7 @@ type DNSRule struct {
 }
 
 // match dns
-func dnsMatcher(c *matchContext) error {
+func dnsIniter(c *matchContext) error {
 	if c.Rule.ContentRuleConfig == nil {
 		return nil
 	}
@@ -30,13 +30,18 @@ func dnsMatcher(c *matchContext) error {
 		}
 	}
 
-	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
-		switch r.Modifier {
+	c.SetBufferProvider(func(modifier Modifier) []byte {
+		switch modifier {
 		case DNSQuery:
-			c.Attach(newPayloadMatcher(r, dns.(*layers.DNS).Questions[0].Name))
+			return dns.(*layers.DNS).Questions[0].Name
 		case Default:
-			c.Attach(newPayloadMatcher(r, dns.LayerContents()))
+			return dns.LayerContents()
 		}
+		return nil
+	})
+
+	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
+		c.Attach(newPayloadMatcher(r, r.Modifier))
 	}
 	return nil
 }
