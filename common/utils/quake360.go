@@ -51,6 +51,66 @@ type quakeQueryParam struct {
 	Size  int    `json:"size"`
 }
 
+type quakeUserInfo struct {
+	Id      string `json:"id"`
+	IsBaned bool   `json:"baned"`
+	// 当月剩余
+	MonthRemainingCredit int    `json:"month_remaining_credit"`
+	TotalCredit          int    `json:"total_credit"`
+	ConstantCredit       int    `json:"constant_credit"`
+	BanStatus            string `json:"ban_status"`
+}
+
+func (q *Quake360Client) UserInfo() (*quakeUserInfo, error) {
+	req, err := http.NewRequest("GET", quakeUserAPI, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-QuakeToken", q.key)
+	req.Header.Set("User-Agent", "curl/7.64.1")
+
+	Debug(func() {
+		reqRaw, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			return
+		}
+		log.Infof("req: \n%s", string(reqRaw))
+	})
+
+	rsp, err := q.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	rspBody, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := gjson.ParseBytes(rspBody)
+	Debug(func() {
+		log.Infof("results: \n%v", string(rspBody))
+	})
+
+	code := result.Get("code")
+	if !code.Exists() || code.Int() != 0 {
+		return nil, Errorf("quake error: %s", result.Get("message").String())
+	}
+
+	data := result.Get("data")
+	user := &quakeUserInfo{
+		Id:                   data.Get("id").String(),
+		IsBaned:              data.Get("baned").Bool(),
+		MonthRemainingCredit: int(data.Get("month_remaining_credit").Int()),
+		TotalCredit:          int(data.Get("total_credit").Int()),
+		ConstantCredit:       int(data.Get("constant_credit").Int()),
+		BanStatus:            data.Get("ban_status").String(),
+	}
+
+	return user, nil
+}
+
 func (q *Quake360Client) QueryNext(start, size int, queries ...string) (*gjson.Result, error) {
 	query := strings.Join(queries, " ")
 	if query != "" && q.currentQuery != "" && q.currentQuery != query {
