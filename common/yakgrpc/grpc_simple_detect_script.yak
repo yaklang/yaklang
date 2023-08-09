@@ -316,7 +316,7 @@ if !skippedHostAliveScan {
 		showAliveHostCount()
 	}
 	// 如果开启存活检测，那么 host 总数应该为存活的IP
-	hostCount = aliveHostCount
+	hostCount = ScanHostCount
 	yakit.StatusCard("Ping存活主机数", aliveHostCount)
 	aliveHostStr = str.Trim(aliveHostStr, "\n")
 
