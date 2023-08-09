@@ -329,8 +329,18 @@ type Update struct {
 	address User
 }
 
+type FunctionAsmFlag int
+
+const (
+	DisAsmDefault FunctionAsmFlag = 1 << iota
+	DisAsmWithoutSource
+)
+
 // implement value
 func (f *Function) String() string {
+	return f.DisAsm(DisAsmDefault)
+}
+func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.name + " "
 	ret += strings.Join(
 		lo.Map(f.Param, func(item *Parameter, _ int) string { return item.variable }),
@@ -420,11 +430,35 @@ func (f *Function) String() string {
 
 	for _, b := range f.Blocks {
 		ret += b.String() + "\n"
+		if flag&DisAsmWithoutSource == 0 {
+			for _, p := range b.Phis {
+				ret += handlerInst(p) + "\n"
+			}
+			for _, i := range b.Instrs {
+				ret += handlerInst(i) + "\n"
+			}
+		} else {
+			insts := make([]string, 0, len(b.Instrs)+len(b.Phis))
+			pos := make([]string, 0, len(b.Instrs)+len(b.Phis))
 		for _, p := range b.Phis {
-			ret += handlerInst(p)
+				insts = append(insts, handlerInst(p))
+				pos = append(pos, p.Pos())
 		}
 		for _, i := range b.Instrs {
-			ret += handlerInst(i)
+				insts = append(insts, handlerInst(i))
+				pos = append(pos, i.Pos())
+			}
+			// get maxlen
+			max := 0
+			for _, s := range insts {
+				if len(s) > max {
+					max = len(s)
+				}
+			}
+			format := fmt.Sprintf("\t%%-%ds\t\t%%s\n", max)
+			for i := range insts {
+				ret += fmt.Sprintf(format, insts[i], pos[i])
+			}
 		}
 	}
 	return ret
