@@ -60,10 +60,12 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 		b.buildExpressionStmt(s)
 	}
 
-	//TODO: Block
-	//TODO: try Stmt
+	// block
+	if s, ok := stmt.Block().(*yak.BlockContext); ok {
+		b.buildBlock(s)
+	}
 
-	//TODO: empty
+	//TODO: try Stmt
 
 	// if stmt
 	if s, ok := stmt.IfStmt().(*yak.IfStmtContext); ok {
@@ -163,15 +165,15 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 	//	    ...enter...
 	//	    // for first expre in here
 	//      jump loop.header
-	// loop.header:
+	// loop.header: 		    <- enter, loop.latch
 	//      // for stmt cond in here
 	//      If [cond] true -> loop.body, false -> loop.exit
-	// loop.body:
+	// loop.body:	    		<- loop.header
 	//      // for body block in here
-	// loop.latch:                           (target of continue)
+	// loop.latch:              <- loop.body      (target of continue)
 	//      // for third expr in here
 	//      jump loop.header
-	// loop.exit:				              (target of break)
+	// loop.exit:	    		<- loop.header    (target of break)
 	//      jump rest
 	// rest:
 	//      ...rest.code....
@@ -283,9 +285,27 @@ func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
 
 //TODO: for range stmt
 
+// switch stmt
 func (b *builder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
+	//	    ...enter...
+	//      // switch stmt cond in here
+	//      switch cond default:[%switch.default] {var1:%switch.handler_var1, var2:%switch.handler_var2...}
+	// switch.done:   				<- switch.[*] // all switch block will jump to here
+	//      jump rest
+	// switch.default: 			  	<- enter
+	//      // default stmt in here
+	//      jump switch.done
+	// switch.handler_var1: 		<- enter
+	//      // case var1 stmt in here
+	//      jump switch.done
+	//      jump switch.{next_case} // if fallthough
+	// switch.handler_var1: 		<- enter
+	//      // case var1 stmt in here
+	//      jump switch.done
+	// rest: <- switch.done
+	//      ...rest.code....
 
 	//  parse expression
 	var cond Value
@@ -374,19 +394,19 @@ func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
 	//	    ...enter...
 	//      // if stmt cond in here
 	//      If [cond] true -> if.true, false -> if.elif
-	// if.true:
+	// if.true: 					<- enter
 	//      // if-true-body block in here
 	//      jump if.done
-	// if.elif:
-	//      // if-elif cond in here         (this build in "elif" and "else if")
+	// if.elif: 					<- enter
+	//      // if-elif cond in here    (this build in "elif" and "else if")
 	//      If [cond] true -> if.elif_true, false -> if.false
-	// if.elif_true:
+	// if.elif_true:				<- if.elif
 	//      // if-elif-true-body block in here
 	//      jump if.done
-	// if.false:
+	// if.false: 					<- if.elif
 	//      // if-elif-false-body block in here
 	//      jump if.done
-	// if.done:				              (target of all if block)
+	// if.done:				        <- if.elif_true,if.true,if.false  (target of all if block)
 	//      jump rest
 	// rest:
 	//      ...rest.code....
