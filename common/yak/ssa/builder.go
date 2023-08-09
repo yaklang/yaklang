@@ -70,7 +70,9 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 		b.buildIfStmt(s, nil)
 	}
 
-	//TODO: Switch stmt
+	if s, ok := stmt.SwitchStmt().(*yak.SwitchStmtContext); ok {
+		b.buildSwitchStmt(s)
+	}
 
 	//TODO: for range stmt
 
@@ -274,7 +276,83 @@ func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
 
 //TODO: for range stmt
 
-// TODO: switch stmt
+func (b *builder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	//  parse expression
+	var cond Value
+	if expr, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		cond = b.buildExpression(expr)
+	} else {
+		// expression is nil
+	}
+	enter := b.currentBlock
+	allcase := stmt.AllCase()
+	slabel := make([]switchlabel, 0, len(allcase))
+	handlers := make([]*BasicBlock, 0, len(allcase))
+	done := b.newBasicBlock("switch.done")
+	defaultb := b.newBasicBlock("switch.default")
+	enter.AddSucc(defaultb)
+
+	// handler label
+	for i := range allcase {
+		if exprlist, ok := stmt.ExpressionList(i).(*yak.ExpressionListContext); ok {
+			exprs := b.buildExpressionList(exprlist)
+			handler := b.newBasicBlock("switch.handler")
+			enter.AddSucc(handler)
+			handlers = append(handlers, handler)
+			if len(exprs) == 1 {
+				// only one expr
+				slabel = append(slabel, switchlabel{
+					exprs[0], handler,
+				})
+
+			} else {
+				for _, expr := range exprs {
+					slabel = append(slabel, switchlabel{
+						expr, handler,
+					})
+				}
+			}
+		}
+	}
+	// build body
+	for i := range allcase {
+		if stmtlist, ok := stmt.StatementList(i).(*yak.StatementListContext); ok {
+			b.target = &target{
+				tail:      b.target,
+				_break:    nil,
+				_continue: nil,
+			}
+			b.currentBlock = handlers[i]
+			b.buildStatementList(stmtlist)
+			b.emitJump(done)
+			b.target = b.target.tail
+		}
+	}
+	// default
+	if stmt.Default() != nil {
+		if stmtlist, ok := stmt.StatementList(len(allcase)).(*yak.StatementListContext); ok {
+			b.target = &target{
+				tail:         b.target,
+				_break:       nil,
+				_continue:    nil,
+			}
+			b.currentBlock = defaultb
+			b.buildStatementList(stmtlist)
+			b.emitJump(done)
+			b.target = b.target.tail
+		}
+	}
+
+	b.currentBlock = enter
+	b.emitSwitch(cond, defaultb, slabel)
+	rest := b.newBasicBlock("")
+	b.currentBlock = done
+	b.emitJump(rest)
+	b.currentBlock = rest
+}
 
 // if stmt
 func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
