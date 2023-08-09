@@ -61,11 +61,14 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 			field: make(map[Value]*Field),
 			users: []User{},
 		},
+		currtenPos: &Position{},
 	}
 	p.funcs = append(p.funcs, f)
 	f.symbol.Func = f
 	if parent != nil {
 		parent.AddAnonymous(f)
+		// Pos: parent.currtenPos,
+		f.Pos = parent.currtenPos
 	}
 	enter := f.newBasicBlock("entry")
 	f.currentBlock = enter

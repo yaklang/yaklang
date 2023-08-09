@@ -27,19 +27,25 @@ func (f *Function) emit(i Instruction) {
 	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
 }
 
+func (f *Function) newAnInstuction() anInstruction {
+	return anInstruction{
+		Func:  f,
+		Block: f.currentBlock,
+		typ:   nil,
+		pos:   f.currtenPos,
+	}
+}
+
 func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 	if f.currentBlock.finish {
 		return nil
 	}
 	b := &BinOp{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-		},
-		Op:   op,
-		X:    x,
-		Y:    y,
-		user: []User{},
+		anInstruction: f.newAnInstuction(),
+		Op:            op,
+		X:             x,
+		Y:             y,
+		user:          []User{},
 	}
 	fixupUseChain(b)
 	f.emit(b)
@@ -51,11 +57,8 @@ func (f *Function) emitIf(cond Value) *If {
 		return nil
 	}
 	ifssa := &If{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-		},
-		Cond: cond,
+		anInstruction: f.newAnInstuction(),
+		Cond:          cond,
 	}
 	fixupUseChain(ifssa)
 	f.emit(ifssa)
@@ -69,12 +72,10 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 	}
 
 	j := &Jump{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-		},
-		To: to,
+		anInstruction: f.newAnInstuction(),
+		To:            to,
 	}
+	j.anInstruction.pos = nil
 	f.emit(j)
 	f.currentBlock.AddSucc(to)
 	f.currentBlock.finish = true
@@ -86,11 +87,8 @@ func (f *Function) emitReturn(vs []Value) *Return {
 		return nil
 	}
 	r := &Return{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-		},
-		Results: vs,
+		anInstruction: f.newAnInstuction(),
+		Results:       vs,
 	}
 	fixupUseChain(r)
 	f.emit(r)
@@ -182,15 +180,12 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 		}
 	}
 	c := &Call{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-		},
-		Method:      target,
-		Args:        args,
-		user:        []User{},
-		isDropError: isDropError,
-		binding:     binding,
+		anInstruction: f.newAnInstuction(),
+		Method:        target,
+		Args:          args,
+		user:          []User{},
+		isDropError:   isDropError,
+		binding:       binding,
 	}
 
 	fixupUseChain(c)
@@ -212,22 +207,18 @@ func (f *Function) emitInterface(parentI *Interface, typ types.Type, low, high, 
 		panic("emit interface unknow type")
 	}
 	i := &Interface{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-			typ:   typ,
-		},
-		parentI: parentI,
-		ITyp:    ITyp,
-		low:     low,
-		high:    high,
-		max:     max,
-		field:   make(map[Value]*Field, 0),
-		Len:     Len,
-		Cap:     Cap,
-		users:   make([]User, 0),
+		anInstruction: f.newAnInstuction(),
+		parentI:       parentI,
+		ITyp:          ITyp,
+		low:           low,
+		high:          high,
+		max:           max,
+		field:         make(map[Value]*Field, 0),
+		Len:           Len,
+		Cap:           Cap,
+		users:         make([]User, 0),
 	}
-
+	i.anInstruction.typ = typ
 	f.emit(i)
 	fixupUseChain(i)
 	return i
@@ -247,13 +238,9 @@ func (f *Function) emitField(i *Interface, key Value) *Field {
 func (f *Function) emitUpdate(address User, v Value) *Update {
 	//use-value-chain: address -> update -> value
 	s := &Update{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: f.currentBlock,
-			typ:   nil,
-		},
-		value:   v,
-		address: address,
+		anInstruction: f.newAnInstuction(),
+		value:         v,
+		address:       address,
 	}
 	f.emit(s)
 	fixupUseChain(s)
