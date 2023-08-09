@@ -218,7 +218,6 @@ entry0:
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
@@ -247,7 +246,6 @@ entry0:
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
@@ -491,8 +489,10 @@ func TestSwitch(t *testing.T) {
 a = 2
 switch a {
 case 1, 2:
+	fallthrough
 case 3:
 case 4:
+	fallthrough
 default:
 }
 	`
@@ -505,11 +505,11 @@ switch.done1: <- switch.handler4 switch.default2
 switch.default2: <- entry0 switch.handler5
                 jump -> switch.done1
 switch.handler3: <- entry0
-                jump -> switch.done1
+                jump -> switch.handler4
 switch.handler4: <- entry0 switch.handler3
                 jump -> switch.done1
 switch.handler5: <- entry0
-                jump -> switch.done1
+                jump -> switch.default2
 b6: <- switch.done1
 	`
 		prog := parseSSA(code)
