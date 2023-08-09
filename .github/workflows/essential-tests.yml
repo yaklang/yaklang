@@ -90,6 +90,9 @@ jobs:
           - name: Test Suricata Match
             run: go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
 
+          - name: Test Ping
+            run: go test -timeout 20s TestPingAutoConfig ./common/utils/pingutil -v
+
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3

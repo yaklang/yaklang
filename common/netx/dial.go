@@ -17,6 +17,13 @@ func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx conte
 			return nil, utils.Errorf("cannot parse %v as host:port, reason: %v", addr, err)
 		}
 
+		ddl, ok := ctx.Deadline()
+		if ok {
+			if du := ddl.Sub(time.Now()); du.Seconds() > 0 {
+				timeout = du
+			}
+		}
+
 		if utils.IsIPv4(host) || utils.IsIPv6(host) {
 			return net.DialTimeout(network, utils.HostPort(host, port), timeout)
 		}
