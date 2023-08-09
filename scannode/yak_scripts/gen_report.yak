@@ -205,10 +205,21 @@ reportInstance.Markdown(`# 1、项目概述
 // targetRawLen = len(str.ParseStringToHosts(targetRaw))
 // redlinePortsLen = len(str.ParseStringToPorts(ports)) + len(str.ParseStringToPorts(ports))
 totalTasks = hostTotal * portTotal
+
+riskGrade = "低危"
+if criticalLens > 0{
+    riskGrade = "超危"
+} else if highLens > 0{
+    riskGrade = "高危"
+} else if warningLens > 0{
+     riskGrade = "中危"
+}
+
 reportInstance.Markdown(sprintf(
     `
 本次测试的总体安全现状如下：
 
+- 风险等级：%v
 - 扫描端口数：%v个
 - 开放端口数：%v个
 - 存活主机数：%v个
@@ -216,6 +227,7 @@ reportInstance.Markdown(sprintf(
 - 每台主机涉及端口数：%v个
 
 `,
+    riskGrade,
     totalTasks,
     openPortCount,
     aliveHostCount,
@@ -773,7 +785,10 @@ func showCVEReportLm(risks, riskSeverity) {
                 complexity = "UNKNOWN"
             }
             addr := sprintf(`%v:%v`, cve.Host, cve.Port)
-
+            parameter = "-"
+            if customHasPrefix(cve.Parameter, "cpe") {
+            	parameter = cve.Parameter
+            }
             if cve.Severity == riskSeverity {
                cveResult = append(cveResult, {
                         "标题": {
@@ -801,6 +816,10 @@ func showCVEReportLm(risks, riskSeverity) {
                              "sort": 6,
                              "value": solution
                         },
+                        "扫描规则": {
+                             "sort": 7,
+                             "value": parameter
+                        },
                         "联网状态": accessVector,
                         "可利用复杂度": complexity
                })
@@ -813,6 +832,20 @@ func showCVEReportLm(risks, riskSeverity) {
 
     }
 
+}
+
+func customHasPrefix(str, prefix) {
+	if len(str) < len(prefix) {
+		return false
+	}
+
+	for i := 0; i < len(prefix); i++ {
+		if str[i] != prefix[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 if len(criticalPotentialRisks) > 0 {

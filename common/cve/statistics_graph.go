@@ -280,12 +280,23 @@ func (s *Statistics) ToGraphs() []*Graph {
 
 	// Years
 	pairs = []*KVPair{}
-	for key, count := range s.YearsCounter {
+	for key, count := range s.YearsSeverityCounter {
+		var a []*KVPair
+		yearsCount := 0
+		for k, v := range count {
+			a = append(a, &KVPair{
+				Key:       k,
+				Value:     v,
+				ShowValue: v,
+			})
+			yearsCount = yearsCount + v
+		}
 		pairs = append(pairs, &KVPair{
 			Key:        key,
-			Value:      count,
-			ShowValue:  count,
+			Value:      yearsCount,
+			ShowValue:  yearsCount,
 			KeyVerbose: "CVE-" + fmt.Sprint(key),
+			Data:       a,
 		})
 	}
 	sort.SliceStable(pairs, func(i, j int) bool {
@@ -294,7 +305,7 @@ func (s *Statistics) ToGraphs() []*Graph {
 	g = &Graph{
 		Name:        "years-analysis",
 		NameVerbose: "CVE 年份统计",
-		Type:        "general",
+		Type:        "year-cve",
 		TypeVerbose: "通用KV",
 		Data:        pairs,
 	}

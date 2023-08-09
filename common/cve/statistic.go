@@ -8,12 +8,13 @@ import (
 )
 
 type KVPair struct {
-	Key        string `json:"key"`
-	Value      int    `json:"value"`
-	ShowValue  int    `json:"show_value"`
-	KeyVerbose string `json:"key_verbose"`
-	Detail     string `json:"detail"`
-	JumpLink   string `json:"jump_link"`
+	Key        string      `json:"key"`
+	Value      int         `json:"value"`
+	ShowValue  int         `json:"show_value"`
+	KeyVerbose string      `json:"key_verbose"`
+	Detail     string      `json:"detail"`
+	JumpLink   string      `json:"jump_link"`
+	Data       interface{} `json:"data"`
 }
 
 func NewStatistics(source string) *Statistics {
@@ -34,13 +35,14 @@ type Statistics struct {
 	NetworkCount                      int
 
 	// NETWORK/LOCAL/ADJACENT_NETWORK/PHYSICAL
-	CWECounter               map[string]int /* 探明漏洞类型 */
-	AccessVectorCounter      map[string]int /* 总体攻击路径的统计 */
-	ComplexityCounter        map[string]int /* 攻击复杂度判定 */
-	NetworkComplexityCounter map[string]int /* 网络攻击复杂度 */
-	LocalComplexityCounter   map[string]int /* 本地攻击复杂度 */
-	YearsCounter             map[string]int /* 按年度统计 */
-	SeverityCounter          map[string]int /* 按危险程度统计 */
+	CWECounter               map[string]int            /* 探明漏洞类型 */
+	AccessVectorCounter      map[string]int            /* 总体攻击路径的统计 */
+	ComplexityCounter        map[string]int            /* 攻击复杂度判定 */
+	NetworkComplexityCounter map[string]int            /* 网络攻击复杂度 */
+	LocalComplexityCounter   map[string]int            /* 本地攻击复杂度 */
+	YearsCounter             map[string]int            /* 按年度统计 */
+	SeverityCounter          map[string]int            /* 按危险程度统计 */
+	YearsSeverityCounter     map[string]map[string]int /* 按年度统计 */
 }
 
 func (s *Statistics) init() {
@@ -55,6 +57,7 @@ func (s *Statistics) init() {
 	s.YearsCounter = make(map[string]int)
 	s.SeverityCounter = make(map[string]int)
 	s.CWECounter = make(map[string]int)
+	s.YearsSeverityCounter = make(map[string]map[string]int)
 }
 
 func (s *Statistics) Feed(c *cveresources.CVE) {
@@ -77,6 +80,14 @@ func (s *Statistics) Feed(c *cveresources.CVE) {
 		s.SeverityCounter[severity]++
 	} else {
 		s.SeverityCounter[severity] = 1
+	}
+
+	for k, _ := range s.YearsCounter {
+		if s.YearsSeverityCounter[k] == nil {
+			s.YearsSeverityCounter[k] = make(map[string]int)
+		}
+		// 增加计数
+		s.YearsSeverityCounter[k][severity]++
 	}
 
 	accessVector := c.AccessVector
