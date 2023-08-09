@@ -44,6 +44,9 @@ type Instruction interface {
 
 	String() string
 	StringByFunc(func(Value) string) string
+
+	// pos
+	Pos() string
 }
 
 func DefaultValueString(v Value) string {
@@ -105,8 +108,10 @@ type Function struct {
 
 	// User
 	user []User
+	Pos  *Position // current position
 
 	// for build
+	currtenPos   *Position
 	currentBlock *BasicBlock                      // current block to build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variable][block]value
 }
@@ -133,6 +138,15 @@ type BasicBlock struct {
 	user []User
 }
 
+type Position struct {
+	// SourceCodeFilePath *string
+	SourceCode  string
+	StartLine   int
+	StartColumn int
+	EndLine     int
+	EndColumn   int
+}
+
 type anInstruction struct {
 	// function
 	Func *Function
@@ -140,6 +154,9 @@ type anInstruction struct {
 	Block *BasicBlock
 	// type
 	typ types.Type
+
+	// source code position
+	pos *Position
 }
 
 // value
@@ -321,7 +338,11 @@ func (f *Function) String() string {
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
-		ret += "parent: " + parent.name + "\n"
+		ret += fmt.Sprintf("parent: %s\n", parent.name)
+	}
+
+	if f.Pos != nil {
+		ret += fmt.Sprintf("pos: %s\n", f.Pos)
 	}
 
 	instReg := make(map[Instruction]string)
@@ -390,7 +411,10 @@ func (f *Function) String() string {
 	}
 
 	handlerInst := func(i Instruction) string {
-		ret := "\t" + i.StringByFunc(getStr) + "\n"
+		ret := fmt.Sprintf(
+			"\t%s",
+			i.StringByFunc(getStr),
+		)
 		return ret
 	}
 
@@ -421,9 +445,25 @@ func (b *BasicBlock) String() string {
 
 var _ Value = (*BasicBlock)(nil)
 
+func (p *Position) String() string {
+	return fmt.Sprintf(
+		"%3d:%-3d - %3d:%-3d: %s",
+		p.StartLine, p.StartColumn,
+		p.EndLine, p.EndColumn,
+		p.SourceCode,
+	)
+}
+
 // implement instruction
 func (a *anInstruction) GetBlock() *BasicBlock { return a.Block }
 func (a *anInstruction) GetParent() *Function  { return a.Func }
+func (a *anInstruction) Pos() string {
+	if a.pos != nil {
+		return a.pos.String()
+	} else {
+		return ""
+	}
+}
 
 // ----------- Phi
 func (p *Phi) String() string {
