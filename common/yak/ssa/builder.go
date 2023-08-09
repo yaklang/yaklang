@@ -236,22 +236,22 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 }
 
 // for first expr
-func (f *builder) buildForFirstExpr(state *yak.ForFirstExprContext) {
-	if ae, ok := state.AssignExpression().(*yak.AssignExpressionContext); ok {
-		f.buildAssignExpression(ae)
+func (b *builder) buildForFirstExpr(stmt *yak.ForFirstExprContext) {
+	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
+		b.buildAssignExpression(ae)
 	}
-	if e, ok := state.Expression().(*yak.ExpressionContext); ok {
-		f.buildExpression(e)
+	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		b.buildExpression(e)
 	}
 }
 
 // for third expr
-func (f *builder) buildForThirdExpr(state *yak.ForThirdExprContext) {
-	if ae, ok := state.AssignExpression().(*yak.AssignExpressionContext); ok {
-		f.buildAssignExpression(ae)
+func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
+	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
+		b.buildAssignExpression(ae)
 	}
-	if e, ok := state.Expression().(*yak.ExpressionContext); ok {
-		f.buildExpression(e)
+	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		b.buildExpression(e)
 	}
 }
 
@@ -260,7 +260,7 @@ func (f *builder) buildForThirdExpr(state *yak.ForThirdExprContext) {
 // TODO: switch stmt
 
 // if stmt
-func (b *builder) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
+func (b *builder) buildIfStmt(stmt *yak.IfStmtContext, done *BasicBlock) {
 	//	    ...enter...
 	//      // if stmt cond in here
 	//      If [cond] true -> if.true, false -> if.elif
@@ -282,7 +282,7 @@ func (b *builder) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 	//      ...rest.code....
 
 	// condition
-	cond := b.buildExpression(state.Expression(0).(*yak.ExpressionContext))
+	cond := b.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
 	// if instruction
 	ifssa := b.emitIf(cond)
 	isOutIf := false
@@ -297,13 +297,16 @@ func (b *builder) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 
 	// build true block
 	b.currentBlock = trueBlock
-	b.buildBlock(state.Block(0).(*yak.BlockContext))
+	if blockstmt, ok := stmt.Block(0).(*yak.BlockContext); ok {
+		b.buildBlock(blockstmt)
+	}
+	// b.buildBlock(stmt.Block(0).(*yak.BlockContext))
 	b.emitJump(done)
 
 	// handler "elif"
 	previf := ifssa
 	// add elif block to prev-if false
-	for index := range state.AllElif() {
+	for index := range stmt.AllElif() {
 		// create false block
 		if previf.False == nil {
 			previf.AddFalse(b.newBasicBlock("if.elif"))
@@ -311,7 +314,8 @@ func (b *builder) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		// in false block
 		b.currentBlock = previf.False
 		// build condition
-		cond := b.buildExpression(state.Expression(index + 1).(*yak.ExpressionContext))
+		if condstmt, ok := stmt.Expression(index + 1).(*yak.ExpressionContext); ok {
+			cond := b.buildExpression(condstmt)
 		// if instruction
 		currentif := b.emitIf(cond)
 		// create true block
@@ -319,15 +323,18 @@ func (b *builder) buildIfStmt(state *yak.IfStmtContext, done *BasicBlock) {
 		currentif.AddTrue(trueBlock)
 		// build true block
 		b.currentBlock = trueBlock
-		b.buildBlock(state.Block(index + 1).(*yak.BlockContext))
+			if blockstmt, ok := stmt.Block(index + 1).(*yak.BlockContext); ok {
+				b.buildBlock(blockstmt)
+			}
 		// jump to done
 		b.emitJump(done)
 		// for next elif
 		previf = currentif
+		}
 	}
 
 	// hanlder "else" and "else if "
-	if elseStmt, ok := state.ElseBlock().(*yak.ElseBlockContext); ok {
+	if elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext); ok {
 		if elseblock, ok := elseStmt.Block().(*yak.BlockContext); ok {
 			// "else"
 			// create false block
@@ -439,22 +446,22 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 //TODO: declear variable expression
 
 // left expression list
-func (f *builder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []LeftValue {
+func (b *builder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []LeftValue {
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
 	values := make([]LeftValue, valueLen)
 	for i, e := range exprs {
 		if e, ok := e.(*yak.LeftExpressionContext); ok {
-			values[i] = f.buildLeftExpression(forceAssign, e)
+			values[i] = b.buildLeftExpression(forceAssign, e)
 		}
 	}
 	return values
 }
 
 // left  expression
-func (f *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) LeftValue {
+func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) LeftValue {
 	if s := stmt.Identifier(); s != nil {
-		if v := f.readVariable(s.GetText()); v != nil {
+		if v := b.readVariable(s.GetText()); v != nil {
 			// when v exist
 			switch v := v.(type) {
 			case *Field:
@@ -462,11 +469,11 @@ func (f *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 			case *Parameter:
 			default:
 			}
-		} else if !forceAssign && f.CanBuildFreeValue(s.GetText()) {
-			field := f.parent.newField(s.GetText())
-			f.FreeValues = append(f.FreeValues, field)
-			f.parent.writeVariable(s.GetText(), field)
-			f.writeVariable(s.GetText(), field)
+		} else if !forceAssign && b.CanBuildFreeValue(s.GetText()) {
+			field := b.parent.newField(s.GetText())
+			b.FreeValues = append(b.FreeValues, field)
+			b.parent.writeVariable(s.GetText(), field)
+			b.writeVariable(s.GetText(), field)
 			return field
 		}
 		return &IdentifierLV{
@@ -474,15 +481,15 @@ func (f *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 		}
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		expr := f.buildExpression(s)
+		expr := b.buildExpression(s)
 		if expr == nil {
 			panic("leftexpression expression is nil")
 		}
 
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
-			index := f.buildLeftSliceCall(s)
+			index := b.buildLeftSliceCall(s)
 			if expr, ok := expr.(*Interface); ok {
-				return f.emitField(expr, index)
+				return b.emitField(expr, index)
 			} else {
 				panic("leftexprssion exprssion is not interface")
 			}
@@ -496,9 +503,9 @@ func (f *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 //TODO: left member call
 
 // left slice call
-func (f *builder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) Value {
+func (b *builder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) Value {
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		return f.buildExpression(s)
+		return b.buildExpression(s)
 	}
 	return nil
 }
