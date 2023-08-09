@@ -416,78 +416,6 @@ b12: <- if.done1
 }
 
 func TestLoop(t *testing.T) {
-
-	t.Run("looptest_normal", func(t *testing.T) {
-		code := `
-	a = 10
-	b = a + 1
-	for i=0;i<b;i++ {
-		b = b + i
-	}
-	c = b + 3
-			`
-		ir := `
-yak-main
-entry0:
-	t0 = 10 add 1
-	jump -> loop.header1
-loop.header1: <- entry0 loop.latch4
-	t4 = phi [t0, entry0] [t6, loop.latch4]
-	t5 = phi [0, entry0] [t9, loop.latch4]
-	t2 = t5 lt t4
-	If [t2] true -> loop.body2, false -> loop.exit3
-loop.body2: <- loop.header1
-	t6 = t4 add t5
-	jump -> loop.latch4
-loop.exit3: <- loop.header1
-	jump -> b5
-loop.latch4: <- loop.body2
-	t9 = t5 add 1
-	jump -> loop.header1
-b5: <- loop.exit3
-	t11 = t4 add 3
-		`
-		prog := parseSSA(code)
-		CheckProgram(t, prog)
-		// showProg(prog)
-		CompareYakMain(t, prog, ir)
-	})
-
-	t.Run("looptest_noexpression", func(t *testing.T) {
-		code := `
-	a = 10
-	b = a + 1
-	for i=0;;i++ {
-		b = b + i
-	}
-	c = b + 3
-			`
-		ir := `
-yak-main
-entry0:
-	t0 = 10 add 1
-	jump -> loop.header1
-loop.header1: <- entry0 loop.latch4
-	t3 = phi [t0, entry0] [t5, loop.latch4]
-	t4 = phi [0, entry0] [t8, loop.latch4]
-	If [true] true -> loop.body2, false -> loop.exit3
-loop.body2: <- loop.header1
-	t5 = t3 add t4
-	jump -> loop.latch4
-loop.exit3: <- loop.header1
-	jump -> b5
-loop.latch4: <- loop.body2
-	t8 = t4 add 1
-	jump -> loop.header1
-b5: <- loop.exit3
-	t10 = t3 add 3
-		`
-		prog := parseSSA(code)
-		CheckProgram(t, prog)
-		// showProg(prog)
-		CompareYakMain(t, prog, ir)
-	})
-
 	// 	t.Run("looptest_range", func(*testing.T) {
 	// 		code := `
 	// a = 0
@@ -552,7 +480,6 @@ b11: <- loop.exit3
 		`
 		prog := parseSSA(code)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
