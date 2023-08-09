@@ -205,16 +205,18 @@ func TestBasicBlock(t *testing.T) {
 a = 42 
 b = a 
 c = a + b + 33
-a = c + 23 
+a = c * 23 
 d = a + 11
+d = a >> 11
 		`
 		ir := `
 yak-main
 entry0:
-	t0 = 42 add 42
-	t1 = t0 add 33
-	t2 = t1 add 23
-	t3 = t2 add 11
+		t0 = 42 add 42
+		t1 = t0 add 33
+		t2 = t1 mul 23
+		t3 = t2 add 11
+		t4 = t2 shr 11
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
