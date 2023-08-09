@@ -146,8 +146,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			}
 			debugger := v.vm.debugger
 			if debugger.InRootState() {
-				debugger.description = "The program is finished"
-				debugger.finished = true
+				debugger.SetFinished()
 
 				v.vm.debugger.Callback()
 			}
