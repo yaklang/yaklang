@@ -537,11 +537,11 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := b.emitArith(yakvm.OpAdd, lvalue.GetValue(b.Function), NewConst(int64(1)))
+		rvalue := b.emitArith(yakvm.OpAdd, lvalue.GetValue(b.Function), NewConst(1))
 		lvalue.Assign(rvalue, b.Function)
 	} else if stmt.SubSub() != nil { // --
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
-		rvalue := b.emitArith(yakvm.OpSub, lvalue.GetValue(b.Function), NewConst(int64(1)))
+		rvalue := b.emitArith(yakvm.OpSub, lvalue.GetValue(b.Function), NewConst(1))
 		lvalue.Assign(rvalue, b.Function)
 	}
 
@@ -662,7 +662,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 	if s := stmt.Literal(); s != nil {
 		//TODO: literal
 		i, _ := strconv.ParseInt(s.GetText(), 10, 64)
-		return NewConst(int64(i))
+		return NewConst(i)
 	}
 
 	// anonymous function decl
@@ -839,7 +839,7 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 	if s, ok := stmt.ExpressionListMultiline().(*yak.ExpressionListMultilineContext); ok {
 		exprs = b.buildExpressionListMultiline(s)
 	}
-	zero := NewConst(int64(0))
+	zero := NewConst(0)
 	switch typ.(type) {
 	case *types.Slice:
 		// fmt.Printf("debug %s %v %d\n", "make slice", typ, num)

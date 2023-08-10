@@ -2,8 +2,8 @@ package ssa
 
 import (
 	"fmt"
-	"go/constant"
 	"go/types"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -190,21 +190,9 @@ type Phi struct {
 // only Value
 type Const struct {
 	user  []User
-	value constant.Value
-}
-
-func NewConst(i any) *Const {
-	c, ok := ConstMap[i]
-	if !ok {
-		c = &Const{
-		user:  []User{},
-		value: constant.Make(i),
-	}
-		// const should same
-		// assert newConst(1) ==newConst(1)
-		ConstMap[i] = c
-	}
-	return c
+	value any
+	typ   types.Type
+	str   string
 }
 
 // parameter
@@ -547,8 +535,32 @@ var _ User = (*Phi)(nil)
 var _ Instruction = (*Phi)(nil)
 
 // ----------- Const
+// create const
+func NewConst(i any) *Const {
+	c, ok := ConstMap[i]
+	if !ok {
+		// build new const
+		typestr := reflect.TypeOf(i).String()
+		c = &Const{
+			value: i,
+			typ:   basicTypes[typestr],
+			str:   fmt.Sprintf("%v", i),
+		}
+		// const should same
+		// assert newConst(1) ==newConst(1)
+		ConstMap[i] = c
+	}
+	return c
+}
+
+// string
 func (c Const) String() string {
-	return strings.Trim(c.value.String(), "\"")
+	return c.str
+}
+
+// get type
+func (c Const) GetType() types.Type {
+	return c.typ
 }
 
 var _ Node = (*Const)(nil)
