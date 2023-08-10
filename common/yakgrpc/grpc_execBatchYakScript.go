@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -56,6 +57,9 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 			}
 		} else {
 			var filter = req.GetPluginFilter()
+			if filter.Type == "nasl" {
+				groupSize = math.MaxInt
+			}
 			if filter.GetNoResultReturn() {
 				return utils.Errorf("no poc selected")
 			}
@@ -111,6 +115,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 	if groupSize <= 0 {
 		groupSize = 5
 	}
+
 	yakScriptGroups := funk.Chunk(rsp, int(groupSize)).([][]*ypb.YakScript)
 	groupScriptTotal := len(yakScriptGroups)
 

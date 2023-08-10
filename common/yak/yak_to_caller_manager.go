@@ -692,7 +692,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
-			v.(func(...any))(id)
+			v.(func(string))(id)
 			return nil
 		}
 	}
@@ -722,10 +722,8 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	// 对于nasl插件还需要提取加载函数
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		f := func(name string) {
-			if strings.HasPrefix(name, "__NaslScript__") {
-				name = name[len("__NaslScript__"):]
-			} else {
-				log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, "nasl script name must start with __NaslScript__")
+			if !strings.HasSuffix(strings.ToLower(name), ".nasl") {
+				log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, "nasl script name must end with .nasl")
 				return
 			}
 			defer func() {
