@@ -10,7 +10,7 @@ import (
 
 var sRe = regexp.MustCompile(`(?i)\|(?P<single>[0-9a-f][0-9a-f])( (?P<after>[0-9a-f][0-9a-f]))*\|`)
 
-func unquoteString(s string) string {
+func unquoteAndParseHex(s string) string {
 	rawStr, err := strconv.Unquote(s)
 	if err != nil {
 		return strings.Trim(strings.TrimSpace(s), `"`)
@@ -21,6 +21,22 @@ func unquoteString(s string) string {
 		var originBytes, _ = codec.DecodeHex(origin)
 		return string(originBytes)
 	})
+}
+
+var unquoteReplacer = strings.NewReplacer(`\"`, `"`, `\\`, `\`, `\;`, `;`)
+
+func unquoteString(s string) string {
+	if !(strings.HasSuffix(s, `"`) && strings.HasPrefix(s, `"`)) {
+		return s
+	}
+	s = strings.Trim(s, `"`)
+	var tmp string
+	tmp = unquoteReplacer.Replace(s)
+	for tmp != s {
+		s = tmp
+		tmp = unquoteReplacer.Replace(s)
+	}
+	return tmp
 }
 
 // setIfNotZero set dst to src if dst is not zero value
