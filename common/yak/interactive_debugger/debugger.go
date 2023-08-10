@@ -25,7 +25,6 @@ func NewInteractiveDebugger() *InteractiveDebugger {
 func (i *InteractiveDebugger) Init() func(g *yakvm.Debugger) {
 	return func(g *yakvm.Debugger) {
 		// 在第一个opcode执行的时候开始回调
-		// g.SetBreakPoint(true, 1)
 		fmt.Printf("Yak version: %s\nType 'help' for help info.\n", consts.GetYakVersion())
 		g.Callback()
 	}
@@ -312,10 +311,12 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 				}
 			case "stack":
 				// get all stackTrace
-				for tid, st := range g.GetStackTraces() {
+				for _, stackTraces := range g.GetStackTraces() {
+					tid := stackTraces.ThreadID
+					sts := stackTraces.StackTraces
 					fmt.Printf("Goroutine %d\n", tid)
-					if len(st) > 0 {
-						for _, t := range st {
+					if len(sts) > 0 {
+						for _, t := range sts {
 							fmt.Printf("  line %d in %s\n", t.Line, t.Name)
 						}
 					} else {
