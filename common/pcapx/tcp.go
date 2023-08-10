@@ -42,7 +42,7 @@ func CreateTCPHandshakePackets(src, dst string, payload []byte) (
 	error,
 ) {
 	if src == "" {
-		_, _, srcRaw, err := GetPublicRoute()
+		_, _, srcRaw, err := getPublicRoute()
 		if err != nil {
 			return nil, nil, nil, nil, nil, utils.Error("cannot found src route")
 		}

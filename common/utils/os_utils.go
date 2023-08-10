@@ -152,7 +152,7 @@ func DebugMockHTTPHandlerFunc(handlerFunc http.HandlerFunc) (string, int) {
 }
 
 func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.HandlerFunc) (string, int) {
-	host := "127.0.0.1"
+	host := "0.0.0.0"
 	port := GetRandomAvailableTCPPort()
 	lis, err := net.Listen("tcp", HostPort(host, port))
 	if err != nil {
@@ -178,7 +178,7 @@ func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.Handl
 	if err != nil {
 		panic(err)
 	}
-	return host, port
+	return "127.0.0.1", port
 }
 
 func DebugMockHTTP(rsp []byte) (string, int) {

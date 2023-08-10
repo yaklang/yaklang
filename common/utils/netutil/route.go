@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"github.com/yaklang/yaklang/common/utils/netutil/routewrapper"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -63,13 +65,28 @@ func RouteAndArpWithTimeout(t time.Duration, target string) (net.HardwareAddr, e
 		return iface.HardwareAddr, nil
 	}
 
-	return utils.ArpWithTimeout(t, iface.Name, targetIP.String())
+	return arpx.ArpWithTimeout(t, iface.Name, targetIP.String())
 }
 
 var (
 	DarwinGetawayExtractorRe   = regexp2.MustCompile(`gateway: ([\[\]0-9a-fA-TaskFunc:\.]+)`, regexp2.IgnoreCase|regexp2.Multiline)
 	DarwinInterfaceExtractorRe = regexp2.MustCompile(`interface: ([^\s]+)`, regexp2.IgnoreCase|regexp2.Multiline)
 )
+
+var (
+	notifyOnce = new(sync.Once)
+)
+
+func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
+	iface, gw, ip, err := Route(5*time.Second, "8.8.8.8")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	notifyOnce.Do(func() {
+		log.Infof("public interface network: %v gw: %v local: %v", iface.Name, gw.String(), ip.String())
+	})
+	return iface, gw, ip, nil
+}
 
 func Route(timeout time.Duration, target string) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
 	var addr = target

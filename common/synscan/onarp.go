@@ -40,7 +40,7 @@ func (s *Scanner) waitForArpResponse(ctx context.Context, dst net.IP) (net.Hardw
 		}
 	})
 	if err != nil {
-		return nil, errors.Errorf("register arp handler failed: %s", err)
+		return nil, errors.Errorf("register arpx handler failed: %s", err)
 	}
 	defer s.UnregisterARPHandler(dst.String())
 
@@ -49,7 +49,7 @@ func (s *Scanner) waitForArpResponse(ctx context.Context, dst net.IP) (net.Hardw
 		if targetHardware != nil {
 			return targetHardware, nil
 		} else {
-			return nil, errors.Errorf("timeout or cannot found arp response for %v", dst.String())
+			return nil, errors.Errorf("timeout or cannot found arpx response for %v", dst.String())
 		}
 	}
 }

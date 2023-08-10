@@ -14,7 +14,7 @@ import (
 
 func injectWithError(raw []byte, c *Config) error {
 	if c.Iface == "" && PublicInterface != nil {
-		iface, _, _, err := GetPublicRoute()
+		iface, _, _, err := getPublicRoute()
 		if err != nil {
 			return utils.Errorf("get default public iface failed: %s", err)
 		}
@@ -123,7 +123,7 @@ func InjectTCPPayload(payload []byte, opt ...ConfigOption) {
 		c.ToServer = true
 	}
 	if c.TCPLocalAddress == "" {
-		_, _, ip, err := GetPublicRoute()
+		_, _, ip, err := getPublicRoute()
 		if err != nil {
 			log.Errorf("cannot fetch public route failed: %s", err)
 		}
@@ -374,7 +374,7 @@ func InjectChaosTraffic(t *chaosmaker.ChaosTraffic, opts ...ConfigOption) {
 	}
 
 	if t.HttpResponse != nil {
-		_, _, _, _ = GetPublicRoute()
+		_, _, _, _ = getPublicRoute()
 		InjectTCPPayload(t.HttpResponse, append(opts, WithToClient(), WithLocalAddress(PublicPreferredAddress.String()+":80"))...)
 	}
 
