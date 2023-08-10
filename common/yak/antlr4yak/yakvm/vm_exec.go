@@ -274,7 +274,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	if v.vm.debugMode && !v.indebuggerEval {
 		debugger := v.vm.debugger
 		debugger.Wait()
-		debugger.BreakPointCallback(v)
+		debugger.ShouldCallback(v)
 	}
 
 	switch c.Opcode {

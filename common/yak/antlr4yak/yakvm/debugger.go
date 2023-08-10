@@ -466,7 +466,7 @@ func (g *Debugger) HandleForStepOut() {
 	g.Callback()
 }
 
-func (g *Debugger) BreakPointCallback(frame *Frame) {
+func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
