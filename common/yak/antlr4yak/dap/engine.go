@@ -35,7 +35,7 @@ func RunProgramInDebugMode(debug bool, program string, args []string) error {
 	}
 
 	// inject args in cli
-	yaklib.InjectArgs(args)
+	yaklib.InjectCliArgs(args)
 
 	err = engine.ExecuteMain(string(raw), absPath)
 	if err != nil {
