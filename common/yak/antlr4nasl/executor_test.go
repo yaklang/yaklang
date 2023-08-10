@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/netx"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
@@ -355,4 +356,8 @@ assert(getword( blob:buf, pos:2) == 2,"getword error");
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+func TestGet_host_name(t *testing.T) {
+	res := netx.LookupFirst("dns.google.")
+	spew.Dump(res)
 }

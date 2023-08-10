@@ -96,6 +96,21 @@ type NaslScriptInfo struct {
 }
 
 func (n *NaslScriptInfo) Run(e *Engine) error {
+	if n.Preferences != nil && e.preferences != nil {
+		for k, v := range e.preferences {
+			if _, ok := n.Preferences[k]; ok {
+				switch ret := v.(type) {
+				case bool:
+					if ret {
+						v = "yes"
+					} else {
+						v = "no"
+					}
+				}
+				n.Preferences[k] = v
+			}
+		}
+	}
 	if n == nil {
 		return utils.Errorf("script is nil")
 	}

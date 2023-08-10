@@ -17,6 +17,7 @@ type NaslScriptConfig struct {
 	proxies    []string
 	riskHandle func(risk any)
 	conditions map[string]any
+	preference map[string]any
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -30,13 +31,8 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 	for _, opt := range opts {
 		opt(config)
 	}
-	engine := NewScriptEngine()
+	engine := NewScriptEngineWithConfig(config)
 	engine.Debug(true)
-	engine.LoadScriptsFromDb(config.plugin...)
-	engine.LoadFamilys(config.family...)
-	if config.conditions != nil {
-		engine.LoadWithConditions(config.conditions)
-	}
 	log.Infof("Loaded script total: %v", len(engine.scripts))
 	engine.proxies = config.proxies
 	riskHandle := config.riskHandle
@@ -272,6 +268,12 @@ var Exports = map[string]any{
 		}
 		return func(c *NaslScriptConfig) {
 			c.conditions = queryCondition
+		}
+	},
+	"preference": func(p interface{}) NaslScriptConfigOptFunc {
+		preference := utils.InterfaceToMapInterface(p)
+		return func(c *NaslScriptConfig) {
+			c.preference = preference
 		}
 	},
 }
