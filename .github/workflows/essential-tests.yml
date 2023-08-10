@@ -3,6 +3,7 @@ name: Essential Tests
 on:
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - 'common/**'
       - '.github/workflows/essential-tests.yml'
