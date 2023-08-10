@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,7 +21,9 @@ var (
 type Debugger struct {
 	vm                *VirtualMachine
 	once              sync.Once
-	finished          bool
+	startWG           sync.WaitGroup  // 用于等待程序启动
+	started           bool            // 表示程序是否已经启动
+	finished          bool            // 表示程序是否已经结束
 	wg                sync.WaitGroup  // 多个异步函数同时执行时回调断点,阻塞执行
 	initFunc          func(*Debugger) // 初始化函数
 	callbackFunc      func(*Debugger) // 断点回调函数
@@ -29,7 +32,7 @@ type Debugger struct {
 	description       string        // 回调时信息
 	frame             *Frame        // 存储当前执行的frame
 	state             string        // 表示当前处于哪个函数
-	lock              sync.Mutex    // 用于BreakPointCallback的同步
+	lock              sync.Mutex    // 用于ShouldCallback的同步
 
 	sourceCode                string
 	sourceCodeLines           []string
@@ -44,7 +47,17 @@ type Debugger struct {
 	stepOut     bool
 	nextState   *StepStack
 	stepInState *StepStack
+
+	// 停止事件原因
+	stopReason string
+
+	// 堆栈跟踪
 	StackTraces map[uint64]*vmstack.Stack
+
+	// 帧id -> 帧
+	FrameCount    int32
+	FrameMap      map[int32]*Frame
+	FrameExistMap map[*Frame]struct{}
 
 	// 观察断点
 	observeBreakPointExpressions map[string]*Value
@@ -58,6 +71,7 @@ type StepStack struct {
 	lineInedx, codeIndex int
 	state                string
 	stateName            string
+	frame                *Frame
 }
 type CodeState struct {
 	codeIndex int
@@ -68,17 +82,28 @@ type StackTrace struct {
 	ID   int
 	Name string
 
+	Frame *Frame
+
+	Source             *string
+	SourceCode         *string
 	Line, Column       int
 	EndLine, EndColumn int
+}
+
+type StackTraces struct {
+	ThreadID    uint64
+	StackTraces []StackTrace
 }
 
 func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, callback func(*Debugger)) *Debugger {
 
 	debugger := &Debugger{
+		started:                      false,
 		finished:                     false,
 		jmpIndex:                     -1,
 		StackTraces:                  map[uint64]*vmstack.Stack{vm.ThreadIDCount: vmstack.New()},
 		vm:                           vm,
+		startWG:                      sync.WaitGroup{},
 		wg:                           sync.WaitGroup{},
 		initFunc:                     init,
 		callbackFunc:                 callback,
@@ -87,6 +112,9 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 		codes:                        make(map[string][]*Code),
 		linePointer:                  0,
 		linesFirstCodeAndStateMap:    make(map[int]*CodeState),
+		FrameCount:                   -1,
+		FrameMap:                     make(map[int32]*Frame),
+		FrameExistMap:                make(map[*Frame]struct{}),
 		breakPoints:                  make([]*Breakpoint, 0),
 		observeExpressions:           make(map[string]*Value),
 		observeBreakPointExpressions: make(map[string]*Value),
@@ -102,12 +130,13 @@ func NewStepStackWithLineIndex(lineInedx int, state string) *StepStack {
 	}
 }
 
-func NewStepStackWithCodeIndex(code *Code, codeIndex int, state, stateName string) *StepStack {
+func NewStepStackWithCodeIndex(code *Code, codeIndex int, state, stateName string, frame *Frame) *StepStack {
 	return &StepStack{
 		code:      code,
 		codeIndex: codeIndex,
 		state:     state,
 		stateName: stateName,
+		frame:     frame,
 	}
 }
 
@@ -119,6 +148,8 @@ func NewCodeState(codeIndex int, state string) *CodeState {
 }
 
 func (g *Debugger) Init(codes []*Code) {
+	g.StartWGAdd()
+
 	g.codes[""] = codes
 
 	// 找出所有的函数及其opcode
@@ -149,6 +180,18 @@ func (g *Debugger) InitCallBack() {
 	g.once.Do(func() {
 		g.initFunc(g)
 	})
+}
+
+func (g *Debugger) StartWGAdd() {
+	g.startWG.Add(1)
+}
+
+func (g *Debugger) StartWGDone() {
+	g.startWG.Done()
+}
+
+func (g *Debugger) StartWGWait() {
+	g.startWG.Wait()
 }
 
 func (g *Debugger) Wait() {
@@ -199,6 +242,9 @@ func (g *Debugger) InRootState() bool {
 func (g *Debugger) StateName() string {
 	frame := g.frame
 	stateName := "global code"
+	if frame == nil {
+		return "unknown"
+	}
 	if f := frame.GetFunction(); f != nil {
 		stateName = f.GetActualName()
 	}
@@ -216,6 +262,12 @@ func (g *Debugger) UpdateByFrame(frame *Frame) {
 		g.state = ""
 	}
 	g.frame = frame
+
+	if _, ok := g.FrameExistMap[frame]; !ok {
+		g.FrameExistMap[frame] = struct{}{}
+		atomic.AddInt32(&g.FrameCount, 1)
+		g.FrameMap[g.FrameCount] = frame
+	}
 }
 
 func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
@@ -223,6 +275,11 @@ func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
 		st *vmstack.Stack
 		ok bool
 	)
+	frame := g.frame
+	if frame == nil {
+		return nil
+	}
+
 	if st, ok = g.StackTraces[g.frame.ThreadID]; !ok {
 		st = vmstack.New()
 		g.StackTraces[g.frame.ThreadID] = st
@@ -231,6 +288,10 @@ func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
 }
 
 func (g *Debugger) CurrentThreadID() uint64 {
+	frame := g.frame
+	if frame == nil {
+		return 0
+	}
 	return g.frame.ThreadID
 }
 
@@ -246,19 +307,31 @@ func (g *Debugger) VM() *VirtualMachine {
 	return g.vm
 }
 func (g *Debugger) Frame() *Frame {
-	frame := g.frame
-	if frame == nil {
-		frame = g.vm.CurrentFM()
-	}
-	return frame
+	return g.frame
 }
 
 func (g *Debugger) Description() string {
 	return g.description
 }
 
+func (g *Debugger) SetDescription(desc string) {
+	g.description = desc
+}
+
 func (g *Debugger) ResetDescription() {
 	g.description = ""
+}
+
+func (g *Debugger) StopReason() string {
+	return g.stopReason
+}
+
+func (g *Debugger) SetStopReason(desc string) {
+	g.stopReason = desc
+}
+
+func (g *Debugger) ResetStopReason() {
+	g.stopReason = ""
 }
 
 func (g *Debugger) GetCode(state string, codeIndex int) *Code {
@@ -277,8 +350,11 @@ func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
 	}
 }
 
-func (g *Debugger) GetStackTraces() [][]StackTrace {
+func (g *Debugger) GetStackTraces() []*StackTraces {
 	stackTrace := g.CurrentStackTrace()
+	if stackTrace == nil {
+		return nil
+	}
 
 	recoverStack := stackTrace.CreateShadowStack()
 	defer recoverStack()
@@ -290,26 +366,38 @@ func (g *Debugger) GetStackTraces() [][]StackTrace {
 		g.linePointer,
 		g.State(),
 		g.StateName(),
+		g.Frame(),
 	))
-	ret := make([][]StackTrace, len(g.StackTraces))
+
+	ret := make([]*StackTraces, len(g.StackTraces))
 	for index, stack := range g.StackTraces {
-		ret[index] = make([]StackTrace, stack.Len())
+		topFrame := stack.Peek().(*StepStack).frame
+		ret[index] = &StackTraces{
+			ThreadID: topFrame.ThreadID,
+		}
+		sts := make([]StackTrace, stack.Len())
+
 		id := 0
 		stack.GetAll(func(i any) {
 			if stepStack, ok := i.(*StepStack); ok {
 				if stepStack.code != nil {
-					ret[index][id] = StackTrace{
-						ID:        id,
-						Name:      stepStack.stateName,
-						Line:      stepStack.code.StartLineNumber,
-						Column:    stepStack.code.StartColumnNumber,
-						EndLine:   stepStack.code.EndLineNumber,
-						EndColumn: stepStack.code.EndColumnNumber,
+					sts[id] = StackTrace{
+						ID:         id,
+						Name:       stepStack.stateName,
+						Frame:      stepStack.frame,
+						SourceCode: stepStack.code.SourceCodePointer,
+						Source:     stepStack.code.SourceCodeFilePath,
+						Line:       stepStack.code.StartLineNumber,
+						Column:     stepStack.code.StartColumnNumber,
+						EndLine:    stepStack.code.EndLineNumber,
+						EndColumn:  stepStack.code.EndColumnNumber,
 					}
 					id++
 				}
 			}
 		})
+
+		ret[index].StackTraces = sts
 	}
 
 	return ret
@@ -453,22 +541,35 @@ func (g *Debugger) StepOut() error {
 
 func (g *Debugger) HandleForStepNext() {
 	g.nextState = nil
+	g.SetStopReason("step")
 	g.Callback()
 }
 
 func (g *Debugger) HandleForStepIn() {
 	g.stepInState = nil
+	g.SetStopReason("step")
 	g.Callback()
 }
 
 func (g *Debugger) HandleForStepOut() {
 	g.stepOut = false
+	g.SetStopReason("step")
+	g.Callback()
+}
+
+func (g *Debugger) HandleForBreakPoint() {
+	g.SetStopReason("breakpoint")
 	g.Callback()
 }
 
 func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
+
+	if !g.started {
+		g.started = true
+		g.StartWGDone()
+	}
 
 	codeIndex := frame.codePointer
 	g.UpdateByFrame(frame)
@@ -485,7 +586,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			if v != nil && v.Callable() {
 				stackTrace := g.CurrentStackTrace()
 				if stackTrace != nil {
-					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName))
+					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame))
 				}
 			}
 		}
@@ -556,7 +657,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			}
 			if !v.Equal(nv) {
 				g.observeBreakPointExpressions[expr] = nv
-				g.Callback()
+				g.HandleForBreakPoint()
 				return
 			}
 		}
@@ -602,7 +703,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 
 	if triggered {
-		g.Callback()
+		g.HandleForBreakPoint()
 	}
 
 }
@@ -610,6 +711,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 func (g *Debugger) Callback() {
 	g.Add()
 	defer g.WaitGroupDone()
+	defer g.ResetStopReason()
 
 	// 更新观察表达式
 	if len(g.observeExpressions) > 0 {
@@ -625,9 +727,8 @@ func (g *Debugger) Callback() {
 	g.callbackFunc(g)
 }
 
-func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error) {
+func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, CompilerWrapperInterface, error) {
 	var err error
-	frame := NewSubFrame(g.Frame())
 	frame.EnableDebuggerEval()
 	sym, err := frame.CurrentScope().GetSymTable().GetRoot()
 	if err != nil {
@@ -638,20 +739,28 @@ func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error
 	YakDebugCompiler.Compiler(code)
 	exist, err := YakDebugCompiler.GetNormalErrors()
 	if exist {
-		return frame, nil, errors.Wrap(err, "compile code error")
+		return nil, nil, errors.Wrap(err, "compile code error")
 	}
 	return frame, YakDebugCompiler, nil
 }
 
-func (g *Debugger) EvalExpression(expr string) (*Value, error) {
-	var err error
-
-	frame, compiler, err := g.Compile(expr)
-	if err != nil {
-		return nil, errors.Wrap(err, "eval code error")
+func (g *Debugger) CompileWithFrameID(code string, frameID int) (*Frame, CompilerWrapperInterface, error) {
+	targetFrame, ok := g.FrameMap[int32(frameID)]
+	if !ok {
+		return nil, nil, errors.New("frame not found")
 	}
 
-	opcode := compiler.GetOpcodes()
+	return g.CompileWithFrame(code, targetFrame)
+}
+
+func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error) {
+	frame := NewSubFrame(g.Frame())
+	return g.CompileWithFrame(code, frame)
+}
+
+func (g *Debugger) evalExpressionWithOpCodes(opcode []*Code, frame *Frame) (*Value, error) {
+	var err error
+
 	if len(opcode) == 0 {
 		return nil, errors.New("eval code error: no opcode")
 	}
@@ -675,4 +784,29 @@ func (g *Debugger) EvalExpression(expr string) (*Value, error) {
 	}()
 
 	return frame.GetLastStackValue(), err
+}
+
+func (g *Debugger) EvalExpressionWithFrameID(expr string, frameID int) (*Value, error) {
+	var err error
+
+	frame, compiler, err := g.CompileWithFrameID(expr, frameID)
+	if err != nil {
+		return nil, errors.Wrap(err, "eval code error")
+	}
+
+	opcode := compiler.GetOpcodes()
+	return g.evalExpressionWithOpCodes(opcode, frame)
+}
+
+func (g *Debugger) EvalExpression(expr string) (*Value, error) {
+	var err error
+
+	frame, compiler, err := g.Compile(expr)
+	if err != nil {
+		return nil, errors.Wrap(err, "eval code error")
+	}
+
+	opcode := compiler.GetOpcodes()
+
+	return g.evalExpressionWithOpCodes(opcode, frame)
 }
