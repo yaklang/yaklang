@@ -383,9 +383,7 @@ func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
 	// ? 不需要处理request.threadId
 	ds.debugger.Continue()
 
-	response := &dap.ContinueResponse{Body: dap.ContinueResponseBody{AllThreadsContinued: true}}
-	response.Response = *newResponse(request.Seq, request.Command)
-	ds.send(response)
+	ds.send(&dap.ContinueResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.ContinueResponseBody{AllThreadsContinued: true}})
 }
 
 func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
