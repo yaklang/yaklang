@@ -147,8 +147,8 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			debugger := v.vm.debugger
 			if debugger.InRootState() {
 				debugger.SetFinished()
-
-				v.vm.debugger.Callback()
+				debugger.SetStopReason("exception")
+				debugger.Callback()
 			}
 		}
 	}()
