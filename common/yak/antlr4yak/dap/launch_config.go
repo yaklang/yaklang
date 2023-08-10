@@ -5,10 +5,12 @@ import (
 	"fmt"
 )
 
+// LaunchConfig is the collection of launch request attributes recognized by DAP implementation.
 type LaunchConfig struct {
 	// Acceptable values are:
-	//   "debug": compiles your program with optimizations disabled, starts and attaches to it.
-	// Default is "debug".
+	//   "debug":
+	//   "exec": executes a yak script and begins a debug session.
+	// Default is "exec".
 	Mode string `json:"mode,omitempty"`
 
 	// Path to the program folder (or any go file within that folder)
