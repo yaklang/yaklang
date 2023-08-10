@@ -61,14 +61,11 @@ func (s *DAPServer) handleConnection(conn net.Conn) {
 
 	// todo: add debugger to session
 	session := &DebugSession{
-		config:    s.config,
-		conn:      conn,
-		rw:        bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
-		sendQueue: make(chan dap.Message),
+		config: s.config,
+		conn:   conn,
+		rw:     bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
 	}
 	s.session = session
-
-	go session.sendFromQueue()
 
 	for {
 		request, err := dap.ReadProtocolMessage(session.rw.Reader)
