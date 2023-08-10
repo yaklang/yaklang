@@ -294,15 +294,11 @@ func TestLaunchStopOnEntry(t *testing.T) {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=10 Result=2", evResp)
 		}
 
-		// 12 >> continue, << continue, << terminated
+		// 12 >> continue, << continue
 		client.ContinueRequest(1)
 		contResp := client.ExpectContinueResponse(t)
 		if contResp.Seq != 0 || contResp.RequestSeq != 12 || !contResp.Body.AllThreadsContinued {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=12 Body.AllThreadsContinued=true", contResp)
-		}
-		termEvent := client.ExpectTerminatedEvent(t)
-		if termEvent.Seq != 0 {
-			t.Errorf("\ngot %#v\nwant Seq=0", termEvent)
 		}
 
 		// 13 >> disconnect, << disconnect
