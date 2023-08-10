@@ -23,12 +23,16 @@ func removeUser(users []User, u User) {
 }
 
 // ----------- Function
+func (f *Function) GetValues() []Value { return nil }
+
 func (f *Function) GetUsers() []User { return f.user }
 func (f *Function) AddUser(u User)   { f.user = append(f.user, u) }
 
 func (f *Function) RemoveUser(u User) { removeUser(f.user, u) }
 
 // ----------- BasicBlock
+func (b *BasicBlock) GetValues() []Value { return nil }
+
 func (b *BasicBlock) GetUsers() []User { return b.user }
 func (b *BasicBlock) AddUser(u User)   { b.user = append(b.user, u) }
 
@@ -48,29 +52,20 @@ func (p *Phi) GetValues() []Value { return p.Edge }
 func (p *Phi) AddValue(v Value)   {}
 
 // ----------- Const
+func (c *Const) GetValues() []Value { return nil }
+
 func (c *Const) GetUsers() []User { return c.user }
 func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
 
 func (c *Const) RemoveUser(u User) { removeUser(c.user, u) }
 
 // ----------- param
+func (p *Parameter) GetValues() []Value { return nil }
+
 func (p *Parameter) GetUsers() []User { return p.user }
 
 func (p *Parameter) AddUser(u User)    { p.user = append(p.user, u) }
 func (p *Parameter) RemoveUser(u User) { removeUser(p.user, u) }
-
-// ----------- Jump
-func (j *Jump) ReplaceValue(v Value, to Value) {
-	panic("jump don't use value")
-}
-
-func (j *Jump) GetUsers() []User { return nil }
-func (j *Jump) AddUser(u User)   {}
-
-func (j *Jump) RemoveUser(u User) {}
-
-func (j *Jump) GetValues() []Value { return nil }
-func (j *Jump) AddValue(u Value)   {}
 
 // ----------- IF
 func (i *If) ReplaceValue(v Value, to Value) {
@@ -99,9 +94,6 @@ func (r *Return) ReplaceValue(v Value, to Value) {
 }
 
 func (r *Return) GetUsers() []User { return nil }
-func (r *Return) AddUser(u User)   {}
-
-func (r *Return) RemoveUser(u User) {}
 
 func (r *Return) GetValues() []Value { return r.Results }
 func (r *Return) AddValue(v Value)   {}
@@ -135,9 +127,8 @@ func (sw *Switch) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (sw *Switch) GetUsers() []User  { return nil }
-func (sw *Switch) AddUser(u User)    {}
-func (sw *Switch) RemoveUser(u User) {}
+func (sw *Switch) GetUsers() []User { return nil }
+
 func (sw *Switch) GetValues() []Value {
 	return append(
 		lo.Map(sw.label,

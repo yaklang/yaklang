@@ -64,18 +64,24 @@ func CheckProgram(t *testing.T, prog *Program) {
 						t.Fatalf("fatal instruction %s[%d] error pointer to function", inst, i)
 					}
 
-					if slices.Contains(inst.GetValues(), inst.(Value)) {
-						t.Fatalf("fatal inst %s has this self", inst)
-					}
-					// value-user check
-					for _, value := range inst.GetValues() {
-						if !slices.Contains(value.GetUsers(), inst.(User)) {
-							t.Fatalf("fatal value %s not't have it %s in user", value, inst)
+					if node, ok := inst.(Node); ok {
+						// value-user check
+						if value, ok := inst.(Value); ok {
+							if slices.Contains(node.GetValues(), value) {
+								t.Fatalf("fatal inst %s has this self", inst)
+							}
+							for _, user := range node.GetUsers() {
+								if !slices.Contains(user.GetValues(), value) {
+									t.Fatalf("fatal user %s not't have it %s in value", user, inst)
+								}
+							}
 						}
-					}
-					for _, user := range inst.GetUsers() {
-						if !slices.Contains(user.GetValues(), inst.(Value)) {
-							t.Fatalf("fatal user %s not't have it %s in value", user, inst)
+						if user, ok := inst.(User); ok {
+							for _, value := range node.GetValues() {
+								if !slices.Contains(value.GetUsers(), user) {
+									t.Fatalf("fatal value %s not't have it %s in user", value, inst)
+								}
+							}
 						}
 					}
 				}
