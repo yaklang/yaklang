@@ -20,6 +20,16 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 		var indexes []matched
 		buffer := c.GetBuffer(modifier)
 
+		defer func() {
+			if r.Negative && c.IsRejected() {
+				c.Recover()
+			}
+			if r.Negative && !c.IsRejected() {
+				c.Reject()
+			}
+		}()
+
+		// match all
 		indexes = bytesIndexAll(buffer, r.Content, r.Nocase)
 		if !c.Must(len(indexes) > 0) {
 			return nil
@@ -147,10 +157,11 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 			}
 		}
 
+		// todo:bsize dsize
 		if r.DSize != "" && r.Modifier == Default {
 
 		}
-		// todo:bsize dsize
+
 		c.Value["prevMatch"] = indexes
 		return nil
 	}
