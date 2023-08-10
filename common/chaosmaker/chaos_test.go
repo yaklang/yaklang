@@ -1,6 +1,7 @@
 package chaosmaker
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -134,79 +135,95 @@ alert tcp $HOME_NET any -> any 3306 (msg: "mysql general_log write file"; flow: 
 func TestChaosMaker_ApplyAll(t *testing.T) {
 }
 
-func TestChaosMaker_HttpGenerate(t *testing.T) {
-
-	var debugRule []*ruleTest
-	var verifyRule []*ruleTest
-
-	handleR := func(r *ruleTest) {
-		if r.rule == "" {
-			return
-		}
+func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
+	httpPrefix, _ := hex.DecodeString("3066d026811b6afd6158af5c0800450000c2695740008006d96cc0a803127ce176d6d3a1005036ffddeba0d11525501804014ac20000")
+	for _, r := range rules {
 		maker := NewChaosMaker()
 		rules, err := suricata.Parse(r.rule)
+
+		// single rule
+		rr := rules[0]
 		if err != nil {
 			panic(err)
 		}
-		var fRule []*rule.Storage
-		for _, r := range rules {
-			rule.SaveSuricata(consts.GetGormProfileDatabase(), r)
-			fRule = append(fRule, rule.NewRuleFromSuricata(r))
-		}
-		maker.FeedRule(fRule...)
+		rule.SaveSuricata(consts.GetGormProfileDatabase(), rr)
+		fRule := rule.NewRuleFromSuricata(rr)
+		maker.FeedRule(fRule)
 		res := maker.Generate()
 		if err != nil {
-			spew.Dump(r)
+			spew.Dump(r.rule)
 			panic(err)
 		}
+
 		count := 0
+		matchedCount := 0
+
 		for result := range res {
 			count++
-			if r.id == "debug" {
+
+			var debug = r.id == "debug"
+			if debug {
+				println("START TO DEBUG")
 				log.Infof("rule: %v", result.SuricataRule.Message)
 			}
 
-			debug := r.id == "debug"
-			if debug {
-				println("START TO DEBUG")
-			}
-			switch result.SuricataRule.Protocol {
-			case "http":
-				if result.HttpRequest != nil && debug {
-					fmt.Println(string(result.HttpRequest))
-				}
-				if result.HttpResponse != nil && debug {
-					fmt.Println(string(result.HttpResponse))
-				}
+			var bytes []byte
+			if result.SuricataRule.Protocol == "http" {
 				if result.HttpRequest == nil && result.HttpResponse == nil {
 					panic("Empty Result")
 				}
-			case "tcp":
-				spew.Dump(result.TCPIPPayload)
+				bytes = make([]byte, len(httpPrefix))
+				copy(bytes, httpPrefix)
+				if result.HttpRequest != nil {
+					bytes = append(bytes, result.HttpRequest...)
+					if debug {
+						fmt.Println(string(result.HttpRequest))
+					}
+				}
+				if result.HttpResponse != nil {
+					bytes = append(bytes, result.HttpResponse...)
+					if debug {
+						fmt.Println(string(result.HttpResponse))
+					}
+				}
+			} else if result.SuricataRule.Protocol == "tcp" {
+				bytes = result.TCPIPPayload
+				if debug {
+					spew.Dump(result.TCPIPPayload)
+				}
+			}
+			var matched bool
+			if result.SuricataRule.Protocol == "tcp" {
+				// tcp match not implement yet
+				continue
+			}
+			for _, rr := range rules {
+				if rr.Match(bytes) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				spew.Dump(rr.Raw)
+				spew.Dump(bytes)
+			} else {
+				matchedCount++
 			}
 		}
-		if count >= r.trafficCount {
-			return
+		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
+need: %d
+got: %d
+match %d
+`, r.trafficCount, count, matchedCount))
+		if count >= r.trafficCount && matchedCount >= r.trafficCount {
+			continue
 		}
-		panic("RULE\n" + r.rule + fmt.Sprintf("\n  need: %v traffic, but got: %v", r.trafficCount, count))
-	}
-
-	for _, r := range rules {
-		if r.id == "debug" {
-			println("START TO DEBUG")
-			debugRule = append(debugRule, r)
+		// tcp not implement yet don't check it
+		if rr.Protocol == suricata.TCP {
+			continue
 		}
-		verifyRule = append(verifyRule, r)
-	}
-
-	for _, r := range debugRule {
-		handleR(r)
-	}
-
-	for _, r := range verifyRule {
-		println(r.rule)
-		r.id = ""
-		handleR(r)
+		t.Fatal("match error or no enough traffic")
+		return
 	}
 }
 
