@@ -137,7 +137,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "content":
 			neg, content := mustSoloSingleSetting(ssts)
 			if contentRule.Content == nil {
-				contentRule.Content = []byte(unquoteString(content))
+				contentRule.Content = []byte(unquoteAndParseHex(content))
 				contentRule.Negative = neg
 			} else {
 				set = false
@@ -328,9 +328,9 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		case "rpc":
 			contentRule.RPC = vStr
 		case "replace":
-			contentRule.RPC = unquoteString(vStr)
+			contentRule.RPC = unquoteAndParseHex(vStr)
 		case "pcre":
-			contentRule.PCRE, _ = strconv.Unquote(vStr)
+			contentRule.PCRE = unquoteString(vStr)
 		case "fast_pattern":
 			contentRule.FastPattern = true
 		case "flowbits":
