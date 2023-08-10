@@ -29,9 +29,9 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 	}
 
 	dnsRule := rule.ContentRuleConfig.DNS
-		if dnsRule == nil {
-			dnsRule = &suricata.DNSRule{}
-		}
+	if dnsRule == nil {
+		dnsRule = &suricata.DNSRule{}
+	}
 
 	var baseUDPLayer = &layers.UDP{}
 	var baseDNSLayer = &layers.DNS{}
@@ -45,12 +45,12 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 
 	// todo: consider dnsRule.OpcodeNegative == true
 	baseDNSLayer.OpCode = layers.DNSOpCode(dnsRule.Opcode)
-	baseDNSLayer.QR = !dnsRule.DNSQuery
 	if dnsRule.OpcodeNegative && baseDNSLayer.OpCode == layers.DNSOpCode(dnsRule.Opcode) {
 		log.Warn("DNS 规则可能存在错误")
 	} else if !dnsRule.OpcodeNegative && baseDNSLayer.OpCode != layers.DNSOpCode(dnsRule.Opcode) {
 		log.Warn("DNS 规则可能存在错误")
 	}
+	baseDNSLayer.QR = true
 
 	ch := make(chan *ChaosTraffic)
 	feedback := func(raw []byte) {
@@ -99,15 +99,15 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 		baseUDPLayer.SrcPort = layers.UDPPort(srcPort)
 		baseUDPLayer.DstPort = layers.UDPPort(dstPort)
 
-			for i := 0; i < rule.ContentRuleConfig.Thresholding.Repeat(); i++ {
-				dnsQuestion := layers.DNSQuestion{
-					Name:  []byte(payloads),  // 查询名称
-					Type:  layers.DNSTypeA,   // 查询类型，A表示查询IPv4地址
-					Class: layers.DNSClassIN, // 查询类别，表示Internet
-				}
-				baseDNSLayer.Questions = []layers.DNSQuestion{dnsQuestion}
-				feedback(encodeDNS(baseIPLayer, baseUDPLayer, baseDNSLayer))
+		for i := 0; i < rule.ContentRuleConfig.Thresholding.Repeat(); i++ {
+			dnsQuestion := layers.DNSQuestion{
+				Name:  []byte(payloads),  // 查询名称
+				Type:  layers.DNSTypeA,   // 查询类型，A表示查询IPv4地址
+				Class: layers.DNSClassIN, // 查询类别，表示Internet
 			}
+			baseDNSLayer.Questions = []layers.DNSQuestion{dnsQuestion}
+			feedback(encodeDNS(baseIPLayer, baseUDPLayer, baseDNSLayer))
+		}
 
 	}()
 	return ch
