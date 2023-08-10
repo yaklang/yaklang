@@ -350,13 +350,12 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 	if code == "" {
 		db := consts.GetGormProfileDatabase()
 		// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
-		NaslTypePrefix := "__NaslScript__"
-		if strings.HasPrefix(name, NaslTypePrefix) {
+		if strings.HasSuffix(strings.ToLower(name), ".nasl") {
 			forNasl = true
 			code = naslCodeExecTemplate
 			params = append(params, &ypb.ExecParamItem{
 				Key:   "NASL_SCRIPT_NAME",
-				Value: name[len(NaslTypePrefix):],
+				Value: name,
 			})
 			//params = append(params, &ypb.ExecParamItem{
 			//	Key:   "NASL_PROXY",
