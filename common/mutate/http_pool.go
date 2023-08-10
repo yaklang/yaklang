@@ -633,6 +633,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						}),
 					}
 					opts = append(opts, FuzzFileOptions()...)
+					if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
+						opts = append(opts, Fuzz_WithParams(config.FuzzParams))
+					}
 					_, err := FuzzTagExec(string(reqRaw), opts...)
 					if err != nil {
 						log.Errorf("fuzz with callback failed: %s", err)
