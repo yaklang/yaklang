@@ -2,16 +2,22 @@ package dap
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/google/go-dap"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
+
+// Flags for convertVariableWithOpts option.
+type convertVariableFlags uint8
 
 const (
 	UnsupportedCommand int = 9999
@@ -44,6 +50,11 @@ const (
 	NoDebugIsRunning  = 3000
 	DebuggeeIsRunning = 4000
 	DisconnectError   = 5000
+)
+
+const (
+	skipRef convertVariableFlags = 1 << iota
+	showFullValue
 )
 
 type DebugSession struct {
@@ -110,28 +121,6 @@ func (ds *DebugSession) Close() {
 
 	ds.conn.Close()
 }
-
-// func (ds *DebugSession) doContinue() {
-// 	var e dap.Message
-// 	ds.bpSetMux.Lock()
-// 	if ds.bpSet == 0 {
-// 		// Pretend that the program is running.
-// 		// The delay will allow for all in-flight responses
-// 		// to be sent before termination.
-// 		time.Sleep(1000 * time.Millisecond)
-// 		e = &dap.TerminatedEvent{
-// 			Event: *newEvent("terminated"),
-// 		}
-// 	} else {
-// 		e = &dap.StoppedEvent{
-// 			Event: *newEvent("stopped"),
-// 			Body:  dap.StoppedEventBody{Reason: "breakpoint", ThreadId: 1, AllThreadsStopped: true},
-// 		}
-// 		ds.bpSet--
-// 	}
-// 	ds.bpSetMux.Unlock()
-// 	ds.send(e)
-// }
 
 // request handlers
 func (ds *DebugSession) dispatchRequest(request dap.Message) {
@@ -228,6 +217,7 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsDataBreakpoints = true          // todo: 是否支持数据断点(即监视和控制特定变量的值，并在变量的值满足特定条件时暂停程序的执行)(未完全支持)
 	response.Body.SupportsStepInTargetsRequest = true     // 支持步入
 	response.Body.SupportsDisassembleRequest = true       // 是否支持反汇编请求(输出opcode)
+	response.Body.SupportTerminateDebuggee = true         // 在调试器终止时是否支持终止调试进程
 
 	response.Body.SupportsFunctionBreakpoints = false        // 函数断点(可以考虑支持)
 	response.Body.SupportsHitConditionalBreakpoints = false  // 在触发条件断点时到达断点但不满足条件的次数(可以考虑支持)
@@ -249,7 +239,6 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsExceptionOptions = false                                // 是否支持自定义异常行为
 	response.Body.SupportsValueFormattingOptions = false                          // 是否支持格式化堆栈跟踪请求,变量请求和执行请求
 	response.Body.SupportsExceptionInfoRequest = false                            // 是否支持输出异常信息请求
-	response.Body.SupportTerminateDebuggee = false                                // 在调试器终止时是否支持终止调试进程
 	response.Body.SupportsDelayedStackTraceLoading = false                        // 是否支持延迟加载堆栈跟踪信息
 	response.Body.SupportsLoadedSourcesRequest = false                            // 是否支持获取已加载的源代码列表请求,获取有关已加载源代码的信息，例如文件路径、调试信息等
 	response.Body.SupportsTerminateThreadsRequest = false                         // 是否支持终止线程请求
@@ -262,9 +251,22 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	ds.send(response)
 }
 
+func (ds *DebugSession) WaitProgramStart() {
+	ds.debugger.WaitProgramStart()
+}
+
 func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 	var args LaunchConfig
-	// todo: check debugger
+	if ds.debugger != nil {
+		ds.sendShowUserErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
+			"debug session already in progress - use remote attach mode to connect to a server with an active debug session")
+		return
+	}
+
+	// default mode
+	if args.Mode == "" {
+		args.Mode = "exec"
+	}
 
 	if err := unmarshalLaunchConfig(request.Arguments, &args); err != nil {
 		ds.sendShowUserErrorResponse(request.Request,
@@ -292,10 +294,15 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 		os.Chdir(args.Cwd)
 	}
 
-	RunProgramInDebugMode(!args.NoDebug, args.Program, args.Args)
+	// save launch config
+	ds.launchConfig = &args
+
+	// todo: handle args.Mode, "debug" and "exec"
 
 	ds.send(&dap.InitializedEvent{Event: *newEvent("initialized")})
 	ds.send(&dap.LaunchResponse{Response: *newResponse(request.Seq, request.Command)})
+
+	go ds.RunProgramInDebugMode(!args.NoDebug, args.Program, args.Args)
 }
 
 func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
@@ -304,13 +311,12 @@ func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
 
 func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 	defer ds.config.triggerServerStop()
-	defer ds.Close()
-	// todo: terminate progress
-	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+	// ? unset debugger
+	// ds.debugger = nil
 
-	response := &dap.DisconnectResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
-	ds.send(response)
+	ds.logToConsole("Detaching")
+	ds.send(&dap.DisconnectResponse{Response: *newResponse(request.Seq, request.Command)})
+	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 }
 
 func (ds *DebugSession) onTerminateRequest(request *dap.TerminateRequest) {
@@ -339,26 +345,39 @@ func (ds *DebugSession) onSetFunctionBreakpointsRequest(request *dap.SetFunction
 	ds.send(newErrorResponse(request.Seq, request.Command, "SetFunctionBreakpointsRequest is not yet supported"))
 }
 
+// Unlike what DAP documentation claims, this request is always sent
+// even though we specified no filters at initialization. Handle as no-op.
 func (ds *DebugSession) onSetExceptionBreakpointsRequest(request *dap.SetExceptionBreakpointsRequest) {
-	response := &dap.SetExceptionBreakpointsResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
-	ds.send(response)
+	ds.send(&dap.SetExceptionBreakpointsResponse{Response: *newResponse(request.Seq, request.Command)})
 }
 
 func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
-	// This would be the place to check if the session was configured to
-	// stop on entry and if that is the case, to issue a
-	// stopped-on-breakpoint event. This being a mock implementation,
-	// we "let" the program continue after sending a successful response.
-	e := &dap.ThreadEvent{Event: *newEvent("thread"), Body: dap.ThreadEventBody{Reason: "started", ThreadId: 1}}
-	ds.send(e)
-	response := &dap.ConfigurationDoneResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
-	ds.send(response)
+
+	// 如果stopOnEtry,则在入口时回调
+	if ds.launchConfig.StopOnEntry {
+		e := &dap.StoppedEvent{
+			Event: *newEvent("stopped"),
+			Body:  dap.StoppedEventBody{Reason: "entry", ThreadId: 0, AllThreadsStopped: true},
+		}
+		ds.send(e)
+
+		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'help' for help info.\n", consts.GetYakVersion()))
+	} else {
+		ds.debugger.Continue()
+	}
+
+	ds.send(&dap.ConfigurationDoneResponse{Response: *newResponse(request.Seq, request.Command)})
 }
 
 func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
-	response := &dap.ContinueResponse{}
+	// 等待调试器初始化完成
+	ds.debugger.WaitInit()
+
+	// ? 不支持单个线程继续运行,整个程序继续执行
+	// ? 不需要处理request.threadId
+	ds.debugger.Continue()
+
+	response := &dap.ContinueResponse{Body: dap.ContinueResponseBody{AllThreadsContinued: true}}
 	response.Response = *newResponse(request.Seq, request.Command)
 	ds.send(response)
 }
@@ -396,19 +415,51 @@ func (ds *DebugSession) onPauseRequest(request *dap.PauseRequest) {
 }
 
 func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	var stackFrames []dap.StackFrame
+
+	threadID := uint64(request.Arguments.ThreadId)
+	startFrame := request.Arguments.StartFrame
+	maxLevels := request.Arguments.Levels
+	found := false
+
+	for _, stackTraces := range ds.debugger.GetStackTraces() {
+		if stackTraces.ThreadID == threadID {
+			found = true
+			for count := startFrame; count < len(stackTraces.StackTraces); count++ {
+				stackFrame := stackTraces.StackTraces[count]
+				source := *stackFrame.Source
+				stackFrames = append(stackFrames, dap.StackFrame{
+					Id:        stackFrame.ID,
+					Name:      stackFrame.Name,
+					Source:    &dap.Source{Name: filepath.Base(source), Path: source},
+					Line:      stackFrame.Line,
+					Column:    stackFrame.Column,
+					EndLine:   stackFrame.EndLine,
+					EndColumn: stackFrame.EndColumn,
+				})
+				// if maxLevels is 0, then return all stackFrames
+				// otherwise, return maxLevels stackFrames
+				if maxLevels > 0 && count >= maxLevels {
+					break
+				}
+			}
+			break
+		}
+	}
+
+	if !found {
+		ds.sendErrorResponse(request.Request, UnableToProduceStackTrace, "Unable to produce stack trace", fmt.Sprintf("Can't found Goroutine %d stack trace", threadID))
+		return
+	}
+
 	response := &dap.StackTraceResponse{}
 	response.Response = *newResponse(request.Seq, request.Command)
 	response.Body = dap.StackTraceResponseBody{
-		StackFrames: []dap.StackFrame{
-			{
-				Id:     1000,
-				Source: &dap.Source{Name: "hello.go", Path: "/Users/foo/go/src/hello/hello.go", SourceReference: 0},
-				Line:   5,
-				Column: 0,
-				Name:   "main.main",
-			},
-		},
-		TotalFrames: 1,
+		StackFrames: stackFrames,
+		TotalFrames: len(stackFrames),
 	}
 	ds.send(response)
 }
@@ -454,9 +505,23 @@ func (ds *DebugSession) onSourceRequest(request *dap.SourceRequest) {
 }
 
 func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
+	// 需要等待程序启动
+	ds.WaitProgramStart()
+
+	var threads []dap.Thread
+	// todo: update selected frame
+
+	yakThreads := ds.debugger.GetThreads()
+	threads = lo.Map(yakThreads, func(item *Thread, index int) dap.Thread {
+		return dap.Thread{
+			Id:   item.Id,
+			Name: item.Name,
+		}
+	})
+
 	response := &dap.ThreadsResponse{}
 	response.Response = *newResponse(request.Seq, request.Command)
-	response.Body = dap.ThreadsResponseBody{Threads: []dap.Thread{{Id: 1, Name: "main"}}}
+	response.Body = dap.ThreadsResponseBody{Threads: threads}
 	ds.send(response)
 
 }
@@ -466,7 +531,30 @@ func (ds *DebugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsR
 }
 
 func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "EvaluateRequest is not yet supported"))
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	// todo: 处理context类型
+	ctxt := request.Arguments.Context
+	showErrorToUser := ctxt != "watch" && ctxt != "repl" && ctxt != "hover"
+
+	value, err := ds.debugger.EvalExpression(request.Arguments.Expression, request.Arguments.FrameId)
+	if err != nil {
+		ds.sendErrorResponseWithOpts(request.Request, UnableToEvaluateExpression, "Unable to evaluate expression", err.Error(), showErrorToUser)
+		return
+	}
+
+	response := &dap.EvaluateResponse{Response: *newResponse(request.Seq, request.Command)}
+	response.Body = dap.EvaluateResponseBody{Result: value.String(), Type: value.TypeVerbose}
+
+	ref, ok := value.GetVarRef()
+	if ok {
+		response.Body.VariablesReference = ref
+		response.Body.IndexedVariables = value.GetIndexedVariableCount()
+		response.Body.NamedVariables = value.GetNamedVariableCount()
+	}
+
+	ds.send(response)
 }
 
 func (ds *DebugSession) onStepInTargetsRequest(request *dap.StepInTargetsRequest) {
@@ -513,14 +601,6 @@ func (ds *DebugSession) onBreakpointLocationsRequest(request *dap.BreakpointLoca
 	ds.send(newErrorResponse(request.Seq, request.Command, "BreakpointLocationsRequest is not yet supported"))
 }
 
-func (ds *DebugSession) sendStoppedEvent() {
-	e := &dap.StoppedEvent{
-		Event: *newEvent("stopped"),
-		Body:  dap.StoppedEventBody{Reason: "entry", ThreadId: 1, AllThreadsStopped: true},
-	}
-	ds.send(e)
-}
-
 func (ds *DebugSession) sendErrorResponse(request dap.Request, id int, summary, details string) {
 	ds.sendErrorResponseWithOpts(request, id, summary, details, false /*showUser*/)
 }
@@ -543,6 +623,15 @@ func (ds *DebugSession) sendErrorResponseWithOpts(request dap.Request, id int, s
 	}
 	log.Debug(er.Body.Error.Format)
 	ds.send(er)
+}
+
+func (ds *DebugSession) logToConsole(msg string) {
+	ds.send(&dap.OutputEvent{
+		Event: *newEvent("output"),
+		Body: dap.OutputEventBody{
+			Output:   msg + "\n",
+			Category: "console",
+		}})
 }
 
 func newEvent(event string) *dap.Event {
@@ -586,7 +675,6 @@ func newErrorResponse(requestSeq int, command string, message string) *dap.Error
 	er.Response = *newResponse(requestSeq, command)
 	er.Success = false
 	er.Message = "unsupported"
-	er.Body.Error.Format = message
-	er.Body.Error.Id = 12345
+	er.Body = dap.ErrorResponseBody{Error: &dap.ErrorMessage{Format: message, Id: 12345}}
 	return er
 }
