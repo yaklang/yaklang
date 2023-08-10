@@ -67,8 +67,9 @@ type DebugSession struct {
 	// the multiple channel senders with a wait group to make sure we do
 	// not close this channel prematurely. Closing this channel will signal
 	// the sendFromQueue goroutine that it can exit.
-	sendQueue chan dap.Message
-	sendWg    sync.WaitGroup
+	// sendQueue chan dap.Message
+	// sendWg    sync.WaitGroup
+	sendingMu sync.Mutex
 
 	// stopDebug is used to notify long-running handlers to stop processing.
 	stopMu sync.Mutex
@@ -80,24 +81,27 @@ type DebugSession struct {
 }
 
 func (ds *DebugSession) send(message dap.Message) {
-	ds.sendQueue <- message
-}
+	jsonmsg, _ := json.Marshal(message)
+	log.Debugf("[-> to client] %v", string(jsonmsg))
 
-func (ds *DebugSession) sendFromQueue() {
-	for message := range ds.sendQueue {
-		dap.WriteProtocolMessage(ds.rw.Writer, message)
-		log.Infof("DAP sent message: %#v", message)
-		ds.rw.Flush()
+	ds.sendingMu.Lock()
+	defer ds.sendingMu.Unlock()
+	err := dap.WriteProtocolMessage(ds.conn, message)
+	if err != nil {
+		log.Debug(err)
 	}
 }
 
 func (ds *DebugSession) handleRequest(request dap.Message) {
-	log.Infof("DAP recv request: %#v", request)
-	ds.sendWg.Add(1)
-	go func() {
-		ds.dispatchRequest(request)
-		ds.sendWg.Done()
-	}()
+	jsonmsg, _ := json.Marshal(request)
+	log.Debugf("[<- from client] %v", string(jsonmsg))
+
+	if _, ok := request.(dap.RequestMessage); !ok {
+		ds.sendInternalErrorResponse(request.GetSeq(), fmt.Sprintf("Unable to process non-request %#v\n", request))
+		return
+	}
+
+	ds.dispatchRequest(request)
 }
 
 func (ds *DebugSession) Close() {
