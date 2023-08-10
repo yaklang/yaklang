@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
-func RunProgramInDebugMode(debug bool, program string, args []string) error {
+func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args []string) error {
 	raw, err := os.ReadFile(program)
 	if err != nil {
 		return err
