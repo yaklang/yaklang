@@ -21,8 +21,6 @@ type DAPDebugger struct {
 
 	initWG sync.WaitGroup // 用于等待初始化
 
-	hasSendTerminateEvent bool // 是否已经发送了terminate事件
-
 	selectFrame *yakvm.Frame // 选择的frame
 
 	finished   bool          // 是否程序已经结束
@@ -112,10 +110,8 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 
 		if g.Finished() {
 			d.finished = true
-			// 如果程序已经结束且已经发送了结束事件,则不再回调
-			if d.hasSendTerminateEvent {
-				return
-			}
+			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+			return
 		}
 
 		select {
@@ -124,19 +120,13 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 			// todo: 超时处理
 			return
 		}
-
-		if d.finished && !d.hasSendTerminateEvent {
-			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
-			d.hasSendTerminateEvent = true
-		}
 	}
 }
 
 func NewDAPDebugger() *DAPDebugger {
 	return &DAPDebugger{
-		continueCh:            make(chan struct{}),
-		timeout:               10 * time.Minute,
-		initWG:                sync.WaitGroup{},
-		hasSendTerminateEvent: false,
+		continueCh: make(chan struct{}),
+		timeout:    10 * time.Minute,
+		initWG:     sync.WaitGroup{},
 	}
 }
