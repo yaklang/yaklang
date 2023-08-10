@@ -1,130 +1,84 @@
 package pcapx
 
 import (
+	"errors"
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
-	"strings"
 )
 
 var arpLayerExports = map[string]interface{}{
-	"arp_question":    WithArpLayerBuilderConfigRequest,
-	"arp_answer":      WithArpLayerBuilderConfigResponse,
-	"arp_source":      WithArpLayerBuilderConfigSource,
-	"arp_destination": WithArpLayerBuilderConfigDestination,
+	"arp_request":   WithArp_RequestAuto,
+	"arp_requestEx": WithArp_RequestEx,
+	"arp_replyEx":   WithArp_ReplyToEx,
+	"arp_reply":     WithArp_ReplyTo,
 }
 
-type ArpLayerBuilderConfig struct {
-	AddrType        layers.LinkType
-	Protocol        layers.EthernetType
-	HwAddressSize   uint8
-	ProtAddressSize uint8
-
-	// req-1
-	// rsp-0
-	Operation             uint16
-	SourceHwAddress       []byte
-	SourceProtocolAddress []byte
-	DstHwAddress          []byte
-	DstProtocolAddress    []byte
-}
-
-type ArpLayerBuilderConfigOption func(*ArpLayerBuilderConfig)
-
-func ArpLayerBuilderConfigAddrType(addrType layers.LinkType) ArpLayerBuilderConfigOption {
-	return func(a *ArpLayerBuilderConfig) {
-		a.AddrType = addrType
+func init() {
+	for k, v := range arpLayerExports {
+		Exports[k] = v
 	}
 }
 
-func ArpLayerBuilderConfigProtocolTypeRaw(protocol any) ArpLayerBuilderConfigOption {
-	switch ret := strings.ToLower(utils.InterfaceToString(protocol)); ret {
-	case "ipv4", "ip", "ip4":
-		return func(a *ArpLayerBuilderConfig) {
-			a.Protocol = layers.EthernetTypeIPv4
-			a.HwAddressSize = 6
-			a.ProtAddressSize = 4
+type ArpConfig func(arp *layers.ARP) error
+
+func WithArp_RequestEx(selfIP, selfMac string, remoteIP string) ArpConfig {
+	local := net.ParseIP(selfIP)
+	srcMac, _ := net.ParseMAC(selfMac)
+	ip := remoteIP
+	return func(arp *layers.ARP) error {
+		arp.HwAddressSize = 6
+		arp.ProtAddressSize = 4
+		arp.Operation = layers.ARPRequest
+		arp.SourceProtAddress = net.ParseIP(local.String())
+		if arp.SourceProtAddress == nil {
+			return errors.New("invalid source ip: " + local.String())
 		}
-	case "ipv6", "ip6":
-		return func(a *ArpLayerBuilderConfig) {
-			a.Protocol = layers.EthernetTypeIPv6
-			a.HwAddressSize = 6
-			a.ProtAddressSize = 16
+		arp.SourceHwAddress = srcMac
+		arp.DstHwAddress = make([]byte, 6)
+		arp.DstProtAddress = net.ParseIP(ip)
+		if arp.DstProtAddress == nil {
+			return errors.New("invalid destination ip: " + ip)
 		}
-	default:
-		return func(a *ArpLayerBuilderConfig) {
-			a.Protocol = layers.EthernetType(utils.Atoi(ret))
-			a.HwAddressSize = 6
+		return nil
+	}
+}
+
+func WithArp_RequestAuto(ip string) ArpConfig {
+	// where is ip?
+	return func(arp *layers.ARP) error {
+		iface, _, local, err := getPublicRoute()
+		if err != nil {
+			return err
 		}
+		srcMac := iface.HardwareAddr
+		return WithArp_RequestEx(local.String(), srcMac.String(), ip)(arp)
 	}
 }
 
-func ArpLayerBUilderConfigOperation(operation uint16) ArpLayerBuilderConfigOption {
-	return func(a *ArpLayerBuilderConfig) {
-		a.Operation = operation
+func WithArp_ReplyToEx(srcTarget, srcMac, targetIp, targetMac string) ArpConfig {
+	return func(arp *layers.ARP) error {
+		arp.Operation = layers.ARPReply
+		arp.SourceProtAddress = net.ParseIP(srcTarget)
+		if arp.SourceProtAddress == nil {
+			return errors.New("invalid source ip: " + srcTarget)
+		}
+		arp.SourceHwAddress, _ = net.ParseMAC(srcMac)
+		arp.DstHwAddress, _ = net.ParseMAC(targetMac)
+		arp.DstProtAddress = net.ParseIP(targetIp)
+		if arp.DstProtAddress == nil {
+			return errors.New("invalid destination ip: " + targetIp)
+		}
+		return nil
 	}
 }
 
-func WithArpLayerBuilderConfigProtocol(protocol layers.EthernetType) ArpLayerBuilderConfigOption {
-	return func(a *ArpLayerBuilderConfig) {
-		a.Protocol = protocol
-	}
-}
-
-func WithArpLayerBuilderConfigRequest() ArpLayerBuilderConfigOption {
-	return func(config *ArpLayerBuilderConfig) {
-		config.Operation = 1
-	}
-}
-
-func WithArpLayerBuilderConfigResponse() ArpLayerBuilderConfigOption {
-	return func(config *ArpLayerBuilderConfig) {
-		config.Operation = 0
-	}
-}
-
-func WithArpLayerBuilderConfigSource(protocolAddr any, hardwareAddr any) ArpLayerBuilderConfigOption {
-	ipAddr := net.ParseIP(utils.InterfaceToString(protocolAddr))
-	hwAddr, err := net.ParseMAC(utils.InterfaceToString(hardwareAddr))
+func WithArp_ReplyTo(targetIp, targetMac string) ArpConfig {
+	iface, _, local, err := getPublicRoute()
 	if err != nil {
-		log.Warnf("parse mac failed: %s", err)
-	}
-	return func(config *ArpLayerBuilderConfig) {
-		if ipAddr != nil {
-			config.SourceProtocolAddress = ipAddr
-		}
-		if hwAddr != nil {
-			config.SourceHwAddress = hwAddr
-		} else {
-			config.SourceHwAddress = make([]byte, 6)
+		return func(arp *layers.ARP) error {
+			return err
 		}
 	}
-}
-
-func WithArpLayerBuilderConfigDestination(protocolAddr any, hardwareAddr any) ArpLayerBuilderConfigOption {
-	ipAddr := net.ParseIP(utils.InterfaceToString(protocolAddr))
-	hwAddr, err := net.ParseMAC(utils.InterfaceToString(hardwareAddr))
-	if err != nil {
-		log.Warnf("parse mac failed: %s", err)
-	}
-	return func(config *ArpLayerBuilderConfig) {
-		if ipAddr != nil {
-			config.DstProtocolAddress = ipAddr
-		}
-		if hwAddr != nil {
-			config.DstHwAddress = hwAddr
-		} else {
-			config.DstHwAddress = make([]byte, 6)
-		}
-	}
-}
-
-func (a *ArpLayerBuilderConfig) Create() *layers.ARP {
-	return &layers.ARP{
-		AddrType:        layers.LinkTypeEthernet,
-		Protocol:        layers.EthernetTypeIPv4,
-		HwAddressSize:   6,
-		ProtAddressSize: 4,
-	}
+	srcMac := iface.HardwareAddr
+	return WithArp_ReplyToEx(local.String(), srcMac.String(), targetIp, targetMac)
 }
