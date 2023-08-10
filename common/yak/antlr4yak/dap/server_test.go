@@ -195,8 +195,8 @@ func TestForceStopWhileStopping(t *testing.T) {
 	verifyServerStopped(t, server)
 }
 
-func TestLaunch(t *testing.T) {
-	runTest(t, "launch", GenerateSimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
+func TestLaunchStopOnEntry(t *testing.T) {
+	runTest(t, "stopOnEntry", GenerateSimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
 		// 1 >> initialize, << initialize
 		client.InitializeRequest()
 		initResp := client.ExpectInitializeResponseAndCapabilities(t)
@@ -243,15 +243,17 @@ func TestLaunch(t *testing.T) {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=5", cdResp)
 		}
 
-		// 一开始stopOnEntry,所以要continue
-		// 6 >> continue, << continue
+		// 一开始stopOnEntry,所以要continue,由于continue后会直接执行结束,所以会收到terminated事件
+		// 6 >> continue, << continue, << terminated
 		client.ContinueRequest(1)
 		cResp := client.ExpectContinueResponse(t)
 		if cResp.Seq != 0 || cResp.RequestSeq != 6 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6", cResp)
 		}
-		// wait program run
-		time.Sleep(100 * time.Millisecond)
+		termEvent := client.ExpectTerminatedEvent(t)
+		if termEvent.Seq != 0 {
+			t.Errorf("\ngot %#v\nwant Seq=0", termEvent)
+		}
 
 		// 7 >> threads, << threads
 		client.ThreadsRequest()
