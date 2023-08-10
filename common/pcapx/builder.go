@@ -8,6 +8,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+var (
+	linkExport = map[string]any{
+		"LINK_TYPE_ETHERNET":  layers.LinkTypeEthernet,
+		"LINK_TYPE_LOOP":      layers.LinkTypeLoop,
+		"LINK_TYPE_RAW":       layers.LinkTypeRaw,
+		"LINK_TYPE_LINUX_SLL": layers.LinkTypeLinuxSLL,
+		"LINK_TYPE_IPV4":      layers.LinkTypeIPv4,
+		"LINK_TYPE_IPV6":      layers.LinkTypeIPv6,
+		"LINK_TYPE_NULL":      layers.LinkTypeNull,
+	}
+)
+
 type BuilderConfig struct {
 	Loopback bool
 	Payload  []byte
@@ -31,7 +43,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	var (
 		baseConfig     = &BuilderConfig{}
 		tcpConfig      *TCPBuilderConfig
-		arpConfig      *ArpLayerBuilderConfig
+		arpConfig      *layers.ARP
 		ipConfig       *IPv4LayerBuilderConfig
 		ethernetConfig *EthernetLayerBuilderConfig
 	)
@@ -44,11 +56,19 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 				tcpConfig = &TCPBuilderConfig{}
 			}
 			optFunc(tcpConfig)
-		case ArpLayerBuilderConfigOption:
+		case ArpConfig:
 			if arpConfig == nil {
-				arpConfig = &ArpLayerBuilderConfig{}
+				arpConfig = &layers.ARP{
+					AddrType:        layers.LinkTypeEthernet,
+					Protocol:        layers.EthernetTypeARP,
+					HwAddressSize:   6,
+					ProtAddressSize: 4,
+				}
 			}
-			optFunc(arpConfig)
+			err := optFunc(arpConfig)
+			if err != nil {
+				return nil, err
+			}
 		case IPv4LayerBuilderConfigOption:
 			if ipConfig == nil {
 				ipConfig = &IPv4LayerBuilderConfig{}
@@ -84,18 +104,38 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	}
 	_ = linkLayer
 
-	// NetworkLayer can be IPv4(Default) or ARP
-	if !funk.Any(ipConfig, arpConfig) {
+	/*
+		check network layer?
+	*/
+	var fetched = false
+	var networkLayerRaw any
+	for _, l := range []any{
+		arpConfig, ipConfig,
+	} {
+		if funk.IsEmpty(l) {
+			if fetched {
+				return nil, utils.Errorf("PacketBuilder: only one network layer is allowed")
+			} else {
+				fetched = true
+				networkLayerRaw = l
+			}
+		}
+	}
+	if networkLayerRaw == nil {
 		return nil, utils.Errorf("PacketBuilder: network layer is empty")
 	}
 
 	var networkLayer gopacket.SerializableLayer
 	var ipEnabled bool
-	if ipConfig != nil {
+	if !funk.IsEmpty(ipConfig) {
 		ipEnabled = true
 		networkLayer = ipConfig.Create()
-	} else if arpConfig != nil {
-		networkLayer = arpConfig.Create()
+		if ipConfig.Version == 6 {
+			linkLayer.EthernetType = layers.EthernetTypeIPv6
+		}
+	} else if !funk.IsEmpty(arpConfig) {
+		networkLayer = arpConfig
+		linkLayer.EthernetType = layers.EthernetTypeARP
 	} else {
 		return nil, utils.Errorf("PacketBuilder: network layer is empty")
 	}
@@ -103,6 +143,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 
 	var err error
 	if ipEnabled {
+		// TCP/IP Stack!
 		// TransportLayer can be TCP(Default)
 		if tcpConfig == nil {
 			log.Warn("PacketBuilder: tcp layer is empty, use default")
