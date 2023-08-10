@@ -45,6 +45,7 @@ Host: www.example.com
 		return nil
 	}
 	_ = httpPacket
+
 	config := originRule.ContentRuleConfig
 	ch := make(chan *ChaosTraffic)
 	var forReq = true
@@ -106,9 +107,6 @@ Host: www.example.com
 						feedback(freq.FuzzHTTPHeader(k, v).FirstHTTPRequestBytes())
 					}
 					feedback(freq.FuzzHTTPHeader("X-Test", content).FirstHTTPRequestBytes())
-				}
-
-				switch rule.Modifier {
 				case suricata.HTTPHost:
 					feedback(freq.FuzzHTTPHeader("Host", string(rule.Content)).FirstHTTPRequestBytes())
 				case suricata.HTTPHostRaw:
@@ -127,10 +125,6 @@ Host: www.example.com
 					freq = freq.FuzzMethod(string(rule.Content))
 					continue
 				case suricata.HTTPUri:
-					if rule.PCRE != "" {
-						// 有正则，则以生成的正则为主
-						extraRules = rule.PCREStringGenerator(5)
-					}
 					if strings.HasPrefix(content, ".") {
 						path := utils.RandStringBytes(10) + content
 						freq = freq.FuzzPathAppend(path, utils.RandStringBytes(3)+"/"+path)
@@ -141,7 +135,10 @@ Host: www.example.com
 						continue
 					}
 				}
-
+				if rule.PCRE != "" {
+					// 有正则，则以生成的正则为主
+					extraRules = rule.PCREStringGenerator(5)
+				}
 				extraBody = append(extraBody, content)
 			}
 			if len(extraRules) > 0 {
@@ -195,79 +192,75 @@ Hello
 				server   = "nginx"
 				location = ""
 			)
-			_ = htmlBody
-			_ = bodyJson
 			var extraRules []*suricata.ContentRule
 			rules := config.ContentRules
 		WRITE_RULES:
 			for _, rule := range rules {
-				if rule == nil || len(rule.Content) <= 0 {
+				if rule == nil && rule.Negative {
 					continue
 				}
-				content := string(rule.Content)
-
-				switch rule.Modifier {
-				case suricata.HTTPCookie:
-					content = strings.ReplaceAll(content, "Set-Cookie: ", "")
-					content = strings.ReplaceAll(content, "Set-Cookie:", "")
-					content = strings.ReplaceAll(content, "Cookie:", "")
-					extraHeader.Add("Set-Cookie", content)
-					continue
-				case suricata.HTTPHeader:
-					fallthrough
-				case suricata.HTTPHeaderRaw:
-					if k, v := lowhttp.SplitHTTPHeader(content); v != "" {
-						extraHeader.Add(k, v)
-					} else {
-						extraHeader.Add("Content-Type", content)
+				if len(rule.Content) == 0 {
+					// pcre
+					if ret := rule.PCREStringGenerator(5); ret != nil {
+						extraRules = append(extraRules, ret...)
 					}
-					continue
-				}
-
-				if ret := rule.PCREStringGenerator(5); ret != nil {
-					extraRules = append(extraRules, ret...)
-				}
-
-				switch rule.Modifier {
-				case suricata.HTTPLocation:
-					location = `{{list(|/|/admin/|/{{(rs(5,5,2))/|http://|https://|login/}})}}` + location
-					continue
-				case suricata.HTTPResponseBody:
-					if rule.Negative {
-						bodyJson = strings.ReplaceAll(bodyJson, content, "")
-						htmlBody = strings.ReplaceAll(htmlBody, content, "")
-					} else {
-						bodyJson = content + bodyJson
-						htmlBody = content + htmlBody
-						extraContent = append(extraContent, content)
+				} else {
+					// content
+					content := string(rule.Content)
+					switch rule.Modifier {
+					case suricata.HTTPCookie:
+						content = strings.ReplaceAll(content, "Set-Cookie: ", "")
+						content = strings.ReplaceAll(content, "Set-Cookie:", "")
+						content = strings.ReplaceAll(content, "Cookie:", "")
+						extraHeader.Add("Set-Cookie", content)
+						continue
+					case suricata.HTTPHeader:
+						fallthrough
+					case suricata.HTTPHeaderRaw:
+						if k, v := lowhttp.SplitHTTPHeader(content); v != "" {
+							extraHeader.Add(k, v)
+						} else {
+							extraHeader.Add("Content-Type", content)
+						}
+						continue
+					case suricata.HTTPLocation:
+						location = `{{list(|/|/admin/|/{{(rs(5,5,2))/|http://|https://|login/}})}}` + location
+						continue
+					case suricata.HTTPResponseBody:
+						if rule.Negative {
+							bodyJson = strings.ReplaceAll(bodyJson, content, "")
+							htmlBody = strings.ReplaceAll(htmlBody, content, "")
+						} else {
+							bodyJson = content + bodyJson
+							htmlBody = content + htmlBody
+							extraContent = append(extraContent, content)
+						}
+						continue
+					case suricata.HTTPServer:
+						server = content + `{{list(/||1.3.1|1.2.3|{{randstr(4,5,3)}})}}`
+						if strings.HasPrefix(server, "Server: ") {
+							server = server[8:]
+						}
+						continue
+					case suricata.HTTPStatCode:
+						code = content
+						var codeInt, _ = strconv.Atoi(code)
+						if codeInt > 0 {
+							status = http.StatusText(codeInt)
+						}
+						continue
+					case suricata.HTTPStatMsg:
+						status = content
+						continue
 					}
-					continue
-				case suricata.HTTPServer:
-					server = content + `{{list(/||1.3.1|1.2.3|{{randstr(4,5,3)}})}}`
-					if strings.HasPrefix(server, "Server: ") {
-						server = server[8:]
-					}
-					continue
-				case suricata.HTTPStatCode:
-					code = content
-					var codeInt, _ = strconv.Atoi(code)
-					if codeInt > 0 {
-						status = http.StatusText(codeInt)
-					}
-					continue
-				case suricata.HTTPStatMsg:
-					status = content
-					continue
-				}
 
-				if !rule.Negative {
 					bodyJson += content
 					htmlBody += content
 					extraContent = append(extraContent, content)
 				}
 			}
 
-			if extraRules != nil || len(extraRules) > 0 {
+			if len(extraRules) > 0 {
 				rules = extraRules
 				extraRules = nil
 				goto WRITE_RULES
