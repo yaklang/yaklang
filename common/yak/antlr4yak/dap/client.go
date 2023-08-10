@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"reflect"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,25 +14,25 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 )
 
-type TestClient struct {
+type Client struct {
 	seq    int
 	conn   net.Conn
 	reader *bufio.Reader
 }
 
-func (c *TestClient) Close() {
+func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *TestClient) send(request dap.Message) {
+func (c *Client) send(request dap.Message) {
 	dap.WriteProtocolMessage(c.conn, request)
 }
 
-func (c *TestClient) ReadMessage() (dap.Message, error) {
+func (c *Client) ReadMessage() (dap.Message, error) {
 	return dap.ReadProtocolMessage(c.reader)
 }
 
-func (c *TestClient) newRequest(command string) *dap.Request {
+func (c *Client) newRequest(command string) *dap.Request {
 	request := &dap.Request{}
 	request.Type = "request"
 	request.Command = command
@@ -41,16 +41,7 @@ func (c *TestClient) newRequest(command string) *dap.Request {
 	return request
 }
 
-func (c *TestClient) ExpectMessage(t *testing.T) dap.Message {
-	t.Helper()
-	m, err := dap.ReadProtocolMessage(c.reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return m
-}
-
-func (c *TestClient) InitializeRequest() {
+func (c *Client) InitializeRequest() {
 	request := &dap.InitializeRequest{Request: *c.newRequest("initialize")}
 	request.Arguments = dap.InitializeRequestArguments{
 		AdapterID:                    "yak",
@@ -65,36 +56,104 @@ func (c *TestClient) InitializeRequest() {
 	c.send(request)
 }
 
-func (c *TestClient) LaunchRequest(mode, program string) {
+func (c *Client) LaunchRequest(mode, program string, stopOnEntry bool) {
 	request := &dap.LaunchRequest{Request: *c.newRequest("launch")}
 	request.Arguments = toRawMessage(map[string]interface{}{
-		"request": "launch",
-		"mode":    mode,
-		"program": program,
+		"request":     "launch",
+		"mode":        mode,
+		"program":     program,
+		"stopOnEntry": stopOnEntry,
 	})
 	c.send(request)
 }
 
-func (c *TestClient) DisconnectRequest() {
+func (c *Client) ContinueRequest(thread int) {
+	request := &dap.ContinueRequest{Request: *c.newRequest("continue")}
+	request.Arguments.ThreadId = thread
+	c.send(request)
+}
+
+func (c *Client) DisconnectRequest() {
 	request := &dap.DisconnectRequest{Request: *c.newRequest("disconnect")}
 	c.send(request)
 }
 
-func (c *TestClient) ExpectInitializeResponseAndCapabilities(t *testing.T) *dap.InitializeResponse {
+func (c *Client) ConfigurationDoneRequest() {
+	request := &dap.ConfigurationDoneRequest{Request: *c.newRequest("configurationDone")}
+	c.send(request)
+}
+
+func (c *Client) ThreadsRequest() {
+	request := &dap.ThreadsRequest{Request: *c.newRequest("threads")}
+	c.send(request)
+}
+
+func (c *Client) EvaluateRequest(expr string, fid int, context string) {
+	request := &dap.EvaluateRequest{Request: *c.newRequest("evaluate")}
+	request.Arguments.Expression = expr
+	request.Arguments.FrameId = fid
+	request.Arguments.Context = context
+	c.send(request)
+}
+
+func (c *Client) StackTraceRequest(threadID, startFrame, levels int) {
+	request := &dap.StackTraceRequest{Request: *c.newRequest("stackTrace")}
+	request.Arguments.ThreadId = threadID
+	request.Arguments.StartFrame = startFrame
+	request.Arguments.Levels = levels
+	c.send(request)
+}
+
+func (c *Client) SetBreakpointsRequest(file string, lines []int) {
+	c.SetBreakpointsRequestWithArgs(file, lines, nil, nil, nil)
+}
+
+func (c *Client) SetExceptionBreakpointsRequest() {
+	request := &dap.SetBreakpointsRequest{Request: *c.newRequest("setExceptionBreakpoints")}
+	c.send(request)
+}
+
+func (c *Client) SetBreakpointsRequestWithArgs(file string, lines []int, conditions, hitConditions, logMessages map[int]string) {
+	request := &dap.SetBreakpointsRequest{Request: *c.newRequest("setBreakpoints")}
+	request.Arguments = dap.SetBreakpointsArguments{
+		Source: dap.Source{
+			Name: filepath.Base(file),
+			Path: file,
+		},
+		Breakpoints: make([]dap.SourceBreakpoint, len(lines)),
+	}
+	for i, l := range lines {
+		request.Arguments.Breakpoints[i].Line = l
+		if cond, ok := conditions[l]; ok {
+			request.Arguments.Breakpoints[i].Condition = cond
+		}
+		if hitCond, ok := hitConditions[l]; ok {
+			request.Arguments.Breakpoints[i].HitCondition = hitCond
+		}
+		if logMessage, ok := logMessages[l]; ok {
+			request.Arguments.Breakpoints[i].LogMessage = logMessage
+		}
+	}
+	c.send(request)
+}
+
+func (c *Client) ExpectOutputEventDetaching(t *testing.T) *dap.OutputEvent {
 	t.Helper()
-	initResp := c.ExpectInitializeResponse(t)
-	wantCapabilities := dap.Capabilities{
-		SupportsStepInTargetsRequest:     true,
-		SupportsEvaluateForHovers:        true,
-		SupportsConditionalBreakpoints:   true,
-		SupportsConfigurationDoneRequest: true,
-		SupportsDataBreakpoints:          true,
-		SupportsDisassembleRequest:       true,
+	return c.ExpectOutputEventRegex(t, `Detaching\n`)
+}
+
+func (c *Client) ExpectOutputEventHelpInfo(t *testing.T) *dap.OutputEvent {
+	t.Helper()
+	return c.ExpectOutputEventRegex(t, `Type 'help' for help info.`)
+}
+
+func (c *Client) ExpectInvisibleErrorResponse(t *testing.T) *dap.ErrorResponse {
+	t.Helper()
+	er := c.ExpectErrorResponse(t)
+	if er.Body.Error != nil && er.Body.Error.ShowUser {
+		t.Errorf("\ngot %#v\nwant ShowUser=false", er)
 	}
-	if !reflect.DeepEqual(initResp.Body, wantCapabilities) {
-		t.Errorf("capabilities in initializeResponse: got %+v, want %v", pretty(initResp.Body), pretty(wantCapabilities))
-	}
-	return initResp
+	return er
 }
 
 func pretty(v interface{}) string {
@@ -110,7 +169,7 @@ func toRawMessage(in interface{}) json.RawMessage {
 	return out
 }
 
-func NewTestClient(addr string) *TestClient {
+func NewTestClient(addr string) *Client {
 	conn, err := netx.DialTCPTimeout(time.Duration(5)*time.Second, addr)
 	if err != nil {
 		log.Fatalf("dail error: %v", err)
@@ -118,8 +177,8 @@ func NewTestClient(addr string) *TestClient {
 	return NewTestClientFromConn(conn)
 }
 
-func NewTestClientFromConn(conn net.Conn) *TestClient {
-	c := &TestClient{
+func NewTestClientFromConn(conn net.Conn) *Client {
+	c := &Client{
 		conn:   conn,
 		seq:    1,
 		reader: bufio.NewReader(conn),
