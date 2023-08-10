@@ -91,7 +91,7 @@ jobs:
             run: go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
 
           - name: Test Ping
-            run: go test -timeout 20s TestPingAutoConfig ./common/utils/pingutil -v
+            run: go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
 
     steps:
       - name: Check out code into the Go module directory
