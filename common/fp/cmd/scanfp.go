@@ -5,15 +5,14 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/fp/cmd/scanfpcmd"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
@@ -51,11 +50,6 @@ func main() {
 	app.Commands = []cli.Command{
 		scanfpcmd.SynScanCmd,
 		scanfpcmd.BruteUtil,
-		{Name: "nuclei", Action: func(c *cli.Context) error {
-			opt := tools.GetDefaultNucleiOptions()
-			spew.Dump(opt)
-			return nil
-		}},
 		{
 			Name: "md5fp",
 			Flags: []cli.Flag{
@@ -116,7 +110,7 @@ func main() {
 			},
 		},
 		{
-			Name: "arp",
+			Name: "arpx",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name: "t,target",
@@ -134,14 +128,14 @@ func main() {
 					return err
 				}
 
-				utils.ARPWithPcap(context.Background(), iface.Name, targets)
-				res, err := utils.ArpIPAddressesWithContext(
+				arpx.ARPWithPcap(context.Background(), iface.Name, targets)
+				res, err := arpx.ArpIPAddressesWithContext(
 					utils.TimeoutContextSeconds(5),
 					iface.Name,
 					targets,
 				)
 				if err != nil {
-					return utils.Errorf("arp ip [%v] from iface: %v error: %v", targets, iface.Name, err)
+					return utils.Errorf("arpx ip [%v] from iface: %v error: %v", targets, iface.Name, err)
 				}
 
 				for ip, mac := range res {

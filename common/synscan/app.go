@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strconv"
@@ -89,9 +91,9 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 	if gateway != "" && s.iface != nil {
 		// 传入的网关不为空
 		srcHw := s.iface.HardwareAddr
-		dstHw, err := utils.ArpWithTimeout(5*time.Second, s.iface.Name, gateway)
+		dstHw, err := arpx.ArpWithTimeout(5*time.Second, s.iface.Name, gateway)
 		if err != nil {
-			log.Warnf("utils.ArpWithTimeout cannot found dstHw: %v, target: %v, iface: %v, gateway: %v", err, target, s.iface.Name, gateway)
+			log.Warnf("ArpWithTimeout cannot found dstHw: %v, target: %v, iface: %v, gateway: %v", err, target, s.iface.Name, gateway)
 		}
 		if dstHw != nil && srcHw != nil {
 			s._cache_eth = &layers.Ethernet{
@@ -100,7 +102,7 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 				EthernetType: layers.EthernetTypeIPv4,
 			}
 			s.defaultDstHw = dstHw
-			log.Infof("use arp proto to fetch gateway's hw address: %s", dstHw.String())
+			log.Infof("use arpx proto to fetch gateway's hw address: %s", dstHw.String())
 			return nil
 		}
 	}
@@ -173,9 +175,9 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	isLoopback := srcIp.IsLoopback()
 
 	log.Debugf("start to init network dev: %v", iface.Name)
-	ifaceName, err := utils.IfaceNameToPcapIfaceName(iface.Name)
+	ifaceName, err := pcaputil.IfaceNameToPcapIfaceName(iface.Name)
 	if err != nil {
-		if _, ok := err.(*utils.ConvertIfaceNameError); !isLoopback || !ok {
+		if _, ok := err.(*pcaputil.ConvertIfaceNameError); !isLoopback || !ok {
 			return nil, err
 		}
 	}
@@ -282,7 +284,7 @@ FLAGS: %v
 
 func (s *Scanner) daemon() {
 	// handler
-	err := s.handler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
+	err := s.handler.SetBPFFilter("(arpx) or (tcp[tcpflags] & (tcp-syn) != 0)")
 	if err != nil {
 		log.Errorf("set bpf filter failed: %s", err)
 	}
@@ -290,7 +292,7 @@ func (s *Scanner) daemon() {
 	packets := source.Packets()
 
 	// local handler
-	err = s.localHandler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
+	err = s.localHandler.SetBPFFilter("(arpx) or (tcp[tcpflags] & (tcp-syn) != 0)")
 	if err != nil {
 		log.Errorf("set bpf filter failed for loopback: %s", err)
 	}

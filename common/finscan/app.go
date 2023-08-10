@@ -7,6 +7,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
@@ -141,9 +142,9 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	isLoopback := srcIp.IsLoopback()
 
 	log.Debugf("start to init network dev: %v", iface.Name)
-	ifaceName, err := utils.IfaceNameToPcapIfaceName(iface.Name)
+	ifaceName, err := pcaputil.IfaceNameToPcapIfaceName(iface.Name)
 	if err != nil {
-		if _, ok := err.(*utils.ConvertIfaceNameError); !isLoopback || !ok {
+		if _, ok := err.(*pcaputil.ConvertIfaceNameError); !isLoopback || !ok {
 			return nil, err
 		}
 	}

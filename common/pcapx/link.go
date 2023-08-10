@@ -2,7 +2,7 @@ package pcapx
 
 import (
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
 	"time"
@@ -14,7 +14,7 @@ var (
 	PublicInterface        *net.Interface
 )
 
-func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
+func getPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 	if PublicInterface != nil && PublicGatewayAddress != nil && PublicPreferredAddress != nil {
 		return PublicInterface, PublicGatewayAddress, PublicPreferredAddress, nil
 	}
@@ -29,12 +29,12 @@ func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 }
 
 func GetPublicLinkLayer(t layers.EthernetType, toServer bool) (*layers.Ethernet, error) {
-	iface, gw, _, err := GetPublicRoute()
+	iface, gw, _, err := getPublicRoute()
 	if err != nil {
 		return nil, err
 	}
 	srcMac := iface.HardwareAddr
-	dstMac, err := utils.Arp(iface.Name, gw.String())
+	dstMac, err := arpx.Arp(iface.Name, gw.String())
 	if err != nil {
 		return nil, err
 	}
