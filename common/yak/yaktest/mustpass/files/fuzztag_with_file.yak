@@ -1,0 +1,5 @@
+file.Save("/tmp/a.txt", "abc")~
+assert string(file.ReadFile("/tmp/a.txt")~) == "abc"
+
+dump(x`{{file(/tmp/a.txt)}}`)
+assert x`{{file(/tmp/a.txt)}}`[0] != "abc"
