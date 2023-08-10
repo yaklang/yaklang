@@ -29,6 +29,9 @@ func RunProgramInDebugMode(debug bool, program string, args []string) error {
 		d := NewDAPDebugger()
 		engine.SetDebugInit(d.Init())
 		engine.SetDebugCallback(d.CallBack())
+
+		ds.debugger = d
+		d.session = ds
 	}
 
 	// inject args in cli
