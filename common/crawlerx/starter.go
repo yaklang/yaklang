@@ -11,6 +11,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"net"
 	"net/http"
 	"runtime"
 	"strings"
@@ -111,8 +112,27 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	starter.urlAfterRepeat = urlRepeatCheckGenerator(baseConfig.scanRepeat, baseConfig.ignoreParams...)
 	starter.counter = tools.NewCounter(starter.concurrent)
 	starter.transport = &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		DialContext:           netx.NewDialContextFunc(30 * time.Second),
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+			host, port, err := utils.ParseStringToHostPort(addr)
+			d := net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+			if err != nil {
+				return nil, utils.Errorf("cannot parse %v as host:port, reason: %v", addr, err)
+			}
+
+			if utils.IsIPv4(host) || utils.IsIPv6(host) {
+				return d.DialContext(ctx, network, utils.HostPort(host, port))
+			}
+
+			newHost := netx.LookupFirst(host)
+			if newHost == "" {
+				return nil, utils.Errorf("cannot resolve %v", addr)
+			}
+			return d.DialContext(ctx, network, utils.HostPort(newHost, port))
+		},
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -390,7 +410,11 @@ running:
 			err = p.Navigate(urlStr)
 			if urlStr == starter.baseUrl && len(starter.baseConfig.localStorage) > 0 {
 				log.Infof(`do local storage on %s`, urlStr)
-				p.WaitLoad()
+				err = p.WaitLoad()
+				if err != nil {
+					log.Errorf(`do local storage page wait load error: %v`, err.Error())
+					continue
+				}
 				for key, value := range starter.baseConfig.localStorage {
 					setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
 					_, err := p.EvalOnNewDocument(setStorageJS)
