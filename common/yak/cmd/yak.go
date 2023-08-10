@@ -1190,7 +1190,7 @@ func main() {
 					return utils.Errorf("file not found: %v", c.String("file"))
 				}
 
-				return chaosmaker.ImportChaosRulesFromFile(consts.GetGormProfileDatabase(), file)
+				return rule.ImportRulesFromFile(consts.GetGormProfileDatabase(), file)
 			},
 		},
 		// chaosmaker
@@ -1200,7 +1200,7 @@ func main() {
 				cli.StringFlag{Name: "file,f"},
 			},
 			Action: func(c *cli.Context) error {
-				return chaosmaker.ExportChaosRulesToFile(consts.GetGormProfileDatabase(), c.String("file"))
+				return rule.ExportRulesToFile(consts.GetGormProfileDatabase(), c.String("file"))
 			},
 		},
 	}
