@@ -328,6 +328,9 @@ func (ds *DebugSession) onRestartRequest(request *dap.RestartRequest) {
 }
 
 func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
+	// 等待调试器初始化完成
+	ds.debugger.WaitInit()
+
 	response := &dap.SetBreakpointsResponse{}
 	response.Response = *newResponse(request.Seq, request.Command)
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
@@ -363,6 +366,9 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 
 		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'help' for help info.\n", consts.GetYakVersion()))
 	} else {
+		// 等待调试器初始化完成
+		ds.debugger.WaitInit()
+
 		ds.debugger.Continue()
 	}
 
