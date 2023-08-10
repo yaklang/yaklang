@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,6 +36,7 @@ type httpPoolConfig struct {
 	PayloadsTable                    *sync.Map
 	Ctx                              context.Context
 	ForceFuzz                        bool
+	ForceFuzzfile                    bool
 	FuzzParams                       map[string][]string
 	RequestCountLimiter              int
 	NoFixContentLength               bool
@@ -332,6 +332,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		FollowJSRedirect:  false,
 		Ctx:               context.Background(),
 		ForceFuzz:         true,
+		ForceFuzzfile:     true,
 	}
 	for _, opt := range opts {
 		opt(base)
@@ -617,26 +618,45 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						paramsGetterHandler := config.ExtraRegexpMutateConditionGetter()
 						conds = append(conds, paramsGetterHandler)
 					}
-					_, err := QuickMutateWithCallbackEx2(
-						string(reqRaw),
-						consts.GetGormProfileDatabase(),
-						[]func(result *MutateResult) bool{
-							func(result *MutateResult) bool {
-								select {
-								case <-config.Ctx.Done():
-									return false
-								default:
-								}
-								if maxSubmit > 0 && requestCounter >= maxSubmit {
-									return false
-								}
-								submitTask([]byte(result.Result), result.Payloads...)
-								return true
-							},
-						}, conds...)
+					var opts []FuzzConfigOpt = []FuzzConfigOpt{
+						Fuzz_WithResultHandler(func(s string, i []string) bool {
+							select {
+							case <-config.Ctx.Done():
+								return false
+							default:
+							}
+							if maxSubmit > 0 && requestCounter >= maxSubmit {
+								return false
+							}
+							submitTask([]byte(s), i...)
+							return true
+						}),
+					}
+					opts = append(opts, FuzzFileOptions()...)
+					_, err := FuzzTagExec(string(reqRaw), opts...)
 					if err != nil {
 						log.Errorf("fuzz with callback failed: %s", err)
 					}
+					//_, err := QuickMutateWithCallbackEx2(
+					//	string(reqRaw),
+					//	consts.GetGormProfileDatabase(),
+					//	[]func(result *MutateResult) bool{
+					//		func(result *MutateResult) bool {
+					//			select {
+					//			case <-config.Ctx.Done():
+					//				return false
+					//			default:
+					//			}
+					//			if maxSubmit > 0 && requestCounter >= maxSubmit {
+					//				return false
+					//			}
+					//			submitTask([]byte(result.Result), result.Payloads...)
+					//			return true
+					//		},
+					//	}, conds...)
+					//if err != nil {
+					//	log.Errorf("fuzz with callback failed: %s", err)
+					//}
 				} else {
 					submitTask(reqRaw)
 				}
