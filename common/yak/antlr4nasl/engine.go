@@ -34,6 +34,7 @@ type Engine struct {
 	scriptExecMutexsLock           *sync.Mutex
 	autoLoadDependencies           bool
 	buildInMethodHook              map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
+	preferences                    map[string]any
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {

@@ -64,6 +64,9 @@ func (n *NaslArray) Copy() *NaslArray {
 	return res
 }
 func (n *NaslArray) AddEleToList(index int, ele interface{}) error {
+	//if ele == nil {
+	//	return nil
+	//}
 	if index < 0 {
 		err := utils.Error("add_var_to_list: negative index are not (yet) supported\n")
 		log.Error(err)
