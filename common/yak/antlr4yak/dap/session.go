@@ -50,8 +50,11 @@ type DebugSession struct {
 	// config
 	config *DAPServerConfig
 
+	// launch config
+	launchConfig *LaunchConfig
+
 	// debugger
-	debugger *yakvm.Debugger
+	debugger *DAPDebugger
 
 	// conn save raw connection
 	conn net.Conn
