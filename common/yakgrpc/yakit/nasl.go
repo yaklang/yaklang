@@ -186,9 +186,9 @@ func (p *NaslScript) ToYakScript() *YakScript {
 	}
 	paramsStr := strconv.Quote(string(raw))
 	return &YakScript{
-		ScriptName:           "__NaslScript__" + p.OriginFileName,
+		ScriptName:           utils.EscapeInvalidUTF8Byte([]byte(p.OriginFileName)),
 		Type:                 "nasl",
-		Content:              p.Script,
+		Content:              utils.EscapeInvalidUTF8Byte([]byte(p.Script)),
 		Level:                "info",
 		Params:               paramsStr,
 		Help:                 "",
