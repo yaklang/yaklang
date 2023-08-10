@@ -42,6 +42,9 @@ type LaunchConfig struct {
 
 	// The output mode specifies how to handle the program's output.
 	OutputMode string `json:"outputMode,omitempty"`
+
+	// Automatically stop program after launch or attach.
+	StopOnEntry bool `json:"stopOnEntry,omitempty"`
 }
 
 func unmarshalLaunchConfig(input json.RawMessage, config any) error {
