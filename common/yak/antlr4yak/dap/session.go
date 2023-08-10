@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-dap"
@@ -85,10 +86,7 @@ type DebugSession struct {
 	// stopDebug is used to notify long-running handlers to stop processing.
 	stopMu sync.Mutex
 
-	// bpSet is a counter of the remaining breakpoints that the debug
-	// session is yet to stop at before the program terminates.
-	bpSet    int
-	bpSetMux sync.Mutex
+	breakpointIDCounter int32
 }
 
 func (ds *DebugSession) send(message dap.Message) {
@@ -331,16 +329,22 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	// 等待调试器初始化完成
 	ds.debugger.WaitInit()
 
+	source := ds.debugger.source
+
 	response := &dap.SetBreakpointsResponse{}
 	response.Response = *newResponse(request.Seq, request.Command)
+
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
 	for i, b := range request.Arguments.Breakpoints {
-		response.Body.Breakpoints[i].Line = b.Line
-		response.Body.Breakpoints[i].Verified = true
-		ds.bpSetMux.Lock()
-		ds.bpSet++
-		ds.bpSetMux.Unlock()
+		bp := &response.Body.Breakpoints[i]
+
+		atomic.AddInt32(&ds.breakpointIDCounter, 1)
+		bp.Source = &dap.Source{Path: source.AbsPath, Name: source.Name}
+		bp.Id = int(ds.breakpointIDCounter)
+		bp.Line = b.Line
+		bp.Verified = true
 	}
+
 	ds.send(response)
 }
 
