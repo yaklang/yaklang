@@ -95,14 +95,17 @@ naslScanHandle = (hosts,ports)=>{
     if proxy != nil && proxy != ""{
         opts.Append(nasl.proxy(proxy))
     }
+	opts.Append(nasl.preference({
+		"Exclude printers from scan": false,
+		"Enable CGI scanning": false,
+	}))
 	opts.Append(nasl.riskHandle((risk)=>{
 		log.info("found risk: %v", risk)
 	}))
-	opts.Append(nasl.conditions({
-		"family": "Web Servers",
-		"category": "ACT_GATHER_INFO",
-	}))
-	//opts.Append(nasl.plugin("mssqlserver_detect.nasl"))
+	//opts.Append(nasl.conditions({
+	//	"family": "Web Servers",
+	//}))
+	opts.Append(nasl.plugin("webmirror.nasl"))
     kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)

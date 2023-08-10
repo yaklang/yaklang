@@ -217,6 +217,9 @@ func init() {
 			if pref.IsUndefined() {
 				return nil, genNotMatchedArgumentTypeError("script_get_preference")
 			}
+			if pref.String() == "Start page : " {
+				println()
+			}
 			if v, ok := engine.scriptObj.Preferences[pref.AsString()]; ok {
 				return v.(map[string]interface{})["value"], nil
 			}
@@ -669,10 +672,7 @@ func init() {
 			return nil, nil
 		},
 		"get_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			names, err := net.LookupAddr(engine.host)
-			if err != nil {
-				return nil, err
-			}
+			names, _ := net.LookupAddr(engine.host)
 			var name string
 			if len(names) > 0 {
 				name = names[0]
@@ -680,12 +680,11 @@ func init() {
 			return name, nil
 		},
 		"get_host_names": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_host_names` is not implement"))
-			return nil, nil
+			names, _ := net.LookupAddr(engine.host)
+			return vm.NewNaslArray(names)
 		},
 		"get_host_name_source": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			panic(fmt.Sprintf("method `get_host_name_source` is not implement"))
-			return nil, nil
+			return netx.LookupFirst(params.getParamByName("hostname", "").String()), nil
 		},
 		"resolve_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			panic(fmt.Sprintf("method `resolve_host_name` is not implement"))
@@ -1022,6 +1021,21 @@ func init() {
 				}
 			})
 			return res, nil
+		},
+		"make_list_unique": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			res, err := engine.CallNativeFunction("make_list", nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			list := res.(*vm.NaslArray).Num_elt
+			set := utils.NewSet[any]()
+			set.AddList(list)
+			newArray, err := vm.NewNaslArray(set.List())
+			if err != nil {
+				return nil, err
+			}
+			return newArray, nil
 		},
 		"make_array": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			array := vm.NewEmptyNaslArray()

@@ -26,8 +26,19 @@ type ScriptEngine struct {
 	loadedScriptsLock              *sync.Mutex
 	scriptExecMutexs               map[string]*sync.Mutex
 	scriptExecMutexsLock           *sync.Mutex
+	config                         *NaslScriptConfig
 }
 
+func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
+	engine := NewScriptEngine()
+	engine.config = cfg
+	engine.LoadScriptsFromDb(cfg.plugin...)
+	engine.LoadFamilys(cfg.family...)
+	if cfg.conditions != nil {
+		engine.LoadWithConditions(cfg.conditions)
+	}
+	return engine
+}
 func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
 		scripts:           make(map[string]*NaslScriptInfo),
@@ -41,6 +52,7 @@ func NewScriptEngine() *ScriptEngine {
 		},
 		scriptExecMutexsLock: &sync.Mutex{},
 		scriptExecMutexs:     make(map[string]*sync.Mutex),
+		config:               NewNaslScriptConfig(),
 	}
 }
 func (engine *ScriptEngine) GetScriptMuxByName(name string) *sync.Mutex {
@@ -118,8 +130,22 @@ func (e *ScriptEngine) LoadFamilys(familys ...string) {
 		return
 	}
 	for _, family := range familys {
+		if family != "Web Servers" {
+			continue
+		}
+
 		var scripts []*yakit.NaslScript
-		if db := db.Where("family = ?", family).Find(&scripts); db.Error != nil {
+		if family == "Web Servers" {
+			db = db.
+				Where("script_name like ?", "'%apache%'").
+				Where("script_name like ?", "'%nginx%'").
+				Where("script_name like ?", "'%jetty%'").
+				Where("script_name like ?", "'%websphere%'").
+				Where("script_name like ?", "'%Lighttpd%'").
+				Where("script_name like ?", "'% (HTTP)'").
+				Where("script_name like ?", "'%weblogic%'")
+		}
+		if db = db.Where("family = ?", family).Find(&scripts); db.Error != nil {
 			continue
 		}
 		for _, script := range scripts {
@@ -135,6 +161,16 @@ func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 	if db == nil {
 		return
 	}
+	if family, ok := conditions["family"].(string); ok && family != "" {
+		if family != "Web Servers" {
+			return
+		}
+		if family == "Web Servers" {
+			db = db.
+				Where("script_name like '%apache%' OR script_name like '%nginx%' OR script_name like '%jetty%' OR script_name like '%websphere%' OR script_name like '%Lighttpd%' OR script_name like '%tomcat%' OR script_name like '% (HTTP)' OR script_name like '%weblogic%'")
+		}
+	}
+
 	var scripts []*yakit.NaslScript
 	if db := db.Where(conditions).Find(&scripts); db.Error != nil {
 		log.Errorf("load scripts with conditions error: %v", db.Error)
@@ -228,6 +264,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 		go func(script *NaslScriptInfo) {
 			defer swg.Done()
 			engine := New()
+			engine.preferences = e.config.preference
 			engine.host = host
 			engine.SetProxies(e.proxies...)
 			engine.SetIncludePath(e.naslLibsPath)
