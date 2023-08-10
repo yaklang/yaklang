@@ -17,7 +17,21 @@ var (
 	ConstMap = make(map[any]*Const)
 )
 
+// TODO
+// data flow graph node
+type Node interface {
+	String() string
+
+	// TODO: Type-system
+	// GetType() types.Type
+
+	GetUsers() []User
+	GetValues() []Value
+}
+
 type Value interface {
+	Node
+
 	String() string
 
 	GetUsers() []User
@@ -26,7 +40,7 @@ type Value interface {
 }
 
 type User interface {
-	Value
+	Node
 
 	String() string
 
@@ -37,19 +51,20 @@ type User interface {
 }
 
 type Instruction interface {
-	User
-
 	GetParent() *Function
 	GetBlock() *BasicBlock
 
 	String() string
-	StringByFunc(func(Value) string) string
+	// dis-asm
+	StringByFunc(func(Node) string) string
+	// asm
+	// ParseByString(string) *Function
 
 	// pos
 	Pos() string
 }
 
-func DefaultValueString(v Value) string {
+func DefaultValueString(v Node) string {
 	op := ""
 	switch v := v.(type) {
 	case Instruction:
@@ -373,7 +388,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 
 	// print instruction
-	getStr := func(v Value) string {
+	getStr := func(v Node) string {
 		op := ""
 		switch v := v.(type) {
 		case Instruction:
@@ -471,6 +486,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	return ret
 }
 
+var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
 
 func (b *BasicBlock) String() string {
@@ -484,6 +500,7 @@ func (b *BasicBlock) String() string {
 	return ret
 }
 
+var _ Node = (*BasicBlock)(nil)
 var _ Value = (*BasicBlock)(nil)
 
 func (p *Position) String() string {
@@ -511,7 +528,7 @@ func (p *Phi) String() string {
 	return p.StringByFunc(DefaultValueString)
 }
 
-func (p *Phi) StringByFunc(getStr func(Value) string) string {
+func (p *Phi) StringByFunc(getStr func(Node) string) string {
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for i := range p.Edge {
 		v := p.Edge[i]
@@ -524,6 +541,7 @@ func (p *Phi) StringByFunc(getStr func(Value) string) string {
 	return ret
 }
 
+var _ Node = (*Phi)(nil)
 var _ Value = (*Phi)(nil)
 var _ User = (*Phi)(nil)
 var _ Instruction = (*Phi)(nil)
@@ -533,13 +551,18 @@ func (c Const) String() string {
 	return strings.Trim(c.value.String(), "\"")
 }
 
+var _ Node = (*Const)(nil)
 var _ Value = (*Const)(nil)
 
 // ----------- Parameter
 func (p *Parameter) String() string {
 	return p.variable
 }
+func (p *Parameter) GetType() types.Type {
+	return p.typ
+}
 
+var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
 
 // ----------- Jump
@@ -547,22 +570,21 @@ func (j *Jump) String() string {
 	return j.StringByFunc(DefaultValueString)
 }
 
-func (j *Jump) StringByFunc(_ func(Value) string) string {
+func (j *Jump) StringByFunc(_ func(Node) string) string {
 	return fmt.Sprintf("jump -> %s", j.To.Name)
 }
 
-var _ Value = (*Jump)(nil)
-var _ User = (*Jump)(nil)
 var _ Instruction = (*Jump)(nil)
 
 // ----------- IF
 func (i *If) String() string {
 	return i.StringByFunc(DefaultValueString)
 }
-func (i *If) StringByFunc(getStr func(Value) string) string {
+func (i *If) StringByFunc(getStr func(Node) string) string {
 	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
 }
 
+var _ Node = (*If)(nil)
 var _ Value = (*If)(nil)
 var _ User = (*If)(nil)
 var _ Instruction = (*If)(nil)
@@ -572,7 +594,7 @@ func (r *Return) String() string {
 	return r.StringByFunc(DefaultValueString)
 }
 
-func (r *Return) StringByFunc(getStr func(Value) string) string {
+func (r *Return) StringByFunc(getStr func(Node) string) string {
 	return fmt.Sprintf(
 		"ret %s",
 		strings.Join(
@@ -582,7 +604,7 @@ func (r *Return) StringByFunc(getStr func(Value) string) string {
 	)
 }
 
-var _ Value = (*Return)(nil)
+var _ Node = (*Return)(nil)
 var _ User = (*Return)(nil)
 var _ Instruction = (*Return)(nil)
 
@@ -591,7 +613,7 @@ func (c *Call) String() string {
 	return c.StringByFunc(DefaultValueString)
 }
 
-func (c *Call) StringByFunc(getStr func(Value) string) string {
+func (c *Call) StringByFunc(getStr func(Node) string) string {
 	return fmt.Sprintf(
 		"%s = call %s (%s) [%s]",
 		getStr(c),
@@ -609,6 +631,7 @@ func (c *Call) StringByFunc(getStr func(Value) string) string {
 	)
 }
 
+var _ Node = (*Call)(nil)
 var _ Value = (*Call)(nil)
 var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
@@ -618,7 +641,7 @@ func (sw *Switch) String() string {
 	return sw.StringByFunc(DefaultValueString)
 }
 
-func (sw *Switch) StringByFunc(Str func(Value) string) string {
+func (sw *Switch) StringByFunc(Str func(Node) string) string {
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
 		Str(sw.cond),
@@ -632,7 +655,7 @@ func (sw *Switch) StringByFunc(Str func(Value) string) string {
 	)
 }
 
-var _ Value = (*Switch)(nil)
+var _ Node = (*Switch)(nil)
 var _ User = (*Switch)(nil)
 var _ Instruction = (*Switch)(nil)
 
@@ -641,12 +664,13 @@ func (b *BinOp) String() string {
 	return b.StringByFunc(DefaultValueString)
 }
 
-func (b *BinOp) StringByFunc(getStr func(Value) string) string {
+func (b *BinOp) StringByFunc(getStr func(Node) string) string {
 	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
 }
 
 var _ Value = (*BinOp)(nil)
 var _ User = (*BinOp)(nil)
+var _ Node = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
 
 // ----------- Interface
@@ -654,7 +678,7 @@ func (i *Interface) String() string {
 	return i.StringByFunc(DefaultValueString)
 }
 
-func (i *Interface) StringByFunc(Str func(Value) string) string {
+func (i *Interface) StringByFunc(Str func(Node) string) string {
 	if i.ITyp == InterfaceGlobal {
 		return i.Func.name + "-symbol"
 	} else {
@@ -665,6 +689,11 @@ func (i *Interface) StringByFunc(Str func(Value) string) string {
 	}
 }
 
+func (i *Interface) GetType() types.Type {
+	return i.typ
+}
+
+var _ Node = (*Interface)(nil)
 var _ Value = (*Interface)(nil)
 var _ User = (*Interface)(nil)
 var _ Instruction = (*Interface)(nil)
@@ -674,13 +703,14 @@ func (f *Field) String() string {
 	return f.StringByFunc(DefaultValueString)
 }
 
-func (f *Field) StringByFunc(Str func(Value) string) string {
+func (f *Field) StringByFunc(Str func(Node) string) string {
 	return fmt.Sprintf(
 		"%s = %s field[%s]",
 		Str(f), Str(f.I), Str(f.Key),
 	)
 }
 
+var _ Node = (*Field)(nil)
 var _ Value = (*Field)(nil)
 var _ User = (*Field)(nil)
 var _ Instruction = (*Field)(nil)
@@ -691,13 +721,14 @@ func (s *Update) String() string {
 	return s.StringByFunc(DefaultValueString)
 }
 
-func (s *Update) StringByFunc(Str func(Value) string) string {
+func (s *Update) StringByFunc(Str func(Node) string) string {
 	return fmt.Sprintf(
 		"update [%s] = %s",
 		Str(s.address), Str(s.value),
 	)
 }
 
+var _ Node = (*Update)(nil)
 var _ Value = (*Update)(nil)
 var _ User = (*Update)(nil)
 var _ Instruction = (*Update)(nil)

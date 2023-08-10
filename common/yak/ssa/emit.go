@@ -7,19 +7,25 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-func fixupUseChain(u User) {
-	if u == nil {
+func fixupUseChain(node Node) {
+	if node == nil {
 		return
 	}
-	for _, v := range u.GetValues() {
-		if v != nil {
-			v.AddUser(u)
+	if u, ok := node.(User); ok {
+		for _, v := range u.GetValues() {
+			if v != nil {
+				v.AddUser(u)
+			}
 		}
 	}
-	for _, user := range u.GetUsers() {
-		if user != nil {
-			user.AddValue(u)
+
+	if v, ok := node.(Value); ok {
+		for _, user := range v.GetUsers() {
+			if user != nil {
+				user.AddValue(v)
+			}
 		}
+
 	}
 }
 
