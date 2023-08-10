@@ -318,3 +318,70 @@ func TestLaunchStopOnEntry(t *testing.T) {
 		client.ExpectTerminatedEvent(t)
 	})
 }
+
+func TestLaunchContinueOnEntry(t *testing.T) {
+	runTest(t, "continueOnEntry", GenerateSimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
+		// 1 >> initialize, << initialize
+		client.InitializeRequest()
+		initResp := client.ExpectInitializeResponseAndCapabilities(t)
+		if initResp.Seq != 0 || initResp.RequestSeq != 1 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=1", initResp)
+		}
+
+		// 2 >> launch,  << initialized, << launch
+		client.LaunchRequest("exec", program, !StopOnEntry)
+		initEvent := client.ExpectInitializedEvent(t)
+		if initEvent.Seq != 0 {
+			t.Errorf("\ngot %#v\nwant Seq=0", initEvent)
+		}
+		launchResp := client.ExpectLaunchResponse(t)
+		if launchResp.Seq != 0 || launchResp.RequestSeq != 2 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=2", launchResp)
+		}
+
+		// 3 >> setBreakpoints, << setBreakpoints
+		client.SetBreakpointsRequest(program, nil)
+		sbpResp := client.ExpectSetBreakpointsResponse(t)
+		if sbpResp.Seq != 0 || sbpResp.RequestSeq != 3 || len(sbpResp.Body.Breakpoints) != 0 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=3, len(Breakpoints)=0", sbpResp)
+		}
+
+		// 4 >> setExceptionBreakpoints, << setExceptionBreakpoints
+		client.SetExceptionBreakpointsRequest()
+		sebpResp := client.ExpectSetExceptionBreakpointsResponse(t)
+		if sebpResp.Seq != 0 || sebpResp.RequestSeq != 4 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=4", sebpResp)
+		}
+		// 5 >> configurationDone, << stopped, << configurationDone
+		client.ConfigurationDoneRequest()
+		cdResp := client.ExpectConfigurationDoneResponse(t)
+		if cdResp.Seq != 0 || cdResp.RequestSeq != 5 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=5", cdResp)
+		}
+
+		// "Continue" happens behind the scenes on another goroutine
+		client.ExpectTerminatedEvent(t)
+
+		// 6 >> threads, << threads
+		client.ThreadsRequest()
+		tResp := client.ExpectThreadsResponse(t)
+		if tResp.Seq != 0 || tResp.RequestSeq != 6 || len(tResp.Body.Threads) != 1 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", tResp)
+		}
+		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] global code" {
+			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] global code\"", tResp)
+		}
+
+		// 7 >> disconnect, << disconnect
+		client.DisconnectRequest()
+		oed := client.ExpectOutputEventDetaching(t)
+		if oed.Seq != 0 || oed.Body.Category != "console" {
+			t.Errorf("\ngot %#v\nwant Seq=0 Category='console'", oed)
+		}
+		dResp := client.ExpectDisconnectResponse(t)
+		if dResp.Seq != 0 || dResp.RequestSeq != 7 {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=7", dResp)
+		}
+		client.ExpectTerminatedEvent(t)
+	})
+}
