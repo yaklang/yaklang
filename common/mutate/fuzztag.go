@@ -231,6 +231,95 @@ func fuzzpass(i string, level int) []string {
 	return res
 }
 
+func FuzzFileOptions() []FuzzConfigOpt {
+	var opt []FuzzConfigOpt
+	for _, t := range Filetag() {
+		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
+		for _, a := range t.Alias {
+			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
+		}
+	}
+	return opt
+}
+
+func Filetag() []*FuzzTagDescription {
+	return []*FuzzTagDescription{
+		{
+			TagName: "file:line",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					lineChan, err := utils.FileLineReader(lineFile)
+					if err != nil {
+						log.Errorf("fuzztag read file failed: %s", err)
+						continue
+					}
+					for line := range lineChan {
+						result = append(result, string(line))
+					}
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Alias:       []string{"fileline", "file:lines"},
+			Description: "解析文件名（可以用 `|` 分割），把文件中的内容按行反回成数组，定义为 `{{file:line(/tmp/test.txt)}}` 或 `{{file:line(/tmp/test.txt|/tmp/1.txt)}}`",
+		},
+		{
+			TagName: "file:dir",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					fileRaw, err := ioutil.ReadDir(lineFile)
+					if err != nil {
+						log.Errorf("fuzz.filedir read dir failed: %s", err)
+						continue
+					}
+					for _, info := range fileRaw {
+						if info.IsDir() {
+							continue
+						}
+						fileContent, err := ioutil.ReadFile(info.Name())
+						if err != nil {
+							continue
+						}
+						result = append(result, string(fileContent))
+					}
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Alias:       []string{"filedir"},
+			Description: "解析文件夹，把文件夹中文件的内容读取出来，读取成数组返回，定义为 `{{file:dir(/tmp/test)}}` 或 `{{file:dir(/tmp/test|/tmp/1)}}`",
+		},
+		{
+			TagName: "file",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					fileRaw, err := ioutil.ReadFile(lineFile)
+					if err != nil {
+						log.Errorf("fuzz.files read file failed: %s", err)
+						continue
+					}
+					result = append(result, string(fileRaw))
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Description: "读取文件内容，可以支持多个文件，用竖线分割，`{{file(/tmp/1.txt)}}` 或 `{{file(/tmp/1.txt|/tmp/test.txt)}}`",
+		},
+	}
+}
+
 func init() {
 	fuzztag.SetMethodAlias("params", "param", "p")
 
@@ -833,81 +922,6 @@ func init() {
 		Description: "随机生成个字符串，定义为 {{randstr(10)}} 生成长度为 10 的随机字符串，{{randstr(1,30)}} 生成长度为 1-30 为随机字符串，{{randstr(1,30,10)}} 生成 10 个随机字符串，长度为 1-30",
 	})
 
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "file:line",
-		Handler: func(s string) []string {
-			s = strings.Trim(s, " ()")
-			var result []string
-			for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-				lineChan, err := utils.FileLineReader(lineFile)
-				if err != nil {
-					log.Errorf("fuzztag read file failed: %s", err)
-					continue
-				}
-				for line := range lineChan {
-					result = append(result, string(line))
-				}
-			}
-			if len(result) <= 0 {
-				return fuzztagfallback
-			}
-			return result
-		},
-		Alias:       []string{"fileline", "file:lines"},
-		Description: "解析文件名（可以用 `|` 分割），把文件中的内容按行反回成数组，定义为 `{{file:line(/tmp/test.txt)}}` 或 `{{file:line(/tmp/test.txt|/tmp/1.txt)}}`",
-	})
-
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "file:dir",
-		Handler: func(s string) []string {
-			s = strings.Trim(s, " ()")
-			var result []string
-			for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-				fileRaw, err := ioutil.ReadDir(lineFile)
-				if err != nil {
-					log.Errorf("fuzz.filedir read dir failed: %s", err)
-					continue
-				}
-				for _, info := range fileRaw {
-					if info.IsDir() {
-						continue
-					}
-					fileContent, err := ioutil.ReadFile(info.Name())
-					if err != nil {
-						continue
-					}
-					result = append(result, string(fileContent))
-				}
-			}
-			if len(result) <= 0 {
-				return fuzztagfallback
-			}
-			return result
-		},
-		Alias:       []string{"filedir"},
-		Description: "解析文件夹，把文件夹中文件的内容读取出来，读取成数组返回，定义为 `{{file:dir(/tmp/test)}}` 或 `{{file:dir(/tmp/test|/tmp/1)}}`",
-	})
-
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "file",
-		Handler: func(s string) []string {
-			s = strings.Trim(s, " ()")
-			var result []string
-			for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-				fileRaw, err := ioutil.ReadFile(lineFile)
-				if err != nil {
-					log.Errorf("fuzz.files read file failed: %s", err)
-					continue
-				}
-				result = append(result, string(fileRaw))
-			}
-			if len(result) <= 0 {
-				return fuzztagfallback
-			}
-			return result
-		},
-		Description: "读取文件内容，可以支持多个文件，用竖线分割，`{{file(/tmp/1.txt)}}` 或 `{{file(/tmp/1.txt|/tmp/test.txt)}}`",
-	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "codec",
 		Handler: func(s string) []string {
