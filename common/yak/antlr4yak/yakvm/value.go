@@ -373,6 +373,50 @@ func (v *Value) Rangeable() bool {
 	return rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || v.IsInt64()
 }
 
+func (v *Value) GetVarRef() (int, bool) {
+	rv := reflect.ValueOf(v.Value)
+	rk := rv.Kind()
+	if rk == reflect.Ptr {
+		rv = rv.Elem()
+		rk = rv.Kind()
+	}
+	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || rk == reflect.Struct
+	if !ok {
+		return 0, false
+	}
+	return v.SymbolId, true
+}
+
+func (v *Value) GetIndexedVariableCount() int {
+	rv := reflect.ValueOf(v.Value)
+	rk := rv.Kind()
+	if rk == reflect.Ptr {
+		rv = rv.Elem()
+		rk = rv.Kind()
+	}
+	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Chan || rk == reflect.Map || rk == reflect.String
+	if !ok {
+		return 0
+	}
+
+	return rv.Len()
+}
+
+func (v *Value) GetNamedVariableCount() int {
+	rv := reflect.ValueOf(v.Value)
+	rk := rv.Kind()
+	if rk == reflect.Ptr {
+		rv = rv.Elem()
+		rk = rv.Kind()
+	}
+	ok := rk == reflect.Struct
+	if !ok {
+		return 0
+	}
+
+	return rv.NumField()
+}
+
 func (v *Value) Callable() bool {
 	return v.NativeCallable() || v.IsYakFunction()
 }
