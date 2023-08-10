@@ -27,6 +27,10 @@ func RunProgramInDebugMode(debug bool, program string, args []string) error {
 	if debug {
 		engine.SetDebug(true)
 		d := NewDAPDebugger()
+
+		// 等待初始化
+		d.InitWGAdd()
+
 		engine.SetDebugInit(d.Init())
 		engine.SetDebugCallback(d.CallBack())
 
