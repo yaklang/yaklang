@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
@@ -19,7 +19,7 @@ func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args [
 	if !filepath.IsAbs(absPath) {
 		absPath, err = filepath.Abs(absPath)
 		if err != nil {
-			return utils.Errorf("fetch abs file path failed: %s", err)
+			return errors.Wrap(err, "fetch abs file path failed")
 		}
 	}
 
@@ -31,8 +31,11 @@ func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args [
 		// 等待初始化
 		d.InitWGAdd()
 
+		// 设置回调
 		engine.SetDebugInit(d.Init())
 		engine.SetDebugCallback(d.CallBack())
+
+		d.source = &Source{AbsPath: absPath, Name: filepath.Base(absPath)}
 
 		ds.debugger = d
 		d.session = ds
