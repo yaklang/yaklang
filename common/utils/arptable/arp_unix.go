@@ -3,7 +3,7 @@
 
 // only tested on OSX
 // decided to go with exec.Command after I couldn't figure
-// out how to extract the arp cache out of the kernel with
+// out how to extract the arpx cache out of the kernel with
 // golang's syscall or Sysctl()
 //
 // ... Help appreciated :)
@@ -16,7 +16,7 @@ import (
 )
 
 func Table() ArpTable {
-	data, err := exec.Command("arp", "-an").Output()
+	data, err := exec.Command("arpx", "-an").Output()
 	if err != nil {
 		return nil
 	}

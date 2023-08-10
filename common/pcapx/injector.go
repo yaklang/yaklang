@@ -6,6 +6,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"math/rand"
@@ -22,7 +23,7 @@ func getInjectorHandler(name string) (*pcap.Handle, error) {
 	raw, ok := deviceToNet.Load(name)
 	if !ok {
 		var err error
-		name, err = utils.IfaceNameToPcapIfaceName(name)
+		name, err = pcaputil.IfaceNameToPcapIfaceName(name)
 		if err != nil {
 			return nil, utils.Errorf("fix iface name failed: %v", err)
 		}
@@ -55,7 +56,7 @@ var defaultGopacketSerializeOpt = gopacket.SerializeOptions{
 
 func createIPTCPHTTPRequest(isHttps bool, raw []byte) ([]byte, error) {
 	raw = lowhttp.FixHTTPRequestOut(raw)
-	_, _, localip, err := GetPublicRoute()
+	_, _, localip, err := getPublicRoute()
 	if err != nil {
 		return nil, utils.Errorf("get default route iface ip failed: %s", err)
 	}

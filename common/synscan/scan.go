@@ -3,6 +3,7 @@ package synscan
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
@@ -107,12 +108,12 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 }
 
 func (s *Scanner) scanPrivate(privateHosts []string, ports []int, random bool) error {
-	log.Infof("private net scan need use arp to locate mac addr")
+	log.Infof("private net scan need use arpx to locate mac addr")
 
 	ctx := utils.TimeoutContextSeconds(5)
-	results, err := utils.ArpIPAddressesWithContext(ctx, s.iface.Name, strings.Join(privateHosts, ","))
+	results, err := arpx.ArpIPAddressesWithContext(ctx, s.iface.Name, strings.Join(privateHosts, ","))
 	if err != nil {
-		log.Errorf("create arp results from privateHosts failed: %s", err)
+		log.Errorf("create arpx results from privateHosts failed: %s", err)
 		return err
 	}
 

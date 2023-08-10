@@ -51,7 +51,7 @@ func CacheUpdateCount() int {
 }
 
 // Search looks up the MAC address for an IP address
-// in the arp table
+// in the arpx table
 func Search(ip string) string {
 	return arpCache.Search(ip)
 }
@@ -61,5 +61,5 @@ func SearchHardware(ip string) (net.HardwareAddr, error) {
 	if result != "" {
 		return net.ParseMAC(result)
 	}
-	return nil, errors.New(fmt.Sprintf("arp search table failed: %s", ip))
+	return nil, errors.New(fmt.Sprintf("arpx search table failed: %s", ip))
 }

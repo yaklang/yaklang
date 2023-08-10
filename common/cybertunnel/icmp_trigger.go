@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
@@ -65,7 +66,7 @@ func (p *ICMPTrigger) run(ctx context.Context) error {
 	_ = ip
 
 	log.Infof("use iface: %v(%v) - %v", ifm.Name, ip, interfaceIP)
-	ifaceName, err := utils.IfaceNameToPcapIfaceName(ifm.Name)
+	ifaceName, err := pcaputil.IfaceNameToPcapIfaceName(ifm.Name)
 	if err != nil {
 		return utils.Errorf("convert iface name failed: %s", err)
 	}

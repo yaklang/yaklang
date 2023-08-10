@@ -3,8 +3,8 @@
 
 package arptable
 
-// Windows arp table reader added by Claudio Matsuoka.
-// Tested only in Windows 8.1, hopefully the arp command output format
+// Windows arpx table reader added by Claudio Matsuoka.
+// Tested only in Windows 8.1, hopefully the arpx command output format
 // is the same in other Windows versions.
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 func Table() ArpTable {
-	data, err := exec.Command("arp", "-a").Output()
+	data, err := exec.Command("arpx", "-a").Output()
 	if err != nil {
 		return nil
 	}
