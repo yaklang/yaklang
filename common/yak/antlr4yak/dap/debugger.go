@@ -99,7 +99,7 @@ func (d *DAPDebugger) OutCallbackState() {
 
 func (d *DAPDebugger) Init() func(g *yakvm.Debugger) {
 	return func(g *yakvm.Debugger) {
-		log.Debug("dap debugger init")
+		log.Debug("[dap debugger] init")
 
 		d.debugger = g
 
@@ -116,14 +116,32 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 		d.InCallbackState()
 		defer d.OutCallbackState()
 
+		defer g.ResetDescription()
 		desc := g.Description()
-		log.Debugf("callback: %s", desc)
-		g.ResetDescription()
+		log.Debugf("[dap debugger] callback: %s", desc)
 
+		// 程序结束,发送terminated事件
 		if g.Finished() {
 			d.finished = true
 			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 			return
+		}
+
+		// 停止事件
+		session := d.session
+		stopReason := g.StopReason()
+		if stopReason != "" {
+			frame := g.Frame()
+			threadID := 0
+			if frame != nil {
+				threadID = int(frame.ThreadID)
+			}
+			event := &dap.StoppedEvent{Event: *newEvent("stopped"), Body: dap.StoppedEventBody{ThreadId: threadID, Reason: stopReason, Description: desc, AllThreadsStopped: true}}
+			if stopReason == "exception" {
+				event.Body.Text = g.VMPanic().Error()
+			}
+
+			session.send(event)
 		}
 
 		select {
@@ -132,6 +150,7 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 			// todo: 超时处理
 			return
 		}
+
 	}
 }
 
