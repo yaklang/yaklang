@@ -243,7 +243,7 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 					if err := g.SetCondtionalBreakPoint(lineNumber, condtionCode); err != nil {
 						fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 					}
-				} else if err := g.SetBreakPoint(false, lineNumber); err != nil {
+				} else if err := g.SetBreakPoint(lineNumber); err != nil {
 					fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 				}
 			case "clear":
