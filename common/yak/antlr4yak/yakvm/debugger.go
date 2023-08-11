@@ -447,22 +447,22 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 	return g.observeExpressions
 }
 
-func (g *Debugger) addBreakPoint(disposable bool, codeIndex, lineIndex int, conditionCode, state string) {
+func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, conditionCode, state string) {
 	g.breakPoints = append(g.breakPoints, NewBreakPoint(codeIndex, lineIndex, conditionCode, state))
 }
 
-func (g *Debugger) SetBreakPoint(disposable bool, lineIndex int) error {
+func (g *Debugger) SetBreakPoint(lineIndex int) error {
 	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
 	if code == nil {
 		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
-		g.addBreakPoint(disposable, codeIndex, lineIndex, "", state)
+		g.addBreakPoint(codeIndex, lineIndex, "", state)
 	}
 	return nil
 }
 
 func (g *Debugger) SetNormalBreakPoint(lineIndex int) error {
-	return g.SetBreakPoint(false, lineIndex)
+	return g.SetBreakPoint(lineIndex)
 }
 
 func (g *Debugger) SetCondtionalBreakPoint(lineIndex int, conditonCode string) error {
@@ -475,7 +475,7 @@ func (g *Debugger) SetCondtionalBreakPoint(lineIndex int, conditonCode string) e
 		if err != nil {
 			return errors.Wrap(err, "Set condtional breakpoint error")
 		}
-		g.addBreakPoint(false, codeIndex, lineIndex, conditonCode, state)
+		g.addBreakPoint(codeIndex, lineIndex, conditonCode, state)
 	}
 	return nil
 }
