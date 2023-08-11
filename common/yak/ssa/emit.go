@@ -114,6 +114,7 @@ func (f *Function) emitReturn(vs []Value) *Return {
 		Results:       vs,
 	}
 	fixupUseChain(r)
+	f.Return = append(f.Return, r)
 	f.emit(r)
 	f.currentBlock.finish = true
 	return r
