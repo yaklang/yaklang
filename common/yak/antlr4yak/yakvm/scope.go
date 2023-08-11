@@ -45,6 +45,11 @@ func (s *Scope) CreateSubScope(table *SymbolTable) *Scope {
 func (s *Scope) IsRoot() bool {
 	return s.parent == nil
 }
+
+func (s *Scope) Len() int {
+	return len(s.idToValue)
+}
+
 func (s *Scope) GetValueByName(name string) (*Value, bool) {
 	if s == nil {
 		return nil, false

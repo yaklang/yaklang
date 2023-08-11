@@ -283,3 +283,18 @@ func (c *Client) CheckErrorResponse(t *testing.T, m dap.Message) *dap.ErrorRespo
 	}
 	return r
 }
+
+func (c *Client) ExpectScopesResponse(t *testing.T) *dap.ScopesResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckScopesResponse(t, m)
+}
+
+func (c *Client) CheckScopesResponse(t *testing.T, m dap.Message) *dap.ScopesResponse {
+	t.Helper()
+	r, ok := m.(*dap.ScopesResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.ScopesResponse", m)
+	}
+	return r
+}

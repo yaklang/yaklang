@@ -104,6 +104,12 @@ func (c *Client) StackTraceRequest(threadID, startFrame, levels int) {
 	c.send(request)
 }
 
+func (c *Client) ScopesRequest(frameID int) {
+	request := &dap.ScopesRequest{Request: *c.newRequest("scopes")}
+	request.Arguments.FrameId = frameID
+	c.send(request)
+}
+
 func (c *Client) SetBreakpointsRequest(file string, lines []int) {
 	c.SetBreakpointsRequestWithArgs(file, lines, nil, nil, nil)
 }
