@@ -52,8 +52,7 @@ var (
 type Node interface {
 	String() string
 
-	// TODO: Type-system
-	// GetType() types.Type
+	GetType() Types
 
 	GetUsers() []User
 	GetValues() []Value
@@ -514,6 +513,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	return ret
 }
 
+func (f *Function) GetType() Types {
+	return nil
+}
+
+
 var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
 
@@ -527,6 +531,11 @@ func (b *BasicBlock) String() string {
 	}
 	return ret
 }
+
+func (b *BasicBlock) GetType() Types {
+	return nil
+}
+
 
 var _ Node = (*BasicBlock)(nil)
 var _ Value = (*BasicBlock)(nil)
@@ -550,6 +559,10 @@ func (a *anInstruction) Pos() string {
 		return ""
 	}
 }
+func (a *anInstruction) GetType() Types {
+	return a.typs
+}
+
 
 // ----------- Phi
 func (p *Phi) String() string {
@@ -600,7 +613,7 @@ func (c Const) String() string {
 }
 
 // get type
-func (c Const) GetType() types.Type {
+func (c Const) GetType() Types {
 	return c.typ
 }
 
@@ -611,9 +624,10 @@ var _ Value = (*Const)(nil)
 func (p *Parameter) String() string {
 	return p.variable
 }
-func (p *Parameter) GetType() types.Type {
-	return p.typ
+func (p *Parameter) GetType() Types {
+	return p.typs
 }
+
 
 var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
@@ -739,10 +753,6 @@ func (i *Interface) StringByFunc(Str func(Node) string) string {
 			Str(i), i.typs, Str(i.Len), Str(i.Cap),
 		)
 	}
-}
-
-func (i *Interface) GetType() types.Type {
-	return i.typ
 }
 
 var _ Node = (*Interface)(nil)
