@@ -91,7 +91,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetBreakPoint(3, "a > 5")
+		err := g.SetBreakPoint(3, "a > 5", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,109 @@ for range 10 {
 			t.Fatal("a not found")
 		}
 		if v.Int() <= 5 {
-			t.Fatal("conditional breakpoint error")
+			t.Fatalf("conditional breakpoint error, a=%d", v.Int())
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_HitConditionBreakPoint(t *testing.T) {
+	code := `a = 1
+for range 10 {
+	a++
+}`
+	init := func(g *yakvm.Debugger) {
+		err := g.SetBreakPoint(3, "", "3")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		scope := g.Frame().CurrentScope()
+		v, ok := scope.GetValueByName("a")
+		if !ok {
+			t.Fatal("a not found")
+		}
+		if v.Int() < 3 {
+			t.Fatalf("conditional breakpoint error, a=%d", v.Int())
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_HitConditionBreakPoint2(t *testing.T) {
+	code := `a = 1
+for range 10 {
+	a++
+}`
+	init := func(g *yakvm.Debugger) {
+		err := g.SetBreakPoint(3, "a > 3", "3")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		scope := g.Frame().CurrentScope()
+		v, ok := scope.GetValueByName("a")
+		if !ok {
+			t.Fatal("a not found")
+		}
+		if v.Int() < 6 {
+			t.Fatalf("conditional breakpoint error, a=%d", v.Int())
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_HitConditionBreakPoint3(t *testing.T) {
+	code := `a = 1
+for range 10 {
+	a++
+}`
+	init := func(g *yakvm.Debugger) {
+		err := g.SetBreakPoint(3, "a > 3", "a > 7")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		scope := g.Frame().CurrentScope()
+		v, ok := scope.GetValueByName("a")
+		if !ok {
+			t.Fatal("a not found")
+		}
+		if v.Int() < 8 {
+			t.Fatalf("conditional breakpoint error, a=%d", v.Int())
 		}
 	}
 
