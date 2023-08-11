@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestArpBuilder(t *testing.T) {
+func TestSmoking_Arp(t *testing.T) {
 	packets, err := PacketBuilder(
 		WithArp_RequestAuto("8.8.8.8"),
 	)

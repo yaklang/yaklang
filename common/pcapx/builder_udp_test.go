@@ -4,25 +4,29 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
 )
 
-func TestSmoking_IP(t *testing.T) {
-	packets, err := PacketBuilder(
+func TestSmoking_UDP(t *testing.T) {
+	var packets, err = PacketBuilder(
 		WithIPv4_SrcIP("1.1.1.1"),
 		WithIPv4_DstIP("1.1.1.2"),
+		WithUDP_SrcPort(80),
+		WithUDP_DstPort(80),
 	)
 	if err != nil {
 		panic(err)
 	}
 	packet := gopacket.NewPacket(packets, layers.LayerTypeEthernet, gopacket.Default)
 	if packet.ErrorLayer() != nil {
-		log.Infof("error layer: %v", packet.ErrorLayer().Error())
 		panic(packet.ErrorLayer().Error())
 	}
 	fmt.Println(packet.String())
-	if packet.NetworkLayer().LayerType() != layers.LayerTypeIPv4 {
-		t.Fatalf("expect ipv4 layer, got %v", packet.NetworkLayer().LayerType())
+	if ret := packet.Layer(layers.LayerTypeUDP); ret == nil {
+		t.Fatal("expect ipv4 udp layer, not found ")
+	} else {
+		if ret.(*layers.UDP).SrcPort == layers.UDPPort(80) && ret.(*layers.UDP).DstPort == layers.UDPPort(80) {
+			t.Log("success")
+		}
 	}
 }
