@@ -137,6 +137,7 @@ type Function struct {
 	Package *Package
 
 	Param []*Parameter
+	Return []*Return
 
 	// BasicBlock list
 	Blocks     []*BasicBlock
@@ -459,6 +460,14 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		for _, p := range b.Phis {
 			setInst(p)
 		}
+	}
+
+	if len(f.Return) > 0 {
+		ret += "return: " + strings.Join(
+			lo.Map(f.Return, func(key *Return, _ int) string {
+				return getStr(key)
+			}),
+			", ") + "\n"
 	}
 
 	handlerInst := func(i Instruction) string {
