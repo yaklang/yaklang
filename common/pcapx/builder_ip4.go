@@ -1,27 +1,24 @@
 package pcapx
 
 import (
-	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strings"
 )
 
 var ipv4LayerExports = map[string]any{
-	"ipv4_tos":                   WithIPv4_TOS,
-	"ipv4_id":                    WithIPv4_ID,
-	"ipv4_next_protocol":         WithIPv4_NextProtocol,
-	"ipv4_src_ip":                WithIPv4_SrcIP,
-	"ipv4_dst_ip":                WithIPv4_DstIP,
-	"ipv4_ttl":                   WithIPv4_TTL,
-	"ipv4_flags":                 WithIPv4_Flags,
-	"ipv4_fragment":              WithIPv4_FragmentOffset,
-	"ipv4_option_mss":            WithIPv4_OptionMSS,
-	"ipv4_option_window_scale":   WithIPv4_OptionWindowScale,
-	"ipv4_option_sack_permitted": WithIPv4_OptionSACKPermitted,
-	"ipv4_option_sack":           WithIPv4_OptionSACK,
-	"ipv4_option_timestamp":      WithIPv4_OptionTimestamp,
+	"ipv4_tos":               WithIPv4_TOS,
+	"ipv4_id":                WithIPv4_ID,
+	"ipv4_nextLayerProtocol": WithIPv4_NextProtocol,
+	"ipv4_srcIp":             WithIPv4_SrcIP,
+	"ipv4_dstOp":             WithIPv4_DstIP,
+	"ipv4_ttl":               WithIPv4_TTL,
+	"ipv4_flags":             WithIPv4_Flags,
+	"ipv4_fragment":          WithIPv4_FragmentOffset,
+	"ipv4_option":            WithIPv4_Option,
 
 	// consts
 	"IPV4_FLAG_EVIL_BIT":      int(layers.IPv4EvilBit),
@@ -58,6 +55,25 @@ func NewDefaultIPv4Layer() *layers.IPv4 {
 		TTL:      64,
 		Protocol: layers.IPProtocolTCP,
 		Options: []layers.IPv4Option{
+			{
+				OptionType:   layers.TCPOptionKindMSS,
+				OptionLength: 4,
+				OptionData:   []byte{0x05, 0xb4},
+			},
+			{
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionLength: 4,
+				OptionData:   []byte{0x07},
+			},
+		},
+	}
+}
+
+func NewDefaultTCPLayer() *layers.TCP {
+	return &layers.TCP{
+		SrcPort: 80,
+		DstPort: 80,
+		Options: []layers.TCPOption{
 			{
 				OptionType:   layers.TCPOptionKindMSS,
 				OptionLength: 4,
@@ -210,69 +226,16 @@ func WithIPv4_NextProtocol(i any) IPv4Option {
 	}
 }
 
-// WithIPv4_OptionMSS is a IPv4Option default 1460
-func WithIPv4_OptionMSS(i any) IPv4Option {
+func WithIPv4_Option(optType any, data []byte) IPv4Option {
 	return func(pv4 *layers.IPv4) error {
-		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   layers.TCPOptionKindMSS,
-			OptionLength: 4,
-			OptionData:   utils.NetworkByteOrderUint16ToBytes(i),
-		})
-		return nil
-	}
-}
-
-// WithIPv4_OptionWindowScale is a IPv4Option default 7
-func WithIPv4_OptionWindowScale(i any) IPv4Option {
-	return func(pv4 *layers.IPv4) error {
-		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   layers.TCPOptionKindWindowScale,
-			OptionLength: 3,
-			OptionData:   utils.NetworkByteOrderUint16ToBytes(i),
-		})
-		return nil
-	}
-}
-
-// WithIPv4_OptionSACKPermitted is a IPv4Option
-func WithIPv4_OptionSACKPermitted() IPv4Option {
-	return func(pv4 *layers.IPv4) error {
-		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   layers.TCPOptionKindSACKPermitted,
-			OptionLength: 2,
-		})
-		return nil
-	}
-}
-
-// WithIPv4_OptionSACK is a IPv4Option
-func WithIPv4_OptionSACK(i ...any) IPv4Option {
-	return func(pv4 *layers.IPv4) error {
-		if len(i) <= 0 {
+		if len(data)+2 > 255 {
+			log.Warnf("ipv4 option data length is too long, max length is 255, got %d, data: %v", len(data), spew.Sdump(data))
 			return nil
 		}
-
-		var buf bytes.Buffer
-		for _, v := range i {
-			buf.Write(utils.NetworkByteOrderUint32ToBytes(v))
-		}
-
 		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   layers.TCPOptionKindSACK,
-			OptionLength: 2 + uint8(len(i))*8,
-			OptionData:   buf.Bytes(),
-		})
-		return nil
-	}
-}
-
-// WithIPv4_OptionTimestamp is a IPv4Option
-func WithIPv4_OptionTimestamp(i any) IPv4Option {
-	return func(pv4 *layers.IPv4) error {
-		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   layers.TCPOptionKindTimestamps,
-			OptionLength: 10,
-			OptionData:   utils.NetworkByteOrderUint32ToBytes(i),
+			OptionType:   uint8(utils.InterfaceToInt(optType)),
+			OptionLength: uint8(len(data)) + 2,
+			OptionData:   data,
 		})
 		return nil
 	}
