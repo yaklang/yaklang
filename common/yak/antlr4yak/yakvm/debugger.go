@@ -475,7 +475,7 @@ func (g *Debugger) SetBreakPoint(lineIndex int, condition string) error {
 	if code == nil {
 		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
-		return g.addBreakPoint(codeIndex, lineIndex, "", state)
+		return g.addBreakPoint(codeIndex, lineIndex, condition, state)
 	}
 }
 
