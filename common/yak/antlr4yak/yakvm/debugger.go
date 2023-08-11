@@ -65,6 +65,9 @@ type Debugger struct {
 	FrameMap   map[int32]*Frame // 帧id -> 帧
 	FrameIDMap map[*Frame]int32 // 帧 -> 帧id
 
+	// 作用域 scope -> id 在vm_scope.go中使用
+	ScopeCount int32
+	ScopeIDMap map[*Scope]int32
 
 	// 观察断点
 	observeBreakPointExpressions map[string]*Value
@@ -121,7 +124,9 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 		linesFirstCodeAndStateMap:    make(map[int]*CodeState),
 		FrameCount:                   -1,
 		FrameMap:                     make(map[int32]*Frame),
-		FrameExistMap:                make(map[*Frame]struct{}),
+		FrameIDMap:                   make(map[*Frame]int32),
+		ScopeCount:                   -1,
+		ScopeIDMap:                   make(map[*Scope]int32),
 		breakPoints:                  make(map[int]*Breakpoint, 0),
 		observeExpressions:           make(map[string]*Value),
 		observeBreakPointExpressions: make(map[string]*Value),
@@ -347,6 +352,13 @@ func (g *Debugger) VMPanic() *VMPanic {
 
 func (g *Debugger) SetVMPanic(p *VMPanic) {
 	g.vmPanic = p
+}
+
+func (g *Debugger) AddScope(scope *Scope) {
+	if _, ok := g.ScopeIDMap[scope]; !ok {
+		atomic.AddInt32(&g.ScopeCount, 1)
+		g.ScopeIDMap[scope] = g.ScopeCount
+	}
 }
 
 func (g *Debugger) GetCode(state string, codeIndex int) *Code {
@@ -779,6 +791,22 @@ func (g *Debugger) Callback() {
 	}
 
 	g.callbackFunc(g)
+}
+
+func (g *Debugger) GetScopesByFrameID(frameID int) map[int]*Scope {
+	frame, ok := g.FrameMap[int32(frameID)]
+	if !ok {
+		return nil
+	}
+	scopes := make(map[int]*Scope, 0)
+	scope := frame.CurrentScope()
+	for scope != nil {
+		if id, ok := g.ScopeIDMap[scope]; ok {
+			scopes[int(id)] = scope
+		}
+		scope = scope.parent
+	}
+	return scopes
 }
 
 func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, CompilerWrapperInterface, error) {

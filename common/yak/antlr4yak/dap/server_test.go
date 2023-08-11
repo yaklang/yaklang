@@ -102,6 +102,17 @@ func checkErrorMessageFormat(er *dap.ErrorMessage, fmt string) bool {
 	return er != nil && er.Format == fmt
 }
 
+func checkScope(t *testing.T, got *dap.ScopesResponse, i int, name string, varRef int) {
+	t.Helper()
+	if len(got.Body.Scopes) <= i {
+		t.Errorf("\ngot  %d\nwant len(Scopes)>%d", len(got.Body.Scopes), i)
+	}
+	goti := got.Body.Scopes[i]
+	if goti.Name != name || (varRef >= 0 && goti.VariablesReference != varRef) || goti.Expensive {
+		t.Errorf("\ngot  %#v\nwant Name=%q VariablesReference=%d Expensive=false", goti, name, varRef)
+	}
+}
+
 func TestStopNoCilent(t *testing.T) {
 	for name, triggerStop := range map[string]func(s *DAPServer, forceStop chan struct{}){
 		"force":          func(s *DAPServer, forceStop chan struct{}) { close(forceStop) },
