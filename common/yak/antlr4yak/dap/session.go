@@ -437,16 +437,16 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 		if stackTraces.ThreadID == threadID {
 			found = true
 			for count := startFrame; count < len(stackTraces.StackTraces); count++ {
-				stackFrame := stackTraces.StackTraces[count]
-				source := *stackFrame.Source
+				stackTrace := stackTraces.StackTraces[count]
+				source := *stackTrace.Source
 				stackFrames = append(stackFrames, dap.StackFrame{
-					Id:        stackFrame.ID,
-					Name:      stackFrame.Name,
+					Id:        stackTrace.ID, // stackTrace.ID 就是 frameId
+					Name:      stackTrace.Name,
 					Source:    &dap.Source{Name: filepath.Base(source), Path: source},
-					Line:      stackFrame.Line,
-					Column:    stackFrame.Column,
-					EndLine:   stackFrame.EndLine,
-					EndColumn: stackFrame.EndColumn,
+					Line:      stackTrace.Line,
+					Column:    stackTrace.Column,
+					EndLine:   stackTrace.EndLine,
+					EndColumn: stackTrace.EndColumn,
 				})
 				// if maxLevels is 0, then return all stackFrames
 				// otherwise, return maxLevels stackFrames
