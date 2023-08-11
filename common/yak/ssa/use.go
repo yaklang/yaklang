@@ -112,7 +112,7 @@ func (c *Call) AddUser(u User)   { c.user = append(c.user, u) }
 
 func (c *Call) RemoveUser(u User) { removeUser(c.user, u) }
 
-func (c *Call) GetValues() []Value { return c.Args }
+func (c *Call) GetValues() []Value { return append(c.Args, append(c.binding, c.Method)...) }
 func (c *Call) AddValue(v Value)   {}
 
 // ----------- Switch
