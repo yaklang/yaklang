@@ -44,6 +44,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		baseConfig = &BuilderConfig{}
 
 		// transport layer
+		udpConfig   *layers.UDP
 		tcpConfig   *layers.TCP
 		icmp4Config *layers.ICMPv4
 
@@ -56,6 +57,14 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		switch optFunc := opt.(type) {
 		case BuilderConfigOption:
 			optFunc(baseConfig)
+		case UDPOption:
+			if udpConfig == nil {
+				udpConfig = &layers.UDP{SrcPort: 80, DstPort: 80}
+			}
+			err := optFunc(udpConfig)
+			if err != nil {
+				return nil, utils.Errorf("set udp config failed: %s", err)
+			}
 		case TCPOption:
 			if tcpConfig == nil {
 				tcpConfig = NewDefaultTCPLayer()
@@ -105,6 +114,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			}
 		default:
 			log.Errorf("PacketBuilder: unknown option type: %T", optFunc)
+			return nil, utils.Errorf("PacketBuilder: unknown option type: %T", optFunc)
 		}
 	}
 
@@ -178,11 +188,20 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			if err != nil {
 				return nil, utils.Errorf("TCP checksum failed: %s", err)
 			}
+			ip4Layer.Protocol = layers.IPProtocolTCP
 			transportLayer = tcpLayer
 		} else if icmp4Config != nil {
 			transportLayer = icmp4Config
 			ip4Layer := networkLayer.(*layers.IPv4)
 			ip4Layer.Protocol = layers.IPProtocolICMPv4
+		} else if udpConfig != nil {
+			ip4Layer := networkLayer.(*layers.IPv4)
+			ip4Layer.Protocol = layers.IPProtocolUDP
+			err := udpConfig.SetNetworkLayerForChecksum(ip4Layer)
+			if err != nil {
+				return nil, utils.Errorf("UDP checksum failed: %s", err)
+			}
+			transportLayer = udpConfig
 		} else {
 			log.Warn("PacketBuilder: tcp layer is empty, use default")
 			tcpConfig = NewDefaultTCPLayer()
