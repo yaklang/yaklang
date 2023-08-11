@@ -2,58 +2,61 @@ package pcapx
 
 import (
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strings"
 )
 
 var ethernetLayerExports = map[string]interface{}{
-	"ethernet_srcMac": EthernetLayerBuilderWithSrcMacStr,
-	"ethernet_dstMac": EthernetLayerBuilderWithDstMacStr,
-	"ethernet_type":   EthernetLayerBuilderWithEthernetType,
+	"ethernet_srcMac":          WithEthernet_SrcMac,
+	"ethernet_dstMac":          WithEthernet_DstMac,
+	"ethernet_next_layer_type": WithEthernet_NextLayerType,
 }
 
-type EthernetLayerBuilderConfig struct {
-	SrcMac       net.HardwareAddr
-	DstMac       net.HardwareAddr
-	EthernetType layers.EthernetType
-}
-
-type EthernetLayerBuilderOption func(config *EthernetLayerBuilderConfig)
-
-func EthernetLayerBuilderWithSrcMac(srcMac net.HardwareAddr) EthernetLayerBuilderOption {
-	return func(config *EthernetLayerBuilderConfig) {
-		config.SrcMac = srcMac
+func init() {
+	for k, v := range ethernetLayerExports {
+		Exports[k] = v
 	}
 }
 
-func EthernetLayerBuilderWithSrcMacStr(srcMacStr string) EthernetLayerBuilderOption {
-	srcMac, err := net.ParseMAC(srcMacStr)
-	if err != nil {
-		log.Errorf("EthernetLayerBuilderWithSrcMac: %v", err)
-		return func(config *EthernetLayerBuilderConfig) {}
+type EthernetOption func(config *layers.Ethernet) error
+
+func WithEthernet_SrcMac(srcMac any) EthernetOption {
+	return func(config *layers.Ethernet) error {
+		switch ret := srcMac.(type) {
+		case net.HardwareAddr:
+			config.SrcMAC = ret
+			return nil
+		default:
+			var err error
+			config.SrcMAC, err = net.ParseMAC(utils.InterfaceToString(ret))
+			if err != nil {
+				return utils.Errorf("parse %v to mac failed: %s", ret, err)
+			}
+			return nil
+		}
 	}
-	return EthernetLayerBuilderWithSrcMac(srcMac)
 }
 
-func EthernetLayerBuilderWithDstMac(dstMac net.HardwareAddr) EthernetLayerBuilderOption {
-	return func(config *EthernetLayerBuilderConfig) {
-		config.DstMac = dstMac
+func WithEthernet_DstMac(dstMac any) EthernetOption {
+	return func(config *layers.Ethernet) error {
+		switch ret := dstMac.(type) {
+		case net.HardwareAddr:
+			config.DstMAC = ret
+			return nil
+		default:
+			var err error
+			config.DstMAC, err = net.ParseMAC(utils.InterfaceToString(ret))
+			if err != nil {
+				return utils.Errorf("parse %v to mac failed: %s", ret, err)
+			}
+			return nil
+		}
 	}
 }
 
-func EthernetLayerBuilderWithDstMacStr(dstMacStr string) EthernetLayerBuilderOption {
-	dstMac, err := net.ParseMAC(dstMacStr)
-	if err != nil {
-		log.Errorf("EthernetLayerBuilderWithDstMacStr: %v", err)
-		return func(config *EthernetLayerBuilderConfig) {}
-	}
-	return EthernetLayerBuilderWithDstMac(dstMac)
-}
-
-func EthernetLayerBuilderWithEthernetType(i any) EthernetLayerBuilderOption {
-	return func(config *EthernetLayerBuilderConfig) {
+func WithEthernet_NextLayerType(i any) EthernetOption {
+	return func(config *layers.Ethernet) error {
 		switch ret := strings.ToLower(utils.InterfaceToString(i)); ret {
 		case "ipv4", "ip4", "ip":
 			config.EthernetType = layers.EthernetTypeIPv4
@@ -72,13 +75,6 @@ func EthernetLayerBuilderWithEthernetType(i any) EthernetLayerBuilderOption {
 		default:
 			config.EthernetType = layers.EthernetType(utils.Atoi(ret))
 		}
-	}
-}
-
-func (l *EthernetLayerBuilderConfig) Create() *layers.Ethernet {
-	return &layers.Ethernet{
-		SrcMAC:       nil,
-		DstMAC:       nil,
-		EthernetType: 0,
+		return nil
 	}
 }
