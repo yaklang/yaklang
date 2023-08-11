@@ -166,5 +166,10 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
 		return true
 	})
+
+	// debug, 将rootScope加入到debugger中
+	if vm.debugMode && vm.debugger != nil {
+		vm.debugger.AddScope(vm.rootScope)
+	}
 	return frame
 }
