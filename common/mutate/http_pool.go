@@ -163,6 +163,12 @@ func _httpPool_SetForceFuzz(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_SetForceFuzzfile(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.ForceFuzzfile = b
+	}
+}
+
 func _httpPool_DelaySeconds(b float64) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.DelayMinSeconds = b
@@ -332,7 +338,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		FollowJSRedirect:  false,
 		Ctx:               context.Background(),
 		ForceFuzz:         true,
-		ForceFuzzfile:     true,
+		ForceFuzzfile:     false,
 	}
 	for _, opt := range opts {
 		opt(base)
@@ -717,6 +723,7 @@ var WithPoolOpt_NoFollowRedirect = _httpPool_SetNoFollowRedirect
 var WithPoolOpt_FollowJSRedirect = _httpPool_SetFollowJSRedirect
 var WithPoolOpt_Context = _httpPool_SetContext
 var WithPoolOpt_ForceFuzz = _httpPool_SetForceFuzz
+var WithPoolOpt_ForceFuzzfile = _httpPool_SetForceFuzzfile
 var WithPoolOpt_FuzzParams = _httpPool_SetFuzzParams
 var WithPoolOpt_ExtraMutateCondition = _httpPool_extraMutateCondition
 var WithPoolOpt_ExtraMutateConditionGetter = _httpPool_extraMutateConditionGetter
