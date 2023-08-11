@@ -52,10 +52,15 @@ func (d *DAPDebugger) WaitProgramStart() {
 func (d *DAPDebugger) Continue() {
 	// 如果在回调状态则写入continueCh,使callback立即返回,程序继续执行
 	if d.inCallback {
+		log.Debugf("[dap debugger] continue")
 		go func() {
 			d.continueCh <- struct{}{}
 		}()
 	}
+}
+
+func (d *DAPDebugger) SetBreakPoint(lineIndex int, condition, hitCondition string) error {
+	return d.debugger.SetBreakPoint(lineIndex, condition, hitCondition)
 }
 
 func (d *DAPDebugger) EvalExpression(expr string, frameID int) (*yakvm.Value, error) {
