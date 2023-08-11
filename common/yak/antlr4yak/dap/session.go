@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // Flags for convertVariableWithOpts option.
@@ -490,14 +492,36 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 }
 
 func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
-	response := &dap.ScopesResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
-	response.Body = dap.ScopesResponseBody{
-		Scopes: []dap.Scope{
-			{Name: "Local", VariablesReference: 1000, Expensive: false},
-			{Name: "Global", VariablesReference: 1001, Expensive: true},
-		},
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	debugger := ds.debugger
+	scopes := lo.MapToSlice(debugger.GetScopes(request.Arguments.FrameId), func(id int, scope *yakvm.Scope) dap.Scope {
+		name := "Locals"
+		if scope.IsRoot() {
+			name = "Globals"
+		}
+		return dap.Scope{
+			Name:               name,
+			VariablesReference: id,               // 通过scope id来找到一组变量,用于VariablesRequest
+			Expensive:          scope.Len() > 50, // 如果变量数量大于50,则认为是expensive
+		}
+	})
+	// 按照VariablesReference排序,这样保证旧的local scope在前面
+	sort.SliceStable(scopes, func(i, j int) bool {
+		return scopes[i].VariablesReference < scopes[j].VariablesReference
+	})
+
+	// 修改重复的local scope名字
+	suffix := 0
+	for i, scope := range scopes {
+		if scope.Name == "Locals" {
+			suffix++
+			scopes[i].Name = fmt.Sprintf("Locals%d", suffix)
+		}
 	}
+
+	response := &dap.ScopesResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.ScopesResponseBody{Scopes: scopes}}
 	ds.send(response)
 }
 

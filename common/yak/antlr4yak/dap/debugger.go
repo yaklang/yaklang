@@ -81,6 +81,10 @@ func (d *DAPDebugger) GetStackTraces() []*yakvm.StackTraces {
 	return d.debugger.GetStackTraces()
 }
 
+func (d *DAPDebugger) GetScopes(frameID int) map[int]*yakvm.Scope {
+	return d.debugger.GetScopesByFrameID(frameID)
+}
+
 func (d *DAPDebugger) IsFinished() bool {
 	return d.finished
 }
