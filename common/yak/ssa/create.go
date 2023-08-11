@@ -108,4 +108,14 @@ func (f *Function) Finish() {
 	f.currentBlock = nil
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+	for _, b := range f.Blocks {
+		for _, phi := range b.inCompletePhi {
+			phi.InferenceType()
+		}
+		for _, i := range b.Instrs {
+			if u, ok := i.(User); ok {
+				u.InferenceType()
+			}
+		}
+	}
 }
