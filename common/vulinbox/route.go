@@ -173,6 +173,7 @@ func (s *VulinServer) init() {
 	s.genRoute()
 
 	s.registerVulRouter()
+	s.registerMiscRoute()
 
 }
 
