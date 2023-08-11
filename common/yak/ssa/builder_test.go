@@ -22,6 +22,43 @@ func parseSSA(src string) *Program {
 
 // check block-graph and value-user chain
 func CheckProgram(t *testing.T, prog *Program) {
+
+	checkValue := func(value Value) {
+		if user, ok := value.(User); ok {
+			if slices.Contains(user.GetValues(), value) {
+				t.Fatalf("fatal inst %s has this self", value)
+			}
+		}
+		for _, user := range value.GetUsers() {
+			if !slices.Contains(user.GetValues(), value) {
+				t.Fatalf("fatal user %s not't have it %s in value", user, value)
+			}
+		}
+	}
+	checkUser := func(user User) {
+		if value, ok := user.(Value); ok {
+			if slices.Contains(value.GetUsers(), user) {
+				t.Fatalf("fatal inst %s has this self", user)
+			}
+		}
+
+		for _, value := range user.GetValues() {
+			if !slices.Contains(value.GetUsers(), user) {
+				t.Fatalf("fatal value %s not't have it %s in user", value, user)
+			}
+		}
+
+	}
+	checkNode := func(node Node) {
+		// value-user check
+		if value, ok := node.(Value); ok {
+			checkValue(value)
+		}
+		if user, ok := node.(User); ok {
+			checkUser(user)
+		}
+	}
+
 	for i, pkg := range prog.Packages {
 		if pkg.Prog != prog {
 			t.Fatalf("fatal pkg %s[%d] error pointer to programe", pkg.name, i)
@@ -63,25 +100,21 @@ func CheckProgram(t *testing.T, prog *Program) {
 					if inst.GetParent() != f {
 						t.Fatalf("fatal instruction %s[%d] error pointer to function", inst, i)
 					}
-
 					if node, ok := inst.(Node); ok {
-						// value-user check
-						if value, ok := inst.(Value); ok {
-							if slices.Contains(node.GetValues(), value) {
-								t.Fatalf("fatal inst %s has this self", inst)
-							}
-							for _, user := range node.GetUsers() {
-								if !slices.Contains(user.GetValues(), value) {
-									t.Fatalf("fatal user %s not't have it %s in value", user, inst)
-								}
-							}
-						}
-						if user, ok := inst.(User); ok {
-							for _, value := range node.GetValues() {
-								if !slices.Contains(value.GetUsers(), user) {
-									t.Fatalf("fatal value %s not't have it %s in user", value, inst)
-								}
-							}
+						checkNode(node)
+					}
+				}
+
+				for _, phi := range b.Phis {
+					if len(phi.Edge) != len(b.Preds) {
+						t.Fatalf("fatal Phi-instruction %s edge error", phi)
+					}
+
+					for i, e := range phi.Edge {
+						if e != nil {
+							checkValue(e)
+						} else {
+							t.Fatalf("fatal phi-instruction[%s] edge[%d] for block[%s] is nil!\n", phi.variable, i, b.Preds[i].Name)
 						}
 					}
 				}
@@ -97,7 +130,7 @@ func showProg(prog *Program) string {
 	ret := ""
 	for _, pkg := range prog.Packages {
 		for _, f := range pkg.funcs {
-			ret += f.DisAsm(DisAsmWithoutSource)
+			ret += f.DisAsm(DisAsmDefault)
 		}
 	}
 	fmt.Println(ret)
@@ -512,15 +545,15 @@ yak-main
 entry0:
 	switch <int64> 2 default:[switch.default2] {<int64> 1:switch.handler3, <int64> 2:switch.handler3, <int64> 3:switch.handler4, <int64> 4:switch.handler5}
 switch.done1: <- switch.handler4 switch.default2
-                jump -> b6
+	jump -> b6
 switch.default2: <- entry0 switch.handler5
-                jump -> switch.done1
+	jump -> switch.done1
 switch.handler3: <- entry0
-                jump -> switch.handler4
+	jump -> switch.handler4
 switch.handler4: <- entry0 switch.handler3
-                jump -> switch.done1
+	jump -> switch.done1
 switch.handler5: <- entry0
-                jump -> switch.default2
+	jump -> switch.default2
 b6: <- switch.done1
 	`
 		prog := parseSSA(code)
@@ -601,13 +634,13 @@ entry0:
 		<int64> t2 = call <> yak-main$1 (<int64> 3) [<int64> 22]
 		<int64> t3 = <int64> 22 add <int64> t2
 		If [<int64> t2] true -> if.true2, false -> if.false3
-if.done1: <- if.true2 if.false3 
+if.done1: <- if.true2 if.false3
 		<int64> t6 = phi [<int64> 12, if.true2] [<int64> 13, if.false3]
-        jump -> b4
-if.true2: <- entry0 
-        jump -> if.done1
-if.false3: <- entry0 
-        jump -> if.done1
+		jump -> b4
+if.true2: <- entry0
+		jump -> if.done1
+if.false3: <- entry0
+		jump -> if.done1
 b4: <- if.done1
 		<int64> t9 = <int64> t6 add <int64> t2
 		<int64> t10 = yak-main-symbol field[<string> cadd]
@@ -725,7 +758,7 @@ call()
 		`
 		ir := []string{
 			`
-yak-main 
+yak-main
 entry0:
 	<> t0 = call <> yak-main$1 (<int64> 1) []
 	<> t1 = call <> yak-main$3 (<int64> 2) [<int64> 12]
