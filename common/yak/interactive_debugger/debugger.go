@@ -240,10 +240,10 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 
 				if len(commands) > 3 && commands[2] == "if" {
 					condtionCode := strings.Join(commands[3:], " ")
-					if err := g.SetCondtionalBreakPoint(lineNumber, condtionCode); err != nil {
+					if err := g.SetBreakPoint(lineNumber, condtionCode); err != nil {
 						fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 					}
-				} else if err := g.SetBreakPoint(lineNumber); err != nil {
+				} else if err := g.SetNormalBreakPoint(lineNumber); err != nil {
 					fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 				}
 			case "clear":

@@ -19,20 +19,19 @@ var (
 )
 
 type Debugger struct {
-	vm                *VirtualMachine
-	once              sync.Once
-	startWG           sync.WaitGroup  // 用于等待程序启动
-	started           bool            // 表示程序是否已经启动
-	finished          bool            // 表示程序是否已经结束
-	wg                sync.WaitGroup  // 多个异步函数同时执行时回调断点,阻塞执行
-	initFunc          func(*Debugger) // 初始化函数
-	callbackFunc      func(*Debugger) // 断点回调函数
-	currentBreakPoint *Breakpoint
-	breakPoints       []*Breakpoint // 断点
-	description       string        // 回调时信息
-	frame             *Frame        // 存储当前执行的frame
-	state             string        // 表示当前处于哪个函数
-	lock              sync.Mutex    // 用于ShouldCallback的同步
+	vm           *VirtualMachine
+	once         sync.Once
+	startWG      sync.WaitGroup  // 用于等待程序启动
+	started      bool            // 表示程序是否已经启动
+	finished     bool            // 表示程序是否已经结束
+	wg           sync.WaitGroup  // 多个异步函数同时执行时回调断点,阻塞执行
+	initFunc     func(*Debugger) // 初始化函数
+	callbackFunc func(*Debugger) // 断点回调函数
+
+	description string     // 回调时信息
+	frame       *Frame     // 存储当前执行的frame
+	state       string     // 表示当前处于哪个函数
+	lock        sync.Mutex // 用于ShouldCallback的同步
 
 	sourceCode                string
 	sourceCodeLines           []string
@@ -41,6 +40,11 @@ type Debugger struct {
 	codePointer               int
 	linePointer               int
 	linesFirstCodeAndStateMap map[int]*CodeState // 每行第一个opcode索引
+
+	// 断点
+	breakPointCount   int32
+	currentBreakPoint *Breakpoint         // 当前断点
+	breakPoints       map[int]*Breakpoint // 行 -> 断点
 
 	// 用于步过，步入，步出
 	jmpIndex    int
@@ -115,7 +119,7 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 		FrameCount:                   -1,
 		FrameMap:                     make(map[int32]*Frame),
 		FrameExistMap:                make(map[*Frame]struct{}),
-		breakPoints:                  make([]*Breakpoint, 0),
+		breakPoints:                  make(map[int]*Breakpoint, 0),
 		observeExpressions:           make(map[string]*Value),
 		observeBreakPointExpressions: make(map[string]*Value),
 	}
@@ -227,7 +231,7 @@ func (g *Debugger) CurrentBreakPoint() *Breakpoint {
 	return g.currentBreakPoint
 }
 
-func (g *Debugger) Breakpoints() []*Breakpoint {
+func (g *Debugger) Breakpoints() map[int]*Breakpoint {
 	return g.breakPoints
 }
 
@@ -447,47 +451,36 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 	return g.observeExpressions
 }
 
-func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, conditionCode, state string) {
-	g.breakPoints = append(g.breakPoints, NewBreakPoint(codeIndex, lineIndex, conditionCode, state))
+func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, conditionCode, state string) error {
+	if _, ok := g.breakPoints[lineIndex]; !ok {
+		g.breakPoints[lineIndex] = g.NewBreakPoint(codeIndex, lineIndex, conditionCode, state)
+		return nil
+	} else {
+		return errors.Errorf("breakpoint already exists in line %d", lineIndex)
+	}
 }
 
-func (g *Debugger) SetBreakPoint(lineIndex int) error {
+func (g *Debugger) SetBreakPoint(lineIndex int, condition string) error {
 	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
 	if code == nil {
 		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
-		g.addBreakPoint(codeIndex, lineIndex, "", state)
+		return g.addBreakPoint(codeIndex, lineIndex, "", state)
 	}
-	return nil
 }
 
 func (g *Debugger) SetNormalBreakPoint(lineIndex int) error {
-	return g.SetBreakPoint(lineIndex)
-}
-
-func (g *Debugger) SetCondtionalBreakPoint(lineIndex int, conditonCode string) error {
-	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
-	if code == nil {
-		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
-	} else {
-		// 如果编译失败,则不应该设置断点
-		_, _, err := g.Compile(conditonCode)
-		if err != nil {
-			return errors.Wrap(err, "Set condtional breakpoint error")
-		}
-		g.addBreakPoint(codeIndex, lineIndex, conditonCode, state)
-	}
-	return nil
+	return g.SetBreakPoint(lineIndex, "")
 }
 
 func (g *Debugger) ClearAllBreakPoints() {
-	g.breakPoints = make([]*Breakpoint, 0)
+	g.breakPoints = make(map[int]*Breakpoint, 0)
 }
 
 func (g *Debugger) ClearBreakpointsInLine(lineIndex int) {
-	g.breakPoints = funk.Filter(g.breakPoints, func(breakpoint *Breakpoint) bool {
-		return breakpoint.LineIndex != lineIndex
-	}).([]*Breakpoint)
+	if _, ok := g.breakPoints[lineIndex]; ok {
+		delete(g.breakPoints, lineIndex)
+	}
 }
 
 func (g *Debugger) EnableAllBreakPoints() {

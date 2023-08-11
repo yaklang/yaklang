@@ -91,7 +91,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetCondtionalBreakPoint(3, "a > 5")
+		err := g.SetBreakPoint(3, "a > 5")
 		if err != nil {
 			t.Fatal(err)
 		}
