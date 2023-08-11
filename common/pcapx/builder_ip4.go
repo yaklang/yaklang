@@ -1,126 +1,279 @@
 package pcapx
 
 import (
+	"bytes"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strings"
 )
 
-type IPv4LayerBuilderConfig struct {
+var ipv4LayerExports = map[string]any{
+	"ipv4_tos":                   WithIPv4_TOS,
+	"ipv4_id":                    WithIPv4_ID,
+	"ipv4_next_protocol":         WithIPv4_NextProtocol,
+	"ipv4_src_ip":                WithIPv4_SrcIP,
+	"ipv4_dst_ip":                WithIPv4_DstIP,
+	"ipv4_ttl":                   WithIPv4_TTL,
+	"ipv4_flags":                 WithIPv4_Flags,
+	"ipv4_fragment":              WithIPv4_FragmentOffset,
+	"ipv4_option_mss":            WithIPv4_OptionMSS,
+	"ipv4_option_window_scale":   WithIPv4_OptionWindowScale,
+	"ipv4_option_sack_permitted": WithIPv4_OptionSACKPermitted,
+	"ipv4_option_sack":           WithIPv4_OptionSACK,
+	"ipv4_option_timestamp":      WithIPv4_OptionTimestamp,
+
+	// consts
+	"IPV4_FLAG_EVIL_BIT":      int(layers.IPv4EvilBit),
+	"IPV4_FLAG_DONT_FRAGMENT": int(layers.IPv4DontFragment),
+	"IPV4_FLAG_MORE_FRAGMENT": int(layers.IPv4MoreFragments),
+
+	"IPV4_PROTOCOL_TCP":      int(layers.IPProtocolTCP),
+	"IPV4_PROTOCOL_UDP":      int(layers.IPProtocolUDP),
+	"IPV4_PROTOCOL_ICMP":     int(layers.IPProtocolICMPv4),
+	"IPV4_PROTOCOL_IGMP":     int(layers.IPProtocolIGMP),
+	"IPV4_PROTOCOL_GRE":      int(layers.IPProtocolGRE),
+	"IPV4_PROTOCOL_SCTP":     int(layers.IPProtocolSCTP),
+	"IPV4_PROTOCOL_OSPF":     int(layers.IPProtocolOSPF),
+	"IPV4_PROTOCOL_IPIP":     int(layers.IPProtocolIPIP),
+	"IPV4_PROTOCOL_VRRP":     int(layers.IPProtocolVRRP),
+	"IPV4_PROTOCOL_UDPLITE":  int(layers.IPProtocolUDPLite),
+	"IPV4_PROTOCOL_MPLSINIP": int(layers.IPProtocolMPLSInIP),
+	"IPV4_PROTOCOL_ETHERIP":  int(layers.IPProtocolEtherIP),
+	"IPV4_PROTOCOL_AH":       int(layers.IPProtocolAH),
+	"IPV4_PROTOCOL_ESP":      int(layers.IPProtocolESP),
+}
+
+func init() {
+	for k, v := range ipv4LayerExports {
+		Exports[k] = v
+	}
+}
+
+type IPv4Option func(pv4 *layers.IPv4) error
+
+func NewDefaultIPv4Layer() *layers.IPv4 {
+	return &layers.IPv4{
+		Version:  4,
+		TTL:      64,
+		Protocol: layers.IPProtocolTCP,
+		Options: []layers.IPv4Option{
+			{
+				OptionType:   layers.TCPOptionKindMSS,
+				OptionLength: 4,
+				OptionData:   []byte{0x05, 0xb4},
+			},
+			{
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionLength: 4,
+				OptionData:   []byte{0x07},
+			},
+		},
+	}
+}
+
+/*
+// IPv4 is the header of an IP packet.
+type IPv4 struct {
+	BaseLayer
 	Version    uint8
 	IHL        uint8
 	TOS        uint8
 	Length     uint16
 	Id         uint16
-	Flags      layers.IPv4Flag
+	Flags      IPv4Flag
 	FragOffset uint16
 	TTL        uint8
-	Protocol   layers.IPProtocol
+	Protocol   IPProtocol
 	Checksum   uint16
 	SrcIP      net.IP
 	DstIP      net.IP
-	Options    []layers.IPv4Option
+	Options    []IPv4Option
+	Padding    []byte
 }
 
-type IPv4LayerBuilderConfigOption func(*IPv4LayerBuilderConfig)
+一般来说，不需要操作的字段有：IHL / Length
+*/
 
-func WithIPv4LayerBuilderConfigSrcIP(srcIP any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.SrcIP = net.ParseIP(utils.InterfaceToString(srcIP))
+func WithIPv4_TOS(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.TOS = uint8(utils.InterfaceToInt(i))
+		return nil
 	}
 }
 
-func WithIPv4LayerBuilderConfigDstIP(dstIP any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.DstIP = net.ParseIP(utils.InterfaceToString(dstIP))
+func WithIPv4_ID(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Id = uint16(utils.InterfaceToInt(i))
+		return nil
 	}
 }
 
-func WithIPv4LayerBuilderConfigVersion(version any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.Version = uint8(utils.Atoi(utils.InterfaceToString(version)))
+func WithIPv4_Flags(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Flags = layers.IPv4Flag(utils.InterfaceToInt(i))
+		return nil
 	}
 }
 
-func WithIPv4LayerBuilderConfigIHL(ihl any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.IHL = uint8(utils.Atoi(utils.InterfaceToString(ihl)))
+func WithIPv4_FragmentOffset(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.FragOffset = uint16(utils.InterfaceToInt(i))
+		return nil
 	}
 }
 
-func WithIPv4LayerBuilderConfigTOS(tos any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.TOS = uint8(utils.Atoi(utils.InterfaceToString(tos)))
+func WithIPv4_TTL(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.TTL = uint8(utils.InterfaceToInt(i))
+		return nil
 	}
 }
 
-func WithIPv4LayerBuilderConfigLength(length any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.Length = uint16(utils.Atoi(utils.InterfaceToString(length)))
-	}
-}
-
-func WithIPv4LayerBuilderConfigId(id any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.Id = uint16(utils.Atoi(utils.InterfaceToString(id)))
-	}
-}
-
-func WithIPv4LayerBuilderConfigFlags(flags any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.Flags = layers.IPv4Flag(utils.Atoi(utils.InterfaceToString(flags)))
-	}
-}
-
-func WithIPv4LayerBuilderConfigFragOffset(fragOffset any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.FragOffset = uint16(utils.Atoi(utils.InterfaceToString(fragOffset)))
-	}
-}
-
-func WithIPv4LayerBuilderConfigTTL(ttl any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		i.TTL = uint8(utils.Atoi(utils.InterfaceToString(ttl)))
-	}
-}
-
-func WithIPv4LayerBuilderConfigProtocol(protocol any) IPv4LayerBuilderConfigOption {
-	return func(i *IPv4LayerBuilderConfig) {
-		switch ret := strings.ToLower(utils.InterfaceToString(protocol)); ret {
-		case "icmp":
-			i.Protocol = layers.IPProtocolICMPv4
-		case "tcp":
-			i.Protocol = layers.IPProtocolTCP
-		case "udp":
-			i.Protocol = layers.IPProtocolUDP
-		case "sctp":
-			i.Protocol = layers.IPProtocolSCTP
-		case "ospf":
-			i.Protocol = layers.IPProtocolOSPF
-		case "gre":
-			i.Protocol = layers.IPProtocolGRE
-		case "igmp":
-			i.Protocol = layers.IPProtocolIGMP
-		default:
-			i.Protocol = layers.IPProtocol(utils.Atoi(ret))
+func WithIPv4_SrcIP(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.SrcIP = net.ParseIP(utils.FixForParseIP(utils.InterfaceToString(i)))
+		if pv4.SrcIP == nil {
+			return utils.Errorf("WithIPv4_SrcIP error: %v", i)
 		}
+		return nil
 	}
 }
 
-func (i *IPv4LayerBuilderConfig) Create() *layers.IPv4 {
-	return &layers.IPv4{
-		Version:    i.IHL,
-		IHL:        i.IHL,
-		TOS:        i.TOS,
-		Length:     i.Length,
-		Id:         i.Id,
-		Flags:      i.Flags,
-		FragOffset: i.FragOffset,
-		TTL:        i.TTL,
-		Protocol:   i.Protocol,
-		SrcIP:      i.SrcIP,
-		DstIP:      i.DstIP,
-		Options:    i.Options,
+func WithIPv4_DstIP(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.DstIP = net.ParseIP(utils.FixForParseIP(utils.InterfaceToString(i)))
+		if pv4.DstIP == nil {
+			return utils.Errorf("WithIPv4_DstIP error: %v", i)
+		}
+		return nil
+	}
+}
+
+func WithIPv4_NextProtocol(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		strI := utils.InterfaceToString(i)
+		switch strings.ToLower(strI) {
+		case "ipv6_hop_by_hop":
+			pv4.Protocol = layers.IPProtocolIPv6HopByHop
+		case "icmp", "icmp4", "icmpv4", "icmp_v4":
+			pv4.Protocol = layers.IPProtocolICMPv4
+		case "igmp":
+			pv4.Protocol = layers.IPProtocolIGMP
+		case "ipv4", "ip4": // ?
+			pv4.Protocol = layers.IPProtocolIPv4
+		case "tcp":
+			pv4.Protocol = layers.IPProtocolTCP
+		case "udp":
+			pv4.Protocol = layers.IPProtocolUDP
+		case "rudp":
+			pv4.Protocol = layers.IPProtocolRUDP
+		case "ipv6", "ip6": // ?
+			pv4.Protocol = layers.IPProtocolIPv6
+		case "ipv6_routing":
+			pv4.Protocol = layers.IPProtocolIPv6Routing
+		case "ipv6_fragment":
+			pv4.Protocol = layers.IPProtocolIPv6Fragment
+		case "ipv6_icmp", "icmp6", "icmp_v6":
+			pv4.Protocol = layers.IPProtocolICMPv6
+		case "no_next_header":
+			pv4.Protocol = layers.IPProtocolNoNextHeader
+		case "ipv6_destination":
+			pv4.Protocol = layers.IPProtocolIPv6Destination
+		case "gre":
+			pv4.Protocol = layers.IPProtocolGRE
+		case "esp":
+			pv4.Protocol = layers.IPProtocolESP
+		case "ah":
+			pv4.Protocol = layers.IPProtocolAH
+		case "ospf":
+			pv4.Protocol = layers.IPProtocolOSPF
+		case "ipip":
+			pv4.Protocol = layers.IPProtocolIPIP
+		case "etherip":
+			pv4.Protocol = layers.IPProtocolEtherIP
+		case "vrrp":
+			pv4.Protocol = layers.IPProtocolVRRP
+		case "sctp":
+			pv4.Protocol = layers.IPProtocolSCTP
+		case "udplite":
+			pv4.Protocol = layers.IPProtocolUDPLite
+		case "mplsinip":
+			pv4.Protocol = layers.IPProtocolMPLSInIP
+		}
+
+		if utils.MatchAllOfRegexp(i, `\d+`) {
+			pv4.Protocol = layers.IPProtocol(utils.InterfaceToInt(i))
+			return nil
+		}
+		return utils.Errorf("unknown parse ip_protocol: %v", i)
+	}
+}
+
+// WithIPv4_OptionMSS is a IPv4Option default 1460
+func WithIPv4_OptionMSS(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Options = append(pv4.Options, layers.IPv4Option{
+			OptionType:   layers.TCPOptionKindMSS,
+			OptionLength: 4,
+			OptionData:   utils.NetworkByteOrderUint16ToBytes(i),
+		})
+		return nil
+	}
+}
+
+// WithIPv4_OptionWindowScale is a IPv4Option default 7
+func WithIPv4_OptionWindowScale(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Options = append(pv4.Options, layers.IPv4Option{
+			OptionType:   layers.TCPOptionKindWindowScale,
+			OptionLength: 3,
+			OptionData:   utils.NetworkByteOrderUint16ToBytes(i),
+		})
+		return nil
+	}
+}
+
+// WithIPv4_OptionSACKPermitted is a IPv4Option
+func WithIPv4_OptionSACKPermitted() IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Options = append(pv4.Options, layers.IPv4Option{
+			OptionType:   layers.TCPOptionKindSACKPermitted,
+			OptionLength: 2,
+		})
+		return nil
+	}
+}
+
+// WithIPv4_OptionSACK is a IPv4Option
+func WithIPv4_OptionSACK(i ...any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		if len(i) <= 0 {
+			return nil
+		}
+
+		var buf bytes.Buffer
+		for _, v := range i {
+			buf.Write(utils.NetworkByteOrderUint32ToBytes(v))
+		}
+
+		pv4.Options = append(pv4.Options, layers.IPv4Option{
+			OptionType:   layers.TCPOptionKindSACK,
+			OptionLength: 2 + uint8(len(i))*8,
+			OptionData:   buf.Bytes(),
+		})
+		return nil
+	}
+}
+
+// WithIPv4_OptionTimestamp is a IPv4Option
+func WithIPv4_OptionTimestamp(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Options = append(pv4.Options, layers.IPv4Option{
+			OptionType:   layers.TCPOptionKindTimestamps,
+			OptionLength: 10,
+			OptionData:   utils.NetworkByteOrderUint32ToBytes(i),
+		})
+		return nil
 	}
 }

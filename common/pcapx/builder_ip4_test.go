@@ -8,9 +8,10 @@ import (
 	"testing"
 )
 
-func TestArpBuilder(t *testing.T) {
+func TestParseIP4(t *testing.T) {
 	packets, err := PacketBuilder(
-		WithArp_RequestAuto("8.8.8.8"),
+		WithIPv4_SrcIP("1.1.1.1"),
+		WithIPv4_DstIP("1.1.1.2"),
 	)
 	if err != nil {
 		panic(err)
@@ -20,8 +21,8 @@ func TestArpBuilder(t *testing.T) {
 		log.Infof("error layer: %v", packet.ErrorLayer().Error())
 		panic(packet.ErrorLayer().Error())
 	}
-	if arp := packet.Layer(layers.LayerTypeARP); arp.LayerType() != layers.LayerTypeARP {
-		panic("build arp error")
-	}
 	fmt.Println(packet.String())
+	if packet.NetworkLayer().LayerType() != layers.LayerTypeIPv4 {
+		t.Fatalf("expect ipv4 layer, got %v", packet.NetworkLayer().LayerType())
+	}
 }

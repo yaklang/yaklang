@@ -41,11 +41,16 @@ func WithLoopback() BuilderConfigOption {
 
 func PacketBuilder(opts ...any) ([]byte, error) {
 	var (
-		baseConfig     = &BuilderConfig{}
-		tcpConfig      *TCPBuilderConfig
+		baseConfig = &BuilderConfig{}
+
+		// transport layer
+		tcpConfig   *TCPBuilderConfig
+		icmp4Config *layers.ICMPv4
+
+		// link and network
 		arpConfig      *layers.ARP
-		ipConfig       *IPv4LayerBuilderConfig
-		ethernetConfig *EthernetLayerBuilderConfig
+		ip4Config      *layers.IPv4
+		ethernetConfig *layers.Ethernet
 	)
 	for _, opt := range opts {
 		switch optFunc := opt.(type) {
@@ -56,6 +61,14 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 				tcpConfig = &TCPBuilderConfig{}
 			}
 			optFunc(tcpConfig)
+		case ICMPOption:
+			if icmp4Config == nil {
+				icmp4Config = &layers.ICMPv4{}
+			}
+			err := optFunc(icmp4Config)
+			if err != nil {
+				return nil, utils.Errorf("set icmp4 config failed: %s", err)
+			}
 		case ArpConfig:
 			if arpConfig == nil {
 				arpConfig = &layers.ARP{
@@ -69,16 +82,24 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-		case IPv4LayerBuilderConfigOption:
-			if ipConfig == nil {
-				ipConfig = &IPv4LayerBuilderConfig{}
+		case IPv4Option:
+			if ip4Config == nil {
+				ip4Config = NewDefaultIPv4Layer()
 			}
-			optFunc(ipConfig)
-		case EthernetLayerBuilderOption:
+			err := optFunc(ip4Config)
+			if err != nil {
+				return nil, utils.Errorf("set ipv4 config failed: %s", err)
+			}
+		case EthernetOption:
 			if ethernetConfig == nil {
-				ethernetConfig = &EthernetLayerBuilderConfig{}
+				ethernetConfig = &layers.Ethernet{
+					EthernetType: layers.EthernetTypeIPv4,
+				}
 			}
-			optFunc(ethernetConfig)
+			err := optFunc(ethernetConfig)
+			if err != nil {
+				return nil, utils.Errorf("set ethernet config failed: %s", err)
+			}
 		default:
 			log.Errorf("PacketBuilder: unknown option type: %T", optFunc)
 		}
@@ -92,14 +113,14 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		linkLayer = &layers.Ethernet{EthernetType: layers.EthernetTypeIPv4}
 	} else {
 		if ethernetConfig == nil {
-			log.Warn("PacketBuilder: ethernet layer is empty, use default")
+			log.Info("PacketBuilder: ethernet layer is empty, use default")
 			var err error
 			linkLayer, err = GetPublicToServerLinkLayerIPv4()
 			if err != nil {
 				return nil, utils.Errorf("PacketBuilder: %v", err)
 			}
 		} else {
-			linkLayer = ethernetConfig.Create()
+			linkLayer = ethernetConfig
 		}
 	}
 	_ = linkLayer
@@ -110,11 +131,11 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	var fetched = false
 	var networkLayerRaw any
 	for _, l := range []any{
-		arpConfig, ipConfig,
+		arpConfig, ip4Config,
 	} {
 		if funk.IsEmpty(l) {
 			if fetched {
-				return nil, utils.Errorf("PacketBuilder: only one network layer is allowed")
+				return nil, utils.Errorf("PacketBuilder: only one network layer is allowed, need ip / arp layer")
 			} else {
 				fetched = true
 				networkLayerRaw = l
@@ -127,10 +148,10 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 
 	var networkLayer gopacket.SerializableLayer
 	var ipEnabled bool
-	if !funk.IsEmpty(ipConfig) {
+	if !funk.IsEmpty(ip4Config) {
 		ipEnabled = true
-		networkLayer = ipConfig.Create()
-		if ipConfig.Version == 6 {
+		networkLayer = ip4Config
+		if ip4Config.Version == 6 {
 			linkLayer.EthernetType = layers.EthernetTypeIPv6
 		}
 	} else if !funk.IsEmpty(arpConfig) {
@@ -144,21 +165,34 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	var err error
 	if ipEnabled {
 		// TCP/IP Stack!
-		// TransportLayer can be TCP(Default)
-		if tcpConfig == nil {
+		// TransportLayer can be TCP(Default) / ICMP / IGMP / UDP ...
+		var transportLayer gopacket.SerializableLayer
+	TRANS:
+		if tcpConfig != nil {
+			tcpLayer := tcpConfig.Create()
+			ip4Layer := networkLayer.(*layers.IPv4)
+			err := tcpLayer.SetNetworkLayerForChecksum(ip4Layer)
+			if err != nil {
+				return nil, utils.Errorf("TCP checksum failed: %s", err)
+			}
+			transportLayer = tcpLayer
+		} else if icmp4Config != nil {
+			transportLayer = icmp4Config
+			ip4Layer := networkLayer.(*layers.IPv4)
+			ip4Layer.Protocol = layers.IPProtocolICMPv4
+		} else {
 			log.Warn("PacketBuilder: tcp layer is empty, use default")
 			tcpConfig = &TCPBuilderConfig{}
+			goto TRANS
 		}
-		transportLayer := tcpConfig.Create()
-		ip4Layer := networkLayer.(*layers.IPv4)
-		err := transportLayer.SetNetworkLayerForChecksum(ip4Layer)
+
 		if err != nil {
 			return nil, utils.Errorf("TCP checksum failed: %s", err)
 		}
 		var buf = gopacket.NewSerializeBuffer()
 		err = gopacket.SerializeLayers(
 			buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true},
-			linkLayer, ip4Layer, transportLayer, gopacket.Payload(baseConfig.Payload),
+			linkLayer, networkLayer, transportLayer, gopacket.Payload(baseConfig.Payload),
 		)
 		if err != nil {
 			return nil, utils.Errorf(`gopacket.SerializeLayers failed: %s`, err)
