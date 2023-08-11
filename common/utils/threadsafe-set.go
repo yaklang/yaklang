@@ -54,8 +54,6 @@ func (s *Set[T]) Add(item T) {
 }
 
 func (s *Set[T]) AddList(items []T) {
-	s.Lock()
-	defer s.Unlock()
 	for _, item := range items {
 		s.Add(item)
 	}
@@ -97,10 +95,10 @@ func (s *Set[T]) IsEmpty() bool {
 }
 
 // Set returns a slice of all items
-func (s *Set[T]) List() []any {
+func (s *Set[T]) List() []T {
 	s.RLock()
 	defer s.RUnlock()
-	list := make([]any, 0)
+	list := make([]T, 0)
 	for item := range s.m {
 		list = append(list, item)
 	}

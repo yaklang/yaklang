@@ -31,6 +31,16 @@ import (
 	"github.com/denisbrodbeck/machineid"
 )
 
+type MergeErrors []error
+
+func (m MergeErrors) Error() string {
+	var s []string
+	for _, e := range m {
+		s = append(s, e.Error())
+	}
+	return strings.Join(s, "\n")
+}
+
 func IContains(s, sub string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }

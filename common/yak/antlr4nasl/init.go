@@ -1,5 +1,8 @@
 package antlr4nasl
 
+import "github.com/yaklang/yaklang/common/log"
+
+var naslLogger = log.GetLogger("NASL Logger")
 var GlobalPrefs = map[string]string{
 	"plugins_folder":           "MAGENI_NVT_DIR",
 	"include_folders":          "MAGENI_NVT_DIR",

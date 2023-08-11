@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"path"
 	"sync"
 )
 
@@ -95,63 +94,6 @@ type NaslScriptInfo struct {
 	Ip     string
 }
 
-func (n *NaslScriptInfo) Run(e *Engine) error {
-	if n.Preferences != nil && e.preferences != nil {
-		for k, v := range e.preferences {
-			if _, ok := n.Preferences[k]; ok {
-				switch ret := v.(type) {
-				case bool:
-					if ret {
-						v = "yes"
-					} else {
-						v = "no"
-					}
-				}
-				n.Preferences[k] = v
-			}
-		}
-	}
-	if n == nil {
-		return utils.Errorf("script is nil")
-	}
-	mux := e.GetScriptMuxByName(n.OID)
-	mux.Lock()
-	defer func() {
-		e.MarkScriptIsLoaded(n.OriginFileName)
-		mux.Unlock()
-	}()
-	if e.IsScriptLoaded(n.OriginFileName) {
-		return nil
-	}
-	// 缺乏循环依赖检查
-	if e.autoLoadDependencies {
-		for _, dependency := range n.Dependencies {
-			if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
-				continue
-			}
-			if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
-				continue
-			}
-			if e.IsScriptLoaded(dependency) {
-				continue
-			}
-			ins, err := e.LoadScript(path.Join(e.dependenciesPath, dependency))
-			if err != nil {
-				log.Errorf("Load dependency %s failed: %s", dependency, err)
-				continue
-			}
-			if err := ins.Run(e); err != nil {
-				log.Errorf("Run dependency %s failed: %s", dependency, err)
-				continue
-			}
-		}
-	}
-	e.scriptObj = n
-	if e.debug {
-		log.Infof("Running script %s", n.OriginFileName)
-	}
-	return e.safeEvalWithFileName(n.Script, n.OriginFileName)
-}
 func NewNaslScriptObject() *NaslScriptInfo {
 	return &NaslScriptInfo{
 		naslScript:  yakit.NewEmptyNaslScript(),

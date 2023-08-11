@@ -15,7 +15,6 @@ import (
 type NaslScript struct {
 	gorm.Model
 	OriginFileName  string `json:"origin_file_name"`
-	Group           string `json:"group"`
 	Hash            string `json:"hash" gorm:"unique_index"`
 	OID             string `json:"oid"`
 	CVE             string `json:"cve"`
