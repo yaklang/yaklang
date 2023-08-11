@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
@@ -54,6 +53,9 @@ type Debugger struct {
 
 	// 停止事件原因
 	stopReason string
+
+	// panic
+	vmPanic *VMPanic
 
 	// 堆栈跟踪
 	StackTraces map[uint64]*vmstack.Stack
@@ -336,6 +338,14 @@ func (g *Debugger) SetStopReason(desc string) {
 
 func (g *Debugger) ResetStopReason() {
 	g.stopReason = ""
+}
+
+func (g *Debugger) VMPanic() *VMPanic {
+	return g.vmPanic
+}
+
+func (g *Debugger) SetVMPanic(p *VMPanic) {
+	g.vmPanic = p
 }
 
 func (g *Debugger) GetCode(state string, codeIndex int) *Code {
