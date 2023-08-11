@@ -61,9 +61,10 @@ type Debugger struct {
 	StackTraces map[uint64]*vmstack.Stack
 
 	// 帧id -> 帧
-	FrameCount    int32
-	FrameMap      map[int32]*Frame
-	FrameExistMap map[*Frame]struct{}
+	FrameCount int32
+	FrameMap   map[int32]*Frame // 帧id -> 帧
+	FrameIDMap map[*Frame]int32 // 帧 -> 帧id
+
 
 	// 观察断点
 	observeBreakPointExpressions map[string]*Value
@@ -269,9 +270,9 @@ func (g *Debugger) UpdateByFrame(frame *Frame) {
 	}
 	g.frame = frame
 
-	if _, ok := g.FrameExistMap[frame]; !ok {
-		g.FrameExistMap[frame] = struct{}{}
+	if _, ok := g.FrameIDMap[frame]; !ok {
 		atomic.AddInt32(&g.FrameCount, 1)
+		g.FrameIDMap[frame] = g.FrameCount
 		g.FrameMap[g.FrameCount] = frame
 	}
 }
@@ -391,14 +392,20 @@ func (g *Debugger) GetStackTraces() []*StackTraces {
 		}
 		sts := make([]StackTrace, stack.Len())
 
-		id := 0
+		index2 := 0
 		stack.GetAll(func(i any) {
 			if stepStack, ok := i.(*StepStack); ok {
 				if stepStack.code != nil {
-					sts[id] = StackTrace{
-						ID:         id,
+					frame := stepStack.frame
+					fid, ok := g.FrameIDMap[frame]
+					if !ok {
+						fid = -1
+					}
+
+					sts[index2] = StackTrace{
+						ID:         int(fid),
 						Name:       stepStack.stateName,
-						Frame:      stepStack.frame,
+						Frame:      frame,
 						SourceCode: stepStack.code.SourceCodePointer,
 						Source:     stepStack.code.SourceCodeFilePath,
 						Line:       stepStack.code.StartLineNumber,
@@ -406,7 +413,7 @@ func (g *Debugger) GetStackTraces() []*StackTraces {
 						EndLine:    stepStack.code.EndLineNumber,
 						EndColumn:  stepStack.code.EndColumnNumber,
 					}
-					id++
+					index2++
 				}
 			}
 		})
