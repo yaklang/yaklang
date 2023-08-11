@@ -638,7 +638,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 							return true
 						}),
 					}
-					opts = append(opts, FuzzFileOptions()...)
+					if config.ForceFuzzfile {
+						opts = append(opts, FuzzFileOptions()...)
+					}
 					if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
 						opts = append(opts, Fuzz_WithParams(config.FuzzParams))
 					}
