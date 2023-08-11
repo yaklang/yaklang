@@ -468,6 +468,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	res, err := mutate.ExecPool(
 		rawRequest,
 		mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
+		mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
 		mutate.WithPoolOpt_Timeout(timeoutSeconds),
 		mutate.WithPoolOpt_Proxy(proxies...),
 		mutate.WithPoolOpt_Concurrent(int(concurrent)),
