@@ -3,10 +3,15 @@ package vulinbox
 import (
 	"encoding/json"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +22,18 @@ func (s *VulinServer) registerSSRF() {
 	s.router.HandleFunc("/redirect/main", func(writer http.ResponseWriter, request *http.Request) {
 		DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
 	})
+
 	ssrfGroup := s.router.PathPrefix("/ssrf").Name("SSRF 参数多种情况的测试").Subrouter()
+
+	ssrfGroup.HandleFunc("/flag", func(writer http.ResponseWriter, request *http.Request) {
+		if strings.Contains(request.Host, "127.0.0.1") {
+			uuid := uuid.NewV4().String()
+			DefaultRender(fmt.Sprintf("flag{%s}", uuid), writer, request)
+			return
+		}
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}).Methods(http.MethodGet)
 	ssrfRoutes := []*VulInfo{
 		{
 			DefaultQuery: "json={\"abc\": 123, \"ref\": \"http://www.baidu.com\"}",
@@ -90,7 +106,7 @@ func (s *VulinServer) registerSSRF() {
 				if request.Method == "GET" {
 					writer.Header().Set("Content-Type", "text/html; charset=utf8")
 					writer.Write([]byte(`
-<form action="/ssrf-in-post" method="post">
+<form action="/ssrf/in-post" method="post">
 	<label for="name">姓名:</label>
 	<input type="text" id="name" name="name" ><br><br>
 
@@ -136,6 +152,89 @@ func (s *VulinServer) registerSSRF() {
 				rsp, err := c.Get(u)
 				if err != nil {
 					writer.Write([]byte(err.Error()))
+					return
+				}
+				rawResponse, err := utils.HttpDumpWithBody(rsp, true)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				writer.Write(rawResponse)
+			},
+			RiskDetected: true,
+		},
+
+		{
+			DefaultQuery: "",
+			Path:         "/rebinding/in-post",
+			Title:        "SSRF POST 中 URL 参数 (DNS Rebinding)",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					writer.Header().Set("Content-Type", "text/html; charset=utf8")
+					writer.Write([]byte(`
+<form action="/ssrf/rebinding/in-post" method="post">
+	<label for="name">姓名:</label>
+	<input type="text" id="name" name="name" ><br><br>
+
+	<label for="email">邮箱:</label>
+	<input type="email" id="email" name="email" ><br><br>
+
+	<label for="age">年龄:</label>
+	<input type="number" id="age" name="age" min="2" max="120" ><br><br>
+
+	
+	<label for="url">URL</label>
+	<input id='url' name="url"><br><br>
+
+	<label for="timeout">TimeOut</label>
+	<input type="number" id='timeout' name="timeout" min="10" max="120"><br><br>
+
+	<label for="gender">性别:</label>
+	<select id="gender" name="gender" >
+		<option value="">请选择</option>
+		<option value="male">男</option>
+		<option value="female">女</option>
+		<option value="other">其他</option>
+	</select><br><br>
+
+	<label for="message">留言:</label>
+	<textarea id="message" name="message" rows="5" ></textarea><br><br>
+
+	<input type="submit" value="提交">
+</form>
+`))
+					return
+				}
+				raw, err := ioutil.ReadAll(request.Body)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				values, err := url.ParseQuery(string(raw))
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				var u = fmt.Sprint(values.Get("url"))
+
+				if u == "" || !check(u) {
+					writer.Write([]byte("check url failed"))
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				c := utils.NewDefaultHTTPClient()
+				timeoutSec, err := strconv.Atoi(values.Get("timeout"))
+				if err != nil {
+					writer.Write([]byte("Invalid timeout value"))
+					return
+				}
+
+				c.Timeout = time.Duration(timeoutSec) * time.Second
+				rsp, err := c.Get(u)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				rawResponse, err := utils.HttpDumpWithBody(rsp, true)
@@ -365,4 +464,107 @@ func getPath(u string) string {
 		return ""
 	}
 	return urlInfo.Path
+}
+
+func checkIP(value string) bool {
+	pattern := `^\d{1,3}(\.\d{1,3}){3}$`
+	if matched, _ := regexp.MatchString(pattern, value); !matched {
+		return false
+	}
+
+	ary := strings.Split(value, ".")
+	for _, v := range ary {
+		num, err := strconv.Atoi(v)
+		if err != nil || num > 255 {
+			return false
+		}
+	}
+	return true
+}
+
+func dnsLookup(s string) string {
+	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9-.]*$`, s); matched {
+		resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", s))
+		if err != nil {
+			return "wrong"
+		}
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		query := gjson.Get(string(body), "query").String()
+
+		if checkIP(query) {
+			return query
+		}
+		return "wrong"
+	}
+	return "wrong"
+}
+
+func check(s string) bool {
+	if !strings.HasPrefix(s, "http://") {
+		return false
+	}
+
+	blacklist := []string{"wrong", "127.", "local", "@", "flag"}
+
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+
+	host := u.Hostname()
+	port := u.Port()
+
+	if host == "" || port == "" {
+		return false
+	}
+	dns := netx.LookupFirst(host,
+		netx.WithDNSNoCache(true),
+		netx.WithDNSDisableSystemResolver(true),
+	)
+	//dns := dnsLookup(host)
+
+	dockerIP := "110.110.2.1"
+	if isPrivate(dns) || dns != dockerIP || port == "80" || port == "8080" {
+		return false
+	}
+
+	for _, blItem := range blacklist {
+		r := regexp.MustCompile(blItem)
+
+		if r.MatchString(s) { // Simplified from ip.fromLong logic for demonstration
+			return false
+		}
+	}
+
+	return true
+}
+
+func isPrivate(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	privateIPBlocks := []*net.IPNet{}
+	for _, cidr := range []string{
+		"127.0.0.0/8",    // IPv4 loopback
+		"10.0.0.0/8",     // RFC1918
+		"172.16.0.0/12",  // RFC1918
+		"192.168.0.0/16", // RFC1918
+		"169.254.0.0/16", // Link-local
+		"::1/128",        // IPv6 loopback
+		"fe80::/10",      // IPv6 link-local
+		"fc00::/7",       // IPv6 unique local addr
+	} {
+		_, block, _ := net.ParseCIDR(cidr)
+		privateIPBlocks = append(privateIPBlocks, block)
+	}
+
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
