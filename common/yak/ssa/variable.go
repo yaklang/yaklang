@@ -83,6 +83,7 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
 		phi := NewPhi(f, block, variable)
+		//TODO: use visit-flag inplace phi variable
 		f.writeVariableByBlock(variable, phi, block)
 		v = phi.Build()
 	}
