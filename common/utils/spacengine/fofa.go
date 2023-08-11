@@ -1,6 +1,7 @@
 package spacengine
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -50,14 +51,14 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				}
 
 				ip := rData[2].String()
-				port := rData[3].String()
+				port := rData[4].String()
 				log.Infof("fofa fetch: %s",
 					utils.HostPort(ip, port),
 				)
 
 				var finalHost = ip
-				var domains = []string{rData[0].String()}
-				urlIns := rData[1].String()
+				var domains = []string{}
+				urlIns := rData[0].String()
 				if urlIns != "" {
 					host, _, _ := utils.ParseStringToHostPort(urlIns)
 					if host != "" {
@@ -77,6 +78,13 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 					urlIns = ""
 				}
 
+				country := rData[5].String()
+				city := rData[6].String()
+				location := country
+				if city != "" {
+					location = fmt.Sprintf("%s %s", country, city)
+				}
+
 				ch <- &NetSpaceEngineResult{
 					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "fofa",
@@ -84,12 +92,11 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 					Longitude:       0,
 					Url:             urlIns,
 					ConfirmHttps:    confirmHttps,
-					HtmlTitle:       rData[4].String(),
+					HtmlTitle:       rData[1].String(),
 					Domains:         strings.Join(domains, "|"),
-					Province:        rData[5].String(),
-					City:            rData[6].String(),
+					City:            city,
 					Asn:             "",
-					Location:        rData[6].String(),
+					Location:        location,
 					ServiceProvider: "",
 					FromFilter:      filter,
 					Host:            finalHost,
