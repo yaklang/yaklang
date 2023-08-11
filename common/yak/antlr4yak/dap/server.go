@@ -59,11 +59,11 @@ func NewDAPServer(config *DAPServerConfig) *DAPServer {
 func (s *DAPServer) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	// todo: add debugger to session
 	session := &DebugSession{
-		config: s.config,
-		conn:   conn,
-		rw:     bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+		config:   s.config,
+		conn:     conn,
+		rw:       bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+		LaunchWg: sync.WaitGroup{},
 	}
 	s.session = session
 

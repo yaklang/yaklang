@@ -87,6 +87,9 @@ type DebugSession struct {
 	stopMu sync.Mutex
 
 	breakpointIDCounter int32
+
+	// wg
+	LaunchWg sync.WaitGroup
 }
 
 func (ds *DebugSession) send(message dap.Message) {
@@ -300,6 +303,8 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 	ds.send(&dap.InitializedEvent{Event: *newEvent("initialized")})
 	ds.send(&dap.LaunchResponse{Response: *newResponse(request.Seq, request.Command)})
 
+	// 等待launch
+	ds.LaunchWg.Add(1)
 	go ds.RunProgramInDebugMode(!args.NoDebug, args.Program, args.Args)
 }
 
@@ -326,13 +331,21 @@ func (ds *DebugSession) onRestartRequest(request *dap.RestartRequest) {
 }
 
 func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
-	// 等待调试器初始化完成
-	ds.debugger.WaitInit()
+	debugger := ds.debugger
 
-	source := ds.debugger.source
+	// 等待launch完成
+	ds.LaunchWg.Wait()
+	// 等待init完成
+	debugger.WaitInit()
 
-	response := &dap.SetBreakpointsResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
+	source := debugger.source
+
+	response := &dap.SetBreakpointsResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.SetBreakpointsResponseBody{}}
+
+	// todo: 多文件调试,处理arguments.Source
+
+	// todo: supportsHitConditionalBreakpoints,处理arguments.Breakpoints.HitCondition
+	// todo: supportsLogPoints,处理arguments.Breakpoints.LogMessage
 
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
 	for i, b := range request.Arguments.Breakpoints {
@@ -342,7 +355,11 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 		bp.Source = &dap.Source{Path: source.AbsPath, Name: source.Name}
 		bp.Id = int(ds.breakpointIDCounter)
 		bp.Line = b.Line
-		bp.Verified = true
+
+		err := debugger.SetBreakPoint(bp.Line, b.Condition, b.HitCondition)
+
+		bp.Verified = (err == nil)
+		// todo: 当存在error的时候,是否需要设置breakpoint?
 	}
 
 	ds.send(response)
