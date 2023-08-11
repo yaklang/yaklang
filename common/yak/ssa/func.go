@@ -19,6 +19,7 @@ func (f *Function) NewParam(name string) {
 		variable: name,
 		Func:     f,
 		user:     []User{},
+		typs:     make(Types, 0),
 	}
 	f.Param = append(f.Param, p)
 	f.writeVariable(name, p)
