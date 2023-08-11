@@ -258,7 +258,7 @@ func (f *Function) emitField(i *Interface, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }
 
-func (f *Function) emitUpdate(address User, v Value) *Update {
+func (f *Function) emitUpdate(address *Field, v Value) *Update {
 	//use-value-chain: address -> update -> value
 	s := &Update{
 		anInstruction: f.newAnInstuction(),
