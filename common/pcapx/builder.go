@@ -44,7 +44,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		baseConfig = &BuilderConfig{}
 
 		// transport layer
-		tcpConfig   *TCPBuilderConfig
+		tcpConfig   *layers.TCP
 		icmp4Config *layers.ICMPv4
 
 		// link and network
@@ -56,11 +56,14 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		switch optFunc := opt.(type) {
 		case BuilderConfigOption:
 			optFunc(baseConfig)
-		case TCPBuilderConfigOption:
+		case TCPOption:
 			if tcpConfig == nil {
-				tcpConfig = &TCPBuilderConfig{}
+				tcpConfig = NewDefaultTCPLayer()
 			}
-			optFunc(tcpConfig)
+			err := optFunc(tcpConfig)
+			if err != nil {
+				return nil, utils.Errorf("set tcp config failed: %s", err)
+			}
 		case ICMPOption:
 			if icmp4Config == nil {
 				icmp4Config = &layers.ICMPv4{}
@@ -169,7 +172,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		var transportLayer gopacket.SerializableLayer
 	TRANS:
 		if tcpConfig != nil {
-			tcpLayer := tcpConfig.Create()
+			tcpLayer := tcpConfig
 			ip4Layer := networkLayer.(*layers.IPv4)
 			err := tcpLayer.SetNetworkLayerForChecksum(ip4Layer)
 			if err != nil {
@@ -182,7 +185,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			ip4Layer.Protocol = layers.IPProtocolICMPv4
 		} else {
 			log.Warn("PacketBuilder: tcp layer is empty, use default")
-			tcpConfig = &TCPBuilderConfig{}
+			tcpConfig = NewDefaultTCPLayer()
 			goto TRANS
 		}
 

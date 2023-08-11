@@ -8,9 +8,9 @@ import (
 )
 
 var ethernetLayerExports = map[string]interface{}{
-	"ethernet_srcMac":          WithEthernet_SrcMac,
-	"ethernet_dstMac":          WithEthernet_DstMac,
-	"ethernet_next_layer_type": WithEthernet_NextLayerType,
+	"ethernet_srcMac":        WithEthernet_SrcMac,
+	"ethernet_dstMac":        WithEthernet_DstMac,
+	"ethernet_nextLayerType": WithEthernet_NextLayerType,
 }
 
 func init() {
