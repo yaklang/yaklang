@@ -37,7 +37,7 @@ func (f *Function) newAnInstuction() anInstruction {
 	return anInstruction{
 		Func:  f,
 		Block: f.currentBlock,
-		typ:   nil,
+		typs:  make(Types, 0),
 		pos:   f.currtenPos,
 	}
 }
@@ -186,8 +186,7 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 					continue
 				}
 			}
-			fmt.Printf("debug %v\n", para.variable)
-			panic("call target clouse binding variable not found")
+			panic(fmt.Sprintf("call target clouse binding variable not found: %s", para))
 		}
 
 		if field, ok := freevalue[index].(*Field); ok { // will modify in function must field
@@ -199,7 +198,7 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 					continue
 				}
 			}
-			panic("call target clouse binding field not found")
+			panic(fmt.Sprintf("call target clouse binding variable not found: %s", field))
 		}
 	}
 	c := &Call{
@@ -241,7 +240,7 @@ func (f *Function) emitInterface(parentI *Interface, typ types.Type, low, high, 
 		Cap:           Cap,
 		users:         make([]User, 0),
 	}
-	i.anInstruction.typ = typ
+	i.anInstruction.typs = append(i.anInstruction.typs, typ)
 	f.emit(i)
 	fixupUseChain(i)
 	return i
@@ -251,7 +250,7 @@ func (f *Function) emitInterfaceBuild(typ types.Type, Len, Cap Value) *Interface
 	return f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
 }
 func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
-	return f.emitInterface(i, i.typ, low, high, max, nil, nil)
+	return f.emitInterface(i, i.typs[0], low, high, max, nil, nil)
 }
 
 func (f *Function) emitField(i *Interface, key Value) *Field {
