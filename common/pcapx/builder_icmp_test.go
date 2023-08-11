@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestWithICMP_Sequence(t *testing.T) {
+func TestSmoking_ICMP(t *testing.T) {
 	var packets, err = PacketBuilder(
 		WithIPv4_DstIP("1.1.1.1"),
 		WithIPv4_SrcIP("1.1.1.2"),

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestWithTCP_Ack(t *testing.T) {
+func TestSmoking_TCP(t *testing.T) {
 	var packets, err = PacketBuilder(
 		WithIPv4_SrcIP("1.1.1.1"),
 		WithIPv4_DstIP("1.1.1.2"),
