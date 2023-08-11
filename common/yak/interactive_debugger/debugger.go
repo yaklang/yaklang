@@ -61,7 +61,7 @@ func (i *InteractiveDebugger) GetPrettySourceCode(g *yakvm.Debugger, start int, 
 			if bp.LineIndex-1 == index {
 				if bp.On {
 					prefix = "**"
-					if bp.ConditionCode != "" {
+					if bp.Condition != "" {
 						prefix = "-*"
 					}
 				} else {
@@ -239,8 +239,8 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 				}
 
 				if len(commands) > 3 && commands[2] == "if" {
-					condtionCode := strings.Join(commands[3:], " ")
-					if err := g.SetBreakPoint(lineNumber, condtionCode); err != nil {
+					condtion := strings.Join(commands[3:], " ")
+					if err := g.SetBreakPoint(lineNumber, condtion, ""); err != nil {
 						fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 					}
 				} else if err := g.SetNormalBreakPoint(lineNumber); err != nil {
