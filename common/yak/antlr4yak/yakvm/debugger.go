@@ -461,26 +461,26 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 	return g.observeExpressions
 }
 
-func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, conditionCode, state string) error {
+func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) error {
 	if _, ok := g.breakPoints[lineIndex]; !ok {
-		g.breakPoints[lineIndex] = g.NewBreakPoint(codeIndex, lineIndex, conditionCode, state)
+		g.breakPoints[lineIndex] = g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
 		return nil
 	} else {
 		return errors.Errorf("breakpoint already exists in line %d", lineIndex)
 	}
 }
 
-func (g *Debugger) SetBreakPoint(lineIndex int, condition string) error {
+func (g *Debugger) SetBreakPoint(lineIndex int, condition, hitCondition string) error {
 	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
 	if code == nil {
 		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
-		return g.addBreakPoint(codeIndex, lineIndex, condition, state)
+		return g.addBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
 	}
 }
 
 func (g *Debugger) SetNormalBreakPoint(lineIndex int) error {
-	return g.SetBreakPoint(lineIndex, "")
+	return g.SetBreakPoint(lineIndex, "", "")
 }
 
 func (g *Debugger) ClearAllBreakPoints() {
@@ -540,6 +540,14 @@ func (g *Debugger) StepOut() error {
 	} else {
 		return utils.Errorf("Can't not step out")
 	}
+}
+
+func (g *Debugger) HitCount(breakpoint *Breakpoint) bool {
+	// 如果命中次数大于0，则命中次数减1,如果还大于0则不断点
+	if breakpoint.HitCount > 0 {
+		breakpoint.HitCount--
+	}
+	return breakpoint.HitCount > 0
 }
 
 func (g *Debugger) HandleForStepNext() {
@@ -684,15 +692,51 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		// 行断点,包含普通断点和条件断点
 		if breakpoint.CodeIndex == codeIndex {
 			// 条件断点
-			if breakpoint.ConditionCode != "" {
-				value, err := g.EvalExpression(breakpoint.ConditionCode)
 
-				// 如果条件不成立,则不断点
+			condition, hitCondition := breakpoint.Condition, breakpoint.HitCondition
+			if condition == "" {
+				// 如果命中次数大于0，则命中次数减1,如果还大于0则不断点
+				if g.HitCount(breakpoint) {
+					continue
+				}
+			}
+
+			if condition != "" || hitCondition != "" {
+				// 如果condition为空，则使用hitCondition
+				cond := condition
+				if condition == "" {
+					cond = hitCondition
+				}
+				value, err := g.EvalExpression(cond)
+
+				// 如果condition不成立,则不断点
 				if err != nil || value.False() {
 					continue
 				}
 
-				g.description = fmt.Sprintf("Trigger condtional breakpoint [%s] at line %d in %s", breakpoint.ConditionCode, g.linePointer, g.StateName())
+				// 如果命中次数大于0，则命中次数减1,如果还大于0则不断点
+				if g.HitCount(breakpoint) {
+					continue
+				}
+
+				// 如果hitCondition都不为空，则还需要判断hitCondition
+				if hitCondition != "" {
+					value, err := g.EvalExpression(hitCondition)
+
+					// 如果条件不成立,则不断点
+					if err != nil || value.False() {
+						continue
+					}
+
+					cond = fmt.Sprintf("%s && %s", condition, hitCondition)
+				}
+
+				// 触发条件断点的条件:
+				// 1. condition成立,没有hitCount和hitCondition
+				// 2. hitCount存在并减为0
+				// 3. condition成立,hitCondition成立
+
+				g.description = fmt.Sprintf("Trigger condtional breakpoint [%s] at line %d in %s", cond, g.linePointer, g.StateName())
 			} else {
 				// 普通断点
 				g.description = fmt.Sprintf("Trigger normal breakpoint at line %d in %s", g.linePointer, g.StateName())
