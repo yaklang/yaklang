@@ -15,6 +15,11 @@ type Thread struct {
 	Id   int
 	Name string
 }
+
+type Source struct {
+	Name    string // 文件名
+	AbsPath string // 完整路径
+}
 type DAPDebugger struct {
 	debugger *yakvm.Debugger // yak debugger
 	session  *DebugSession   // DAP session
@@ -27,6 +32,8 @@ type DAPDebugger struct {
 	timeout    time.Duration // 超时时间
 	inCallback bool          // 是否在回调状态
 	continueCh chan struct{} // 继续执行
+
+	source *Source // 源码相关
 }
 
 func (d *DAPDebugger) InitWGAdd() {
