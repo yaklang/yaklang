@@ -12,16 +12,21 @@ import (
 )
 
 type NaslScriptConfig struct {
-	plugin     []string
-	family     []string
-	proxies    []string
-	riskHandle func(risk any)
-	conditions map[string]any
-	preference map[string]any
+	plugin               []string
+	family               []string
+	proxies              []string
+	riskHandle           func(risk any)
+	conditions           map[string]any
+	preference           map[string]any
+	autoLoadDependencies bool
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
-	return &NaslScriptConfig{}
+	return &NaslScriptConfig{
+		autoLoadDependencies: true,
+		preference:           make(map[string]any),
+		conditions:           make(map[string]any),
+	}
 }
 
 type NaslScriptConfigOptFunc func(c *NaslScriptConfig)
@@ -88,7 +93,6 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 			}
 			return origin(engine, params)
 		})
-		engine.SetAutoLoadDependencies(true)
 		// 需要把ACT_SCAN的脚本都patch一遍
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
 			codeBytes, err := embed.Asset("data/nasl-patches/" + "ping_host_patch.nasl")
@@ -168,27 +172,6 @@ var Exports = map[string]any{
 		} else if utils.IsFile(p) {
 			saveScript(p)
 		}
-	},
-	"NewScriptGroup": func(name string, scriptNames ...string) error {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return utils.Errorf("cannot fetch database: %s", db.Error)
-		}
-		for _, scriptName := range scriptNames {
-			scriptIns, err := yakit.QueryNaslScriptByName(db, scriptName)
-			if err != nil {
-				log.Errorf("cannot find script %s: %s", scriptName, err.Error())
-				continue
-			}
-			if scriptIns == nil {
-				return utils.Errorf("cannot find script %s", scriptName)
-			}
-			scriptIns.Group = name
-			if db := db.Save(scriptIns); db.Error != nil {
-				return db.Error
-			}
-		}
-		return nil
 	},
 	"RemoveDatabase": func() error {
 		db := consts.GetGormProfileDatabase()

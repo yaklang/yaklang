@@ -13,7 +13,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sync"
 )
 
 type Engine struct {
@@ -28,13 +27,11 @@ type Engine struct {
 	host                           string
 	proxies                        []string
 	Kbs                            *NaslKBs
-	loadedScripts                  map[string]struct{}
-	loadedScriptsLock              *sync.Mutex
-	scriptExecMutexs               map[string]*sync.Mutex
-	scriptExecMutexsLock           *sync.Mutex
-	autoLoadDependencies           bool
-	buildInMethodHook              map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
-	preferences                    map[string]any
+	//scriptExecMutexs               map[string]*sync.Mutex
+	//scriptExecMutexsLock           *sync.Mutex
+	buildInMethodHook map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
+	preferences       map[string]any
+	logger            *log.Logger
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {
@@ -44,14 +41,14 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 	vm.GetConfig().SetFunctionNumberCheck(false)
 	vm.GetConfig().SetYVMMode(yakvm.NASL)
 	engine := &Engine{
-		compiler:          visitors.NewCompilerWithSymbolTable(table),
-		vm:                vm,
-		naslLibPatch:      make(map[string]func(string) string),
-		Kbs:               kbs,
-		loadedScripts:     make(map[string]struct{}),
-		loadedScriptsLock: &sync.Mutex{},
+		compiler:     visitors.NewCompilerWithSymbolTable(table),
+		vm:           vm,
+		naslLibPatch: make(map[string]func(string) string),
+		Kbs:          kbs,
+		logger:       log.GetLogger("NASL Logger"),
+		//loadedScriptsLock: &sync.Mutex{},
 		buildInMethodHook: make(map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)),
-		scriptExecMutexs:  make(map[string]*sync.Mutex),
+		//scriptExecMutexs:  make(map[string]*sync.Mutex),
 	}
 	engine.compiler.SetNaslLib(GetNaslLibKeys())
 	engine.compiler.RegisterVisitHook("a", func(c *visitors.Compiler, ctx antlr.ParserRuleContext) {
@@ -99,35 +96,35 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
 }
-func (engine *Engine) GetScriptMuxByName(name string) *sync.Mutex {
-	engine.scriptExecMutexsLock.Lock()
-	defer engine.scriptExecMutexsLock.Unlock()
-	if v, ok := engine.scriptExecMutexs[name]; ok {
-		return v
-	}
-	engine.scriptExecMutexs[name] = &sync.Mutex{}
-	return engine.scriptExecMutexs[name]
-}
+
+//	func (engine *Engine) GetScriptMuxByName(name string) *sync.Mutex {
+//		engine.scriptExecMutexsLock.Lock()
+//		defer engine.scriptExecMutexsLock.Unlock()
+//		if v, ok := engine.scriptExecMutexs[name]; ok {
+//			return v
+//		}
+//		engine.scriptExecMutexs[name] = &sync.Mutex{}
+//		return engine.scriptExecMutexs[name]
+//	}
 func (engine *Engine) RegisterBuildInMethodHook(name string, hook func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)) {
 	engine.buildInMethodHook[name] = hook
 }
 func (engine *Engine) UnRegisterBuildInMethodHook(name string) {
 	delete(engine.buildInMethodHook, name)
 }
-func (engine *Engine) SetAutoLoadDependencies(autoLoad bool) {
-	engine.autoLoadDependencies = autoLoad
-}
-func (e *Engine) MarkScriptIsLoaded(scriptName string) {
-	e.loadedScriptsLock.Lock()
-	defer e.loadedScriptsLock.Unlock()
-	e.loadedScripts[scriptName] = struct{}{}
-}
-func (e *Engine) IsScriptLoaded(scriptName string) bool {
-	e.loadedScriptsLock.Lock()
-	defer e.loadedScriptsLock.Unlock()
-	_, ok := e.loadedScripts[scriptName]
-	return ok
-}
+
+//	func (e *Engine) MarkScriIsLoadptIsLoaded(scriptName string) {
+//		e.loadedScriptsLock.Lock()
+//		defer e.loadedScriptsLock.Unlock()
+//		e.loadedScripts[scriptName] = struct{}{}
+//	}
+//
+//	func (e *Engine) IsScriptLoaded(scriptName string) bool {
+//		e.loadedScriptsLock.Lock()
+//		defer e.loadedScriptsLock.Unlock()
+//		_, ok := e.loadedScripts[scriptName]
+//		return ok
+//	}
 func (engine *Engine) SetProxies(proxies ...string) {
 	engine.proxies = proxies
 }
@@ -198,7 +195,8 @@ func (e *Engine) SafeRunFile(path string) (err error) {
 	return e.RunFile(path)
 }
 func (e *Engine) RunScript(script *NaslScriptInfo) error {
-	return script.Run(e)
+	e.logger.Debugf("Running script %s", script.OriginFileName)
+	return e.safeEvalWithFileName(script.Script, script.OriginFileName)
 }
 
 func (e *Engine) EvalInclude(name string) error {
@@ -214,7 +212,7 @@ func (e *Engine) EvalInclude(name string) error {
 		data, err := embed.Asset("data/nasl-incs/" + name)
 		if err != nil {
 			err = utils.Errorf("not found include file: %s", name)
-			log.Error(err)
+			e.logger.Error(err)
 			return err
 		}
 		sourceBytes = data
@@ -263,9 +261,9 @@ func (e *Engine) Eval(code string) error {
 	defer func() {
 		if err := recover(); err != nil {
 			if v, ok := err.(*yakvm.VMPanicSignal); ok {
-				log.Infof("script [%s] exit with value: %v", e.scriptObj.OriginFileName, v.Info)
+				e.logger.Infof("script [%s] exit with value: %v", e.scriptObj.OriginFileName, v.Info)
 				if e.debug {
-					log.Infof("script additional info: %v", v.AdditionalInfo)
+					e.logger.Infof("script additional info: %v", v.AdditionalInfo)
 				}
 			} else {
 				panic(err)
