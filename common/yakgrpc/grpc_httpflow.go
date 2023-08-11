@@ -54,16 +54,16 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 	return flow.ToGRPCModelFull()
 }
 
-func (s *Server) QueryHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequest) (*ypb.HTTPFlows, error) {
+func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequest) (*ypb.HTTPFlows, error) {
 	db := s.GetProjectDatabase()
 	var full []*ypb.HTTPFlow
 	for _, group := range funk.ChunkInt64s(r.Ids, 10) {
 		var g []*yakit.HTTPFlow
-		if resultHandler := bizhelper.QueryIntegerInArrayInt64(db, "id", group).Find(&g); resultHandler.Error != nil {
+		if db = db.Where("id in (?)", group).Find(&g); db.Error != nil {
 			continue
 		}
 		for _, flow := range g {
-			r, _ := flow.ToGRPCModel()
+			r, _ := flow.ToGRPCModel(true)
 			if r != nil {
 				full = append(full, r)
 			}
@@ -83,7 +83,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	})
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModel()
+		m, err := r.ToGRPCModel(req.Full)
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
@@ -251,18 +251,18 @@ func (s *Server) GetResponseBodyByHTTPFlowID(ctx context.Context, req *ypb.Downl
 }
 
 func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequest) (*ypb.HTTPFlowsShareResponse, error) {
-	if req.GetIds() == nil || req.Module == "" ||  req.ExpiredTime == 0{
+	if req.GetIds() == nil || req.Module == "" || req.ExpiredTime == 0 {
 		return nil, utils.Error("params empty")
 	}
 
 	type HTTPFlowShare struct {
 		*yakit.HTTPFlow
-		ExtractedList []*yakit.ExtractedData
+		ExtractedList      []*yakit.ExtractedData
 		WebsocketFlowsList []*yakit.WebsocketFlowShare
 	}
 	var (
-		data []HTTPFlowShare
-	    extractedData []*yakit.ExtractedData
+		data               []HTTPFlowShare
+		extractedData      []*yakit.ExtractedData
 		websocketFlowsData []*yakit.WebsocketFlowShare
 	)
 
@@ -319,22 +319,22 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 			//Request:            request,
 			//Response:           response,
 			Request:           httpFlow.Request,
-			Response:           httpFlow.Response,
-			GetParamsTotal:     httpFlow.GetParamsTotal,
-			PostParamsTotal:    httpFlow.PostParamsTotal,
-			CookieParamsTotal:  httpFlow.CookieParamsTotal,
-			IPAddress:          httpFlow.IPAddress,
-			RemoteAddr:         httpFlow.RemoteAddr,
-			IPInteger:          httpFlow.IPInteger,
-			Tags:               httpFlow.Tags,
-			IsWebsocket:        httpFlow.IsWebsocket,
-			WebsocketHash:      httpFlow.WebsocketHash,
+			Response:          httpFlow.Response,
+			GetParamsTotal:    httpFlow.GetParamsTotal,
+			PostParamsTotal:   httpFlow.PostParamsTotal,
+			CookieParamsTotal: httpFlow.CookieParamsTotal,
+			IPAddress:         httpFlow.IPAddress,
+			RemoteAddr:        httpFlow.RemoteAddr,
+			IPInteger:         httpFlow.IPInteger,
+			Tags:              httpFlow.Tags,
+			IsWebsocket:       httpFlow.IsWebsocket,
+			WebsocketHash:     httpFlow.WebsocketHash,
 		}
 		data = append(data, HTTPFlowShare{
-			HTTPFlow: httpFlowShare ,
+			HTTPFlow:           httpFlowShare,
 			ExtractedList:      extractedData,
 			WebsocketFlowsList: websocketFlowsData,
-		} )
+		})
 	}
 	shareContent, err := json.Marshal(data)
 	if err != nil {
@@ -358,7 +358,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	}
 	type HTTPFlowShare struct {
 		*yakit.HTTPFlow
-		ExtractedList []*yakit.ExtractedData
+		ExtractedList      []*yakit.ExtractedData
 		WebsocketFlowsList []*yakit.WebsocketFlowShare
 	}
 	var (
@@ -403,7 +403,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 			}
 		}
 
-		for _, v := range data.ExtractedList{
+		for _, v := range data.ExtractedList {
 			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &yakit.ExtractedData{
 				SourceType:  v.SourceType,
 				TraceId:     v.TraceId,
@@ -419,7 +419,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 
 		for _, v := range data.WebsocketFlowsList {
 			if db1 := s.GetProjectDatabase().Create(&yakit.WebsocketFlow{
-				WebsocketRequestHash:      v.WebsocketRequestHash,
+				WebsocketRequestHash: v.WebsocketRequestHash,
 				FrameIndex:           v.FrameIndex,
 				FromServer:           v.FromServer,
 				QuotedData:           string(v.QuotedData),

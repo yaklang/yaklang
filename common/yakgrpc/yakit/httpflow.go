@@ -222,8 +222,8 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 	return p
 }
 
-func (f *HTTPFlow) ToGRPCModel() (*ypb.HTTPFlow, error) {
-	return f.toGRPCModel(false)
+func (f *HTTPFlow) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
+	return f.toGRPCModel(full)
 }
 
 func (f *HTTPFlow) ToGRPCModelFull() (*ypb.HTTPFlow, error) {
