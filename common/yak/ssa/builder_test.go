@@ -243,14 +243,14 @@ b1[1] += 1
 		ir := `
 yak-main
 entry0:
-	t0 = Interface []int [1, 1]
-	t1 = Interface []int [0, 0]
-	t2 = t0 field[1]
-	update [t2] = 1
-	t4 = t2 add 2
-	t5 = t2 add 2
-	t6 = t2 add 1
-	update [t2] = t6
+	<[]int64> t0 = Interface []int64 [<int64> 1, <int64> 1]
+	<[]int64> t1 = Interface []int64 [<int64> 0, <int64> 0]
+	<int64> t2 = <[]int64> t0 field[<int64> 1]
+	update [<int64> t2] = <int64> 1
+	<int64> t4 = <int64> t2 add <int64> 2
+	<int64> t5 = <int64> t2 add <int64> 2
+	<int64> t6 = <int64> t2 add <int64> 1
+	update [<int64> t2] = <int64> t6
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
@@ -464,8 +464,8 @@ loop.body2: <- loop.header1
 loop.exit3: <- loop.header1 if.true8
 	jump -> b11
 loop.latch4: <- b9 b10
-	t10 = phi [t3, b9] [t17, b10]
-	t8 = t4 add 1
+	<int64> t10 = phi [<int64> t3, b9] [<int64> t17, b10]
+	<int64> t8 = <int64> t4 add <int64> 1
 	jump -> loop.header1
 if.done5: <- loop.body2
 	jump -> b10
@@ -605,15 +605,15 @@ if.true2: <- entry0
 if.false3: <- entry0 
         jump -> if.done1
 b4: <- if.done1
-        t9 = t6 add t2
-        t10 = yak-main-symbol field[cadd]
-        t11 = call yak-main$2 () [t10]
-        t12 = t10 add 1
-        t13 = yak-main-symbol field[ca]
-        t14 = call yak-main$3 (1, 2, 3) [t13, yak-main$1, 11]
-        t15 = t14 add 13
-        t16 = call yak-main$4 (1, 2, 3) [yak-main$1, 11]
-        t17 = t16 add 13
+		<int64> t9 = <int64> t6 add <int64> t2
+		<int64> t10 = yak-main-symbol field[<string> cadd]
+		<untyped nil> t11 = call <> yak-main$2 () [<int64> t10]
+		<int64> t12 = <int64> t10 add <int64> 1
+		<int64> t13 = yak-main-symbol field[<string> ca]
+		<int64> t14 = call <> yak-main$3 (<int64> 1, <int64> 2, <int64> 3) [<int64> t13, <> yak-main$1, <int64> 11]
+		<int64> t15 = <int64> t14 add <int64> 13
+		<int64> t16 = call <> yak-main$4 (<int64> 1, <int64> 2, <int64> 3) [<> yak-main$1, <int64> 11]
+		<int64> t17 = <int64> t16 add <int64> 13
 			`,
 			`
 yak-main$1 arg1
@@ -638,11 +638,11 @@ b4: <- if.done1
 			`
 yak-main$2
 parent: yak-main
-pos:  36:6   -  36:20 : ()=>{cadd++}
-freeValue: t0
+pos:  37:6   -  37:20 : ()=>{cadd++}
+freeValue: <int64> t0
 entry0:
-        t1 = t0 add 1
-        update [t0] = t1
+        <int64> t1 = <int64> t0 add <int64> 1
+        update [<int64> t0] = <int64> t1
 			`,
 			`
 yak-main$3 pc1, pc2, pc3

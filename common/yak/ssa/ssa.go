@@ -79,6 +79,9 @@ type User interface {
 	AddValue(Value)
 
 	ReplaceValue(Value, Value)
+
+	// inference type
+	InferenceType()
 }
 
 type Instruction interface {
@@ -137,7 +140,7 @@ type Function struct {
 	// package
 	Package *Package
 
-	Param []*Parameter
+	Param  []*Parameter
 	Return []*Return
 
 	// BasicBlock list
@@ -149,7 +152,7 @@ type Function struct {
 	AnonFuncs []*Function
 
 	// if this function is anonFunc
-	parent *Function // parent function if anonymous function; nil if global function.
+	parent     *Function  // parent function if anonymous function; nil if global function.
 	FreeValues []Value    // the value, captured variable form parent-function,
 	symbol     *Interface // for function symbol table
 
@@ -369,7 +372,7 @@ type Field struct {
 type Update struct {
 	anInstruction
 	value   Value
-	address User
+	address *Field
 }
 
 type FunctionAsmFlag int
@@ -491,11 +494,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		} else {
 			insts := make([]string, 0, len(b.Instrs)+len(b.Phis))
 			pos := make([]string, 0, len(b.Instrs)+len(b.Phis))
-		for _, p := range b.Phis {
+			for _, p := range b.Phis {
 				insts = append(insts, handlerInst(p))
 				pos = append(pos, p.Pos())
-		}
-		for _, i := range b.Instrs {
+			}
+			for _, i := range b.Instrs {
 				insts = append(insts, handlerInst(i))
 				pos = append(pos, i.Pos())
 			}
