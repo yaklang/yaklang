@@ -58,6 +58,12 @@ type Node interface {
 	GetValues() []Value
 }
 
+func GetTypeStr(n Node) string {
+	return fmt.Sprintf(
+		"<%s> ", n.GetType(),
+	)
+}
+
 type Value interface {
 	Node
 
@@ -100,13 +106,14 @@ type Instruction interface {
 
 func DefaultValueString(v Node) string {
 	op := ""
+	op += GetTypeStr(v)
 	switch v := v.(type) {
 	case Instruction:
-		op = "t0"
+		op += "t0"
 	case *Const:
-		op = v.String()
+		op += v.String()
 	case *Parameter:
-		op = v.String()
+		op += v.String()
 	default:
 		panic("instruction unknow value type: " + v.String())
 	}
@@ -389,7 +396,7 @@ func (f *Function) String() string {
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.name + " "
 	ret += strings.Join(
-		lo.Map(f.Param, func(item *Parameter, _ int) string { return item.variable }),
+		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.variable }),
 		", ")
 	ret += "\n"
 
@@ -414,6 +421,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	// print instruction
 	getStr := func(v Node) string {
 		op := ""
+		op += GetTypeStr(v)
 		switch v := v.(type) {
 		case Instruction:
 			if i, ok := v.(*Interface); ok {
@@ -422,17 +430,18 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				}
 			}
 			if name, ok := instReg[v]; ok {
-				op = name
+				op += name
 			} else {
-				op = newName()
-				instReg[v] = op
+				name := newName()
+				op += name
+				instReg[v] = name
 			}
 		case *Const:
-			op = v.String()
+			op += v.String()
 		case *Parameter:
-			op = v.String()
+			op += v.String()
 		case *Function:
-			op = v.name
+			op += v.name
 		default:
 			panic("instruction unknow value type: " + v.String())
 		}
@@ -447,7 +456,6 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
-
 	setInst := func(i Instruction) {
 		if _, ok := instReg[i]; !ok {
 			instReg[i] = newName()
