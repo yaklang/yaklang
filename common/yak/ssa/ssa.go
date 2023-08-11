@@ -13,6 +13,36 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+type Type types.Type
+type Types []Type
+
+// return true  if org != typs
+// return false if org == typs
+func (org Types) Compare(typs Types) bool {
+	if len(org) == 0 && len(typs) != 0 {
+		return true
+	}
+	return slices.CompareFunc(org, typs, func(org, typ Type) int {
+		if types.Identical(org, typ) {
+			return 0
+		}
+		return 1
+	}) != 0
+}
+
+func (t Types) String() string {
+	return strings.Join(
+		lo.Map(t, func(typ Type, _ int) string {
+			if typ == nil {
+				return "nil"
+			} else {
+				return typ.String()
+			}
+		}),
+		", ",
+	)
+}
+
 var (
 	ConstMap = make(map[any]*Const)
 )
@@ -168,7 +198,7 @@ type anInstruction struct {
 	// basicblock
 	Block *BasicBlock
 	// type
-	typ types.Type
+	typs Types
 
 	// source code position
 	pos *Position
@@ -191,7 +221,7 @@ type Phi struct {
 type Const struct {
 	user  []User
 	value any
-	typ   types.Type
+	typ   Types
 	str   string
 }
 
@@ -201,6 +231,7 @@ type Parameter struct {
 	variable    string
 	Func        *Function
 	isFreevalue bool
+	typs        Types
 
 	user []User
 }
@@ -542,8 +573,9 @@ func NewConst(i any) *Const {
 		// build new const
 		typestr := reflect.TypeOf(i).String()
 		c = &Const{
+			user:  make([]User, 0),
 			value: i,
-			typ:   basicTypes[typestr],
+			typ:   Types{basicTypes[typestr]},
 			str:   fmt.Sprintf("%v", i),
 		}
 		// const should same
@@ -597,7 +629,6 @@ func (i *If) StringByFunc(getStr func(Node) string) string {
 }
 
 var _ Node = (*If)(nil)
-var _ Value = (*If)(nil)
 var _ User = (*If)(nil)
 var _ Instruction = (*If)(nil)
 
@@ -696,7 +727,7 @@ func (i *Interface) StringByFunc(Str func(Node) string) string {
 	} else {
 		return fmt.Sprintf(
 			"%s = Interface %s [%s, %s]",
-			Str(i), i.typ, Str(i.Len), Str(i.Cap),
+			Str(i), i.typs, Str(i.Len), Str(i.Cap),
 		)
 	}
 }

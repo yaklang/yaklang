@@ -5,6 +5,8 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 		anInstruction: anInstruction{
 			Func:  f,
 			Block: block,
+			typs:  make(Types, 0),
+			pos:   &Position{},
 		},
 		Edge:     make([]Value, 0, len(block.Preds)),
 		user:     make([]User, 0),

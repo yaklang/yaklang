@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"go/types"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,11 @@ var (
 func init() {
 	for _, basic := range types.Typ {
 		basicTypes[basic.Name()] = basic
+	}
+	if strings.Contains(runtime.GOARCH, "64") {
+		basicTypes["int"] = basicTypes["int64"]
+	} else {
+		basicTypes["int"] = basicTypes["int32"]
 	}
 }
 
