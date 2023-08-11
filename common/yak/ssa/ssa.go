@@ -66,6 +66,8 @@ type Value interface {
 	GetUsers() []User
 	AddUser(User)
 	RemoveUser(User)
+
+	SetType(Types)
 }
 
 type User interface {
@@ -517,6 +519,8 @@ func (f *Function) GetType() Types {
 	return nil
 }
 
+func (f *Function) SetType(ts Types) {
+}
 
 var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
@@ -536,6 +540,8 @@ func (b *BasicBlock) GetType() Types {
 	return nil
 }
 
+func (b *BasicBlock) SetType(ts Types) {
+}
 
 var _ Node = (*BasicBlock)(nil)
 var _ Value = (*BasicBlock)(nil)
@@ -563,6 +569,9 @@ func (a *anInstruction) GetType() Types {
 	return a.typs
 }
 
+func (a *anInstruction) SetType(ts Types) {
+	a.typs = ts
+}
 
 // ----------- Phi
 func (p *Phi) String() string {
@@ -617,6 +626,10 @@ func (c Const) GetType() Types {
 	return c.typ
 }
 
+func (c *Const) SetType(ts Types) {
+	c.typ = ts
+}
+
 var _ Node = (*Const)(nil)
 var _ Value = (*Const)(nil)
 
@@ -628,6 +641,9 @@ func (p *Parameter) GetType() Types {
 	return p.typs
 }
 
+func (p *Parameter) SetType(ts Types) {
+	p.typs = ts
+}
 
 var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
