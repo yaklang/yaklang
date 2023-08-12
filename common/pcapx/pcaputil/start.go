@@ -5,20 +5,36 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/tcpassembly"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
+	"time"
 )
 
 type Config struct {
 	Device    []string
 	BPFFilter string
 	Context   context.Context
+	Assembler *tcpassembly.Assembler
 }
 
 func (c *Config) packetHandler(ctx context.Context, packet gopacket.Packet) {
-	fmt.Println(packet.String())
+	if c.Assembler != nil {
+		ret, isOk := packet.TransportLayer().(*layers.TCP)
+		if isOk && ret != nil {
+			var ts time.Time
+			if packet.Metadata() != nil {
+				ts = packet.Metadata().Timestamp
+			} else {
+				ts = time.Now()
+			}
+			c.Assembler.AssembleWithTimestamp(ret.TransportFlow(), ret, ts)
+		}
+	}
+	// fmt.Println(packet.String())
 }
 
 func NewDefaultConfig() *Config {
@@ -42,6 +58,7 @@ func _open(ctx context.Context, dev string, bpf string, packetEntry func(context
 	}
 
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,6 +113,12 @@ func Start(opt ...Option) error {
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
 	defer cancel()
+
+	// create stream factory and pool
+	streamFactory := &StreamFactory{}
+	streamPool := tcpassembly.NewStreamPool(streamFactory)
+	assembler := tcpassembly.NewAssembler(streamPool)
+	conf.Assembler = assembler
 
 	var wg = new(sync.WaitGroup)
 	for _, i := range devs {
