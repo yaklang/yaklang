@@ -74,21 +74,6 @@ func (c *Client) CheckInitializeResponse(t *testing.T, m dap.Message) *dap.Initi
 	return r
 }
 
-func (c *Client) ExpectTerminateEvent(t *testing.T) *dap.TerminatedEvent {
-	t.Helper()
-	m := c.ExpectMessage(t)
-	return c.CheckTerminateEvent(t, m)
-}
-
-func (c *Client) CheckTerminateEvent(t *testing.T, m dap.Message) *dap.TerminatedEvent {
-	t.Helper()
-	r, ok := m.(*dap.TerminatedEvent)
-	if !ok {
-		t.Fatalf("got %#v, want *dap.TerminatedEvent", m)
-	}
-	return r
-}
-
 func (c *Client) ExpectInitializedEvent(t *testing.T) *dap.InitializedEvent {
 	t.Helper()
 	m := c.ExpectMessage(t)

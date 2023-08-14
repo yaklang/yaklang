@@ -389,6 +389,8 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 
 		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'help' for help info.\n", consts.GetYakVersion()))
 	} else {
+		// 等待launch完成
+		ds.LaunchWg.Wait()
 		// 等待调试器初始化完成
 		ds.debugger.WaitInit()
 
@@ -399,6 +401,8 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 }
 
 func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
+	// 等待launch完成
+	ds.LaunchWg.Wait()
 	// 等待调试器初始化完成
 	ds.debugger.WaitInit()
 

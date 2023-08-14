@@ -15,22 +15,67 @@ var (
 	StopOnEntry = true
 )
 
+type onBreakpoint struct {
+	execute    func()
+	disconnect bool
+	terminated bool
+}
+
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func runTest(t *testing.T, name string, generateFunc GernerateFuncTyp, test func(s *DAPServer, c *Client, program string)) {
+func runTest(t *testing.T, name string, filepath string, test func(s *DAPServer, c *Client, program string)) {
 	serverStopped := make(chan struct{})
 
 	server, _ := startDAPServer(t, serverStopped)
 	client := NewTestClient(server.listener.Addr().String())
 	defer client.Close()
 
-	tc, removeFunc := generateFunc()
-	defer removeFunc()
+	filepath = GetYakTestCasePath(filepath)
 
-	test(server, client, tc)
+	test(server, client, filepath)
 	<-serverStopped
+}
+
+func runDebugSessionWithBPs(t *testing.T, client *Client, cmdRequest func(), source string, breakpoints []int, onBPs []onBreakpoint) {
+	client.InitializeRequest()
+	client.ExpectInitializeResponseAndCapabilities(t)
+
+	cmdRequest()
+	client.ExpectInitializedEvent(t)
+	client.ExpectLaunchResponse(t)
+	if source != "" {
+		client.SetBreakpointsRequest(source, breakpoints)
+		client.ExpectSetBreakpointsResponse(t)
+	}
+
+	disconnect := func() {
+		client.DisconnectRequest()
+		client.ExpectOutputEventDetaching(t)
+		client.ExpectDisconnectResponse(t)
+		client.ExpectTerminatedEvent(t)
+	}
+
+	client.ConfigurationDoneRequest()
+	client.ExpectConfigurationDoneResponse(t)
+
+	for _, onBP := range onBPs {
+		client.ExpectStoppedEvent(t)
+		onBP.execute()
+		if onBP.disconnect {
+			disconnect()
+			return
+		}
+		client.ContinueRequest(1)
+		client.ExpectContinueResponse(t)
+	}
+
+	client.ExpectTerminatedEvent(t) // Let the program run to completion
+
+	disconnect()
+	client.ExpectDisconnectResponse(t)
+	client.ExpectTerminatedEvent(t)
 }
 
 func startDAPServer(t *testing.T, serverStopped chan struct{}) (server *DAPServer, forceStop chan struct{}) {
@@ -256,10 +301,13 @@ func TestStopWithTarget(t *testing.T) {
 		"disconnect_after_exit": func(c *Client, forceStop chan struct{}) {
 			c.ContinueRequest(1)
 			c.ExpectContinueResponse(t)
+
+			c.ExpectTerminatedEvent(t) // program finished, recv terminated event
+
 			c.DisconnectRequest()
 			c.ExpectOutputEventDetaching(t)
 			c.ExpectDisconnectResponse(t)
-			c.ExpectTerminateEvent(t)
+			c.ExpectTerminatedEvent(t)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -270,10 +318,9 @@ func TestStopWithTarget(t *testing.T) {
 
 			client.InitializeRequest()
 			client.ExpectInitializeResponseAndCapabilities(t)
-			tc, removeFunc := GenerateSimpleYakTestCase()
-			defer removeFunc()
+			tc := GetYakTestCasePath(SimpleYakTestCase)
 
-			client.LaunchRequest("debug", tc, StopOnEntry)
+			client.LaunchRequest("exec", tc, StopOnEntry)
 			client.ExpectInitializedEvent(t)
 			client.ExpectLaunchResponse(t)
 
@@ -291,8 +338,7 @@ func TestForceStopWhileStopping(t *testing.T) {
 
 	client.InitializeRequest()
 	client.ExpectInitializeResponseAndCapabilities(t)
-	tc, removeFunc := GenerateSimpleYakTestCase()
-	defer removeFunc()
+	tc := GetYakTestCasePath(SimpleYakTestCase)
 
 	client.LaunchRequest("exec", tc, StopOnEntry)
 	client.ExpectInitializedEvent(t)
@@ -304,7 +350,7 @@ func TestForceStopWhileStopping(t *testing.T) {
 }
 
 func TestLaunchStopOnEntry(t *testing.T) {
-	runTest(t, "stopOnEntry", GenerateSimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
+	runTest(t, "stopOnEntry", SimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
 		// 1 >> initialize, << initialize
 		client.InitializeRequest()
 		initResp := client.ExpectInitializeResponseAndCapabilities(t)
@@ -424,7 +470,7 @@ func TestLaunchStopOnEntry(t *testing.T) {
 }
 
 func TestLaunchContinueOnEntry(t *testing.T) {
-	runTest(t, "continueOnEntry", GenerateSimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
+	runTest(t, "continueOnEntry", SimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
 		// 1 >> initialize, << initialize
 		client.InitializeRequest()
 		initResp := client.ExpectInitializeResponseAndCapabilities(t)
@@ -491,7 +537,7 @@ func TestLaunchContinueOnEntry(t *testing.T) {
 }
 
 func TestPreSetBreakPoint(t *testing.T) {
-	runTest(t, "PreSetBreakPoint", GenerateFuncCallYakTestCase, func(server *DAPServer, client *Client, program string) {
+	runTest(t, "PreSetBreakPoint", FuncCallTestcase, func(server *DAPServer, client *Client, program string) {
 		client.InitializeRequest()
 		client.ExpectInitializeResponseAndCapabilities(t)
 
