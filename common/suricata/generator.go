@@ -1,28 +1,27 @@
-// Package surigen gen payload based on payload keywords
-package surigen
+package suricata
 
 import (
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/log"
 	"math"
 	"strconv"
 	"strings"
 )
 
 type PayloadGen struct {
-	Modifiers []Modifier
+	Modifiers []ByteMapModifier
 	Len       int
 }
 
 type Surigen struct {
-	rules []*suricata.ContentRule
-	gen   map[suricata.Modifier]*PayloadGen
+	rules []*ContentRule
+	gen   map[Modifier]*PayloadGen
 }
 
-func NewSurigen(contentRules []*suricata.ContentRule) (*Surigen, error) {
+func NewSurigen(contentRules []*ContentRule) (*Surigen, error) {
 	g := &Surigen{
 		rules: contentRules,
-		gen:   make(map[suricata.Modifier]*PayloadGen),
+		gen:   make(map[Modifier]*PayloadGen),
 	}
 	err := g.parse()
 	if err != nil {
@@ -31,8 +30,8 @@ func NewSurigen(contentRules []*suricata.ContentRule) (*Surigen, error) {
 	return g, nil
 }
 
-func (g *Surigen) Gen() (map[suricata.Modifier][]byte, error) {
-	output := make(map[suricata.Modifier][]byte)
+func (g *Surigen) Gen() (map[Modifier][]byte, error) {
+	output := make(map[Modifier][]byte)
 	for k, payload := range g.gen {
 		bm := NewByteMap(payload.Len)
 		for i := 0; i < len(payload.Modifiers); i++ {
@@ -61,7 +60,19 @@ func (g *Surigen) parse() error {
 		case rule.Negative:
 			// ignore
 		case rule.PCRE != "":
-			// waiting for package suricata to implement it.
+			// PCRE
+			pcre, err := ParsePCREStr(rule.PCRE)
+			if err != nil {
+				log.Warnf("parse pcre rule failed:%v", err)
+				continue
+			}
+			generator, err := pcre.Generator()
+			if err != nil {
+				log.Warnf("new regexp generator from rule failed:%v", err)
+			}
+			g.gen[generator.modifier].Modifiers = append(g.gen[generator.modifier].Modifiers,
+				&RegexpModifier{generator},
+			)
 		case rule.StartsWith:
 			cm = &ContentModifier{
 				NoCase:  rule.Nocase,
@@ -168,6 +179,8 @@ func (g *Surigen) parse() error {
 				if m.Offset+len(m.Content) > payload.Len || m.Relative {
 					payload.Len += m.Offset + len(m.Content)
 				}
+			case *RegexpModifier:
+				payload.Len += len(m.Generator.Generate())
 			}
 		}
 		payload.Len = 1 << (math.Ilogb(float64(payload.Len+1)) + 1)

@@ -170,7 +170,11 @@ func TestPCRE(t *testing.T) {
 	if err != nil {
 		return
 	}
-	matches := pcre.Match([]byte("abc abc ab"))
+	matcher, err := pcre.Matcher()
+	if err != nil {
+		return
+	}
+	matches := matcher.Match([]byte("abc abc ab"))
 	_ = matches
 	assert.Equal(t, 3, len(matches), "match failed")
 	assert.Equal(t, matched{pos: 0, len: 3}, matches[0], "match failed")
