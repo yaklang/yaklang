@@ -2,6 +2,8 @@ package dap
 
 import (
 	"net"
+	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -111,6 +113,101 @@ func checkScope(t *testing.T, got *dap.ScopesResponse, i int, name string, varRe
 	if goti.Name != name || (varRef >= 0 && goti.VariablesReference != varRef) || goti.Expensive {
 		t.Errorf("\ngot  %#v\nwant Name=%q VariablesReference=%d Expensive=false", goti, name, varRef)
 	}
+}
+
+func checkChildren(t *testing.T, got *dap.VariablesResponse, parentName string, numChildren int) {
+	t.Helper()
+	if got.Body.Variables == nil {
+		t.Errorf("\ngot  %s children=%#v want []", parentName, got.Body.Variables)
+	}
+	if len(got.Body.Variables) != numChildren {
+		t.Errorf("\ngot  len(%s)=%d (children=%#v)\nwant len=%d", parentName, len(got.Body.Variables), got.Body.Variables, numChildren)
+	}
+}
+
+func checkVar(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, useExactMatch, hasRef bool, indexed, named int) (ref int) {
+	t.Helper()
+	if len(got.Body.Variables) <= i {
+		t.Errorf("\ngot  len=%d (children=%#v)\nwant len>%d", len(got.Body.Variables), got.Body.Variables, i)
+		return
+	}
+	if i < 0 {
+		for vi, v := range got.Body.Variables {
+			if v.Name == name {
+				i = vi
+				break
+			}
+		}
+	}
+	if i < 0 {
+		t.Errorf("\ngot  %#v\nwant Variables[i].Name=%q (not found)", got, name)
+		return 0
+	}
+
+	goti := got.Body.Variables[i]
+	matchedName := false
+	if useExactMatch {
+		matchedName = (goti.Name == name)
+	} else {
+		matchedName, _ = regexp.MatchString(name, goti.Name)
+	}
+	if !matchedName || (goti.VariablesReference > 0) != hasRef {
+		t.Errorf("\ngot  %#v\nwant Name=%q hasRef=%t", goti, name, hasRef)
+	}
+	matchedEvalName := false
+	if useExactMatch {
+		matchedEvalName = (goti.EvaluateName == evalName)
+	} else {
+		matchedEvalName, _ = regexp.MatchString(evalName, goti.EvaluateName)
+	}
+	if !matchedEvalName {
+		t.Errorf("\ngot  %q\nwant EvaluateName=%q", goti.EvaluateName, evalName)
+	}
+	matchedValue := false
+	if useExactMatch {
+		matchedValue = (goti.Value == value)
+	} else {
+		matchedValue, _ = regexp.MatchString(value, goti.Value)
+	}
+	if !matchedValue {
+		t.Errorf("\ngot  %s=%q\nwant %q", name, goti.Value, value)
+	}
+	matchedType := false
+	if useExactMatch {
+		matchedType = (goti.Type == typ)
+	} else {
+		matchedType, _ = regexp.MatchString(typ, goti.Type)
+	}
+	if !matchedType {
+		t.Errorf("\ngot  %s=%q\nwant %q", name, goti.Type, typ)
+	}
+	if indexed >= 0 && goti.IndexedVariables != indexed {
+		t.Errorf("\ngot  %s=%d indexed\nwant %d indexed", name, goti.IndexedVariables, indexed)
+	}
+	if named >= 0 && goti.NamedVariables != named {
+		t.Errorf("\ngot  %s=%d named\nwant %d named", name, goti.NamedVariables, named)
+	}
+	return goti.VariablesReference
+}
+
+func checkVarExact(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, hasRef bool) (ref int) {
+	t.Helper()
+	return checkVarExactIndexed(t, got, i, name, evalName, value, typ, hasRef, -1, -1)
+}
+
+func checkVarExactIndexed(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, hasRef bool, indexed, named int) (ref int) {
+	t.Helper()
+	return checkVar(t, got, i, name, evalName, value, typ, true, hasRef, indexed, named)
+}
+
+func checkVarRegex(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, hasRef bool) (ref int) {
+	t.Helper()
+	return checkVarRegexIndexed(t, got, i, name, evalName, value, typ, hasRef, -1, -1)
+}
+
+func checkVarRegexIndexed(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, hasRef bool, indexed, named int) (ref int) {
+	t.Helper()
+	return checkVar(t, got, i, name, evalName, value, typ, false, hasRef, indexed, named)
 }
 
 func TestStopNoCilent(t *testing.T) {
@@ -389,6 +486,101 @@ func TestLaunchContinueOnEntry(t *testing.T) {
 		if dResp.Seq != 0 || dResp.RequestSeq != 7 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=7", dResp)
 		}
+		client.ExpectTerminatedEvent(t)
+	})
+}
+
+func TestPreSetBreakPoint(t *testing.T) {
+	runTest(t, "PreSetBreakPoint", GenerateFuncCallYakTestCase, func(server *DAPServer, client *Client, program string) {
+		client.InitializeRequest()
+		client.ExpectInitializeResponseAndCapabilities(t)
+
+		client.LaunchRequest("exec", program, !StopOnEntry)
+		client.ExpectInitializedEvent(t)
+		client.ExpectLaunchResponse(t)
+
+		client.SetBreakpointsRequest(program, []int{2})
+		sResp := client.ExpectSetBreakpointsResponse(t)
+		if len(sResp.Body.Breakpoints) != 1 {
+			t.Errorf("got %#v, want len(Breakpoints)=1", sResp)
+		}
+		bkpt0 := sResp.Body.Breakpoints[0]
+		if !bkpt0.Verified || bkpt0.Line != 2 || bkpt0.Id != 1 || bkpt0.Source.Name != filepath.Base(program) || bkpt0.Source.Path != program {
+			t.Errorf("got breakpoints[0] = %#v, want Verified=true, Line=2, Id=1, Path=%q", bkpt0, program)
+		}
+
+		client.SetExceptionBreakpointsRequest()
+		client.ExpectSetExceptionBreakpointsResponse(t)
+
+		client.ConfigurationDoneRequest()
+		client.ExpectConfigurationDoneResponse(t)
+
+		client.ThreadsRequest()
+		// Since we are in async mode while running, we might receive messages in either order.
+		for i := 0; i < 2; i++ {
+			msg := client.ExpectMessage(t)
+			switch m := msg.(type) {
+			case *dap.ThreadsResponse:
+				// If the thread request arrived while the program was running, we expect to get the dummy response
+				// with a single goroutine "Current".
+				// If the thread request arrived after the stop, we should get the goroutine stopped at main.Increment.
+				if len(m.Body.Threads) != 1 {
+					t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", m)
+				}
+				if len(m.Body.Threads) < 1 || m.Body.Threads[0].Id != 0 || m.Body.Threads[0].Name != "[Yak 0] test" {
+					t.Errorf("\ngot  %#v\nwant Id=0, Name=\"[Yak 0] test\"", m.Body.Threads)
+				}
+			case *dap.StoppedEvent:
+				if m.Body.Reason != "breakpoint" || m.Body.ThreadId != 0 || !m.Body.AllThreadsStopped || m.Body.Description != "Trigger normal breakpoint at line 2 in test" {
+					t.Errorf("got %#v, want Body={Reason=\"breakpoint\", ThreadId=0, AllThreadsStopped=true}", m)
+				}
+			default:
+				t.Fatalf("got %#v, want ThreadsResponse or StoppedEvent", m)
+			}
+		}
+
+		client.StackTraceRequest(0, 0, 20)
+		stResp := client.ExpectStackTraceResponse(t)
+		if stResp.Body.TotalFrames != 2 {
+			t.Errorf("\ngot %#v\nwant TotalFrames=2", stResp.Body.TotalFrames)
+		}
+		checkFrame := func(got dap.StackFrame, id int, name string, sourceName string, line int) {
+			t.Helper()
+			if got.Id != id || got.Name != name {
+				t.Errorf("\ngot  %#v\nwant Id=%d Name=%s", got, id, name)
+			}
+			if (sourceName != "" && (got.Source == nil || got.Source.Name != sourceName)) || (line > 0 && got.Line != line) {
+				t.Errorf("\ngot  %#v\nwant Source.Name=%s Line=%d", got, sourceName, line)
+			}
+		}
+		checkFrame(stResp.Body.StackFrames[0], 1, "test", "", 2)
+		checkFrame(stResp.Body.StackFrames[1], 0, "global code", "", 7)
+
+		client.ScopesRequest(1)
+		scopes := client.ExpectScopesResponse(t)
+		if len(scopes.Body.Scopes) != 3 {
+			t.Errorf("\ngot  %#v\nwant len(Scopes)=3 (Locals)", scopes)
+		}
+		checkScope(t, scopes, 0, "Globals", 1) // varRef 从1开始
+		checkScope(t, scopes, 1, "Locals1", 2)
+		checkScope(t, scopes, 2, "Locals2", 3)
+
+		client.VariablesRequest(1) // 从varRef=1 即Globals作用于中获取变量
+		args := client.ExpectVariablesResponse(t)
+		checkChildren(t, args, "Globals", 3)
+		checkVarExact(t, args, 0, "a", "a", "1", "int", false)
+		checkVarExact(t, args, 1, "b", "b", "2", "int", false)
+
+		client.ContinueRequest(1)
+		ctResp := client.ExpectContinueResponse(t)
+		if !ctResp.Body.AllThreadsContinued {
+			t.Errorf("\ngot  %#v\nwant AllThreadsContinued=true", ctResp.Body)
+		}
+		client.ExpectTerminatedEvent(t)
+
+		client.DisconnectRequest()
+		client.ExpectOutputEventDetaching(t)
+		client.ExpectDisconnectResponse(t)
 		client.ExpectTerminatedEvent(t)
 	})
 }

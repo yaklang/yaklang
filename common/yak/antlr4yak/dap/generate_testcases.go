@@ -9,6 +9,8 @@ b=2`
 println("hello")	
 }
 
+a = 1
+b = a + 1
 test()`
 )
 
