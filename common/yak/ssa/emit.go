@@ -254,7 +254,7 @@ func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Inter
 	return f.emitInterface(i, i.typs[0], low, high, max, nil, nil)
 }
 
-func (f *Function) emitField(i *Interface, key Value) *Field {
+func (f *Function) emitField(i Value, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }
 
