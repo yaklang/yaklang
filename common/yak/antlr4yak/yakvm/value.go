@@ -353,6 +353,13 @@ func (v *Value) Type() reflect.Type {
 	return nil
 }
 
+func (v *Value) TypeStr() string {
+	if v.IsType() {
+		return "type"
+	}
+	return reflect.TypeOf(v.Value).String()
+}
+
 func (v *Value) IsType() bool {
 	_, ok := v.Value.(reflect.Type)
 	return ok
@@ -373,48 +380,12 @@ func (v *Value) Rangeable() bool {
 	return rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || v.IsInt64()
 }
 
-func (v *Value) GetVarRef() (int, bool) {
-	rv := reflect.ValueOf(v.Value)
-	rk := rv.Kind()
-	if rk == reflect.Ptr {
-		rv = rv.Elem()
-		rk = rv.Kind()
-	}
-	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || rk == reflect.Struct
-	if !ok {
-		return 0, false
-	}
-	return v.SymbolId, true
-}
-
 func (v *Value) GetIndexedVariableCount() int {
-	rv := reflect.ValueOf(v.Value)
-	rk := rv.Kind()
-	if rk == reflect.Ptr {
-		rv = rv.Elem()
-		rk = rv.Kind()
-	}
-	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Chan || rk == reflect.Map || rk == reflect.String
-	if !ok {
-		return 0
-	}
-
-	return rv.Len()
+	return GetIndexedVariableCount(v.Value)
 }
 
 func (v *Value) GetNamedVariableCount() int {
-	rv := reflect.ValueOf(v.Value)
-	rk := rv.Kind()
-	if rk == reflect.Ptr {
-		rv = rv.Elem()
-		rk = rv.Kind()
-	}
-	ok := rk == reflect.Struct
-	if !ok {
-		return 0
-	}
-
-	return rv.NumField()
+	return GetNamedVariableCount(v.Value)
 }
 
 func (v *Value) Callable() bool {
@@ -441,15 +412,20 @@ func (v *Value) AsString() string {
 	if v == nil {
 		return ""
 	}
-	s, ok := v.Value.(string)
-	if !ok {
-		raw, ok := v.Value.([]byte)
-		if !ok {
-			return v.String()
-		}
-		return string(raw)
+	switch s := v.Value.(type) {
+	case string:
+		return s
+	case []byte:
+		return string(s)
+	case []rune:
+		return string(s)
+	default:
+		return fmt.Sprintf("%v", s)
 	}
-	return s
+}
+
+func (v *Value) IsBytesOrRunes() bool {
+	return IsBytesOrRunes(v.Value)
 }
 
 func (v *Value) IsStringOrBytes() bool {
@@ -1116,4 +1092,47 @@ func NewValues(val []*Value) *Value {
 		TypeVerbose: "[]interface{}",
 		Value:       vars,
 	}
+}
+
+func GetIndexedVariableCount(v interface{}) int {
+	rv := reflect.ValueOf(v)
+	rk := rv.Kind()
+	if rk == reflect.Ptr {
+		rv = rv.Elem()
+		rk = rv.Kind()
+	}
+	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Chan || rk == reflect.Map || rk == reflect.String
+	if !ok {
+		return 0
+	}
+
+	return rv.Len()
+}
+
+func GetNamedVariableCount(v interface{}) int {
+	rv := reflect.ValueOf(v)
+	rk := rv.Kind()
+	if rk == reflect.Ptr {
+		rv = rv.Elem()
+		rk = rv.Kind()
+	}
+	if _, ok := v.(*Function); rk == reflect.Struct && !ok {
+		return rv.NumField()
+	} else if rk == reflect.Map && rv.Len() > 0 {
+		// len()
+		return 1
+	} else if IsBytesOrRunes(v) {
+		// string()
+		return 1
+	}
+	return 0
+}
+
+func IsBytesOrRunes(v interface{}) bool {
+	_, ok := v.([]byte)
+	if !ok {
+		_, ok := v.([]rune)
+		return ok
+	}
+	return ok
 }
