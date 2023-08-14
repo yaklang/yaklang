@@ -39,10 +39,9 @@ func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args [
 
 		ds.debugger = d
 		d.session = ds
-
-		// launch完成
-		ds.LaunchWg.Done()
 	}
+	// launch完成
+	ds.LaunchWg.Done()
 
 	// inject args in cli
 	yaklib.InjectCliArgs(args)
