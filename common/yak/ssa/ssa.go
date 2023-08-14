@@ -204,6 +204,9 @@ type Const struct {
 	value any
 	typ   Types
 	str   string
+
+	// other
+	Unary int
 }
 
 // parameter
@@ -578,6 +581,12 @@ var _ Instruction = (*Phi)(nil)
 
 // ----------- Const
 // create const
+
+func NewConstWithUnary(i any, un int) *Const {
+	c := NewConst(i)
+	c.Unary = un
+	return c
+}
 func NewConst(i any) *Const {
 	c, ok := ConstMap[i]
 	if !ok {
