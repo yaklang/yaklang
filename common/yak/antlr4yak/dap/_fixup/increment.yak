@@ -1,0 +1,12 @@
+func Increment(v) {
+	if v == 0 {
+		return 1
+	}
+	if v % 2 == 1 {
+		return 2 * Increment(v/2)
+	}
+	return v + 1
+}
+{
+	Increment(3)
+}
