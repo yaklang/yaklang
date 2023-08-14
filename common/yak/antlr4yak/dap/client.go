@@ -56,6 +56,12 @@ func (c *Client) InitializeRequest() {
 	c.send(request)
 }
 
+func (c *Client) PauseRequest(threadId int) {
+	request := &dap.PauseRequest{Request: *c.newRequest("pause")}
+	request.Arguments.ThreadId = threadId
+	c.send(request)
+}
+
 func (c *Client) LaunchRequest(mode, program string, stopOnEntry bool) {
 	request := &dap.LaunchRequest{Request: *c.newRequest("launch")}
 	request.Arguments = toRawMessage(map[string]interface{}{
