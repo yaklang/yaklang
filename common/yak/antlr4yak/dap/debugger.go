@@ -101,6 +101,19 @@ func (d *DAPDebugger) OutCallbackState() {
 	d.inCallback = false
 }
 
+func (d *DAPDebugger) Halt() error {
+	// 如果已经处在回调状态则直接返回
+	if d.inCallback {
+		return nil
+	}
+	if d.finished {
+		return errors.New("program finished")
+	}
+
+	d.debugger.Pause() // 设置Pause,在执行下一个opcode的时候会停止
+	return nil
+}
+
 func (d *DAPDebugger) Init() func(g *yakvm.Debugger) {
 	return func(g *yakvm.Debugger) {
 		log.Debug("[dap debugger] init")
