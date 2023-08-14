@@ -190,6 +190,14 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 		}
 	}
 
+	if r.URL.Scheme == "" {
+		if https {
+			r.URL.Scheme = "https"
+		} else {
+			r.URL.Scheme = "http"
+		}
+	}
+
 	var raw string
 	switch https {
 	case true:
