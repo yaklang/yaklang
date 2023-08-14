@@ -19,6 +19,38 @@ type Config struct {
 	BPFFilter string
 	Context   context.Context
 	Assembler *tcpassembly.Assembler
+	// output debug info
+	Debug bool
+}
+
+type CaptureOption func(*Config) error
+
+func WithBPFFilter(bpf string) CaptureOption {
+	return func(c *Config) error {
+		c.BPFFilter = bpf
+		return nil
+	}
+}
+
+func WithContext(ctx context.Context) CaptureOption {
+	return func(c *Config) error {
+		c.Context = ctx
+		return nil
+	}
+}
+
+func WithDebug(b bool) CaptureOption {
+	return func(c *Config) error {
+		c.Debug = b
+		return nil
+	}
+}
+
+func WithDevice(devs ...string) CaptureOption {
+	return func(c *Config) error {
+		c.Device = devs
+		return nil
+	}
 }
 
 func (c *Config) assemblyWithTS(flow gopacket.Flow, tcp *layers.TCP, ts time.Time) {
@@ -48,14 +80,15 @@ func (c *Config) packetHandler(ctx context.Context, packet gopacket.Packet) {
 			c.assemblyWithTS(ret.TransportFlow(), ret, ts)
 		}
 	}
-	fmt.Println(packet.String())
+
+	if c.Debug {
+		fmt.Println(packet.String())
+	}
 }
 
 func NewDefaultConfig() *Config {
 	return &Config{}
 }
-
-type Option func(*Config) error
 
 func _open(ctx context.Context, dev string, bpf string, packetEntry func(context.Context, gopacket.Packet)) error {
 	innerCtx, cancel := context.WithCancel(ctx)
@@ -87,7 +120,7 @@ func _open(ctx context.Context, dev string, bpf string, packetEntry func(context
 	}
 }
 
-func Start(opt ...Option) error {
+func Start(opt ...CaptureOption) error {
 	conf := NewDefaultConfig()
 	for _, i := range opt {
 		if err := i(conf); err != nil {

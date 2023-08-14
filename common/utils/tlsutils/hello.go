@@ -129,7 +129,7 @@ func ParseClientHello(data []byte) (*HandshakeClientHello, error) {
 		}
 		helloInfo = data[0:]
 	} else {
-		if len(helloInfo) <= 5 {
+		if len(data) <= 5 {
 			return nil, utils.Errorf("tls handshake client hello too short: %d", len(data))
 		}
 		helloInfo = data[5:]

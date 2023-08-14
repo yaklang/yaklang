@@ -105,6 +105,12 @@ func (r *ctxReader) Read(buf []byte) (int, error) {
 	c := make(chan ioret, 1)
 
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				// log.Errorf("recover: %v", err)
+			}
+		}()
+
 		n, err := r.r.Read(buf2)
 		c <- ioret{n, err}
 		close(c)
