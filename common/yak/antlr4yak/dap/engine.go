@@ -1,25 +1,29 @@
 package dap
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
+	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
-func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args []string) error {
+func (ds *DebugSession) RunProgramInDebugMode(request *dap.LaunchRequest, debug bool, program string, args []string) {
 	raw, err := os.ReadFile(program)
 	if err != nil {
-		return err
+		ds.sendErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
+			fmt.Sprintf("read file[%s] error: %v", program, err))
+		raw = []byte{}
 	}
 
 	var absPath = program
 	if !filepath.IsAbs(absPath) {
 		absPath, err = filepath.Abs(absPath)
 		if err != nil {
-			return errors.Wrap(err, "fetch abs file path failed")
+			ds.sendErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
+				fmt.Sprintf("get abs file path[%s] error: %v", program, err))
 		}
 	}
 
@@ -48,8 +52,7 @@ func (ds *DebugSession) RunProgramInDebugMode(debug bool, program string, args [
 
 	err = engine.ExecuteMain(string(raw), absPath)
 	if err != nil {
-		return err
+		ds.sendErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
+			fmt.Sprintf("run file[%s] error: %v", absPath, err))
 	}
-
-	return nil
 }
