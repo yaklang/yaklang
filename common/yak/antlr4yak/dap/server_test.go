@@ -578,6 +578,17 @@ func TestPreSetBreakPoint(t *testing.T) {
 		}
 		client.ExpectTerminatedEvent(t)
 
+		client.PauseRequest(1)
+		switch r := client.ExpectMessage(t).(type) {
+		case *dap.ErrorResponse:
+			if r.Message != "Unable to halt execution" {
+				t.Errorf("\ngot  %#v\nwant Message='Unable to halt execution'", r)
+			}
+		case *dap.PauseResponse:
+		default:
+			t.Fatalf("Unexpected response type: expect error or pause, got %#v", r)
+		}
+
 		client.DisconnectRequest()
 		client.ExpectOutputEventDetaching(t)
 		client.ExpectDisconnectResponse(t)
