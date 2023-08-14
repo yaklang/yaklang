@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,12 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io"
+	"sync/atomic"
 	"time"
 )
 
 // StreamFactory implements tcpassembly.StreamFactory
 type StreamFactory struct {
-	ctx context.Context
+	ctx         context.Context
+	activeCount int64
 }
 
 func NewStreamFactory(ctx context.Context) *StreamFactory {
@@ -36,7 +39,15 @@ func (f *StreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 		r:         tcpassembly.NewReaderStream(),
 	}
 	s.r.ReaderStreamOptions.LossErrors = true
+	atomic.AddInt64(&f.activeCount, 1)
+	netEpSrc, netEpDst := net.Endpoints()
+	vector := fmt.Sprintf("%v:%v -> %v:%v", netEpSrc.String(), transport.Src(), netEpDst.String(), transport.Dst())
 	go func() {
+		defer func() {
+			count := atomic.AddInt64(&f.activeCount, -1)
+			log.Infof("active stream %v closed, current count: %d", vector, count)
+		}()
+
 		reAssemblyReader := &(s.r)
 		var ctxReader = ctxio.NewReader(f.ctx, reAssemblyReader)
 		peekable := utils.NewPeekableReader(ctxReader)
@@ -79,20 +90,6 @@ func (f *StreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 		}
 	}()
 	return s
-}
-
-// run reads packets from the stream
-func (s *Stream) run() {
-	buf := make([]byte, 1024)
-	for {
-		n, err := s.r.Read(buf)
-		if err != nil {
-			// end of stream
-			return
-		}
-		// print data from the stream
-		log.Printf("%v: received %d bytes", s.net, n)
-	}
 }
 
 // Reassembled handles reassembled packets

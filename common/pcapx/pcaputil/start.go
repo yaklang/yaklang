@@ -8,7 +8,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil/tcpassembly"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
@@ -18,9 +17,14 @@ type Config struct {
 	Device    []string
 	BPFFilter string
 	Context   context.Context
-	Assembler *tcpassembly.Assembler
+
+	trafficPool *TrafficPool
+	//Assembler *tcpassembly.Assembler
+
 	// output debug info
 	Debug bool
+
+	//
 }
 
 type CaptureOption func(*Config) error
@@ -53,31 +57,37 @@ func WithDevice(devs ...string) CaptureOption {
 	}
 }
 
-func (c *Config) assemblyWithTS(flow gopacket.Flow, tcp *layers.TCP, ts time.Time) {
+func (c *Config) assemblyWithTS(flow gopacket.Flow, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
 		}
 	}()
-	if c.Assembler != nil {
-		if tcp.Payload == nil {
-			return
-		}
-		c.Assembler.AssembleWithTimestamp(flow, tcp, ts)
-	}
+	c.trafficPool.Feed(flow, networkLayer, tcp)
+	//if c.Assembler != nil {
+	//	if tcp.Payload == nil {
+	//		return
+	//	}
+	//	c.Assembler.AssembleWithTimestamp(flow, tcp, ts)
+	//}
 }
 
 func (c *Config) packetHandler(ctx context.Context, packet gopacket.Packet) {
-	if c.Assembler != nil {
-		ret, isOk := packet.TransportLayer().(*layers.TCP)
-		if isOk && ret != nil {
-			var ts time.Time
-			if packet.Metadata() != nil {
-				ts = packet.Metadata().Timestamp
-			} else {
-				ts = time.Now()
-			}
-			c.assemblyWithTS(ret.TransportFlow(), ret, ts)
+	ret, isOk := packet.TransportLayer().(*layers.TCP)
+	if isOk && ret != nil {
+		var ts time.Time
+		if packet.Metadata() != nil {
+			ts = packet.Metadata().Timestamp
+		} else {
+			ts = time.Now()
+		}
+
+		if netIPv4Layer, ipv4ok := packet.NetworkLayer().(*layers.IPv4); ipv4ok {
+			c.assemblyWithTS(netIPv4Layer.NetworkFlow(), netIPv4Layer, ret, ts)
+		} else if netIPv6Layer, ipv6ok := packet.NetworkLayer().(*layers.IPv6); ipv6ok {
+			c.assemblyWithTS(netIPv6Layer.NetworkFlow(), netIPv6Layer, ret, ts)
+		} else {
+			log.Warnf("unknown network layer: %v", packet.NetworkLayer())
 		}
 	}
 
@@ -162,10 +172,11 @@ func Start(opt ...CaptureOption) error {
 	defer cancel()
 
 	// create stream factory and pool
-	streamFactory := NewStreamFactory(ctx)
-	streamPool := tcpassembly.NewStreamPool(streamFactory)
-	assembler := tcpassembly.NewAssembler(streamPool)
-	conf.Assembler = assembler
+	//streamFactory := NewStreamFactory(ctx)
+	//streamPool := tcpassembly.NewStreamPool(streamFactory)
+	//assembler := tcpassembly.NewAssembler(streamPool)
+	// conf.Assembler = assembler
+	conf.trafficPool = NewTrafficPool(ctx)
 
 	var wg = new(sync.WaitGroup)
 	for _, i := range devs {
