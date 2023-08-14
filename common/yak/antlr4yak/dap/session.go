@@ -307,7 +307,7 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 
 	// 等待launch
 	ds.LaunchWg.Add(1)
-	go ds.RunProgramInDebugMode(!args.NoDebug, args.Program, args.Args)
+	go ds.RunProgramInDebugMode(request, !args.NoDebug, args.Program, args.Args)
 }
 
 func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
