@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil/tcpassembly"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io"
 	"time"
@@ -54,13 +55,26 @@ func (f *StreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 			return
 		}
 
-		switch rets[0] {
-		case 0x16: // TLS Client Hello
-			hello, _ := tlsutils.ParseClientHello(utils.StableReader(peekable, 5*time.Second, 4096))
-			if hello != nil && hello.SNI() != "" {
-				log.Infof("tls client hello to sni: %v", hello.SNI())
+		// tls client hello
+		data := utils.StableReader(peekable, 5*time.Second, 4096)
+		if rets[0] == 0x16 {
+			hello, err := tlsutils.ParseClientHello(data)
+			if err != nil {
+				return
 			}
-		default:
+			if hello.SNI() != "" {
+				log.Infof("tls client hello: %s", hello.SNI())
+			}
+		} else if (rets[0] >= 'A' && rets[0] <= 'Z') || (rets[0] >= 'a' && rets[0] <= 'z') {
+			uIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(data, false)
+			if err != nil {
+				return
+			}
+			method, _, _ := lowhttp.GetHTTPPacketFirstLine(data)
+			if method != "" {
+				log.Infof("http [%v]: %s", method, uIns.String())
+			}
+		} else {
 
 		}
 	}()
