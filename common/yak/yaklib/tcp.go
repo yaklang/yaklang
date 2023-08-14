@@ -102,7 +102,7 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 	var conn net.Conn
 	var err error
 	addr := utils.HostPort(fmt.Sprint(host), port)
-	if tcpDialer.tlsConfig == nil {
+	if tcpDialer.tlsConfig != nil {
 		conn, err = netx.DialTLSTimeout(tcpDialer.timeout, addr, tcpDialer.tlsConfig, tcpDialer.proxy)
 	} else {
 		conn, err = netx.DialTCPTimeout(tcpDialer.timeout, addr, tcpDialer.proxy)
