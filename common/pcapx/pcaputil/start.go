@@ -7,8 +7,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/tcpassembly"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil/tcpassembly"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
@@ -21,6 +21,20 @@ type Config struct {
 	Assembler *tcpassembly.Assembler
 }
 
+func (c *Config) assemblyWithTS(flow gopacket.Flow, tcp *layers.TCP, ts time.Time) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
+		}
+	}()
+	if c.Assembler != nil {
+		if tcp.Payload == nil {
+			return
+		}
+		c.Assembler.AssembleWithTimestamp(flow, tcp, ts)
+	}
+}
+
 func (c *Config) packetHandler(ctx context.Context, packet gopacket.Packet) {
 	if c.Assembler != nil {
 		ret, isOk := packet.TransportLayer().(*layers.TCP)
@@ -31,10 +45,10 @@ func (c *Config) packetHandler(ctx context.Context, packet gopacket.Packet) {
 			} else {
 				ts = time.Now()
 			}
-			c.Assembler.AssembleWithTimestamp(ret.TransportFlow(), ret, ts)
+			c.assemblyWithTS(ret.TransportFlow(), ret, ts)
 		}
 	}
-	// fmt.Println(packet.String())
+	fmt.Println(packet.String())
 }
 
 func NewDefaultConfig() *Config {
@@ -115,7 +129,7 @@ func Start(opt ...Option) error {
 	defer cancel()
 
 	// create stream factory and pool
-	streamFactory := &StreamFactory{}
+	streamFactory := NewStreamFactory(ctx)
 	streamPool := tcpassembly.NewStreamPool(streamFactory)
 	assembler := tcpassembly.NewAssembler(streamPool)
 	conf.Assembler = assembler
@@ -129,6 +143,7 @@ func Start(opt ...Option) error {
 				defer func() {
 					if err := recover(); err != nil {
 						spew.Dump(err)
+
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()

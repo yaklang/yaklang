@@ -1,29 +1,69 @@
 package pcaputil
 
 import (
+	"context"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/tcpassembly"
-	"github.com/google/gopacket/tcpassembly/tcpreader"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil/tcpassembly"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"io"
+	"time"
 )
 
 // StreamFactory implements tcpassembly.StreamFactory
-type StreamFactory struct{}
+type StreamFactory struct {
+	ctx context.Context
+}
+
+func NewStreamFactory(ctx context.Context) *StreamFactory {
+	return &StreamFactory{ctx: ctx}
+}
 
 // Stream implements tcpassembly.Stream
 type Stream struct {
 	net, transport gopacket.Flow
-	r              tcpreader.ReaderStream
+	r              tcpassembly.ReaderStream
 }
 
 // New creates a new stream
-func (StreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
+func (f *StreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 	s := &Stream{
 		net:       net,
 		transport: transport,
-		r:         tcpreader.NewReaderStream(),
+		r:         tcpassembly.NewReaderStream(),
 	}
-	go s.run() // start reading in the background
+	s.r.ReaderStreamOptions.LossErrors = true
+	go func() {
+		reAssemblyReader := &(s.r)
+		var ctxReader = ctxio.NewReader(f.ctx, reAssemblyReader)
+		peekable := utils.NewPeekableReader(ctxReader)
+		rets, err := peekable.Peek(1)
+		if err != nil {
+			if err != io.EOF {
+				log.Errorf("peek error: %v", err)
+			}
+			return
+		}
+		defer func() {
+			io.Copy(io.Discard, peekable)
+		}()
+
+		if len(rets) == 0 {
+			return
+		}
+
+		switch rets[0] {
+		case 0x16: // TLS Client Hello
+			hello, _ := tlsutils.ParseClientHello(utils.StableReader(peekable, 5*time.Second, 4096))
+			if hello != nil && hello.SNI() != "" {
+				log.Infof("tls client hello to sni: %v", hello.SNI())
+			}
+		default:
+
+		}
+	}()
 	return s
 }
 
