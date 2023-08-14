@@ -7,10 +7,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/google/go-dap"
 	"github.com/samber/lo"
@@ -213,7 +213,7 @@ func (ds *DebugSession) dispatchRequest(request dap.Message) {
 
 func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response := &dap.InitializeResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
+	response.Response = *newResponse(request.Request)
 	response.Body.SupportsEvaluateForHovers = true        // 鼠标悬停时是否支持求值
 	response.Body.SupportsConditionalBreakpoints = true   // 条件断点
 	response.Body.SupportsConfigurationDoneRequest = true // 是否支持检测配置是否完成的请求,如果支持,则客户端发送一个SupportsConfigurationDoneRequest请求,而适配器会在调试会话的配置已完成时返回configurationDone响应,告诉客户端可以开始执行调试操作（如运行、单步执行等）
@@ -303,7 +303,7 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 	// todo: handle args.Mode, "debug" and "exec"
 
 	ds.send(&dap.InitializedEvent{Event: *newEvent("initialized")})
-	ds.send(&dap.LaunchResponse{Response: *newResponse(request.Seq, request.Command)})
+	ds.send(&dap.LaunchResponse{Response: *newResponse(request.Request)})
 
 	// 等待launch
 	ds.LaunchWg.Add(1)
@@ -320,7 +320,7 @@ func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 	// ds.debugger = nil
 
 	ds.logToConsole("Detaching")
-	ds.send(&dap.DisconnectResponse{Response: *newResponse(request.Seq, request.Command)})
+	ds.send(&dap.DisconnectResponse{Response: *newResponse(request.Request)})
 	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 }
 
@@ -342,7 +342,7 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 
 	source := debugger.source
 
-	response := &dap.SetBreakpointsResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.SetBreakpointsResponseBody{}}
+	response := &dap.SetBreakpointsResponse{Response: *newResponse(request.Request), Body: dap.SetBreakpointsResponseBody{}}
 
 	// todo: 多文件调试,处理arguments.Source
 
@@ -374,7 +374,7 @@ func (ds *DebugSession) onSetFunctionBreakpointsRequest(request *dap.SetFunction
 // Unlike what DAP documentation claims, this request is always sent
 // even though we specified no filters at initialization. Handle as no-op.
 func (ds *DebugSession) onSetExceptionBreakpointsRequest(request *dap.SetExceptionBreakpointsRequest) {
-	ds.send(&dap.SetExceptionBreakpointsResponse{Response: *newResponse(request.Seq, request.Command)})
+	ds.send(&dap.SetExceptionBreakpointsResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
@@ -395,7 +395,7 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 		ds.debugger.Continue()
 	}
 
-	ds.send(&dap.ConfigurationDoneResponse{Response: *newResponse(request.Seq, request.Command)})
+	ds.send(&dap.ConfigurationDoneResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
@@ -406,7 +406,7 @@ func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
 	// ? 不需要处理request.threadId
 	ds.debugger.Continue()
 
-	ds.send(&dap.ContinueResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.ContinueResponseBody{AllThreadsContinued: true}})
+	ds.send(&dap.ContinueResponse{Response: *newResponse(request.Request), Body: dap.ContinueResponseBody{AllThreadsContinued: true}})
 }
 
 func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
@@ -490,7 +490,7 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 	}
 
 	response := &dap.StackTraceResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
+	response.Response = *newResponse(request.Request)
 	response.Body = dap.StackTraceResponseBody{
 		StackFrames: stackFrames,
 		TotalFrames: len(stackFrames),
@@ -503,14 +503,17 @@ func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
 	ds.WaitProgramStart()
 
 	debugger := ds.debugger
+
 	scopes := lo.MapToSlice(debugger.GetScopes(request.Arguments.FrameId), func(id int, scope *yakvm.Scope) dap.Scope {
 		name := "Locals"
 		if scope.IsRoot() {
 			name = "Globals"
 		}
+		ref := ds.ConvertVariable(scope)
+
 		return dap.Scope{
 			Name:               name,
-			VariablesReference: id,               // 通过scope id来找到一组变量,用于VariablesRequest
+			VariablesReference: ref,              // 通过scope id来找到一组变量,用于VariablesRequest
 			Expensive:          scope.Len() > 50, // 如果变量数量大于50,则认为是expensive
 		}
 	})
@@ -519,7 +522,7 @@ func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
 		return scopes[i].VariablesReference < scopes[j].VariablesReference
 	})
 
-	// 修改重复的local scope名字
+	// 修改重复的local scope名字,同时添加到ref中
 	suffix := 0
 	for i, scope := range scopes {
 		if scope.Name == "Locals" {
@@ -528,24 +531,46 @@ func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
 		}
 	}
 
-	response := &dap.ScopesResponse{Response: *newResponse(request.Seq, request.Command), Body: dap.ScopesResponseBody{Scopes: scopes}}
+	response := &dap.ScopesResponse{Response: *newResponse(request.Request), Body: dap.ScopesResponseBody{Scopes: scopes}}
 	ds.send(response)
 }
 
 func (ds *DebugSession) onVariablesRequest(request *dap.VariablesRequest) {
-	select {
-	case <-ds.config.stopped:
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	debugger := ds.debugger
+
+	ref := request.Arguments.VariablesReference
+	filtered := request.Arguments.Filter
+	start, count := request.Arguments.Start, request.Arguments.Count
+
+	v, ok := debugger.GetVariablesByReference(ref)
+	if !ok {
+		ds.sendErrorResponse(request.Request, UnableToLookupVariable, "Unable to lookup variable", fmt.Sprintf("unknown reference %d", ref))
 		return
-	// simulate long-running processing to make this handler
-	// respond to this request after the next request is received
-	case <-time.After(100 * time.Millisecond):
-		response := &dap.VariablesResponse{}
-		response.Response = *newResponse(request.Seq, request.Command)
-		response.Body = dap.VariablesResponseBody{
-			Variables: []dap.Variable{{Name: "i", Value: "18434528", EvaluateName: "i", VariablesReference: 0}},
-		}
-		ds.send(response)
 	}
+
+	children := []dap.Variable{}
+	if filtered == "named" || filtered == "" {
+		named := ds.metadataToDAPVariables(v)
+		children = append(children, named...)
+	}
+
+	if filtered == "indexed" || filtered == "" {
+		indexed := ds.childrenToDAPVariables(v, start)
+		children = append(children, indexed...)
+	}
+
+	if count > 0 {
+		children = children[:count]
+	}
+
+	response := &dap.VariablesResponse{
+		Response: *newResponse(request.Request),
+		Body:     dap.VariablesResponseBody{Variables: children},
+	}
+	ds.send(response)
 }
 
 func (ds *DebugSession) onSetVariableRequest(request *dap.SetVariableRequest) {
@@ -576,7 +601,7 @@ func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
 	})
 
 	response := &dap.ThreadsResponse{}
-	response.Response = *newResponse(request.Seq, request.Command)
+	response.Response = *newResponse(request.Request)
 	response.Body = dap.ThreadsResponseBody{Threads: threads}
 	ds.send(response)
 
@@ -600,15 +625,13 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 		return
 	}
 
-	response := &dap.EvaluateResponse{Response: *newResponse(request.Seq, request.Command)}
+	response := &dap.EvaluateResponse{Response: *newResponse(request.Request)}
 	response.Body = dap.EvaluateResponseBody{Result: value.String(), Type: value.TypeVerbose}
 
-	ref, ok := value.GetVarRef()
-	if ok {
-		response.Body.VariablesReference = ref
-		response.Body.IndexedVariables = value.GetIndexedVariableCount()
-		response.Body.NamedVariables = value.GetNamedVariableCount()
-	}
+	ref := ds.debugger.debugger.AddVar(value)
+	response.Body.VariablesReference = ref
+	response.Body.IndexedVariables = value.GetIndexedVariableCount()
+	response.Body.NamedVariables = value.GetNamedVariableCount()
 
 	ds.send(response)
 }
@@ -714,21 +737,218 @@ func (s *DebugSession) sendInternalErrorResponse(seq int, details string) {
 	s.send(er)
 }
 
-func newResponse(requestSeq int, command string) *dap.Response {
+func (ds *DebugSession) metadataToDAPVariables(i interface{}) []dap.Variable {
+	children := []dap.Variable{} // must return empty array, not null, if no children
+	switch v := i.(type) {
+	case *yakvm.Value:
+		length := v.GetIndexedVariableCount()
+		if length > 0 {
+			children = append(children, dap.Variable{
+				Name:         "len()",
+				Value:        fmt.Sprintf("%d", length),
+				Type:         "int",
+				EvaluateName: fmt.Sprintf("len(%s)", v.Literal),
+			})
+		}
+
+		if v.IsBytesOrRunes() {
+			children = append(children, dap.Variable{
+				Name:  "string()",
+				Value: v.AsString(),
+				Type:  "string",
+			})
+		}
+	case *yakvm.Scope:
+		// ? scope没有metadata
+		break
+	}
+	return children
+}
+
+func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.Variable {
+	children := []dap.Variable{} // must return empty array, not null, if no children
+	var (
+		handleValue interface{} = nil
+		literal     string      = ""
+	)
+
+	switch v := i.(type) {
+	case *yakvm.Scope:
+		valuesMap := v.GetAllNameAndValueInScopes()
+
+		// 排序保证顺序一致
+		values := lo.MapToSlice(valuesMap, func(key string, value *yakvm.Value) *KV {
+			return &KV{key, value}
+		})
+		sort.SliceStable(values, func(i, j int) bool {
+			return values[i].Key < values[j].Key
+		})
+
+		children = make([]dap.Variable, len(valuesMap))
+		index := 0
+		for _, kv := range values {
+			name, value := kv.Key, kv.Value
+
+			ref := ds.ConvertVariable(value.Value)
+
+			indexed := value.GetIndexedVariableCount()
+			named := value.GetNamedVariableCount()
+			children[index] = dap.Variable{
+				Name:               name,
+				EvaluateName:       name,
+				Value:              value.AsString(),
+				Type:               value.TypeStr(),
+				VariablesReference: ref,
+				IndexedVariables:   indexed,
+				NamedVariables:     named,
+			}
+			index++
+		}
+	case *yakvm.Value:
+		handleValue = v.Value
+		literal = v.Literal
+	default:
+		handleValue = v
+		literal = "{null}"
+	}
+
+	if handleValue != nil {
+		refV := reflect.ValueOf(handleValue)
+		if literal == "{null}" {
+			literal = ""
+		}
+
+		switch refV.Kind() {
+		case reflect.Map:
+			keys := refV.MapKeys()
+			cap := (len(keys) - start) * 2
+			if cap < 0 {
+				cap = 0
+			}
+			children = make([]dap.Variable, 0, cap)
+			for i := start; i < len(keys); i++ {
+				key := keys[i]
+				iKey := key.Interface()
+				keyRef := ds.ConvertVariable(iKey)
+
+				keyStr := key.String()
+
+				keyVar := dap.Variable{
+					Name:               fmt.Sprintf("[key %d]", start+i),
+					Type:               key.Type().String(),
+					Value:              key.String(),
+					VariablesReference: keyRef,
+					IndexedVariables:   yakvm.GetIndexedVariableCount(iKey),
+					NamedVariables:     yakvm.GetNamedVariableCount(iKey),
+				}
+
+				value := refV.MapIndex(key)
+				iValue := value.Interface()
+				valueRef := ds.ConvertVariable(iValue)
+
+				mapVar := dap.Variable{
+					Name:               fmt.Sprintf("[value %d]", start+i),
+					EvaluateName:       fmt.Sprintf("%s[%s]", literal, keyStr),
+					Type:               value.Type().String(),
+					Value:              value.String(),
+					VariablesReference: valueRef,
+					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
+					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
+				}
+
+				children = append(children, keyVar, mapVar)
+			}
+		case reflect.Array, reflect.Slice:
+			length := refV.Len()
+			children = make([]dap.Variable, length)
+			for i := start; i < length; i++ {
+				idx := start + i
+				value := refV.Index(i)
+				iValue := value.Interface()
+				ref := ds.ConvertVariable(iValue)
+
+				children[i] = dap.Variable{
+					Name:               fmt.Sprintf("[%d]", idx),
+					EvaluateName:       fmt.Sprintf("%s[%d]", literal, idx),
+					Type:               refV.Type().String(),
+					Value:              value.String(),
+					VariablesReference: ref,
+					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
+					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
+				}
+			}
+		case reflect.Ptr:
+			refV = refV.Elem()
+			if refV.Kind() != reflect.Struct {
+				return children
+			}
+			fallthrough
+		case reflect.Struct:
+			length := refV.NumField()
+			children = make([]dap.Variable, length)
+			for i := start; i < length; i++ {
+				value := refV.Field(i)
+				iValue := value.Interface()
+				fieldName := value.String()
+				ref := ds.ConvertVariable(iValue)
+
+				children[i] = dap.Variable{
+					Name:               fmt.Sprintf("%s", fieldName),
+					EvaluateName:       fmt.Sprintf("%s.%s", literal, fieldName),
+					Type:               refV.Type().String(),
+					Value:              value.String(),
+					VariablesReference: ref,
+					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
+					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
+				}
+			}
+		}
+	}
+
+	return children
+}
+
+func (ds *DebugSession) ConvertVariable(v interface{}) int {
+	refV := reflect.ValueOf(v)
+	switch refV.Kind() {
+	case reflect.Ptr:
+		refV = refV.Elem()
+		if refV.Kind() != reflect.Struct {
+			return 0
+		}
+	case reflect.Map, reflect.Array, reflect.Slice, reflect.Struct:
+	default:
+		return 0
+	}
+
+	if _, ok := v.(*yakvm.Function); ok {
+		return 0
+	}
+
+	debugger := ds.debugger
+	i, ok := debugger.GetVariablesReference(v)
+	if !ok {
+		return debugger.debugger.AddVariable(v)
+	}
+	return i
+}
+
+func newResponse(request dap.Request) *dap.Response {
 	return &dap.Response{
 		ProtocolMessage: dap.ProtocolMessage{
 			Seq:  0,
 			Type: "response",
 		},
-		Command:    command,
-		RequestSeq: requestSeq,
+		Command:    request.Command,
+		RequestSeq: request.Seq,
 		Success:    true,
 	}
 }
 
 func newErrorResponse(requestSeq int, command string, message string) *dap.ErrorResponse {
+	// todo: remove this function
 	er := &dap.ErrorResponse{}
-	er.Response = *newResponse(requestSeq, command)
+	er.Response = *newResponse(dap.Request{ProtocolMessage: dap.ProtocolMessage{Seq: requestSeq}, Command: command})
 	er.Success = false
 	er.Message = "unsupported"
 	er.Body = dap.ErrorResponseBody{Error: &dap.ErrorMessage{Format: message, Id: 12345}}

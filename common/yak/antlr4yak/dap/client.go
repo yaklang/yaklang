@@ -110,6 +110,12 @@ func (c *Client) ScopesRequest(frameID int) {
 	c.send(request)
 }
 
+func (c *Client) VariablesRequest(variablesReference int) {
+	request := &dap.VariablesRequest{Request: *c.newRequest("variables")}
+	request.Arguments.VariablesReference = variablesReference
+	c.send(request)
+}
+
 func (c *Client) SetBreakpointsRequest(file string, lines []int) {
 	c.SetBreakpointsRequestWithArgs(file, lines, nil, nil, nil)
 }

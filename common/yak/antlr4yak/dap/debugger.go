@@ -1,6 +1,7 @@
 package dap
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -83,6 +84,18 @@ func (d *DAPDebugger) GetStackTraces() []*yakvm.StackTraces {
 
 func (d *DAPDebugger) GetScopes(frameID int) map[int]*yakvm.Scope {
 	return d.debugger.GetScopesByFrameID(frameID)
+}
+
+func (d *DAPDebugger) GetVariablesByReference(ref int) (interface{}, bool) {
+	return d.debugger.GetVariablesByRef(ref)
+}
+
+func (d *DAPDebugger) GetVariablesReference(v interface{}) (int, bool) {
+	return d.debugger.GetVariablesRef(v)
+}
+
+func (d *DAPDebugger) AddVariables(v interface{}) int {
+	return d.debugger.AddVariable(v)
 }
 
 func (d *DAPDebugger) IsFinished() bool {

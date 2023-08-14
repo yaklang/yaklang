@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
@@ -63,14 +62,8 @@ type Debugger struct {
 	// 堆栈跟踪
 	StackTraces map[uint64]*vmstack.Stack
 
-	// 帧id -> 帧
-	FrameCount int32
-	FrameMap   map[int32]*Frame // 帧id -> 帧
-	FrameIDMap map[*Frame]int32 // 帧 -> 帧id
-
-	// 作用域 scope -> id 在vm_scope.go中使用
-	ScopeCount int32
-	ScopeIDMap map[*Scope]int32
+	// Reference,用于存储帧,作用域,变量引用的信息
+	Reference *Reference
 
 	// 观察断点
 	observeBreakPointExpressions map[string]*Value
@@ -111,25 +104,22 @@ type StackTraces struct {
 func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, callback func(*Debugger)) *Debugger {
 
 	debugger := &Debugger{
-		started:                      false,
-		finished:                     false,
-		jmpIndex:                     -1,
-		StackTraces:                  map[uint64]*vmstack.Stack{vm.ThreadIDCount: vmstack.New()},
-		vm:                           vm,
-		startWG:                      sync.WaitGroup{},
-		wg:                           sync.WaitGroup{},
-		initFunc:                     init,
-		callbackFunc:                 callback,
-		sourceCode:                   sourceCode,
-		sourceCodeLines:              strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
-		codes:                        make(map[string][]*Code),
-		linePointer:                  0,
-		linesFirstCodeAndStateMap:    make(map[int]*CodeState),
-		FrameCount:                   -1,
-		FrameMap:                     make(map[int32]*Frame),
-		FrameIDMap:                   make(map[*Frame]int32),
-		ScopeCount:                   -1,
-		ScopeIDMap:                   make(map[*Scope]int32),
+		started:                   false,
+		finished:                  false,
+		jmpIndex:                  -1,
+		StackTraces:               map[uint64]*vmstack.Stack{vm.ThreadIDCount: vmstack.New()},
+		vm:                        vm,
+		startWG:                   sync.WaitGroup{},
+		wg:                        sync.WaitGroup{},
+		initFunc:                  init,
+		callbackFunc:              callback,
+		sourceCode:                sourceCode,
+		sourceCodeLines:           strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
+		codes:                     make(map[string][]*Code),
+		linePointer:               0,
+		linesFirstCodeAndStateMap: make(map[int]*CodeState),
+
+		Reference:                    NewReference(),
 		breakPoints:                  make(map[int]*Breakpoint, 0),
 		observeExpressions:           make(map[string]*Value),
 		observeBreakPointExpressions: make(map[string]*Value),
@@ -277,12 +267,7 @@ func (g *Debugger) UpdateByFrame(frame *Frame) {
 		g.state = ""
 	}
 	g.frame = frame
-
-	if _, ok := g.FrameIDMap[frame]; !ok {
-		atomic.AddInt32(&g.FrameCount, 1)
-		g.FrameIDMap[frame] = g.FrameCount
-		g.FrameMap[g.FrameCount] = frame
-	}
+	g.AddFrame(frame)
 }
 
 func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
@@ -357,11 +342,51 @@ func (g *Debugger) SetVMPanic(p *VMPanic) {
 	g.vmPanic = p
 }
 
-func (g *Debugger) AddScope(scope *Scope) {
-	if _, ok := g.ScopeIDMap[scope]; !ok {
-		atomic.AddInt32(&g.ScopeCount, 1)
-		g.ScopeIDMap[scope] = g.ScopeCount
+func (g *Debugger) AddFrame(frame *Frame) int {
+	ref := g.Reference
+
+	if i, ok := ref.FrameHM.getReverse(frame); !ok {
+		return ref.FrameHM.create(frame)
+	} else {
+		return i
 	}
+}
+
+func (g *Debugger) AddVariable(v interface{}) int {
+	ref := g.Reference
+	if i, ok := ref.VarHM.getReverse(v); !ok {
+		return ref.VarHM.create(v)
+	} else {
+		return i
+	}
+}
+
+func (g *Debugger) AddScope(scope *Scope) int {
+	ref := g.Reference
+	if i, ok := ref.VarHM.getReverse(scope); !ok {
+		return ref.VarHM.create(scope)
+
+	} else {
+		return i
+	}
+}
+
+func (g *Debugger) AddVar(val *Value) int {
+	ref := g.Reference
+	if i, ok := ref.VarHM.getReverse(val); !ok {
+		return ref.VarHM.create(val)
+
+	} else {
+		return i
+	}
+}
+
+func (g *Debugger) Pause() {
+	g.halt = true
+}
+
+func (g *Debugger) IsPause() bool {
+	return g.halt
 }
 
 func (g *Debugger) GetCode(state string, codeIndex int) *Code {
@@ -412,7 +437,7 @@ func (g *Debugger) GetStackTraces() []*StackTraces {
 			if stepStack, ok := i.(*StepStack); ok {
 				if stepStack.code != nil {
 					frame := stepStack.frame
-					fid, ok := g.FrameIDMap[frame]
+					fid, ok := g.Reference.FrameHM.getReverse(frame)
 					if !ok {
 						fid = -1
 					}
@@ -810,19 +835,36 @@ func (g *Debugger) Callback() {
 }
 
 func (g *Debugger) GetScopesByFrameID(frameID int) map[int]*Scope {
-	frame, ok := g.FrameMap[int32(frameID)]
+	ref := g.Reference
+	frame, ok := ref.FrameHM.get(frameID)
 	if !ok {
 		return nil
 	}
 	scopes := make(map[int]*Scope, 0)
 	scope := frame.CurrentScope()
 	for scope != nil {
-		if id, ok := g.ScopeIDMap[scope]; ok {
-			scopes[int(id)] = scope
+		if id, ok := ref.VarHM.getReverse(scope); ok {
+			scopes[id] = scope
 		}
 		scope = scope.parent
 	}
 	return scopes
+}
+
+func (g *Debugger) GetVariablesByRef(ref int) (interface{}, bool) {
+	v, ok := g.Reference.VarHM.get(ref)
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
+func (g *Debugger) GetVariablesRef(v interface{}) (int, bool) {
+	i, ok := g.Reference.VarHM.getReverse(v)
+	if !ok {
+		return 0, false
+	}
+	return i, true
 }
 
 func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, CompilerWrapperInterface, error) {
@@ -843,7 +885,7 @@ func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, Compiler
 }
 
 func (g *Debugger) CompileWithFrameID(code string, frameID int) (*Frame, CompilerWrapperInterface, error) {
-	targetFrame, ok := g.FrameMap[int32(frameID)]
+	targetFrame, ok := g.Reference.FrameHM.get(frameID)
 	if !ok {
 		return nil, nil, errors.New("frame not found")
 	}
