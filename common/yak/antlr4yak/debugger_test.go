@@ -490,3 +490,29 @@ c(a+b)
 		t.Fatal("callback not called")
 	}
 }
+
+func TestDebugger_Pause(t *testing.T) {
+	code := `test_debugger_sleep(1)
+a = 1
+b = a+1
+`
+	init := func(g *yakvm.Debugger) {
+		g.Pause()
+	}
+	in := false
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		index := g.CurrentCodeIndex()
+		if index != 0 {
+			t.Fatal("index != 0")
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
