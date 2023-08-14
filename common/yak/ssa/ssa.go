@@ -364,7 +364,7 @@ type Field struct {
 
 	// field
 	Key Value
-	I   *Interface
+	I   Value
 
 	update []Value // value
 
