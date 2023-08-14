@@ -3,7 +3,6 @@ package ssa
 import (
 	"fmt"
 	"go/types"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -15,21 +14,6 @@ type builder struct {
 	*Function
 	next   *builder
 	target *target // for break and continue
-}
-
-var (
-	basicTypes = make(map[string]*types.Basic)
-)
-
-func init() {
-	for _, basic := range types.Typ {
-		basicTypes[basic.Name()] = basic
-	}
-	if strings.Contains(runtime.GOARCH, "64") {
-		basicTypes["int"] = basicTypes["int64"]
-	} else {
-		basicTypes["int"] = basicTypes["int32"]
-	}
 }
 
 // entry point
