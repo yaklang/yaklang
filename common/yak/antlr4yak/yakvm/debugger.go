@@ -51,6 +51,9 @@ type Debugger struct {
 	nextState   *StepStack
 	stepInState *StepStack
 
+	// 停止
+	halt bool
+
 	// 停止事件原因
 	stopReason string
 
@@ -587,6 +590,11 @@ func (g *Debugger) HandleForStepOut() {
 	g.Callback()
 }
 
+func (g *Debugger) HandleForPause() {
+	g.SetStopReason("pause")
+	g.Callback()
+}
+
 func (g *Debugger) HandleForBreakPoint() {
 	g.SetStopReason("breakpoint")
 	g.Callback()
@@ -609,18 +617,18 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
 
-	defer func() {
+	if code.Opcode == OpCall {
+		v := frame.peekN(code.Unary)
 		// 如果同步调用yak函数，则push stepIn栈
-		if code.Opcode == OpCall {
-			v := frame.peekN(code.Unary)
-			if v != nil && v.Callable() {
+		if v != nil && v.Callable() {
+			defer func() {
 				stackTrace := g.CurrentStackTrace()
 				if stackTrace != nil {
 					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame))
 				}
-			}
+			}()
 		}
-	}()
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -632,6 +640,13 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			g.Callback()
 		}
 	}()
+
+	// 如果halt,则回调
+	if g.halt {
+		g.halt = false
+		g.HandleForPause()
+		return
+	}
 
 	// 步进
 	if g.nextState != nil {
@@ -675,6 +690,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			}
 		}
 	}
+	// 如果处于stepOut状态，则不应该触发断点
 	if g.stepOut {
 		return
 	}

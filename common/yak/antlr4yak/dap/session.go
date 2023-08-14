@@ -438,7 +438,14 @@ func (ds *DebugSession) onGotoRequest(request *dap.GotoRequest) {
 }
 
 func (ds *DebugSession) onPauseRequest(request *dap.PauseRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "PauseRequest is not yet supported"))
+	// 等待程序启动
+	ds.WaitProgramStart()
+	err := ds.debugger.Halt()
+	if err != nil {
+		ds.sendErrorResponse(request.Request, UnableToHalt, "Unable to halt execution", err.Error())
+		return
+	}
+	ds.send(&dap.PauseResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
