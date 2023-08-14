@@ -39,7 +39,7 @@ func (g *Surigen) Gen() (map[suricata.Modifier][]byte, error) {
 			err := payload.Modifiers[i].Modify(bm)
 			if err != nil {
 				if errors.Is(err, ErrOverFlow) {
-					payload.Len >>= 1
+					payload.Len <<= 1
 				} else {
 					return output, errors.Wrap(err, "failed to modify payload")
 				}
@@ -153,11 +153,14 @@ func (g *Surigen) parse() error {
 				}
 			}
 		}
+
+		if cm == nil {
+			continue
+		}
 		g.gen[rule.Modifier].Modifiers = append(g.gen[rule.Modifier].Modifiers, cm)
 	}
 
 	// Set Len
-
 	for _, payload := range g.gen {
 		for _, m := range payload.Modifiers {
 			switch m := m.(type) {
@@ -169,5 +172,6 @@ func (g *Surigen) parse() error {
 		}
 		payload.Len = 1 << (math.Ilogb(float64(payload.Len+1)) + 1)
 	}
+
 	return nil
 }
