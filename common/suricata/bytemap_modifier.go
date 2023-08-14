@@ -1,13 +1,13 @@
-package surigen
+package suricata
 
 import (
+	"github.com/dlclark/regexp2"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils/regen"
 	"math"
 	"math/rand"
 )
 
-type Modifier interface {
+type ByteMapModifier interface {
 	Modify(payload *ByteMap) error
 }
 
@@ -58,10 +58,31 @@ func (m *ContentModifier) Modify(payload *ByteMap) error {
 }
 
 type RegexpModifier struct {
-	Gen      regen.Generator
-	Relative bool
+	Generator *PCREGenerator
 }
 
-func (m *RegexpModifier) Modify(payload *ByteMap) {
+func (m *RegexpModifier) Modify(payload *ByteMap) error {
+	content := m.Generator.Generate()
 
+	begin := 0
+	end := math.MaxInt
+
+	if m.Generator.startsWith {
+		begin = 0
+		end = len(content)
+	} else if m.Generator.relative {
+		begin = payload.lastPos + payload.lastLen
+	}
+
+	allfree := payload.FindFreeRange(len(content), begin, end)
+	if len(allfree) == 0 {
+		return ErrOverFlow
+	}
+
+	if m.Generator.opts&regexp2.IgnoreCase != 0 {
+		payload.Fill(allfree[rand.Intn(len(allfree))], nocaseFilter(content))
+	} else {
+		payload.Fill(allfree[rand.Intn(len(allfree))], content)
+	}
+	return nil
 }

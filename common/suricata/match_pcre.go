@@ -5,7 +5,9 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/regen"
 	"golang.org/x/exp/slices"
+	"regexp/syntax"
 	"strings"
 	"time"
 )
@@ -19,6 +21,10 @@ func newPCREMatch(r *ContentRule) matchHandler {
 	if err != nil {
 		return nil
 	}
+	matcher, err := pcre.Matcher()
+	if err != nil {
+		return nil
+	}
 	return func(c *matchContext) error {
 		var indexes []matched
 		buffer := c.GetBuffer(pcre.modifier)
@@ -29,7 +35,7 @@ func newPCREMatch(r *ContentRule) matchHandler {
 			}
 		}
 
-		indexes = pcre.Match(buffer)
+		indexes = matcher.Match(buffer)
 		if !c.Must(len(indexes) > 0) {
 			return nil
 		}
@@ -63,13 +69,24 @@ func newPCREMatch(r *ContentRule) matchHandler {
 }
 
 type PCRE struct {
-	expr     string
-	regexp   *regexp2.Regexp
+	expr string
+
+	opts     regexp2.RegexOptions
 	modifier Modifier
 
 	relative         bool
 	ignoreEndNewline bool
 	startsWith       bool
+}
+
+type PCREMatcher struct {
+	*PCRE
+	matcher *regexp2.Regexp
+}
+
+type PCREGenerator struct {
+	*PCRE
+	generator regen.Generator
 }
 
 func ParsePCREStr(pattern string) (*PCRE, error) {
@@ -150,23 +167,51 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 			}
 		}
 	}
-	regexp, err := regexp2.Compile(pcre.expr, opt)
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid pcre pattern")
-	}
-	pcre.regexp = regexp
+	pcre.opts = opt
 	return &pcre, nil
 }
 
-func (p *PCRE) Match(content []byte) []matched {
+func (p *PCRE) Matcher() (*PCREMatcher, error) {
+	matcher, err := regexp2.Compile(p.expr, p.opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid pcre pattern")
+	}
+	return &PCREMatcher{
+		PCRE:    p,
+		matcher: matcher,
+	}, nil
+}
+
+func (p *PCREMatcher) Match(content []byte) []matched {
 	var matches []matched
-	match, _ := p.regexp.FindStringMatch(string(content))
+	match, _ := p.matcher.FindStringMatch(string(content))
 	for match != nil {
 		matches = append(matches, matched{
 			pos: match.Index,
 			len: match.Length,
 		})
-		match, _ = p.regexp.FindNextMatch(match)
+		match, _ = p.matcher.FindNextMatch(match)
 	}
 	return matches
+}
+
+func (p *PCRE) Generator() (*PCREGenerator, error) {
+	generator, err := regen.NewGeneratorOne(p.expr, &regen.GeneratorArgs{
+		Flags: syntax.Perl,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid pcre pattern")
+	}
+	return &PCREGenerator{
+		PCRE:      p,
+		generator: generator,
+	}, nil
+}
+
+func (p *PCREGenerator) Generate() []byte {
+	strs := p.generator.Generate()
+	if len(strs) == 0 {
+		return nil
+	}
+	return []byte(strs[0])
 }
