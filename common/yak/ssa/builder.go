@@ -8,6 +8,7 @@ import (
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type builder struct {
@@ -649,10 +650,8 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 	//TODO: typeliteral expression
 
 	// literal
-	if s := stmt.Literal(); s != nil {
-		//TODO: literal
-		i, _ := strconv.ParseInt(s.GetText(), 10, 64)
-		return NewConst(i)
+	if s, ok := stmt.Literal().(*yak.LiteralContext); ok {
+		return b.buildLiteral(s)
 	}
 
 	// anonymous function decl
@@ -1045,7 +1044,162 @@ func (b *builder) buildSliceCall(stmt *yak.SliceCallContext) []Value {
 	return values
 }
 
-//TODO: literal
+func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	//TODO: template stirng literal
+
+	// string literal
+	if s, ok := stmt.StringLiteral().(*yak.StringLiteralContext); ok {
+		return b.buildStringLiteral(s)
+	}
+
+	// numeric literal
+	if s, ok := stmt.NumericLiteral().(*yak.NumericLiteralContext); ok {
+		return b.buildNumericLiteral(s)
+	}
+
+	//TODO: bool literal
+	//TODO: undefined literal
+	//TODO: charater literal
+	//TODO: map literal
+	//TODO: slice typed literal
+	//TODO: type literal
+	//TODO: slice literal
+
+	return nil
+}
+
+// numeric literal
+func (b *builder) buildNumericLiteral(stmt *yak.NumericLiteralContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	// integer literal
+	if ilit := stmt.IntegerLiteral(); ilit != nil {
+		var err error
+		var originIntStr = ilit.GetText()
+		var intStr = strings.ToLower(originIntStr)
+		var resultInt64 int64
+		switch true {
+		case strings.HasPrefix(intStr, "0b"): // 二进制
+			resultInt64, err = strconv.ParseInt(intStr[2:], 2, 64)
+		case strings.HasPrefix(intStr, "0x"): // 十六进制
+			resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
+		case strings.HasPrefix(intStr, "0o"): // 八进制
+			resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
+		case len(intStr) > 1 && intStr[0] == '0':
+			resultInt64, err = strconv.ParseInt(intStr[1:], 8, 64)
+		default:
+			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
+		}
+		if err != nil {
+			fmt.Printf("cannot parse `%s` as integer literal... is too large for int64:%v", originIntStr, err)
+		}
+		return NewConst(resultInt64)
+	}
+
+	// float literal
+	if iFloat := stmt.FloatLiteral(); iFloat != nil {
+		lit := iFloat.GetText()
+		if strings.HasPrefix(lit, ".") {
+			lit = "0" + lit
+		}
+		var f, _ = strconv.ParseFloat(lit, 64)
+		return NewConst(f)
+	}
+	fmt.Printf("cannot parse num for literal: %s", stmt.GetText())
+	return nil
+}
+
+// string literal
+func (b *builder) buildStringLiteral(stmt *yak.StringLiteralContext) Value {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+	var text = stmt.GetText()
+	if text == "" {
+		return NewConst(text)
+	}
+
+	var prefix byte
+	var hasPrefix = false
+	var supportPrefix = []byte{'x', 'b', 'r'}
+ParseStrLit:
+	switch text[0] {
+	case '"':
+		if prefix == 'r' {
+			var val string
+			if lit := text; len(lit) >= 2 {
+				val = lit[1 : len(lit)-1]
+			} else {
+				val = lit
+			}
+			prefix = 0
+			return NewConstWithUnary(val, int(prefix))
+		} else {
+			val, err := strconv.Unquote(text)
+			if err != nil {
+				fmt.Printf("parse %v to stirng literal fieled: %s", stmt.GetText(), err.Error())
+			}
+			return NewConstWithUnary(val, int(prefix))
+		}
+	case '\'':
+		if prefix == 'r' {
+			var val string
+			if lit := stmt.GetText(); len(lit) >= 2 {
+				val = lit[1 : len(lit)-1]
+			} else {
+				val = lit
+			}
+			prefix = 0
+			return NewConstWithUnary(val, int(prefix))
+
+		} else {
+			if lit := stmt.GetText(); len(lit) >= 2 {
+				text = lit[1 : len(lit)-1]
+			} else {
+				text = lit
+			}
+			text = strings.Replace(text, "\\'", "'", -1)
+			text = strings.Replace(text, `"`, `\"`, -1)
+			val, err := strconv.Unquote(`"` + text + `"`)
+			if err != nil {
+				fmt.Printf("pars %v to string literal field: %s", stmt.GetText(), err.Error())
+			}
+			return NewConstWithUnary(val, int(prefix))
+		}
+	case '`':
+		val := text[1 : len(text)-1]
+		return NewConstWithUnary(val, int(prefix))
+	case '0':
+		switch text[1] {
+		case 'h':
+			text = text[2:]
+			hex, err := codec.DecodeHex(text)
+			if err != nil {
+				fmt.Printf("parse hex string error: %v", err)
+			}
+			return NewConst(hex)
+		}
+	default:
+		if !hasPrefix {
+			hasPrefix = true
+			prefix = text[0]
+			for _, p := range supportPrefix {
+				if p == prefix {
+					text = text[1:]
+					goto ParseStrLit
+				}
+			}
+		}
+		if hasPrefix {
+			fmt.Printf("invalid string literal: %s", stmt.GetText())
+		}
+	}
+
+	return nil
+}
 
 // expression list
 func (b *builder) buildExpressionList(stmt *yak.ExpressionListContext) []Value {
