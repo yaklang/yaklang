@@ -853,7 +853,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 		//还不成功就只能试试自动转换了，转换失败就panic
-		refV := reflect.ValueOf(val)
+		refV := reflect.ValueOf(val.Value)
 		err = v.AutoConvertReflectValueByType(&refV, typ.Type())
 		if err != nil {
 			panic(fmt.Sprintf("cannot cast %v to %v", val.Value, typ.Type().String()))
