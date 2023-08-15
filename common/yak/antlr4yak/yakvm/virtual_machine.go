@@ -209,7 +209,7 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, args map[int]*Value) error {
 	return v.Exec(ctx, func(frame *Frame) {
 		// 设置线程ID
-		frame.ThreadID = v.ThreadIDCount
+		frame.ThreadID = int(v.ThreadIDCount)
 
 		name := f.GetActualName()
 		frame.SetVerbose("function: " + name)

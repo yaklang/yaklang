@@ -60,7 +60,8 @@ type Debugger struct {
 	vmPanic *VMPanic
 
 	// 堆栈跟踪
-	StackTraces map[uint64]*vmstack.Stack
+	StackTraces      map[int]*vmstack.Stack // threadID -> stacktraces
+	ThreadStackTrace map[int]*StepStack     // 每个线程对应的当前的stackTrace
 
 	// Reference,用于存储帧,作用域,变量引用的信息
 	Reference *Reference
@@ -97,7 +98,7 @@ type StackTrace struct {
 }
 
 type StackTraces struct {
-	ThreadID    uint64
+	ThreadID    int
 	StackTraces []StackTrace
 }
 
@@ -107,7 +108,8 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 		started:                   false,
 		finished:                  false,
 		jmpIndex:                  -1,
-		StackTraces:               map[uint64]*vmstack.Stack{vm.ThreadIDCount: vmstack.New()},
+		StackTraces:               map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
+		ThreadStackTrace:          make(map[int]*StepStack, 0),
 		vm:                        vm,
 		startWG:                   sync.WaitGroup{},
 		wg:                        sync.WaitGroup{},
@@ -287,7 +289,7 @@ func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
 	return st
 }
 
-func (g *Debugger) CurrentThreadID() uint64 {
+func (g *Debugger) CurrentThreadID() int {
 	frame := g.frame
 	if frame == nil {
 		return 0
@@ -405,60 +407,60 @@ func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
 	}
 }
 
-func (g *Debugger) GetStackTraces() []*StackTraces {
+func (g *Debugger) stepStackToStackTrace(stepStack *StepStack) StackTrace {
+	frame := stepStack.frame
+	fid, ok := g.Reference.FrameHM.getReverse(frame)
+	if !ok {
+		fid = -1
+	}
+	return StackTrace{
+		ID:         fid,
+		Name:       stepStack.stateName,
+		Frame:      frame,
+		SourceCode: stepStack.code.SourceCodePointer,
+		Source:     stepStack.code.SourceCodeFilePath,
+		Line:       stepStack.code.StartLineNumber,
+		Column:     stepStack.code.StartColumnNumber,
+		EndLine:    stepStack.code.EndLineNumber,
+		EndColumn:  stepStack.code.EndColumnNumber,
+	}
+}
+
+func (g *Debugger) GetStackTraces() map[int]*StackTraces {
 	stackTrace := g.CurrentStackTrace()
 	if stackTrace == nil {
 		return nil
 	}
-
-	recoverStack := stackTrace.CreateShadowStack()
-	defer recoverStack()
 	if g.linePointer == 0 {
 		return nil
 	}
-	stackTrace.Push(NewStepStackWithCodeIndex(
-		g.GetCode(g.state, g.codePointer),
-		g.linePointer,
-		g.State(),
-		g.StateName(),
-		g.Frame(),
-	))
 
-	ret := make([]*StackTraces, len(g.StackTraces))
-	for index, stack := range g.StackTraces {
-		topFrame := stack.Peek().(*StepStack).frame
-		ret[index] = &StackTraces{
-			ThreadID: topFrame.ThreadID,
+	ret := make(map[int]*StackTraces, len(g.StackTraces))
+
+	for threadID, stack := range g.StackTraces {
+
+		ret[threadID] = &StackTraces{
+			ThreadID: threadID,
 		}
-		sts := make([]StackTrace, stack.Len())
 
-		index2 := 0
+		sts := make([]StackTrace, stack.Len()+1)
+
+		// 加入ThreadStackTrace
+		if stepStack, ok := g.ThreadStackTrace[threadID]; ok && stepStack.code != nil {
+			sts[0] = g.stepStackToStackTrace(stepStack)
+		}
+
+		index2 := 1
 		stack.GetAll(func(i any) {
 			if stepStack, ok := i.(*StepStack); ok {
 				if stepStack.code != nil {
-					frame := stepStack.frame
-					fid, ok := g.Reference.FrameHM.getReverse(frame)
-					if !ok {
-						fid = -1
-					}
-
-					sts[index2] = StackTrace{
-						ID:         int(fid),
-						Name:       stepStack.stateName,
-						Frame:      frame,
-						SourceCode: stepStack.code.SourceCodePointer,
-						Source:     stepStack.code.SourceCodeFilePath,
-						Line:       stepStack.code.StartLineNumber,
-						Column:     stepStack.code.StartColumnNumber,
-						EndLine:    stepStack.code.EndLineNumber,
-						EndColumn:  stepStack.code.EndColumnNumber,
-					}
+					sts[index2] = g.stepStackToStackTrace(stepStack)
 					index2++
 				}
 			}
 		})
 
-		ret[index].StackTraces = sts
+		ret[threadID].StackTraces = sts
 	}
 
 	return ret
@@ -642,12 +644,13 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
 
+	stackTrace := g.CurrentStackTrace()
+
 	if code.Opcode == OpCall {
 		v := frame.peekN(code.Unary)
-		// 如果同步调用yak函数，则push stepIn栈
+		// 如果同步调用函数，则push stepIn栈
 		if v != nil && v.Callable() {
 			defer func() {
-				stackTrace := g.CurrentStackTrace()
 				if stackTrace != nil {
 					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame))
 				}
@@ -655,6 +658,10 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		}
 	}
 
+	// 更新ThreadStackTrace
+	g.ThreadStackTrace[g.frame.ThreadID] = NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame)
+
+	// 捕捉错误
 	defer func() {
 		if r := recover(); r != nil {
 			if rerr, ok := r.(error); ok {
@@ -662,6 +669,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			} else {
 				g.description = fmt.Sprintf("Runtime error: %v", r)
 			}
+			g.SetStopReason("exception")
 			g.Callback()
 		}
 	}()
@@ -703,7 +711,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 
 	// 步出
-	stackTrace := g.CurrentStackTrace()
 	if stackTrace != nil && stackTrace.Len() > 0 {
 		stepStack := stackTrace.Peek().(*StepStack)
 		// pop stepIn栈

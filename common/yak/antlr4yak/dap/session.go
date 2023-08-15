@@ -461,7 +461,7 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 		stackFrames []dap.StackFrame
 	)
 
-	threadID := uint64(request.Arguments.ThreadId)
+	threadID := request.Arguments.ThreadId
 	start := request.Arguments.StartFrame
 	if start < 0 {
 		start = 0
