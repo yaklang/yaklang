@@ -1,5 +1,7 @@
 package yakvm
 
+import "fmt"
+
 type handlesMap struct {
 	start       int
 	nextHandle  int
@@ -20,7 +22,8 @@ func (hs *handlesMap) create(value interface{}) int {
 	next := hs.nextHandle
 	hs.nextHandle++
 	hs.handleToVal[next] = value
-	hs.ValToHandle[value] = next
+	addr := fmt.Sprintf("%p", value)
+	hs.ValToHandle[addr] = next
 	return next
 }
 
@@ -30,7 +33,8 @@ func (hs *handlesMap) get(handle int) (interface{}, bool) {
 }
 
 func (hs *handlesMap) getReverse(v interface{}) (int, bool) {
-	i, ok := hs.ValToHandle[v]
+	addr := fmt.Sprintf("%p", v)
+	i, ok := hs.ValToHandle[addr]
 	return i, ok
 }
 
