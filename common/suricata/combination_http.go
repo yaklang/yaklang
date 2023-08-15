@@ -13,6 +13,7 @@ var defaultRandom = map[Modifier]regen.Generator{
 	HTTPMethod:   MustGenerator(`^(GET|POST|HEAD|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)`),
 	HTTPUri:      MustGenerator(`^(\/[a-zA-Z0-9]{3,10}){2,5}`),
 	HTTPStatCode: MustGenerator(`^[1-5][0-1][0-9]`),
+	HTTPStatMsg:  MustGenerator(`^[A-Z][a-zA-Z]{2,5}`),
 	HTTPHost:     MustGenerator(`^([a-zA-Z0-9]{3,6}\.){2,}[a-zA-Z0-9]{3,6}`),
 	HTTPProtocol: MustGenerator(`^HTTP\/1\.1`),
 	Fallback:     MustGenerator(`[a-zA-Z0-9]{6,10}`),
@@ -74,7 +75,15 @@ func httpreqCombination(mp map[Modifier][]byte) []byte {
 }
 
 func httprespCombination(mp map[Modifier][]byte) []byte {
-	return nil
+	var buf bytes.Buffer
+
+	p := partProvider{mp}
+	p.FillHTTPResponseLine(&buf)
+	p.FillHTTPResponseHeader(&buf)
+	buf.WriteString(lowhttp.CRLF)
+	p.FillHTTPResponseBody(&buf)
+
+	return buf.Bytes()
 }
 
 type partProvider struct {
@@ -126,59 +135,34 @@ func (p *partProvider) FillHTTPRequestLine(w *bytes.Buffer) {
 	_, _ = w.WriteString(lowhttp.CRLF)
 }
 
-func (p *partProvider) FillHTTPRequestHeader(w *bytes.Buffer) {
-	var buf []byte
+func (p *partProvider) fillHTTPHeaderBackground(w *bytes.Buffer) {
 	if p.mp[HTTPHeaderRaw] != nil {
 		w.Write(p.mp[HTTPHeaderRaw])
-		buf = p.mp[HTTPHeaderRaw]
 	} else if p.mp[HTTPHeader] != nil {
 		w.Write(p.mp[HTTPHeader])
-		buf = p.mp[HTTPHeader]
 	}
-	if buf != nil && !bytes.HasSuffix(buf, []byte(lowhttp.CRLF)) {
+	if !bytes.HasSuffix(w.Bytes(), []byte(lowhttp.CRLF)) {
 		_, _ = w.WriteString(lowhttp.CRLF)
 	}
+}
 
-	// try best to fill, may be not correct
-
-	if !bytes.Contains(buf, []byte("Host: ")) {
-		_, _ = w.WriteString("Host: ")
-		if p.mp[HTTPHostRaw] != nil {
-			_, _ = w.Write(p.mp[HTTPHostRaw])
-		} else {
-			_, _ = w.Write(p.getOrRandom(HTTPHost))
-		}
-		_, _ = w.WriteString(lowhttp.CRLF)
-	}
-
-	var tryheaders = []header{
-		{HTTPCookie, []byte("Cookie")},
-		{HTTPUserAgent, []byte("User-Agent")},
-		{HTTPReferer, []byte("Referer")},
-		{HTTPAccept, []byte("Accept")},
-		{HTTPAcceptLang, []byte("Accept-Language")},
-		{HTTPAcceptEnc, []byte("Accept-Encoding")},
-		{HTTPConnection, []byte("Connection")},
-		{HTTPContentType, []byte("Content-Type")},
-		{HTTPContentLen, []byte("Content-Length")},
-	}
-
+func (p *partProvider) fillHTTPHeaderOthers(w *bytes.Buffer, headers []header) {
 	if p.mp[HTTPHeaderNames] != nil {
 		for _, hdr := range bytes.Fields(p.mp[HTTPHeaderNames]) {
-			for _, try := range tryheaders {
+			for _, try := range headers {
 				if bytes.EqualFold(try.prefix, hdr) {
 					continue
 				}
 			}
-			tryheaders = append(tryheaders, header{Fallback, hdr})
+			headers = append(headers, header{Fallback, hdr})
 		}
 	}
 
-	for _, try := range tryheaders {
+	for _, try := range headers {
 		if p.mp[try.header] != nil {
-			indexes := bytesIndexAll(buf, append(try.prefix, []byte(": ")...), true)
+			indexes := bytesIndexAll(w.Bytes(), append(try.prefix, []byte(": ")...), true)
 			for _, index := range indexes {
-				if index.pos == 0 || index.pos > 1 && bytes.Equal(buf[index.pos-2:index.pos], []byte(lowhttp.CRLF)) {
+				if index.pos == 0 || index.pos > 1 && bytes.Equal(w.Bytes()[index.pos-2:index.pos], []byte(lowhttp.CRLF)) {
 					continue
 				}
 			}
@@ -190,8 +174,85 @@ func (p *partProvider) FillHTTPRequestHeader(w *bytes.Buffer) {
 	}
 }
 
+func (p *partProvider) FillHTTPRequestHeader(w *bytes.Buffer) {
+	p.fillHTTPHeaderBackground(w)
+
+	// try best to fill, may be not correct
+	if !bytes.Contains(w.Bytes(), []byte("Host: ")) {
+		_, _ = w.WriteString("Host: ")
+		if p.mp[HTTPHostRaw] != nil {
+			_, _ = w.Write(p.mp[HTTPHostRaw])
+		} else {
+			_, _ = w.Write(p.getOrRandom(HTTPHost))
+		}
+		_, _ = w.WriteString(lowhttp.CRLF)
+	}
+
+	p.fillHTTPHeaderOthers(w, []header{
+		{HTTPCookie, []byte("Cookie")},
+		{HTTPUserAgent, []byte("User-Agent")},
+		{HTTPReferer, []byte("Referer")},
+		{HTTPAccept, []byte("Accept")},
+		{HTTPAcceptLang, []byte("Accept-Language")},
+		{HTTPAcceptEnc, []byte("Accept-Encoding")},
+		{HTTPConnection, []byte("Connection")},
+		{HTTPContentType, []byte("Content-Type")},
+		{HTTPContentLen, []byte("Content-Length")},
+	})
+}
+
 func (p *partProvider) FillHTTPRequestBody(w *bytes.Buffer) {
 	for _, v := range []Modifier{HTTPRequestBody, FileData, Default} {
+		if p.mp[v] != nil {
+			_, _ = w.Write(p.mp[v])
+			if !bytes.HasSuffix(p.mp[v], []byte(lowhttp.CRLF)) {
+				_, _ = w.WriteString(lowhttp.CRLF)
+			}
+			return
+		}
+	}
+	return
+}
+
+func (p *partProvider) FillHTTPResponseLine(w *bytes.Buffer) {
+	if p.mp[HTTPResponseLine] != nil {
+		_, _ = w.Write(p.mp[HTTPResponseLine])
+		if !bytes.HasSuffix(p.mp[HTTPResponseLine], []byte(lowhttp.CRLF)) {
+			_, _ = w.WriteString(lowhttp.CRLF)
+		}
+		return
+	}
+	if p.mp[HTTPStart] != nil {
+		_, _ = w.Write(p.mp[HTTPStart])
+		if !bytes.HasSuffix(p.mp[HTTPStart], []byte(lowhttp.CRLF)) {
+			_, _ = w.WriteString(lowhttp.CRLF)
+		}
+		return
+	}
+
+	_, _ = w.Write(p.getOrRandom(HTTPProtocol))
+	_ = w.WriteByte(' ')
+	_, _ = w.Write(p.getOrRandom(HTTPStatCode))
+	_ = w.WriteByte(' ')
+	_, _ = w.Write(p.getOrRandom(HTTPStatMsg))
+
+	_, _ = w.WriteString(lowhttp.CRLF)
+}
+
+func (p *partProvider) FillHTTPResponseHeader(w *bytes.Buffer) {
+	p.fillHTTPHeaderBackground(w)
+	p.fillHTTPHeaderOthers(w, []header{
+		{HTTPServer, []byte("Server")},
+		{HTTPLocation, []byte("Location")},
+		{HTTPCookie, []byte("Set-Cookie")},
+		{HTTPContentType, []byte("Content-Type")},
+		{HTTPContentLen, []byte("Content-Length")},
+		{HTTPConnection, []byte("Connection")},
+	})
+}
+
+func (p *partProvider) FillHTTPResponseBody(w *bytes.Buffer) {
+	for _, v := range []Modifier{HTTPResponseBody, FileData, Default} {
 		if p.mp[v] != nil {
 			_, _ = w.Write(p.mp[v])
 			if !bytes.HasSuffix(p.mp[v], []byte(lowhttp.CRLF)) {
