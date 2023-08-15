@@ -194,7 +194,8 @@ type Phi struct {
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	user []User
 	// for build
-	variable string
+	wit1, wit2 Value // witness for trivial-phi
+	variable   string
 }
 
 // const
