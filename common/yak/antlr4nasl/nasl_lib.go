@@ -217,9 +217,6 @@ func init() {
 			if pref.IsUndefined() {
 				return nil, genNotMatchedArgumentTypeError("script_get_preference")
 			}
-			if pref.String() == "Start page : " {
-				println()
-			}
 			if v, ok := engine.scriptObj.Preferences[pref.AsString()]; ok {
 				return v.(map[string]interface{})["value"], nil
 			}
@@ -349,7 +346,7 @@ func init() {
 		"log_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			//port := params.getParamByName("port", -1)
 			data := params.getParamByName("data").Value
-			log.Info(data)
+			naslLogger.Info(data)
 			return nil, nil
 		},
 		"error_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -362,7 +359,7 @@ func init() {
 			if data == "" {
 				data = "Success"
 			}
-			errorLogger.Info(data, port.Int(), protocol.String())
+			naslLogger.Info(data, port.Int(), protocol.String())
 			return nil, nil
 		},
 		"open_sock_tcp": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -474,7 +471,7 @@ func init() {
 			option := params.getParamByName("option", 0)
 			length := params.getParamByName("length", 0)
 			if engine.debug {
-				log.Infof("send data: %s", data)
+				naslLogger.Infof("send data: %s", data)
 			}
 			data_length := len(data)
 			_ = option
@@ -483,7 +480,7 @@ func init() {
 			if conn, ok := iconn.(net.Conn); ok {
 				n, err := conn.Write([]byte(data))
 				if err != nil {
-					log.Error(err)
+					naslLogger.Error(err)
 					return 0, nil
 				}
 				return n, nil
@@ -998,7 +995,7 @@ func init() {
 			forEachParams(params, func(value *yakvm.Value) {
 				defer func() { i++ }()
 				if value.Value == nil {
-					log.Errorf("nasl_make_list: undefined variable #%d skipped\n", i)
+					naslLogger.Errorf("nasl_make_list: undefined variable #%d skipped\n", i)
 					return
 				}
 				// 列表的每一个元素添加到新的列表中
@@ -1058,7 +1055,7 @@ func init() {
 						}
 					default:
 						err := utils.Errorf("make_array: bad value type %s for arg #%d\n", reflect.TypeOf(v2).Kind(), v1)
-						log.Error(err)
+						naslLogger.Error(err)
 					}
 				}
 				iskey = !iskey
@@ -1974,11 +1971,6 @@ func init() {
 	for name, method := range naslLib {
 		NaslLib[name] = func(name string, m NaslBuildInMethod) func(engine *Engine, params *NaslBuildInMethodParam) interface{} {
 			return func(engine *Engine, params *NaslBuildInMethodParam) interface{} {
-				//defer func() {
-				//	if e := recover(); e != nil {
-				//		log.Errorf("call function `%s` panic error: %v", name, e)
-				//	}
-				//}()
 				var res interface{}
 				var err error
 				timeStart := time.Now()
@@ -1996,12 +1988,12 @@ func init() {
 				}
 
 				if err != nil {
-					log.Errorf("call build in function `%s(%v)` error in script `%v`: %v", name, paramstr, engine.scriptObj.OriginFileName, err)
+					naslLogger.Errorf("call build in function `%s(%v)` error in script `%v`: %v", name, paramstr, engine.scriptObj.OriginFileName, err)
 					return res
 				}
 				du := time.Now().Sub(timeStart).Seconds()
 				if engine.IsDebug() && du > 3 {
-					log.Infof("call build in function `%s` cost: %f", name, du)
+					naslLogger.Infof("call build in function `%s` cost: %f", name, du)
 				}
 				if res == nil {
 					return res

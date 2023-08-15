@@ -20,7 +20,7 @@ type ScriptEngine struct {
 	scripts                        map[string]*NaslScriptInfo // 将会被执行的脚本
 	scriptCache                    map[string]*NaslScriptInfo // 用于缓存查询过的脚本
 	dependencyScripts              map[string]struct{}        // 标记被依赖的脚本，减少查找根脚本的负担
-	excludeScripts                 map[string]struct{}        // 基于OID排除一些脚本
+	excludeScripts                 map[string]struct{}        // 排除一些脚本
 	goroutineNum                   int
 	debug                          bool
 	engineHooks                    []func(engine *Engine)
@@ -49,7 +49,7 @@ func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 	}
 	engine.config = cfg
 	engine.LoadScript(cfg.plugin)
-	engine.LoadFamilys(cfg.family...)
+	engine.LoadFamilys(cfg.family)
 	if cfg.conditions != nil {
 		engine.LoadWithConditions(cfg.conditions)
 	}
@@ -90,9 +90,9 @@ func (engine *ScriptEngine) Debug(debug ...bool) {
 		engine.debug = true
 	}
 }
-func (engine *ScriptEngine) AddExcludeScripts(paths ...string) {
-	for _, p := range paths {
-		engine.excludeScripts[p] = struct{}{}
+func (engine *ScriptEngine) AddExcludeScripts(names ...string) {
+	for _, name := range names {
+		engine.excludeScripts[name] = struct{}{}
 	}
 }
 func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}) ([]*NaslScriptInfo, error) {
@@ -110,9 +110,9 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 					if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
 						continue
 					}
-					if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
-						continue
-					}
+					//if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
+					//	continue
+					//}
 					if _, ok := engine.scripts[dependency]; ok {
 						continue
 					}
@@ -134,15 +134,22 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 			if script.Preferences != nil && engine.config.preference != nil {
 				for k, v := range engine.config.preference {
 					if _, ok := script.Preferences[k]; ok {
+						val := map[string]interface{}{}
+						val["name"] = k
 						switch ret := v.(type) {
 						case bool:
 							if ret {
-								v = "yes"
+								val["value"] = "yes"
+								val["type"] = "checkbox"
 							} else {
-								v = "no"
+								val["value"] = "no"
+								val["type"] = "checkbox"
 							}
+						default:
+							val["value"] = v
+							val["type"] = "entry"
 						}
-						script.Preferences[k] = v
+						script.Preferences[k] = val
 					}
 				}
 			}
@@ -274,41 +281,27 @@ func (engine *ScriptEngine) LoadScript(script any) bool {
 	}
 	return true
 }
-func (e *ScriptEngine) LoadFamilys(familys ...string) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
+func (e *ScriptEngine) LoadFamilys(family string) {
+	if family == "" {
 		return
 	}
-	for _, family := range familys {
-		if family != "Web Servers" {
-			continue
-		}
-
-		var scripts []*yakit.NaslScript
-		if family == "Web Servers" {
-			db = db.
-				Where("script_name like ?", "'%apache%'").
-				Where("script_name like ?", "'%nginx%'").
-				Where("script_name like ?", "'%jetty%'").
-				Where("script_name like ?", "'%websphere%'").
-				Where("script_name like ?", "'%Lighttpd%'").
-				Where("script_name like ?", "'% (HTTP)'").
-				Where("script_name like ?", "'%weblogic%'")
-		}
-		if db = db.Where("family = ?", family).Find(&scripts); db.Error != nil {
-			continue
-		}
-		for _, script := range scripts {
-			if _, ok := e.excludeScripts[script.OID]; ok {
-				continue
-			}
-			e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
-		}
-	}
+	e.LoadWithConditions(map[string]any{
+		"family": family,
+	})
 }
 func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
+		return
+	}
+	allowedConditions := make(map[string]any)
+	for k, v := range conditions {
+		switch k {
+		case "family", "category", "origin_file_name":
+			allowedConditions[k] = v
+		}
+	}
+	if len(allowedConditions) == 0 {
 		return
 	}
 	if family, ok := conditions["family"].(string); ok && family != "" {
@@ -317,7 +310,7 @@ func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 		}
 		if family == "Web Servers" {
 			db = db.
-				Where("script_name like '%apache%' OR script_name like '%nginx%' OR script_name like '%jetty%' OR script_name like '%websphere%' OR script_name like '%Lighttpd%' OR script_name like '%tomcat%' OR script_name like '% (HTTP)' OR script_name like '%weblogic%'")
+				Where("script_name like '%apache%' OR script_name like '%nginx%' OR script_name like '%jetty%' OR script_name like '%websphere%' OR script_name like '%Lighttpd%' OR script_name like '%tomcat%' OR script_name like '% (HTTP)' OR script_name like '%weblogic%'").Unscoped()
 		}
 	}
 
@@ -363,7 +356,6 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	if len(rootScripts) == 0 {
 		return utils.Errorf("no scripts to scan")
 	}
-	var allErrors multiError
 	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxies...)
 	if res.Ok {
 		e.Kbs.SetKB("Host/dead", 0)
@@ -425,11 +417,36 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	for _, hook := range e.engineHooks {
 		hook(engine)
 	}
-	for _, script := range rootScripts {
-		if _, ok := e.excludeScripts[script.OID]; ok {
-			continue
+	executedScripts := map[string]struct{}{}
+	var allErrors utils.MergeErrors
+	var runScriptWithDep func(script *NaslScriptInfo) error
+	runScriptWithDep = func(script *NaslScriptInfo) error {
+		if _, ok := executedScripts[script.OriginFileName]; ok {
+			return nil
 		}
-		err := engine.RunScript(script)
+		executedScripts[script.OriginFileName] = struct{}{}
+		if _, ok := e.excludeScripts[script.OID]; ok {
+			return fmt.Errorf("script %s is excluded", script.OriginFileName)
+		}
+		if len(script.Dependencies) > 0 {
+			for _, dependency := range script.Dependencies {
+				if dependency == "toolcheck.nasl" {
+					continue
+				}
+				dependencyScript, ok := e.scripts[dependency]
+				if !ok {
+					return fmt.Errorf("script %s dependency %s not found", script.OriginFileName, dependency)
+				}
+				err := runScriptWithDep(dependencyScript)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return engine.RunScript(script)
+	}
+	for _, script := range rootScripts {
+		err := runScriptWithDep(script)
 		if err != nil {
 			log.Errorf("run script %s met error: %s", script.OriginFileName, err)
 			allErrors = append(allErrors, err)
