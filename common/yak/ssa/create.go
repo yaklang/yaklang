@@ -56,7 +56,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		symbol: &Interface{
 			anInstruction: anInstruction{},
-			ITyp:          InterfaceGlobal,
 			// I:     parent.symbol,
 			field: make(map[Value]*Field),
 			users: []User{},

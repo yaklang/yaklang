@@ -302,20 +302,10 @@ type UnOp struct {
 
 // special instruction ------------------------------------------
 
-type InterfaceType int
-
-const (
-	InterfaceSlice = iota
-	InterfaceStruct
-	InterfaceMap
-	InterfaceGlobal
-)
-
 // instruction + value + user
 type Interface struct {
 	anInstruction
 
-	ITyp InterfaceType
 	// when slice
 	low, high, max Value
 
@@ -397,7 +387,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		switch v := v.(type) {
 		case Instruction:
 			if i, ok := v.(*Interface); ok {
-				if i.ITyp == InterfaceGlobal {
+				if i == i.Func.symbol {
 					return i.Func.name + "-symbol"
 				}
 			}
@@ -750,14 +740,10 @@ func (i *Interface) String() string {
 }
 
 func (i *Interface) StringByFunc(Str func(Node) string) string {
-	if i.ITyp == InterfaceGlobal {
-		return i.Func.name + "-symbol"
-	} else {
-		return fmt.Sprintf(
-			"%s = Interface %s [%s, %s]",
-			Str(i), i.typs, Str(i.Len), Str(i.Cap),
-		)
-	}
+	return fmt.Sprintf(
+		"%s = Interface %s [%s, %s]",
+		Str(i), i.typs, Str(i.Len), Str(i.Cap),
+	)
 }
 
 var _ Node = (*Interface)(nil)
