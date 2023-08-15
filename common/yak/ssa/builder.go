@@ -1009,8 +1009,9 @@ func (b *builder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 		b.NewParam(id.GetText())
 	}
 	if ellipsis != nil {
-		//TODO: handler "..." to array
-		// param[len(ids)-1]
+		// handler "..." to array
+		b.Param[len(b.Param)-1].typs = append(b.Param[len(b.Param)-1].typs, NewSliceType(nil))
+		b.hasEllipsis = true
 	}
 }
 
@@ -1040,8 +1041,10 @@ func (b *builder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []V
 		v = append(v, b.buildExpression(expr.(*yak.ExpressionContext)))
 	}
 	if ellipsis != nil {
-		//TODO: handler "..." to array
-		// v[len(v)-1]
+		//handler "..." to array
+		typ := v[len(v)-1].GetType()
+		typ = append(typ, NewSliceType(nil))
+		v[len(v)-1].SetType(typ)
 	}
 	return v
 }

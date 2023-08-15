@@ -77,6 +77,9 @@ func (i SliceType) String() string {
 }
 
 func NewSliceType(elem Types) *SliceType {
+	if elem == nil {
+		elem = make(Types, 0)
+	}
 	return &SliceType{
 		Elem: elem,
 	}
