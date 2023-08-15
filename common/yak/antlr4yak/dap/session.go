@@ -259,7 +259,7 @@ func (ds *DebugSession) WaitProgramStart() {
 }
 
 func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
-	var args LaunchConfig
+	args := defaultArgs
 	if ds.debugger != nil {
 		ds.sendShowUserErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
 			"debug session already in progress - use remote attach mode to connect to a server with an active debug session")
@@ -456,18 +456,32 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 	// 等待程序启动
 	ds.WaitProgramStart()
 
-	var stackFrames []dap.StackFrame
+	var (
+		frames      []yakvm.StackTrace
+		stackFrames []dap.StackFrame
+	)
 
 	threadID := uint64(request.Arguments.ThreadId)
-	startFrame := request.Arguments.StartFrame
-	maxLevels := request.Arguments.Levels
+	start := request.Arguments.StartFrame
+	if start < 0 {
+		start = 0
+	}
+	levels := ds.launchConfig.StackTraceDepth
+	if request.Arguments.Levels > 0 {
+		levels = request.Arguments.Levels
+	}
+
 	found := false
+	total := 0
 
 	for _, stackTraces := range ds.debugger.GetStackTraces() {
 		if stackTraces.ThreadID == threadID {
 			found = true
-			for count := startFrame; count < len(stackTraces.StackTraces); count++ {
-				stackTrace := stackTraces.StackTraces[count]
+			frames = stackTraces.StackTraces
+			total = len(frames)
+
+			for i := 0; i < levels && start+i < total; i++ {
+				stackTrace := frames[start+i]
 				source := *stackTrace.Source
 				stackFrames = append(stackFrames, dap.StackFrame{
 					Id:        stackTrace.ID, // stackTrace.ID 就是 frameId
@@ -478,11 +492,7 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 					EndLine:   stackTrace.EndLine,
 					EndColumn: stackTrace.EndColumn,
 				})
-				// if maxLevels is 0, then return all stackFrames
-				// otherwise, return maxLevels stackFrames
-				if maxLevels > 0 && count >= maxLevels {
-					break
-				}
+
 			}
 			break
 		}
@@ -495,9 +505,16 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 
 	response := &dap.StackTraceResponse{}
 	response.Response = *newResponse(request.Request)
+	if len(frames) >= start+levels && frames[len(frames)-1].ID != 0 {
+		// We don't know the exact number of available stack frames, so
+		// add an arbitrary number so the client knows to request additional
+		// frames.
+		total += ds.launchConfig.StackTraceDepth
+	}
+
 	response.Body = dap.StackTraceResponseBody{
 		StackFrames: stackFrames,
-		TotalFrames: len(stackFrames),
+		TotalFrames: total,
 	}
 	ds.send(response)
 }

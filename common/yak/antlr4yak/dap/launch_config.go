@@ -45,6 +45,14 @@ type LaunchConfig struct {
 
 	// Automatically stop program after launch or attach.
 	StopOnEntry bool `json:"stopOnEntry,omitempty"`
+
+	// StackTraceDepth is the maximum length of the returned list of stack frames.
+	StackTraceDepth int `cfgName:"stackTraceDepth"`
+}
+
+var defaultArgs = LaunchConfig{
+	StopOnEntry:     false,
+	StackTraceDepth: 50,
 }
 
 func unmarshalLaunchConfig(input json.RawMessage, config any) error {
