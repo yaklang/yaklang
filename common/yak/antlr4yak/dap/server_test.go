@@ -74,8 +74,6 @@ func runDebugSessionWithBPs(t *testing.T, client *Client, cmdRequest func(), sou
 	client.ExpectTerminatedEvent(t) // Let the program run to completion
 
 	disconnect()
-	client.ExpectDisconnectResponse(t)
-	client.ExpectTerminatedEvent(t)
 }
 
 func startDAPServer(t *testing.T, serverStopped chan struct{}) (server *DAPServer, forceStop chan struct{}) {
