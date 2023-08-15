@@ -1,0 +1,10 @@
+wg = sync.NewSizedWaitGroup(10)
+func work() {
+    wg.Done()
+}
+
+wg.Add(10)
+for i := 0; i < 10; i++ {
+    go work()
+}
+wg.Wait()
