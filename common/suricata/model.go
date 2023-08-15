@@ -13,53 +13,6 @@ import (
 	"time"
 )
 
-type Modifier uint32
-
-const (
-	Default Modifier = iota
-
-	// http req
-	HTTPUri
-	HTTPUriRaw
-	HTTPMethod
-	HTTPRequestLine
-	HTTPRequestBody
-	HTTPUserAgent
-	HTTPHost
-	HTTPHostRaw
-	HTTPAccept
-	HTTPAcceptLang
-	HTTPAcceptEnc
-	HTTPReferer
-
-	// http resp
-	HTTPStatMsg
-	HTTPStatCode
-	HTTPResponseLine
-	HTTPResponseBody
-	HTTPServer
-	HTTPLocation
-
-	// http common
-	HTTPHeader
-	HTTPHeaderRaw
-	HTTPCookie
-	HTTPConnection
-	FileData
-	HTTPContentType
-	HTTPContentLen
-	HTTPStart
-	HTTPProtocol
-	HTTPHeaderNames
-
-	// DNS
-	DNSQuery
-
-	// IP
-	IPv4HDR
-	IPv6HDR
-)
-
 type Rule struct {
 	Raw                string       `json:"raw"`
 	Message            string       `json:"message"`
