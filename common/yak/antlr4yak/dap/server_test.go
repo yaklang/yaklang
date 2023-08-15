@@ -452,8 +452,8 @@ func TestLaunchStopOnEntry(t *testing.T) {
 		if tResp.Seq != 0 || tResp.RequestSeq != 7 || len(tResp.Body.Threads) != 1 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", tResp)
 		}
-		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] global code" {
-			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] global code\"", tResp)
+		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] main" {
+			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] main\"", tResp)
 		}
 
 		// 8 >> stackTrace, << error
@@ -555,8 +555,8 @@ func TestLaunchContinueOnEntry(t *testing.T) {
 		if tResp.Seq != 0 || tResp.RequestSeq != 6 || len(tResp.Body.Threads) != 1 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", tResp)
 		}
-		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] global code" {
-			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] global code\"", tResp)
+		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] main" {
+			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] main\"", tResp)
 		}
 
 		// 7 >> disconnect, << disconnect
@@ -637,7 +637,7 @@ func TestPreSetBreakPoint(t *testing.T) {
 			}
 		}
 		checkFrame(stResp.Body.StackFrames[0], 1, "test", "", 2)
-		checkFrame(stResp.Body.StackFrames[1], 0, "global code", "", 7)
+		checkFrame(stResp.Body.StackFrames[1], 0, "main", "", 7)
 
 		client.ScopesRequest(1)
 		scopes := client.ExpectScopesResponse(t)
@@ -703,7 +703,7 @@ func TestStackTraceRequest(t *testing.T) {
 						"subset of frames from 1 to -1":           {1, NumFrames - 1, "Increment", 6, 1, NumFrames - 1, NumFrames, true},
 						"load stack in pages: first half":         {0, NumFrames / 2, "Increment", 3, 0, NumFrames / 2, NumFrames, false},
 						"load stack in pages: second half":        {NumFrames / 2, NumFrames, "Increment", 6, NumFrames / 2, NumFrames / 2, NumFrames, true},
-						"load final stack":                        {NumFrames - 1, NumFrames, "global code", 11, NumFrames - 1, 1, NumFrames, true},
+						"load final stack":                        {NumFrames - 1, NumFrames, "main", 11, NumFrames - 1, 1, NumFrames, true},
 						"zero levels means all levels":            {0, 0, "Increment", 3, 0, NumFrames, NumFrames, true},
 						"zero levels means all remaining levels":  {NumFrames / 2, 0, "Increment", 6, NumFrames / 2, NumFrames / 2, NumFrames, true},
 						"negative levels treated as 0 (all)":      {0, -10, "Increment", 3, 0, NumFrames, NumFrames, true},
@@ -725,7 +725,7 @@ func TestStackTraceRequest(t *testing.T) {
 					execute: func() {
 						client.StackTraceRequest(0, 0, 0)
 						stResp = client.ExpectStackTraceResponse(t)
-						checkStackFramesExact(t, stResp, "global code", 13, 0, 1, 1)
+						checkStackFramesExact(t, stResp, "main", 13, 0, 1, 1)
 					},
 					disconnect: false,
 				}})
