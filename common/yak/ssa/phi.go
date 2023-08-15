@@ -17,6 +17,7 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 }
 
 func (phi *Phi) Build() Value {
+	phi.Block.skip = true
 	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
 		v := phi.Func.readVariableByBlock(phi.variable, predBlock)
@@ -27,6 +28,7 @@ func (phi *Phi) Build() Value {
 		}
 		phi.Edge = append(phi.Edge, v)
 	}
+	phi.Block.skip = false
 	v := phi.tryRemoveTrivialPhi()
 	if v == phi {
 		block := phi.Block

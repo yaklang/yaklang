@@ -62,6 +62,9 @@ func (f *Function) writeVariableByBlock(variable string, value Value, block *Bas
 }
 
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
+	if block.skip {
+		return nil
+	}
 	if map2, ok := f.currentDef[variable]; ok {
 		if value, ok := map2[block]; ok {
 			return value
@@ -82,10 +85,7 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 	} else if len(block.Preds) == 1 {
 		v = f.readVariableByBlock(variable, block.Preds[0])
 	} else {
-		phi := NewPhi(f, block, variable)
-		//TODO: use visit-flag inplace phi variable
-		f.writeVariableByBlock(variable, phi, block)
-		v = phi.Build()
+		v = NewPhi(f, block, variable).Build()
 	}
 	if v != nil {
 		f.writeVariableByBlock(variable, v, block)
