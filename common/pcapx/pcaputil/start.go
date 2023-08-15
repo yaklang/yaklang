@@ -18,7 +18,7 @@ type Config struct {
 	BPFFilter string
 	Context   context.Context
 
-	trafficPool *TrafficPool
+	trafficPool *trafficPool
 	//Assembler *tcpassembly.Assembler
 
 	// output debug info
@@ -61,6 +61,7 @@ func (c *Config) assemblyWithTS(flow gopacket.Flow, networkLayer gopacket.Serial
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 	c.trafficPool.Feed(flow, networkLayer, tcp)
