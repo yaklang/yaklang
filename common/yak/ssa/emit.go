@@ -216,23 +216,10 @@ func (f *Function) emitCall(target Value, args []Value, isDropError bool) *Call 
 	return c
 }
 
-func (f *Function) emitInterface(parentI *Interface, typ types.Type, low, high, max, Len, Cap Value) *Interface {
-	var ITyp InterfaceType
-
-	switch typ.(type) {
-	case *types.Slice:
-		ITyp = InterfaceSlice
-	case *types.Map:
-		ITyp = InterfaceMap
-	case *types.Struct:
-		ITyp = InterfaceStruct
-	default:
-		panic("emit interface unknow type")
-	}
+func (f *Function) emitInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value) *Interface {
 	i := &Interface{
 		anInstruction: f.newAnInstuction(),
 		parentI:       parentI,
-		ITyp:          ITyp,
 		low:           low,
 		high:          high,
 		max:           max,
@@ -241,7 +228,9 @@ func (f *Function) emitInterface(parentI *Interface, typ types.Type, low, high, 
 		Cap:           Cap,
 		users:         make([]User, 0),
 	}
-	i.anInstruction.typs = append(i.anInstruction.typs, typ)
+	if typs != nil {
+		i.anInstruction.typs = typs
+	}
 	f.emit(i)
 	fixupUseChain(i)
 	return i
