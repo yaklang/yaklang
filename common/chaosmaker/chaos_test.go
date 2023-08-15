@@ -28,7 +28,7 @@ var rules = []*ruleTest{
 		trafficCount: 4,
 	},
 	{
-		rule:         `alert http $EXTERNAL_NET any -> $HOME_NET any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w{2,3}\s+\d{4}-\d{2}-\d{2}\s[\d:]{8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
+		rule:         `alert http any any -> any any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w{2,3}\s+\d{4}-\d{2}-\d{2}\s[\d:]{8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
 		trafficCount: 2,
 	},
 	{

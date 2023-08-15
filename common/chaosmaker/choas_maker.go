@@ -2,6 +2,7 @@ package chaosmaker
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -108,11 +109,12 @@ func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *ChaosTra
 		return nil, utils.Errorf("parse suricata rule failed: %v", err)
 	}
 
-	mapRule := originRule.RuleType + "-" + originRule.Protocol
+	mapRule := fmt.Sprintf("%s-%s", originRule.RuleType, originRule.Protocol)
 	handler, ok := chaosMap.Load(mapRule)
 	if !ok {
 		return nil, utils.Errorf("cannot found protocol %s", mapRule)
 	}
+
 	h, ok := handler.(chaosHandler)
 	if !ok {
 		return nil, utils.Errorf("cannot convert %v to chaosHandler", handler)
@@ -133,12 +135,12 @@ func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *ChaosTra
 	}
 
 	if len(chans) > 0 {
-		return c.mergeChans(chans...), nil
+		return mergeChans(chans...), nil
 	}
 	return nil, utils.Errorf("no traffic generator found for %d rules", len(rules))
 }
 
-func (c *ChaosMaker) mergeChans(chans ...chan *ChaosTraffic) chan *ChaosTraffic {
+func mergeChans(chans ...chan *ChaosTraffic) chan *ChaosTraffic {
 	merged := make(chan *ChaosTraffic)
 	go func() {
 		defer func() {
