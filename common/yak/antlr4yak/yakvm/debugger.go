@@ -246,7 +246,7 @@ func (g *Debugger) InRootState() bool {
 
 func (g *Debugger) StateName() string {
 	frame := g.frame
-	stateName := "global code"
+	stateName := "main"
 	if frame == nil {
 		return "unknown"
 	}
