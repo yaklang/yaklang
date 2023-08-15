@@ -267,13 +267,11 @@ entry0:
 	update [<int64> t6] = <int64> 1
 	<int64> t8 = <[]int64> t5 field[<int64> 1]
 	update [<int64> t8] = <int64> 2
-	<int64, string> t10 = <[]int64> t5 field[<int64> 2]
-	update [<int64, string> t10] = <int64> 3
+	<int64> t10 = <[]int64> t5 field[<int64> 2]
+	update [<int64> t10] = <int64> 3
 	<int64> t12 = <int64> t6 add <int64> t8
-	<int64> t13 = <int64> t12 add <int64, string> t10
-	update [<int64, string> t10] = <int64> t13
-	<string> t15 = <string> arst add <string> a
-	update [<int64, string> t10] = <string> t15
+	<int64> t13 = <int64> t12 add <int64> t10
+	<string> t14 = <string> arst add <string> a
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
