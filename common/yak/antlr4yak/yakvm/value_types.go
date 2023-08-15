@@ -223,6 +223,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 ) error {
 
 	srcKind := reflectValue.Kind()
+
 	if srcKind == reflect.Invalid {
 		*reflectValue = reflect.Zero(reflectType) // work around `reflect: Call using zero Value argument`
 		return nil
