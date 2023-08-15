@@ -120,6 +120,8 @@ type Function struct {
 	Return []*Return
 
 	// type
+	ParamTyp    []Types
+	ReturnTyp   []Types
 	hasEllipsis bool
 
 	// BasicBlock list

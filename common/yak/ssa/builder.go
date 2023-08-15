@@ -693,21 +693,28 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 			return ret
 		} else if b.CanBuildFreeValue(text) {
 			return b.BuildFreeValue(text)
+		} else {
+			fmt.Printf("warn!! Expression: undefine value %v\n", s.GetText())
+			return nil
 		}
-		panic(fmt.Sprintf("undefine value %v", s.GetText()))
 	}
 
-	getExpr := func(index int) Value {
+	getValueWithExpr := func(index int) (Value, *yak.ExpressionContext) {
 		if s, ok := stmt.Expression(index).(*yak.ExpressionContext); ok {
-			return b.buildExpression(s)
+			return b.buildExpression(s), s
 		}
-		return nil
+		return nil, nil
 	}
+	getValue := func(index int) Value {
+		v, _ := getValueWithExpr(index)
+		return v
+	}
+
 	//TODO: member call
 
 	// slice call
 	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
-		expr, ok := getExpr(0).(*Interface)
+		expr, ok := getValue(0).(*Interface)
 		if !ok {
 			panic("expression slice need expression")
 		}
@@ -725,12 +732,16 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 
 	// function call
 	if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
-		v := getExpr(0)
+		v, expr := getValueWithExpr(0)
 		if v != nil {
 			return b.buildFunctionCall(s, v)
-		} else {
-			panic("call target is nil")
 		}
+		if expr != nil {
+			if f, ok := buildin[expr.GetText()]; ok {
+				return b.buildFunctionCall(s, f)
+			}
+		}
+		panic("call target is nil")
 	}
 
 	//TODO: parent expression
@@ -771,8 +782,8 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 	}
 
 	if op := getBinaryOp(); op != nil {
-		op0 := getExpr(0)
-		op1 := getExpr(1)
+		op0 := getValue(0)
+		op1 := getValue(1)
 		if op0 == nil || op1 == nil {
 			panic("additive binary operator need two expression")
 		}
