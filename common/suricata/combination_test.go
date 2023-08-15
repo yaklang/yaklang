@@ -19,4 +19,9 @@ func TestHTTPCombination(t *testing.T) {
 		HTTPHeader:      []byte(`Abc: efg`),
 		HTTPRequestBody: []byte("Hello World"),
 	})))
+	t.Log(string(HTTPCombination(map[Modifier][]byte{
+		HTTPStatCode:     []byte("200"),
+		HTTPHeader:       []byte(`Abc: efg`),
+		HTTPResponseBody: []byte("Hello World"),
+	})))
 }
