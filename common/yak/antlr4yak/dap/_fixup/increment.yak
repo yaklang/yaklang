@@ -10,3 +10,4 @@ func Increment(v) {
 {
 	Increment(3)
 }
+a = 1 // for breakpoint
