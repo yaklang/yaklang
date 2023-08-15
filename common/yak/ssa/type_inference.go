@@ -8,6 +8,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
+func ParseInterfaceTypes(vs []Value) Types {
+	structType := NewStructType()
+	for i, v := range vs {
+		typs := v.GetType()
+		structType.AddField(NewConst(i), typs)
+	}
+	return Types{structType.Transform()}
+}
+
 func ParseTypesFromValues(vs []Value) Types {
 	typs := make(Types, 0, len(vs))
 	tmp := map[Type]struct{}{}
@@ -42,7 +51,7 @@ func (i *If) InferenceType() {
 	if len(condtyp) == 0 {
 		fmt.Printf("warn: if cond type is nil\n")
 	} else if len(condtyp) == 1 {
-		if cond.GetType()[0] != basicTypes["bool"] {
+		if cond.GetType()[0] != basicTypesKind[Bool] {
 			fmt.Printf("warn: if condition must be bool\n")
 		}
 	} else {
@@ -59,16 +68,12 @@ func (r *Return) InferenceType() {
 		r.typs = r.Results[0].GetType()
 	} else {
 		// multiple, make a interface_struct
-
-		v := make([]*types.Var, 0, len(r.Results))
-		for _, r := range r.Results {
-			var typ Type
-			if len(r.GetType()) >= 1 {
-				typ = r.GetType()[0]
-			}
-			v = append(v, types.NewVar(0, nil, r.String(), typ))
+		structType := NewStructType()
+		for i, r := range r.Results {
+			structType.AddField(NewConst(i), r.GetType())
 		}
-		r.typs = append(r.typs, types.NewStruct(v, nil))
+		r.typs = Types{structType.Transform()}
+
 	}
 }
 
@@ -108,7 +113,7 @@ func (sw *Switch) InferenceType() {
 
 func (b *BinOp) InferenceType() {
 	if b.Op >= yakvm.OpGt && b.Op <= yakvm.OpNotEq {
-		b.typs = []Type{basicTypes["bool"]}
+		b.typs = []Type{basicTypesKind[Bool]}
 		return
 	}
 	org := b.typs
@@ -116,7 +121,7 @@ func (b *BinOp) InferenceType() {
 	x, y := b.X.GetType(), b.Y.GetType()
 
 	parseType := func(x, y Type) bool {
-		if x == y {
+		if x.String() == y.String() {
 			typs = append(typs, x)
 			return true
 		} else if x, ok := x.(*types.Basic); ok {
@@ -203,26 +208,12 @@ func (i *Interface) InferenceType() {
 
 func GetField(I Type, key Value) Type {
 	switch I := I.(type) {
-	case *types.Slice:
-		return I.Elem()
-	case *types.Map:
-		return I.Elem()
-	case *types.Struct:
-		// I.Field()
-		if key, ok := key.(*Const); ok {
-			if key.typ[0] == basicTypes["int64"] {
-				return I.Field(int(key.value.(int64))).Type()
-			}
-			if key.typ[0] == basicTypes["string"] {
-				for i := 0; i < I.NumFields(); i++ {
-					v := I.Field(i)
-					if v.Name() == key.value.(string) {
-						return v.Type()
-					}
-				}
-			}
-		}
-
+	case *SliceType:
+		return I.Elem
+	case *MapType:
+		return I.Value
+	case *StructType:
+		return I.GetField(key)
 	}
 
 	return nil
@@ -271,7 +262,7 @@ func (u *Update) InferenceType() {
 		}
 	} else {
 		// addtyp > 0 && valueTyp > 0
-		addTyp = lo.Uniq(append(addTyp, valueTyp...))
+		addTyp = lo.UniqBy(append(addTyp, valueTyp...), func(t Type) string { return t.String() })
 		address.SetType(addTyp)
 	}
 }
@@ -291,5 +282,5 @@ func CheckUpdateType(address, value []Type) {
 	}
 }
 
-func CheckTransForm(from, to types.Type) {
+func CheckTransForm(from, to Type) {
 }

@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"go/types"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
@@ -236,11 +235,11 @@ func (f *Function) emitInterface(parentI *Interface, typs Types, low, high, max,
 	return i
 }
 
-func (f *Function) emitInterfaceBuild(typ types.Type, Len, Cap Value) *Interface {
+func (f *Function) emitInterfaceBuildWithType(typ Types, Len, Cap Value) *Interface {
 	return f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
 }
 func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
-	return f.emitInterface(i, i.typs[0], low, high, max, nil, nil)
+	return f.emitInterface(i, i.typs, low, high, max, nil, nil)
 }
 
 func (f *Function) emitField(i Value, key Value) *Field {
@@ -249,6 +248,7 @@ func (f *Function) emitField(i Value, key Value) *Field {
 
 func (f *Function) emitUpdate(address *Field, v Value) *Update {
 	//use-value-chain: address -> update -> value
+	CheckUpdateType(address.GetType(), v.GetType())
 	s := &Update{
 		anInstruction: f.newAnInstuction(),
 		value:         v,
