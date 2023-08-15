@@ -298,3 +298,19 @@ func (c *Client) CheckVariablesResponse(t *testing.T, m dap.Message) *dap.Variab
 	}
 	return r
 }
+
+func (c *Client) CheckStopLocation(t *testing.T, thread int, name string, line int) {
+	t.Helper()
+	c.StackTraceRequest(thread, 0, 20)
+	st := c.ExpectStackTraceResponse(t)
+	if len(st.Body.StackFrames) < 1 {
+		t.Errorf("\ngot  %#v\nwant len(stackframes) => 1", st)
+	} else {
+		if line != -1 && st.Body.StackFrames[0].Line != line {
+			t.Errorf("\ngot  %#v\nwant Line=%d", st, line)
+		}
+		if st.Body.StackFrames[0].Name != name {
+			t.Errorf("\ngot  %#v\nwant Name=%q", st, name)
+		}
+	}
+}
