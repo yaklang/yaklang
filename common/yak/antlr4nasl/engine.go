@@ -196,6 +196,7 @@ func (e *Engine) SafeRunFile(path string) (err error) {
 }
 func (e *Engine) RunScript(script *NaslScriptInfo) error {
 	e.logger.Debugf("Running script %s", script.OriginFileName)
+	e.scriptObj = script
 	return e.safeEvalWithFileName(script.Script, script.OriginFileName)
 }
 
