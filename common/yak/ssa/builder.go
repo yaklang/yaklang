@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"go/types"
 	"strconv"
 	"strings"
 
@@ -866,9 +865,9 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 		} else {
 			panic("make slice expression error!")
 		}
-	case *types.Map:
+	case *MapType:
 		fmt.Printf("debug %v\n", "make map")
-	case *types.Chan:
+	case *ChanType:
 		fmt.Printf("debug %v\n", "make chan")
 	default:
 		panic("make unknow type")
@@ -916,7 +915,6 @@ func (b *builder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) Type 
 	defer recover()
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
-			// return types.NewSlice(eleTyp)
 			return NewSliceType(Types{eleTyp})
 		}
 	}
