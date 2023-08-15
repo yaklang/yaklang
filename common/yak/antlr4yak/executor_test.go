@@ -3680,3 +3680,10 @@ test()
 		t.Fatal(utils2.Errorf("expect error `native func arg number error`, but get `nil`"))
 	}
 }
+
+func TestFixIssues304(t *testing.T) {
+	code := `
+ni = []var([]var{[]var{123}})
+`
+	_marshallerTest(code)
+}

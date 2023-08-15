@@ -223,13 +223,14 @@ func (v *Frame) AutoConvertReflectValueByType(
 ) error {
 
 	srcKind := reflectValue.Kind()
+
 	if srcKind == reflect.Invalid {
 		*reflectValue = reflect.Zero(reflectType) // work around `reflect: Call using zero Value argument`
 		return nil
 	}
 
 	// 类型相同，不需要转换
-	if reflectType == reflectValue.Type() {
+	if srcKind != reflect.Array && srcKind != reflect.Slice && reflectType == reflectValue.Type() {
 		return nil
 	}
 
