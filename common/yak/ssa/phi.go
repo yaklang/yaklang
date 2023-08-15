@@ -17,9 +17,9 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 }
 
 func (phi *Phi) Build() Value {
-	for _, p := range phi.Block.Preds {
+	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
-		v := phi.Func.readVariableByBlock(phi.variable, p)
+		v := phi.Func.readVariableByBlock(phi.variable, predBlock)
 		if v == nil {
 			// warn!!! con't found this variable
 			//TODO: if in left-expression is not warn
@@ -27,7 +27,7 @@ func (phi *Phi) Build() Value {
 		}
 		phi.Edge = append(phi.Edge, v)
 	}
-	v := phi.triRemoveTrivialPhi()
+	v := phi.tryRemoveTrivialPhi()
 	if v == phi {
 		block := phi.Block
 		block.Phis = append(block.Phis, phi)
@@ -36,35 +36,49 @@ func (phi *Phi) Build() Value {
 	return v
 }
 
-func (phi *Phi) triRemoveTrivialPhi() Value {
-	var same Value
-	same = nil
-	for _, v := range phi.Edge {
-		// pass same and phi self
-		if v == same || v == phi {
-			continue
+func (phi *Phi) tryRemoveTrivialPhi() Value {
+	w1, w2 := phi.wit1, phi.wit2
+	getValue := func(pass Value) Value {
+		for _, v := range phi.Edge {
+			if v == phi || v == pass {
+				continue
+			}
+			return v
 		}
-
-		// if have multiple value
-		if same != nil {
-			return phi
-		}
-		same = v
-	}
-
-	if same == nil {
-		// The phi is in unreachable block or in the start block
 		return nil
 	}
-
-	ReplaceValue(phi, same)
-
-	for _, user := range phi.GetUsers() {
-		switch p := user.(type) {
-		case *Phi:
-			p.triRemoveTrivialPhi()
+	if w1 == nil || w2 == nil {
+		// init w1 w2
+		w1 = getValue(nil)
+		w2 = getValue(w1)
+	} else {
+		if w1 == phi || w1 == w2 {
+			w1 = getValue(w2)
+		}
+		if w2 == phi || w2 == w1 {
+			w2 = getValue(w1)
 		}
 	}
 
-	return same
+	var ret Value
+	ret = phi
+	if w1 == nil {
+		if w2 == nil {
+			ret = nil
+		}
+		ret = w2
+	}
+	if w2 == nil {
+		ret = w1
+	}
+	if ret != nil && ret != phi {
+		ReplaceValue(phi, ret)
+		for _, user := range phi.GetUsers() {
+			switch p := user.(type) {
+			case *Phi:
+				p.tryRemoveTrivialPhi()
+			}
+		}
+	}
+	return ret
 }
