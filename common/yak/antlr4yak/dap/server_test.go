@@ -168,6 +168,20 @@ func checkChildren(t *testing.T, got *dap.VariablesResponse, parentName string, 
 	}
 }
 
+func checkStop(t *testing.T, client *Client, thread int, fname string, line int) {
+	t.Helper()
+	client.ThreadsRequest()
+	client.ExpectThreadsResponse(t)
+
+	client.CheckStopLocation(t, thread, fname, line)
+
+	client.ScopesRequest(1)
+	client.ExpectScopesResponse(t)
+
+	client.VariablesRequest(1)
+	client.ExpectVariablesResponse(t)
+}
+
 func checkStackFramesExact(t *testing.T, got *dap.StackTraceResponse,
 	wantStartName string, wantStartLine, wantStartID, wantFrames, wantTotalFrames int) {
 	t.Helper()
@@ -755,5 +769,48 @@ func TestStackTraceRequest(t *testing.T) {
 					},
 					disconnect: false,
 				}})
+	})
+}
+
+func TestThreadsRequest(t *testing.T) {
+	runTest(t, "ThreadsRequest", GoroutineTestcase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{6},
+			[]onBreakpoint{{
+				execute: func() {
+					checkStop(t, client, 0, "main", 6)
+					client.SetBreakpointsRequest(program, []int{3})
+					client.ExpectSetBreakpointsResponse(t)
+
+					client.ContinueRequest(1)
+					client.ExpectContinueResponse(t)
+
+					se := client.ExpectStoppedEvent(t)
+					if se.Body.Reason != "breakpoint" || se.Body.ThreadId == 0 {
+						t.Errorf("got %#v, want Reason=%q, ThreadId!=0", se, "breakpoint")
+					}
+
+					client.ThreadsRequest()
+					tr := client.ExpectThreadsResponse(t)
+
+					if len(tr.Body.Threads) != 2 {
+						t.Errorf("got %d threads, expected 2\n", len(tr.Body.Threads))
+					}
+
+					var selectedFound bool
+					for _, thread := range tr.Body.Threads {
+						if thread.Id == se.Body.ThreadId {
+							selectedFound = true
+							break
+						}
+					}
+					if !selectedFound {
+						t.Errorf("got %#v, want ThreadId=%d\n", tr.Body.Threads, se.Body.ThreadId)
+					}
+				},
+				disconnect: true,
+			}})
 	})
 }
