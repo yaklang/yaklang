@@ -230,7 +230,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 	}
 
 	// 类型相同，不需要转换
-	if srcKind != reflect.Array && srcKind != reflect.Slice && reflectType == reflectValue.Type() {
+	if reflectType == reflectValue.Type() {
 		return nil
 	}
 
