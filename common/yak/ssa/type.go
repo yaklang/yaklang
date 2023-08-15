@@ -155,17 +155,17 @@ func (s *StructType) Transform() Type {
 }
 
 // ====================== chan type
-type Chan struct {
+type ChanType struct {
 	elem Types
 }
 
-func NewChanType(elem Types) *Chan {
-	return &Chan{
+func NewChanType(elem Types) *ChanType {
+	return &ChanType{
 		elem: elem,
 	}
 }
 
-func (c Chan) String() string {
+func (c ChanType) String() string {
 	return fmt.Sprintf("chan %s", c.elem)
 }
 
