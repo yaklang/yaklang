@@ -618,12 +618,15 @@ func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 			// when v exist
 			switch v := v.(type) {
 			case *Field:
-				return v
+				if v.outCapture {
+					return v
+				}
 			case *Parameter:
 			default:
 			}
 		} else if !forceAssign && b.CanBuildFreeValue(s.GetText()) {
 			field := b.parent.newField(s.GetText())
+			field.outCapture = true
 			b.FreeValues = append(b.FreeValues, field)
 			b.parent.writeVariable(s.GetText(), field)
 			b.writeVariable(s.GetText(), field)
