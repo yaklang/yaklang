@@ -87,7 +87,6 @@ func (c *Call) InferenceType() {
 		ret := inst.Return
 		if len(ret) == 0 {
 			fmt.Printf("warn: function %s return type is nil\n", inst.name)
-			typs = []Type{types.Typ[types.UntypedNil]}
 		} else if len(ret) == 1 {
 			typs = inst.Return[0].GetType()
 		} else {
