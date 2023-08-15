@@ -1,27 +1,25 @@
 package suricata
 
 import (
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"math"
 	"strconv"
 	"strings"
 )
 
-type PayloadGen struct {
-	Modifiers []ByteMapModifier
-	Len       int
+type Generator interface {
+	Gen() []byte
 }
 
 type Surigen struct {
 	rules []*ContentRule
-	gen   map[Modifier]*PayloadGen
+	gen   map[Modifier]Generator
 }
 
 func NewSurigen(contentRules []*ContentRule) (*Surigen, error) {
 	g := &Surigen{
 		rules: contentRules,
-		gen:   make(map[Modifier]*PayloadGen),
+		gen:   make(map[Modifier]Generator),
 	}
 	err := g.parse()
 	if err != nil {
@@ -30,149 +28,33 @@ func NewSurigen(contentRules []*ContentRule) (*Surigen, error) {
 	return g, nil
 }
 
-func (g *Surigen) Gen() (map[Modifier][]byte, error) {
-	output := make(map[Modifier][]byte)
-	for k, payload := range g.gen {
-		bm := NewByteMap(payload.Len)
-		for i := 0; i < len(payload.Modifiers); i++ {
-			err := payload.Modifiers[i].Modify(bm)
-			if err != nil {
-				if errors.Is(err, ErrOverFlow) {
-					payload.Len <<= 1
-				} else {
-					return output, errors.Wrap(err, "failed to modify payload")
-				}
-			}
-		}
-		bm.FillLeftWithNoise()
-		output[k] = bm.Bytes()
+func (g *Surigen) Gen() ([]byte, error) {
+	mp := make(map[Modifier][]byte)
+	for k, gener := range g.gen {
+		mp[k] = gener.Gen()
 	}
-	return output, nil
+	return HTTPCombination(mp), nil
 }
 
 func (g *Surigen) parse() error {
+	// parse rules
 	for _, rule := range g.rules {
-		if g.gen[rule.Modifier] == nil {
-			g.gen[rule.Modifier] = &PayloadGen{}
-		}
-		var cm *ContentModifier
-		switch {
-		case rule.Negative:
-			// ignore
-		case rule.PCRE != "":
-			// PCRE
-			pcre, err := ParsePCREStr(rule.PCRE)
-			if err != nil {
-				log.Warnf("parse pcre rule failed:%v", err)
-				continue
-			}
-			generator, err := pcre.Generator()
-			if err != nil {
-				log.Warnf("new regexp generator from rule failed:%v", err)
-			}
-			g.gen[generator.modifier].Modifiers = append(g.gen[generator.modifier].Modifiers,
-				&RegexpModifier{generator},
-			)
-		case rule.StartsWith:
-			cm = &ContentModifier{
-				NoCase:  rule.Nocase,
-				Content: rule.Content,
-				Offset:  0,
-			}
-		case rule.EndsWith:
-			if rule.Depth != nil {
-				cm = &ContentModifier{
-					NoCase:  rule.Nocase,
-					Content: rule.Content,
-					Offset:  *rule.Depth - len(rule.Content),
-				}
-			} else {
-				cm = &ContentModifier{
-					NoCase:  rule.Nocase,
-					Content: rule.Content,
-					Offset:  -len(rule.Content),
-				}
-			}
-		case rule.Within == nil && rule.Distance == nil && rule.Depth == nil && rule.Offset == nil:
-			cm = &ContentModifier{
-				NoCase:  rule.Nocase,
-				Content: rule.Content,
-				Range:   math.MaxInt,
-			}
-		default:
-			cm := &ContentModifier{
-				NoCase:   rule.Nocase,
-				Relative: rule.Distance != nil || rule.Within != nil,
-				Content:  rule.Content,
-			}
-
-			cm.Range = math.MaxInt
-
-			// absolute offset
-			if rule.Offset != nil {
-				cm.Offset = *rule.Offset
-			}
-			if rule.Depth != nil {
-				cm.Range = *rule.Depth - len(rule.Content)
-			}
-
-			// relative offset
-			if rule.Distance != nil {
-				cm.Offset = *rule.Distance
-			}
-			if rule.Within != nil {
-				cm.Range = *rule.Within - len(rule.Content) - cm.Offset
-			}
-		}
-
-		if rule.IsDataAt != "" {
-			var neg bool
-			var relative bool
-			var pos int
-			strs := strings.Split(rule.IsDataAt, ",")
-			for _, str := range strs {
-				if strings.Contains(str, "relative") {
-					relative = true
-				} else {
-					str = strings.TrimSpace(str)
-					if strings.HasPrefix(str, "!") {
-						neg = true
-					}
-					str = strings.Trim(str, "!")
-					v, err := strconv.Atoi(str)
-					if err != nil {
-						return errors.Wrap(err, "parse isdataat modifier:"+rule.IsDataAt)
-					}
-					pos = v
-				}
-			}
-			if !relative {
-				if neg && g.gen[rule.Modifier].Len > pos {
-					g.gen[rule.Modifier].Len = pos
-				} else if !neg && g.gen[rule.Modifier].Len <= pos {
-					g.gen[rule.Modifier].Len <<= 1
-				}
-			} else {
-				cm.Filter = func(free []int, payload *ByteMap, cm *ContentModifier) []int {
-					var res []int
-					for _, v := range free {
-						if neg && g.gen[rule.Modifier].Len <= v+pos || !neg && g.gen[rule.Modifier].Len > v+pos {
-							res = append(res, v)
-						}
-					}
-					return res
-				}
-			}
-		}
-
-		if cm == nil {
+		// special part use special generator
+		switch rule.Modifier {
+		case HTTPStatCode:
+			// do something
 			continue
+		default:
+			g.parse2ContentGen(rule)
 		}
-		g.gen[rule.Modifier].Modifiers = append(g.gen[rule.Modifier].Modifiers, cm)
 	}
 
-	// Set Len
+	// set Len
 	for _, payload := range g.gen {
+		payload, ok := payload.(*ContentGen)
+		if !ok {
+			continue
+		}
 		for _, m := range payload.Modifiers {
 			switch m := m.(type) {
 			case *ContentModifier:
@@ -183,8 +65,133 @@ func (g *Surigen) parse() error {
 				payload.Len += len(m.Generator.Generate())
 			}
 		}
-		payload.Len = 1 << (math.Ilogb(float64(payload.Len+1)) + 1)
+		payload.Len = 1 << math.Ilogb(float64(payload.Len+1))
 	}
 
 	return nil
+}
+
+func (g *Surigen) parse2ContentGen(rule *ContentRule) {
+	var mdf *ContentGen
+	if g.gen[rule.Modifier] == nil {
+		mdf = &ContentGen{}
+	} else {
+		mdf = g.gen[rule.Modifier].(*ContentGen)
+	}
+
+	var cm *ContentModifier
+	switch {
+	case rule.Negative:
+		// ignore
+	case rule.PCRE != "":
+		// PCRE
+		pcre, err := ParsePCREStr(rule.PCRE)
+		if err != nil {
+			log.Warnf("parse pcre rule failed:%v", err)
+		}
+		generator, err := pcre.Generator()
+		if err != nil {
+			log.Warnf("new regexp generator from rule failed:%v", err)
+		}
+		mdf.Modifiers = append(mdf.Modifiers,
+			&RegexpModifier{generator},
+		)
+	case rule.StartsWith:
+		cm = &ContentModifier{
+			NoCase:  rule.Nocase,
+			Content: rule.Content,
+			Offset:  0,
+		}
+	case rule.EndsWith:
+		if rule.Depth != nil {
+			cm = &ContentModifier{
+				NoCase:  rule.Nocase,
+				Content: rule.Content,
+				Offset:  *rule.Depth - len(rule.Content),
+			}
+		} else {
+			cm = &ContentModifier{
+				NoCase:  rule.Nocase,
+				Content: rule.Content,
+				Offset:  -len(rule.Content),
+			}
+		}
+	case rule.Within == nil && rule.Distance == nil && rule.Depth == nil && rule.Offset == nil:
+		cm = &ContentModifier{
+			NoCase:  rule.Nocase,
+			Content: rule.Content,
+			Range:   math.MaxInt,
+		}
+	default:
+		cm := &ContentModifier{
+			NoCase:   rule.Nocase,
+			Relative: rule.Distance != nil || rule.Within != nil,
+			Content:  rule.Content,
+		}
+
+		cm.Range = math.MaxInt
+
+		// absolute offset
+		if rule.Offset != nil {
+			cm.Offset = *rule.Offset
+		}
+		if rule.Depth != nil {
+			cm.Range = *rule.Depth - len(rule.Content)
+		}
+
+		// relative offset
+		if rule.Distance != nil {
+			cm.Offset = *rule.Distance
+		}
+		if rule.Within != nil {
+			cm.Range = *rule.Within - len(rule.Content) - cm.Offset
+		}
+	}
+
+	if rule.IsDataAt != "" {
+		var neg bool
+		var relative bool
+		var pos int
+		strs := strings.Split(rule.IsDataAt, ",")
+		for _, str := range strs {
+			if strings.Contains(str, "relative") {
+				relative = true
+			} else {
+				str = strings.TrimSpace(str)
+				if strings.HasPrefix(str, "!") {
+					neg = true
+				}
+				str = strings.Trim(str, "!")
+				v, err := strconv.Atoi(str)
+				if err != nil {
+					log.Warnf("parse isdataat modifier:" + rule.IsDataAt)
+				}
+				pos = v
+			}
+		}
+		if !relative {
+			if neg && mdf.Len > pos {
+				mdf.Len = pos
+			} else if !neg && mdf.Len <= pos {
+				mdf.Len <<= 1
+			}
+		} else {
+			cm.Filter = func(free []int, payload *ByteMap, cm *ContentModifier) []int {
+				var res []int
+				for _, v := range free {
+					if neg && mdf.Len <= v+pos || !neg && mdf.Len > v+pos {
+						res = append(res, v)
+					}
+				}
+				return res
+			}
+		}
+	}
+
+	if cm == nil {
+		return
+	}
+
+	mdf.Modifiers = append(mdf.Modifiers, cm)
+	g.gen[rule.Modifier] = mdf
 }
