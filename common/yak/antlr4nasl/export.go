@@ -13,7 +13,7 @@ import (
 
 type NaslScriptConfig struct {
 	plugin               []string
-	family               []string
+	family               string
 	proxies              []string
 	riskHandle           func(risk any)
 	conditions           map[string]any
@@ -225,7 +225,7 @@ var Exports = map[string]any{
 	},
 	"family": func(family string) NaslScriptConfigOptFunc {
 		return func(c *NaslScriptConfig) {
-			c.family = append(c.family, family)
+			c.family = family
 		}
 	},
 	"riskHandle": func(f func(any)) NaslScriptConfigOptFunc {
