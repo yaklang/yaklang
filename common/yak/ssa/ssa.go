@@ -119,6 +119,9 @@ type Function struct {
 	Param  []*Parameter
 	Return []*Return
 
+	// type
+	hasEllipsis bool
+
 	// BasicBlock list
 	Blocks     []*BasicBlock
 	EnterBlock *BasicBlock
