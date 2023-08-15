@@ -247,6 +247,12 @@ c = a + b + 33
 a = c * 23 
 d = a + 11
 d = a >> 11
+// (1) = (n)
+a = 1, 2, 3 
+// (n) = (1)
+b, c, d = a
+d = b + c + d
+d = "arst" + "a"
 		`
 		ir := `
 yak-main
@@ -256,6 +262,18 @@ entry0:
 	<int64> t2 = <int64> t1 mul <int64> 23
 	<int64> t3 = <int64> t2 add <int64> 11
 	<int64> t4 = <int64> t2 shr <int64> 11
+	<[]int64>t5=Interface[]int64[<int64>1,<int64>1]
+	<int64> t6 = <[]int64> t5 field[<int64> 0]
+	update [<int64> t6] = <int64> 1
+	<int64> t8 = <[]int64> t5 field[<int64> 1]
+	update [<int64> t8] = <int64> 2
+	<int64, string> t10 = <[]int64> t5 field[<int64> 2]
+	update [<int64, string> t10] = <int64> 3
+	<int64> t12 = <int64> t6 add <int64> t8
+	<int64> t13 = <int64> t12 add <int64, string> t10
+	update [<int64, string> t10] = <int64> t13
+	<string> t15 = <string> arst add <string> a
+	update [<int64, string> t10] = <string> t15
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
@@ -317,7 +335,6 @@ b3: <- if.done1
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
@@ -384,7 +401,6 @@ b12: <- if.done1
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 
@@ -452,7 +468,6 @@ b12: <- if.done1
 		`
 		prog := parseSSA(src)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 }
@@ -558,7 +573,6 @@ b6: <- switch.done1
 	`
 		prog := parseSSA(code)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakMain(t, prog, ir)
 	})
 }
@@ -818,7 +832,6 @@ entry0:
 		}
 		prog := parseSSA(code)
 		CheckProgram(t, prog)
-		// showProg(prog)
 		CompareYakFunc(t, prog, ir)
 	})
 

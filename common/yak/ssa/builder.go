@@ -519,10 +519,32 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 		}
 
 		// assign
+		// (n) = (n), just assign
 		if len(rvalues) == len(lvalues) {
 			for i := range rvalues {
 				lvalues[i].Assign(rvalues[i], b.Function)
 			}
+		} else if len(rvalues) == 1 {
+			// (n) = (1)
+			// (n) = field(1, #index)
+			for i, lv := range lvalues {
+				field := b.emitField(rvalues[0], NewConst(i))
+				lv.Assign(field, b.Function)
+			}
+		} else if len(lvalues) == 1 {
+			// (1) = (n)
+			// (1) = interface(n)
+			lValueLen := NewConst(len(lvalues))
+			typ := ParseInterfaceTypes(rvalues)
+			_interface := b.emitInterfaceBuildWithType(typ, lValueLen, lValueLen)
+			lvalues[0].Assign(_interface, b.Function)
+			for i, rv := range rvalues {
+				field := b.emitField(_interface, NewConst(i))
+				b.emitUpdate(field, rv)
+			}
+		} else {
+			// (n) = (m) && n!=m  faltal
+			panic(fmt.Sprintf("multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues)))
 		}
 	}
 
