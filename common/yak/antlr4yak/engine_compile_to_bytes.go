@@ -5,15 +5,16 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sync"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protowire"
@@ -235,7 +236,7 @@ func (n *Engine) ExecYakc(ctx context.Context, b []byte, key []byte, code string
 
 	n.vm.SetSymboltable(symbolTable)
 	err = n.vm.Exec(ctx, func(frame *yakvm.Frame) {
-		frame.SetVerbose("global code")
+		frame.SetVerbose("main")
 		frame.Exec(codes)
 	})
 	return err
