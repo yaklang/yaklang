@@ -168,6 +168,45 @@ func checkChildren(t *testing.T, got *dap.VariablesResponse, parentName string, 
 	}
 }
 
+func checkStackFramesExact(t *testing.T, got *dap.StackTraceResponse,
+	wantStartName string, wantStartLine, wantStartID, wantFrames, wantTotalFrames int) {
+	t.Helper()
+	checkStackFramesNamed("", t, got, wantStartName, wantStartLine, wantStartID, wantFrames, wantTotalFrames, true)
+}
+
+func checkStackFramesNamed(testName string, t *testing.T, got *dap.StackTraceResponse,
+	wantStartName string, wantStartLine, wantStartFrame, wantFrames, wantTotalFrames int, totalExact bool) {
+	t.Helper()
+	if totalExact && got.Body.TotalFrames != wantTotalFrames {
+		t.Errorf("%s\ngot  %#v\nwant TotalFrames=%d", testName, got.Body.TotalFrames, wantTotalFrames)
+	} else if !totalExact && got.Body.TotalFrames < wantTotalFrames {
+		t.Errorf("%s\ngot  %#v\nwant TotalFrames>=%d", testName, got.Body.TotalFrames, wantTotalFrames)
+	}
+
+	if len(got.Body.StackFrames) != wantFrames {
+		t.Errorf("%s\ngot  len(StackFrames)=%d\nwant %d", testName, len(got.Body.StackFrames), wantFrames)
+	} else {
+		for i := 0; i < wantFrames; i++ {
+			frame := got.Body.StackFrames[i]
+			// 由于最顶层的frameID是最大的,所以要反着来
+			want := wantTotalFrames - wantStartFrame - (i + 1)
+			if frame.Id != want {
+				t.Errorf("%s\ngot  %#v\nwant Id=%d", testName, frame, want)
+			}
+		}
+		// Verify the name and line corresponding to the first returned frame (if any).
+		// This is useful when the first frame is the frame corresponding to the breakpoint at
+		// a predefined line. Line values < 0 are a signal to skip the check (which can be useful
+		// for frames in the third-party code, where we do not control the lines).
+		if wantFrames > 0 && wantStartLine > 0 && got.Body.StackFrames[0].Line != wantStartLine {
+			t.Errorf("%s\ngot  Line=%d\nwant %d", testName, got.Body.StackFrames[0].Line, wantStartLine)
+		}
+		if wantFrames > 0 && wantStartName != "" && got.Body.StackFrames[0].Name != wantStartName {
+			t.Errorf("%s\ngot  Name=%s\nwant %s", testName, got.Body.StackFrames[0].Name, wantStartName)
+		}
+	}
+}
+
 func checkVar(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, useExactMatch, hasRef bool, indexed, named int) (ref int) {
 	t.Helper()
 	if len(got.Body.Variables) <= i {
@@ -637,5 +676,58 @@ func TestPreSetBreakPoint(t *testing.T) {
 		client.ExpectOutputEventDetaching(t)
 		client.ExpectDisconnectResponse(t)
 		client.ExpectTerminatedEvent(t)
+	})
+}
+
+func TestStackTraceRequest(t *testing.T) {
+	runTest(t, "StackTraceRequest", IncrementTestcase, func(server *DAPServer, client *Client, program string) {
+		var stResp *dap.StackTraceResponse
+		runDebugSessionWithBPs(t, client, func() {
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{3, 13},
+			[]onBreakpoint{{
+				execute: func() {
+					const NumFrames = 4
+					tests := map[string]struct {
+						startFrame          int
+						levels              int
+						wantStartName       string
+						wantStartLine       int
+						wantStartFrame      int
+						wantFramesReturned  int
+						wantFramesAvailable int
+						exact               bool
+					}{
+						"all frame levels from 0 to NumFrames":    {0, NumFrames, "Increment", 3, 0, NumFrames, NumFrames, true},
+						"subset of frames from 1 to -1":           {1, NumFrames - 1, "Increment", 6, 1, NumFrames - 1, NumFrames, true},
+						"load stack in pages: first half":         {0, NumFrames / 2, "Increment", 3, 0, NumFrames / 2, NumFrames, false},
+						"load stack in pages: second half":        {NumFrames / 2, NumFrames, "Increment", 6, NumFrames / 2, NumFrames / 2, NumFrames, true},
+						"load final stack":                        {NumFrames - 1, NumFrames, "global code", 11, NumFrames - 1, 1, NumFrames, true},
+						"zero levels means all levels":            {0, 0, "Increment", 3, 0, NumFrames, NumFrames, true},
+						"zero levels means all remaining levels":  {NumFrames / 2, 0, "Increment", 6, NumFrames / 2, NumFrames / 2, NumFrames, true},
+						"negative levels treated as 0 (all)":      {0, -10, "Increment", 3, 0, NumFrames, NumFrames, true},
+						"OOB levels is capped at available len":   {0, NumFrames + 1, "Increment", 3, 0, NumFrames, NumFrames, true},
+						"OOB levels is capped at available len 1": {1, NumFrames + 1, "Increment", 6, 1, NumFrames - 1, NumFrames, true},
+						"negative startFrame treated as 0":        {-10, 0, "Increment", 3, 0, NumFrames, NumFrames, true},
+						"OOB startFrame returns empty trace":      {NumFrames, 0, "Increment", -1, -1, 0, NumFrames, true},
+					}
+					for name, tc := range tests {
+						client.StackTraceRequest(0, tc.startFrame, tc.levels)
+						stResp = client.ExpectStackTraceResponse(t)
+						checkStackFramesNamed(name, t, stResp,
+							tc.wantStartName, tc.wantStartLine, tc.wantStartFrame, tc.wantFramesReturned, tc.wantFramesAvailable, tc.exact)
+					}
+				},
+				disconnect: false,
+			},
+				{
+					execute: func() {
+						client.StackTraceRequest(0, 0, 0)
+						stResp = client.ExpectStackTraceResponse(t)
+						checkStackFramesExact(t, stResp, "global code", 13, 0, 1, 1)
+					},
+					disconnect: false,
+				}})
 	})
 }
