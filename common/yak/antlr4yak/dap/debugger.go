@@ -69,16 +69,16 @@ func (d *DAPDebugger) EvalExpression(expr string, frameID int) (*yakvm.Value, er
 }
 
 func (d *DAPDebugger) GetThreads() []*Thread {
-	return lo.Map(d.debugger.GetStackTraces(), func(st *yakvm.StackTraces, index int) *Thread {
+	return lo.MapToSlice(d.debugger.GetStackTraces(), func(threadID int, st *yakvm.StackTraces) *Thread {
 		topStackTrace := st.StackTraces[0]
 		return &Thread{
-			Id:   int(st.ThreadID),
-			Name: fmt.Sprintf("[Yak %d] %s", index, topStackTrace.Name),
+			Id:   int(threadID),
+			Name: fmt.Sprintf("[Yak %d] %s", threadID, topStackTrace.Name),
 		}
 	})
 }
 
-func (d *DAPDebugger) GetStackTraces() []*yakvm.StackTraces {
+func (d *DAPDebugger) GetStackTraces() map[int]*yakvm.StackTraces {
 	return d.debugger.GetStackTraces()
 }
 
