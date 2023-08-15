@@ -833,4 +833,57 @@ entry0:
 		CompareYakFunc(t, prog, ir)
 	})
 
+	t.Run("closure_mutiple", func(t *testing.T) {
+		code := `
+a = (a, b, c...) => {
+	return a, b, c
+}
+
+e = (a1, b, c, d...) => {
+	a(a1, b, c...)
+}
+
+// multiple return 
+print(a(1, 2, 3, 4, "3"))
+
+// extra return list
+b, c, d = a(1, 2, 3, 4, "3")
+b = c + d 
+print(b, c, d)
+`
+		ir := []string{
+			`
+yak-main
+entry0:
+	<struct {<> 0, <> 1, <[]> 2, }> t0 = call <> yak-main$1 (<int64> 1, <int64> 2, <int64> 3, <int64> 4, <string> 3) []
+	<> t1 = call <> print (<struct {<> 0, <> 1, <[]> 2, }> t0) []
+	<struct {<> 0, <> 1, <[]> 2, }> t2 = call <> yak-main$1 (<int64> 1, <int64> 2, <int64> 3, <int64> 4, <string> 3) []
+	<> t3 = <struct {<> 0, <> 1, <[]> 2, }> t2 field[<int64> 0]
+	<> t4 = <struct {<> 0, <> 1, <[]> 2, }> t2 field[<int64> 1]
+	<[]> t5 = <struct {<> 0, <> 1, <[]> 2, }> t2 field[<int64> 2]
+	<> t6 = <> t4 add <[]> t5
+	<> t7 = call <> print (<> t6, <> t4, <[]> t5) []
+	`,
+			`
+yak-main$1 <> a, <> b, <[]> c
+parent: yak-main
+pos:   2:4   -   4:0  : (a,b,c...)=>{
+return: <struct {<> 0, <> 1, <[]> 2, }> t0
+entry0:
+	ret <> a, <> b, <[]> c
+`,
+			`
+yak-main$2 <> a1, <> b, <[]> c, <[]> d
+parent: yak-main
+pos:   6:4   -   8:0  : (a1,b,c,d...)=>{
+freeValue: <> a
+entry0:
+	<> t0 = call <> a (<> a1, <> b, <[]> c) []
+`,
+		}
+		prog := parseSSA(code)
+		CheckProgram(t, prog)
+		showProg(prog)
+		CompareYakFunc(t, prog, ir)
+	})
 }
