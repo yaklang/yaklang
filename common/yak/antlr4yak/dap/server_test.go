@@ -718,6 +718,32 @@ func TestStackTraceRequest(t *testing.T) {
 						checkStackFramesNamed(name, t, stResp,
 							tc.wantStartName, tc.wantStartLine, tc.wantStartFrame, tc.wantFramesReturned, tc.wantFramesAvailable, tc.exact)
 					}
+
+					// check all frames
+					client.StackTraceRequest(0, 0, 0)
+					stResp = client.ExpectStackTraceResponse(t)
+					frames := stResp.Body.StackFrames
+					want := []struct {
+						wantName string
+						wantLine int
+						wantID   int
+					}{
+						{"Increment", 3, 3},
+						{"Increment", 6, 2},
+						{"Increment", 6, 1},
+						{"main", 11, 0},
+					}
+					for i, frame := range frames {
+						if frame.Id != want[i].wantID {
+							t.Errorf("got  %#v\nwant Id=%d\n", frame, want[i].wantID)
+						}
+						if want[i].wantLine > 0 && frame.Line != want[i].wantLine {
+							t.Errorf("got  Line=%d\nwant %d\n", frame.Line, want[i].wantLine)
+						}
+						if want[i].wantName != "" && frame.Name != want[i].wantName {
+							t.Errorf("got  Name=%s\nwant %s\n", frame.Name, want[i].wantName)
+						}
+					}
 				},
 				disconnect: false,
 			},
