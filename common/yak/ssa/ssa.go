@@ -328,6 +328,9 @@ type Field struct {
 	Key Value
 	I   Value
 
+	// capture by other function
+	outCapture bool
+
 	update []Value // value
 
 	users []User
