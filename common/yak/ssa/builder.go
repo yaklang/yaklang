@@ -816,7 +816,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
-	var typ types.Type
+	var typ Type
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		typ = b.buildTypeLiteral(s)
 	}
@@ -830,14 +830,14 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 	}
 	zero := NewConst(0)
 	switch typ.(type) {
-	case *types.Slice:
+	case *SliceType:
 		// fmt.Printf("debug %s %v %d\n", "make slice", typ, num)
 		if len(exprs) == 0 {
-			return b.emitInterfaceBuild(typ, zero, zero)
+			return b.emitInterfaceBuildWithType(Types{typ}, zero, zero)
 		} else if len(exprs) == 1 {
-			return b.emitInterfaceBuild(typ, exprs[0], exprs[0])
+			return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[0])
 		} else if len(exprs) == 2 {
-			return b.emitInterfaceBuild(typ, exprs[0], exprs[1])
+			return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[1])
 		} else {
 			panic("make slice expression error!")
 		}
@@ -852,12 +852,12 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 }
 
 // type literal
-func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
+func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) Type {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	text := stmt.GetText()
 	// var type name
-	if b, ok := basicTypes[text]; ok {
+	if b, ok := basicTypesStr[text]; ok {
 		return b
 	}
 
@@ -877,7 +877,7 @@ func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
 	if strings.HasPrefix(text, "chan") {
 		if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 			if typ := b.buildTypeLiteral(s); typ != nil {
-				return types.NewChan(types.SendRecv, typ)
+				return NewChanType(Types{typ})
 			}
 		}
 	}
@@ -886,24 +886,25 @@ func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) types.Type {
 }
 
 // slice type literal
-func (b *builder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) types.Type {
+func (b *builder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) Type {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
-			return types.NewSlice(eleTyp)
+			// return types.NewSlice(eleTyp)
+			return NewSliceType(Types{eleTyp})
 		}
 	}
 	return nil
 }
 
 // map type literal
-func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) types.Type {
+func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) Type {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	// key
-	var keyTyp types.Type
-	var valueTyp types.Type
+	var keyTyp Type
+	var valueTyp Type
 	if s, ok := stmt.TypeLiteral(0).(*yak.TypeLiteralContext); ok {
 		keyTyp = b.buildTypeLiteral(s)
 	}
@@ -913,7 +914,7 @@ func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) types.Typ
 		valueTyp = b.buildTypeLiteral(s)
 	}
 	if keyTyp != nil && valueTyp != nil {
-		return types.NewMap(keyTyp, valueTyp)
+		return NewMapType(Types{keyTyp}, Types{valueTyp})
 	}
 
 	return nil

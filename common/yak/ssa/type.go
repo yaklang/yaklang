@@ -1,30 +1,172 @@
 package ssa
 
 import (
+	"fmt"
 	"go/types"
-	"runtime"
 	"strings"
 
 	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 )
 
-type Type types.Type
-type Types []Type
+type BasicKind types.BasicKind
+
+const (
+	Invalid BasicKind = iota // type is invalid
+
+	// predeclared types
+	Bool
+	Int
+	Int8
+	Int16
+	Int32
+	Int64
+	Uint
+	Uint8
+	Uint16
+	Uint32
+	Uint64
+	Uintptr
+	Float32
+	Float64
+	Complex64
+	Complex128
+	String
+	UnsafePointer
+
+	// types for untyped values
+	UntypedBool
+	UntypedInt
+	UntypedRune
+	UntypedFloat
+	UntypedComplex
+	UntypedString
+	UntypedNil
+
+	// aliases
+	Byte = Uint8
+	Rune = Int32
+)
 
 var (
-	basicTypes = make(map[string]*types.Basic)
+	basicTypesKind = make(map[BasicKind]*types.Basic)
+	basicTypesStr  = make(map[string]*types.Basic)
 )
 
 func init() {
 	for _, basic := range types.Typ {
-		basicTypes[basic.Name()] = basic
+		basicTypesKind[BasicKind(basic.Kind())] = basic
+		basicTypesStr[basic.String()] = basic
 	}
-	if strings.Contains(runtime.GOARCH, "64") {
-		basicTypes["int"] = basicTypes["int64"]
-	} else {
-		basicTypes["int"] = basicTypes["int32"]
+	basicTypesKind[Int] = basicTypesKind[Int64]
+	basicTypesStr["int"] = basicTypesStr["int64"]
+}
+
+type Type interface {
+	String() string
+}
+type Types []Type // each value can have multiple type possible
+
+// ==================== slice type
+type SliceType struct {
+	Elem Types
+}
+
+func (i SliceType) String() string {
+	return "[]" + i.Elem.String()
+}
+
+func NewSliceType(elem Types) *SliceType {
+	return &SliceType{
+		Elem: elem,
 	}
+}
+
+var _ (Type) = (*SliceType)(nil)
+
+// ==================== struct type
+type StructType struct {
+	Key   []Value
+	Field []Types
+}
+
+func (s StructType) String() string {
+	str := ""
+	for i := range s.Key {
+		str += fmt.Sprintf("<%s> %s, ", s.Field[i].String(), s.Key[i])
+	}
+	return "struct {" + str + "}"
+}
+
+func NewStructType() *StructType {
+	return &StructType{
+		Key:   make([]Value, 0),
+		Field: make([]Types, 0),
+	}
+}
+
+func (s *StructType) AddField(key Value, field Types) {
+	s.Key = append(s.Key, key)
+	s.Field = append(s.Field, field)
+}
+
+func (s *StructType) GetField(key Value) Types {
+	if index := slices.Index(s.Key, key); index != -1 {
+		return s.Field[index]
+	}
+	return nil
+}
+
+var _ (Type) = (*StructType)(nil)
+
+// ==================== map type
+
+type MapType struct {
+	Key, Value Types
+}
+
+func (m MapType) String() string {
+	return fmt.Sprintf("map[%s]%s", m.Key.String(), m.Value.String())
+}
+
+func NewMapType(key, value Types) *MapType {
+	return &MapType{
+		Key:   key,
+		Value: value,
+	}
+}
+
+var _ (Type) = (*MapType)(nil)
+
+// ===================== transform
+
+func (s *StructType) Transform() Type {
+	field := lo.UniqBy(s.Field, func(t Types) string { return t.String() })
+	key := lo.UniqBy(s.Key, func(t Value) string { return t.GetType().String() })
+	if len(field) == 1 {
+		if len(key) == 1 {
+			if key[0].GetType().String() == "int64" {
+				return NewSliceType(field[0])
+			}
+			return NewMapType(key[0].GetType(), field[0])
+		}
+	}
+	return s
+}
+
+// ====================== chan type
+type Chan struct {
+	elem Types
+}
+
+func NewChanType(elem Types) *Chan {
+	return &Chan{
+		elem: elem,
+	}
+}
+
+func (c Chan) String() string {
+	return fmt.Sprintf("chan %s", c.elem)
 }
 
 // return true  if org != typs
@@ -34,7 +176,7 @@ func (org Types) Compare(typs Types) bool {
 		return true
 	}
 	return slices.CompareFunc(org, typs, func(org, typ Type) int {
-		if types.Identical(org, typ) {
+		if org.String() == typs.String() {
 			return 0
 		}
 		return 1
