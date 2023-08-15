@@ -656,7 +656,7 @@ if.false3: <- entry0
 b4: <- if.done1
 		<int64> t9 = <int64> t6 add <int64> t2
 		<int64> t10 = yak-main-symbol field[<string> cadd]
-		<untyped nil> t11 = call <> yak-main$2 () [<int64> t10]
+		<> t11 = call <> yak-main$2 () [<int64> t10]
 		<int64> t12 = <int64> t10 add <int64> 1
 		<int64> t13 = yak-main-symbol field[<string> ca]
 		<int64> t14 = call <> yak-main$3 (<int64> 1, <int64> 2, <int64> 3) [<int64> t13, <> yak-main$1, <int64> 11]
