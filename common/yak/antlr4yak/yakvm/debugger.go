@@ -465,15 +465,15 @@ func (g *Debugger) GetStackTraces() []*StackTraces {
 }
 
 func (g *Debugger) AddObserveBreakPoint(expr string) error {
-	_, _, err := g.Compile(expr)
-	if err != nil {
-		return errors.Wrap(err, "add observe breakpoint error")
+	frame := g.frame
+	if frame == nil {
+		g.observeBreakPointExpressions[expr] = undefined
+	} else {
+		_, _, err := g.Compile(expr)
+		if err != nil {
+			return errors.Wrap(err, "add observe breakpoint error")
+		}
 	}
-	v, _ := g.EvalExpression(expr)
-	if v == nil || v.Value == nil {
-		v = undefined
-	}
-	g.observeBreakPointExpressions[expr] = v
 	return nil
 }
 
@@ -496,8 +496,8 @@ func (g *Debugger) AddObserveExpression(expr string) error {
 }
 
 func (g *Debugger) RemoveObserveExpression(expr string) error {
-	if _, ok := g.observeBreakPointExpressions[expr]; ok {
-		delete(g.observeBreakPointExpressions, expr)
+	if _, ok := g.observeExpressions[expr]; ok {
+		delete(g.observeExpressions, expr)
 		return nil
 	}
 
@@ -728,6 +728,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			}
 			if !v.Equal(nv) {
 				g.observeBreakPointExpressions[expr] = nv
+				g.description = fmt.Sprintf("Trigger observe breakpoint at line %d in %s", g.linePointer, g.StateName())
 				g.HandleForBreakPoint()
 				return
 			}
@@ -894,7 +895,7 @@ func (g *Debugger) CompileWithFrameID(code string, frameID int) (*Frame, Compile
 }
 
 func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error) {
-	frame := NewSubFrame(g.Frame())
+	frame := NewSubFrame(g.frame)
 	return g.CompileWithFrame(code, frame)
 }
 
