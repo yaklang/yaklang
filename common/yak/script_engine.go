@@ -486,7 +486,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		return engine, engine.SafeExecYakc(ctx, []byte(code), e.cryptoKey, code)
 	}
 
-	if cache && !engine.HaveEvaluatedCode() {
+	if !e.debug && cache && !engine.HaveEvaluatedCode() {
 		if yakcBytes, ok := antlr4yak.HaveYakcCache(code); ok && antlr4yak.IsYakc(yakcBytes) {
 			return engine, engine.SafeExecYakcWithCode(ctx, yakcBytes, e.cryptoKey, code)
 		}
