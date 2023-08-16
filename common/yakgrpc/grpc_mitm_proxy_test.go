@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
@@ -307,6 +308,10 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
+	name, err := yakit.CreateTemporaryYakScript("mitm", `
+yakit.AutoInitYakit()
+yakit.StatusCard("mitmId", "StatusCard")
+`)
 	ctx := utils.TimeoutContextSeconds(10)
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
@@ -325,33 +330,70 @@ func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
 	})
+	var (
+		started               bool
+		pluginStartLoading    bool
+		pluginLoaded          bool
+		pluginStatusCardFound bool
+		hotStatusCardFound    bool
+	)
 	for {
 		data, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		spew.Dump(data)
 		if data.GetMessage().GetIsMessage() {
 			var msg = string(data.GetMessage().GetMessage())
-			if strings.Contains(msg, "starting mitm server") {
-				stream.Send(&ypb.MITMRequest{SetYakScript: true, YakScriptContent: `
+			if strings.Contains(msg, "starting mitm server") && !started {
+				stream.Send(&ypb.MITMRequest{
+					SetYakScript: true,
+					YakScriptContent: `
 mirrorNewWebsite = (tls, url, req, rsp, body) => {
 	yakit.StatusCard("abc", 1)
 	dump(req)
 }
-`})
-			}
-		}
+`,
+				})
 
-		if data.GetMessage().GetIsMessage() && strings.Contains(string(data.GetMessage().GetMessage()), `HotPatched MITM HOOKS`) {
-			// do sth
-			_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
+				stream.Send(&ypb.MITMRequest{
+					SetPluginMode:   true,
+					InitPluginNames: []string{name},
+				})
+				started = true
+			}
+
+			if data.GetMessage().GetIsMessage() && strings.Contains(string(data.GetMessage().GetMessage()), `HotPatched MITM HOOKS`) {
+				// do sth
+				_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
 assert string(rsp.RawPacket).Contains("Hello Token")
 `, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort)})
-			if err != nil {
-				panic(err)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 
+		if strings.Contains(spew.Sdump(data), "abc") && strings.Contains(spew.Sdump(data), "feature-status-card-data") {
+			hotStatusCardFound = true
+		}
+
+		if !pluginStartLoading && started && strings.Contains(spew.Sdump(data), "Initializing MITM Plugin: "+name) {
+			pluginStartLoading = true
+		}
+
+		if pluginStartLoading && strings.Contains(spew.Sdump(data), "初始化加载插件完成，加载成功【1】个") {
+			pluginLoaded = true
+		}
+
+		if strings.Contains(spew.Sdump(data), "StatusCard") && strings.Contains(spew.Sdump(data), "mitmId") {
+			pluginStatusCardFound = true
+		}
+
+		t.Logf("%v-%v-%v-%v-%v", pluginStatusCardFound, hotStatusCardFound, pluginLoaded, pluginStartLoading, pluginLoaded)
+
+	}
+
+	if !(pluginStatusCardFound && hotStatusCardFound) {
+		panic("mitm plugin/hot patched status card not found")
 	}
 }
