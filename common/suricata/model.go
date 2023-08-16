@@ -143,6 +143,7 @@ type ContentRule struct {
 	// won't support
 	Replace     []byte
 	PCRE        string
+	PCREParsed  *PCRE
 	FastPattern bool
 
 	// e.g set,bihinder3

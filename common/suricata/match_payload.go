@@ -23,8 +23,7 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 		defer func() {
 			if r.Negative && c.IsRejected() {
 				c.Recover()
-			}
-			if r.Negative && !c.IsRejected() {
+			} else if r.Negative && !c.IsRejected() {
 				c.Reject()
 			}
 		}()

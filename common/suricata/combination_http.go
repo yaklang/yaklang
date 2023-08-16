@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"golang.org/x/exp/slices"
+	"time"
 )
 
 const Fallback Modifier = 1 << 20
@@ -146,31 +147,53 @@ func (p *partProvider) fillHTTPHeaderBackground(w *bytes.Buffer) {
 	}
 }
 
-func (p *partProvider) fillHTTPHeaderOthers(w *bytes.Buffer, headers []header) {
+func (p *partProvider) fillHTTPHeaderOthersIfExisted(w *bytes.Buffer, headers []header) {
+	var mustfill []header
+
+	// header Modifiers (check existed with list headers) -> mustfill
+	for _, try := range headers {
+		if p.mp[try.header] == nil {
+			continue
+		}
+
+		for _, index := range bytesIndexAll(w.Bytes(), append(try.prefix, []byte(": ")...), true) {
+			if index.pos == 0 || index.pos > 1 && bytes.Equal(w.Bytes()[index.pos-2:index.pos], []byte(lowhttp.CRLF)) {
+				continue
+			}
+		}
+		mustfill = append(mustfill, try)
+	}
+
+	// headernames Modifier -> mustfill
 	if p.mp[HTTPHeaderNames] != nil {
 		for _, hdr := range bytes.Fields(p.mp[HTTPHeaderNames]) {
-			for _, try := range headers {
-				if bytes.EqualFold(try.prefix, hdr) {
-					continue
+			add := true
+
+			// no add if existed in mustfill
+			for _, inorder := range mustfill {
+				if bytes.EqualFold(inorder.prefix, hdr) {
+					add = false
 				}
 			}
-			headers = append(headers, header{Fallback, hdr})
+
+			// no add if existed in buf
+			for _, index := range bytesIndexAll(w.Bytes(), append(hdr, []byte(": ")...), true) {
+				if index.pos == 0 || index.pos > 1 && bytes.Equal(w.Bytes()[index.pos-2:index.pos], []byte(lowhttp.CRLF)) {
+					add = false
+				}
+			}
+
+			if add {
+				mustfill = append(mustfill, header{Fallback, hdr})
+			}
 		}
 	}
 
-	for _, try := range headers {
-		if p.mp[try.header] != nil {
-			indexes := bytesIndexAll(w.Bytes(), append(try.prefix, []byte(": ")...), true)
-			for _, index := range indexes {
-				if index.pos == 0 || index.pos > 1 && bytes.Equal(w.Bytes()[index.pos-2:index.pos], []byte(lowhttp.CRLF)) {
-					continue
-				}
-			}
-			_, _ = w.Write(try.prefix)
-			_, _ = w.WriteString(": ")
-			_, _ = w.Write(p.mp[try.header])
-			_, _ = w.WriteString(lowhttp.CRLF)
-		}
+	for _, try := range mustfill {
+		_, _ = w.Write(try.prefix)
+		_, _ = w.WriteString(": ")
+		_, _ = w.Write(p.getOrRandom(try.header))
+		_, _ = w.WriteString(lowhttp.CRLF)
 	}
 }
 
@@ -188,7 +211,7 @@ func (p *partProvider) FillHTTPRequestHeader(w *bytes.Buffer) {
 		_, _ = w.WriteString(lowhttp.CRLF)
 	}
 
-	p.fillHTTPHeaderOthers(w, []header{
+	p.fillHTTPHeaderOthersIfExisted(w, []header{
 		{HTTPCookie, []byte("Cookie")},
 		{HTTPUserAgent, []byte("User-Agent")},
 		{HTTPReferer, []byte("Referer")},
@@ -205,10 +228,6 @@ func (p *partProvider) FillHTTPRequestBody(w *bytes.Buffer) {
 	for _, v := range []Modifier{HTTPRequestBody, FileData, Default} {
 		if p.mp[v] != nil {
 			_, _ = w.Write(p.mp[v])
-			if !bytes.HasSuffix(p.mp[v], []byte(lowhttp.CRLF)) {
-				_, _ = w.WriteString(lowhttp.CRLF)
-			}
-			return
 		}
 	}
 	return
@@ -241,7 +260,14 @@ func (p *partProvider) FillHTTPResponseLine(w *bytes.Buffer) {
 
 func (p *partProvider) FillHTTPResponseHeader(w *bytes.Buffer) {
 	p.fillHTTPHeaderBackground(w)
-	p.fillHTTPHeaderOthers(w, []header{
+
+	if !bytes.Contains(w.Bytes(), []byte("Date: ")) {
+		_, _ = w.WriteString("Date: ")
+		_, _ = w.WriteString(time.Now().Format(time.RFC1123))
+		_, _ = w.WriteString(lowhttp.CRLF)
+	}
+
+	p.fillHTTPHeaderOthersIfExisted(w, []header{
 		{HTTPServer, []byte("Server")},
 		{HTTPLocation, []byte("Location")},
 		{HTTPCookie, []byte("Set-Cookie")},
@@ -255,10 +281,6 @@ func (p *partProvider) FillHTTPResponseBody(w *bytes.Buffer) {
 	for _, v := range []Modifier{HTTPResponseBody, FileData, Default} {
 		if p.mp[v] != nil {
 			_, _ = w.Write(p.mp[v])
-			if !bytes.HasSuffix(p.mp[v], []byte(lowhttp.CRLF)) {
-				_, _ = w.WriteString(lowhttp.CRLF)
-			}
-			return
 		}
 	}
 	return

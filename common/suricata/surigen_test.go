@@ -16,7 +16,7 @@ func TestGen(t *testing.T) {
 		rules, _ := Parse(c)
 		assert.Equal(t, len(rules), 1)
 		rule := rules[0]
-		generator, _ := NewSurigen(rule.ContentRuleConfig.ContentRules)
+		generator, _ := NewPloadgen(rule.ContentRuleConfig.ContentRules)
 		assert.NotNil(t, generator)
 		output, err := generator.Gen()
 		if err != nil {

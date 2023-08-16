@@ -50,9 +50,9 @@ type httpGenerator struct {
 }
 
 func (h *httpGenerator) generator(count int) {
-	surigen, err := suricata.NewSurigen(h.originRule.ContentRuleConfig.ContentRules)
+	surigen, err := suricata.NewPloadgen(h.originRule.ContentRuleConfig.ContentRules)
 	if err != nil {
-		log.Warnf("suricata.NewSurigen failed: %v", err)
+		log.Warnf("suricata.NewPloadgen failed: %v", err)
 	}
 
 	for i := 0; i < count; i++ {
