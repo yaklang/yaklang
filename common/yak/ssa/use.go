@@ -77,10 +77,7 @@ func (i *If) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (i *If) GetUsers() []User { return i.user }
-func (i *If) AddUser(u User)   { i.user = append(i.user, u) }
-
-func (i *If) RemoveUser(u User) { removeUser(i.user, u) }
+func (i *If) GetUsers() []User { return nil }
 
 func (i *If) GetValues() []Value { return []Value{i.Cond} }
 func (i *If) AddValue(v Value)   {}
