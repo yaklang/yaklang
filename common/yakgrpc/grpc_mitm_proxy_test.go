@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -12,6 +13,56 @@ import (
 	"strings"
 	"testing"
 )
+
+func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(10)
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello Token"))
+	})
+	var targetUrl = "http://" + utils.HostPort(targetHost, targetPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(data)
+		if data.GetMessage().GetIsMessage() {
+			var msg = string(data.GetMessage().GetMessage())
+			if strings.Contains(msg, "starting mitm server") {
+				stream.Send(&ypb.MITMRequest{SetYakScript: true, YakScriptContent: `
+mirrorNewWebsite = (tls, url, req, rsp, body) => {
+	yakit.StatusCard("abc", 1)
+}
+`})
+			}
+		}
+
+		if data.GetMessage().GetIsMessage() && strings.Contains(string(data.GetMessage().GetMessage()), `HotPatched MITM HOOKS`) {
+			// do sth
+			_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
+dump(rsp.RawPacket)
+assert string(rsp.RawPacket).Contains("Hello Token")
+`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort)})
+			if err != nil {
+				panic(err)
+			}
+		}
+
+	}
+}
 
 func TemplateTestGRPCMUSTPASS_MITM_Proxy_Template(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(10)
@@ -253,4 +304,54 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 		t.Fatalf("Plugin Downstream not passed")
 	}
 	t.Log("PASS")
+}
+
+func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(10)
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello Token"))
+	})
+	var targetUrl = "http://" + utils.HostPort(targetHost, targetPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(data)
+		if data.GetMessage().GetIsMessage() {
+			var msg = string(data.GetMessage().GetMessage())
+			if strings.Contains(msg, "starting mitm server") {
+				stream.Send(&ypb.MITMRequest{SetYakScript: true, YakScriptContent: `
+mirrorNewWebsite = (tls, url, req, rsp, body) => {
+	yakit.StatusCard("abc", 1)
+	dump(req)
+}
+`})
+			}
+		}
+
+		if data.GetMessage().GetIsMessage() && strings.Contains(string(data.GetMessage().GetMessage()), `HotPatched MITM HOOKS`) {
+			// do sth
+			_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
+assert string(rsp.RawPacket).Contains("Hello Token")
+`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort)})
+			if err != nil {
+				panic(err)
+			}
+		}
+
+	}
 }
