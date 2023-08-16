@@ -33,6 +33,7 @@ func (phi *Phi) Build() Value {
 	if v == phi {
 		block := phi.Block
 		block.Phis = append(block.Phis, phi)
+		phi.Func.SetReg(phi)
 	}
 	fixupUseChain(v)
 	return v

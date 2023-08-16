@@ -142,6 +142,7 @@ type Function struct {
 	Pos  *Position // current position
 
 	// for build
+	instReg      map[Instruction]string // instruction -> virtual register
 	currtenPos   *Position
 	currentBlock *BasicBlock                      // current block to build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variable][block]value

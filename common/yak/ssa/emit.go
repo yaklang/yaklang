@@ -30,6 +30,7 @@ func fixupUseChain(node Node) {
 
 func (f *Function) emit(i Instruction) {
 	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
+	f.SetReg(i)
 }
 
 func (f *Function) newAnInstuction() anInstruction {

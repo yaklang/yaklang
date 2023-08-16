@@ -73,6 +73,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 			users: []User{},
 		},
 		currtenPos: &Position{},
+		instReg:    make(map[Instruction]string),
 	}
 	p.funcs = append(p.funcs, f)
 	f.symbol.Func = f
