@@ -370,6 +370,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 
 		// conflict, save current and turn to new empty rule
 		if !set || i == len(params)-1 {
+			// MultipleBufferMatching
 			switch contentRule.Modifier {
 			case DNSQuery, FileData, HTTPHeader:
 				MultipleBufferMatching = contentRule.Modifier
@@ -378,6 +379,11 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			default:
 				MultipleBufferMatching = Default
 			}
+
+		}
+
+		// save current
+		if !set || i == len(params)-1 && len(contentRule.Content) != 0 {
 			contents = append(contents, contentRule)
 			contentRule = new(ContentRule)
 		}
