@@ -47,7 +47,7 @@ type Manager struct {
 
 	// 控制页面并发
 	concurrent         int
-	pageSizedWaitGroup utils.SizedWaitGroup
+	pageSizedWaitGroup *utils.SizedWaitGroup
 
 	config *Config
 

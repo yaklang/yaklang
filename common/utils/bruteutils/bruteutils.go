@@ -62,7 +62,7 @@ type BruteUtil struct {
 	processes            sync.Map
 	TargetTaskConcurrent int
 
-	targetsSwg utils.SizedWaitGroup
+	targetsSwg *utils.SizedWaitGroup
 
 	targetList     *list.List
 	targetListLock sync.Mutex
@@ -162,7 +162,7 @@ func (b *BruteUtil) Feed(item *BruteItem) {
 		swg := utils.NewSizedWaitGroup(b.TargetTaskConcurrent)
 		process = &targetProcessing{
 			Target: item.Target,
-			Swg:    &swg,
+			Swg:    swg,
 		}
 		b.targetList.PushBack(item.Target)
 		b.processes.Store(item.Target, process)

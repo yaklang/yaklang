@@ -256,7 +256,7 @@ func initYaklangLib() {
 }
 
 type ScriptEngine struct {
-	swg utils.SizedWaitGroup
+	swg *utils.SizedWaitGroup
 
 	tasks *sync.Map
 

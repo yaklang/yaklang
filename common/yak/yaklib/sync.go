@@ -24,7 +24,7 @@ func NewWaitGroup() *WaitGroupProxy {
 
 func NewSizedWaitGroup(size int) *utils.SizedWaitGroup {
 	swg := utils.NewSizedWaitGroup(size)
-	return &swg
+	return swg
 }
 
 var SyncExport = map[string]interface{}{

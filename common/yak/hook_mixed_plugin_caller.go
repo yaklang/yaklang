@@ -98,7 +98,7 @@ type MixPluginCaller struct {
 	ordinaryFeedback   func(i interface{}, item ...interface{})
 	callers            *YakToCallerManager
 	fingerprintMatcher *fp.Matcher
-	swg                utils.SizedWaitGroup
+	swg                *utils.SizedWaitGroup
 	cache              bool
 }
 
