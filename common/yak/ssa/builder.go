@@ -779,7 +779,10 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 
 	//TODO: parent expression
 
-	//TODO: instance code
+	// instance code
+	if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
+		return b.emitCall(b.buildInstanceCode(s))
+	}
 
 	// make expression
 	if s, ok := stmt.MakeExpression().(*yak.MakeExpressionContext); ok {
@@ -987,7 +990,25 @@ func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) Type {
 	return nil
 }
 
-//TODO: instance code
+// instance code
+func (b *builder) buildInstanceCode(stmt *yak.InstanceCodeContext) *Call {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	newfunc := b.Package.NewFunctionWithParent("", b.Function)
+	b = &builder{
+		Function: newfunc,
+		next:     b,
+	}
+
+	if block, ok := stmt.Block().(*yak.BlockContext); ok {
+		b.buildBlock(block)
+	}
+
+	b.Finish()
+	b = b.next
+	return b.newCall(newfunc, nil, false)
+}
 
 // anonymous function decl
 func (b *builder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) Value {
