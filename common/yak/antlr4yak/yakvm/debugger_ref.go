@@ -18,6 +18,12 @@ func (hs *handlesMap) reset() {
 	hs.handleToVal = make(map[int]interface{})
 }
 
+func (hs *handlesMap) forceSet(handle int, value interface{}) {
+	hs.handleToVal[handle] = value
+	addr := fmt.Sprintf("%p", value)
+	hs.ValToHandle[addr] = handle
+}
+
 func (hs *handlesMap) create(value interface{}) int {
 	next := hs.nextHandle
 	hs.nextHandle++
