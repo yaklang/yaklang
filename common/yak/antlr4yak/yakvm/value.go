@@ -76,7 +76,7 @@ func (v *Frame) getValueForLeftIterableCall(args []*Value) *Value {
 	switch iterableValueRF.Type().Kind() {
 	case reflect.String:
 		fallthrough
-	case reflect.Slice:
+	case reflect.Array, reflect.Slice:
 		if argsLength != 1 {
 			panic("left slice call args must be 1")
 		}
