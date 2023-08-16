@@ -1036,6 +1036,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		mitmLock.Lock()
 		defer mitmLock.Unlock()
 
+		handled := lowhttp.DeletePacketEncoding(req)
+		if handled != nil {
+			req = handled
+		}
+
 		var matchedRules []*ypb.MITMContentReplacer
 		matchedRulesP := &matchedRules
 		ctx := context.WithValue(originReqIns.Context(), REQUEST_CONTEXT_KEY_MatchedRules, matchedRulesP)
@@ -1044,8 +1049,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var (
 			method = originReqIns.Method
 		)
-		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
-		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestBytes, string(originReqRaw))
+		httpctx.SetRequestHTTPS(originReqIns, isHttps)
+		httpctx.SetRequestBytes(originReqIns, originReqRaw)
+		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip, true)
 
 		// 保证始终只有一个 Goroutine 在处理请求
 		defer func() {
@@ -1144,17 +1150,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-
-		// 处理 gzip
-		var strippedGzip = StripHTTPRequestGzip(req)
-		if strippedGzip == nil {
-			req = originReqRaw[:]
-		} else {
-			req = strippedGzip
-			httpctx.SetRequestBytes(originReqIns, strippedGzip)
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip, true)
-		}
-
+		
 		// 开始劫持
 		counter := time.Now().UnixNano()
 		select {
@@ -1332,7 +1328,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		// 处理 gzip
 		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip) {
-			requestRaw = StripHTTPRequestGzip(requestRaw)
+			requestRaw = lowhttp.DeletePacketEncoding(requestRaw)
 		}
 
 		tooLarge := utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit)
