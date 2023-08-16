@@ -61,6 +61,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		EnterBlock:   nil,
 		ExitBlock:    nil,
 		AnonFuncs:    make([]*Function, 0),
+		deferexpr:    make([]*Call, 0),
 		parent:       nil,
 		FreeValues:   make([]Value, 0),
 		user:         make([]User, 0),
@@ -117,9 +118,14 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 }
 
 func (f *Function) Finish() {
-	f.currentBlock = nil
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+	// set defer function
+	f.currentBlock = f.ExitBlock
+	for i := len(f.deferexpr) - 1; i >= 0; i-- {
+		f.emitCall(f.deferexpr[i])
+	}
+	f.currentBlock = nil
 	for _, b := range f.Blocks {
 		//TODO: use worklist avoid repeat inference
 		for _, phi := range b.Phis {

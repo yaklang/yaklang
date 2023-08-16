@@ -10,6 +10,7 @@ import (
 
 // check block-graph and value-user chain
 func CheckProgram(t *testing.T, prog *Program) {
+	// showProg(prog)
 
 	checkInst := func(v Node) {
 		if phi, ok := v.(*Phi); ok {
@@ -951,6 +952,68 @@ return: <int64> t1
 entry0:
 	<int64> t0 = <int64> a add <int64> 1
 	ret <int64> t0
+`,
+		}
+		prog := ParseSSA(code)
+		CheckProgram(t, prog)
+		CompareYakFunc(t, prog, ir)
+	})
+
+	t.Run("closure_defer", func(t *testing.T) {
+		code := `
+// instance function
+defer func{
+    print("defer func 1")
+}
+
+// function call
+defer func(){
+    print("defer func 2")
+}()
+defer () => {
+    print("defer func 3")
+}()
+
+// anonymouse function
+defer func(){
+    print("defer func 4")
+}
+
+defer () => {
+    print("defer func 5")
+}
+
+print("main")
+			`
+		ir := []string{
+			`
+yak-main
+entry0:
+        <> t0 = call <> print (<string> main) []
+        <> t1 = call <> yak-main$3 () []
+        <> t2 = call <> yak-main$2 () []
+        <> t3 = call <> yak-main$1 () []
+`,
+			`
+yak-main$1
+parent: yak-main
+pos:   3:6   -   5:0  : func{
+entry0:
+        <> t0 = call <> print (<string> defer func 1) []
+`,
+			`
+yak-main$2
+parent: yak-main
+pos:   8:6   -  10:0  : func(){
+entry0:
+        <> t0 = call <> print (<string> defer func 2) []
+`,
+			`
+yak-main$3
+parent: yak-main
+pos:  11:6   -  13:0  : ()=>{
+entry0:
+        <> t0 = call <> print (<string> defer func 3) []
 `,
 		}
 		prog := ParseSSA(code)
