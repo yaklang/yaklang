@@ -189,7 +189,7 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 }
 
 func (g *rdpClient) Login(domain, user, pwd string) error {
-	conn, err := netx.DialTCPTimeout(5*time.Second, "tcp", g.Host)
+	conn, err := netx.DialTCPTimeout(5*time.Second, g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
