@@ -97,6 +97,7 @@ func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
 		p.Build()
 	}
+	b.inCompletePhi = nil
 	b.isSealed = true
 }
 
