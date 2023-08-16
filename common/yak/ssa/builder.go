@@ -745,15 +745,11 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		}
 	}
 
-	getValueWithExpr := func(index int) (Value, *yak.ExpressionContext) {
-		if s, ok := stmt.Expression(index).(*yak.ExpressionContext); ok {
-			return b.buildExpression(s), s
-		}
-		return nil, nil
-	}
 	getValue := func(index int) Value {
-		v, _ := getValueWithExpr(index)
-		return v
+		if s, ok := stmt.Expression(index).(*yak.ExpressionContext); ok {
+			return b.buildExpression(s)
+		}
+		return nil
 	}
 
 	//TODO: member call
@@ -778,16 +774,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 
 	// function call
 	if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
-		v, expr := getValueWithExpr(0)
-		if v != nil {
-			return b.buildFunctionCall(s, v)
-		}
-		if expr != nil {
-			if f, ok := buildin[expr.GetText()]; ok {
-				return b.buildFunctionCall(s, f)
-			}
-		}
-		panic("call target is nil")
+		return b.emitCall(b.buildFunctionCallWarp(stmt, s))
 	}
 
 	//TODO: parent expression
@@ -1072,8 +1059,23 @@ func (b *builder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 	}
 }
 
+func (b *builder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt *yak.FunctionCallContext) *Call {
+	if expr, ok := exprstmt.Expression(0).(*yak.ExpressionContext); ok {
+		v := b.buildExpression(expr)
+		if v != nil {
+			return b.buildFunctionCall(stmt, v)
+		}
+		if expr != nil {
+			if f, ok := buildin[expr.GetText()]; ok {
+				return b.buildFunctionCall(stmt, f)
+			}
+		}
+	}
+	panic("call target is nil")
+}
+
 // function call
-func (b *builder) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) Value {
+func (b *builder) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) *Call {
 	// recover := b.SetRange(stmt.BaseParserRuleContext)
 	// defer recover()
 	var args []Value
@@ -1084,7 +1086,7 @@ func (b *builder) buildFunctionCall(stmt *yak.FunctionCallContext, v Value) Valu
 	if stmt.Wavy() != nil {
 		isDropErr = true
 	}
-	return b.emitCall(v, args, isDropErr)
+	return b.newCall(v, args, isDropErr)
 }
 
 // ordinary argument
