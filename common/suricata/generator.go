@@ -47,8 +47,12 @@ func (g *Surigen) parse() error {
 		switch mdf {
 		case HTTPStatCode:
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseDigit), WithTryLen(3))
+		case HTTPRequestBody, HTTPResponseBody:
+			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseAll))
+		case HTTPContentLen:
+			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseDigit))
 		default:
-			g.gen[mdf] = parse2ContentGen(rule)
+			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseVisable))
 		}
 	}
 
