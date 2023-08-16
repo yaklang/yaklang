@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
 	"testing"
@@ -244,4 +245,17 @@ func TestParseResponseLine(t *testing.T) {
 		}
 
 	}
+}
+
+func TestGZIP_IN_REQUEST(t *testing.T) {
+	raw, _ := utils.GzipCompress("abc")
+	var packetResult []byte
+	packetResult = ReplaceHTTPPacketBody([]byte(`POST / HTTP/1.1
+Host: www.baidu.com
+Content-Encoding: gzip
+
+`), raw, false)
+	packetResult = FixHTTPRequestOut(packetResult)
+	ReplaceHTTPPacketBody()
+	println(string(packetResult))
 }
