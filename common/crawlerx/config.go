@@ -40,6 +40,7 @@ type BaseConfig struct {
 	leakless          string
 	localStorage      map[string]string
 	invalidSuffix     []string
+	stealth           bool
 
 	targetUrl      string
 	ch             chan ReqInfo
@@ -87,6 +88,7 @@ func NewConfig() *Config {
 			leakless:          "default",
 			localStorage:      make(map[string]string),
 			invalidSuffix:     make([]string, 0),
+			stealth:           false,
 		},
 	}
 }
@@ -337,5 +339,11 @@ func WithPageSizedWaitGroup(pageSizedWaitGroup *utils.SizedWaitGroup) ConfigOpt 
 func WithStartWaitGroup(waitGroup *utils.SizedWaitGroup) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.startWaitGroup = waitGroup
+	}
+}
+
+func WithStealth(stealth bool) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.stealth = stealth
 	}
 }

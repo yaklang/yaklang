@@ -35,7 +35,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	if err != nil {
 		return nil, utils.Errorf(`Data channel create error: %s`, err)
 	}
-	urlTree := tools.CreateTree(targetUrl)
+	//urlTree := tools.CreateTree(targetUrl)
 	waitGroup := utils.NewSizedWaitGroup(20)
 	startWaitGroup := utils.NewSizedWaitGroup(20)
 	baseOpts := make([]ConfigOpt, 0)
@@ -45,7 +45,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		WithPageVisitFilter(pageVisit),
 		WithResultSentFilter(resultSent),
 		WithUChan(uChan),
-		WithUrlTree(urlTree),
+		// WithUrlTree(urlTree),
 		WithPageSizedWaitGroup(waitGroup),
 		WithStartWaitGroup(startWaitGroup),
 	)
@@ -67,6 +67,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		return nil, utils.Errorf(`target url %s check failed: %s`, targetUrl, err)
 	}
 	WithTargetUrl(checkedUrl)(config)
+	WithUrlTree(tools.CreateTree(checkedUrl))(config)
 	core := CrawlerCore{
 		targetUrl:      checkedUrl,
 		config:         config,

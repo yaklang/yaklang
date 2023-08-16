@@ -39,9 +39,13 @@ func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, sele
 		return false
 	}
 	//element.Click(proto.InputMouseButtonLeft)
-	element.Eval(`this.click()`)
-	page.MustWaitLoad()
+	_, err = element.Eval(`()=>this.click()`)
+	if err != nil {
+		log.Errorf(`click element %v error: %v`, element, err.Error())
+		return false
+	}
 	time.Sleep(500 * time.Millisecond)
+	page.MustWaitLoad()
 	return true
 }
 
