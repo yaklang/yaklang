@@ -121,7 +121,8 @@ func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 	for _, b := range f.Blocks {
-		for _, phi := range b.inCompletePhi {
+		//TODO: use worklist avoid repeat inference
+		for _, phi := range b.Phis {
 			phi.InferenceType()
 		}
 		for _, i := range b.Instrs {
