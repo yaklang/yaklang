@@ -263,7 +263,7 @@ Content-Encoding: gzip
 		panic("gzip must in request error")
 	}
 
-	var result = RemoveContentEncoding(packetResult)
+	var result = DeletePacketEncoding(packetResult)
 	fmt.Println(string(result))
 	if !strings.Contains(string(result), "abc") || strings.Contains(string(result), `-Encoding: gzip`) {
 		panic("clear in request error")

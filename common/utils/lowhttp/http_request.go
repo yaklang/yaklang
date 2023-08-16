@@ -120,7 +120,7 @@ func FixHTTPRequestOut(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
 }
 
-func RemoveContentEncoding(raw []byte) []byte {
+func DeletePacketEncoding(raw []byte) []byte {
 	var encoding string
 	var isChunked bool
 	var buf bytes.Buffer
@@ -138,16 +138,25 @@ func RemoveContentEncoding(raw []byte) []byte {
 			return ""
 		} else if ret == "transfer-encoding" && strings.ToLower(v) == "chunked" {
 			isChunked = true
+			return ""
 		}
 		buf.WriteString(line + CRLF)
 		return line
 	})
 	buf.WriteString(CRLF)
+
+	if isChunked {
+		decBody, _ := codec.HTTPChunkedDecode(body)
+		if len(decBody) > 0 {
+			body = decBody
+		}
+	}
+
 	decResult, fixed := ContentEncodingDecode(encoding, body)
 	if fixed && len(decResult) > 0 {
 		body = decResult
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
 }
 
 func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
