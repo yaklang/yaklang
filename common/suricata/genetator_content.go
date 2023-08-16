@@ -95,11 +95,7 @@ func parse2ContentGen(rules []*ContentRule, opts ...ContentGenOpt) *ContentGen {
 			// ignore
 		case rule.PCRE != "":
 			// PCRE
-			pcre, err := ParsePCREStr(rule.PCRE)
-			if err != nil {
-				log.Warnf("parse pcre rule failed:%v", err)
-			}
-			generator, err := pcre.Generator()
+			generator, err := rule.PCREParsed.Generator()
 			if err != nil {
 				log.Warnf("new regexp generator from rule failed:%v", err)
 			}
@@ -135,7 +131,7 @@ func parse2ContentGen(rules []*ContentRule, opts ...ContentGenOpt) *ContentGen {
 				Range:   math.MaxInt,
 			}
 		default:
-			cm := &ContentModifier{
+			cm = &ContentModifier{
 				NoCase:   rule.Nocase,
 				Relative: rule.Distance != nil || rule.Within != nil,
 				Content:  rule.Content,

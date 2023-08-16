@@ -17,19 +17,15 @@ func init() {
 }
 
 func newPCREMatch(r *ContentRule) matchHandler {
-	pcre, err := ParsePCREStr(r.PCRE)
-	if err != nil {
-		return nil
-	}
-	matcher, err := pcre.Matcher()
+	matcher, err := r.PCREParsed.Matcher()
 	if err != nil {
 		return nil
 	}
 	return func(c *matchContext) error {
 		var indexes []matched
-		buffer := c.GetBuffer(pcre.modifier)
+		buffer := c.GetBuffer(r.PCREParsed.modifier)
 
-		if pcre.ignoreEndNewline {
+		if r.PCREParsed.ignoreEndNewline {
 			if buffer[len(buffer)-1] == '\n' {
 				buffer = buffer[:len(buffer)-1]
 			}
@@ -40,7 +36,7 @@ func newPCREMatch(r *ContentRule) matchHandler {
 			return nil
 		}
 
-		if pcre.startsWith {
+		if r.PCREParsed.startsWith {
 			if !c.Must(indexes[0].pos == 0) {
 				return nil
 			}
@@ -49,7 +45,7 @@ func newPCREMatch(r *ContentRule) matchHandler {
 		var prevMatch []matched
 		loadIfMapEz(c.Value, &prevMatch, "prevMatch")
 
-		if pcre.relative {
+		if r.PCREParsed.relative {
 			indexes = slices.DeleteFunc(indexes, func(m matched) bool {
 				for _, pm := range prevMatch {
 					if m.pos == pm.pos+pm.len {
@@ -89,7 +85,7 @@ type PCREGenerator struct {
 	generator regen.Generator
 }
 
-func ParsePCREStr(pattern string) (*PCRE, error) {
+func parsePCREStr(pattern string) (*PCRE, error) {
 	if len(pattern) < 3 {
 		return nil, errors.New("invalid pcre pattern")
 	}
