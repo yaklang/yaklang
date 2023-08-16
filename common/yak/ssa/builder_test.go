@@ -23,6 +23,26 @@ func parseSSA(src string) *Program {
 // check block-graph and value-user chain
 func CheckProgram(t *testing.T, prog *Program) {
 
+	checkInst := func(v Node) {
+		if phi, ok := v.(*Phi); ok {
+			if !slices.Contains(phi.GetBlock().Phis, phi) {
+				t.Fatalf("fatal phi inst %s not't in block %s", phi, phi.GetBlock().Name)
+			}
+			// phi is ok return
+			return
+		}
+		if inst, ok := v.(Instruction); ok {
+			if block := inst.GetBlock(); block != nil {
+				// inst must in inst.block
+				if !slices.Contains(block.Instrs, inst) {
+					t.Fatalf("fatal inst %s not't in block %s", inst, inst.GetBlock().Name)
+				}
+			} else if inst != inst.GetParent().symbol {
+				t.Fatalf("fatal inst %s not't have block ", inst)
+			}
+		}
+	}
+
 	checkValue := func(value Value) {
 		if user, ok := value.(User); ok {
 			if slices.Contains(user.GetValues(), value) {
@@ -33,6 +53,7 @@ func CheckProgram(t *testing.T, prog *Program) {
 			if !slices.Contains(user.GetValues(), value) {
 				t.Fatalf("fatal user %s not't have it %s in value", user, value)
 			}
+			checkInst(user)
 		}
 	}
 	checkUser := func(user User) {
@@ -46,6 +67,7 @@ func CheckProgram(t *testing.T, prog *Program) {
 			if !slices.Contains(value.GetUsers(), user) {
 				t.Fatalf("fatal value %s not't have it %s in user", value, user)
 			}
+			checkInst(value)
 		}
 
 	}

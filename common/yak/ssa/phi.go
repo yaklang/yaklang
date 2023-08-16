@@ -34,7 +34,7 @@ func (phi *Phi) Build() Value {
 		block := phi.Block
 		block.Phis = append(block.Phis, phi)
 	}
-	fixupUseChain(phi)
+	fixupUseChain(v)
 	return v
 }
 
