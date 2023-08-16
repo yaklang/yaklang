@@ -108,6 +108,9 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 	}
 	//TODO: include stmt
 	//TODO: defer stmt
+	if s, ok := stmt.DeferStmt().(*yak.DeferStmtContext); ok {
+		b.buildDeferStmt(s)
+	}
 	//TODO: go stmt
 	//TODO: assert stmt
 
@@ -139,6 +142,28 @@ func (b *builder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtContex
 
 // TODO: include stmt
 // TODO: defer stmt
+func (b *builder) buildDeferStmt(stmt *yak.DeferStmtContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	if stmt, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		// instance code
+		if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
+			c := b.buildInstanceCode(s)
+			b.deferexpr = append(b.deferexpr, c)
+		}
+
+		// function call
+		if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
+			if c := b.buildFunctionCallWarp(stmt, s); c != nil {
+				b.deferexpr = append(b.deferexpr, c)
+			}
+		}
+
+	}
+
+}
+
 // TODO: go stmt
 // return stmt
 func (b *builder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
