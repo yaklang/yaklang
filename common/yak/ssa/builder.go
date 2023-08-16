@@ -627,6 +627,7 @@ func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 			field := b.parent.newField(s.GetText())
 			field.outCapture = true
 			b.FreeValues = append(b.FreeValues, field)
+			b.SetReg(field)
 			b.parent.writeVariable(s.GetText(), field)
 			b.writeVariable(s.GetText(), field)
 			return field
