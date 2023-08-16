@@ -4,8 +4,10 @@ package crawlerx
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"mime/multipart"
@@ -13,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 func (starter *BrowserStarter) HttpPostFile(element *rod.Element) error {
@@ -107,7 +110,15 @@ type HttpRequest struct {
 }
 
 func (request *HttpRequest) init() {
-	transport := http.Transport{}
+	transport := http.Transport{
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		DialContext:           netx.NewDialContextFunc(15 * time.Second),
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 	if request.proxy != nil {
 		transport.Proxy = http.ProxyURL(request.proxy)
 	}

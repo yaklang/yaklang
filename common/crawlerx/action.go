@@ -42,7 +42,10 @@ func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 		return utils.Errorf(`Page %s get input elements error: %s`, originUrl, err)
 	}
 	for _, inputElement := range inputElements {
-		starter.inputElementsExploit(inputElement)
+		err = starter.inputElementsExploit(inputElement)
+		if err != nil {
+			return utils.Errorf(`Page %v input element %v error: %v`, originUrl, inputElement, err.Error())
+		}
 	}
 	if len(urls) == 0 && len(submitElements) == 0 {
 		eventSelectors, err := starter.getEventElements(page)
@@ -50,21 +53,30 @@ func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 			return utils.Errorf(`Page %s get event elements error: %s`, originUrl, err)
 		}
 		for _, eventSelector := range eventSelectors {
-			starter.eventElementsExploit(page, originUrl, eventSelector)
+			err = starter.eventElementsExploit(page, originUrl, eventSelector)
+			if err != nil {
+				return utils.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+			}
 		}
 	} else {
 		for _, url := range urls {
 			if starter.banList.Exist(url) {
 				continue
 			}
-			starter.urlsExploit(originUrl, url)
+			err = starter.urlsExploit(originUrl, url)
+			if err != nil {
+				return utils.Errorf(`Url %v from %v exploit error: %v`, url, originUrl, err.Error())
+			}
 		}
 		clickSelectors, err := starter.getClickElements(page)
 		if err != nil {
 			return utils.Errorf(`Page %s get click elements error: %s`, originUrl, err)
 		}
 		for _, clickSelector := range clickSelectors {
-			starter.clickElementsExploit(page, originUrl, clickSelector)
+			err = starter.clickElementsExploit(page, originUrl, clickSelector)
+			if err != nil {
+				return utils.Errorf(`Page %v click selector %v error: %v`, originUrl, clickSelector, err.Error())
+			}
 		}
 	}
 	return nil
@@ -205,10 +217,14 @@ func (starter *BrowserStarter) generateClickElementsExploit() func(*rod.Page, st
 					if starter.banList.Exist(url) {
 						continue
 					}
-					starter.urlsExploit(originUrl, url)
+					err = starter.urlsExploit(currentUrl, url)
+					if err != nil {
+						return utils.Errorf(`Url %v from %v exploit error: %v`, url, currentUrl, err.Error())
+					}
+
 				}
 			}
-			page.NavigateBack()
+			_ = page.NavigateBack()
 			time.Sleep(time.Second)
 		}
 		return nil
@@ -232,7 +248,8 @@ func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element)
 		case "radio", "checkbox":
 			return element.Click(proto.InputMouseButtonLeft)
 		default:
-			return utils.Errorf("unknown attribute: %s", attribute)
+			//log.Infof("unknown attribute: %s", attribute)
+			return nil
 		}
 	}
 }
@@ -268,7 +285,10 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 			if starter.banList.Exist(currentUrl) {
 				return nil
 			}
-			starter.urlsExploit(originUrl, currentUrl)
+			err = starter.urlsExploit(originUrl, currentUrl)
+			if err != nil {
+				return utils.Errorf(`Url %v from %v exploit error: %v`, currentUrl, originUrl, err.Error())
+			}
 		}
 		return nil
 	}
