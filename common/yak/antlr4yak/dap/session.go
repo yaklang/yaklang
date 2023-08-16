@@ -83,6 +83,10 @@ type DebugSession struct {
 	// wg
 	LaunchWg sync.WaitGroup
 
+	// variablesMap  ref -> dap.Variable
+	variablesMap map[int]dap.Variable
+}
+
 func NewDebugSession(conn net.Conn, config *DAPServerConfig) *DebugSession {
 	return &DebugSession{
 		config:       config,
@@ -569,7 +573,7 @@ func (ds *DebugSession) onVariablesRequest(request *dap.VariablesRequest) {
 
 	children := []dap.Variable{}
 	if filtered == "named" || filtered == "" {
-		named := ds.metadataToDAPVariables(v)
+		named := ds.namedToDAPVariables(v, start)
 		children = append(children, named...)
 	}
 
@@ -644,7 +648,7 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 	response := &dap.EvaluateResponse{Response: *newResponse(request.Request)}
 	response.Body = dap.EvaluateResponseBody{Result: value.String(), Type: value.TypeVerbose}
 
-	ref := ds.debugger.debugger.AddVar(value)
+	ref := ds.ConvertVariable(value.Value)
 	response.Body.VariablesReference = ref
 	response.Body.IndexedVariables = value.GetIndexedVariableCount()
 	response.Body.NamedVariables = value.GetNamedVariableCount()
@@ -753,8 +757,9 @@ func (s *DebugSession) sendInternalErrorResponse(seq int, details string) {
 	s.send(er)
 }
 
-func (ds *DebugSession) metadataToDAPVariables(i interface{}) []dap.Variable {
+func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Variable {
 	children := []dap.Variable{} // must return empty array, not null, if no children
+	// metadata
 	switch v := i.(type) {
 	case *yakvm.Value:
 		length := v.GetIndexedVariableCount()
@@ -774,10 +779,50 @@ func (ds *DebugSession) metadataToDAPVariables(i interface{}) []dap.Variable {
 				Type:  "string",
 			})
 		}
+		return children
 	case *yakvm.Scope:
 		// ? scope没有metadata
-		break
+		return children
 	}
+
+	refV := reflect.ValueOf(i)
+	switch refV.Kind() {
+	case reflect.Ptr:
+		refV = refV.Elem()
+		if refV.Kind() != reflect.Struct {
+			return children
+		}
+		fallthrough
+	case reflect.Struct:
+		length := refV.NumField()
+		children = make([]dap.Variable, length)
+		refT := refV.Type()
+		varname := ds.GetEvaluateName(i)
+
+		for i := start; i < length; i++ {
+			fieldName := refT.Field(i).Name
+
+			value := refV.Field(i)
+			iValue := value.Interface()
+			ref := ds.ConvertVariable(iValue)
+
+			vari := dap.Variable{
+				Name:               fmt.Sprintf("%s", fieldName),
+				EvaluateName:       fmt.Sprintf("%s.%s", varname, fieldName),
+				Type:               value.Type().String(),
+				Value:              yakvm.AsString(iValue),
+				VariablesReference: ref,
+				IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
+				NamedVariables:     yakvm.GetNamedVariableCount(iValue),
+			}
+
+			// 保存到varibalesMap中
+			ds.variablesMap[ref] = vari
+
+			children[i] = vari
+		}
+	}
+
 	return children
 }
 
@@ -785,7 +830,6 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 	children := []dap.Variable{} // must return empty array, not null, if no children
 	var (
 		handleValue interface{} = nil
-		literal     string      = ""
 	)
 
 	switch v := i.(type) {
@@ -809,7 +853,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 
 			indexed := value.GetIndexedVariableCount()
 			named := value.GetNamedVariableCount()
-			children[index] = dap.Variable{
+			vari := dap.Variable{
 				Name:               name,
 				EvaluateName:       name,
 				Value:              value.AsString(),
@@ -818,21 +862,23 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				IndexedVariables:   indexed,
 				NamedVariables:     named,
 			}
+
+			// 保存到varibalesMap中
+			ds.variablesMap[ref] = vari
+
+			children[index] = vari
+
 			index++
 		}
 	case *yakvm.Value:
 		handleValue = v.Value
-		literal = v.Literal
 	default:
 		handleValue = v
-		literal = "{null}"
 	}
 
 	if handleValue != nil {
 		refV := reflect.ValueOf(handleValue)
-		if literal == "{null}" {
-			literal = ""
-		}
+		varname := ds.GetEvaluateName(handleValue)
 
 		switch refV.Kind() {
 		case reflect.Map:
@@ -862,9 +908,9 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				iValue := value.Interface()
 				valueRef := ds.ConvertVariable(iValue)
 
-				mapVar := dap.Variable{
+				valueVar := dap.Variable{
 					Name:               fmt.Sprintf("[value %d]", start+i),
-					EvaluateName:       fmt.Sprintf("%s[%s]", literal, keyStr),
+					EvaluateName:       fmt.Sprintf("%s[%s]", varname, keyStr),
 					Type:               value.Type().String(),
 					Value:              value.String(),
 					VariablesReference: valueRef,
@@ -872,7 +918,11 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
 				}
 
-				children = append(children, keyVar, mapVar)
+				// 保存到varibalesMap中
+				ds.variablesMap[keyRef] = keyVar
+				ds.variablesMap[valueRef] = valueVar
+
+				children = append(children, keyVar, valueVar)
 			}
 		case reflect.Array, reflect.Slice:
 			length := refV.Len()
@@ -883,45 +933,43 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				iValue := value.Interface()
 				ref := ds.ConvertVariable(iValue)
 
-				children[i] = dap.Variable{
+				vari := dap.Variable{
 					Name:               fmt.Sprintf("[%d]", idx),
-					EvaluateName:       fmt.Sprintf("%s[%d]", literal, idx),
-					Type:               refV.Type().String(),
-					Value:              value.String(),
+					EvaluateName:       fmt.Sprintf("%s[%d]", varname, idx),
+					Type:               value.Type().String(),
+					Value:              yakvm.AsString(iValue),
 					VariablesReference: ref,
 					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
 				}
-			}
-		case reflect.Ptr:
-			refV = refV.Elem()
-			if refV.Kind() != reflect.Struct {
-				return children
-			}
-			fallthrough
-		case reflect.Struct:
-			length := refV.NumField()
-			children = make([]dap.Variable, length)
-			for i := start; i < length; i++ {
-				value := refV.Field(i)
-				iValue := value.Interface()
-				fieldName := value.String()
-				ref := ds.ConvertVariable(iValue)
 
-				children[i] = dap.Variable{
-					Name:               fmt.Sprintf("%s", fieldName),
-					EvaluateName:       fmt.Sprintf("%s.%s", literal, fieldName),
-					Type:               refV.Type().String(),
-					Value:              value.String(),
-					VariablesReference: ref,
-					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
-					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
-				}
+				// 保存到varibalesMap中
+				ds.variablesMap[ref] = vari
+
+				children[i] = vari
 			}
+
 		}
 	}
 
 	return children
+}
+
+// 获取handleValue对应的ref,然后在从保存的dap.Variable中拿到变量名
+func (ds *DebugSession) GetEvaluateName(v interface{}) string {
+	ref := ds.GetConvertedVariableRef(v)
+	if v, ok := ds.variablesMap[ref]; ok {
+		return v.EvaluateName
+	}
+	return ""
+}
+
+func (ds *DebugSession) GetConvertedVariableRef(v interface{}) int {
+	i, ok := ds.debugger.GetVariablesReference(v)
+	if !ok {
+		return -1
+	}
+	return i
 }
 
 func (ds *DebugSession) ConvertVariable(v interface{}) int {
@@ -946,6 +994,7 @@ func (ds *DebugSession) ConvertVariable(v interface{}) int {
 	if !ok {
 		return debugger.AddVariableRef(v)
 	}
+
 	return i
 }
 
