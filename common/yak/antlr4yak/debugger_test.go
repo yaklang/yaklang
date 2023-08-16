@@ -91,7 +91,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetBreakPoint(3, "a > 5", "")
+		_, err := g.SetBreakPoint(3, "a > 5", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +125,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetBreakPoint(3, "", "3")
+		_, err := g.SetBreakPoint(3, "", "3")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,7 +159,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetBreakPoint(3, "a > 3", "3")
+		_, err := g.SetBreakPoint(3, "a > 3", "3")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetBreakPoint(3, "a > 3", "a > 7")
+		_, err := g.SetBreakPoint(3, "a > 3", "a > 7")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +227,7 @@ for range 10 {
 	a++
 }`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetNormalBreakPoint(3)
+		_, err := g.SetNormalBreakPoint(3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -288,7 +288,7 @@ dump(a)
 
 test()`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetNormalBreakPoint(3)
+		_, err := g.SetNormalBreakPoint(3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -325,7 +325,7 @@ test()
 b = 2
 c = 3`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetNormalBreakPoint(5)
+		_, err := g.SetNormalBreakPoint(5)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,7 +374,7 @@ test()
 b = 2
 c = 3`
 	init := func(g *yakvm.Debugger) {
-		err := g.SetNormalBreakPoint(5)
+		_, err := g.SetNormalBreakPoint(5)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -468,7 +468,7 @@ b = 2
 c(a+b)
 `
 	init := func(g *yakvm.Debugger) {
-		err := g.SetNormalBreakPoint(16)
+		_, err := g.SetNormalBreakPoint(16)
 		if err != nil {
 			t.Fatal(err)
 		}
