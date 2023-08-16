@@ -1,9 +1,11 @@
 package ssa
 
+import "fmt"
+
 func (p *Program) show(flag FunctionAsmFlag) {
 	for _, pkg := range p.Packages {
 		for _, i := range pkg.funcs {
-			i.DisAsm(flag)
+			fmt.Println(i.DisAsm(flag))
 		}
 	}
 }
