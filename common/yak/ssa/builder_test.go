@@ -5,20 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"golang.org/x/exp/slices"
 )
-
-func parseSSA(src string) *Program {
-	inputStream := antlr.NewInputStream(src)
-	lex := yak.NewYaklangLexer(inputStream)
-	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
-	p := yak.NewYaklangParser(tokenStream)
-	prog := NewProgram(p)
-	prog.Build()
-	return prog
-}
 
 // check block-graph and value-user chain
 func CheckProgram(t *testing.T, prog *Program) {
@@ -295,7 +283,7 @@ entry0:
 	<int64> t13 = <int64> t12 add <int64> t10
 	<string> t14 = <string> arst add <string> a
 		`
-		prog := parseSSA(src)
+		prog := ParseSSA(src)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -323,7 +311,7 @@ entry0:
 	<int64> t6 = <int64> t2 add <int64> 1
 	update [<int64> t2] = <int64> t6
 		`
-		prog := parseSSA(src)
+		prog := ParseSSA(src)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -353,7 +341,7 @@ if.true2: <- entry0
 b3: <- if.done1
 	<int64> t5 = <int64> 1 add <int64> 2
 		`
-		prog := parseSSA(src)
+		prog := ParseSSA(src)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -419,7 +407,7 @@ if.false11: <- if.elif9
 b12: <- if.done1
 	<int64> t24 = <int64> 1 add <int64> 2
 		`
-		prog := parseSSA(src)
+		prog := ParseSSA(src)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -486,7 +474,7 @@ if.false11: <- if.elif9
 b12: <- if.done1
 	<int64> t24 = <int64> t3 add <int64> 2
 		`
-		prog := parseSSA(src)
+		prog := ParseSSA(src)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -555,7 +543,7 @@ b10: <- if.done5
 b11: <- loop.exit3
 	<int64> t19 = <int64> t3 add <int64> 1
 		`
-		prog := parseSSA(code)
+		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -591,7 +579,7 @@ switch.handler5: <- entry0
 	jump -> switch.default2
 b6: <- switch.done1
 	`
-		prog := parseSSA(code)
+		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -748,7 +736,7 @@ entry0:
 			`,
 		}
 
-		prog := parseSSA(code)
+		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakFunc(t, prog, ir)
 	})
@@ -850,7 +838,7 @@ entry0:
 	ret <> t1
 `,
 		}
-		prog := parseSSA(code)
+		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakFunc(t, prog, ir)
 	})
@@ -903,9 +891,8 @@ entry0:
 	<> t0 = call <> a (<> a1, <> b, <[]> c) []
 `,
 		}
-		prog := parseSSA(code)
+		prog := ParseSSA(code)
 		CheckProgram(t, prog)
-		showProg(prog)
 		CompareYakFunc(t, prog, ir)
 	})
 }
