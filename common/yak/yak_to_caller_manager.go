@@ -131,7 +131,7 @@ func (m *YakToCallerManager) SetConcurrent(i int) error {
 		return err
 	}
 	swg := utils.NewSizedWaitGroup(i)
-	m.swg = &swg
+	m.swg = swg
 	return nil
 }
 

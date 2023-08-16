@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
@@ -23,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/saintfish/chardet"
@@ -341,24 +345,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		return nil
 	}
 
-	/*
-
-	 */
-	var mergedParams = make(map[string]interface{})
-	renderedParams, err := s.RenderVariables(stream.Context(), &ypb.RenderVariablesRequest{
-		Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
-			return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
-		}).([]*ypb.KVPair),
-		IsHTTPS: req.GetIsHTTPS(),
-		IsGmTLS: req.GetIsGmTLS(),
-	})
-	if err != nil {
-		return utils.Errorf("render variables failed: %v", err)
-	}
-	for _, kv := range renderedParams.GetResults() {
-		mergedParams[kv.GetKey()] = kv.GetValue()
-	}
-
 	if req.GetHistoryWebFuzzerId() > 0 {
 		for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(req.GetHistoryWebFuzzerId())) {
 			rsp, err := resp.ToGRPCModel()
@@ -465,67 +451,172 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	if req.GetForceOnlyOneResponse() {
 		requestCount = 1
 	}
-	res, err := mutate.ExecPool(
-		rawRequest,
-		mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
-		mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
-		mutate.WithPoolOpt_Timeout(timeoutSeconds),
-		mutate.WithPoolOpt_Proxy(proxies...),
-		mutate.WithPoolOpt_Concurrent(int(concurrent)),
-		mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
-		mutate.WithPoolOpt_RawMode(true),
-		mutate.WithPoolOpt_Https(req.GetIsHTTPS()),
-		mutate.WithPoolOpt_GmTLS(req.GetIsGmTLS()),
-		mutate.WithPoolOpt_Context(stream.Context()),
-		mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),
-		mutate.WithPoolOpt_FollowJSRedirect(req.GetFollowJSRedirect()),
-		mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
-		mutate.WithPoolOpt_noFixContentLength(req.GetNoFixContentLength()),
-		mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(
-			req.GetHotPatchCodeWithParamGetter()),
-		),
-		mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
-		mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
-		mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
-		mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
-		mutate.WithPoolOpt_Source("webfuzzer"),
-		mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
-		mutate.WithPoolOpt_RetryInStatusCode(inStatusCode),
-		mutate.WithPoolOpt_RetryNotInStatusCode(notInStatusCode),
-		mutate.WithPoolOpt_RetryWaitTime(req.GetRetryWaitSeconds()),
-		mutate.WithPoolOpt_RetryMaxWaitTime(req.GetRetryMaxWaitSeconds()),
-		mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
-		mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
-		mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
-		mutate.WithPoolOpt_FuzzParams(mergedParams),
-		mutate.WithPoolOpt_RequestCountLimiter(requestCount),
-	)
-	if err != nil {
-		task.Ok = false
-		task.Reason = utils.Errorf("exec http pool failed: %s", err).Error()
-		return err
-	}
 
-	// 可以用于计算相似度
-	var firstHeader, firstBody []byte
-	for result := range res {
-		task.HTTPFlowTotal++
-		var payloads = make([]string, len(result.Payloads))
-		for i, payload := range result.Payloads {
-			if len(payload) > 100 {
-				payload = payload[:100] + "..."
+	fuzzerRequestSwg := utils.NewSizedWaitGroup(int(concurrent))
+	executeBatchRequestsWithParams := func(mergedParams map[string]any) (retErr error) {
+		defer func() {
+			if err := recover(); err != nil {
+				retErr = utils.Errorf("panic from grpc.httpfuzzer executeBatchRequestsWithParams: %v", err)
+				utils.Debug(func() {
+					utils.PrintCurrentGoroutineRuntimeStack()
+				})
 			}
-			payloads[i] = utils.ParseStringToVisible(payload)
+		}()
+		res, err := mutate.ExecPool(
+			rawRequest,
+			mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
+			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
+			mutate.WithPoolOpt_Timeout(timeoutSeconds),
+			mutate.WithPoolOpt_Proxy(proxies...),
+			//mutate.WithPoolOpt_Concurrent(int(concurrent)),
+			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
+			mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
+			mutate.WithPoolOpt_RawMode(true),
+			mutate.WithPoolOpt_Https(req.GetIsHTTPS()),
+			mutate.WithPoolOpt_GmTLS(req.GetIsGmTLS()),
+			mutate.WithPoolOpt_Context(stream.Context()),
+			mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),
+			mutate.WithPoolOpt_FollowJSRedirect(req.GetFollowJSRedirect()),
+			mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
+			mutate.WithPoolOpt_noFixContentLength(req.GetNoFixContentLength()),
+			mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
+			mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
+			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
+			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
+			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
+			mutate.WithPoolOpt_Source("webfuzzer"),
+			mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
+			mutate.WithPoolOpt_RetryInStatusCode(inStatusCode),
+			mutate.WithPoolOpt_RetryNotInStatusCode(notInStatusCode),
+			mutate.WithPoolOpt_RetryWaitTime(req.GetRetryWaitSeconds()),
+			mutate.WithPoolOpt_RetryMaxWaitTime(req.GetRetryMaxWaitSeconds()),
+			mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
+			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
+			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
+			mutate.WithPoolOpt_FuzzParams(mergedParams),
+			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
+		)
+		if err != nil {
+			task.Ok = false
+			task.Reason = utils.Errorf("exec http pool failed: %s", err).Error()
+			return err
 		}
+		// 可以用于计算相似度
+		var firstHeader, firstBody []byte
+		for result := range res {
+			task.HTTPFlowTotal++
+			var payloads = make([]string, len(result.Payloads))
+			for i, payload := range result.Payloads {
+				if len(payload) > 100 {
+					payload = payload[:100] + "..."
+				}
+				payloads[i] = utils.ParseStringToVisible(payload)
+			}
 
-		if result.Error != nil {
-			rsp := &ypb.FuzzerResponse{}
-			rsp.UUID = uuid.NewV4().String()
-			rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
-			rsp.Ok = false
-			rsp.Reason = result.Error.Error()
-			rsp.TaskId = int64(taskId)
-			rsp.Payloads = payloads
+			if result.Error != nil {
+				rsp := &ypb.FuzzerResponse{}
+				rsp.UUID = uuid.NewV4().String()
+				rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
+				rsp.Ok = false
+				rsp.Reason = result.Error.Error()
+				rsp.TaskId = int64(taskId)
+				rsp.Payloads = payloads
+				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
+					rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
+					rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
+					rsp.FirstByteDurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
+					rsp.DNSDurationMs = result.LowhttpResponse.TraceInfo.DNSTime.Milliseconds()
+					rsp.Proxy = result.LowhttpResponse.Proxy
+					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
+				}
+
+				task.HTTPFlowFailedCount++
+				yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
+				_ = feedbackResponse(rsp, false)
+				continue
+			}
+
+			var extractorResults []*ypb.KVPair
+			if haveHTTPTplExtractor {
+				for _, extractor := range httpTplExtractor {
+					vars, err := extractor.Execute(result.ResponseRaw)
+					if err != nil {
+						log.Errorf("extractor execute failed: %s", err)
+						continue
+					}
+					for k, v := range vars {
+						extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)})
+					}
+				}
+			}
+			for _, p := range req.GetParams() {
+				extractorResults = append(extractorResults, &ypb.KVPair{Key: p.GetKey(), Value: p.GetValue()})
+			}
+
+			var httpTPLmatchersResult bool
+			if haveHTTPTplMatcher && result.LowhttpResponse != nil {
+				cond := "and"
+				switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
+				case "or", "and":
+					cond = ret
+				default:
+				}
+				ins := &httptpl.YakMatcher{
+					SubMatcherCondition: cond,
+					SubMatchers:         httpTplMatcher,
+				}
+				matcherParams := utils.CopyMapInterface(mergedParams)
+				for _, kv := range extractorResults {
+					matcherParams[kv.GetKey()] = kv.GetValue()
+				}
+				httpTPLmatchersResult, err = ins.Execute(result.LowhttpResponse, matcherParams)
+				if finalError != nil {
+					log.Errorf("httptpl.YakMatcher execute failed: %s", err)
+				}
+			}
+
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+			if len(body) > 2*1024*1024 {
+				body = body[:2*1024*1024]
+				body = append(body, []byte("...chunked by yakit web fuzzer")...)
+			}
+
+			if !req.GetNoFixContentLength() && (result.Request != nil && result.Request.ProtoMajor != 2) { // no fix for h2 rsp
+				result.ResponseRaw = lowhttp.ReplaceHTTPPacketBody(result.ResponseRaw, body, false)
+				result.Response, _ = lowhttp.ParseStringToHTTPResponse(string(result.ResponseRaw))
+			}
+
+			if len(result.RequestRaw) > 1*1024*1024 {
+				result.RequestRaw = result.RequestRaw[:1*1024*1024]
+				result.RequestRaw = append(result.RequestRaw, []byte("...chunked by yakit web fuzzer")...)
+			}
+
+			task.HTTPFlowSuccessCount++
+			var rsp = &ypb.FuzzerResponse{
+				Url:                   utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
+				Method:                utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
+				ResponseRaw:           result.ResponseRaw,
+				GuessResponseEncoding: Chardet(result.ResponseRaw),
+				RequestRaw:            result.RequestRaw,
+				Payloads:              payloads,
+				IsHTTPS:               strings.HasPrefix(strings.ToLower(result.Url), "https://"),
+				ExtractedResults:      extractorResults,
+				MatchedByMatcher:      httpTPLmatchersResult,
+				HitColor:              req.GetHitColor(),
+			}
+
+			if result.LowhttpResponse != nil {
+				// redirect
+				for _, f := range result.LowhttpResponse.RedirectRawPackets {
+					rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
+						IsHttps:  f.IsHttps,
+						Request:  f.Request,
+						Response: f.Response,
+					})
+				}
+			}
+
+			// 处理额外时间
 			if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 				rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
 				rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
@@ -534,185 +625,127 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Proxy = result.LowhttpResponse.Proxy
 				rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
 			}
+			if rsp.ResponseRaw != nil {
+				// 处理结果，相似度
+				header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
+				if firstHeader == nil {
+					log.Debugf("start to set first header[%v]...", result.Url)
+					firstHeader = []byte(header)
+					rsp.HeaderSimilarity = 1.0
+				} else {
+					rsp.HeaderSimilarity = utils.CalcSimilarity(firstHeader, []byte(header))
+				}
 
-			task.HTTPFlowFailedCount++
+				if firstBody == nil {
+					log.Debugf("start to set first body[%v]...", result.Url)
+					firstBody = body
+					rsp.BodySimilarity = 1.0
+				} else {
+					rsp.BodySimilarity = utils.CalcSimilarity(firstBody, body)
+				}
+			}
+
+			rsp.UUID = uuid.NewV4().String()
+			rsp.Timestamp = result.Timestamp
+			rsp.DurationMs = result.DurationMs
+			rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(result.Request.Header.Get("Host")))
+			if rsp.Host == "" {
+				rsp.Host = result.Request.Host
+			}
+			rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(utils.ParseStringToVisible(result.Request.Host)))
+
+			if result.Response != nil {
+				rsp.Ok = true
+				rsp.StatusCode = int32(result.Response.StatusCode)
+				rsp.ContentType = utils.ParseStringToVisible(result.Response.Header.Get("Content-Type"))
+				var bodyLen int64 = 0
+				if result.Response.Body != nil {
+					raw, _ := ioutil.ReadAll(result.Response.Body)
+					bodyLen = int64(len(raw))
+				}
+				rsp.BodyLength = bodyLen
+
+				// 解析 Headers
+				for k, vs := range result.Response.Header {
+					for _, v := range vs {
+						rsp.Headers = append(rsp.Headers, &ypb.HTTPHeader{
+							Header: utils.ParseStringToVisible(k),
+							Value:  utils.ParseStringToVisible(v),
+						})
+					}
+				}
+			}
+
+			if rsp.StatusCode > 0 {
+				// 通过长度过滤
+				if minBody <= maxBody && (minBody > 0 || maxBody > 0) {
+					if maxBody >= rsp.BodyLength && minBody <= rsp.BodyLength {
+						rsp.MatchedByFilter = true
+					}
+				}
+
+				// 通过 StatusCode 过滤
+				if !rsp.MatchedByFilter {
+					rsp.MatchedByFilter = includeStatusCodeFilter.Contains(int(rsp.StatusCode))
+				}
+
+				// rule
+				if !rsp.MatchedByFilter && (len(regexps) > 0 || len(keywords) > 0) {
+					if utils.MatchAnyOfRegexp(rsp.ResponseRaw, regexps...) {
+						rsp.MatchedByFilter = true
+					}
+					if rsp.MatchedByFilter || utils.MatchAllOfRegexp(rsp.ResponseRaw, keywords...) {
+						rsp.MatchedByFilter = true
+					}
+				}
+			}
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
-			_ = feedbackResponse(rsp, false)
-			continue
-		}
-
-		var extractorResults []*ypb.KVPair
-		if haveHTTPTplExtractor {
-			for _, extractor := range httpTplExtractor {
-				vars, err := extractor.Execute(result.ResponseRaw)
-				if err != nil {
-					log.Errorf("extractor execute failed: %s", err)
-					continue
-				}
-				for k, v := range vars {
-					extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)})
-				}
+			rsp.TaskId = int64(taskId)
+			err := feedbackResponse(rsp, false)
+			if err != nil {
+				log.Errorf("send to client failed: %s", err)
+				continue
 			}
 		}
-		for _, p := range req.GetParams() {
-			extractorResults = append(extractorResults, &ypb.KVPair{Key: p.GetKey(), Value: p.GetValue()})
-		}
-
-		var httpTPLmatchersResult bool
-		if haveHTTPTplMatcher && result.LowhttpResponse != nil {
-			cond := "and"
-			switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
-			case "or", "and":
-				cond = ret
-			default:
-			}
-			ins := &httptpl.YakMatcher{
-				SubMatcherCondition: cond,
-				SubMatchers:         httpTplMatcher,
-			}
-			matcherParams := utils.CopyMapInterface(mergedParams)
-			for _, kv := range extractorResults {
-				matcherParams[kv.GetKey()] = kv.GetValue()
-			}
-			httpTPLmatchersResult, err = ins.Execute(result.LowhttpResponse, matcherParams)
-			if finalError != nil {
-				log.Errorf("httptpl.YakMatcher execute failed: %s", err)
-			}
-		}
-
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
-		if len(body) > 2*1024*1024 {
-			body = body[:2*1024*1024]
-			body = append(body, []byte("...chunked by yakit web fuzzer")...)
-		}
-
-		if !req.GetNoFixContentLength() && (result.Request != nil && result.Request.ProtoMajor != 2) { // no fix for h2 rsp
-			result.ResponseRaw = lowhttp.ReplaceHTTPPacketBody(result.ResponseRaw, body, false)
-			result.Response, _ = lowhttp.ParseStringToHTTPResponse(string(result.ResponseRaw))
-		}
-
-		if len(result.RequestRaw) > 1*1024*1024 {
-			result.RequestRaw = result.RequestRaw[:1*1024*1024]
-			result.RequestRaw = append(result.RequestRaw, []byte("...chunked by yakit web fuzzer")...)
-		}
-
-		task.HTTPFlowSuccessCount++
-		var rsp = &ypb.FuzzerResponse{
-			Url:                   utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
-			Method:                utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
-			ResponseRaw:           result.ResponseRaw,
-			GuessResponseEncoding: Chardet(result.ResponseRaw),
-			RequestRaw:            result.RequestRaw,
-			Payloads:              payloads,
-			IsHTTPS:               strings.HasPrefix(strings.ToLower(result.Url), "https://"),
-			ExtractedResults:      extractorResults,
-			MatchedByMatcher:      httpTPLmatchersResult,
-			HitColor:              req.GetHitColor(),
-		}
-
-		if result.LowhttpResponse != nil {
-			// redirect
-			for _, f := range result.LowhttpResponse.RedirectRawPackets {
-				rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
-					IsHttps:  f.IsHttps,
-					Request:  f.Request,
-					Response: f.Response,
-				})
-			}
-		}
-
-		// 处理额外时间
-		if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
-			rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
-			rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-			rsp.FirstByteDurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
-			rsp.DNSDurationMs = result.LowhttpResponse.TraceInfo.DNSTime.Milliseconds()
-			rsp.Proxy = result.LowhttpResponse.Proxy
-			rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
-		}
-		if rsp.ResponseRaw != nil {
-			// 处理结果，相似度
-			header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
-			if firstHeader == nil {
-				log.Debugf("start to set first header[%v]...", result.Url)
-				firstHeader = []byte(header)
-				rsp.HeaderSimilarity = 1.0
-			} else {
-				rsp.HeaderSimilarity = utils.CalcSimilarity(firstHeader, []byte(header))
-			}
-
-			if firstBody == nil {
-				log.Debugf("start to set first body[%v]...", result.Url)
-				firstBody = body
-				rsp.BodySimilarity = 1.0
-			} else {
-				rsp.BodySimilarity = utils.CalcSimilarity(firstBody, body)
-			}
-		}
-
-		rsp.UUID = uuid.NewV4().String()
-		rsp.Timestamp = result.Timestamp
-		rsp.DurationMs = result.DurationMs
-		rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(result.Request.Header.Get("Host")))
-		if rsp.Host == "" {
-			rsp.Host = result.Request.Host
-		}
-		rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(utils.ParseStringToVisible(result.Request.Host)))
-
-		if result.Response != nil {
-			rsp.Ok = true
-			rsp.StatusCode = int32(result.Response.StatusCode)
-			rsp.ContentType = utils.ParseStringToVisible(result.Response.Header.Get("Content-Type"))
-			var bodyLen int64 = 0
-			if result.Response.Body != nil {
-				raw, _ := ioutil.ReadAll(result.Response.Body)
-				bodyLen = int64(len(raw))
-			}
-			rsp.BodyLength = bodyLen
-
-			// 解析 Headers
-			for k, vs := range result.Response.Header {
-				for _, v := range vs {
-					rsp.Headers = append(rsp.Headers, &ypb.HTTPHeader{
-						Header: utils.ParseStringToVisible(k),
-						Value:  utils.ParseStringToVisible(v),
-					})
-				}
-			}
-		}
-
-		if rsp.StatusCode > 0 {
-			// 通过长度过滤
-			if minBody <= maxBody && (minBody > 0 || maxBody > 0) {
-				if maxBody >= rsp.BodyLength && minBody <= rsp.BodyLength {
-					rsp.MatchedByFilter = true
-				}
-			}
-
-			// 通过 StatusCode 过滤
-			if !rsp.MatchedByFilter {
-				rsp.MatchedByFilter = includeStatusCodeFilter.Contains(int(rsp.StatusCode))
-			}
-
-			// rule
-			if !rsp.MatchedByFilter && (len(regexps) > 0 || len(keywords) > 0) {
-				if utils.MatchAnyOfRegexp(rsp.ResponseRaw, regexps...) {
-					rsp.MatchedByFilter = true
-				}
-				if rsp.MatchedByFilter || utils.MatchAllOfRegexp(rsp.ResponseRaw, keywords...) {
-					rsp.MatchedByFilter = true
-				}
-			}
-		}
-		yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
-		rsp.TaskId = int64(taskId)
-		err := feedbackResponse(rsp, false)
-		if err != nil {
-			log.Errorf("send to client failed: %s", err)
-			continue
-		}
+		return nil
 	}
 
+	/*
+		handle vars
+	*/
+	wg := new(sync.WaitGroup)
+	var mergedErr = make(chan error)
+	for _param := range s.FuzztagPreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
+		mergedParams := _param
+		wg.Add(1)
+		go func() {
+			err := executeBatchRequestsWithParams(mergedParams)
+			wg.Done()
+			if err != nil {
+				mergedErr <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(mergedErr)
+
+	errFilter := filter2.NewFilter()
+	var errBuf bytes.Buffer
+	for retErr := range mergedErr {
+		h := codec.Sha256(retErr.Error())
+		if errFilter.Exist(h) {
+			continue
+		}
+		errFilter.Insert(h)
+		errBuf.WriteString(retErr.Error())
+		errBuf.WriteString("\n")
+	}
+
+	if errBuf.Len() > 0 {
+		task.Ok = false
+		task.Reason = errBuf.String()
+		return utils.Errorf("execute batch requests failed: %s", errBuf.String())
+	}
 	task.Ok = true
 	task.Reason = "normal exit / user canceled"
 	return nil
@@ -1085,6 +1118,75 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 	})
 	finalResults = append(finalResults, responseVars...)
 	return &ypb.RenderVariablesResponse{Results: finalResults}, nil
+}
+func (s *Server) FuzztagPreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls bool) chan map[string]any {
+	var resultsChan = make(chan map[string]any, 100)
+	if len(params) <= 0 {
+		resultsChan <- make(map[string]any)
+		close(resultsChan)
+		return resultsChan
+	}
+
+	var l = make([][]string, len(params))
+	var idToKey = make(map[int]string)
+	for index, p := range params {
+		idToKey[index] = p.GetKey()
+
+		if strings.TrimSpace(strings.ToLower(p.GetType())) == "fuzztag" {
+			rets, _ := mutate.FuzzTagExec(p.GetValue(), mutate.FuzzFileOptions()...)
+			if len(rets) > 0 {
+				l[index] = rets
+				continue
+			}
+		}
+
+		ret := make([]string, 1)
+		ret[0] = p.GetValue()
+		l[index] = ret
+	}
+
+	var count int64 = 0
+	go func() {
+		defer func() {
+			if count <= 0 {
+				resultsChan <- make(map[string]any)
+				close(resultsChan)
+				return
+			}
+			close(resultsChan)
+
+			if err := recover(); err != nil {
+				log.Errorf("cartesian to fuzztag vars failed: %v", err)
+			}
+		}()
+
+		err := cartesian.ProductExContext(ctx, l, func(payloads []string) error {
+			var results = make([]*ypb.KVPair, len(payloads))
+			for index, v := range payloads {
+				results[index] = &ypb.KVPair{Key: idToKey[index], Value: v}
+			}
+			resultMap := make(map[string]any)
+			rsp, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
+				Params:  results,
+				IsHTTPS: https,
+				IsGmTLS: gmtls,
+			})
+			if err != nil {
+				log.Errorf("(after fuzztag) render variables failed: %s", err)
+				return nil
+			}
+			for _, i := range rsp.Results {
+				resultMap[i.GetKey()] = i.GetValue()
+			}
+			atomic.AddInt64(&count, 1)
+			resultsChan <- resultMap
+			return nil
+		})
+		if err != nil {
+			log.Errorf("cartesian product failed: %s", err)
+		}
+	}()
+	return resultsChan
 }
 func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
 	servers, err := utils.GetSystemDnsServers()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -387,4 +389,61 @@ Connection: close
 		panic(err)
 	}
 	fmt.Println(string(r.Result))
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	token := utils.RandStringBytes(100)
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		time.Sleep(time.Second)
+		writer.Write([]byte(token))
+	})
+
+	start := time.Now()
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Params: []*ypb.FuzzerParamItem{
+			{
+				Key:   "a",
+				Value: "{{int(1-10)}}-a",
+				Type:  "fuzztag",
+			},
+		},
+		Concurrent: 7,
+		Request: `GET /?c=1&d={{rs(10,10,3)}}&c={{params(a)}} HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+`})
+	if err != nil {
+		panic(err)
+	}
+
+	var count = 0
+	payloadDiffFilter := filter2.NewFilter()
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if len(rsp.Payloads) > 0 {
+			if payloadDiffFilter.Exist(rsp.Payloads[0]) {
+				continue
+			}
+			payloadDiffFilter.Insert(rsp.Payloads[0])
+			count++
+		}
+		log.Infof("url: %v payloads: %v", rsp.Url, rsp.Payloads)
+	}
+	if count != 30 {
+		panic("expect 30, got " + fmt.Sprint(count))
+	}
+
+	if ret := time.Since(start); ret.Seconds() > 5 && ret.Seconds() < 6 {
+		t.Log("time cost [" + ret.String() + "] is expected")
+	} else {
+		t.Fatalf("time cost is not expected: %v", ret)
+	}
 }

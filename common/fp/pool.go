@@ -52,7 +52,7 @@ func NewExecutingPool(
 		matcher: matcher,
 		targets: targetStream,
 		ctx:     pCtx,
-		swg:     &swg,
+		swg:     swg,
 	}
 
 	return pool, nil

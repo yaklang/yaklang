@@ -65,7 +65,7 @@ type SubdomainScanner struct {
 	targets []string
 	config  *SubdomainScannerConfig
 
-	dnsQuerierSwg utils.SizedWaitGroup
+	dnsQuerierSwg *utils.SizedWaitGroup
 	dnsClient     *dns.Client
 
 	// 结果回调函数
