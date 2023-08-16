@@ -74,14 +74,21 @@ func (s *Scope) GetNameById(id int) string {
 	return raw
 }
 
+func (s *Scope) GetIdByName(name string) int {
+	tbl := s.GetSymTable()
+	if tbl == nil {
+		return 0
+	}
+	raw, _ := tbl.GetSymbolByVariableName(name)
+	return raw
+}
+
 func (s *Scope) GetValueByID(id int) (*Value, bool) {
 	if s == nil {
 		return nil, false
 	}
 
-	s.mu.Lock()
 	raw, ok := s.idToValue[id]
-	s.mu.Unlock()
 	if ok {
 		return raw, true
 	}
@@ -99,9 +106,7 @@ func (s *Scope) InCurrentScope(id int) bool {
 	if s == nil {
 		return false
 	}
-	s.mu.Lock()
 	_, ok := s.idToValue[id]
-	s.mu.Unlock()
 	return ok
 }
 

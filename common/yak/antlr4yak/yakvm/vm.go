@@ -169,7 +169,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 
 	// debug, 将rootScope加入到debugger中
 	if vm.debugMode && vm.debugger != nil {
-		vm.debugger.AddScope(vm.rootScope)
+		vm.debugger.AddScopeRef(vm.rootScope)
 	}
 	return frame
 }

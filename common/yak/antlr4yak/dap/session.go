@@ -594,11 +594,55 @@ func (ds *DebugSession) onVariablesRequest(request *dap.VariablesRequest) {
 }
 
 func (ds *DebugSession) onSetVariableRequest(request *dap.SetVariableRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "setVariableRequest is not yet supported"))
+	arg := request.Arguments
+	ref := arg.VariablesReference
+	frameID := ds.debugger.CurrentFrameID()
+
+	v, ok := ds.GetConvertedVariable(ref)
+	if !ok {
+		ds.sendErrorResponse(request.Request, UnableToSetVariable, "Unable to lookup variable", fmt.Sprintf("unknown reference %d", ref))
+		return
+	}
+	if scope, ok := v.(*yakvm.Scope); ok {
+		id := scope.GetIdByName(arg.Name)
+		if id == 0 {
+			ds.sendErrorResponse(request.Request, UnableToSetVariable, "Unable to set variable", fmt.Sprintf("unknown reference %d", ref))
+		}
+		// use eval to get yakvm.Value
+		value, err := ds.debugger.EvalExpression(arg.Value, frameID)
+		if err != nil {
+			ds.sendErrorResponse(request.Request, UnableToSetVariable, "Unable to set variable", err.Error())
+			return
+		}
+		scope.NewValueByID(id, value)
+		ds.debugger.ForceSetVariableRef(ref, value.Value)
+	} else {
+		// use eval to assign
+		_, err := ds.debugger.EvalExpression(fmt.Sprintf("%s=%s", arg.Name, arg.Value), frameID)
+		if err != nil {
+			ds.sendErrorResponse(request.Request, UnableToSetVariable, "Unable to set variable", err.Error())
+			return
+		}
+	}
+
+	response := &dap.SetVariableResponse{Response: *newResponse(request.Request)}
+	response.Body.Value = arg.Value
+	ds.send(response)
 }
 
 func (ds *DebugSession) onSetExpressionRequest(request *dap.SetExpressionRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "SetExpressionRequest is not yet supported"))
+	arg := request.Arguments
+	frameID := arg.FrameId
+
+	// return value is not used
+	_, err := ds.debugger.EvalExpression(fmt.Sprintf("%s=%s", arg.Expression, arg.Value), frameID)
+	if err != nil {
+		ds.sendErrorResponse(request.Request, UnableToSetVariable, "Unable to set variable", err.Error())
+		return
+	}
+	response := &dap.SetExpressionResponse{Response: *newResponse(request.Request)}
+	response.Body.Value = arg.Value
+	ds.send(response)
 }
 
 func (ds *DebugSession) onSourceRequest(request *dap.SourceRequest) {
@@ -962,6 +1006,11 @@ func (ds *DebugSession) GetEvaluateName(v interface{}) string {
 		return v.EvaluateName
 	}
 	return ""
+}
+
+func (ds *DebugSession) GetConvertedVariable(ref int) (interface{}, bool) {
+	debugger := ds.debugger
+	return debugger.GetVariablesByReference(ref)
 }
 
 func (ds *DebugSession) GetConvertedVariableRef(v interface{}) int {

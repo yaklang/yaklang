@@ -297,6 +297,19 @@ func (g *Debugger) CurrentThreadID() int {
 	return g.frame.ThreadID
 }
 
+func (g *Debugger) CurrentFrameID() int {
+	frame := g.frame
+	if frame == nil {
+		return 0
+	}
+	ref := g.Reference
+	i, ok := ref.FrameHM.getReverse(frame)
+	if !ok {
+		return 0
+	}
+	return i
+}
+
 func (g *Debugger) Codes() []*Code {
 	return g.codes[g.State()]
 }
@@ -363,6 +376,10 @@ func (g *Debugger) AddBreakPointRef(b *Breakpoint) int {
 		return i
 	}
 }
+func (g *Debugger) ForceSetVariableRef(id int, v interface{}) {
+	ref := g.Reference
+	ref.VarHM.forceSet(id, v)
+}
 
 func (g *Debugger) AddVariableRef(v interface{}) int {
 	ref := g.Reference
@@ -373,20 +390,10 @@ func (g *Debugger) AddVariableRef(v interface{}) int {
 	}
 }
 
-func (g *Debugger) AddScope(scope *Scope) int {
+func (g *Debugger) AddScopeRef(scope *Scope) int {
 	ref := g.Reference
 	if i, ok := ref.VarHM.getReverse(scope); !ok {
 		return ref.VarHM.create(scope)
-
-	} else {
-		return i
-	}
-}
-
-func (g *Debugger) AddVar(val *Value) int {
-	ref := g.Reference
-	if i, ok := ref.VarHM.getReverse(val); !ok {
-		return ref.VarHM.create(val)
 
 	} else {
 		return i
