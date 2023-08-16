@@ -612,6 +612,9 @@ func TestPreSetBreakPoint(t *testing.T) {
 		client.ConfigurationDoneRequest()
 		client.ExpectConfigurationDoneResponse(t)
 
+		// wait program run to breakpoint 2
+		time.Sleep(100 * time.Millisecond)
+
 		client.ThreadsRequest()
 		// Since we are in async mode while running, we might receive messages in either order.
 		for i := 0; i < 2; i++ {
