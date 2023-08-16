@@ -98,6 +98,18 @@ func (d *DAPDebugger) AddVariableRef(v interface{}) int {
 	return d.debugger.AddVariableRef(v)
 }
 
+func (d *DAPDebugger) ForceSetVariableRef(id int, v interface{}) {
+	d.debugger.ForceSetVariableRef(id, v)
+}
+
+func (d *DAPDebugger) CurrentThreadID() int {
+	return d.debugger.CurrentThreadID()
+}
+
+func (d *DAPDebugger) CurrentFrameID() int {
+	return d.debugger.CurrentFrameID()
+}
+
 func (d *DAPDebugger) IsFinished() bool {
 	return d.finished
 }

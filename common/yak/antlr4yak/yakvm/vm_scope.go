@@ -4,7 +4,7 @@ func (v *Frame) CreateAndSwitchSubScope(table *SymbolTable) {
 	v.scope = v.scope.CreateSubScope(table)
 	vm := v.vm
 	if vm.debugMode && vm.debugger != nil {
-		vm.debugger.AddScope(v.scope)
+		vm.debugger.AddScopeRef(v.scope)
 	}
 }
 func (v *Frame) CurrentScope() *Scope {

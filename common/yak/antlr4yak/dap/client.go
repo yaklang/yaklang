@@ -122,6 +122,18 @@ func (c *Client) VariablesRequest(variablesReference int) {
 	c.send(request)
 }
 
+func (c *Client) SetVariableRequest(variablesRef int, name, value string) {
+	request := &dap.SetVariableRequest{Request: *c.newRequest("setVariable")}
+	request.Arguments.VariablesReference = variablesRef
+	request.Arguments.Name = name
+	request.Arguments.Value = value
+	c.send(request)
+}
+
+func (c *Client) SetExpressionRequest() {
+	c.send(&dap.SetExpressionRequest{Request: *c.newRequest("setExpression")})
+}
+
 func (c *Client) SetBreakpointsRequest(file string, lines []int) {
 	c.SetBreakpointsRequestWithArgs(file, lines, nil, nil, nil)
 }
