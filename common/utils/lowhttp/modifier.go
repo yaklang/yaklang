@@ -304,56 +304,6 @@ func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
 	})
 }
 
-func RemoveHTTPPacketHeader(packet []byte, headerKey ...string) []byte {
-	var firstLine string
-	var header []string
-	var isChunked = false
-	var removeGzip = false
-	var removeChunk = false
-	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
-		firstLine = method + " " + requestUri + " " + proto
-		return nil
-	}, func(proto string, code int, codeMsg string) error {
-		if codeMsg == "" {
-			firstLine = proto + " " + fmt.Sprint(code)
-		} else {
-			firstLine = proto + " " + fmt.Sprint(code) + " " + codeMsg
-		}
-		return nil
-	}, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
-
-		if k, v := SplitHTTPHeader(line); utils.StringArrayContains(headerKey, k) {
-			if strings.ToLower(k) == "content-encoding" && strings.ToLower(v) == "gzip" {
-				removeGzip = true
-			} else if strings.ToLower(k) == "transfer-encoding" && strings.ToLower(v) == "chunked" {
-				removeChunk = true
-			}
-			return line
-		}
-		header = append(header, line)
-		return line
-	})
-
-	if removeGzip {
-		var bodyDecoded, _ = utils.GzipDeCompress(body)
-		if len(bodyDecoded) > 0 {
-			body = bodyDecoded
-		}
-	}
-
-	var buf bytes.Buffer
-	buf.WriteString(firstLine)
-	buf.WriteString(CRLF)
-	for _, line := range header {
-		buf.WriteString(line)
-		buf.WriteString(CRLF)
-	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked && !removeChunk)
-}
-
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string

@@ -46,7 +46,6 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	var isMultipart bool
 	var haveChunkedHeader bool
 	var haveContentLength bool
-	var contentTypeGziped bool
 	header, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
 		key, value := SplitHTTPHeader(line)
 
@@ -63,10 +62,6 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 
 		if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
 			haveChunkedHeader = true
-		}
-
-		if !contentTypeGziped && keyLower == "content-encoding" && valLower == "gzip" {
-			contentTypeGziped = true
 		}
 	})
 
@@ -123,6 +118,36 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 
 func FixHTTPRequestOut(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
+}
+
+func RemoveContentEncoding(raw []byte) []byte {
+	var encoding string
+	var isChunked bool
+	var buf bytes.Buffer
+	_, body := SplitHTTPPacket(raw, func(method string, requestUri string, proto string) error {
+		buf.WriteString(method + " " + requestUri + " " + proto + CRLF)
+		return nil
+	}, func(proto string, code int, codeMsg string) error {
+		buf.WriteString(proto + " " + strconv.Itoa(code) + " " + codeMsg + CRLF)
+		return nil
+	}, func(line string) string {
+		k, v := SplitHTTPHeader(line)
+		ret := strings.ToLower(k)
+		if ret == "content-encoding" {
+			encoding = v
+			return ""
+		} else if ret == "transfer-encoding" && strings.ToLower(v) == "chunked" {
+			isChunked = true
+		}
+		buf.WriteString(line + CRLF)
+		return line
+	})
+	buf.WriteString(CRLF)
+	decResult, fixed := ContentEncodingDecode(encoding, body)
+	if fixed && len(decResult) > 0 {
+		body = decResult
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
