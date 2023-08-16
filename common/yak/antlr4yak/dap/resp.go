@@ -299,6 +299,36 @@ func (c *Client) CheckVariablesResponse(t *testing.T, m dap.Message) *dap.Variab
 	return r
 }
 
+func (c *Client) ExpectSetVariableResponse(t *testing.T) *dap.SetVariableResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckSetVariableResponse(t, m)
+}
+
+func (c *Client) CheckSetVariableResponse(t *testing.T, m dap.Message) *dap.SetVariableResponse {
+	t.Helper()
+	r, ok := m.(*dap.SetVariableResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.SetVariableResponse", m)
+	}
+	return r
+}
+
+func (c *Client) ExpectSetExpressionResponse(t *testing.T) *dap.SetExpressionResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckSetExpressionResponse(t, m)
+}
+
+func (c *Client) CheckSetExpressionResponse(t *testing.T, m dap.Message) *dap.SetExpressionResponse {
+	t.Helper()
+	r, ok := m.(*dap.SetExpressionResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.SetExpressionResponse", m)
+	}
+	return r
+}
+
 func (c *Client) CheckStopLocation(t *testing.T, thread int, name string, line int) {
 	t.Helper()
 	c.StackTraceRequest(thread, 0, 20)
