@@ -9,6 +9,71 @@ import (
 	"strings"
 )
 
+func modifierMapping(str string) Modifier {
+	switch str {
+	case "file_data", "file.data":
+		return FileData
+	case "http_content_type", "http.content_type":
+		return HTTPContentType
+	case "http_content_len", "http.content_len":
+		return HTTPContentLen
+	case "http_start", "http.start":
+		return HTTPStart
+	case "http_protocol", "http.protocol":
+		return HTTPProtocol
+	case "http_header_names", "http.header_names":
+		return HTTPHeaderNames
+	case "http_request_line", "http.request_line":
+		return HTTPRequestLine
+	case "http_accept", "http.accept":
+		return HTTPAccept
+	case "http_accept_enc", "http.accept_enc":
+		return HTTPAcceptEnc
+	case "http_referer", "http.referer":
+		return HTTPReferer
+	case "http_connection", "http.connection":
+		return HTTPConnection
+	case "http_response_line", "http.response_line":
+		return HTTPResponseLine
+	case "dns_query", "dns.query":
+		return DNSQuery
+	case "http_header", "http.header":
+		return HTTPHeader
+	case "http_raw_header", "http.raw_header":
+		return HTTPHeaderRaw
+	case "http_cookie", "http.cookie":
+		return HTTPCookie
+	case "http_uri", "http.uri":
+		return HTTPUri
+	case "http_raw_uri", "http.uri.raw":
+		return HTTPUriRaw
+	case "http_method", "http.method":
+		return HTTPMethod
+	case "http_user_agent", "http.user_agent":
+		return HTTPUserAgent
+	case "http_host", "http.host":
+		return HTTPHost
+	case "http_raw_host", `http.raw_host`:
+		return HTTPHostRaw
+	case "http_stat_msg", "http.stat_msg":
+		return HTTPStatMsg
+	case "http_stat_code", "http.stat_code":
+		return HTTPStatCode
+	case "http_client_body", "http.client_body":
+		return HTTPRequestBody
+	case "http_server_body", "http.server_body":
+		return HTTPResponseBody
+	case "http_server", "http.server":
+		return HTTPServer
+	case "http_location", "http.location":
+		return HTTPLocation
+	case "ipv4.hdr", "ipv4_hdr":
+		return IPv4HDR
+	case "ipv6.hdr", "ipv6_hdr":
+		return IPv6HDR
+	}
+	return Default
+}
 func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 	if len(ssts) != 1 {
 		return false, ""
@@ -17,9 +82,34 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 	return ctx.Negative() != nil, ctx.Settingcontent().GetText()
 }
 
+type MultipleBufferMatching struct {
+	last Modifier
+}
+
+func (m *MultipleBufferMatching) transfer(modifier Modifier) Modifier {
+	switch modifier {
+	case DNSQuery, FileData, HTTPHeader:
+		m.last = modifier
+	case Default:
+		modifier = m.last
+	default:
+		m.last = Default
+	}
+	return modifier
+}
+
 func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
+	const (
+		HasNone = iota
+		HasContent
+		HasModif
+		ModifContent
+		ContentModif
+		SavingPCRE
+	)
+	STATUS := HasNone
 	var contents []*ContentRule
-	var MultipleBufferMatching Modifier
+	multipleBufferMatching := new(MultipleBufferMatching)
 	contentRule := new(ContentRule)
 
 	params := i.AllParam()
@@ -44,7 +134,72 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			ssts = setting.AllSingleSetting()
 		}
 
-		var set = true
+		switch STATUS {
+		case HasNone:
+			if modifierMapping(key) != Default {
+				STATUS = HasModif
+			} else if key == "content" {
+				STATUS = HasContent
+			} else if key == "pcre" {
+				STATUS = SavingPCRE
+			} else {
+				STATUS = HasNone
+			}
+		case HasContent:
+			if modifierMapping(key) != Default {
+				STATUS = ContentModif
+			} else if key == "content" {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = HasContent
+			} else if key == "pcre" {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = SavingPCRE
+			} else {
+				STATUS = HasContent
+			}
+		case SavingPCRE:
+			contents = append(contents, contentRule)
+			contentRule = new(ContentRule)
+			if modifierMapping(key) != Default {
+				STATUS = ContentModif
+			} else if key == "content" {
+				STATUS = HasContent
+			} else if key == "pcre" {
+				STATUS = SavingPCRE
+			} else {
+				STATUS = HasNone
+			}
+		case HasModif:
+			if modifierMapping(key) != Default {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = HasModif
+			} else if key == "content" {
+				STATUS = ModifContent
+			}
+		case ModifContent, ContentModif:
+			if modifierMapping(key) != Default {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = HasModif
+			} else if key == "content" {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = HasContent
+			} else if key == "pcre" {
+				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = SavingPCRE
+			}
+		}
 
 		switch key {
 		// meta keywords
@@ -75,73 +230,69 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 		// payload keyword
 		case "file_data", "file.data":
-			set = setIfNotZero(&contentRule.Modifier, FileData)
+			contentRule.Modifier = FileData
 		case "http_content_type", "http.content_type":
-			set = setIfNotZero(&contentRule.Modifier, HTTPContentType)
+			contentRule.Modifier = HTTPContentType
 		case "http_content_len", "http.content_len":
-			set = setIfNotZero(&contentRule.Modifier, HTTPContentLen)
+			contentRule.Modifier = HTTPContentLen
 		case "http_start", "http.start":
-			set = setIfNotZero(&contentRule.Modifier, HTTPStart)
+			contentRule.Modifier = HTTPStart
 		case "http_protocol", "http.protocol":
-			set = setIfNotZero(&contentRule.Modifier, HTTPProtocol)
+			contentRule.Modifier = HTTPProtocol
 		case "http_header_names", "http.header_names":
-			set = setIfNotZero(&contentRule.Modifier, HTTPHeaderNames)
+			contentRule.Modifier = HTTPHeaderNames
 		case "http_request_line", "http.request_line":
-			set = setIfNotZero(&contentRule.Modifier, HTTPRequestLine)
+			contentRule.Modifier = HTTPRequestLine
 		case "http_accept", "http.accept":
-			set = setIfNotZero(&contentRule.Modifier, HTTPAccept)
+			contentRule.Modifier = HTTPAccept
 		case "http_accept_enc", "http.accept_enc":
-			set = setIfNotZero(&contentRule.Modifier, HTTPAcceptEnc)
+			contentRule.Modifier = HTTPAcceptEnc
 		case "http_referer", "http.referer":
-			set = setIfNotZero(&contentRule.Modifier, HTTPReferer)
+			contentRule.Modifier = HTTPReferer
 		case "http_connection", "http.connection":
-			set = setIfNotZero(&contentRule.Modifier, HTTPConnection)
+			contentRule.Modifier = HTTPConnection
 		case "http_response_line", "http.response_line":
-			set = setIfNotZero(&contentRule.Modifier, HTTPResponseLine)
+			contentRule.Modifier = HTTPResponseLine
 		case "dns_query", "dns.query":
-			set = setIfNotZero(&contentRule.Modifier, DNSQuery)
+			contentRule.Modifier = DNSQuery
 		case "http_header", "http.header":
-			set = setIfNotZero(&contentRule.Modifier, HTTPHeader)
+			contentRule.Modifier = HTTPHeader
 		case "http_raw_header", "http.raw_header":
-			set = setIfNotZero(&contentRule.Modifier, HTTPHeaderRaw)
+			contentRule.Modifier = HTTPHeaderRaw
 		case "http_cookie", "http.cookie":
-			set = setIfNotZero(&contentRule.Modifier, HTTPCookie)
+			contentRule.Modifier = HTTPCookie
 		case "http_uri", "http.uri":
-			set = setIfNotZero(&contentRule.Modifier, HTTPUri)
+			contentRule.Modifier = HTTPUri
 		case "http_raw_uri", "http.uri.raw":
-			set = setIfNotZero(&contentRule.Modifier, HTTPUriRaw)
+			contentRule.Modifier = HTTPUriRaw
 		case "http_method", "http.method":
-			set = setIfNotZero(&contentRule.Modifier, HTTPMethod)
+			contentRule.Modifier = HTTPMethod
 		case "http_user_agent", "http.user_agent":
-			set = setIfNotZero(&contentRule.Modifier, HTTPUserAgent)
+			contentRule.Modifier = HTTPUserAgent
 		case "http_host", "http.host":
-			set = setIfNotZero(&contentRule.Modifier, HTTPHost)
+			contentRule.Modifier = HTTPHost
 		case "http_raw_host", `http.raw_host`:
-			set = setIfNotZero(&contentRule.Modifier, HTTPHostRaw)
+			contentRule.Modifier = HTTPHostRaw
 		case "http_stat_msg", "http.stat_msg":
-			set = setIfNotZero(&contentRule.Modifier, HTTPStatMsg)
+			contentRule.Modifier = HTTPStatMsg
 		case "http_stat_code", "http.stat_code":
-			set = setIfNotZero(&contentRule.Modifier, HTTPStatCode)
+			contentRule.Modifier = HTTPStatCode
 		case "http_client_body", "http.client_body":
-			set = setIfNotZero(&contentRule.Modifier, HTTPRequestBody)
+			contentRule.Modifier = HTTPRequestBody
 		case "http_server_body", "http.server_body":
-			set = setIfNotZero(&contentRule.Modifier, HTTPResponseBody)
+			contentRule.Modifier = HTTPResponseBody
 		case "http_server", "http.server":
-			set = setIfNotZero(&contentRule.Modifier, HTTPServer)
+			contentRule.Modifier = HTTPServer
 		case "http_location", "http.location":
-			set = setIfNotZero(&contentRule.Modifier, HTTPLocation)
+			contentRule.Modifier = HTTPLocation
 		case "ipv4.hdr", "ipv4_hdr":
-			set = setIfNotZero(&contentRule.Modifier, IPv4HDR)
+			contentRule.Modifier = IPv4HDR
 		case "ipv6.hdr", "ipv6_hdr":
-			set = setIfNotZero(&contentRule.Modifier, IPv6HDR)
+			contentRule.Modifier = IPv6HDR
 		case "content":
 			neg, content := mustSoloSingleSetting(ssts)
-			if contentRule.Content == nil {
-				contentRule.Content = []byte(unquoteAndParseHex(content))
-				contentRule.Negative = neg
-			} else {
-				set = false
-			}
+			contentRule.Content = []byte(unquoteAndParseHex(content))
+			contentRule.Negative = neg
 		case "dns.opcode", "dns_opcode":
 			neg, content := mustSoloSingleSetting(ssts)
 			rule.ContentRuleConfig.DNS = &DNSRule{
@@ -331,6 +482,11 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			contentRule.RPC = unquoteAndParseHex(vStr)
 		case "pcre":
 			contentRule.PCRE = unquoteString(vStr)
+			parsed, err := parsePCREStr(contentRule.PCRE)
+			if err != nil {
+				log.Errorf("parsePCREStr err:%v", err)
+			}
+			contentRule.PCREParsed = parsed
 		case "fast_pattern":
 			contentRule.FastPattern = true
 		case "flowbits":
@@ -356,43 +512,11 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				log.Errorf("BAD RULE:\n\n%v\n\n", rule.Raw)
 			}
 		}
+	}
 
-		// pcre is individual
-		if contentRule.PCRE != "" {
-			pcre := contentRule.PCRE
-			contentRule.PCRE = ""
-			contents = append(contents, contentRule, &ContentRule{
-				PCRE: pcre,
-			})
-			contentRule = new(ContentRule)
-			continue
-		}
-
-		// conflict, save current and turn to new empty rule
-		if !set || i == len(params)-1 {
-			// MultipleBufferMatching
-			switch contentRule.Modifier {
-			case DNSQuery, FileData, HTTPHeader:
-				MultipleBufferMatching = contentRule.Modifier
-			case Default:
-				contentRule.Modifier = MultipleBufferMatching
-			default:
-				MultipleBufferMatching = Default
-			}
-
-		}
-
-		// save current
-		if !set || i == len(params)-1 && len(contentRule.Content) != 0 {
-			contents = append(contents, contentRule)
-			contentRule = new(ContentRule)
-		}
-
-		if !set {
-			i--
-		}
-
-		set = true
+	if STATUS != HasNone {
+		contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+		contents = append(contents, contentRule)
 	}
 
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)

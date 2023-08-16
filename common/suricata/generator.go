@@ -1,6 +1,7 @@
 package suricata
 
 import (
+	"bytes"
 	"math"
 )
 
@@ -8,13 +9,13 @@ type Generator interface {
 	Gen() []byte
 }
 
-type Surigen struct {
+type Ploadgen struct {
 	rules []*ContentRule
 	gen   map[Modifier]Generator
 }
 
-func NewSurigen(contentRules []*ContentRule) (*Surigen, error) {
-	g := &Surigen{
+func NewPloadgen(contentRules []*ContentRule) (*Ploadgen, error) {
+	g := &Ploadgen{
 		rules: contentRules,
 		gen:   make(map[Modifier]Generator),
 	}
@@ -25,7 +26,7 @@ func NewSurigen(contentRules []*ContentRule) (*Surigen, error) {
 	return g, nil
 }
 
-func (g *Surigen) Gen() ([]byte, error) {
+func (g *Ploadgen) Gen() ([]byte, error) {
 	mp := make(map[Modifier][]byte)
 	for k, gener := range g.gen {
 		mp[k] = gener.Gen()
@@ -33,7 +34,7 @@ func (g *Surigen) Gen() ([]byte, error) {
 	return HTTPCombination(mp), nil
 }
 
-func (g *Surigen) parse() error {
+func (g *Ploadgen) parse() error {
 	// mapping by Modifier
 	var mp = make(map[Modifier][]*ContentRule)
 	for _, rule := range g.rules {
@@ -51,6 +52,16 @@ func (g *Surigen) parse() error {
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseAll))
 		case HTTPContentLen:
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseDigit))
+		case HTTPMethod:
+			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseChar), WithTryLen(3))
+		case HTTPHeaderNames:
+			g.gen[mdf] = parse2DirectGen(rule)
+		case HTTPRequestLine, HTTPResponseLine, HTTPStart:
+			if len(bytes.Fields(rule[0].Content)) == 3 {
+				g.gen[mdf] = parse2DirectGen(rule)
+			} else {
+				g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseVisable))
+			}
 		default:
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseVisable))
 		}
@@ -65,14 +76,20 @@ func (g *Surigen) parse() error {
 		for _, m := range payload.Modifiers {
 			switch m := m.(type) {
 			case *ContentModifier:
-				if m.Offset+len(m.Content) > payload.Len || m.Relative {
-					payload.Len += m.Offset + len(m.Content)
+				if m.Offset >= 0 {
+					if m.Offset+len(m.Content) > payload.Len || m.Relative {
+						payload.Len += m.Offset + len(m.Content)
+					}
+				} else {
+					if -m.Offset > payload.Len || m.Relative {
+						payload.Len = -m.Offset
+					}
 				}
 			case *RegexpModifier:
 				payload.Len += len(m.Generator.Generate())
 			}
 		}
-		payload.Len = 1 << math.Ilogb(float64(payload.Len+1))
+		payload.Len = 1 << (math.Ilogb(float64(payload.Len+1)) + 1)
 	}
 
 	return nil
