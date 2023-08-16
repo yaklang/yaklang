@@ -296,23 +296,6 @@ func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
 
 	if c.ordinaryFeedback != nil {
 		c.ordinaryFeedback(i)
-		//log.Info("Initial ordinary feedback")
-		//c.SetFeedback(func(i *ypb.ExecResult) error {
-		//	var l yaklib.YakitLog
-		//	err := json.Unmarshal(i.Message, &l)
-		//	if err != nil {
-		//		log.Errorf("unmarshal yakit_output/save msg failed: %s", err)
-		//		return err
-		//	}
-		//
-		//	if l.Level != "" {
-		//		client := yaklib.GetYakitClientInstance()
-		//		if client != nil {
-		//			return client.SendRaw(&l)
-		//		}
-		//	}
-		//	return nil
-		//})
 	}
 
 }
