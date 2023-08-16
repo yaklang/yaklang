@@ -20,17 +20,18 @@ import (
 var poolingList sync.Map
 
 type httpPoolConfig struct {
-	Size              int
-	PerRequestTimeout time.Duration
-	IsHttps           bool
-	IsGmTLS           bool
-	Host              string
-	Port              int
-	NoSystemProxy     bool
-	Proxies           []string
-	UseRawMode        bool
-	RedirectTimes     int
-	NoFollowRedirect  bool
+	Size                   int
+	SizedWaitGroupInstance *utils.SizedWaitGroup
+	PerRequestTimeout      time.Duration
+	IsHttps                bool
+	IsGmTLS                bool
+	Host                   string
+	Port                   int
+	NoSystemProxy          bool
+	Proxies                []string
+	UseRawMode             bool
+	RedirectTimes          int
+	NoFollowRedirect       bool
 	// NoFollowMetaRedirect             bool
 	FollowJSRedirect                 bool
 	PayloadsTable                    *sync.Map
@@ -212,6 +213,12 @@ func _httpPool_SetSize(i int) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_SetSizedWaitGroup(i *utils.SizedWaitGroup) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.SizedWaitGroupInstance = i
+	}
+}
+
 func _httpPool_RawMode(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.UseRawMode = b
@@ -370,7 +377,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 
 		if config.Ctx.Value("invoker") != nil { //caller set NamingContext
 			group := utils.NewSizedWaitGroup(config.Size)
-			wg, _ := poolingList.LoadOrStore(config.Ctx.Value("invoker"), &group)
+			wg, _ := poolingList.LoadOrStore(config.Ctx.Value("invoker"), group)
 			wg.(*utils.SizedWaitGroup).Add()
 			defer func() { wg.(*utils.SizedWaitGroup).Done() }()
 		}
@@ -447,6 +454,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			var maxSubmit = config.RequestCountLimiter
 			var requestCounter int
 			swg := utils.NewSizedWaitGroup(config.Size)
+			if config.SizedWaitGroupInstance != nil {
+				swg = config.SizedWaitGroupInstance
+			}
 			submitTask := func(targetRequest []byte, payloads ...string) {
 				if maxSubmit > 0 && requestCounter >= maxSubmit {
 					return
@@ -714,6 +724,7 @@ var WithPoolOpt_noFixContentLength = _httpPool_noFixContentLength
 var WithPoolOpt_Proxy = _httpPool_proxies
 var WithPoolOpt_Timeout = _httpPool_PerRequestTimeout
 var WithPoolOpt_Concurrent = _httpPool_SetSize
+var WithPoolOpt_SizedWaitGroup = _httpPool_SetSizedWaitGroup
 var WithPoolOpt_Addr = _httpPool_Host
 var WithPoolOpt_RedirectTimes = _httpPool_redirectTimes
 var WithPoolOpt_RawMode = _httpPool_RawMode

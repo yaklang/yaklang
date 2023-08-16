@@ -46,8 +46,8 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		WithResultSentFilter(resultSent),
 		WithUChan(uChan),
 		WithUrlTree(urlTree),
-		WithPageSizedWaitGroup(&waitGroup),
-		WithStartWaitGroup(&startWaitGroup),
+		WithPageSizedWaitGroup(waitGroup),
+		WithStartWaitGroup(startWaitGroup),
 	)
 	for _, opt := range baseOpts {
 		opt(config)
@@ -72,8 +72,8 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		config:         config,
 		uChan:          uChan,
 		ch:             config.baseConfig.ch,
-		waitGroup:      &waitGroup,
-		startWaitGroup: &startWaitGroup,
+		waitGroup:      waitGroup,
+		startWaitGroup: startWaitGroup,
 	}
 	core.init()
 	return &core, nil
