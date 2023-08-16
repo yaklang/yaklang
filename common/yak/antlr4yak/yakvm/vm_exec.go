@@ -1307,7 +1307,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch iterableValueRF.Type().Kind() {
 		case reflect.String:
 			fallthrough
-		case reflect.Slice:
+		case reflect.Array, reflect.Slice:
 			/*
 				in nasl
 				"123"[0] means "1" instead of '1'
