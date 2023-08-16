@@ -3,10 +3,10 @@
 package crawlerx
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	u "net/url"
 	"regexp"
@@ -264,7 +264,7 @@ func GetSortedQuery(rawQuery string) (query []string, err error) {
 		var key string
 		key, rawQuery, _ = strings.Cut(rawQuery, "&")
 		if strings.Contains(key, ";") {
-			err = fmt.Errorf("invalid semicolon separator in query")
+			err = utils.Error("invalid semicolon separator in query")
 			continue
 		}
 		if key == "" {
@@ -274,14 +274,14 @@ func GetSortedQuery(rawQuery string) (query []string, err error) {
 		key, err1 := u.QueryUnescape(key)
 		if err1 != nil {
 			if err == nil {
-				err = err1
+				err = utils.Error(err1)
 			}
 			continue
 		}
 		value, err1 = u.QueryUnescape(value)
 		if err1 != nil {
 			if err == nil {
-				err = err1
+				err = utils.Error(err1)
 			}
 			continue
 		}
