@@ -46,6 +46,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	var isMultipart bool
 	var haveChunkedHeader bool
 	var haveContentLength bool
+	var contentTypeGziped bool
 	header, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
 		key, value := SplitHTTPHeader(line)
 
@@ -62,6 +63,10 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 
 		if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
 			haveChunkedHeader = true
+		}
+
+		if !contentTypeGziped && keyLower == "content-encoding" && valLower == "gzip" {
+			contentTypeGziped = true
 		}
 	})
 
