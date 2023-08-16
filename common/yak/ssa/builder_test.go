@@ -899,4 +899,63 @@ entry0:
 		CheckProgram(t, prog)
 		CompareYakFunc(t, prog, ir)
 	})
+
+	t.Run("closure_instancecode", func(t *testing.T) {
+		code := `
+	
+// normal func
+a = func(){
+	return 11
+}() + 12
+a = func{
+	return 11
+} + 12
+
+// capture
+d = func{
+	return a + 1
+}
+`
+		ir := []string{
+			`
+yak-main
+entry0:
+	<int64> t0 = call <> yak-main$1 () []
+	<int64> t1 = <int64> t0 add <int64> 12
+	<int64> t2 = call <> yak-main$2 () []
+	<int64> t3 = <int64> t2 add <int64> 12
+	<int64> t4 = call <> yak-main$3 () [<int64> t3]
+`,
+			`
+yak-main$1
+parent: yak-main
+pos:   4:4   -   6:0  : func(){
+return: <int64> t0
+entry0:
+	ret <int64> 11
+`,
+			`
+yak-main$2
+parent: yak-main
+pos:   7:4   -   9:0  : func{
+return: <int64> t0
+entry0:
+	ret <int64> 11
+`,
+			`
+yak-main$3
+parent: yak-main
+pos:  12:4   -  14:0  : func{
+freeValue: <int64> a
+return: <int64> t1
+entry0:
+	<int64> t0 = <int64> a add <int64> 1
+	ret <int64> t0
+`,
+		}
+		prog := ParseSSA(code)
+		CheckProgram(t, prog)
+		CompareYakFunc(t, prog, ir)
+	})
+
 }
