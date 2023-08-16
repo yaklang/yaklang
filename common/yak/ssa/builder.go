@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -37,7 +38,10 @@ func (b *builder) buildStatementList(stmtlist *yak.StatementListContext) {
 func (b *builder) buildStatement(stmt *yak.StatementContext) {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
-	//TODO: decalear Variable Expression
+	// declear Variable Expression
+	if s, ok := stmt.DeclearVariableExpressionStmt().(*yak.DeclearVariableExpressionStmtContext); ok {
+		b.buildDeclearVariableExpressionStmt(s)
+	}
 
 	// assign Expression
 	if s, ok := stmt.AssignExpressionStmt().(*yak.AssignExpressionStmtContext); ok {
@@ -500,10 +504,14 @@ func (b *builder) buildBlock(stmt *yak.BlockContext) {
 	}
 }
 
-// assign expression
-func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
-	recover := b.SetRange(stmt.BaseParserRuleContext)
-	defer recover()
+type assiglist interface {
+	AssignEq() antlr.TerminalNode
+	ColonAssignEq() antlr.TerminalNode
+	ExpressionList() yak.IExpressionListContext
+	LeftExpressionList() yak.ILeftExpressionListContext
+}
+
+func (b *builder) AssignList(stmt assiglist) {
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
 		var rvalues []Value
@@ -546,6 +554,14 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 			panic(fmt.Sprintf("multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues)))
 		}
 	}
+}
+
+// assign expression
+func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	b.AssignList(stmt)
 
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
@@ -591,7 +607,42 @@ func (b *builder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 	}
 }
 
-//TODO: declear variable expression
+// declear variable expression
+func (b *builder) buildDeclearVariableExpressionStmt(stmt *yak.DeclearVariableExpressionStmtContext) {
+	// recover := b.SetRange(stmt.BaseParserRuleContext)
+	// defer recover()
+	if s, ok := stmt.DeclearVariableExpression().(*yak.DeclearVariableExpressionContext); ok {
+		b.buildDeclearVariableExpression(s)
+	}
+}
+
+func (b *builder) buildDeclearVariableExpression(stmt *yak.DeclearVariableExpressionContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	if s, ok := stmt.DeclearVariableOnly().(*yak.DeclearVariableOnlyContext); ok {
+		b.buildDeclearVariableOnly(s)
+	}
+	if s, ok := stmt.DeclearAndAssignExpression().(*yak.DeclearAndAssignExpressionContext); ok {
+		b.buildDeclearAndAssignExpression(s)
+	}
+}
+
+func (b *builder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+	// TODO: how handler this ?
+	for _, id := range stmt.AllIdentifier() {
+		b.writeVariable(id.GetText(), nil)
+	}
+}
+
+func (b *builder) buildDeclearAndAssignExpression(stmt *yak.DeclearAndAssignExpressionContext) {
+	recover := b.SetRange(stmt.BaseParserRuleContext)
+	defer recover()
+
+	b.AssignList(stmt)
+}
 
 // left expression list
 func (b *builder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []LeftValue {
