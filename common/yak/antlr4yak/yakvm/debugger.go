@@ -269,7 +269,7 @@ func (g *Debugger) UpdateByFrame(frame *Frame) {
 		g.state = ""
 	}
 	g.frame = frame
-	g.AddFrame(frame)
+	g.AddFrameRef(frame)
 }
 
 func (g *Debugger) CurrentStackTrace() *vmstack.Stack {
@@ -344,7 +344,7 @@ func (g *Debugger) SetVMPanic(p *VMPanic) {
 	g.vmPanic = p
 }
 
-func (g *Debugger) AddFrame(frame *Frame) int {
+func (g *Debugger) AddFrameRef(frame *Frame) int {
 	ref := g.Reference
 
 	if i, ok := ref.FrameHM.getReverse(frame); !ok {
@@ -354,7 +354,17 @@ func (g *Debugger) AddFrame(frame *Frame) int {
 	}
 }
 
-func (g *Debugger) AddVariable(v interface{}) int {
+func (g *Debugger) AddBreakPointRef(b *Breakpoint) int {
+	ref := g.Reference
+
+	if i, ok := ref.BreakPointHM.getReverse(b); !ok {
+		return ref.BreakPointHM.create(b)
+	} else {
+		return i
+	}
+}
+
+func (g *Debugger) AddVariableRef(v interface{}) int {
 	ref := g.Reference
 	if i, ok := ref.VarHM.getReverse(v); !ok {
 		return ref.VarHM.create(v)
@@ -510,25 +520,27 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 	return g.observeExpressions
 }
 
-func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) error {
+func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) (int, error) {
 	if _, ok := g.breakPoints[lineIndex]; !ok {
-		g.breakPoints[lineIndex] = g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
-		return nil
+		bp := g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
+		g.breakPoints[lineIndex] = bp
+		ref := g.AddBreakPointRef(bp)
+		return ref, nil
 	} else {
-		return errors.Errorf("breakpoint already exists in line %d", lineIndex)
+		return -1, errors.Errorf("breakpoint already exists in line %d", lineIndex)
 	}
 }
 
-func (g *Debugger) SetBreakPoint(lineIndex int, condition, hitCondition string) error {
+func (g *Debugger) SetBreakPoint(lineIndex int, condition, hitCondition string) (int, error) {
 	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
 	if code == nil {
-		return utils.Errorf("Can't set breakPoint in line %d", lineIndex)
+		return -1, utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
 		return g.addBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
 	}
 }
 
-func (g *Debugger) SetNormalBreakPoint(lineIndex int) error {
+func (g *Debugger) SetNormalBreakPoint(lineIndex int) (int, error) {
 	return g.SetBreakPoint(lineIndex, "", "")
 }
 

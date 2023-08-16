@@ -60,7 +60,7 @@ func (d *DAPDebugger) Continue() {
 	}
 }
 
-func (d *DAPDebugger) SetBreakPoint(lineIndex int, condition, hitCondition string) error {
+func (d *DAPDebugger) SetBreakPoint(lineIndex int, condition, hitCondition string) (int, error) {
 	return d.debugger.SetBreakPoint(lineIndex, condition, hitCondition)
 }
 
@@ -94,8 +94,8 @@ func (d *DAPDebugger) GetVariablesReference(v interface{}) (int, bool) {
 	return d.debugger.GetVariablesRef(v)
 }
 
-func (d *DAPDebugger) AddVariables(v interface{}) int {
-	return d.debugger.AddVariable(v)
+func (d *DAPDebugger) AddVariableRef(v interface{}) int {
+	return d.debugger.AddVariableRef(v)
 }
 
 func (d *DAPDebugger) IsFinished() bool {
