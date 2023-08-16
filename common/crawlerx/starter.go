@@ -11,7 +11,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
-	"net"
+	"github.com/yaklang/yaklang/embed"
 	"net/http"
 	"runtime"
 	"strings"
@@ -56,6 +56,7 @@ type BrowserStarter struct {
 
 	stopSignal bool
 	running    bool
+	stealth    bool
 
 	extraWaitLoadTime int
 
@@ -99,10 +100,17 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 
 		stopSignal: false,
 		running:    false,
+		stealth:    baseConfig.stealth,
 
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
 	}
-	ctx, cancel := context.WithCancel(baseConfig.ctx)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if starter.baseConfig.fullTimeout != 0 {
+		ctx, cancel = context.WithTimeout(baseConfig.ctx, time.Second*time.Duration(starter.baseConfig.fullTimeout))
+	} else {
+		ctx, cancel = context.WithCancel(baseConfig.ctx)
+	}
 	starter.ctx = ctx
 	starter.cancel = cancel
 	starter.pageVisit = repeatCheckFunctionGenerate(baseConfig.pageVisit)
@@ -112,27 +120,8 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	starter.urlAfterRepeat = urlRepeatCheckGenerator(baseConfig.scanRepeat, baseConfig.ignoreParams...)
 	starter.counter = tools.NewCounter(starter.concurrent)
 	starter.transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-			host, port, err := utils.ParseStringToHostPort(addr)
-			d := net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}
-			if err != nil {
-				return nil, utils.Errorf("cannot parse %v as host:port, reason: %v", addr, err)
-			}
-
-			if utils.IsIPv4(host) || utils.IsIPv6(host) {
-				return d.DialContext(ctx, network, utils.HostPort(host, port))
-			}
-
-			newHost := netx.LookupFirst(host)
-			if newHost == "" {
-				return nil, utils.Errorf("cannot resolve %v", addr)
-			}
-			return d.DialContext(ctx, network, utils.HostPort(newHost, port))
-		},
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		DialContext:           netx.NewDialContextFunc(30 * time.Second),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -178,17 +167,12 @@ func (starter *BrowserStarter) startBrowser() error {
 		}
 		starter.browser = starter.browser.Client(client)
 	}
-	if starter.baseConfig.fullTimeout != 0 {
-		ctx, _ := context.WithTimeout(starter.ctx, time.Second*time.Duration(starter.baseConfig.fullTimeout))
-		starter.browser = starter.browser.Context(ctx)
-	} else {
-		starter.browser = starter.browser.Context(starter.ctx)
-	}
+	starter.browser = starter.browser.Context(starter.ctx)
 	err := starter.browser.Connect()
 	if err != nil {
 		return utils.Errorf(`browser connect error: %s`, err)
 	}
-	starter.browser.IgnoreCertErrors(true)
+	_ = starter.browser.IgnoreCertErrors(true)
 	starter.pageActionGenerator()
 	starter.pageDetectEventGenerator()
 	return nil
@@ -384,7 +368,14 @@ func (starter *BrowserStarter) Start() {
 	}
 	headlessBrowser := starter.browser
 	defer headlessBrowser.MustClose()
+	defer starter.cancel()
 	starter.baseConfig.startWaitGroup.Done()
+	stealthJs, err := embed.Asset("data/anti-crawler/stealth.min.js")
+	if err != nil {
+		log.Errorf("stealth.min.js read error: %v", err.Error())
+	} else {
+		log.Info("stealth.min.js load done!")
+	}
 running:
 	for {
 		select {
@@ -406,6 +397,13 @@ running:
 			}
 			urlStr, _ := v.(string)
 			p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			if starter.stealth {
+				_, err := p.EvalOnNewDocument(string(stealthJs))
+				if err != nil {
+					log.Errorf(`eval stealth.min.js on page error: %v`, err.Error())
+					starter.stealth = false
+				}
+			}
 			starter.createPageHijack(p)
 			err = p.Navigate(urlStr)
 			if urlStr == starter.baseUrl && len(starter.baseConfig.localStorage) > 0 {

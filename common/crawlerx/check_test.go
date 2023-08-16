@@ -3,18 +3,12 @@
 package crawlerx
 
 import (
-	"github.com/ysmood/gson"
+	"github.com/stretchr/testify/assert"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
 )
-
-func TestJson(t *testing.T) {
-	testStr := `abc*123`
-	testJson := gson.NewFrom(testStr)
-	t.Log(testJson)
-}
 
 func TestUrlRepeatCheckGenerator(t *testing.T) {
 	testURL := "https://www.abc.com?id=3&value=4"
@@ -70,16 +64,14 @@ func TestUrlRepeatCheckGenerator(t *testing.T) {
 }
 
 func TestUrlQuery(t *testing.T) {
-	urlStr := "https://www.abc.com?id=3&value=4"
+	test := assert.New(t)
+	urlStr := "https://www.abc.com?id=3&value=4&test=5&data=xxx"
 	urlObj, _ := url.Parse(urlStr)
-	t.Log(urlObj.Query(), urlObj.RawQuery)
 	query, _ := GetSortedQuery(urlObj.RawQuery)
-	t.Log(query)
-	//query = append(query, "test")
 	length := len(query)
 	var queryItem []string
 	for i := 0; i < length-1; i += 2 {
 		queryItem = append(queryItem, query[i]+"="+query[i+1])
 	}
-	t.Log(strings.Join(queryItem, "&"))
+	test.Equal("id=3&value=4&test=5&data=xxx", strings.Join(queryItem, "&"))
 }
