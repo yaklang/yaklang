@@ -1,7 +1,7 @@
 package suricata
 
 import (
-	"crypto/rand"
+	"github.com/yaklang/yaklang/common/utils"
 	"math"
 )
 
@@ -60,14 +60,12 @@ func (m *ByteMap) Fill(offset int, content []byte) {
 }
 
 // FillLeftWithNoise fill the left empty space with noise
-func (m *ByteMap) FillLeftWithNoise() {
-	noise := make([]byte, len(m.mp))
-	rand.Read(noise)
+func (m *ByteMap) FillLeftWithNoise(noise func() byte) {
 	for i := 0; i < len(m.mp); i++ {
 		if m.filled[i] {
 			continue
 		}
-		m.mp[i] = noise[i]
+		m.mp[i] = noise()
 		m.filled[i] = true
 	}
 }
@@ -125,6 +123,49 @@ func (m *ByteMap) FindFreeRange(Len, begin, end int) []int {
 		}
 	}
 	return res
+}
+
+func (m *ByteMap) Trim(trimleft bool, trimright bool, targetLen int) {
+	// [lpos,rpos)
+	lpos := 0
+	rpos := len(m.mp)
+
+	if trimright {
+		for i := len(m.mp) - 1; i >= 0; i-- {
+			if m.filled[i] {
+				break
+			}
+			rpos--
+		}
+	}
+	if trimleft {
+		for i := 0; i < len(m.mp); i++ {
+			if m.filled[i] {
+				break
+			}
+			lpos++
+		}
+	}
+
+	if rpos-lpos < targetLen {
+		remain := targetLen - (lpos - rpos)
+		lremain := lpos
+		rremain := len(m.mp) - rpos
+		minremain := utils.Min(lremain, rremain)
+		if remain <= 2*minremain {
+			lpos = lpos - remain/2
+			rpos = rpos + remain - remain/2
+		} else if lremain < rremain {
+			lpos = 0
+			rpos = rpos + (remain - lremain)
+		} else if lremain >= rremain {
+			lpos = lpos - (remain - rremain)
+			rpos = len(m.mp)
+		}
+	}
+
+	m.filled = m.filled[lpos:rpos]
+	m.mp = m.mp[lpos:rpos]
 }
 
 func (m *ByteMap) Bytes() []byte {
