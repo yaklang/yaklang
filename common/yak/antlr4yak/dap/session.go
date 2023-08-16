@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sort"
 	"sync"
-	"sync/atomic"
 
 	"github.com/google/go-dap"
 	"github.com/samber/lo"
@@ -75,20 +74,11 @@ type DebugSession struct {
 
 	// rw is used to read requests and write events/responses
 	rw *bufio.ReadWriter
-	// sendQueue is used to capture messages from multiple request
-	// processing goroutines while writing them to the client connection
-	// from a single goroutine via sendFromQueue. We must keep track of
-	// the multiple channel senders with a wait group to make sure we do
-	// not close this channel prematurely. Closing this channel will signal
-	// the sendFromQueue goroutine that it can exit.
-	// sendQueue chan dap.Message
-	// sendWg    sync.WaitGroup
+
 	sendingMu sync.Mutex
 
 	// stopDebug is used to notify long-running handlers to stop processing.
 	stopMu sync.Mutex
-
-	breakpointIDCounter int32
 
 	// wg
 	LaunchWg sync.WaitGroup
@@ -346,20 +336,16 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 
 	// todo: 多文件调试,处理arguments.Source
 
-	// todo: supportsHitConditionalBreakpoints,处理arguments.Breakpoints.HitCondition
 	// todo: supportsLogPoints,处理arguments.Breakpoints.LogMessage
 
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
 	for i, b := range request.Arguments.Breakpoints {
 		bp := &response.Body.Breakpoints[i]
 
-		atomic.AddInt32(&ds.breakpointIDCounter, 1)
-		bp.Source = &dap.Source{Path: source.AbsPath, Name: source.Name}
-		bp.Id = int(ds.breakpointIDCounter)
+		ref, err := debugger.SetBreakPoint(b.Line, b.Condition, b.HitCondition)
+		bp.Id = ref
 		bp.Line = b.Line
-
-		err := debugger.SetBreakPoint(bp.Line, b.Condition, b.HitCondition)
-
+		bp.Source = &dap.Source{Path: source.AbsPath, Name: source.Name}
 		bp.Verified = (err == nil)
 		// todo: 当存在error的时候,是否需要设置breakpoint?
 	}
@@ -930,6 +916,10 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 }
 
 func (ds *DebugSession) ConvertVariable(v interface{}) int {
+	if _, ok := v.(*yakvm.Function); ok {
+		return 0
+	}
+
 	refV := reflect.ValueOf(v)
 	switch refV.Kind() {
 	case reflect.Ptr:
@@ -942,14 +932,10 @@ func (ds *DebugSession) ConvertVariable(v interface{}) int {
 		return 0
 	}
 
-	if _, ok := v.(*yakvm.Function); ok {
-		return 0
-	}
-
 	debugger := ds.debugger
 	i, ok := debugger.GetVariablesReference(v)
 	if !ok {
-		return debugger.debugger.AddVariable(v)
+		return debugger.AddVariableRef(v)
 	}
 	return i
 }
