@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1119,17 +1120,38 @@ func IsBytesOrRunes(v interface{}) bool {
 	return ok
 }
 
-func AsString(v interface{}) string {
-	switch s := v.(type) {
-	case string:
-		return s
-	case []byte:
-		return string(s)
-	case []rune:
-		return string(s)
-	case *Function:
-		return s.String()
-	default:
-		return fmt.Sprintf("%#v", s)
+func AsString(i interface{}) string {
+	refV := reflect.ValueOf(i)
+	typ := refV.Type()
+	kind := typ.Kind()
+
+	if kind == reflect.Array || kind == reflect.Slice {
+		length := refV.Len()
+		if length > 0 {
+			elemKind := refV.Index(0).Kind()
+			if elemKind == reflect.Uint8 { // []byte
+				v := i.([]byte)
+				return string(v)
+			} else if elemKind == reflect.Int32 { // []rune
+				v := i.([]rune)
+				return string(v)
+			}
+		}
+		content := make([]string, length)
+		for i := 0; i < length; i++ {
+			content[i] = AsString(refV.Index(i).Interface())
+		}
+		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
+	} else if kind == reflect.String {
+		return fmt.Sprintf("%s", i)
+	} else if kind == reflect.Map {
+		content := make([]string, refV.Len())
+		for i, key := range refV.MapKeys() {
+			content[i] = fmt.Sprintf("%q: %s", AsString(key.Interface()), AsString(refV.MapIndex(key).Interface()))
+		}
+		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
+	} else if typ == literalReflectType_YakFunction {
+		return fmt.Sprintf("%s", i.(*Function).String())
 	}
+	return fmt.Sprintf("%#v", i)
 }
