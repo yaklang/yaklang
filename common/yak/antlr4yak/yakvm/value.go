@@ -409,19 +409,7 @@ func (v *Value) NativeCallable() bool {
 }
 
 func (v *Value) AsString() string {
-	if v == nil {
-		return ""
-	}
-	switch s := v.Value.(type) {
-	case string:
-		return s
-	case []byte:
-		return string(s)
-	case []rune:
-		return string(s)
-	default:
-		return fmt.Sprintf("%v", s)
-	}
+	return AsString(v.Value)
 }
 
 func (v *Value) IsBytesOrRunes() bool {
@@ -1095,7 +1083,7 @@ func GetIndexedVariableCount(v interface{}) int {
 		rv = rv.Elem()
 		rk = rv.Kind()
 	}
-	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Chan || rk == reflect.Map || rk == reflect.String
+	ok := rk == reflect.Slice || rk == reflect.Array || rk == reflect.Chan || rk == reflect.Map
 	if !ok {
 		return 0
 	}
@@ -1129,4 +1117,19 @@ func IsBytesOrRunes(v interface{}) bool {
 		return ok
 	}
 	return ok
+}
+
+func AsString(v interface{}) string {
+	switch s := v.(type) {
+	case string:
+		return s
+	case []byte:
+		return string(s)
+	case []rune:
+		return string(s)
+	case *Function:
+		return s.String()
+	default:
+		return fmt.Sprintf("%#v", s)
+	}
 }
