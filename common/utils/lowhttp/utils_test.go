@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
@@ -256,6 +257,15 @@ Content-Encoding: gzip
 
 `), raw, false)
 	packetResult = FixHTTPRequestOut(packetResult)
-	ReplaceHTTPPacketBody()
-	println(string(packetResult))
+	fmt.Println(string(packetResult))
+
+	if strings.Contains(string(packetResult), "abc") {
+		panic("gzip must in request error")
+	}
+
+	var result = RemoveContentEncoding(packetResult)
+	fmt.Println(string(result))
+	if !strings.Contains(string(result), "abc") || strings.Contains(string(result), `-Encoding: gzip`) {
+		panic("clear in request error")
+	}
 }
