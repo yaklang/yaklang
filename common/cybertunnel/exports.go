@@ -10,12 +10,17 @@ import (
 	"google.golang.org/grpc"
 	grpcMetadata "google.golang.org/grpc/metadata"
 	"net"
+	"strconv"
 	"strings"
 
 	"time"
 )
 
 func GetTunnelServerExternalIP(addr string, secret string) (net.IP, error) {
+	if addr == "" {
+		return nil, utils.Errorf("empty addr")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -32,7 +37,7 @@ func GetTunnelServerExternalIP(addr string, secret string) (net.IP, error) {
 		grpc.WithNoProxy(),
 	)
 	if err != nil {
-		log.Errorf("dial %s failed: %s", addr, err)
+		log.Debugf("grpc dial %s failed: %s", strconv.Quote(addr), err)
 		return nil, err
 	}
 	defer conn.Close()
