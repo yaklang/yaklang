@@ -60,12 +60,7 @@ func NewDAPServer(config *DAPServerConfig) *DAPServer {
 func (s *DAPServer) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	session := &DebugSession{
-		config:   s.config,
-		conn:     conn,
-		rw:       bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
-		LaunchWg: sync.WaitGroup{},
-	}
+	session := NewDebugSession(conn, s.config)
 	s.session = session
 
 	for {
