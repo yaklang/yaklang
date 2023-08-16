@@ -263,6 +263,9 @@ a = 1, 2, 3
 b, c, d = a
 d = b + c + d
 d = "arst" + "a"
+var e, f, g 
+var e = 1 
+var f = e + 2
 		`
 		ir := `
 yak-main
@@ -282,6 +285,7 @@ entry0:
 	<int64> t12 = <int64> t6 add <int64> t8
 	<int64> t13 = <int64> t12 add <int64> t10
 	<string> t14 = <string> arst add <string> a
+	<int64> t15 = <int64> 1 add <int64> 2
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
