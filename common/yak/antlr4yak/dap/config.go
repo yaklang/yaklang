@@ -3,8 +3,9 @@ package dap
 import "net"
 
 type DAPServerConfig struct {
-	listener net.Listener
-	stopped  chan struct{}
+	listener  net.Listener
+	stopped   chan struct{}
+	extraLibs map[string]interface{}
 }
 
 func (c *DAPServerConfig) triggerServerStop() {
