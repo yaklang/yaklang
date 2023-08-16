@@ -232,6 +232,17 @@ func OpcodesString(c []*Code) string {
 	var buf strings.Builder
 	for i, code := range c {
 		buf.WriteString(fmt.Sprintf("%-13s %4d:%v\n", code.RangeVerbose(), i, code.String()))
+		if code.Opcode == OpPush {
+			op1 := code.Op1
+			if op1 == nil {
+				continue
+			}
+			if f, ok := op1.Value.(*Function); ok {
+				buf.WriteString("--------------------------------\n")
+				buf.WriteString(OpcodesString(f.codes))
+				buf.WriteString("--------------------------------\n")
+			}
+		}
 	}
 	return buf.String()
 }
