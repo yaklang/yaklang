@@ -190,7 +190,9 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 		if first, ok := condition.ForFirstExpr().(*yak.ForFirstExprContext); ok {
 			// first expression is initialization, in enter block
 			b.currentBlock = enter
-			b.buildForFirstExpr(first)
+			recover := b.SetRange(first.BaseParserRuleContext)
+			b.ForExpr(first)
+			recover()
 		}
 		if expr, ok := condition.Expression().(*yak.ExpressionContext); ok {
 			// build expression in header
@@ -237,7 +239,9 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 	b.currentBlock = latch
 	if endThird != nil {
 		// build third expression in loop.body end
-		b.buildForThirdExpr(endThird)
+		recover := b.SetRange(endThird.BaseParserRuleContext)
+		b.ForExpr(endThird)
+		recover()
 	}
 	// jump latch -> header
 	b.emitJump(header)
@@ -253,22 +257,12 @@ func (b *builder) buildForStmt(stmt *yak.ForStmtContext) {
 	b.currentBlock = rest
 }
 
-// for first expr
-func (b *builder) buildForFirstExpr(stmt *yak.ForFirstExprContext) {
-	recover := b.SetRange(stmt.BaseParserRuleContext)
-	defer recover()
-	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
-		b.buildAssignExpression(ae)
-	}
-	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		b.buildExpression(e)
-	}
+type forExpr interface {
+	Expression() yak.IExpressionContext
+	AssignExpression() yak.IAssignExpressionContext
 }
 
-// for third expr
-func (b *builder) buildForThirdExpr(stmt *yak.ForThirdExprContext) {
-	recover := b.SetRange(stmt.BaseParserRuleContext)
-	defer recover()
+func (b *builder) ForExpr(stmt forExpr) {
 	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
 		b.buildAssignExpression(ae)
 	}
