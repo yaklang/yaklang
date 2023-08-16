@@ -82,6 +82,15 @@ type DebugSession struct {
 
 	// wg
 	LaunchWg sync.WaitGroup
+
+func NewDebugSession(conn net.Conn, config *DAPServerConfig) *DebugSession {
+	return &DebugSession{
+		config:       config,
+		conn:         conn,
+		rw:           bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
+		LaunchWg:     sync.WaitGroup{},
+		variablesMap: make(map[int]dap.Variable),
+	}
 }
 
 func (ds *DebugSession) send(message dap.Message) {
