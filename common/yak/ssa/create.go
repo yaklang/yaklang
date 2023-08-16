@@ -5,7 +5,19 @@ import (
 	"sync"
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
+
+func ParseSSA(src string) *Program {
+	inputStream := antlr.NewInputStream(src)
+	lex := yak.NewYaklangLexer(inputStream)
+	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
+	p := yak.NewYaklangParser(tokenStream)
+	prog := NewProgram(p)
+	prog.Build()
+	return prog
+}
 
 func NewProgram(ast *yak.YaklangParser) *Program {
 	pkg := &Package{
