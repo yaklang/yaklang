@@ -38,7 +38,6 @@ func (hs *handlesMap) getReverse(v interface{}) (int, bool) {
 	return i, ok
 }
 
-// frameHandlesMap is a map from frame handles to frames.
 type frameHandlesMap struct {
 	m *handlesMap
 }
@@ -67,14 +66,44 @@ func (hs *frameHandlesMap) reset() {
 	hs.m.reset()
 }
 
+type breakPointHandlesMap struct {
+	m *handlesMap
+}
+
+func newBreakPointHandlesMap() *breakPointHandlesMap {
+	return &breakPointHandlesMap{newHandlesMap(1)}
+}
+
+func (hs *breakPointHandlesMap) create(value *Breakpoint) int {
+	return hs.m.create(value)
+}
+
+func (hs *breakPointHandlesMap) get(handle int) (*Breakpoint, bool) {
+	v, ok := hs.m.get(handle)
+	if !ok {
+		return nil, false
+	}
+	return v.(*Breakpoint), true
+}
+
+func (hs *breakPointHandlesMap) getReverse(v *Breakpoint) (int, bool) {
+	return hs.m.getReverse(v)
+}
+
+func (hs *breakPointHandlesMap) reset() {
+	hs.m.reset()
+}
+
 type Reference struct {
-	FrameHM *frameHandlesMap
-	VarHM   *handlesMap // 这里会存储Scope, yakvm.Value, 或者golang的value
+	FrameHM      *frameHandlesMap
+	BreakPointHM *breakPointHandlesMap
+	VarHM        *handlesMap // 这里会存储Scope, yakvm.Value, 或者golang的value
 }
 
 func NewReference() *Reference {
 	return &Reference{
-		FrameHM: newFrameHandlesMap(),
-		VarHM:   newHandlesMap(1), // 0 is nil
+		FrameHM:      newFrameHandlesMap(),
+		BreakPointHM: newBreakPointHandlesMap(),
+		VarHM:        newHandlesMap(1), // 0 is nil
 	}
 }
