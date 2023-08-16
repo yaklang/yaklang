@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
@@ -49,6 +50,14 @@ func (ds *DebugSession) RunProgramInDebugMode(request *dap.LaunchRequest, debug 
 
 	// inject args in cli
 	yaklib.InjectCliArgs(args)
+
+	// inject extra libs
+	if len(ds.config.extraLibs) > 0 {
+		engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+			engine.ImportLibs(ds.config.extraLibs)
+			return nil
+		})
+	}
 
 	err = engine.ExecuteMain(string(raw), absPath)
 	if err != nil {
