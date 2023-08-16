@@ -336,7 +336,7 @@ entry0:
 if.done1: <- if.true2 entry0
 	jump -> b3
 if.true2: <- entry0
-	<int64> t3 = <int64> 5 add <int64> 6
+	<int64> t2 = <int64> 5 add <int64> 6
 	jump -> if.done1
 b3: <- if.done1
 	<int64> t5 = <int64> 1 add <int64> 2
@@ -372,40 +372,40 @@ entry0:
 	<bool> t0 = <int64> 5 lt <int64> 2
 	If [<bool> t0] true -> if.true2, false -> if.elif3
 if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
-	<int64> t3 = phi [<int64> 1, if.true2] [<int64> 1, if.true4] [<int64> t12, if.true6] [<int64> t16, if.true8] [<int64> t20, if.true10] [<int64> t22, if.false11]
+	<int64> t24 = phi [<int64> 1, if.true2] [<int64> 1, if.true4] [<int64> t10, if.true6] [<int64> t14, if.true8] [<int64> t18, if.true10] [<int64> t20, if.false11]
 	jump -> b12
 if.true2: <- entry0
-	<int64> t4 = <int64> 5 add <int64> 6
+	<int64> t2 = <int64> 5 add <int64> 6
 	jump -> if.done1
 if.elif3: <- entry0
-	<bool> t6 = <int64> 5 lt <int64> 4
-	If [<bool> t6] true -> if.true4, false -> if.elif5
+	<bool> t4 = <int64> 5 lt <int64> 4
+	If [<bool> t4] true -> if.true4, false -> if.elif5
 if.true4: <- if.elif3
-	<int64> t8 = <int64> 5 add <int64> 9
+	<int64> t6 = <int64> 5 add <int64> 9
 	jump -> if.done1
 if.elif5: <- if.elif3
-	<bool> t10 = <int64> 5 lt <int64> 6
-	If [<bool> t10] true -> if.true6, false -> if.elif7
+	<bool> t8 = <int64> 5 lt <int64> 6
+	If [<bool> t8] true -> if.true6, false -> if.elif7
 if.true6: <- if.elif5
-	<int64> t12 = <int64> 5 add <int64> 5
+	<int64> t10 = <int64> 5 add <int64> 5
 	jump -> if.done1
 if.elif7: <- if.elif5
-	<bool> t14 = <int64> 5 lt <int64> 10
-	If [<bool> t14] true -> if.true8, false -> if.elif9
+	<bool> t12 = <int64> 5 lt <int64> 10
+	If [<bool> t12] true -> if.true8, false -> if.elif9
 if.true8: <- if.elif7
-	<int64> t16 = <int64> 5 add <int64> 20
+	<int64> t14 = <int64> 5 add <int64> 20
 	jump -> if.done1
 if.elif9: <- if.elif7
-	<bool> t18 = <int64> 5 lt <int64> 20
-	If [<bool> t18] true -> if.true10, false -> if.false11
+	<bool> t16 = <int64> 5 lt <int64> 20
+	If [<bool> t16] true -> if.true10, false -> if.false11
 if.true10: <- if.elif9
-	<int64> t20 = <int64> 5 add <int64> 30
+	<int64> t18 = <int64> 5 add <int64> 30
 	jump -> if.done1
 if.false11: <- if.elif9
-	<int64> t22 = <int64> 5 add <int64> 40
+	<int64> t20 = <int64> 5 add <int64> 40
 	jump -> if.done1
 b12: <- if.done1
-	<int64> t24 = <int64> 1 add <int64> 2
+	<int64> t23 = <int64> 1 add <int64> 2
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -439,40 +439,40 @@ entry0:
 	<bool> t0 = <int64> 5 lt <int64> 2
 	If [<bool> t0] true -> if.true2, false -> if.elif3
 if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
-	<int64> t3 = phi [<int64> 1, if.true2] [<int64> t8, if.true4] [<int64> t12, if.true6] [<int64> t16, if.true8] [<int64> t20, if.true10] [<int64> 1, if.false11]
+	<int64> t23 = phi [<int64> 1, if.true2] [<int64> t6, if.true4] [<int64> t10, if.true6] [<int64> t14, if.true8] [<int64> t18, if.true10] [<int64> 1, if.false11]
 	jump -> b12
 if.true2: <- entry0
-	<int64> t4 = <int64> 5 add <int64> 6
+	<int64> t2 = <int64> 5 add <int64> 6
 	jump -> if.done1
 if.elif3: <- entry0
-	<bool> t6 = <int64> 5 lt <int64> 4
-	If [<bool> t6] true -> if.true4, false -> if.elif5
+	<bool> t4 = <int64> 5 lt <int64> 4
+	If [<bool> t4] true -> if.true4, false -> if.elif5
 if.true4: <- if.elif3
-	<int64> t8 = <int64> 5 add <int64> 9
+	<int64> t6 = <int64> 5 add <int64> 9
 	jump -> if.done1
 if.elif5: <- if.elif3
-	<bool> t10 = <int64> 5 lt <int64> 6
-	If [<bool> t10] true -> if.true6, false -> if.elif7
+	<bool> t8 = <int64> 5 lt <int64> 6
+	If [<bool> t8] true -> if.true6, false -> if.elif7
 if.true6: <- if.elif5
-	<int64> t12 = <int64> 5 add <int64> 10
+	<int64> t10 = <int64> 5 add <int64> 10
 	jump -> if.done1
 if.elif7: <- if.elif5
-	<bool> t14 = <int64> 5 lt <int64> 10
-	If [<bool> t14] true -> if.true8, false -> if.elif9
+	<bool> t12 = <int64> 5 lt <int64> 10
+	If [<bool> t12] true -> if.true8, false -> if.elif9
 if.true8: <- if.elif7
-	<int64> t16 = <int64> 5 add <int64> 20
+	<int64> t14 = <int64> 5 add <int64> 20
 	jump -> if.done1
 if.elif9: <- if.elif7
-	<bool> t18 = <int64> 5 lt <int64> 20
-	If [<bool> t18] true -> if.true10, false -> if.false11
+	<bool> t16 = <int64> 5 lt <int64> 20
+	If [<bool> t16] true -> if.true10, false -> if.false11
 if.true10: <- if.elif9
-	<int64> t20 = <int64> 5 add <int64> 30
+	<int64> t18 = <int64> 5 add <int64> 30
 	jump -> if.done1
 if.false11: <- if.elif9
-	<int64> t22 = <int64> 5 add <int64> 7
+	<int64> t20 = <int64> 5 add <int64> 7
 	jump -> if.done1
 b12: <- if.done1
-	<int64> t24 = <int64> t3 add <int64> 2
+	<int64> t24 = <int64> t23 add <int64> 2
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -513,24 +513,24 @@ yak-main
 entry0:
 	jump -> loop.header1
 loop.header1: <- entry0 loop.latch4
-	<int64> t3 = phi [<int64> 0, entry0] [<int64> t10, loop.latch4]
-	<int64> t4 = phi [<int64> 0, entry0] [<int64> t8, loop.latch4]
-	<bool> t1 = <int64> t4 lt <int64> 10
-	If [<bool> t1] true -> loop.body2, false -> loop.exit3
+	<int64> t15 = phi [<int64> 0, entry0] [<int64> t13, loop.latch4]
+	<int64> t17 = phi [<int64> 0, entry0] [<int64> t16, loop.latch4]
+	<bool> t0 = <int64> t15 lt <int64> 10
+	If [<bool> t0] true -> loop.body2, false -> loop.exit3
 loop.body2: <- loop.header1
-	<bool> t5 = <int64> t3 gt-eq <int64> 3
-	If [<bool> t5] true -> if.true6, false -> if.done5
+	<bool> t3 = <int64> t17 gt-eq <int64> 3
+	If [<bool> t3] true -> if.true6, false -> if.done5
 loop.exit3: <- loop.header1 if.true8
 	jump -> b11
 loop.latch4: <- b9 b10
-	<int64> t10 = phi [<int64> t3, b9] [<int64> t17, b10]
-	<int64> t8 = <int64> t4 add <int64> 1
+	<int64> t16 = phi [<int64> t17, b9] [<int64> t11, b10]
+	<int64> t13 = <int64> t15 add <int64> 1
 	jump -> loop.header1
 if.done5: <- loop.body2
 	jump -> b10
 if.true6: <- loop.body2
-	<bool> t12 = <int64> t3 eq <int64> 3
-	If [<bool> t12] true -> if.true8, false -> if.done7
+	<bool> t5 = <int64> t17 eq <int64> 3
+	If [<bool> t5] true -> if.true8, false -> if.done7
 if.done7: <- if.true6
 	jump -> b9
 if.true8: <- if.true6
@@ -538,10 +538,10 @@ if.true8: <- if.true6
 b9: <- if.done7
 	jump -> loop.latch4
 b10: <- if.done5
-	<int64> t17 = <int64> t3 mul <int64> 2
+	<int64> t11 = <int64> t17 mul <int64> 2
 	jump -> loop.latch4
 b11: <- loop.exit3
-	<int64> t19 = <int64> t3 add <int64> 1
+	<int64> t19 = <int64> t17 add <int64> 1
 		`
 		prog := ParseSSA(code)
 		CheckProgram(t, prog)
@@ -649,30 +649,30 @@ vd = d(1, 2, 3) + 13
 		`
 		ir := []string{
 			`
-yak-main 
+yak-main
 entry0:
-		<int64> t0 = call <> yak-main$1 (<int64> 1) [<int64> 11]
-		<int64> t1 = call <> yak-main$1 (<int64> 2) [<int64> 11]
-		<int64> t2 = call <> yak-main$1 (<int64> 3) [<int64> 22]
-		<int64> t3 = <int64> 22 add <int64> t2
-		If [<int64> t2] true -> if.true2, false -> if.false3
+        <int64> t0 = call <> yak-main$1 (<int64> 1) [<int64> 11]
+        <int64> t1 = call <> yak-main$1 (<int64> 2) [<int64> 11]
+        <int64> t2 = call <> yak-main$1 (<int64> 3) [<int64> 22]
+        <int64> t3 = <int64> 22 add <int64> t2
+        If [<int64> t2] true -> if.true2, false -> if.false3
 if.done1: <- if.true2 if.false3
-		<int64> t6 = phi [<int64> 12, if.true2] [<int64> 13, if.false3]
-		jump -> b4
+        <int64> t8 = phi [<int64> 12, if.true2] [<int64> 13, if.false3]
+        jump -> b4
 if.true2: <- entry0
-		jump -> if.done1
+        jump -> if.done1
 if.false3: <- entry0
-		jump -> if.done1
+        jump -> if.done1
 b4: <- if.done1
-		<int64> t9 = <int64> t6 add <int64> t2
-		<int64> t10 = yak-main-symbol field[<string> cadd]
-		<> t11 = call <> yak-main$2 () [<int64> t10]
-		<int64> t12 = <int64> t10 add <int64> 1
-		<int64> t13 = yak-main-symbol field[<string> ca]
-		<int64> t14 = call <> yak-main$3 (<int64> 1, <int64> 2, <int64> 3) [<int64> t13, <> yak-main$1, <int64> 11]
-		<int64> t15 = <int64> t14 add <int64> 13
-		<int64> t16 = call <> yak-main$4 (<int64> 1, <int64> 2, <int64> 3) [<> yak-main$1, <int64> 11]
-		<int64> t17 = <int64> t16 add <int64> 13
+        <int64> t9 = <int64> t8 add <int64> t2
+        cadd-capture = yak-main-symbol field[<string> cadd]
+        <> t11 = call <> yak-main$2 () [cadd-capture]
+        <int64> t12 = cadd-capture add <int64> 1
+        ca-capture = yak-main-symbol field[<string> ca]
+        <int64> t14 = call <> yak-main$3 (<int64> 1, <int64> 2, <int64> 3) [ca-capture, <> yak-main$1, <int64> 11]
+        <int64> t15 = <int64> t14 add <int64> 13
+        <int64> t16 = call <> yak-main$4 (<int64> 1, <int64> 2, <int64> 3) [<> yak-main$1, <int64> 11]
+        <int64> t17 = <int64> t16 add <int64> 13
 			`,
 			`
 yak-main$1 <int64> arg1
@@ -684,40 +684,40 @@ entry0:
         <bool> t0 = <int64> 1 gt <int64> 2
         If [<bool> t0] true -> if.true2, false -> if.false3
 if.done1: <- if.true2 if.false3
-        <int64> t3 = phi [<int64> t4, if.true2] [<int64> t6, if.false3]
+        <int64> t7 = phi [<int64> t2, if.true2] [<int64> t4, if.false3]
         jump -> b4
 if.true2: <- entry0
-        <int64> t4 = <int64> arg1 add <int64> 2
+        <int64> t2 = <int64> arg1 add <int64> 2
         jump -> if.done1
 if.false3: <- entry0
-        <int64> t6 = <int64> ca add <int64> 2
+        <int64> t4 = <int64> ca add <int64> 2
         jump -> if.done1
 b4: <- if.done1
-        <int64> t8 = <int64> t3 add <int64> 1
+        <int64> t8 = <int64> t7 add <int64> 1
         ret <int64> t8
 			`,
 			`
 yak-main$2
 parent: yak-main
 pos:  37:6   -  37:20 : ()=>{cadd++}
-freeValue: <int64> t0
+freeValue: cadd-capture
 entry0:
-        <int64> t1 = <int64> t0 add <int64> 1
-        update [<int64> t0] = <int64> t1
+        <int64> t1 = cadd-capture add <int64> 1
+        update [cadd-capture] = <int64> t1
 			`,
 			`
 yak-main$3 <> pc1, <int64> pc2, <int64> pc3
 parent: yak-main
 pos:  43:4   -  50:0  : fn(pc1,pc2,pc3){
-freeValue: <int64> t0, <> a, <> va
+freeValue: ca-capture, <> a, <> va
 return: <int64> t7
 entry0:
-        update [<int64> t0] = <int64> 55
+        update [ca-capture] = <int64> 55
         <int64> t2 = call <> a (<> va) []
         <int64> t3 = <int64> 13 add <int64> t2
         <int64> t4 = <int64> pc2 mul <int64> pc3
         <int64> t5 = <int64> t3 add <int64> t4
-        <int64> t6 = <int64> t5 add <int64> t0
+        <int64> t6 = <int64> t5 add ca-capture
         ret <int64> t6
 			`,
 			`
