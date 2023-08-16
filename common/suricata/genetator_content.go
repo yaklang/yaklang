@@ -27,6 +27,21 @@ func noiseDigit() byte {
 	return byte(rand.Intn(10) + '0')
 }
 
+func noiseVisable() byte {
+	return byte(rand.Intn(95) + 32)
+}
+
+func noiseDigitChar() byte {
+	tmp := rand.Intn(62)
+	if tmp < 10 {
+		return byte(tmp + '0')
+	}
+	if tmp < 36 {
+		return byte(tmp - 10 + 'A')
+	}
+	return byte(tmp - 36 + 'a')
+}
+
 type ContentGen struct {
 	Modifiers []ByteMapModifier
 	Len       int
