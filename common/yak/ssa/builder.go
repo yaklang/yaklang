@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"strconv"
 	"strings"
 
@@ -531,6 +532,7 @@ type assiglist interface {
 }
 
 func (b *builder) AssignList(stmt assiglist) {
+	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
 		var rvalues []Value
@@ -659,7 +661,6 @@ func (b *builder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyContext)
 func (b *builder) buildDeclearAndAssignExpression(stmt *yak.DeclearAndAssignExpressionContext) {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
-
 	b.AssignList(stmt)
 }
 
@@ -1185,21 +1186,51 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 	// string literal
 	if s, ok := stmt.StringLiteral().(*yak.StringLiteralContext); ok {
 		return b.buildStringLiteral(s)
-	}
-
-	// numeric literal
-	if s, ok := stmt.NumericLiteral().(*yak.NumericLiteralContext); ok {
+	} else if s, ok := stmt.NumericLiteral().(*yak.NumericLiteralContext); ok {
 		return b.buildNumericLiteral(s)
+	} else if s, ok := stmt.BoolLiteral().(*yak.BoolLiteralContext); ok {
+		boolLit, err := strconv.ParseBool(s.GetText())
+		if err != nil {
+			panic("Unhandled bool literal")
+		}
+		return NewConst(boolLit)
+	} else if stmt.UndefinedLiteral() != nil {
+		return NewConst(nil)
+	} else if stmt.CharaterLiteral() != nil {
+		runeChar, _, _, err := strconv.UnquoteChar(stmt.CharaterLiteral().GetText(), '\'')
+		if err != nil {
+			panic("Unhandled charater literal: " + stmt.CharaterLiteral().GetText())
+		}
+		if runeChar < 256 {
+			return NewConst(byte(runeChar))
+		} else {
+			// unbelievable
+			log.Warnf("charater literal is rune: %s", stmt.CharaterLiteral().GetText())
+			return NewConst(runeChar)
+		}
+	} else if stmt.MapLiteral() != nil {
+		switch ret := stmt.MapLiteral().(type) {
+		case *yak.MapLiteralContext:
+			return b.buildMapLiteral(ret)
+		default:
+		}
+		panic("Unhandled Map(Object) Literal: " + stmt.MapLiteral().GetText())
+	} else if stmt.SliceLiteral() != nil {
+		switch ret := stmt.SliceLiteral().(type) {
+		case *yak.SliceLiteralContext:
+			return b.buildSliceLiteral(ret)
+		default:
+		}
+		panic("Unhandled Slice Literal: " + stmt.SliceLiteral().GetText())
 	}
 
-	//TODO: bool literal
-	//TODO: undefined literal
-	//TODO: charater literal
-	//TODO: map literal
 	//TODO: slice typed literal
 	//TODO: type literal
 	//TODO: slice literal
 
+	// mixed
+
+	panic("Not Implemented Expr Parse YET: " + stmt.GetText())
 	return nil
 }
 
