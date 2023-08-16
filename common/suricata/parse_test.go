@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestMUSTPASS_Parse(t *testing.T) {
 	rules, err := Parse(`alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)
 alert http $EXTERNAL_NET any -> $HOME_NET any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w{2,3}\s+\d{4}-\d{2}-\d{2}\s[\d:]{8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg: "CobaltStrike login server"; flow:established; content:"Cyberspace"; depth:200; content:"Somewhere"; distance:0; content:"cobaltstrike"; distance:0; content:"AdvancedPenTesting";distance:0; classtype:exploit-kit; sid:3016001; rev:1; metadata:by al0ne;)
@@ -79,8 +79,12 @@ alert http any any -> any any (msg: "test\"\;";)`)
 		spew.Dump(rules)
 		panic("parse failed")
 	}
-	if rules[60].ContentRuleConfig.ContentRules[0].PCRE != `/[a-zA-Z0-9+/]{100,}=/i` {
+	if rules[60].ContentRuleConfig.ContentRules[1].PCRE != "/[a-zA-Z0-9+/]{100,}=/i" {
 		spew.Dump(rules[60])
+		panic("parse failed")
+	}
+	if len(rules[1].ContentRuleConfig.ContentRules) != 4 {
+		spew.Dump(rules[2])
 		panic("parse failed")
 	}
 }
@@ -93,7 +97,7 @@ func TestParse2(t *testing.T) {
 	spew.Dump(rules)
 }
 
-func TestParse_PortSyntaxAndMatch(t *testing.T) {
+func TestMUSTPASS_Parse_PortSyntaxAndMatch(t *testing.T) {
 	for _, i := range [][]any{
 		// rule, include, exclude
 		{`alert tcp any [111,222] <> any any (msg: "abc")`, []int{111, 222}, []int{22}},
@@ -129,13 +133,11 @@ func TestParse_PortSyntaxAndMatch(t *testing.T) {
 					panic(msg)
 				}
 			}
-
-			spew.Dump(subRule.SourcePort)
 		}
 	}
 }
 
-func TestParse_AddrSyntaxAndMatch(t *testing.T) {
+func TestMUSTPASS_Parse_AddrSyntaxAndMatch(t *testing.T) {
 	var envs = []string{"HOME=2.3.4.5", "HOME2=1.2.3.4"}
 	for _, i := range [][]any{
 		// rule, include, exclude
