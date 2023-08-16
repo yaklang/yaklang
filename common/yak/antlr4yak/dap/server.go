@@ -1,10 +1,8 @@
 package dap
 
 import (
-	"bufio"
 	"io"
 	"net"
-	"sync"
 
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/log"
