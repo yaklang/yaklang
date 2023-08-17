@@ -258,7 +258,7 @@ func checkStop(t *testing.T, client *Client, thread int, fname string, line int)
 
 	client.CheckStopLocation(t, thread, fname, line)
 
-	client.ScopesRequest(1)
+	client.ScopesRequest(0)
 	client.ExpectScopesResponse(t)
 
 	client.VariablesRequest(1)
@@ -1165,4 +1165,22 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 			}},
 		)
 	})
+}
+func TestEvaluateCommandRequest(t *testing.T) {
+	log.SetLevel(log.ErrorLevel)
+	runTest(t, "EvaluateCommandRequest", SimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			server.config.extraLibs = TestExtraLibs
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{2},
+			[]onBreakpoint{{
+				execute: func() {
+					checkStop(t, client, 0, "__yak_main__", 2)
+				},
+				disconnect: true,
+			}},
+		)
+	},
+	)
 }
