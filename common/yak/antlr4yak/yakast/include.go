@@ -1,12 +1,13 @@
 package yakast
 
 import (
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"io/ioutil"
 	"strconv"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+
 	"github.com/go-rod/rod/lib/utils"
 )
 
@@ -38,8 +39,10 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 	if err != nil {
 		y.panicCompilerError(readFileError, fpath, err)
 	}
+	codeStr := string(code)
 
 	y.writeString(`"` + fpath + `"`)
+
 	// parse
 	inputStream := antlr.NewInputStream(string(code))
 	lex := yak.NewYaklangLexer(inputStream)
@@ -48,7 +51,13 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 
 	// compile, 忽略formatter
 	recoverFormatBufferFunc := y.switchFormatBuffer()
+	recoverSource := y.switchSource(&fpath, &codeStr)
+	defer func() {
+		recoverFormatBufferFunc()
+		recoverSource()
+	}()
+
 	y.VisitProgramWithoutSymbolTable(p.Program().(*yak.ProgramContext))
-	recoverFormatBufferFunc()
+
 	return nil
 }
