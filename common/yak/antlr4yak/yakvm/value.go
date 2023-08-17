@@ -3,6 +3,7 @@ package yakvm
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1131,10 +1132,13 @@ func IsBytesOrRunes(v interface{}) bool {
 	return ok
 }
 
-func AsString(i interface{}) string {
+func AsDebugString(i interface{}) string {
 	refV := reflect.ValueOf(i)
 	typ := refV.Type()
 	kind := typ.Kind()
+	if !refV.IsValid() {
+		return fmt.Sprintf("%#v", i)
+	}
 
 	if kind == reflect.Array || kind == reflect.Slice {
 		length := refV.Len()
@@ -1150,19 +1154,36 @@ func AsString(i interface{}) string {
 		}
 		content := make([]string, length)
 		for i := 0; i < length; i++ {
-			content[i] = AsString(refV.Index(i).Interface())
+			content[i] = AsDebugString(refV.Index(i).Interface())
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
 	} else if kind == reflect.String {
-		return fmt.Sprintf("%s", i)
+		return fmt.Sprintf("%q", i)
 	} else if kind == reflect.Map {
 		content := make([]string, refV.Len())
-		for i, key := range refV.MapKeys() {
-			content[i] = fmt.Sprintf("%q: %s", AsString(key.Interface()), AsString(refV.MapIndex(key).Interface()))
+		keys := refV.MapKeys()
+		sort.SliceStable(keys, func(i, j int) bool {
+			return fmt.Sprintf("%v", keys[i]) < fmt.Sprintf("%v", keys[j])
+		})
+		for i, key := range keys {
+			content[i] = fmt.Sprintf("%q: %s", AsDebugString(key.Interface()), AsDebugString(refV.MapIndex(key).Interface()))
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
 	} else if typ == literalReflectType_YakFunction {
 		return fmt.Sprintf("%s", i.(*Function).String())
+	} else if kind == reflect.Ptr {
+		elem := refV.Elem()
+		if elem.IsValid() {
+			return fmt.Sprintf("&%s", AsDebugString(elem.Interface()))
+		} else {
+			return fmt.Sprintf("%#v", i)
+		}
+	} else if kind == reflect.Struct {
+		content := make([]string, refV.NumField())
+		for i := 0; i < refV.NumField(); i++ {
+			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, AsDebugString(refV.Field(i).Interface()))
+		}
+		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
 	}
 	return fmt.Sprintf("%#v", i)
 }
