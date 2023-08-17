@@ -183,6 +183,7 @@ var GlobalExport = map[string]interface{}{
 	"parseFloat":   parseFloat,
 	"atoi":         strconv.Atoi,
 	"parseTime":    time.Parse,
+	"input":        _input,
 
 	// 每一秒执行一次
 	"tick1s": tick1s,
