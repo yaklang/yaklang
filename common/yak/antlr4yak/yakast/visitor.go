@@ -3,12 +3,13 @@ package yakast
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"reflect"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
@@ -342,4 +343,14 @@ func (y *YakCompiler) GetParserErrors() YakMergeError {
 
 func (y *YakCompiler) GetCompileErrors() YakMergeError {
 	return y.compilerErrors
+}
+
+func (y *YakCompiler) switchSource(newFilePath, newSourceCode *string) func() {
+	oldFilePath, oldCode := y.sourceCodeFilePathPointer, y.sourceCodePointer
+	y.sourceCodeFilePathPointer = newFilePath
+	y.sourceCodePointer = newSourceCode
+	return func() {
+		y.sourceCodeFilePathPointer = oldFilePath
+		y.sourceCodePointer = oldCode
+	}
 }
