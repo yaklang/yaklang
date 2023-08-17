@@ -46,6 +46,7 @@ func init() {
 		}
 		ctx.PushToStack(newMethod)
 	}
+	actionMap[stateEmptyRight+stateMethod] = actionMap[stateEmptyLeft+stateMethod]
 	actionMap[stateLeftBrace+stateMethod] = actionMap[stateEmptyLeft+stateMethod]
 
 	actionMap[stateMethod+stateLeftParen] = func(ctx *DataContext) { // OnMethodEnd
@@ -73,6 +74,14 @@ func init() {
 	}
 	actionMap[stateParam+stateRightParen] = func(ctx *DataContext) { // OnParamEnd
 		ctx.stack.Peek().(*FuzzTagMethod).params = append(ctx.stack.Peek().(*FuzzTagMethod).params, NewStringNode(ctx.token))
+		ctx.Pop()
+	}
+	actionMap[stateParam+stateLeftParen] = func(ctx *DataContext) { // OnParamEnd
+		newMethod := &FuzzTagMethod{methodCtx: ctx.methodCtx, name: ctx.token}
+		ctx.stack.Peek().(*FuzzTagMethod).params = append(ctx.stack.Peek().(*FuzzTagMethod).params, newMethod)
+		ctx.PushToStack(newMethod)
+	}
+	actionMap[stateLeftParen+stateRightParen] = func(ctx *DataContext) { // OnParamEnd
 		ctx.Pop()
 	}
 
@@ -122,31 +131,33 @@ func init() {
 		stateExpression:      {{StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateExpression}},
 		stateEmptyLeft:       {{CharAccepter(" \r\n"), stateEmptyLeft}, {CharIdentify(), stateMethod}},
 		stateMethod:          {{CharAccepter("("), stateLeftParen}, {CharIdentify(), stateMethod}, {StringRightBrace(), stateRightBrace}},
-		stateLeftParen:       {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(""), stateParam}},
-		stateParam:           {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateParam}},
+		stateLeftParen:       {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateParam}},
+		stateParam:           {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(")"), stateRightParen}, {CharAccepter("("), stateLeftParen}, {CharAccepter(""), stateParam}},
 		stateRightParen:      {{CharAccepter(" \r\n"), stateEmptyRight}, {StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateNone}},
-		stateEmptyRight:      {{CharAccepter(" \r\n"), stateEmptyRight}, {StringRightBrace(), stateRightBrace}},
+		stateEmptyRight:      {{CharAccepter(" \r\n"), stateEmptyRight}, {CharIdentify(), stateMethod}, {StringRightBrace(), stateRightBrace}},
 		stateRightBrace:      {{CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateNone}},
 	}
 }
 func CharAccepter(s string) func(ctx *DataContext) bool {
 	return func(ctx *DataContext) bool {
 		if ctx.currentByte == '\\' && (s == "(" || s == ")") { // 小括号接收器需要转义
-			ctx.preIndex = ctx.currentIndex + 1 // 跳过这个字符
+			bytSource := []byte(ctx.source)
+			bytSource[ctx.currentIndex] = 0
+			ctx.source = string(bytSource)
 			ctx.currentIndex++
 			ctx.currentByte = ctx.source[ctx.currentIndex]
 			ctx.transOk = true
-			ctx.toState = ctx.currentState
-			return true
-		}
-		if s == "" {
-			ctx.transOk = true
+			ctx.toState = stateParam
 		} else {
-			ctx.transOk = strings.Contains(s, string(ctx.currentByte))
+			if s == "" {
+				ctx.transOk = true
+			} else {
+				ctx.transOk = strings.Contains(s, string(ctx.currentByte))
+			}
 		}
 		if v, ok := actionMap[ctx.currentState+ctx.toState]; ctx.transOk {
 			if ctx.currentState != ctx.toState {
-				ctx.token = ctx.source[ctx.preIndex:ctx.currentIndex]
+				ctx.token = GetToken(ctx.source[ctx.preIndex:ctx.currentIndex])
 				ctx.preIndex = ctx.currentIndex
 			}
 			if ok {
@@ -164,7 +175,7 @@ func StringLeftBrace() func(ctx *DataContext) bool {
 			} else {
 				if i > 1 {
 					ctx.currentIndex += i - 1
-					ctx.token = ctx.source[ctx.preIndex : ctx.currentIndex-1]
+					ctx.token = GetToken(ctx.source[ctx.preIndex : ctx.currentIndex-1])
 					ctx.preIndex = ctx.currentIndex + 1
 					ctx.transOk = true
 					if v, ok := actionMap[ctx.currentState+ctx.toState]; ok {
@@ -186,7 +197,7 @@ func StringRightBrace() func(ctx *DataContext) bool {
 			if ctx.source[ctx.currentIndex+i] == '}' {
 				if i == 1 {
 					ctx.currentIndex += i
-					ctx.token = ctx.source[ctx.preIndex : ctx.currentIndex-1]
+					ctx.token = GetToken(ctx.source[ctx.preIndex : ctx.currentIndex-1])
 					ctx.preIndex = ctx.currentIndex + 1
 					ctx.transOk = true
 					if v, ok := actionMap[ctx.currentState+ctx.toState]; ok {
@@ -208,7 +219,7 @@ func CharIdentify() func(ctx *DataContext) bool {
 		ctx.transOk = utils.MatchAllOfRegexp(string(ctx.currentByte), "[a-zA-Z0-9_:-]")
 		if v, ok := actionMap[ctx.currentState+ctx.toState]; ctx.transOk {
 			if ctx.currentState != ctx.toState {
-				ctx.token = ctx.source[ctx.preIndex:ctx.currentIndex]
+				ctx.token = GetToken(ctx.source[ctx.preIndex:ctx.currentIndex])
 				ctx.preIndex = ctx.currentIndex
 			}
 			if ok {
@@ -217,4 +228,14 @@ func CharIdentify() func(ctx *DataContext) bool {
 		}
 		return ctx.transOk
 	}
+}
+func GetToken(token string) string {
+	res := strings.Builder{}
+	for _, ch := range []byte(token) {
+		if ch == 0 {
+			continue
+		}
+		res.WriteByte(ch)
+	}
+	return res.String()
 }
