@@ -200,7 +200,7 @@ func (h *httpProvider) Get(modi Modifier) []byte {
 func (h *httpProvider) getReq(modi Modifier) []byte {
 	switch modi {
 	case HTTPUri:
-		return []byte(h.req.URL.Path)
+		return []byte(h.req.RequestURI)
 	case HTTPUriRaw:
 		rd := bufio.NewReader(bytes.NewReader(h.raw))
 		if _, err := rd.ReadBytes(' '); err != nil {

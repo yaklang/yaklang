@@ -23,6 +23,9 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert http any any -> any any (msg:"***Linux wget/curl download .sh script***"; flow:established,to_server; content:".sh"; http_uri;  pcre:"/curl|Wget|linux-gnu/Vi"; classtype:trojan-activity; sid:3013002; rev:1; metadata:by al0ne;)`,
+	},
+	{
 		rule: `alert http any any -> any any (msg: "CobaltStrike ARP Scan module"; flow:established; content:"POST"; http_method; content:"(ARP)"; http_client_body; content:"Scanner module is complete"; http_client_body; distance:0; classtype:exploit-kit; sid:3016004; rev:1; metadata:created_at 2018_11_15,by al0ne;)`,
 	},
 	{
@@ -36,9 +39,6 @@ var rules = []*ruleTest{
 	},
 	{
 		rule: `alert http any any -> any any (msg:"***Windows Powershell Request UserAgent***"; flow:established; content:"PowerShell"; http_user_agent; pcre:"/PowerShell|WindowsPowerShell/i"; classtype:trojan-activity; sid:3013001; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"***Linux wget/curl download .sh script***"; flow:established,to_server; content:".sh"; http_uri;  pcre:"/curl|Wget|linux-gnu/Vi"; classtype:trojan-activity; sid:3013002; rev:1; metadata:by al0ne;)`,
 	},
 	{
 		rule: `alert http any any -> any any  (msg: "Behinder3 PHP HTTP Request"; flow: established, to_server; content:".php"; http_uri;  pcre:"/[a-zA-Z0-9+/]{1000,}=/i"; flowbits:set,behinder3;noalert; classtype:shellcode-detect; sid: 3016017; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`,
