@@ -2,6 +2,7 @@ package suricata
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"math"
 )
 
@@ -31,7 +32,7 @@ func (g *Ploadgen) Gen() ([]byte, error) {
 	for k, gener := range g.gen {
 		mp[k] = gener.Gen()
 	}
-	return HTTPCombination(mp), nil
+	return lowhttp.FixHTTPPacketCRLF(HTTPCombination(mp), false), nil
 }
 
 func (g *Ploadgen) parse() error {
