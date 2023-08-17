@@ -228,8 +228,8 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsFunctionBreakpoints = false        // 函数断点(可以考虑支持)
 	response.Body.SupportsHitConditionalBreakpoints = false  // 在触发条件断点时到达断点但不满足条件的次数(可以考虑支持)
 	response.Body.SupportsBreakpointLocationsRequest = false // 是否支持客户端向调试适配器查询特定源代码文件中可用的断点位置(可以考虑支持)
-	response.Body.SupportsSetVariable = false                // 支持调试器设置变量的新值(可以考虑支持)
-	response.Body.SupportsSetExpression = false              // 是否支持设置表达式的新值(可以考虑支持)
+	response.Body.SupportsSetVariable = true                 // 支持调试器设置变量的新值(可以考虑支持)
+	response.Body.SupportsSetExpression = true               // 是否支持设置表达式的新值(可以考虑支持)
 	response.Body.SupportsLogPoints = false                  // 是否支持断点不暂停,而是在断点处输出信息(可以考虑支持)
 
 	response.Body.ExceptionBreakpointFilters = []dap.ExceptionBreakpointsFilter{} // 异常断点的过滤器
