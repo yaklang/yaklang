@@ -51,7 +51,13 @@ func init() {
 	actionMap[stateMethod+stateLeftParen] = func(ctx *DataContext) { // OnMethodEnd
 		ctx.stack.Peek().(*FuzzTagMethod).name = ctx.token
 	}
-
+	actionMap[stateMethod+stateRightBrace] = func(ctx *DataContext) { // OnMethodEnd
+		method, _ := ctx.Pop()
+		method.(*FuzzTagMethod).name = ctx.token
+		itag, _ := ctx.Pop()
+		tag := itag.(*Tag)
+		ctx.PushData(tag)
+	}
 	//actionMap[stateLeftParen+stateParam] = func(ctx *DataContext) { // OnParamStart
 	//	ctx.preIndex = ctx.currentIndex
 	//}
@@ -115,7 +121,7 @@ func init() {
 		stateExpressionStart: {{StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateExpression}},
 		stateExpression:      {{StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateExpression}},
 		stateEmptyLeft:       {{CharAccepter(" \r\n"), stateEmptyLeft}, {CharIdentify(), stateMethod}},
-		stateMethod:          {{CharAccepter("("), stateLeftParen}, {CharIdentify(), stateMethod}},
+		stateMethod:          {{CharAccepter("("), stateLeftParen}, {CharIdentify(), stateMethod}, {StringRightBrace(), stateRightBrace}},
 		stateLeftParen:       {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(""), stateParam}},
 		stateParam:           {{StringLeftBrace(), stateLeftBrace}, {CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateParam}},
 		stateRightParen:      {{CharAccepter(" \r\n"), stateEmptyRight}, {StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateNone}},
@@ -125,6 +131,14 @@ func init() {
 }
 func CharAccepter(s string) func(ctx *DataContext) bool {
 	return func(ctx *DataContext) bool {
+		if ctx.currentByte == '\\' && (s == "(" || s == ")") { // 小括号接收器需要转义
+			ctx.preIndex = ctx.currentIndex + 1 // 跳过这个字符
+			ctx.currentIndex++
+			ctx.currentByte = ctx.source[ctx.currentIndex]
+			ctx.transOk = true
+			ctx.toState = ctx.currentState
+			return true
+		}
 		if s == "" {
 			ctx.transOk = true
 		} else {
@@ -191,7 +205,7 @@ func StringRightBrace() func(ctx *DataContext) bool {
 }
 func CharIdentify() func(ctx *DataContext) bool {
 	return func(ctx *DataContext) bool {
-		ctx.transOk = utils.MatchAllOfRegexp(string(ctx.currentByte), "[a-zA-Z0-9_:-]*")
+		ctx.transOk = utils.MatchAllOfRegexp(string(ctx.currentByte), "[a-zA-Z0-9_:-]")
 		if v, ok := actionMap[ctx.currentState+ctx.toState]; ctx.transOk {
 			if ctx.currentState != ctx.toState {
 				ctx.token = ctx.source[ctx.preIndex:ctx.currentIndex]
