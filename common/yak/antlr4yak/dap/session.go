@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/google/go-dap"
@@ -386,7 +387,7 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 		}
 		ds.send(e)
 
-		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'help' for help info.\n", consts.GetYakVersion()))
+		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'dbg help' for help info.\n", consts.GetYakVersion()))
 	} else {
 		// 等待launch完成
 		ds.LaunchWg.Wait()
@@ -682,20 +683,35 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 	// todo: 处理context类型
 	ctxt := request.Arguments.Context
 	showErrorToUser := ctxt != "watch" && ctxt != "repl" && ctxt != "hover"
-
-	value, err := ds.debugger.EvalExpression(request.Arguments.Expression, request.Arguments.FrameId)
-	if err != nil {
-		ds.sendErrorResponseWithOpts(request.Request, UnableToEvaluateExpression, "Unable to evaluate expression", err.Error(), showErrorToUser)
-		return
-	}
+	expr := request.Arguments.Expression
 
 	response := &dap.EvaluateResponse{Response: *newResponse(request.Request)}
-	response.Body = dap.EvaluateResponseBody{Result: yakvm.AsDebugString(value.Value), Type: value.TypeVerbose}
 
-	ref := ds.ConvertVariable(value.Value)
-	response.Body.VariablesReference = ref
-	response.Body.IndexedVariables = value.GetIndexedVariableCount()
-	response.Body.NamedVariables = value.GetNamedVariableCount()
+	// 处理用户命令
+	if ctxt == "repl" && strings.HasPrefix(expr, "dbg ") {
+		cmd := strings.TrimPrefix(expr, "dbg ")
+		result, err := ds.dbgCommand(cmd)
+		if err != nil {
+			ds.sendErrorResponseWithOpts(request.Request, UnableToRunDlvCommand, "Unable to run dbg command", err.Error(), showErrorToUser)
+			return
+		}
+		response.Body = dap.EvaluateResponseBody{
+			Result: result,
+		}
+	} else {
+		value, err := ds.debugger.EvalExpression(expr, request.Arguments.FrameId)
+		if err != nil {
+			ds.sendErrorResponseWithOpts(request.Request, UnableToEvaluateExpression, "Unable to evaluate expression", err.Error(), showErrorToUser)
+			return
+		}
+
+		response.Body = dap.EvaluateResponseBody{Result: yakvm.AsDebugString(value.Value), Type: value.TypeVerbose}
+
+		ref := ds.ConvertVariable(value.Value)
+		response.Body.VariablesReference = ref
+		response.Body.IndexedVariables = value.GetIndexedVariableCount()
+		response.Body.NamedVariables = value.GetNamedVariableCount()
+	}
 
 	ds.send(response)
 }
