@@ -3,14 +3,15 @@ package fuzztagx
 import "github.com/yaklang/yaklang/common/utils"
 
 type DataContext struct {
-	data         []Node
-	deep         int
-	unscanstr    string
-	stack        *utils.Stack[any]
-	currentIndex int
-	preIndex     int
-	currentByte  byte
-	source       string
+	data               []Node
+	deep               int
+	unscanstr          string
+	stack              *utils.Stack[any]
+	currentIndex       int
+	preIndex           int
+	currentByte        byte
+	source, sourceBack string
+
 	toState      state
 	currentState state
 	transOk      bool
@@ -28,7 +29,7 @@ func (d *DataContext) SetIndex(i int) {
 //		return s
 //	}
 func NewDataContext(source string) *DataContext {
-	return &DataContext{source: source, stack: utils.NewStack[any]()}
+	return &DataContext{source: source, sourceBack: source, stack: utils.NewStack[any]()}
 }
 func (d *DataContext) Generate() ([]string, error) {
 	return nil, nil
