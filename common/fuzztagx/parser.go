@@ -38,6 +38,7 @@ func Parse(raw interface{}, methodCtx *MethodContext) ([]Node, error) {
 				}
 				if i != -1 {
 					ctx.PushData(NewStringNode(ctx.source[i:ctx.currentIndex]))
+					ctx.preIndex = ctx.currentIndex
 				}
 			}
 		}()
