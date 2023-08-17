@@ -1,11 +1,20 @@
 package fuzztagx
 
+type MethodContext struct {
+	methodTable map[string]BuildInTagFun
+	labelTable  map[string][]*FuzzTagMethod
+}
+
 func ExecuteWithStringHandler(source string, param map[string]BuildInTagFun) ([]string, error) {
-	res, err := Parse(source, &param)
+	dataCtx := &MethodContext{
+		methodTable: param,
+		labelTable:  make(map[string][]*FuzzTagMethod),
+	}
+	res, err := Parse(source, dataCtx)
 	if err != nil {
 		return nil, err
 	}
-	generator := NewGenerator(&GeneratorContext{}, res)
+	generator := NewGenerator(res)
 	result := []string{}
 	for {
 		s, ok := generator.Generate()

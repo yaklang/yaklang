@@ -15,7 +15,7 @@ type DataContext struct {
 	currentState state
 	transOk      bool
 	token        string
-	funTable     *map[string]BuildInTagFun
+	methodCtx    *MethodContext
 }
 
 func (d *DataContext) SetIndex(i int) {
