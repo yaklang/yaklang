@@ -830,6 +830,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 	}
 
 	refV := reflect.ValueOf(i)
+
 	switch refV.Kind() {
 	case reflect.Ptr:
 		refV = refV.Elem()
@@ -936,13 +937,12 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				key := keys[i]
 				iKey := key.Interface()
 				keyRef := ds.ConvertVariable(iKey)
-
-				keyStr := key.String()
+				keyStr := yakvm.AsString(iKey)
 
 				keyVar := dap.Variable{
 					Name:               fmt.Sprintf("[key %d]", start+i),
 					Type:               key.Type().String(),
-					Value:              key.String(),
+					Value:              keyStr,
 					VariablesReference: keyRef,
 					IndexedVariables:   yakvm.GetIndexedVariableCount(iKey),
 					NamedVariables:     yakvm.GetNamedVariableCount(iKey),
@@ -951,12 +951,13 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				value := refV.MapIndex(key)
 				iValue := value.Interface()
 				valueRef := ds.ConvertVariable(iValue)
+				valueStr := yakvm.AsString(iValue)
 
 				valueVar := dap.Variable{
 					Name:               fmt.Sprintf("[value %d]", start+i),
 					EvaluateName:       fmt.Sprintf("%s[%s]", varname, keyStr),
 					Type:               value.Type().String(),
-					Value:              value.String(),
+					Value:              valueStr,
 					VariablesReference: valueRef,
 					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
