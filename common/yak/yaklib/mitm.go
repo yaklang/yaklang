@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"net/http"
 )
 
@@ -14,17 +15,18 @@ var (
 		"Start":  startMitm,
 		"Bridge": startBridge,
 
-		"maxContentLength":   mitmMaxContentLength,
-		"isTransparent":      mitmConfigIsTransparent,
-		"context":            mitmConfigContext,
-		"host":               mitmConfigHost,
-		"callback":           mitmConfigCallback,
-		"hijackHTTPRequest":  mitmConfigHijackHTTPRequest,
-		"hijackHTTPResponse": mitmConfigHijackHTTPResponse,
-		"wscallback":         mitmConfigWSCallback,
-		"wsforcetext":        mitmConfigWSForceTextFrame,
-		"rootCA":             mitmConfigCertAndKey,
-		"useDefaultCA":       mitmConfigUseDefault,
+		"maxContentLength":     mitmMaxContentLength,
+		"isTransparent":        mitmConfigIsTransparent,
+		"context":              mitmConfigContext,
+		"host":                 mitmConfigHost,
+		"callback":             mitmConfigCallback,
+		"hijackHTTPRequest":    mitmConfigHijackHTTPRequest,
+		"hijackHTTPResponse":   mitmConfigHijackHTTPResponse,
+		"hijackHTTPResponseEx": mitmConfigHijackHTTPResponseEx,
+		"wscallback":           mitmConfigWSCallback,
+		"wsforcetext":          mitmConfigWSForceTextFrame,
+		"rootCA":               mitmConfigCertAndKey,
+		"useDefaultCA":         mitmConfigUseDefault,
 	}
 )
 
@@ -49,7 +51,8 @@ type mitmConfig struct {
 	isTransparent            bool
 	hijackRequest            func(isHttps bool, urlStr string, req []byte, forward func([]byte), reject func())
 	hijackWebsocketDataFrame func(isHttps bool, urlStr string, req []byte, forward func([]byte), reject func())
-	hijackResponse           func(isHttps bool, urlStr string, req []byte, forward func([]byte), reject func())
+	hijackResponse           func(isHttps bool, urlStr string, rsp []byte, forward func([]byte), reject func())
+	hijackResponseEx         func(isHttps bool, urlStr string, req, rsp []byte, forward func([]byte), reject func())
 }
 
 type mitmConfigOpt func(config *mitmConfig)
@@ -93,6 +96,12 @@ func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modi
 func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, modified func([]byte), dropped func())) mitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.hijackResponse = h
+	}
+}
+
+func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]byte), func())) mitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.hijackResponseEx = h
 	}
 }
 
@@ -286,7 +295,7 @@ func startBridge(
 			return lowhttp.FixHTTPRequestOut(after)
 		}),
 		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rsp []byte, remoteAddr string) []byte {
-			if config.hijackResponse == nil {
+			if config.hijackResponse == nil && config.hijackResponseEx == nil {
 				return rsp
 			}
 
@@ -304,11 +313,29 @@ func startBridge(
 			}
 			var after = fixedResp
 			var isDropped = utils.NewBool(false)
-			config.hijackResponse(isHttps, urlStrIns.String(), fixedResp, func(bytes []byte) {
-				after = bytes
-			}, func() {
-				isDropped.IsSet()
-			})
+			if config.hijackResponse != nil {
+				config.hijackResponse(isHttps, urlStrIns.String(), fixedResp, func(bytes []byte) {
+					after = bytes
+				}, func() {
+					isDropped.IsSet()
+				})
+			}
+
+			if config.hijackResponseEx != nil {
+				reqRaw := httpctx.GetRequestBytes(req)
+				if reqRaw != nil {
+					reqRaw, _ = utils.HttpDumpWithBody(req, true)
+					if reqRaw != nil && httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip)){
+						reqRaw = lowhttp.DeletePacketEncoding(reqRaw)
+					}
+				}
+				config.hijackResponseEx(isHttps, urlStrIns.String(), reqRaw, fixedResp, func(bytes []byte) {
+					after = bytes
+				}, func() {
+					isDropped.IsSet()
+				})
+			}
+
 			return after
 		}),
 	)
