@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/go-dap"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -23,11 +22,6 @@ type onBreakpoint struct {
 	disconnect bool
 	terminated bool
 }
-
-func init() {
-	log.SetLevel(log.DebugLevel)
-}
-
 type helperForSetVariable struct {
 	t *testing.T
 	c *Client
@@ -927,7 +921,6 @@ func TestThreadsRequest(t *testing.T) {
 }
 
 func TestScopesAndVairablesRequest(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
 	runTest(t, "ScopesAndVairablesRequest", VariablesTestcase, func(server *DAPServer, client *Client, program string) {
 		runDebugSessionWithBPs(t, client, func() {
 			server.config.extraLibs = TestExtraLibs
@@ -1167,7 +1160,6 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 	})
 }
 func TestEvaluateCommandRequest(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
 	runTest(t, "EvaluateCommandRequest", SimpleYakTestCase, func(server *DAPServer, client *Client, program string) {
 		runDebugSessionWithBPs(t, client, func() {
 			server.config.extraLibs = TestExtraLibs
