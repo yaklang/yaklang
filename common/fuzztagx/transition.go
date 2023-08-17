@@ -36,7 +36,7 @@ func init() {
 		}
 	}
 	actionMap[stateEmptyLeft+stateMethod] = func(ctx *DataContext) { // OnMethodStart
-		newMethod := &FuzzTagMethod{funTable: ctx.funTable}
+		newMethod := &FuzzTagMethod{methodCtx: ctx.methodCtx}
 		node := ctx.stack.Peek()
 		switch ret := node.(type) {
 		case *Tag:
