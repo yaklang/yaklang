@@ -89,7 +89,9 @@ func (g *Ploadgen) parse() error {
 				payload.Len += len(m.Generator.Generate())
 			}
 		}
-		payload.Len = 1 << (math.Ilogb(float64(payload.Len+1)) + 1)
+		if payload.Len > 2 {
+			payload.Len = 1 << (math.Ilogb(float64(payload.Len-1)) + 1)
+		}
 	}
 
 	return nil

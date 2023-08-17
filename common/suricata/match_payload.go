@@ -90,11 +90,10 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 		}
 
 		// load prev matches for rel checker
-		var prevMatch []matched
-		loadIfMapEz(c.Value, &prevMatch, "prevMatch")
+		prevMatch, existed := c.GetPrevMatched(modifier)
 
 		// distance
-		if r.Distance != nil {
+		if r.Distance != nil && existed {
 			indexes = slices.DeleteFunc(indexes, func(m matched) bool {
 				for _, pm := range prevMatch {
 					if m.pos == pm.pos+pm.len+*r.Distance {
@@ -109,7 +108,7 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 		}
 
 		// within
-		if r.Within != nil {
+		if r.Within != nil && existed {
 			indexes = slices.DeleteFunc(indexes, func(m matched) bool {
 				for _, pm := range prevMatch {
 					if m.pos+m.len <= pm.pos+pm.len+*r.Within {
@@ -161,7 +160,7 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 
 		}
 
-		c.Value["prevMatch"] = indexes
+		c.SetPrevMatched(modifier, indexes)
 		return nil
 	}
 }
