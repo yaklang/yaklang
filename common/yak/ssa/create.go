@@ -110,7 +110,7 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 		Instrs:        make([]Instruction, 0),
 		Phis:          make([]*Phi, 0),
 		isSealed:      isSealed,
-		inCompletePhi: make(map[string]*Phi),
+		inCompletePhi: make([]*Phi, 0),
 		user:          make([]User, 0),
 	}
 	f.Blocks = append(f.Blocks, b)

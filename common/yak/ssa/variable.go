@@ -89,7 +89,7 @@ func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Val
 	// if block in sealedBlock
 	if !block.isSealed {
 		phi := NewPhi(f, block, variable)
-		block.inCompletePhi[variable] = phi
+		block.inCompletePhi = append(block.inCompletePhi, phi)
 		v = phi
 	} else if len(block.Preds) == 0 {
 		// this is enter block  in this function
