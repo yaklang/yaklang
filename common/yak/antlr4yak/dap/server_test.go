@@ -4,6 +4,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 
 var (
 	StopOnEntry = true
+	noChildren  = false
+	hasChildren = true
 )
 
 type onBreakpoint struct {
@@ -23,6 +26,71 @@ type onBreakpoint struct {
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+}
+
+type helperForSetVariable struct {
+	t *testing.T
+	c *Client
+}
+
+func (h *helperForSetVariable) expectSetVariable(ref int, name, value string) {
+	h.t.Helper()
+	h.expectSetVariable0(ref, name, value, false)
+}
+
+func (h *helperForSetVariable) failSetVariable(ref int, name, value, wantErrInfo string) {
+	h.t.Helper()
+	h.failSetVariable0(ref, name, value, wantErrInfo, false)
+}
+
+func (h *helperForSetVariable) failSetVariableAndStop(ref int, name, value, wantErrInfo string) {
+	h.t.Helper()
+	h.failSetVariable0(ref, name, value, wantErrInfo, true)
+}
+
+func (h *helperForSetVariable) evaluate(frameID int, expr, want string, hasRef bool) {
+	h.t.Helper()
+	h.c.EvaluateRequest(expr, frameID, "whatever")
+	got := h.c.ExpectEvaluateResponse(h.t)
+	checkEval(h.t, got, want, hasRef)
+}
+
+func (h *helperForSetVariable) evaluateRegex(frameID int, expr, want string, hasRef bool) {
+	h.t.Helper()
+	h.c.EvaluateRequest(expr, frameID, "whatever")
+	got := h.c.ExpectEvaluateResponse(h.t)
+	checkEvalRegex(h.t, got, want, hasRef)
+}
+
+func (h *helperForSetVariable) expectSetVariable0(ref int, name, value string, wantStop bool) {
+	h.t.Helper()
+
+	h.c.SetVariableRequest(ref, name, value)
+	if wantStop {
+		h.c.ExpectStoppedEvent(h.t)
+	}
+	if got, want := h.c.ExpectSetVariableResponse(h.t), value; got.Success != true || got.Body.Value != want {
+		h.t.Errorf("SetVariableRequest(%v, %v)=%#v, want {Success=true, Body.Value=%q", name, value, got, want)
+	}
+}
+
+func (h *helperForSetVariable) failSetVariable0(ref int, name, value, wantErrInfo string, wantStop bool) {
+	h.t.Helper()
+
+	h.c.SetVariableRequest(ref, name, value)
+	if wantStop {
+		h.c.ExpectStoppedEvent(h.t)
+	}
+	resp := h.c.ExpectErrorResponse(h.t)
+	if got := resp.Body.Error; !strings.Contains(got.Format, wantErrInfo) {
+		h.t.Errorf("got %#v, want error string containing %v", got, wantErrInfo)
+	}
+}
+
+func (h *helperForSetVariable) variables(ref int) *dap.VariablesResponse {
+	h.t.Helper()
+	h.c.VariablesRequest(ref)
+	return h.c.ExpectVariablesResponse(h.t)
 }
 
 func runTest(t *testing.T, name string, filepath string, test func(s *DAPServer, c *Client, program string)) {
@@ -139,6 +207,21 @@ func verifyConnStopped(t *testing.T, conn net.Conn) {
 	}
 }
 
+func validateEvaluateName(t *testing.T, client *Client, frameID int, got *dap.VariablesResponse, i int) {
+	t.Helper()
+	original := got.Body.Variables[i]
+	client.EvaluateRequest(original.EvaluateName, frameID, "this context will be ignored")
+	validated := client.ExpectEvaluateResponse(t)
+	if original.VariablesReference == 0 && validated.Body.VariablesReference != 0 ||
+		original.VariablesReference != 0 && validated.Body.VariablesReference == 0 {
+		t.Errorf("\ngot  varref=%d\nwant %d", validated.Body.VariablesReference, original.VariablesReference)
+	}
+
+	if original.Value != validated.Body.Result {
+		t.Errorf("\ngot  value=%q\nwant %q", validated.Body.Result, original.Value)
+	}
+}
+
 func checkErrorMessageId(er *dap.ErrorMessage, id int) bool {
 	return er != nil && er.Id == id
 }
@@ -219,6 +302,31 @@ func checkStackFramesNamed(testName string, t *testing.T, got *dap.StackTraceRes
 			t.Errorf("%s\ngot  Name=%s\nwant %s", testName, got.Body.StackFrames[0].Name, wantStartName)
 		}
 	}
+}
+
+func checkEval(t *testing.T, got *dap.EvaluateResponse, value string, hasRef bool) (ref int) {
+	t.Helper()
+	if got.Body.Result != value || (got.Body.VariablesReference > 0) != hasRef {
+		t.Errorf("\ngot  %#v\nwant Result=%q hasRef=%t", got, value, hasRef)
+	}
+	return got.Body.VariablesReference
+}
+
+func checkEvalIndexed(t *testing.T, got *dap.EvaluateResponse, value string, hasRef bool, indexed, named int) (ref int) {
+	t.Helper()
+	if got.Body.Result != value || (got.Body.VariablesReference > 0) != hasRef || got.Body.IndexedVariables != indexed || got.Body.NamedVariables != named {
+		t.Errorf("\ngot  %#v\nwant Result=%q hasRef=%t IndexedVariables=%d NamedVariables=%d", got, value, hasRef, indexed, named)
+	}
+	return got.Body.VariablesReference
+}
+
+func checkEvalRegex(t *testing.T, got *dap.EvaluateResponse, valueRegex string, hasRef bool) (ref int) {
+	t.Helper()
+	matched, _ := regexp.MatchString(valueRegex, got.Body.Result)
+	if !matched || (got.Body.VariablesReference > 0) != hasRef {
+		t.Errorf("\ngot  %#v\nwant Result=%q hasRef=%t", got, valueRegex, hasRef)
+	}
+	return got.Body.VariablesReference
 }
 
 func checkVar(t *testing.T, got *dap.VariablesResponse, i int, name, evalName, value, typ string, useExactMatch, hasRef bool, indexed, named int) (ref int) {
@@ -668,8 +776,8 @@ func TestPreSetBreakPoint(t *testing.T) {
 		client.VariablesRequest(1) // 从varRef=1 即Globals作用于中获取变量
 		args := client.ExpectVariablesResponse(t)
 		checkChildren(t, args, "Globals", 3)
-		checkVarExact(t, args, 0, "a", "a", "1", "int", false)
-		checkVarExact(t, args, 1, "b", "b", "2", "int", false)
+		checkVarExact(t, args, 0, "a", "a", "1", "int", noChildren)
+		checkVarExact(t, args, 1, "b", "b", "2", "int", noChildren)
 
 		client.ContinueRequest(1)
 		ctResp := client.ExpectContinueResponse(t)
@@ -815,5 +923,246 @@ func TestThreadsRequest(t *testing.T) {
 				},
 				disconnect: true,
 			}})
+	})
+}
+
+func TestScopesAndVairablesRequest(t *testing.T) {
+	log.SetLevel(log.ErrorLevel)
+	runTest(t, "ScopesAndVairablesRequest", VariablesTestcase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			server.config.extraLibs = TestExtraLibs
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{28},
+			[]onBreakpoint{{
+				execute: func() {
+					var ref int
+					frameID := 1
+
+					client.StackTraceRequest(0, 0, 20)
+					stack := client.ExpectStackTraceResponse(t)
+					checkStackFramesExact(t, stack, "foobar", 28, 0, 2, 2)
+
+					client.ScopesRequest(1)
+					scopes := client.ExpectScopesResponse(t)
+					checkScope(t, scopes, 0, "Globals", 1)
+					checkScope(t, scopes, 1, "Locals1", 2)
+
+					// Globals
+					client.VariablesRequest(1)
+					globals := client.ExpectVariablesResponse(t)
+
+					checkVarRegex(t, globals, 0, "foobar", "foobar", "function", "yakvm.Function", noChildren)
+					checkVarExact(t, globals, 1, "p1", "p1", "10", "int", noChildren)
+
+					// Locals2
+					locals2ScopeRef := 3
+					client.VariablesRequest(locals2ScopeRef)
+					locals := client.ExpectVariablesResponse(t)
+					checkChildren(t, locals, "Locals2", 26)
+
+					// checkVarExact(t, locals, -1, "a1", "a1", `foofoofoofoofoofoo`, "string", noChildren)
+					// bool
+					checkVarExact(t, locals, -1, "b1", "b1", "true", "bool", noChildren)
+					checkVarExact(t, locals, -1, "b2", "b2", "false", "bool", noChildren)
+
+					// int
+					checkVarExact(t, locals, -1, "a2", "a2", "6", "int", noChildren)
+					// neg turn into int64
+					checkVarExact(t, locals, -1, "neg", "neg", "-1", "int64", noChildren)
+					// int8
+					checkVarExact(t, locals, -1, "i8", "i8", "1", "int", noChildren)
+					// uint8
+					checkVarExact(t, locals, -1, "u8", "u8", "0xff", "uint8", noChildren)
+					// uint16
+					checkVarExact(t, locals, -1, "u16", "u16", "65535", "int", noChildren)
+					// uint32
+					checkVarExact(t, locals, -1, "u32", "u32", "4294967295", "int", noChildren)
+					// uint64
+					checkVarExact(t, locals, -1, "u64", "u64", "9223372036854775807", "int", noChildren)
+					// float64
+					checkVarExact(t, locals, -1, "f1", "f1", "1.2", "float64", noChildren)
+					// string
+					checkVarExact(t, locals, -1, "a10", "a10", `"ofo"`, "string", noChildren)
+					// slice
+					ref = checkVarRegex(t, locals, -1, "ba", "ba", `\[\]int\{`, `\[\]int`, hasChildren)
+					client.VariablesRequest(ref)
+					ba := client.ExpectVariablesResponse(t)
+					checkChildren(t, ba, "ba", 200)
+
+					ref = checkVarExact(t, locals, -1, "a4", "a4", "[]int{1, 2}", "[]int", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a4 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a4, "a4", 2)
+						checkVarExact(t, a4, 0, "[0]", "a4[0]", "1", "int", noChildren)
+						checkVarExact(t, a4, 1, "[1]", "a4[1]", "2", "int", noChildren)
+					}
+					ref = checkVarExact(t, locals, -1, "a5", "a5", "[]int{1, 2, 3, 4, 5}", "[]int", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a5 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a5, "a5", 5)
+						checkVarExact(t, a5, 0, "[0]", "a5[0]", "1", "int", noChildren)
+						checkVarExact(t, a5, 4, "[4]", "a5[4]", "5", "int", noChildren)
+						validateEvaluateName(t, client, frameID, a5, 0)
+						validateEvaluateName(t, client, frameID, a5, 1)
+					}
+					ref = checkVarExact(t, locals, -1, "a12", "a12", `[]dap.FooBar{dap.FooBar{Baz: 4, Bur: "d"}, dap.FooBar{Baz: 5, Bur: "e"}}`, "[]dap.FooBar", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a12 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a12, "a12", 2)
+						checkVarExact(t, a12, 0, "[0]", "a12[0]", `dap.FooBar{Baz: 4, Bur: "d"}`, "dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a12, 1, "[1]", "a12[1]", `dap.FooBar{Baz: 5, Bur: "e"}`, "dap.FooBar", hasChildren)
+						if ref > 0 {
+							client.VariablesRequest(ref)
+							a12_1 := client.ExpectVariablesResponse(t)
+							checkChildren(t, a12_1, "a12[1]", 2)
+							checkVarExact(t, a12_1, 0, "Baz", "a12[1].Baz", "5", "int", noChildren)
+							checkVarExact(t, a12_1, 1, "Bur", "a12[1].Bur", `"e"`, "string", noChildren)
+							validateEvaluateName(t, client, frameID, a12_1, 0)
+							validateEvaluateName(t, client, frameID, a12_1, 1)
+						}
+					}
+					ref = checkVarExact(t, locals, -1, "a13", "a13", `[]*dap.FooBar{&dap.FooBar{Baz: 6, Bur: "f"}, &dap.FooBar{Baz: 7, Bur: "g"}, &dap.FooBar{Baz: 8, Bur: "h"}}`, "[]*dap.FooBar", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a13 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a13, "a13", 3)
+						checkVarExact(t, a13, 0, "[0]", "a13[0]", `&dap.FooBar{Baz: 6, Bur: "f"}`, "*dap.FooBar", hasChildren)
+						checkVarExact(t, a13, 1, "[1]", "a13[1]", `&dap.FooBar{Baz: 7, Bur: "g"}`, "*dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a13, 2, "[2]", "a13[2]", `&dap.FooBar{Baz: 8, Bur: "h"}`, "*dap.FooBar", hasChildren)
+						if ref > 0 {
+							client.VariablesRequest(ref)
+							a13_2 := client.ExpectVariablesResponse(t)
+							checkChildren(t, a13_2, "a13[2]", 2)
+							checkVarExact(t, a13_2, 0, "Baz", "a13[2].Baz", "8", "int", noChildren)
+							checkVarExact(t, a13_2, 1, "Bur", "a13[2].Bur", `"h"`, "string", noChildren)
+							validateEvaluateName(t, client, frameID, a13_2, 0)
+							validateEvaluateName(t, client, frameID, a13_2, 1)
+						}
+					}
+
+					ref = checkVarExact(t, locals, -1, "ni", "ni", `[]interface {}{[]interface {}{123}}`, `[]interface {}`, hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						ni := client.ExpectVariablesResponse(t)
+						checkChildren(t, ni, "ni", 1)
+						ref = checkVarExact(t, ni, 0, "[0]", "ni[0]", `[]interface {}{123}`, `interface {}`, hasChildren)
+						if ref > 0 {
+							client.VariablesRequest(ref)
+							ni_0 := client.ExpectVariablesResponse(t)
+							checkChildren(t, ni_0, "ni[0]", 1)
+							checkVarExact(t, ni_0, 0, "[0]", "ni[0][0]", `123`, `interface {}`, noChildren)
+						}
+					}
+
+					ref = checkVarExact(t, locals, -1, "ms", "ms", `dap.Nest{Level: 0, Nest: &dap.Nest{Level: 1, Nest: &dap.Nest{Level: 2, Nest: &dap.Nest{Level: 3, Nest: &dap.Nest{Level: 4, Nest: (*dap.Nest)(nil)}}}}}`, "dap.Nest", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						ms := client.ExpectVariablesResponse(t)
+						checkChildren(t, ms, "ms", 2)
+						checkVarExact(t, ms, 0, "Level", "ms.Level", "0", "int", noChildren)
+						ref = checkVarExact(t, ms, 1, "Nest", "ms.Nest", `&dap.Nest{Level: 1, Nest: &dap.Nest{Level: 2, Nest: &dap.Nest{Level: 3, Nest: &dap.Nest{Level: 4, Nest: (*dap.Nest)(nil)}}}}`, "*dap.Nest", hasChildren)
+						validateEvaluateName(t, client, frameID, ms, 0)
+						validateEvaluateName(t, client, frameID, ms, 1)
+						if ref > 0 {
+							client.VariablesRequest(ref)
+							ms_1 := client.ExpectVariablesResponse(t)
+							checkChildren(t, ms_1, "ms.Nest", 2)
+							checkVarExact(t, ms_1, 0, "Level", "ms.Nest.Level", "1", "int", noChildren)
+							ref = checkVarExact(t, ms_1, 1, "Nest", "ms.Nest.Nest", `&dap.Nest{Level: 2, Nest: &dap.Nest{Level: 3, Nest: &dap.Nest{Level: 4, Nest: (*dap.Nest)(nil)}}}`, "*dap.Nest", hasChildren)
+							validateEvaluateName(t, client, frameID, ms_1, 0)
+							validateEvaluateName(t, client, frameID, ms_1, 1)
+							if ref > 0 {
+								client.VariablesRequest(ref)
+								ms_1_1 := client.ExpectVariablesResponse(t)
+								checkChildren(t, ms_1_1, "ms.Nest.Nest", 2)
+								checkVarExact(t, ms_1_1, 0, "Level", "ms.Nest.Nest.Level", "2", "int", noChildren)
+								ref = checkVarExact(t, ms_1_1, 1, "Nest", "ms.Nest.Nest.Nest", `&dap.Nest{Level: 3, Nest: &dap.Nest{Level: 4, Nest: (*dap.Nest)(nil)}}`, "*dap.Nest", hasChildren)
+								validateEvaluateName(t, client, frameID, ms_1_1, 0)
+								validateEvaluateName(t, client, frameID, ms_1_1, 1)
+								if ref > 0 {
+									client.VariablesRequest(ref)
+									ms_1_1_1 := client.ExpectVariablesResponse(t)
+									checkChildren(t, ms_1_1_1, "ms.Nest.Nest.Nest", 2)
+									checkVarExact(t, ms_1_1_1, 0, "Level", "ms.Nest.Nest.Nest.Level", "3", "int", noChildren)
+									ref = checkVarExact(t, ms_1_1_1, 1, "Nest", "ms.Nest.Nest.Nest.Nest", `&dap.Nest{Level: 4, Nest: (*dap.Nest)(nil)}`, "*dap.Nest", hasChildren)
+								}
+							}
+						}
+					}
+
+					// array
+					ref = checkVarExact(t, locals, -1, "a11", "a11", `[3]dap.FooBar{dap.FooBar{Baz: 1, Bur: "a"}, dap.FooBar{Baz: 2, Bur: "b"}, dap.FooBar{Baz: 3, Bur: "c"}}`, "[3]dap.FooBar", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a11 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a11, "a11", 3)
+						checkVarExact(t, a11, 0, "[0]", "a11[0]", `dap.FooBar{Baz: 1, Bur: "a"}`, "dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a11, 1, "[1]", "a11[1]", `dap.FooBar{Baz: 2, Bur: "b"}`, "dap.FooBar", hasChildren)
+						if ref > 0 {
+							client.VariablesRequest(ref)
+							a11_1 := client.ExpectVariablesResponse(t)
+							checkChildren(t, a11_1, "a11[1]", 2)
+							checkVarExact(t, a11_1, 0, "Baz", "a11[1].Baz", "2", "int", noChildren)
+							checkVarExact(t, a11_1, 1, "Bur", "a11[1].Bur", `"b"`, "string", noChildren)
+							validateEvaluateName(t, client, frameID, a11_1, 0)
+							validateEvaluateName(t, client, frameID, a11_1, 1)
+						}
+						checkVarExact(t, a11, 2, "[2]", "a11[2]", `dap.FooBar{Baz: 3, Bur: "c"}`, "dap.FooBar", hasChildren)
+					}
+
+					// struct
+					ref = checkVarExact(t, locals, -1, "a6", "a6", `dap.FooBar{Baz: 8, Bur: "word"}`, "dap.FooBar", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a6 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a6, "a6", 2)
+						checkVarExact(t, a6, 0, "Baz", "a6.Baz", "8", "int", noChildren)
+						checkVarExact(t, a6, 1, "Bur", "a6.Bur", `"word"`, "string", noChildren)
+					}
+					ref = checkVarExact(t, locals, -1, "a8", "a8", `dap.FooBar2{Bur: 10, Baz: "feh"}`, "dap.FooBar2", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a8 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a8, "a8", 2)
+						checkVarExact(t, a8, 0, "Bur", "a8.Bur", "10", "int", noChildren)
+						checkVarExact(t, a8, 1, "Baz", "a8.Baz", `"feh"`, "string", noChildren)
+					}
+
+					// struct ptr
+					ref = checkVarExact(t, locals, -1, "a7", "a7", `&dap.FooBar{Baz: 5, Bur: "strum"}`, "*dap.FooBar", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						a7 := client.ExpectVariablesResponse(t)
+						checkChildren(t, a7, "a7", 2)
+						checkVarExact(t, a7, 0, "Baz", "a7.Baz", "5", "int", noChildren)
+						checkVarExact(t, a7, 1, "Bur", "a7.Bur", `"strum"`, "string", noChildren)
+						validateEvaluateName(t, client, frameID, a7, 0)
+						validateEvaluateName(t, client, frameID, a7, 1)
+
+					}
+
+					// map
+					ref = checkVarExact(t, locals, -1, "mp", "mp", `map[int]interface {}{"1": 42, "2": 43}`, "map[int]interface {}", hasChildren)
+					if ref > 0 {
+						client.VariablesRequest(ref)
+						mp := client.ExpectVariablesResponse(t)
+						checkChildren(t, mp, "mp", 4)
+						checkVarExact(t, mp, 0, "[key 0]", "", "1", "int", noChildren)
+						checkVarExact(t, mp, 1, "[value 0]", "mp[1]", "42", "interface {}", noChildren)
+						checkVarExact(t, mp, 2, "[key 1]", "", "2", "int", noChildren)
+						checkVarExact(t, mp, 3, "[value 1]", "mp[2]", "43", "interface {}", noChildren)
+					}
+
+					// nil
+					checkVarExact(t, locals, -1, "a9", "a9", "(*dap.FooBar)(nil)", "*dap.FooBar", noChildren)
+
+				},
+				disconnect: false,
+			}},
+		)
 	})
 }

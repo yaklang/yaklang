@@ -1,0 +1,33 @@
+foobar = func() {
+    a1   = "foofoofoofoofoofoo"
+    a2   = 6
+    a3   = 7.23
+    a4   = []int{1, 2}
+    a5   = []int{1, 2, 3, 4, 5}
+    a6   = get_a6()
+    a7   = get_a7()
+    a8   = get_a8()
+    a9   = get_a9()
+    a10  = a1[2:5]
+    a11  = get_a11()
+    a12  = get_a12()
+    a13  = get_a13()
+    b1   = true 
+    b2   = false
+    neg  = -1
+    i8   = int8(1)
+    u8   = uint8(255)
+    u16  = uint16(65535)
+    u32  = uint32(4294967295)
+    u64  = uint64(9223372036854775807)
+    f1   = float64(1.2)
+    ba   = make([]int, 200, 200)
+    ms   = get_ms()
+    mp   = map[int]var{1: 42, 2: 43}
+    ni   = []var([]var{[]var{123}})
+    println(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, b1, b2, neg, i8, u8, u16, u32, u64, f1, ba, ni, ms, mp)
+}
+
+p1 = 10
+
+foobar()

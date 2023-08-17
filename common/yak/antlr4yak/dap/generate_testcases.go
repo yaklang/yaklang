@@ -12,6 +12,7 @@ var (
 	FuncCallTestcase  = "func_call.yak"
 	IncrementTestcase = "increment.yak"
 	GoroutineTestcase = "goroutine.yak"
+	VariablesTestcase = "variables.yak"
 )
 
 func GetYakTestCasePath(p string) string {
