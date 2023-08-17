@@ -325,7 +325,7 @@ func startBridge(
 				reqRaw := httpctx.GetRequestBytes(req)
 				if reqRaw != nil {
 					reqRaw, _ = utils.HttpDumpWithBody(req, true)
-					if reqRaw != nil && httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip)){
+					if reqRaw != nil && !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip) {
 						reqRaw = lowhttp.DeletePacketEncoding(reqRaw)
 					}
 				}
