@@ -73,6 +73,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 			users: []User{},
 		},
 		currtenPos:   &Position{},
+		err:          make(SSAErrors, 0),
 		currentBlock: nil,
 	}
 	p.funcs = append(p.funcs, f)

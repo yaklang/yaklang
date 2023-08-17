@@ -32,10 +32,14 @@ func (b *builder) build(ast *yak.YaklangParser) {
 func (b *builder) buildStatementList(stmtlist *yak.StatementListContext) {
 	recover := b.SetRange(stmtlist.BaseParserRuleContext)
 	defer recover()
-
-	for _, stmt := range stmtlist.AllStatement() {
-		if stmt, ok := stmt.(*yak.StatementContext); ok {
-			b.buildStatement(stmt)
+	allstmt := stmtlist.AllStatement()
+	if len(allstmt) == 0 {
+		b.NewError(Warn, "empty statement list")
+	} else {
+		for _, stmt := range allstmt {
+			if stmt, ok := stmt.(*yak.StatementContext); ok {
+				b.buildStatement(stmt)
+			}
 		}
 	}
 }
@@ -525,6 +529,8 @@ func (b *builder) buildBlock(stmt *yak.BlockContext) {
 	defer recover()
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(s)
+	} else {
+		b.NewError(Warn, "empty block")
 	}
 }
 
@@ -770,7 +776,7 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		} else if b.CanBuildFreeValue(text) {
 			return b.BuildFreeValue(text)
 		} else {
-			fmt.Printf("warn!! Expression: undefine value %v\n", s.GetText())
+			b.NewError(Warn, "Expression: undefine value %s", s.GetText())
 			return nil
 		}
 	}
@@ -851,7 +857,8 @@ func (b *builder) buildExpression(stmt *yak.ExpressionContext) Value {
 		op0 := getValue(0)
 		op1 := getValue(1)
 		if op0 == nil || op1 == nil {
-			panic("additive binary operator need two expression")
+			b.NewError(Error, "additive binary operator need two expression")
+			return nil
 		}
 		var opcode yakvm.OpcodeFlag
 		switch op.GetText() {
@@ -1229,12 +1236,16 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 	}
 
 	//TODO: slice typed literal
-	//TODO: type literal
-	//TODO: slice literal
+
+	// type literal
+	if _, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
+		// b.buildTypeLiteral(s)
+		b.NewError(Warn, "this expression is a type")
+	}
 
 	// mixed
 
-	panic("Not Implemented Expr Parse YET: " + stmt.GetText())
+	// panic("Not Implemented Expr Parse YET: " + stmt.GetText())
 	return nil
 }
 
@@ -1262,7 +1273,7 @@ func (b *builder) buildNumericLiteral(stmt *yak.NumericLiteralContext) Value {
 			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 		}
 		if err != nil {
-			fmt.Printf("cannot parse `%s` as integer literal... is too large for int64:%v", originIntStr, err)
+			b.NewError(Error, "const parse %s as integer literal... is to large for int64: %v", originIntStr, err)
 		}
 		return NewConst(resultInt64)
 	}
@@ -1276,7 +1287,7 @@ func (b *builder) buildNumericLiteral(stmt *yak.NumericLiteralContext) Value {
 		var f, _ = strconv.ParseFloat(lit, 64)
 		return NewConst(f)
 	}
-	fmt.Printf("cannot parse num for literal: %s", stmt.GetText())
+	b.NewError(Error, "cannot parse num for literal: %s", stmt.GetText())
 	return nil
 }
 
