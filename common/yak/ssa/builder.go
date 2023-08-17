@@ -14,8 +14,12 @@ import (
 
 type builder struct {
 	*Function
-	next   *builder
+
 	target *target // for break and continue
+	// defer function call
+	deferexpr []*Call // defer funciton, reverse  for-range
+
+	next *builder
 }
 
 // entry point
@@ -1393,6 +1397,15 @@ func (b *builder) buildExpressionListMultiline(stmt *yak.ExpressionListMultiline
 	return exprs
 }
 
+func (b *builder) finish() {
+	// set defer function
+	b.currentBlock = b.Blocks[len(b.Blocks)-1]
+	for i := len(b.deferexpr) - 1; i >= 0; i-- {
+		b.emitCall(b.deferexpr[i])
+	}
+	b.Finish()
+}
+
 func (pkg *Package) build() {
 	main := pkg.NewFunction("yak-main")
 	b := builder{
@@ -1401,7 +1414,7 @@ func (pkg *Package) build() {
 		target:   nil,
 	}
 	b.build(pkg.ast)
-	b.Finish()
+	b.finish()
 }
 
 func (pkg *Package) Build() { pkg.buildOnece.Do(pkg.build) }

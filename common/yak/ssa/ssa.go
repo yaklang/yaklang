@@ -98,9 +98,6 @@ type Function struct {
 	// anonymous function in this function
 	AnonFuncs []*Function
 
-	// defer function call
-	deferexpr []*Call // defer funciton, reverse  for-range
-
 	// if this function is anonFunc
 	parent     *Function  // parent function if anonymous function; nil if global function.
 	FreeValues []Value    // the value, captured variable form parent-function,
