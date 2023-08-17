@@ -37,8 +37,9 @@ func Parse(raw interface{}, methodCtx *MethodContext) ([]Node, error) {
 					_, i = ctx.Pop()
 				}
 				if i != -1 {
-					ctx.PushData(NewStringNode(ctx.source[i:ctx.currentIndex]))
+					ctx.PushData(NewStringNode(ctx.sourceBack[i:ctx.currentIndex]))
 					ctx.preIndex = ctx.currentIndex
+					ctx.currentIndex--
 				}
 			}
 		}()
