@@ -16,6 +16,9 @@ var (
 	YakDebugCompiler CompilerWrapperInterface
 )
 
+type LinesFirstCodeStateMap = map[int]*CodeState
+type BreakpointMap = map[int]*Breakpoint
+
 type Debugger struct {
 	vm           *VirtualMachine
 	once         sync.Once
@@ -31,18 +34,20 @@ type Debugger struct {
 	state       string     // 表示当前处于哪个函数
 	lock        sync.Mutex // 用于ShouldCallback的同步
 
-	sourceCode                string
-	sourceCodeLines           []string
-	codes                     map[string][]*Code
-	maxLine                   int
-	codePointer               int
-	linePointer               int
-	linesFirstCodeAndStateMap map[int]*CodeState // 每行第一个opcode索引
+	sourceFilePath                string
+	sourceCode                    string
+	sourceCodeLines               []string
+	codes                         map[string][]*Code // state -> []code
+	codePointer                   int
+	linePointer                   int
+	currentLinesFirstCodeStateMap LinesFirstCodeStateMap            // 每行第一个opcode索引
+	lineFirstCodeStateMap         map[string]LinesFirstCodeStateMap // 文件路径 -> LinesFirstCodeStateMap
 
 	// 断点
-	breakPointCount   int32
-	currentBreakPoint *Breakpoint         // 当前断点
-	breakPoints       map[int]*Breakpoint // 行 -> 断点
+	breakPointCount      int32
+	currentBreakPoint    *Breakpoint              // 当前断点
+	currentBreakPointMap BreakpointMap            // 行 -> 断点
+	breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
 
 	// 用于步过，步入，步出
 	jmpIndex    int
@@ -105,24 +110,26 @@ type StackTraces struct {
 func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, callback func(*Debugger)) *Debugger {
 
 	debugger := &Debugger{
-		started:                   false,
-		finished:                  false,
-		jmpIndex:                  -1,
-		StackTraces:               map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
-		ThreadStackTrace:          make(map[int]*StepStack, 0),
-		vm:                        vm,
-		startWG:                   sync.WaitGroup{},
-		wg:                        sync.WaitGroup{},
-		initFunc:                  init,
-		callbackFunc:              callback,
-		sourceCode:                sourceCode,
-		sourceCodeLines:           strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
-		codes:                     make(map[string][]*Code),
-		linePointer:               0,
-		linesFirstCodeAndStateMap: make(map[int]*CodeState),
+		started:               false,
+		finished:              false,
+		jmpIndex:              -1,
+		StackTraces:           map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
+		ThreadStackTrace:      make(map[int]*StepStack, 0),
+		vm:                    vm,
+		startWG:               sync.WaitGroup{},
+		wg:                    sync.WaitGroup{},
+		initFunc:              init,
+		callbackFunc:          callback,
+		sourceCode:            sourceCode,
+		sourceCodeLines:       strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
+		codes:                 make(map[string][]*Code),
+		linePointer:           0,
+		lineFirstCodeStateMap: make(map[string]LinesFirstCodeStateMap),
+		breakpointMap:         make(map[string]BreakpointMap),
+		// currentLinesFirstCodeStateMap: make(LinesFirstCodeStateMap),
 
 		Reference:                    NewReference(),
-		breakPoints:                  make(map[int]*Breakpoint, 0),
+		currentBreakPointMap:         make(map[int]*Breakpoint, 0),
 		observeExpressions:           make(map[string]*Value),
 		observeBreakPointExpressions: make(map[string]*Value),
 	}
@@ -173,20 +180,55 @@ func (g *Debugger) Init(codes []*Code) {
 		}
 	}
 
+	hasSet := false
+
 	for state, codes := range g.codes {
 		for index, code := range codes {
-			if _, ok := g.linesFirstCodeAndStateMap[code.StartLineNumber]; !ok {
-				g.linesFirstCodeAndStateMap[code.StartLineNumber] = NewCodeState(index, state)
-				g.maxLine = code.StartLineNumber
+			current, ok := g.lineFirstCodeStateMap[*code.SourceCodeFilePath]
+			if !ok {
+				current = make(LinesFirstCodeStateMap)
+				g.lineFirstCodeStateMap[*code.SourceCodeFilePath] = current
+			}
+
+			if _, ok := current[code.StartLineNumber]; !ok {
+				current[code.StartLineNumber] = NewCodeState(index, state)
+			}
+
+			// 设置currentLinesFirstCodeStateMap和sourceFilePath
+			// 使用比较笨的办法,找到传入的sourceCode与code绑定的sourceCode相同的第一个code
+			if !hasSet && code.SourceCodePointer != nil && *code.SourceCodePointer == g.sourceCode {
+				hasSet = true
+				g.SwitchByOtherFileOpcode(code)
 			}
 		}
 	}
+
 }
 
 func (g *Debugger) InitCallBack() {
 	g.once.Do(func() {
 		g.initFunc(g)
 	})
+}
+
+func (g *Debugger) SwitchByOtherFileOpcode(code *Code) {
+	newFilePath := *code.SourceCodeFilePath
+	if newFilePath != g.sourceFilePath {
+		g.sourceFilePath = newFilePath
+		g.sourceCode = *code.SourceCodePointer
+		g.sourceCodeLines = strings.Split(strings.ReplaceAll(g.sourceCode, "\r", ""), "\n")
+
+		// 修改currentLinesFirstCodeStateMap
+		g.currentLinesFirstCodeStateMap = g.lineFirstCodeStateMap[newFilePath]
+
+		// 修改currentBreakPointMap
+		bpm, ok := g.breakpointMap[newFilePath]
+		if !ok {
+			bpm = make(BreakpointMap)
+			g.breakpointMap[newFilePath] = bpm
+		}
+		g.currentBreakPointMap = bpm
+	}
 }
 
 func (g *Debugger) StartWGAdd() {
@@ -235,7 +277,7 @@ func (g *Debugger) CurrentBreakPoint() *Breakpoint {
 }
 
 func (g *Debugger) Breakpoints() map[int]*Breakpoint {
-	return g.breakPoints
+	return g.currentBreakPointMap
 }
 
 func (g *Debugger) SourceCodeLines() []string {
@@ -417,7 +459,7 @@ func (g *Debugger) GetCode(state string, codeIndex int) *Code {
 }
 
 func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
-	if codeState, ok := g.linesFirstCodeAndStateMap[lineIndex]; ok {
+	if codeState, ok := g.currentLinesFirstCodeStateMap[lineIndex]; ok {
 		return g.GetCode(codeState.state, codeState.codeIndex), codeState.codeIndex, codeState.state
 	} else {
 		return nil, -1, ""
@@ -528,9 +570,9 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 }
 
 func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) (int, error) {
-	if _, ok := g.breakPoints[lineIndex]; !ok {
+	if _, ok := g.currentBreakPointMap[lineIndex]; !ok {
 		bp := g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
-		g.breakPoints[lineIndex] = bp
+		g.currentBreakPointMap[lineIndex] = bp
 		ref := g.AddBreakPointRef(bp)
 		return ref, nil
 	} else {
@@ -552,23 +594,23 @@ func (g *Debugger) SetNormalBreakPoint(lineIndex int) (int, error) {
 }
 
 func (g *Debugger) ClearAllBreakPoints() {
-	g.breakPoints = make(map[int]*Breakpoint, 0)
+	g.currentBreakPointMap = make(map[int]*Breakpoint, 0)
 }
 
 func (g *Debugger) ClearBreakpointsInLine(lineIndex int) {
-	if _, ok := g.breakPoints[lineIndex]; ok {
-		delete(g.breakPoints, lineIndex)
+	if _, ok := g.currentBreakPointMap[lineIndex]; ok {
+		delete(g.currentBreakPointMap, lineIndex)
 	}
 }
 
 func (g *Debugger) EnableAllBreakPoints() {
-	for _, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.currentBreakPointMap {
 		breakpoint.On = true
 	}
 }
 
 func (g *Debugger) EnableBreakpointsInLine(lineIndex int) {
-	for _, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.currentBreakPointMap {
 		if breakpoint.LineIndex == lineIndex {
 			breakpoint.On = true
 		}
@@ -576,13 +618,13 @@ func (g *Debugger) EnableBreakpointsInLine(lineIndex int) {
 }
 
 func (g *Debugger) DisableAllBreakPoints() {
-	for _, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.currentBreakPointMap {
 		breakpoint.On = false
 	}
 }
 
 func (g *Debugger) DisableBreakpointsInLine(lineIndex int) {
-	for _, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.currentBreakPointMap {
 		if breakpoint.LineIndex == lineIndex {
 			breakpoint.On = false
 		}
@@ -662,6 +704,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	code := g.GetCode(state, codeIndex)
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
+
+	g.SwitchByOtherFileOpcode(code)
 
 	stackTrace := g.CurrentStackTrace()
 
@@ -764,7 +808,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	triggered := false
 
 	// 如果存在于断点列表中，则回调
-	for _, breakpoint := range g.breakPoints {
+	for _, breakpoint := range g.currentBreakPointMap {
 
 		// 如果断点被禁用则不应该触发
 		if !breakpoint.On {
