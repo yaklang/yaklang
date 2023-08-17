@@ -174,7 +174,7 @@ func (c *Client) ExpectOutputEventDetaching(t *testing.T) *dap.OutputEvent {
 
 func (c *Client) ExpectOutputEventHelpInfo(t *testing.T) *dap.OutputEvent {
 	t.Helper()
-	return c.ExpectOutputEventRegex(t, `Type 'help' for help info.`)
+	return c.ExpectOutputEventRegex(t, `Type 'dbg help' for help info.`)
 }
 
 func (c *Client) ExpectInvisibleErrorResponse(t *testing.T) *dap.ErrorResponse {
