@@ -248,7 +248,7 @@ func (g *Debugger) InRootState() bool {
 
 func (g *Debugger) StateName() string {
 	frame := g.frame
-	stateName := "main"
+	stateName := "__yak_main__"
 	if frame == nil {
 		return "unknown"
 	}

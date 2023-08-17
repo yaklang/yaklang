@@ -236,7 +236,7 @@ func (n *Engine) ExecYakc(ctx context.Context, b []byte, key []byte, code string
 
 	n.vm.SetSymboltable(symbolTable)
 	err = n.vm.Exec(ctx, func(frame *yakvm.Frame) {
-		frame.SetVerbose("main")
+		frame.SetVerbose("__yak_main__")
 		frame.Exec(codes)
 	})
 	return err

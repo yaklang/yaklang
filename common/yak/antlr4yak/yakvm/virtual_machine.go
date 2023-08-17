@@ -236,7 +236,7 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 
 func (v *VirtualMachine) ExecYakCode(ctx context.Context, sourceCode string, codes []*Code, flags ...ExecFlag) error {
 	return v.Exec(ctx, func(frame *Frame) {
-		frame.SetVerbose("main")
+		frame.SetVerbose("__yak_main__")
 		frame.SetOriginCode(sourceCode)
 		frame.Exec(codes)
 	}, flags...)
