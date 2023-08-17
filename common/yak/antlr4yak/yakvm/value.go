@@ -1181,7 +1181,12 @@ func AsDebugString(i interface{}) string {
 	} else if kind == reflect.Struct {
 		content := make([]string, refV.NumField())
 		for i := 0; i < refV.NumField(); i++ {
-			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, AsDebugString(refV.Field(i).Interface()))
+			field := refV.Field(i)
+			fieldStr := "<Unavailable>"
+			if field.IsValid() && field.CanInterface() {
+				fieldStr = AsDebugString(field.Interface())
+			}
+			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, fieldStr)
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
 	}
