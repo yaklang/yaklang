@@ -49,10 +49,10 @@ func (i *If) InferenceType() {
 	// type check
 	condtyp := cond.GetType()
 	if len(condtyp) == 0 {
-		fmt.Printf("warn: if cond type is nil\n")
+		i.NewError(Warn, "if cond type is nil\n")
 	} else if len(condtyp) == 1 {
 		if cond.GetType()[0] != basicTypesKind[Bool] {
-			fmt.Printf("warn: if condition must be bool\n")
+			i.NewError(Warn, "if condition must be bool\n")
 		}
 	} else {
 		// handler if multiple possible type
@@ -123,7 +123,10 @@ func (b *BinOp) InferenceType() {
 		if x.String() == y.String() {
 			typs = append(typs, x)
 			return true
-		} else if x, ok := x.(*types.Basic); ok {
+		} else {
+			b.NewError(Warn, "binary operation type not same")
+		}
+		if x, ok := x.(*types.Basic); ok {
 			if y, ok := y.(*types.Basic); ok {
 				// x y all basic
 				var max types.BasicKind

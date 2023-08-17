@@ -111,6 +111,8 @@ type Function struct {
 	instReg    map[Instruction]string             // instruction -> virtual register
 	currentDef map[string]map[*BasicBlock]*Values // currentDef[variable][block]value
 
+	// ssa error
+	err SSAErrors
 
 	currtenPos *Position
 	// for build
