@@ -521,7 +521,13 @@ func (v *Value) Bool() bool {
 	}
 	return false
 }
-
+func (v *Value) IntBool() bool {
+	switch b := v.Value.(type) {
+	case int:
+		return b == 1
+	}
+	return false
+}
 func (v *Value) IsCodes() bool {
 	_, ok := v.Value.([]*Code)
 	return ok
