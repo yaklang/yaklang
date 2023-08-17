@@ -21,10 +21,10 @@ const (
 	stateNone            state = "None"
 )
 
-func Parse(raw interface{}, funTable *map[string]BuildInTagFun) ([]Node, error) {
+func Parse(raw interface{}, methodCtx *MethodContext) ([]Node, error) {
 	rawCode := utils.InterfaceToString(raw)
 	ctx := NewDataContext(rawCode) // 在状态切换cb中的上下文
-	ctx.funTable = funTable
+	ctx.methodCtx = methodCtx
 	// 词法解析
 	currentState := stateStart
 	trans := func() {

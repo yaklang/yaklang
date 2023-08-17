@@ -3,7 +3,9 @@ package fuzztagx
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"reflect"
 	"strings"
+	"unsafe"
 )
 
 type NodeAttr struct {
@@ -13,14 +15,15 @@ type NodeAttr struct {
 }
 type Node interface {
 	Strings() []string
-	GenerateOne() (string, bool)
+	GenerateOne() bool
 	Reset()
 }
 
 // String
 type StringNode struct {
 	*NodeAttr
-	data string
+	backpropagation func(s string)
+	data            string
 }
 
 func NewStringNode(s string) *StringNode {
@@ -35,12 +38,14 @@ func NewStringNode(s string) *StringNode {
 func (s *StringNode) Strings() []string {
 	return []string{s.data}
 }
-func (s *StringNode) GenerateOne() (string, bool) {
+func (s *StringNode) GenerateOne() bool {
 	if s.index > 0 {
-		return "", false
+		s.backpropagation("")
+		return false
 	} else {
 		s.index++
-		return s.data, true
+		s.backpropagation(s.data)
+		return true
 	}
 }
 func (s *StringNode) Reset() {
@@ -50,7 +55,8 @@ func (s *StringNode) Reset() {
 // Expression
 type ExpressionNode struct {
 	*NodeAttr
-	data string
+	backpropagation func(s string)
+	data            string
 }
 
 func NewExpressionNode(s string) *ExpressionNode {
@@ -65,16 +71,18 @@ func NewExpressionNode(s string) *ExpressionNode {
 func (s *ExpressionNode) Strings() []string {
 	return []string{s.data}
 }
-func (f *ExpressionNode) GenerateOne() (string, bool) {
+func (f *ExpressionNode) GenerateOne() bool {
 	if f.index > 0 {
-		return "", false
+		return false
 	} else {
 		box := httptpl.NewNucleiDSLYakSandbox()
 		res, err := box.Execute(f.data)
 		if err != nil {
-			return "", true
+			f.backpropagation("")
+			return true
 		} else {
-			return utils.InterfaceToString(res), true
+			f.backpropagation(utils.InterfaceToString(res))
+			return true
 		}
 	}
 }
@@ -93,11 +101,16 @@ type Tag struct {
 func (f *Tag) Strings() []string {
 	return nil
 }
-func (f *Tag) GenerateOne() (string, bool) {
+func (f *Tag) GenerateOne() bool {
 	if f.generator == nil {
-		f.generator = NewGenerator(f.Nodes)
+		f.generator = NewBackpropagationGenerator(f.backpropagation, f.Nodes)
 	}
-	return f.generator.Generate()
+	s, ok := f.generator.Generate()
+	if !ok {
+		return false
+	}
+	f.backpropagation(s)
+	return true
 }
 func (s *Tag) Reset() {
 	s.generator = nil
@@ -114,7 +127,7 @@ type FuzzTagMethod struct {
 	isDyn           bool
 	isRep           bool
 	params          []Node
-	funTable        *map[string]BuildInTagFun
+	methodCtx       *MethodContext
 	generator       *Generator
 	index           int
 	backpropagation func(s string)
@@ -140,21 +153,30 @@ func (f *FuzzTagMethod) ParseLabel() {
 	}
 }
 
-func (f *FuzzTagMethod) GenerateOne() (string, bool) {
+func (f *FuzzTagMethod) GenerateOne() bool {
 	if f.generator == nil { // 未初始化
-		f.generator = NewGenerator(f.params)
+		f.generator = NewBackpropagationGenerator(f.backpropagation, f.params)
 		f.ParseLabel()
+		if f.label != "" {
+			if v, ok := f.methodCtx.labelTable[f.label]; ok {
+				f.methodCtx.labelTable[f.label] = append(v, f)
+			} else {
+				f.methodCtx.labelTable[f.label] = []*FuzzTagMethod{f}
+			}
+		}
 	}
 CHECK:
 	if f.cache == nil || f.isDyn || f.index >= len(*f.cache) {
-		if f.funTable != nil && *f.funTable != nil {
-			fun, ok := (*f.funTable)[f.name]
+		if f.methodCtx.methodTable != nil {
+			fun, ok := (f.methodCtx.methodTable)[f.name]
 			if !ok {
-				return "", true
+				f.backpropagation("")
+				return false
 			}
 			s, ok := f.generator.Generate()
 			if !ok {
-				return "", false
+				f.backpropagation("")
+				return false
 			}
 			result := fun(s)
 			f.cache = &result
@@ -163,7 +185,8 @@ CHECK:
 			}
 			goto CHECK
 		} else {
-			return "", false
+			f.backpropagation("")
+			return false
 		}
 	}
 
@@ -177,8 +200,8 @@ CHECK:
 	defer func() {
 		f.index++
 	}()
-	return (*f.cache)[f.index], true
-
+	f.backpropagation((*f.cache)[f.index])
+	return true
 }
 func (s *FuzzTagMethod) Reset() {
 	s.generator = nil
@@ -189,37 +212,78 @@ func (s *FuzzTagMethod) Reset() {
 	}
 }
 
+type LabelMethods struct {
+	methods []*FuzzTagMethod
+}
+
+func (l *LabelMethods) Reset() {
+	for _, method := range l.methods {
+		method.Reset()
+	}
+}
+func (l *LabelMethods) GenerateOne() bool {
+	ok := false
+	for _, method := range l.methods {
+		genOk := method.GenerateOne()
+		if genOk {
+			ok = true
+		}
+	}
+	return ok
+}
+
 type GeneratorContext struct {
 }
 type Generator struct {
 	container []string
 	//index     int
-	data  []Node
-	first bool
-	ctx   *GeneratorContext
+	data            []Node
+	first           bool
+	ctx             *GeneratorContext
+	backpropagation func(s string)
 }
 
-func NewGenerator(nodes []Node) *Generator {
-	g := &Generator{data: nodes, container: make([]string, len(nodes)), first: true}
+func NewBackpropagationGenerator(f func(s string), nodes []Node) *Generator {
+	g := &Generator{data: nodes, container: make([]string, len(nodes)), first: true, backpropagation: f}
 	for index, d := range g.data {
 		switch ret := d.(type) {
 		case *Tag:
 			ret.backpropagation = func(index int) func(s string) {
 				return func(s string) {
 					g.container[index] = s
+					g.backpropagation(s)
 				}
 			}(index)
 		case *FuzzTagMethod:
 			ret.backpropagation = func(index int) func(s string) {
 				return func(s string) {
 					g.container[index] = s
+					g.backpropagation(s)
+				}
+			}(index)
+		case *StringNode:
+			ret.backpropagation = func(index int) func(s string) {
+				return func(s string) {
+					g.container[index] = s
+					g.backpropagation(s)
+				}
+			}(index)
+		case *ExpressionNode:
+			ret.backpropagation = func(index int) func(s string) {
+				return func(s string) {
+					g.container[index] = s
+					g.backpropagation(s)
 				}
 			}(index)
 		}
-		s, _ := d.GenerateOne()
-		g.container[index] = s
+		d.GenerateOne()
 	}
 	return g
+}
+func NewGenerator(nodes []Node) *Generator {
+	return NewBackpropagationGenerator(func(s string) {
+
+	}, nodes)
 }
 func (g *Generator) Generate() (string, bool) {
 	if g.first {
@@ -230,19 +294,37 @@ func (g *Generator) Generate() (string, bool) {
 	} else {
 		isOk := false
 		i := 0
+		renderedNode := map[unsafe.Pointer]struct{}{}
 		for {
 			if len(g.data) == i {
 				break
 			}
-			s, ok := g.data[i].GenerateOne()
+			uid := reflect.ValueOf(g.data[i]).UnsafePointer()
+			if _, ok := renderedNode[uid]; ok {
+				i++
+				continue
+			}
+			renderedNode[reflect.ValueOf(g.data[i]).UnsafePointer()] = struct{}{}
+			ok := g.data[i].GenerateOne()
+
 			if !ok {
 				if i < len(g.data)-1 { // 最后一个元素无法进位
 					g.data[i].Reset()
-					s, _ := g.data[i].GenerateOne()
-					g.container[i] = s
+					g.data[i].GenerateOne()
 				}
 			} else {
-				g.container[i] = s
+				if v, ok := g.data[i].(*FuzzTagMethod); ok {
+					if ms, ok := v.methodCtx.labelTable[v.label]; ok {
+						for _, m := range ms {
+							uid1 := reflect.ValueOf(m).UnsafePointer()
+							if uid1 == uid {
+								continue
+							}
+							renderedNode[uid1] = struct{}{}
+							m.GenerateOne()
+						}
+					}
+				}
 				isOk = true
 				break
 			}
