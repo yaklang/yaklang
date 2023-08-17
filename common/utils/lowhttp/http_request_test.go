@@ -4,15 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -153,6 +155,26 @@ func TestParseBytesToHttpRequest2(t *testing.T) {
 		t.FailNow()
 	}
 	_ = rsp
+}
+
+func TestParseBytesToHttpRequestForHTTP2(t *testing.T) {
+	packet := "GET / HTTP/2\r\nHost: www.baidu.com\r\n\r\n"
+	req, err := ParseBytesToHttpRequest([]byte(packet))
+	if err != nil {
+		log.Error(err)
+		t.FailNow()
+	}
+	if req.ProtoMajor != 2 && req.ProtoMinor != 0 {
+		t.Fatalf("prase request proto version failed, got %d.%d", req.ProtoMajor, req.ProtoMinor)
+	}
+	raw, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		log.Error(err)
+		t.FailNow()
+	}
+	if !strings.Contains(string(raw), "HTTP/2.0") {
+		t.Fatalf("prase request proto version failed, got raw packet: %s", string(raw))
+	}
 }
 
 func TestFixHTTPRequestOut(t *testing.T) {
