@@ -34,17 +34,12 @@ func httpIniter(c *matchContext) error {
 		return nil
 	}
 
-	// read payload
-	httpraw := c.PK.ApplicationLayer().LayerContents()
-	if !c.Must(len(httpraw) != 0) {
-		return nil
-	}
-
 	// buffer provider
 	provider := newHTTPBufferProvider(c.PK)
 	if provider == nil {
 		return errors.New("parse httpraw as http request failed")
 	}
+
 	// prefilter
 	if c.Rule.ContentRuleConfig.PrefilterRule != nil {
 		// keyword prefilter not implement yet
@@ -142,7 +137,7 @@ type httpProvider struct {
 
 // if success, return value not nil
 func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
-	payload := pk.ApplicationLayer().LayerContents()
+	payload := pk.TransportLayer().LayerPayload()
 	if lowhttp.IsResp(payload) {
 		res, err := lowhttp.ParseBytesToHTTPResponse(payload)
 		if err != nil {

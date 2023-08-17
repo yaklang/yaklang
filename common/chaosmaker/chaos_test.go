@@ -1,7 +1,6 @@
 package chaosmaker
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -9,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -107,7 +107,6 @@ func TestChaosMaker_ApplyAll(t *testing.T) {
 }
 
 func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
-	httpPrefix, _ := hex.DecodeString("3066d026811b6afd6158af5c0800450000c2695740008006d96cc0a803127ce176d6d3a1005036ffddeba0d11525501804014ac20000")
 	for _, r := range rules {
 		maker := NewChaosMaker()
 		rules, err := suricata.Parse(r.rule)
@@ -143,8 +142,6 @@ func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
 				if result.HttpRequest == nil && result.HttpResponse == nil {
 					panic("Empty Result")
 				}
-				bytes = make([]byte, len(httpPrefix))
-				copy(bytes, httpPrefix)
 				if result.HttpRequest != nil {
 					bytes = append(bytes, result.HttpRequest...)
 					if debug {
@@ -163,20 +160,27 @@ func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
 					spew.Dump(result.TCPIPPayload)
 				}
 			}
+
+			pk, err := pcapx.PacketBuilder(pcapx.WithPayload(bytes))
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
 			var matched bool
 			if result.SuricataRule.Protocol == "tcp" {
 				// tcp match not implement yet
 				continue
 			}
 			for _, rr := range rules {
-				if rr.Match(bytes) {
+				if rr.Match(pk) {
 					matched = true
 					break
 				}
 			}
 			if !matched {
 				spew.Dump(rr.Raw)
-				spew.Dump(bytes)
+				spew.Dump(pk)
 			} else {
 				matchedCount++
 			}
