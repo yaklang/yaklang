@@ -1169,6 +1169,9 @@ func TestEvaluateCommandRequest(t *testing.T) {
 			[]onBreakpoint{{
 				execute: func() {
 					checkStop(t, client, 0, "__yak_main__", 2)
+					client.EvaluateRequest("dbg help", 0, "repl")
+					got := client.ExpectEvaluateResponse(t)
+					checkEval(t, got, HelpInfo, noChildren)
 				},
 				disconnect: true,
 			}},
