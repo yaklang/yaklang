@@ -23,6 +23,9 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert http any any -> any any (msg: "CobaltStrike ARP Scan module"; flow:established; content:"POST"; http_method; content:"(ARP)"; http_client_body; content:"Scanner module is complete"; http_client_body; distance:0; classtype:exploit-kit; sid:3016004; rev:1; metadata:created_at 2018_11_15,by al0ne;)`,
+	},
+	{
 		rule: `alert http any any -> any any (msg: "CobaltStrike download.windowsupdate.com C2 Profile"; flow: established; content:"msdownload"; http_uri; pcre:"/\/c\/msdownload\/update\/others\/[\d]{4}/\d{2}/\d{7,8}_[\d\w-_]{50,}\.cab/UR"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )`,
 	},
 	{
@@ -30,9 +33,6 @@ var rules = []*ruleTest{
 	},
 	{
 		rule: `alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "CobaltStrike ARP Scan module"; flow:established; content:"POST"; http_method; content:"(ARP)"; http_client_body; content:"Scanner module is complete"; http_client_body; distance:0; classtype:exploit-kit; sid:3016004; rev:1; metadata:created_at 2018_11_15,by al0ne;)`,
 	},
 	{
 		rule: `alert http any any -> any any (msg:"***Windows Powershell Request UserAgent***"; flow:established; content:"PowerShell"; http_user_agent; pcre:"/PowerShell|WindowsPowerShell/i"; classtype:trojan-activity; sid:3013001; rev:1; metadata:by al0ne;)`,

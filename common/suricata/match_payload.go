@@ -96,7 +96,7 @@ func newPayloadMatcher(r *ContentRule, modifier Modifier) matchHandler {
 		if r.Distance != nil && existed {
 			indexes = slices.DeleteFunc(indexes, func(m matched) bool {
 				for _, pm := range prevMatch {
-					if m.pos == pm.pos+pm.len+*r.Distance {
+					if m.pos >= pm.pos+pm.len+*r.Distance {
 						return false
 					}
 				}
