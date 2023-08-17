@@ -631,6 +631,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			//尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
+			if id == 118 && strings.Contains(val.String(), "html") && c.StartLineNumber == 629 {
+				println()
+			}
 			if !ok {
 				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 				if ok1 {
@@ -654,6 +657,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if !ok {
 					panic("cannot found value by variable name:[" + name + "]")
 				}
+			} else {
+				val1 := *val // nasl里函数参数和形参名是绑定的，这里需要拷贝一份
+				val = &val1
 			}
 			if !ok {
 				panic("BUG: cannot found value by symbol:[" + fmt.Sprint(id) + "]")

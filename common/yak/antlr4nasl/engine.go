@@ -85,7 +85,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 	})
 	vm.SetVar("__OpCallCallBack__", func(name string) {
 		// 做一些函数调试的工作
-		if name == "enable_keepalive" {
+		if name == "http_recv_headers2" {
 			print()
 		}
 	})
