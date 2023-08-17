@@ -410,7 +410,18 @@ func (v *Value) NativeCallable() bool {
 }
 
 func (v *Value) AsString() string {
-	return AsString(v.Value)
+	if v == nil {
+		return ""
+	}
+	s, ok := v.Value.(string)
+	if !ok {
+		raw, ok := v.Value.([]byte)
+		if !ok {
+			return v.String()
+		}
+		return string(raw)
+	}
+	return s
 }
 
 func (v *Value) IsBytesOrRunes() bool {
