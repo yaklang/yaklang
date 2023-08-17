@@ -77,7 +77,7 @@ func TestInitNaslDatabase(t *testing.T) {
 			Name: "测试初始化NaslScript",
 			Src: `
 
-libraryPath = "/Users/z3/nasl/nasl-plugins"
+libraryPath = "/Users/z3/nasl/nasl-plugins/gb_netapp_data_ontap_consolidation.nasl"
 err = nasl.UpdateDatabase(libraryPath)
 if err{
 	log.Error(err)
@@ -97,7 +97,7 @@ naslScanHandle = (hosts,ports)=>{
     }
 	opts.Append(nasl.preference({
 		"Exclude printers from scan": false,
-		"Enable CGI scanning": false,
+		//"Enable CGI scanning": false,
 	}))
 	opts.Append(nasl.riskHandle((risk)=>{
 		log.info("found risk: %v", risk)
@@ -105,14 +105,14 @@ naslScanHandle = (hosts,ports)=>{
 	//opts.Append(nasl.conditions({
 	//	"family": "Web Servers",
 	//}))
-	opts.Append(nasl.plugin("webmirror.nasl"))
+	opts.Append(nasl.plugin("gb_apache_tomcat_consolidation.nasl"))
     kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)
     }
 }
 
-naslScanHandle("wi-mobile.com","80")
+naslScanHandle("123.56.92.66","80")
 `
 	err := yaklang.New().SafeEval(context.Background(), scanCode)
 	if err != nil {

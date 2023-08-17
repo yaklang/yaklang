@@ -8,6 +8,7 @@ import (
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/embed"
+	"os"
 	"strings"
 )
 
@@ -71,7 +72,7 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 			if cve != "" {
 				title += fmt.Sprintf(", CVE: %s", summary)
 			}
-			risk, _ := yakit.NewRisk(concludedUrl,
+			risk, _ := yakit.NewRisk(engine.host,
 				yakit.WithRiskParam_Title(title),
 				yakit.WithRiskParam_RiskType(riskType),
 				yakit.WithRiskParam_Severity("low"),
@@ -79,13 +80,14 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 				yakit.WithRiskParam_Description(summary),
 				yakit.WithRiskParam_Solution(solution),
 				yakit.WithRiskParam_Details(map[string]any{
-					"app":       app,
-					"version":   version,
-					"install":   install,
-					"cpe":       cpe,
-					"concluded": concluded,
-					"source":    source,
-					"cve":       cve,
+					"app":          app,
+					"version":      version,
+					"install":      install,
+					"cpe":          cpe,
+					"concluded":    concluded,
+					"source":       source,
+					"cve":          cve,
+					"concludedUrl": concludedUrl,
 				}),
 			)
 			if riskHandle != nil {
@@ -103,12 +105,26 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 			return string(codeBytes)
 		})
 		engine.AddNaslLibPatch("http_keepalive.inc", func(code string) string {
-			codeLines := strings.Split(code, "\n")
-			if len(codeLines) > 341 {
-				codeLines[341] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
-				code = strings.Join(codeLines, "\n")
+			byts, err := os.ReadFile("/Users/z3/Downloads/http_keepalive_patch.inc")
+			if err != nil {
+				log.Errorf("read http_keepalive_patch.inc error: %v", err)
+				return code
 			}
-			return code
+			return string(byts)
+			//codeLines := strings.Split(code, "\n")
+			//if len(codeLines) > 341 {
+			//	codeLines[341] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
+			//	code = strings.Join(codeLines, "\n")
+			//}
+			//return code
+		})
+		engine.AddNaslLibPatch("http_func.inc", func(code string) string {
+			byts, err := os.ReadFile("/Users/z3/Downloads/http_func_patch.inc")
+			if err != nil {
+				log.Errorf("read http_func_patch.inc error: %v", err)
+				return code
+			}
+			return string(byts)
 		})
 		engine.AddNaslLibPatch("gb_altn_mdaemon_http_detect.nasl", func(code string) string {
 			codeLines := strings.Split(code, "\n")

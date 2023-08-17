@@ -418,21 +418,48 @@ func init() {
 			//min := params.getParamByName("min", -1).Int()
 			iconn := params.getParamByName("socket", nil).Value
 			timeout := params.getParamByName("timeout", 2).Int()
-			length := params.getParamByName("length", -1).Int()
+			max := params.getParamByName("length", -1).Int()
+			min := params.getParamByName("min", -1).Int()
+			if max == -1 {
+				panic("max is empty")
+				return nil, utils.Errorf("length is empty")
+			}
+			if iconn == nil {
+				return nil, utils.Errorf("socket is empty")
+			}
 			//min := params.getParamByName("min", -1).Int()
 			conn := iconn.(net.Conn)
-			if length == -1 {
-				res := utils.StableReader(conn, time.Duration(timeout)*time.Second, 10240)
-				return res, nil
-			} else {
-				conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
-				res := make([]byte, length)
-				n, err := conn.Read(res)
-				if err != nil {
-					return nil, err
-				}
-				return res[:n], nil
+			if err := conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout))); err != nil {
+				return "", err
 			}
+			byt := make([]byte, 1)
+			timeoutFlag := 0
+			var buf bytes.Buffer
+			for {
+				n, err := conn.Read(byt)
+				if err != nil {
+					if err, ok := err.(net.Error); ok && err.Timeout() {
+						timeoutFlag++
+						if timeoutFlag == 1 && buf.Len() >= min {
+							break
+						}
+						if timeoutFlag > 3 {
+							break
+						}
+						continue
+					}
+					break
+				}
+				if n == 0 {
+					break
+				}
+				buf.Write(byt[:n])
+				if buf.Len() >= max {
+					break
+				}
+			}
+			//log.Infof("recv_line:%v: %s", reflect.ValueOf(iconn).Pointer(), buf.String())
+			return buf.String(), nil
 		},
 		"recv_line": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			iconn := params.getParamByName("socket", nil).Value
@@ -447,6 +474,7 @@ func init() {
 			}
 			byt := make([]byte, 1)
 			var buf bytes.Buffer
+			flag := 0
 			for {
 				n, err := conn.Read(byt)
 				if err != nil {
@@ -456,13 +484,19 @@ func init() {
 					break
 				}
 				buf.Write(byt[:n])
-				if byt[0] == '\n' {
+				if byt[0] == '\r' {
+					flag = 1
+					continue
+				}
+				if flag == 1 && byt[0] == '\n' {
 					break
 				}
 				if buf.Len() >= length {
 					break
 				}
 			}
+			//log.Infof("recv_line:%v: %s", reflect.ValueOf(iconn).Pointer(), buf.String())
+			spew.Dump(buf.String())
 			return buf.String(), nil
 		},
 		"send": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -471,7 +505,7 @@ func init() {
 			option := params.getParamByName("option", 0)
 			length := params.getParamByName("length", 0)
 			if engine.debug {
-				naslLogger.Infof("send data: %s", data)
+				//naslLogger.Infof("send data: %s", data)
 			}
 			data_length := len(data)
 			_ = option
@@ -545,6 +579,7 @@ func init() {
 			}
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			log.Info("open socket")
 			port := params.getParamByNumber(0, -1).Int()
 			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
@@ -645,6 +680,7 @@ func init() {
 			return nil, nil
 		},
 		"http_close_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+			log.Info("close socket")
 			connV := params.getParamByNumber(0, nil)
 			conn := connV.Value
 			if v, ok := conn.(net.Conn); ok {
@@ -669,16 +705,10 @@ func init() {
 			return nil, nil
 		},
 		"get_host_name": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			names, _ := net.LookupAddr(engine.host)
-			var name string
-			if len(names) > 0 {
-				name = names[0]
-			}
-			return name, nil
+			return engine.host, nil
 		},
 		"get_host_names": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			names, _ := net.LookupAddr(engine.host)
-			return vm.NewNaslArray(names)
+			return vm.NewNaslArray([]interface{}{engine.host})
 		},
 		"get_host_name_source": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			return netx.LookupFirst(params.getParamByName("hostname", "").String()), nil
@@ -770,7 +800,7 @@ func init() {
 					return nil, err
 				}
 				if v1, ok := v.(int); ok {
-					if params.getParamByName("asstring").Bool() {
+					if params.getParamByName("asstring").IntBool() {
 						return utils2.GetEncapsName(v1), nil
 					} else {
 						return v1, nil
@@ -802,6 +832,9 @@ func init() {
 		"strcat": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := ""
 			forEachParams(params, func(value *yakvm.Value) {
+				if value.Value == nil {
+					return
+				}
 				s += value.String()
 			})
 			return s, nil
@@ -843,7 +876,7 @@ func init() {
 			return matched, nil
 		},
 		"ereg_replace": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			icase := params.getParamByName("icase", false).Bool()
+			icase := params.getParamByName("icase", false).IntBool()
 			pattern := params.getParamByName("pattern").String()
 			s := params.getParamByName("string").String()
 			replace := params.getParamByName("replace").String()
@@ -857,10 +890,10 @@ func init() {
 			}
 			return re.ReplaceAllString(s, replace), nil
 		},
-		"egrep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
+		"egrep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) { // 返回值应该是匹配内容
 			pattern := params.getParamByName("pattern").String()
 			s := params.getParamByName("string").String()
-			icase := params.getParamByName("icase").Bool()
+			icase := params.getParamByName("icase").IntBool()
 			if icase {
 				pattern = "(?i)" + pattern
 			}
@@ -868,12 +901,18 @@ func init() {
 			if err != nil {
 				return "", err
 			}
-			return re.FindString(s), nil
+			var res interface{}
+			if r := re.FindString(s); r != "" {
+				res = r
+			} else {
+				res = nil
+			}
+			return res, nil
 		},
 		"eregmatch": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			pattern := params.getParamByName("pattern").String()
 			s := params.getParamByName("string").String()
-			icase := params.getParamByName("icase").Bool()
+			icase := params.getParamByName("icase").IntBool()
 			if icase {
 				pattern = "(?i)" + pattern
 			}
@@ -886,7 +925,7 @@ func init() {
 		"match": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			pattern := params.getParamByName("pattern").String()
 			s := params.getParamByName("string").String()
-			icase := params.getParamByName("icase").Bool()
+			icase := params.getParamByName("icase").IntBool()
 			if icase {
 				pattern = "(?i)" + pattern
 			}
@@ -946,7 +985,7 @@ func init() {
 		"split": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			str := params.getParamByNumber(0, "").String()
 			sep := params.getParamByName("sep", "").String()
-			keep := params.getParamByName("keep").Bool()
+			keep := params.getParamByName("keep").IntBool()
 			res := strings.Split(str, sep)
 			if keep {
 				newRes := make([]string, 0)
@@ -967,7 +1006,11 @@ func init() {
 			return strings.TrimSpace(s), nil
 		},
 		"int": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			return strconv.Atoi(params.getParamByNumber(0, "0").String())
+			v, err := strconv.Atoi(params.getParamByNumber(0, "0").String())
+			if err != nil {
+				panic(err)
+			}
+			return v, err
 		},
 		"stridx": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			s := params.getParamByNumber(0).String()
@@ -1632,7 +1675,7 @@ func init() {
 			return nil, nil
 		},
 		"assert": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			b := params.getParamByNumber(0).Bool()
+			b := params.getParamByNumber(0).IntBool()
 			msg := params.getParamByNumber(1).String()
 			if !b {
 				panic(msg)
@@ -1754,7 +1797,7 @@ func init() {
 				}
 				default_port_list = append(default_port_list, port)
 			}
-			nodefault := params.getParamByName("nodefault", 0).Bool()
+			nodefault := params.getParamByName("nodefault", 0).IntBool()
 			service := params.getParamByName("proto", "").String()
 			ipproto := params.getParamByName("ipproto", "tcp").String()
 			var port = -1
@@ -1787,7 +1830,7 @@ func init() {
 				"proto":             params.getParamByName("proto", "").Value,
 				"ipproto":           params.getParamByName("ipproto", "").Value,
 				"default_port_list": []int{params.getParamByName("default", "").Int()},
-				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+				"nodefault":         params.getParamByName("nodefault", 0).IntBool(),
 			}, nil)
 			if err != nil {
 				return nil, err
@@ -1806,7 +1849,7 @@ func init() {
 				"proto":     "unknown",
 				"ipproto":   params.getParamByName("ipproto", "").Value,
 				"default":   params.getParamByName("default", 0).Int(),
-				"nodefault": params.getParamByName("nodefault", 0).Bool(),
+				"nodefault": params.getParamByName("nodefault", 0).IntBool(),
 			}, nil)
 		},
 		"unknownservice_get_ports": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1814,7 +1857,7 @@ func init() {
 				"proto":             "unknown",
 				"ipproto":           params.getParamByName("ipproto", "").Value,
 				"default_port_list": params.getParamByName("default_port_list", "").Value,
-				"nodefault":         params.getParamByName("nodefault", 0).Bool(),
+				"nodefault":         params.getParamByName("nodefault", 0).IntBool(),
 			}, nil)
 		},
 		"report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -1826,10 +1869,14 @@ func init() {
 		},
 		//http_report_vuln_url(port: port, url: url1, url_only: TRUE);
 		"http_report_vuln_url": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//port := params.getParamByName("port", "").Int()
+			port := params.getParamByName("port", "").Int()
 			url := params.getParamByName("url", "").String()
-			//url_only := params.getParamByName("url_only", false).Bool()
-			return fmt.Sprintf("detect vuln on url: %s", url), nil
+			url_only := params.getParamByName("url_only", false).IntBool()
+			if url_only {
+				return fmt.Sprintf("%v%v", utils.HostPort(engine.host, port), url), nil
+			} else {
+				return fmt.Sprintf("detect vul on: %v%v", utils.HostPort(engine.host, port), url), nil
+			}
 		},
 		//build_detection_report(app: "OpenMairie Open Foncier", version: version,
 		//install: install, cpe: cpe, concluded: vers[0],
