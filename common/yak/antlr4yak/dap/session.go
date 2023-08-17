@@ -336,10 +336,10 @@ func (ds *DebugSession) onRestartRequest(request *dap.RestartRequest) {
 }
 
 func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
-	debugger := ds.debugger
-
 	// 等待launch完成
 	ds.LaunchWg.Wait()
+
+	debugger := ds.debugger
 	// 等待init完成
 	debugger.WaitInit()
 
