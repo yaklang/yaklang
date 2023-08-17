@@ -72,6 +72,7 @@ func (m *RegexpModifier) Modify(payload *ByteMap) error {
 		end = len(content)
 	} else if m.Generator.relative {
 		begin = payload.lastPos + payload.lastLen
+		end = begin + len(content)
 	}
 
 	allfree := payload.FindFreeRange(len(content), begin, end)

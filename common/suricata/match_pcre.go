@@ -42,10 +42,9 @@ func newPCREMatch(r *ContentRule) matchHandler {
 			}
 		}
 
-		var prevMatch []matched
-		loadIfMapEz(c.Value, &prevMatch, "prevMatch")
+		prevMatch, existed := c.GetPrevMatched(r.PCREParsed.modifier)
 
-		if r.PCREParsed.relative {
+		if r.PCREParsed.relative && existed {
 			indexes = slices.DeleteFunc(indexes, func(m matched) bool {
 				for _, pm := range prevMatch {
 					if m.pos == pm.pos+pm.len {
@@ -59,7 +58,7 @@ func newPCREMatch(r *ContentRule) matchHandler {
 			}
 		}
 
-		c.Value["prevMatch"] = indexes
+		c.SetPrevMatched(r.PCREParsed.modifier, indexes)
 		return nil
 	}
 }

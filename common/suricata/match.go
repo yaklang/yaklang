@@ -35,8 +35,10 @@ type matchContext struct {
 	provider bufferProvider
 	buffer   map[Modifier][]byte
 
-	Value             map[string]any
-	ContentMatchCache []matched
+	Value map[string]any
+
+	prevMatched  []matched
+	prevModifier Modifier
 
 	PK   gopacket.Packet
 	Rule *Rule
@@ -126,4 +128,17 @@ func (c *matchContext) GetBuffer(modifier Modifier) []byte {
 
 func (c *matchContext) SetBuffer(modifier Modifier, buf []byte) {
 	c.buffer[modifier] = buf
+}
+
+// GetPrevMatched return true if the previous motch for current modifier existed.
+func (c *matchContext) GetPrevMatched(mdf Modifier) ([]matched, bool) {
+	if c.prevModifier == mdf {
+		return c.prevMatched, true
+	}
+	return nil, false
+}
+
+func (c *matchContext) SetPrevMatched(mdf Modifier, matched []matched) {
+	c.prevModifier = mdf
+	c.prevMatched = matched
 }
