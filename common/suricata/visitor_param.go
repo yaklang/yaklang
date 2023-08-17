@@ -487,6 +487,7 @@ func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				log.Errorf("parsePCREStr err:%v", err)
 			}
 			contentRule.PCREParsed = parsed
+			contentRule.Modifier = parsed.modifier
 		case "fast_pattern":
 			contentRule.FastPattern = true
 		case "flowbits":
