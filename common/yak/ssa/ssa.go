@@ -110,11 +110,19 @@ type Function struct {
 	user []User
 	Pos  *Position // current position
 
+	// for instruction
+	instReg    map[Instruction]string             // instruction -> virtual register
+	currentDef map[string]map[*BasicBlock]*Values // currentDef[variable][block]value
+
+
+	currtenPos *Position
 	// for build
-	instReg      map[Instruction]string // instruction -> virtual register
-	currtenPos   *Position
-	currentBlock *BasicBlock                      // current block to build
-	currentDef   map[string]map[*BasicBlock]Value // currentDef[variable][block]value
+	currentBlock *BasicBlock // current block to build
+}
+
+type Values struct {
+	v    Value
+	next *Values
 }
 
 func (f *Function) GetType() Types {

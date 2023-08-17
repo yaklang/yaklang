@@ -56,9 +56,20 @@ func (f *Function) readVariable(variable string) Value {
 func (f *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
 	_, ok := f.currentDef[variable]
 	if !ok {
-		f.currentDef[variable] = make(map[*BasicBlock]Value)
+		f.currentDef[variable] = make(map[*BasicBlock]*Values)
 	}
-	f.currentDef[variable][block] = value
+	if vs, ok := f.currentDef[variable][block]; !ok {
+		f.currentDef[variable][block] = &Values{
+			v:    value,
+			next: nil,
+		}
+
+	} else {
+		f.currentDef[variable][block] = &Values{
+			v:    value,
+			next: vs,
+		}
+	}
 }
 
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
@@ -67,7 +78,7 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 	}
 	if map2, ok := f.currentDef[variable]; ok {
 		if value, ok := map2[block]; ok {
-			return value
+			return value.v
 		}
 	}
 	return f.readVariableRecursive(variable, block)

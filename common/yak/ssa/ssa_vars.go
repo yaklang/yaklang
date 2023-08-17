@@ -39,13 +39,16 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 		return result
 	}
 	var probablyTypes []string
-	for block, value := range res {
-		_ = block
-		valType := value.GetType()
+	var probablyValue []string
+	for _, vs := range res {
+		v := vs.v
+		probablyValue = append(probablyValue, v.String())
+		valType := v.GetType()
 		if valType != nil {
 			probablyTypes = append(probablyTypes, valType.String())
 		}
 	}
 	result.ProbablyTypes = probablyTypes
+	result.ProbablyValues = probablyValue
 	return result
 }
