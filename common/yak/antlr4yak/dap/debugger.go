@@ -60,6 +60,47 @@ func (d *DAPDebugger) Continue() {
 	}
 }
 
+func (d *DAPDebugger) StepIn() error {
+	d.debugger.StepIn()
+	d.Continue()
+	return nil
+}
+
+func (d *DAPDebugger) StepOut() error {
+	err := d.debugger.StepOut()
+	if err != nil {
+		return err
+	}
+	d.Continue()
+	return nil
+}
+
+func (d *DAPDebugger) StepNext() error {
+	d.debugger.StepNext()
+	d.Continue()
+	return nil
+}
+
+func (d *DAPDebugger) AddObserveBreakPoint(expr string) error {
+	return d.debugger.AddObserveBreakPoint(expr)
+}
+
+func (d *DAPDebugger) RemoveObserveBreakPoint(expr string) error {
+	return d.debugger.RemoveObserveBreakPoint(expr)
+}
+
+func (d *DAPDebugger) AddObserveExpression(expr string) error {
+	return d.debugger.AddObserveExpression(expr)
+}
+
+func (d *DAPDebugger) RemoveObserveExpression(expr string) error {
+	return d.debugger.RemoveObserveExpression(expr)
+}
+
+func (d *DAPDebugger) GetAllObserveExpressions() map[string]*yakvm.Value {
+	return d.debugger.GetAllObserveExpressions()
+}
+
 func (d *DAPDebugger) SetBreakPoint(lineIndex int, condition, hitCondition string) (int, error) {
 	return d.debugger.SetBreakPoint(lineIndex, condition, hitCondition)
 }
