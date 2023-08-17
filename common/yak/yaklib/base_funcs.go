@@ -32,3 +32,15 @@ func parseBool(i interface{}) bool {
 	r, _ := strconv.ParseBool(fmt.Sprint(i))
 	return r
 }
+
+func _input(s ...string) string {
+	var input string
+	if len(s) > 0 {
+		fmt.Print(s[0])
+	}
+	n, err := fmt.Scanln(&input)
+	if err != nil && n != 0 {
+		panic(err)
+	}
+	return input
+}
