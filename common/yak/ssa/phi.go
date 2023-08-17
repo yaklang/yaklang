@@ -1,7 +1,5 @@
 package ssa
 
-import "fmt"
-
 func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 	return &Phi{
 		anInstruction: anInstruction{
@@ -21,11 +19,6 @@ func (phi *Phi) Build() Value {
 	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
 		v := phi.Func.readVariableByBlock(phi.variable, predBlock)
-		if v == nil {
-			// warn!!! con't found this variable
-			//TODO: if in left-expression is not warn
-			fmt.Printf("warn!!! phi con't found this variable[%s]\n", phi.variable)
-		}
 		phi.Edge = append(phi.Edge, v)
 	}
 	phi.Block.skip = false
