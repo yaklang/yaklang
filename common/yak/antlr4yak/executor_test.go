@@ -830,9 +830,10 @@ func _marshallerTest(i string) {
 	if err != nil {
 		panic(err)
 	}
+
 }
 
-func _formattest(i string) {
+func _formattest(i string) []*yakvm.Code {
 	e := NewExecutor(i)
 	codes1 := e.VM.GetCodes()
 	code2 := e.Compiler.GetFormattedCode()
@@ -850,6 +851,7 @@ func _formattest(i string) {
 		panic("code format error, code1-length: " + fmt.Sprint(len(codes1)) + " formatted length: " + fmt.Sprint(len(codes2)))
 	}
 	e.VM.NormalExec()
+	return codes1
 }
 
 func TestNewExecutor_YakFuncCallPanic(t *testing.T) {
@@ -1589,11 +1591,13 @@ func TestNewExecutor_Include(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	file.WriteString(`
+	includeCode := `
 abc = func(){
-    return "test"
+	return "test"
 }
-`)
+`
+
+	file.WriteString(includeCode)
 	defer os.Remove(file.Name())
 
 	code := fmt.Sprintf(`
@@ -1602,7 +1606,15 @@ abc = func(){
 	`, file.Name())
 
 	_marshallerTest(code)
-	_formattest(code)
+	codes := _formattest(code)
+
+	checkFilePath, checkCode := *codes[0].SourceCodeFilePath, *codes[0].SourceCodePointer
+	if checkFilePath != file.Name() {
+		t.Fatalf("include file path error, expected: %s, got: %s", file.Name(), checkFilePath)
+	}
+	if checkCode != includeCode {
+		t.Fatalf("include file code error, expected: %#v, got: %#v", includeCode, checkCode)
+	}
 }
 
 func TestNewExecutor_Eval(t *testing.T) {
