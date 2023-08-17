@@ -3,7 +3,6 @@
 package crawlerx
 
 import (
-	"encoding/json"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
@@ -157,16 +156,7 @@ func TestStartCrawler(t *testing.T) {
 	}))
 	defer server.Close()
 	opts := make([]ConfigOpt, 0)
-	browserInfo := BrowserInfo{
-		ExePath:       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		WsAddress:     "",
-		ProxyAddress:  "",
-		ProxyUsername: "",
-		ProxyPassword: "",
-	}
-	browserBytes, _ := json.Marshal(&browserInfo)
 	opts = append(opts,
-		WithBrowserInfo(string(browserBytes)),
 		WithFormFill(map[string]string{"username": "admin", "password": "password"}),
 		WithBlackList("logout"),
 		WithMaxDepth(2),
