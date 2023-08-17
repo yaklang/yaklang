@@ -52,6 +52,8 @@ func (c *Client) ExpectInitializeResponseAndCapabilities(t *testing.T) *dap.Init
 		SupportsDataBreakpoints:          true,
 		SupportsDisassembleRequest:       true,
 		SupportTerminateDebuggee:         true,
+		SupportsSetVariable:              true,
+		SupportsSetExpression:            true,
 	}
 	if !reflect.DeepEqual(initResp.Body, wantCapabilities) {
 		t.Errorf("capabilities in initializeResponse: got %+v, want %v", pretty(initResp.Body), pretty(wantCapabilities))
