@@ -8,15 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-func ParseInterfaceTypes(vs []Value) Types {
-	structType := NewStructType()
-	for i, v := range vs {
-		typs := v.GetType()
-		structType.AddField(NewConst(i), typs)
-	}
-	return Types{structType.Transform()}
-}
-
 func ParseTypesFromValues(vs []Value) Types {
 	typs := make(Types, 0, len(vs))
 	tmp := map[Type]struct{}{}
@@ -51,7 +42,7 @@ func (i *If) InferenceType() {
 	if len(condtyp) == 0 {
 		i.NewError(Warn, "if cond type is nil\n")
 	} else if len(condtyp) == 1 {
-		if cond.GetType()[0] != basicTypesKind[Bool] {
+		if cond.GetType()[0] != BasicTypesKind[Boolean] {
 			i.NewError(Warn, "if condition must be bool\n")
 		}
 	} else {
@@ -68,11 +59,12 @@ func (r *Return) InferenceType() {
 		r.typs = r.Results[0].GetType()
 	} else {
 		// multiple, make a interface_struct
-		structType := NewStructType()
+		iType := NewInterfaceType()
 		for i, r := range r.Results {
-			structType.AddField(NewConst(i), r.GetType())
+			iType.AddField(NewConst(i), r.GetType())
 		}
-		r.typs = Types{structType.Transform()}
+		iType.Transform()
+		r.typs = Types{iType}
 
 	}
 }
@@ -112,7 +104,7 @@ func (sw *Switch) InferenceType() {
 
 func (b *BinOp) InferenceType() {
 	if b.Op >= yakvm.OpGt && b.Op <= yakvm.OpNotEq {
-		b.typs = []Type{basicTypesKind[Bool]}
+		b.typs = []Type{BasicTypesKind[Boolean]}
 		return
 	}
 	org := b.typs
@@ -208,19 +200,6 @@ func (i *Interface) InferenceType() {
 
 }
 
-func GetField(I Type, key Value) Type {
-	switch I := I.(type) {
-	case *SliceType:
-		return I.Elem
-	case *MapType:
-		return I.Value
-	case *StructType:
-		return I.GetField(key)
-	}
-
-	return nil
-}
-
 func (f *Field) InferenceType() {
 	org := f.GetType()
 	interfacetyp := f.I.GetType()
@@ -228,7 +207,9 @@ func (f *Field) InferenceType() {
 	if len(f.I.GetType()) == 0 {
 		fmt.Printf("warn: interface type is not set\n")
 	} else if len(interfacetyp) == 1 {
-		typs = append(typs, GetField(interfacetyp[0], f.Key))
+		if ityp, ok := interfacetyp[0].(InterfaceType); ok {
+			typs = append(typs, ityp.GetField(f.Key))
+		}
 	} else {
 		// handler interface-type and key
 

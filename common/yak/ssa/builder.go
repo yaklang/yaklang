@@ -2,9 +2,11 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
+	"math"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -572,14 +574,8 @@ func (b *builder) AssignList(stmt assiglist) {
 		} else if len(lvalues) == 1 {
 			// (1) = (n)
 			// (1) = interface(n)
-			lValueLen := NewConst(len(lvalues))
-			typ := ParseInterfaceTypes(rvalues)
-			_interface := b.emitInterfaceBuildWithType(typ, lValueLen, lValueLen)
+			_interface := b.CreateInterfaceWithVs(nil, rvalues)
 			lvalues[0].Assign(_interface, b.Function)
-			for i, rv := range rvalues {
-				field := b.emitField(_interface, NewConst(i))
-				b.emitUpdate(field, rv)
-			}
 		} else {
 			// (n) = (m) && n!=m  faltal
 			panic(fmt.Sprintf("multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues)))
@@ -937,20 +933,22 @@ func (b *builder) buildMakeExpression(stmt *yak.MakeExpressionContext) Value {
 		exprs = b.buildExpressionListMultiline(s)
 	}
 	zero := NewConst(0)
-	switch typ.(type) {
-	case *SliceType:
-		// fmt.Printf("debug %s %v %d\n", "make slice", typ, num)
-		if len(exprs) == 0 {
-			return b.emitInterfaceBuildWithType(Types{typ}, zero, zero)
-		} else if len(exprs) == 1 {
-			return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[0])
-		} else if len(exprs) == 2 {
-			return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[1])
-		} else {
-			panic("make slice expression error!")
+	switch typ := typ.(type) {
+	case *InterfaceType:
+		switch typ.Kind {
+		case Slice:
+			if len(exprs) == 0 {
+				return b.emitInterfaceBuildWithType(Types{typ}, zero, zero)
+			} else if len(exprs) == 1 {
+				return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[0])
+			} else if len(exprs) == 2 {
+				return b.emitInterfaceBuildWithType(Types{typ}, exprs[0], exprs[1])
+			} else {
+				panic("make slice expression error!")
+			}
+		case Map:
+		case Struct:
 		}
-	case *MapType:
-		fmt.Printf("debug %v\n", "make map")
 	case *ChanType:
 		fmt.Printf("debug %v\n", "make chan")
 	default:
@@ -965,7 +963,7 @@ func (b *builder) buildTypeLiteral(stmt *yak.TypeLiteralContext) Type {
 	defer recover()
 	text := stmt.GetText()
 	// var type name
-	if b, ok := basicTypesStr[text]; ok {
+	if b := GetTypeByStr(text); b != nil {
 		return b
 	}
 
@@ -1022,6 +1020,7 @@ func (b *builder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) Type {
 	}
 	if keyTyp != nil && valueTyp != nil {
 		return NewMapType(Types{keyTyp}, Types{valueTyp})
+
 	}
 
 	return nil
@@ -1112,7 +1111,7 @@ func (b *builder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
 	}
 	if ellipsis != nil {
 		// handler "..." to array
-		b.Param[len(b.Param)-1].typs = append(b.Param[len(b.Param)-1].typs, NewSliceType(nil))
+		b.Param[len(b.Param)-1].typs = append(b.Param[len(b.Param)-1].typs, NewInterfaceType())
 		b.hasEllipsis = true
 	}
 }
@@ -1160,7 +1159,7 @@ func (b *builder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []V
 	if ellipsis != nil {
 		//handler "..." to array
 		typ := v[len(v)-1].GetType()
-		typ = append(typ, NewSliceType(nil))
+		typ = append(typ, NewInterfaceType())
 		v[len(v)-1].SetType(typ)
 	}
 	return v
@@ -1206,7 +1205,7 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 		}
 		return NewConst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
-		return NewConst(nil)
+		return UnDefineConst
 	} else if stmt.CharaterLiteral() != nil {
 		runeChar, _, _, err := strconv.UnquoteChar(stmt.CharaterLiteral().GetText(), '\'')
 		if err != nil {
@@ -1219,20 +1218,18 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 			log.Warnf("charater literal is rune: %s", stmt.CharaterLiteral().GetText())
 			return NewConst(runeChar)
 		}
-	} else if stmt.MapLiteral() != nil {
-		switch ret := stmt.MapLiteral().(type) {
-		case *yak.MapLiteralContext:
-			return b.buildMapLiteral(ret)
-		default:
+	} else if s := stmt.MapLiteral(); s != nil {
+		if s, ok := s.(*yak.MapLiteralContext); ok {
+			return b.buildMapLiteral(s)
+		} else {
+			b.NewError(Error, "Unhandled Map(Object) Literal: "+stmt.MapLiteral().GetText())
 		}
-		panic("Unhandled Map(Object) Literal: " + stmt.MapLiteral().GetText())
-	} else if stmt.SliceLiteral() != nil {
-		switch ret := stmt.SliceLiteral().(type) {
-		case *yak.SliceLiteralContext:
-			return b.buildSliceLiteral(ret)
-		default:
+	} else if s := stmt.SliceLiteral(); s != nil {
+		if s, ok := s.(*yak.SliceLiteralContext); ok {
+			return b.buildSliceLiteral(s)
+		} else {
+			panic("Unhandled Slice Literal: " + stmt.SliceLiteral().GetText())
 		}
-		panic("Unhandled Slice Literal: " + stmt.SliceLiteral().GetText())
 	}
 
 	//TODO: slice typed literal
@@ -1275,7 +1272,11 @@ func (b *builder) buildNumericLiteral(stmt *yak.NumericLiteralContext) Value {
 		if err != nil {
 			b.NewError(Error, "const parse %s as integer literal... is to large for int64: %v", originIntStr, err)
 		}
-		return NewConst(resultInt64)
+		if resultInt64 > math.MaxInt {
+			return NewConst(int64(resultInt64))
+		} else {
+			return NewConst(int(resultInt64))
+		}
 	}
 
 	// float literal

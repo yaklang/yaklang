@@ -154,6 +154,30 @@ func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Inter
 	return f.emitInterface(i, i.typs, low, high, max, nil, nil)
 }
 
+func (b *builder) CreateInterfaceWithVs(keys []Value, vs []Value) *Interface {
+	hasKey := true
+	if len(keys) == 0 {
+		hasKey = false
+	}
+	lValueLen := NewConst(len(vs))
+	// typ := ParseInterfaceTypes(vs)
+	typ := NewInterfaceType()
+	itf := b.emitInterfaceBuildWithType(Types{typ}, lValueLen, lValueLen)
+	for i, rv := range vs {
+		var key Value
+		if hasKey {
+			key = keys[i]
+		} else {
+			key = NewConst(i)
+		}
+		typ.AddField(key, rv.GetType())
+		field := b.emitField(itf, key)
+		b.emitUpdate(field, rv)
+	}
+	typ.Transform()
+	return itf
+}
+
 func (f *Function) emitField(i Value, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }

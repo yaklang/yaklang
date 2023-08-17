@@ -2,11 +2,18 @@ package ssa
 
 import (
 	"fmt"
-	"reflect"
 )
 
 var (
 	ConstMap = make(map[any]*Const)
+
+	UnDefineConst = &Const{
+		user:  []User{},
+		value: nil,
+		typ:   []Type{BasicTypesKind[Undefine]},
+		str:   "Undefine",
+		Unary: 0,
+	}
 )
 
 // create const
@@ -17,11 +24,7 @@ func NewConstWithUnary(i any, un int) *Const {
 }
 func NewConst(i any) *Const {
 	// build new const
-	typestr := reflect.TypeOf(i).String()
-	if typestr == "int" {
-		i = int64(i.(int))
-		typestr = "int64"
-	}
+	typ := GetType(i)
 	// after update i
 	if c, ok := ConstMap[i]; ok {
 		return c
@@ -29,7 +32,7 @@ func NewConst(i any) *Const {
 	c := &Const{
 		user:  make([]User, 0),
 		value: i,
-		typ:   Types{basicTypesStr[typestr]},
+		typ:   Types{typ},
 		str:   fmt.Sprintf("%v", i),
 	}
 	// const should same
