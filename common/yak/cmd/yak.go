@@ -10,7 +10,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -33,6 +32,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/scannode"
+
+	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"io"
 	"io/ioutil"
 	"net"
@@ -405,9 +406,6 @@ var startGRPCServerCommand = cli.Command{
 			log.Errorf("init database failed: %s", err)
 			return err
 		}
-
-		/* 覆写核心插件 */
-		coreplugin.OverWriteCorePluginToLocal()
 
 		/* 初始化数据库后进行权限修复 */
 		base := consts.GetDefaultYakitBaseDir()
