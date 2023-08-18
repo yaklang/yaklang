@@ -74,6 +74,8 @@ type BrowserStarter struct {
 	eventElementsExploit func(*rod.Page, string, string) error
 
 	invalidSuffix []string
+
+	storageSave bool
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -103,11 +105,12 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		stealth:    baseConfig.stealth,
 
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
+
+		storageSave: false,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if starter.baseConfig.fullTimeout != 0 {
-		log.Infof(`timeout context create time: %v`, time.Now())
 		ctx, cancel = context.WithTimeout(baseConfig.ctx, time.Second*time.Duration(starter.baseConfig.fullTimeout))
 	} else {
 		ctx, cancel = context.WithCancel(baseConfig.ctx)
@@ -246,11 +249,23 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		log.Errorf(`TargetID %s get page wait load error: %s`, targetID, err)
 		return
 	}
+	if !starter.storageSave && len(starter.baseConfig.localStorage) > 0 {
+		starter.storageSave = true
+		urlStr, _ := getCurrentUrl(page)
+		log.Infof(`do local storage on %s`, urlStr)
+		for key, value := range starter.baseConfig.localStorage {
+			setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
+			_, err := page.EvalOnNewDocument(setStorageJS)
+			if err != nil {
+				log.Errorf(`local storage save error: %s`, err)
+				break
+			}
+		}
+	}
 	if starter.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 	}
 	if starter.baseConfig.pageTimeout != 0 {
-		log.Infof(`create page timeout %v`, time.Now())
 		page = page.Timeout(time.Duration(starter.baseConfig.pageTimeout) * time.Second)
 	}
 	err = starter.actionOnPage(page)
@@ -408,21 +423,6 @@ running:
 			}
 			starter.createPageHijack(p)
 			err = p.Navigate(urlStr)
-			if urlStr == starter.baseUrl && len(starter.baseConfig.localStorage) > 0 {
-				log.Infof(`do local storage on %s`, urlStr)
-				err = p.WaitLoad()
-				if err != nil {
-					log.Errorf(`do local storage page wait load error: %v`, err.Error())
-					continue
-				}
-				for key, value := range starter.baseConfig.localStorage {
-					setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
-					_, err := p.EvalOnNewDocument(setStorageJS)
-					if err != nil {
-						log.Errorf(`local storage save error: %s`, err)
-					}
-				}
-			}
 			if err != nil {
 				log.Errorf("page navigate %s error: %s", urlStr, err)
 			}
