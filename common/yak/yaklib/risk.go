@@ -106,6 +106,7 @@ var (
 		"severity":                  yakit.WithRiskParam_Severity,
 		"level":                     yakit.WithRiskParam_Severity,
 		"fromYakScript":             yakit.WithRiskParam_FromScript,
+		"ignore":                    yakit.WithRiskParam_Ignore,
 
 		// RandomPortTrigger
 

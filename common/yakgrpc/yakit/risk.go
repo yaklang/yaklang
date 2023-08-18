@@ -58,6 +58,7 @@ type Risk struct {
 
 	CVE                 string `json:"cve"`
 	IsRead              bool   `json:"is_read"`
+	Ignore              bool   `json:"ignore"`
 	UploadOnline        bool   `json:"upload_online"`
 	TaskName            string `json:"task_name"`
 	CveAccessVector     string `json:"cve_access_vector"`
