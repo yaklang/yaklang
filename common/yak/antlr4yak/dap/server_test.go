@@ -129,7 +129,7 @@ func runDebugSessionWithBPs(t *testing.T, client *Client, cmdRequest func(), sou
 			disconnect()
 			return
 		}
-		client.ContinueRequest(1)
+		client.ContinueRequest(0)
 		client.ExpectContinueResponse(t)
 	}
 
@@ -452,7 +452,7 @@ func TestStopWithTarget(t *testing.T) {
 		"client_close":           func(c *Client, forceStop chan struct{}) { c.Close() },
 		"disconnect_before_exit": func(c *Client, forceStop chan struct{}) { c.DisconnectRequest() },
 		"disconnect_after_exit": func(c *Client, forceStop chan struct{}) {
-			c.ContinueRequest(1)
+			c.ContinueRequest(0)
 			c.ExpectContinueResponse(t)
 
 			c.ExpectTerminatedEvent(t) // program finished, recv terminated event
@@ -552,7 +552,7 @@ func TestLaunchStopOnEntry(t *testing.T) {
 
 		// 一开始stopOnEntry,所以要continue,由于continue后会直接执行结束,所以会收到terminated事件
 		// 6 >> continue, << continue, << terminated
-		client.ContinueRequest(1)
+		client.ContinueRequest(0)
 		cResp := client.ExpectContinueResponse(t)
 		if cResp.Seq != 0 || cResp.RequestSeq != 6 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6", cResp)
@@ -602,7 +602,7 @@ func TestLaunchStopOnEntry(t *testing.T) {
 		}
 
 		// 12 >> continue, << continue
-		client.ContinueRequest(1)
+		client.ContinueRequest(0)
 		contResp := client.ExpectContinueResponse(t)
 		if contResp.Seq != 0 || contResp.RequestSeq != 12 || !contResp.Body.AllThreadsContinued {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=12 Body.AllThreadsContinued=true", contResp)
@@ -773,7 +773,7 @@ func TestPreSetBreakPoint(t *testing.T) {
 		checkVarExact(t, args, 0, "a", "a", "1", "int", noChildren)
 		checkVarExact(t, args, 1, "b", "b", "2", "int", noChildren)
 
-		client.ContinueRequest(1)
+		client.ContinueRequest(0)
 		ctResp := client.ExpectContinueResponse(t)
 		if !ctResp.Body.AllThreadsContinued {
 			t.Errorf("\ngot  %#v\nwant AllThreadsContinued=true", ctResp.Body)
@@ -889,7 +889,7 @@ func TestThreadsRequest(t *testing.T) {
 					client.SetBreakpointsRequest(program, []int{3})
 					client.ExpectSetBreakpointsResponse(t)
 
-					client.ContinueRequest(1)
+					client.ContinueRequest(0)
 					client.ExpectContinueResponse(t)
 
 					se := client.ExpectStoppedEvent(t)
@@ -1194,7 +1194,7 @@ func TestStepAndNextRequest(t *testing.T) {
 						t.Helper()
 						se := client.ExpectStoppedEvent(t)
 						if se.Body.Reason != "step" || se.Body.ThreadId != 0 || !se.Body.AllThreadsStopped {
-							t.Errorf("got %#v, want Reason=\"step\", ThreadId=1, AllThreadsStopped=true", se)
+							t.Errorf("got %#v, want Reason=\"step\", ThreadId=0, AllThreadsStopped=true", se)
 						}
 						checkStop(t, client, 0, fun, line)
 					}
@@ -1213,6 +1213,32 @@ func TestStepAndNextRequest(t *testing.T) {
 					client.NextRequest(0)
 					client.ExpectNextResponse(t)
 					expectStop("square", 2)
+				},
+				disconnect: true,
+			}},
+		)
+	},
+	)
+}
+
+func TestHardCodedBreakpoints(t *testing.T) {
+	runTest(t, "HardCodedBreakpoints", HardCodeBreakPointTestcase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			server.config.extraLibs = TestExtraLibs
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{10},
+			[]onBreakpoint{{
+				execute: func() {
+					checkStop(t, client, 0, "main", 10)
+					client.ContinueRequest(0)
+					client.ExpectContinueResponse(t)
+					se := client.ExpectStoppedEvent(t)
+					_ = se
+					if se.Body.ThreadId != 0 || se.Body.Reason != "breakpoint" {
+						t.Errorf("\ngot  %#v\nwant ThreadId=0 Reason=\"breakpoint\"", se)
+					}
+					checkStop(t, client, 0, "f", 3)
 				},
 				disconnect: true,
 			}},
