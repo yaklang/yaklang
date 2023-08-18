@@ -60,7 +60,6 @@ type Debugger struct {
 
 	// 断点
 	breakPointCount      int32
-	currentBreakPoint    *Breakpoint   // 当前断点
 	currentBreakPointMap BreakpointMap // 行 -> 断点
 	// breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
 
@@ -289,10 +288,6 @@ func (g *Debugger) CurrentCodeIndex() int {
 
 func (g *Debugger) CurrentLine() int {
 	return g.linePointer
-}
-
-func (g *Debugger) CurrentBreakPoint() *Breakpoint {
-	return g.currentBreakPoint
 }
 
 func (g *Debugger) Breakpoints() map[int]*Breakpoint {
@@ -897,7 +892,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 				// 普通断点
 				g.description = fmt.Sprintf("Trigger normal breakpoint at line %d in %s", g.linePointer, g.StateName())
 			}
-			g.currentBreakPoint = breakpoint
 
 			triggered = true
 
