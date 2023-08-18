@@ -313,6 +313,18 @@ b2 = b1[1]
 b  = b1[1] + 2
 c  = b2 + 2
 b1[1] += 1
+
+d = [1, 2, 3]
+d = ['1', "2", true]
+d = []int {1, 2, 3}
+
+d = {"11": "11", "23": "23"}
+d = {"a": 1, "b": "23", "c" : true}
+a = 1
+b = a + 1
+c = b + 1
+d = {a : 1, b : "11", c : true}
+d = map[int]string {1:"11", 2:"23", 3:"23"}
 		`
 		ir := `
 yak-main
@@ -325,6 +337,55 @@ entry0:
 	<number> t5 = <number> t2 add <number> 2
 	<number> t6 = <number> t2 add <number> 1
 	update [<number> t2] = <number> t6
+	<[]number> t8 = Interface []number [<number> 3, <number> 3]
+	<number> t9 = <[]number> t8 field[<number> 0]
+	update [<number> t9] = <number> 1
+	<number> t11 = <[]number> t8 field[<number> 1]
+	update [<number> t11] = <number> 2
+	<number> t13 = <[]number> t8 field[<number> 2]
+	update [<number> t13] = <number> 3
+	<struct {number,string,boolean}> t15 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+	<number> t16 = <struct {number,string,boolean}> t15 field[<number> 0]
+	update [<number> t16] = <number> 49
+	<string> t18 = <struct {number,string,boolean}> t15 field[<number> 1]
+	update [<string> t18] = <string> 2
+	<boolean> t20 = <struct {number,string,boolean}> t15 field[<number> 2]
+	update [<boolean> t20] = <boolean> true
+	<[]number> t22 = Interface []number [<number> 3, <number> 3]
+	<number> t23 = <[]number> t22 field[<number> 0]
+	update [<number> t23] = <number> 1
+	<number> t25 = <[]number> t22 field[<number> 1]
+	update [<number> t25] = <number> 2
+	<number> t27 = <[]number> t22 field[<number> 2]
+	update [<number> t27] = <number> 3
+	<map[string]string> t29 = Interface map[string]string [<number> 2, <number> 2]
+	<string> t30 = <map[string]string> t29 field[<string> 11]
+	update [<string> t30] = <string> 11
+	<string> t32 = <map[string]string> t29 field[<string> 23]
+	update [<string> t32] = <string> 23
+	<struct {number,string,boolean}> t34 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+	<number> t35 = <struct {number,string,boolean}> t34 field[<string> a]
+	update [<number> t35] = <number> 1
+	<string> t37 = <struct {number,string,boolean}> t34 field[<string> b]
+	update [<string> t37] = <string> 23
+	<boolean> t39 = <struct {number,string,boolean}> t34 field[<string> c]
+	update [<boolean> t39] = <boolean> true
+	<number> t41 = <number> 1 add <number> 1
+	<number> t42 = <number> t41 add <number> 1
+	<struct {number,string,boolean}> t43 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+	<number> t44 = <struct {number,string,boolean}> t43 field[<number> 1]
+	update [<number> t44] = <number> 1
+	<string> t46 = <struct {number,string,boolean}> t43 field[<number> t41]
+	update [<string> t46] = <string> 11
+	<boolean> t48 = <struct {number,string,boolean}> t43 field[<number> t42]
+	update [<boolean> t48] = <boolean> true
+	<map[number]string> t50 = Interface map[number]string [<number> 3, <number> 3]
+	<string> t51 = <map[number]string> t50 field[<number> 1]
+	update [<string> t51] = <string> 11
+	<string> t53 = <map[number]string> t50 field[<number> 2]
+	update [<string> t53] = <string> 23
+	<string> t55 = <map[number]string> t50 field[<number> 3]
+	update [<string> t55] = <string> 23
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
