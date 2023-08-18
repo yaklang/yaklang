@@ -52,15 +52,12 @@ type Frame struct {
 	hijackMapMemberCallHandlers sync.Map
 	ctx                         context.Context
 	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
-	currentArgument             []*Value
 }
 
 func (v *Frame) SetOriginCode(s string) {
 	v.originCode = s
 }
-func (v *Frame) GetCurrentArgument() []*Value {
-	return v.currentArgument
-}
+
 func (v *Frame) EnableDebuggerEval() {
 	v.indebuggerEval = true
 }

@@ -105,9 +105,7 @@ naslScanHandle = (hosts,ports)=>{
 	//opts.Append(nasl.conditions({
 	//	"family": "Web Servers",
 	//}))
-	//opts.Append(nasl.plugin("gb_apache_tomcat_consolidation.nasl"))
-	opts.Append(nasl.plugin("httpver.nasl"))
-	//opts.Append(nasl.plugin("webmirror.nasl"))
+	opts.Append(nasl.plugin("gb_apache_tomcat_consolidation.nasl"))
     kbs ,err = nasl.Scan(hosts,ports,opts...)
     if err{
         log.error("%v", err)
