@@ -89,6 +89,7 @@ func NewWithKbs(kbs *NaslKBs) *Engine {
 			print()
 		}
 	})
+	vm.SetVar("__nasl_global_var_table", make(map[int]*yakvm.Value))
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	engine.scriptObj = NewNaslScriptObject()
 	return engine

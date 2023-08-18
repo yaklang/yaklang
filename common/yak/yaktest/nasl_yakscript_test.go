@@ -98,6 +98,7 @@ naslScanHandle = (hosts,ports)=>{
 	opts.Append(nasl.preference({
 		"Exclude printers from scan": false,
 		//"Enable CGI scanning": false,
+		"global_settings/debug_level": 1,
 	}))
 	opts.Append(nasl.riskHandle((risk)=>{
 		log.info("found risk: %v", risk)

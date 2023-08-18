@@ -92,14 +92,19 @@ func (c *Compiler) VisitIfStatement(i nasl.IIfStatementContext) {
 	if !ok {
 		return
 	}
+
 	c.VisitSingleExpression(ifStatement.SingleExpression())
 
 	jmpF := c.pushJmpIfFalse()
-	c.VisitStatement(ifStatement.Statement(0))
+	//c.pushScope("if")
+	c.VisitStatement(ifStatement.Statement(0)) // if body
+	//c.pushScopeEnd()
 	jmp := c.pushJmp()
 	jmpF.Unary = len(c.codes)
 	if ifStatement.Else() != nil {
-		c.VisitStatement(ifStatement.Statement(1))
+		//c.pushScope("else")
+		c.VisitStatement(ifStatement.Statement(1)) // else body
+		//c.pushScopeEnd()
 	}
 	jmp.Unary = len(c.codes)
 }

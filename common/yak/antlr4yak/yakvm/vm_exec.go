@@ -284,6 +284,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		v.catchErrorRun(catchCodeIndex, id)
 	case OpScope:
 		v.CreateAndSwitchSubScope(v.scope.symtbl.GetSymbolTableById(c.Unary))
+		if v.vm.GetConfig().vmMode == NASL {
+			v.scope.verbose = c.Op1.String()
+		}
 	case OpScopeEnd:
 		v.ExitScope()
 	case OpAsyncCall:
@@ -299,10 +302,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			if c.Op1 != nil && c.Op1.IsString() && c.Op1.String() == "nasl_global_declare" {
+				table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
 				valId := v.pop()
-				_, ok := v.CurrentScope().GetValueByID(valId.SymbolId)
+				v1, ok := v.CurrentScope().GetValueByID(valId.SymbolId)
+				table[valId.SymbolId] = v1
 				if !ok {
-					valId.AssignBySymbol(v.CurrentScope(), GetUndefined())
+					table[valId.SymbolId] = GetUndefined()
 				}
 				return
 			}
@@ -318,8 +323,20 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			arg1 := v.pop()
 
 			if arg1.IsLeftValueRef() {
-				arg1.AssignBySymbol(v.CurrentScope(), arg2)
-				arg1.Assign(v, arg2)
+				table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+				if _, ok := table[arg1.SymbolId]; ok {
+					table[arg1.SymbolId] = arg2
+					v.push(arg2)
+					return
+				}
+				if arg2.IsYakFunction() { // nasl的函数都保存到全局
+					table[arg1.SymbolId] = arg2
+					v.push(arg2)
+					return
+				} else {
+					arg1.AssignBySymbol(v.CurrentScope(), arg2)
+					arg1.Assign(v, arg2)
+				}
 			} else {
 				assignOk := false
 				if v1, ok := arg1.Value.([]*Value); ok {
@@ -622,6 +639,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			id := c.Unary
+			table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+			if val, ok := table[id]; ok {
+				v.push(val)
+				return
+			}
 			name, ok := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 			if ok && name == "_FCT_ANON_ARGS" {
 				if val, ok := v.contextData["argument"]; ok {

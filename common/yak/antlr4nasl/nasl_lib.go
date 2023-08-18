@@ -507,6 +507,7 @@ func init() {
 			if engine.debug {
 				//naslLogger.Infof("send data: %s", data)
 			}
+			log.Infof("send data: %s", data)
 			data_length := len(data)
 			_ = option
 			_ = length
@@ -844,7 +845,7 @@ func init() {
 			forEachParams(params, func(value *yakvm.Value) {
 				s += value.String()
 			})
-			fmt.Sprintln(s)
+			commonLogger.Info(s)
 			return nil, nil
 		},
 		"ord": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
