@@ -107,6 +107,7 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if starter.baseConfig.fullTimeout != 0 {
+		log.Infof(`timeout context create time: %v`, time.Now())
 		ctx, cancel = context.WithTimeout(baseConfig.ctx, time.Second*time.Duration(starter.baseConfig.fullTimeout))
 	} else {
 		ctx, cancel = context.WithCancel(baseConfig.ctx)
@@ -249,6 +250,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 	}
 	if starter.baseConfig.pageTimeout != 0 {
+		log.Infof(`create page timeout %v`, time.Now())
 		page = page.Timeout(time.Duration(starter.baseConfig.pageTimeout) * time.Second)
 	}
 	err = starter.actionOnPage(page)
