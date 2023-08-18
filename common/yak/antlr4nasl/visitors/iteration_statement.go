@@ -32,7 +32,7 @@ func (c *Compiler) VisitForStatement(i *nasl.TraditionalForContext) {
 		return
 	}
 	c.visitHook(c, i)
-
+	c.pushScope("for")
 	c.VisitSingleExpression(i.SingleExpression(0))
 	ctrlStack := vmstack.New()
 	c.TmpData.Push(ctrlStack)
@@ -60,6 +60,7 @@ func (c *Compiler) VisitForStatement(i *nasl.TraditionalForContext) {
 		}
 	}
 	c.TmpData.Pop()
+	c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitWhileStatement(i *nasl.WhileContext) {
@@ -67,7 +68,7 @@ func (c *Compiler) VisitWhileStatement(i *nasl.WhileContext) {
 		return
 	}
 	c.visitHook(c, i)
-
+	c.pushScope("while")
 	ctrlStack := vmstack.New()
 	c.TmpData.Push(ctrlStack)
 	startP := c.GetCodePostion()
@@ -93,6 +94,7 @@ func (c *Compiler) VisitWhileStatement(i *nasl.WhileContext) {
 		}
 	}
 	c.TmpData.Pop()
+	c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
@@ -100,7 +102,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 		return
 	}
 	c.visitHook(c, i)
-
+	c.pushScope("foreach")
 	ctrlStack := vmstack.New()
 	c.TmpData.Push(ctrlStack)
 	//创建迭代器
@@ -170,6 +172,7 @@ func (c *Compiler) VisitForEachStatement(i *nasl.ForEachContext) {
 		}
 	}
 	c.TmpData.Pop()
+	c.pushScopeEnd()
 }
 
 func (c *Compiler) VisitRepeatStatement(i *nasl.RepeatContext) {
@@ -177,7 +180,7 @@ func (c *Compiler) VisitRepeatStatement(i *nasl.RepeatContext) {
 		return
 	}
 	c.visitHook(c, i)
-
+	c.pushScope("repeat")
 	ctrlStack := vmstack.New()
 	c.TmpData.Push(ctrlStack)
 	startP := c.GetCodePostion()
@@ -200,4 +203,5 @@ func (c *Compiler) VisitRepeatStatement(i *nasl.RepeatContext) {
 		}
 	}
 	c.TmpData.Pop()
+	c.pushScopeEnd()
 }
