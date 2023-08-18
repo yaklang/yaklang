@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"path"
 	"time"
@@ -402,20 +403,21 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	//swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	//errorsMux := sync.Mutex{}
 	// 创建执行引擎
-	engine := New()
-	engine.preferences = e.config.preference
-	engine.host = host
-	engine.SetProxies(e.proxies...)
-	engine.SetIncludePath(e.naslLibsPath)
-	engine.SetDependenciesPath(e.dependenciesPath)
-	engine.SetKBs(e.Kbs)
-	engine.InitBuildInLib()
-	engine.Debug(e.debug)
-	//engine.scriptExecMutexsLock = e.scriptExecMutexsLock
-	//engine.scriptExecMutexs = e.scriptExecMutexs
-	//engine.loadedScriptsLock = e.loadedScriptsLock
-	for _, hook := range e.engineHooks {
-		hook(engine)
+	symbolTable := yakvm.NewSymbolTable() //
+	newEngineByConfig := func() *Engine {
+		engine := NewWithKbsWithSymbolTable(e.Kbs, symbolTable)
+		engine.vm.SetSymboltable(symbolTable)
+		engine.preferences = e.config.preference
+		engine.host = host
+		engine.SetProxies(e.proxies...)
+		engine.SetIncludePath(e.naslLibsPath)
+		engine.SetDependenciesPath(e.dependenciesPath)
+		engine.InitBuildInLib()
+		engine.Debug(e.debug)
+		for _, hook := range e.engineHooks {
+			hook(engine)
+		}
+		return engine
 	}
 	executedScripts := map[string]struct{}{}
 	var allErrors utils.MergeErrors
@@ -443,7 +445,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 				}
 			}
 		}
-		return engine.RunScript(script)
+		return newEngineByConfig().RunScript(script)
 	}
 	for _, script := range rootScripts {
 		err := runScriptWithDep(script)

@@ -276,7 +276,7 @@ func TestPocScanner(t *testing.T) {
 			)
 			return origin(engine, params)
 		})
-		engine.SetAutoLoadDependencies(true)
+		//engine.SetAutoLoadDependencies(true)
 		// 需要把ACT_SCAN的脚本都patch一遍
 		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
 			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")

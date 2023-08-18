@@ -284,6 +284,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		v.catchErrorRun(catchCodeIndex, id)
 	case OpScope:
 		v.CreateAndSwitchSubScope(v.scope.symtbl.GetSymbolTableById(c.Unary))
+		if v.vm.GetConfig().vmMode == NASL {
+			v.scope.verbose = c.Op1.String()
+		}
 	case OpScopeEnd:
 		v.ExitScope()
 	case OpAsyncCall:
@@ -316,9 +319,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			arg2 := v.pop()
 			arg1 := v.pop()
-
 			if arg1.IsLeftValueRef() {
-				arg1.AssignBySymbol(v.CurrentScope(), arg2)
 				arg1.Assign(v, arg2)
 			} else {
 				assignOk := false
@@ -631,9 +632,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			//尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
-			if id == 118 && strings.Contains(val.String(), "html") && c.StartLineNumber == 629 {
-				println()
-			}
 			if !ok {
 				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 				if ok1 {
@@ -1181,6 +1179,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					naslArray.AddEleToList(index, v.Value)
 				}
 				v.contextData["argument"] = naslArray
+				v.currentArgument = args
 				val := idValue.Call(v, false, args...)
 				if idValue.GetExtraInfo("getOne") != nil {
 					refVal := reflect.ValueOf(val)

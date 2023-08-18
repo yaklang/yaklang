@@ -24,10 +24,15 @@ func (c *Compiler) pushOpcode(code *yakvm.Code) *yakvm.Code {
 	return code
 }
 
-func (c *Compiler) pushScope() {
+func (c *Compiler) pushScope(verbose string) {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpScope,
 		Unary:  c.symbolTable.GetTableCount(),
+		Op1: &yakvm.Value{
+			TypeVerbose: verbose,
+			Value:       verbose,
+			Literal:     verbose,
+		},
 	})
 }
 func (c *Compiler) pushScopeEnd() {
