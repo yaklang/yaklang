@@ -171,6 +171,10 @@ func (n *VirtualMachine) GetGlobalVar() map[string]interface{} {
 	return n.globalVar
 }
 
+func (n *VirtualMachine) GetDebugger() *Debugger {
+	return n.debugger
+}
+
 func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args map[int]*Value, flags ...ExecFlag) (interface{}, error) {
 	var value interface{}
 	var finalFlags = []ExecFlag{Sub}
