@@ -48,6 +48,9 @@ func (f *Function) writeVariable(variable string, value Value) {
 }
 
 func (f *Function) readVariable(variable string) Value {
+	if t, ok := f.symbolBlock.symbol[variable]; ok {
+		variable = t
+	}
 	if f.currentBlock != nil {
 		// for building function
 		return f.readVariableByBlock(variable, f.currentBlock)

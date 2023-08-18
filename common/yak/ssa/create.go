@@ -77,6 +77,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		currtenPos:   &Position{},
 		currentBlock: nil,
 		currentDef:   make(map[string]map[*BasicBlock]Value),
+		symbolBlock:  NewBlockSymbolTable("func-block-scope", nil),
 	}
 	p.funcs = append(p.funcs, f)
 	f.symbol.Func = f
