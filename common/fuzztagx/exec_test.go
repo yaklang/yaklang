@@ -254,6 +254,23 @@ func TestExecuteWithMultimethod(t *testing.T) {
 		panic("{{  s(s())   }}")
 	}
 }
+func TestExecuteBug1(t *testing.T) {
+	var m = map[string]BuildInTagFun{
+		"int": func(s string) []string {
+			return []string{s}
+		},
+	}
+
+	res, err := ExecuteWithStringHandler(`{{int::aaa(1)}} {{int::aaa(1)}} {{int::aaa(1)}}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if len(res) < 1 || res[0] != "1 1 1" {
+		panic("error")
+	}
+}
+
 func TestExecuteWithNewLine(t *testing.T) {
 	var m = map[string]BuildInTagFun{
 		"s": func(s string) []string {

@@ -19,6 +19,7 @@ const (
 	stateExpressionStart state = "{{="
 	stateExpression      state = "expression"
 	stateNone            state = "None"
+	stateMethodEmpty     state = " \n"
 )
 
 func Parse(raw interface{}, methodCtx *MethodContext) ([]Node, error) {
