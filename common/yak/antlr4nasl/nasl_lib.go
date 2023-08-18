@@ -102,6 +102,7 @@ func forEachParams(params *NaslBuildInMethodParam, handle func(value *yakvm.Valu
 type NaslBuildInMethod func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
 
 var NaslLib = make(map[string]func(engine *Engine, params *NaslBuildInMethodParam) interface{})
+var NaslIncLib = make(map[string]map[string]*yakvm.Value)
 
 func init() {
 	naslLib := map[string]NaslBuildInMethod{
@@ -495,8 +496,6 @@ func init() {
 					break
 				}
 			}
-			//log.Infof("recv_line:%v: %s", reflect.ValueOf(iconn).Pointer(), buf.String())
-			spew.Dump(buf.String())
 			return buf.String(), nil
 		},
 		"send": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
