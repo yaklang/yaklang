@@ -24,6 +24,16 @@ type builder struct {
 	next *builder
 }
 
+var (
+	blockId int = 0
+)
+
+func NewBlockId() string {
+	ret := fmt.Sprintf("block%d", blockId)
+	blockId += 1
+	return ret
+}
+
 // entry point
 func (b *builder) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
@@ -530,7 +540,10 @@ func (b *builder) buildBlock(stmt *yak.BlockContext) {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
+		// b.symbolBlock[]
+		b.symbolBlock = NewBlockSymbolTable(NewBlockId(), b.symbolBlock)
 		b.buildStatementList(s)
+		b.symbolBlock = b.symbolBlock.next
 	} else {
 		b.NewError(Warn, "empty block")
 	}
@@ -690,7 +703,12 @@ func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	if s := stmt.Identifier(); s != nil {
-		if v := b.readVariable(s.GetText()); v != nil {
+		text := s.GetText()
+		if forceAssign {
+			newtext := text + b.symbolBlock.blockid
+			b.symbolBlock.symbol[text] = newtext
+			text = newtext
+		} else if v := b.readVariable(text); v != nil {
 			// when v exist
 			switch v := v.(type) {
 			case *Field:
@@ -700,17 +718,17 @@ func (b *builder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpression
 			case *Parameter:
 			default:
 			}
-		} else if !forceAssign && b.CanBuildFreeValue(s.GetText()) {
-			field := b.parent.newField(s.GetText())
+		} else if b.CanBuildFreeValue(text) {
+			field := b.parent.newField(text)
 			field.outCapture = true
 			b.FreeValues = append(b.FreeValues, field)
 			b.SetReg(field)
-			b.parent.writeVariable(s.GetText(), field)
-			b.writeVariable(s.GetText(), field)
+			b.parent.writeVariable(text, field)
+			b.writeVariable(text, field)
 			return field
 		}
 		return &IdentifierLV{
-			variable: s.GetText(),
+			variable: text,
 		}
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
