@@ -282,6 +282,63 @@ for range 10 {
 	}
 }
 
+func TestDebugger_StepNext2(t *testing.T) {
+	code := `f = func(v) {
+	return v+1
+}
+a = f(1)
+a = f(a)
+println(a)
+`
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetNormalBreakPoint(4)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	next := 0
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+
+		checkA := func(wanted int) {
+			scope := g.Frame().CurrentScope()
+			v, ok := scope.GetValueByName("a")
+			if !ok {
+				t.Fatal("a not found")
+			}
+			if v.Int() != wanted {
+				t.Fatalf("a(%d) != %d in line %d", v.Int(), wanted, g.CurrentLine())
+			}
+		}
+		checkLine := func(lineIndex int) {
+			if g.CurrentLine() != lineIndex {
+				t.Fatalf("line %d not reached", lineIndex)
+			}
+		}
+
+		if next == 0 {
+			checkLine(4)
+			g.StepNext()
+			next++
+		} else if next == 1 {
+			checkLine(5)
+			checkA(2)
+			g.StepNext()
+			next++
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
 func TestDebugger_BreakPoint_In_Function(t *testing.T) {
 	code := `func test() {
 a = 1
