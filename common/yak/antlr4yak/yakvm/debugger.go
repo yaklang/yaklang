@@ -18,6 +18,21 @@ var (
 
 type LinesFirstCodeStateMap = map[int]*CodeState
 type BreakpointMap = map[int]*Breakpoint
+type ObserveBreakPointMap = map[string]*Value
+
+type switchBundle struct {
+	linesFirstCodeStateMap LinesFirstCodeStateMap
+	breakpointMap          BreakpointMap
+	observeBreakPointMap   ObserveBreakPointMap
+}
+
+func NewSwitchBundle() *switchBundle {
+	return &switchBundle{
+		linesFirstCodeStateMap: make(LinesFirstCodeStateMap),
+		breakpointMap:          make(BreakpointMap),
+		observeBreakPointMap:   make(ObserveBreakPointMap),
+	}
+}
 
 type Debugger struct {
 	vm           *VirtualMachine
@@ -40,14 +55,14 @@ type Debugger struct {
 	codes                         map[string][]*Code // state -> []code
 	codePointer                   int
 	linePointer                   int
-	currentLinesFirstCodeStateMap LinesFirstCodeStateMap            // 每行第一个opcode索引
-	lineFirstCodeStateMap         map[string]LinesFirstCodeStateMap // 文件路径 -> LinesFirstCodeStateMap
+	currentLinesFirstCodeStateMap LinesFirstCodeStateMap // 每行第一个opcode索引
+	// lineFirstCodeStateMap         map[string]LinesFirstCodeStateMap // 文件路径 -> LinesFirstCodeStateMap
 
 	// 断点
 	breakPointCount      int32
-	currentBreakPoint    *Breakpoint              // 当前断点
-	currentBreakPointMap BreakpointMap            // 行 -> 断点
-	breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
+	currentBreakPoint    *Breakpoint   // 当前断点
+	currentBreakPointMap BreakpointMap // 行 -> 断点
+	// breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
 
 	// 用于步过，步入，步出
 	jmpIndex    int
@@ -72,10 +87,13 @@ type Debugger struct {
 	Reference *Reference
 
 	// 观察断点
-	observeBreakPointExpressions map[string]*Value
+	currentObserveBreakPointMap ObserveBreakPointMap
 
 	// 观察表达式
 	observeExpressions map[string]*Value
+
+	// switch bundle, 用于切换多文件间的LinesFirstCodeStateMap, BreakpointMap, ObserveBreakPointMap
+	switchBundleMap map[string]*switchBundle
 }
 
 type StepStack struct {
@@ -110,28 +128,24 @@ type StackTraces struct {
 func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, callback func(*Debugger)) *Debugger {
 
 	debugger := &Debugger{
-		started:               false,
-		finished:              false,
-		jmpIndex:              -1,
-		StackTraces:           map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
-		ThreadStackTrace:      make(map[int]*StepStack, 0),
-		vm:                    vm,
-		startWG:               sync.WaitGroup{},
-		wg:                    sync.WaitGroup{},
-		initFunc:              init,
-		callbackFunc:          callback,
-		sourceCode:            sourceCode,
-		sourceCodeLines:       strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
-		codes:                 make(map[string][]*Code),
-		linePointer:           0,
-		lineFirstCodeStateMap: make(map[string]LinesFirstCodeStateMap),
-		breakpointMap:         make(map[string]BreakpointMap),
-		// currentLinesFirstCodeStateMap: make(LinesFirstCodeStateMap),
+		started:          false,
+		finished:         false,
+		jmpIndex:         -1,
+		StackTraces:      map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
+		ThreadStackTrace: make(map[int]*StepStack, 0),
+		vm:               vm,
+		startWG:          sync.WaitGroup{},
+		wg:               sync.WaitGroup{},
+		initFunc:         init,
+		callbackFunc:     callback,
+		sourceCode:       sourceCode,
+		sourceCodeLines:  strings.Split(strings.ReplaceAll(sourceCode, "\r", ""), "\n"),
+		codes:            make(map[string][]*Code),
+		linePointer:      0,
+		switchBundleMap:  make(map[string]*switchBundle),
 
-		Reference:                    NewReference(),
-		currentBreakPointMap:         make(map[int]*Breakpoint, 0),
-		observeExpressions:           make(map[string]*Value),
-		observeBreakPointExpressions: make(map[string]*Value),
+		Reference:          NewReference(),
+		observeExpressions: make(map[string]*Value),
 	}
 	debugger.Init(codes)
 	return debugger
@@ -184,14 +198,15 @@ func (g *Debugger) Init(codes []*Code) {
 
 	for state, codes := range g.codes {
 		for index, code := range codes {
-			current, ok := g.lineFirstCodeStateMap[*code.SourceCodeFilePath]
+			currentBundle, ok := g.switchBundleMap[*code.SourceCodeFilePath]
 			if !ok {
-				current = make(LinesFirstCodeStateMap)
-				g.lineFirstCodeStateMap[*code.SourceCodeFilePath] = current
+				currentBundle = NewSwitchBundle()
+				g.switchBundleMap[*code.SourceCodeFilePath] = currentBundle
 			}
+			linesFirstCodeStateMap := currentBundle.linesFirstCodeStateMap
 
-			if _, ok := current[code.StartLineNumber]; !ok {
-				current[code.StartLineNumber] = NewCodeState(index, state)
+			if _, ok := linesFirstCodeStateMap[code.StartLineNumber]; !ok {
+				linesFirstCodeStateMap[code.StartLineNumber] = NewCodeState(index, state)
 			}
 
 			// 设置currentLinesFirstCodeStateMap和sourceFilePath
@@ -218,16 +233,16 @@ func (g *Debugger) SwitchByOtherFileOpcode(code *Code) {
 		g.sourceCode = *code.SourceCodePointer
 		g.sourceCodeLines = strings.Split(strings.ReplaceAll(g.sourceCode, "\r", ""), "\n")
 
-		// 修改currentLinesFirstCodeStateMap
-		g.currentLinesFirstCodeStateMap = g.lineFirstCodeStateMap[newFilePath]
-
-		// 修改currentBreakPointMap
-		bpm, ok := g.breakpointMap[newFilePath]
+		currentBundle, ok := g.switchBundleMap[newFilePath]
 		if !ok {
-			bpm = make(BreakpointMap)
-			g.breakpointMap[newFilePath] = bpm
+			currentBundle = NewSwitchBundle()
+			g.switchBundleMap[newFilePath] = currentBundle
 		}
-		g.currentBreakPointMap = bpm
+
+		// 修改currentLinesFirstCodeStateMap, currentBreakPointMap, currentObserveBreakPointMap
+		g.currentLinesFirstCodeStateMap = currentBundle.linesFirstCodeStateMap
+		g.currentBreakPointMap = currentBundle.breakpointMap
+		g.currentObserveBreakPointMap = currentBundle.observeBreakPointMap
 	}
 }
 
@@ -527,9 +542,8 @@ func (g *Debugger) GetStackTraces() map[int]*StackTraces {
 
 func (g *Debugger) AddObserveBreakPoint(expr string) error {
 	frame := g.frame
-	if frame == nil {
-		g.observeBreakPointExpressions[expr] = undefined
-	} else {
+	g.currentObserveBreakPointMap[expr] = undefined
+	if frame != nil {
 		_, _, err := g.Compile(expr)
 		if err != nil {
 			return errors.Wrap(err, "add observe breakpoint error")
@@ -539,8 +553,8 @@ func (g *Debugger) AddObserveBreakPoint(expr string) error {
 }
 
 func (g *Debugger) RemoveObserveBreakPoint(expr string) error {
-	if _, ok := g.observeBreakPointExpressions[expr]; ok {
-		delete(g.observeBreakPointExpressions, expr)
+	if _, ok := g.currentObserveBreakPointMap[expr]; ok {
+		delete(g.currentObserveBreakPointMap, expr)
 		return nil
 	}
 
@@ -693,6 +707,7 @@ func (g *Debugger) HandleForBreakPoint() {
 }
 
 func (g *Debugger) ShouldCallback(frame *Frame) {
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -708,6 +723,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	code := g.GetCode(state, codeIndex)
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
+
+	ShowOpcodes([]*Code{code})
 
 	g.SwitchByOtherFileOpcode(code)
 
@@ -768,7 +785,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	if g.stepInState != nil {
 		// 如果debugger想要步进且state不同，则回调
 		if g.stepInState.state != state {
-			// g.HandleForStepIn(codeIndex, state)
 			g.HandleForStepIn()
 		} else if g.stepInState.lineInedx < g.linePointer {
 			// 如果已经超出此行，则回调
@@ -794,17 +810,20 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		return
 	}
 
-	if len(g.observeBreakPointExpressions) > 0 {
-		for expr, v := range g.observeBreakPointExpressions {
-			nv, err := g.EvalExpression(expr)
-			if nv == nil || err != nil {
-				nv = undefined
-			}
-			if !v.Equal(nv) {
-				g.observeBreakPointExpressions[expr] = nv
-				g.description = fmt.Sprintf("Trigger observe breakpoint at line %d in %s", g.linePointer, g.StateName())
-				g.HandleForBreakPoint()
-				return
+	if len(g.currentObserveBreakPointMap) > 0 {
+		// 当函数(正常/异常)退出时不应该触发观察断点
+		if code.Opcode != OpReturn && code.Opcode != OpPanic {
+			for expr, v := range g.currentObserveBreakPointMap {
+				nv, err := g.EvalExpression(expr)
+				if nv == nil || err != nil {
+					nv = undefined
+				}
+				if !v.Equal(nv) {
+					g.currentObserveBreakPointMap[expr] = nv
+					g.description = fmt.Sprintf("Trigger observe breakpoint at line %d in %s", g.linePointer, g.StateName())
+					g.HandleForBreakPoint()
+					return
+				}
 			}
 		}
 	}
