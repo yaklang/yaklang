@@ -3,9 +3,7 @@ package yakvm
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1136,65 +1134,4 @@ func IsBytesOrRunes(v interface{}) bool {
 		return ok
 	}
 	return ok
-}
-
-func AsDebugString(i interface{}) string {
-	refV := reflect.ValueOf(i)
-	typ := refV.Type()
-	kind := typ.Kind()
-	if !refV.IsValid() {
-		return fmt.Sprintf("%#v", i)
-	}
-
-	if kind == reflect.Array || kind == reflect.Slice {
-		length := refV.Len()
-		if length > 0 {
-			elemKind := refV.Index(0).Kind()
-			if elemKind == reflect.Uint8 { // []byte
-				v := i.([]byte)
-				return string(v)
-			} else if elemKind == reflect.Int32 { // []rune
-				v := i.([]rune)
-				return string(v)
-			}
-		}
-		content := make([]string, length)
-		for i := 0; i < length; i++ {
-			content[i] = AsDebugString(refV.Index(i).Interface())
-		}
-		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
-	} else if kind == reflect.String {
-		return fmt.Sprintf("%q", i)
-	} else if kind == reflect.Map {
-		content := make([]string, refV.Len())
-		keys := refV.MapKeys()
-		sort.SliceStable(keys, func(i, j int) bool {
-			return fmt.Sprintf("%v", keys[i]) < fmt.Sprintf("%v", keys[j])
-		})
-		for i, key := range keys {
-			content[i] = fmt.Sprintf("%q: %s", AsDebugString(key.Interface()), AsDebugString(refV.MapIndex(key).Interface()))
-		}
-		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
-	} else if typ == literalReflectType_YakFunction {
-		return fmt.Sprintf("%s", i.(*Function).String())
-	} else if kind == reflect.Ptr {
-		elem := refV.Elem()
-		if elem.IsValid() {
-			return fmt.Sprintf("&%s", AsDebugString(elem.Interface()))
-		} else {
-			return fmt.Sprintf("%#v", i)
-		}
-	} else if kind == reflect.Struct {
-		content := make([]string, refV.NumField())
-		for i := 0; i < refV.NumField(); i++ {
-			field := refV.Field(i)
-			fieldStr := "<Unavailable>"
-			if field.IsValid() && field.CanInterface() {
-				fieldStr = AsDebugString(field.Interface())
-			}
-			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, fieldStr)
-		}
-		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
-	}
-	return fmt.Sprintf("%#v", i)
 }
