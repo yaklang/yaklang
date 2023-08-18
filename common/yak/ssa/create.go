@@ -54,27 +54,29 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		name:       name,
-		Package:    p,
-		Param:      make([]*Parameter, 0),
-		Blocks:     make([]*BasicBlock, 0),
-		EnterBlock: nil,
-		ExitBlock:  nil,
-		AnonFuncs:  make([]*Function, 0),
-		parent:     nil,
-		FreeValues: make([]Value, 0),
-		user:       make([]User, 0),
-		currentDef: make(map[string]map[*BasicBlock]*Values),
-		instReg:    make(map[Instruction]string),
+		name:        name,
+		Package:     p,
+		Param:       make([]*Parameter, 0),
+		Blocks:      make([]*BasicBlock, 0),
+		EnterBlock:  nil,
+		ExitBlock:   nil,
+		AnonFuncs:   make([]*Function, 0),
+		parent:      nil,
+		FreeValues:  make([]Value, 0),
+		user:        make([]User, 0),
+		symbolTable: make(map[string][]Value),
+		instReg:     make(map[Instruction]string),
 		symbol: &Interface{
 			anInstruction: anInstruction{},
 			// I:     parent.symbol,
 			field: make(map[Value]*Field),
 			users: []User{},
 		},
+		err: make(SSAErrors, 0),
+		// for build
 		currtenPos:   &Position{},
-		err:          make(SSAErrors, 0),
 		currentBlock: nil,
+		currentDef:   make(map[string]map[*BasicBlock]Value),
 	}
 	p.funcs = append(p.funcs, f)
 	f.symbol.Func = f
