@@ -3,6 +3,7 @@ package antlr4yak
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.D
 	engine.SetDebugMode(true)
 	engine.SetDebugInit(debuggerInit)
 	engine.SetDebugCallback(debuggerCallBack)
+	engine.SetSourceFilePath("/xxx/test.yak")
 	engine.Eval(context.Background(), code)
 }
 
@@ -508,6 +510,65 @@ b = a+1
 		index := g.CurrentCodeIndex()
 		if index != 0 {
 			t.Fatal("index != 0")
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_MultiFileDebug(t *testing.T) {
+	file, err := os.CreateTemp("", "test*.yak")
+	if err != nil {
+		panic(err)
+	}
+	includeCode := `abc = func(){
+	a = 1
+	println(a+1)
+}
+`
+
+	file.WriteString(includeCode)
+	defer os.Remove(file.Name())
+
+	code := fmt.Sprintf(`include "%s"
+
+abc()
+println("finish")`, file.Name())
+
+	init := func(g *yakvm.Debugger) {
+		g.SetNormalBreakPoint(3)
+	}
+	in := false
+	stepIn, addObs := false, false
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		if !stepIn {
+			if g.CurrentLine() != 3 {
+				t.Fatal("line != 3")
+			}
+			stepIn = true
+			g.StepIn()
+		} else if !addObs {
+			if g.CurrentLine() != 1 {
+				t.Fatal("line != 1")
+			}
+			addObs = true
+			g.AddObserveBreakPoint("a")
+		} else {
+			scope := g.Frame().CurrentScope()
+			v, ok := scope.GetValueByName("a")
+			if !ok {
+				t.Fatal("a not found")
+			}
+			if v.Int() != 1 {
+				t.Fatalf("a != 1")
+			}
 		}
 	}
 
