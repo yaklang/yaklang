@@ -6,10 +6,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 )
 
-func (s *Server) AddToNavigation (ctx context.Context, req *ypb.AddToNavigationRequest)  (*ypb.Empty, error) {
+func (s *Server) AddToNavigation(ctx context.Context, req *ypb.AddToNavigationRequest) (*ypb.Empty, error) {
 	if req.Data != nil {
 		var errVerbose []string
 		for _, v := range req.Data {
@@ -52,17 +53,16 @@ func IsContainNavigation(items []*ypb.NavigationList, item string) bool {
 	return false
 }
 
-
-func (s *Server) GetAllNavigationItem (ctx context.Context, req *ypb.GetAllNavigationRequest) (*ypb.GetAllNavigationItemResponse, error) {
+func (s *Server) GetAllNavigationItem(ctx context.Context, req *ypb.GetAllNavigationRequest) (*ypb.GetAllNavigationItemResponse, error) {
 	var groups = map[string]*ypb.NavigationList{}
 	allNavigationItem := yakit.GetAllNavigation(s.GetProfileDatabase(), req)
 	var groupItems []*ypb.NavigationList
 	for _, i := range allNavigationItem {
 		groups[i.Group] = &ypb.NavigationList{
-			Group: i.Group,
+			Group:      i.Group,
 			GroupLabel: i.GroupLabel,
-			GroupSort: i.GroupSort,
-			Mode:      i.Mode,
+			GroupSort:  i.GroupSort,
+			Mode:       i.Mode,
 		}
 		if !IsContainNavigation(groupItems, groups[i.Group].Group) {
 			groupItems = append(groupItems, groups[i.Group])
@@ -74,7 +74,7 @@ func (s *Server) GetAllNavigationItem (ctx context.Context, req *ypb.GetAllNavig
 			if i.Group == v.Group {
 				item, err := s.ToGRPCNavigation(i)
 				if err != nil {
-					log.Error(err)
+					log.Warn(err)
 					continue
 				}
 				v.Items = append(v.Items, item)
@@ -87,29 +87,29 @@ func (s *Server) GetAllNavigationItem (ctx context.Context, req *ypb.GetAllNavig
 func (s *Server) ToGRPCNavigation(i *yakit.NavigationBar) (*ypb.NavigationItem, error) {
 	var (
 		yakScriptId int64
-		headImg string
+		headImg     string
 	)
 	if i.YakScriptName != "" {
 		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), i.YakScriptName)
 		if err != nil {
-			return nil, utils.Errorf("loading NavigationBar failed: %s", err)
+			return nil, utils.Errorf("loading %v NavigationBar failed: %s", strconv.Quote(i.YakScriptName), err)
 		}
 		headImg = script.HeadImg
 		yakScriptId = int64(script.ID)
 	}
 	item := &ypb.NavigationItem{
-		Group:       	i.Group,
-		YakScriptId: 	yakScriptId,
+		Group:       i.Group,
+		YakScriptId: yakScriptId,
 		//MenuItemId:  uint64(i.ID),
-		Mode:          	i.Mode,
-		VerboseSort:      i.VerboseSort,
-		GroupSort:     	i.GroupSort,
-		Route:         	i.Route,
-		YakScriptName: 	i.YakScriptName,
-		Verbose: 		i.Verbose,
-		GroupLabel: 	i.GroupLabel,
-		VerboseLabel: 	i.VerboseLabel,
-		HeadImg:        headImg,
+		Mode:          i.Mode,
+		VerboseSort:   i.VerboseSort,
+		GroupSort:     i.GroupSort,
+		Route:         i.Route,
+		YakScriptName: i.YakScriptName,
+		Verbose:       i.Verbose,
+		GroupLabel:    i.GroupLabel,
+		VerboseLabel:  i.VerboseLabel,
+		HeadImg:       headImg,
 	}
 	if item.Verbose == "" {
 		item.Verbose = i.YakScriptName
@@ -117,7 +117,7 @@ func (s *Server) ToGRPCNavigation(i *yakit.NavigationBar) (*ypb.NavigationItem, 
 	return item, nil
 }
 
-func (s *Server) DeleteAllNavigation (ctx context.Context, req *ypb.GetAllNavigationRequest) (*ypb.Empty, error) {
+func (s *Server) DeleteAllNavigation(ctx context.Context, req *ypb.GetAllNavigationRequest) (*ypb.Empty, error) {
 	err := yakit.DeleteNavigationByWhere(s.GetProfileDatabase(), req)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (s *Server) DeleteAllNavigation (ctx context.Context, req *ypb.GetAllNaviga
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) AddOneNavigation (ctx context.Context, req *ypb.AddOneNavigationRequest) (*ypb.Empty, error)  {
+func (s *Server) AddOneNavigation(ctx context.Context, req *ypb.AddOneNavigationRequest) (*ypb.Empty, error) {
 	if req.YakScriptName == "" {
 		return nil, utils.Errorf("no script name...")
 	}
@@ -149,7 +149,7 @@ func (s *Server) AddOneNavigation (ctx context.Context, req *ypb.AddOneNavigatio
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) QueryNavigationGroups (ctx context.Context, req *ypb.QueryNavigationGroupsRequest) (*ypb.GroupNames, error)  {
+func (s *Server) QueryNavigationGroups(ctx context.Context, req *ypb.QueryNavigationGroupsRequest) (*ypb.GroupNames, error) {
 	var items []*yakit.NavigationBar
 	db := s.GetProfileDatabase().Where("yak_script_name = ?", req.YakScriptName)
 	if req.GetMode() != "" {

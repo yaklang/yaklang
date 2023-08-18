@@ -180,12 +180,16 @@ execNuclei = func(target) {
 `
 
 func (m *MixPluginCaller) SetFeedback(i func(i *ypb.ExecResult) error) {
-	feedBack := m.feedbackHandler
+	if i == nil {
+		return
+	}
 	m.feedbackHandler = func(result *ypb.ExecResult) error {
 		defer func() {
-			err := feedBack(result)
-			if err != nil {
-				log.Errorf("feedback error: %v", err)
+			if err := recover(); err != nil {
+				log.Errorf("MixPluginCaller Feedback Panic: %v", err)
+				utils.Debug(func() {
+					utils.PrintCurrentGoroutineRuntimeStack()
+				})
 				return
 			}
 		}()
@@ -195,8 +199,25 @@ func (m *MixPluginCaller) SetFeedback(i func(i *ypb.ExecResult) error) {
 		return nil
 	}
 	m.ordinaryFeedback = FeedbackFactory(consts.GetGormProjectDatabase(), m.feedbackHandler, false, "")
-
 }
+
+//func (m *MixPluginCaller) SetFeedback(i func(i *ypb.ExecResult) error) {
+//	feedBack := m.feedbackHandler
+//	m.feedbackHandler = func(result *ypb.ExecResult) error {
+//		defer func() {
+//			err := feedBack(result)
+//			if err != nil {
+//				log.Errorf("feedback error: %v", err)
+//				return
+//			}
+//		}()
+//		if i != nil {
+//			return i(result)
+//		}
+//		return nil
+//	}
+//	m.ordinaryFeedback = FeedbackFactory(consts.GetGormProjectDatabase(), m.feedbackHandler, false, "")
+//}
 
 func (m *MixPluginCaller) SetDividedContext(b bool) {
 	if m.callers == nil {

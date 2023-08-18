@@ -134,7 +134,11 @@ func (c *YakitClient) OutputLog(level string, info string, items ...interface{})
 	default:
 		f = log.Info
 	}
-	f(data)
+	if len(data) > 256 {
+		f(string(data[:100]) + "...")
+	} else {
+		f(data)
+	}
 
 	// client 不存在
 	if c == nil {

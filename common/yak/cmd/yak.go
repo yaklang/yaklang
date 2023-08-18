@@ -36,6 +36,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"io"
 	"io/ioutil"
+	systemLog "log"
 	"net"
 	"net/http"
 	"os"
@@ -87,6 +88,7 @@ func initializeDatabase(projectDatabase string, profileDBName string) error {
 func init() {
 	// 取消掉 0022 的限制，让用户可以创建别人也能写的文件夹
 	umask.Umask(0)
+	systemLog.Default().SetOutput(io.Discard)
 
 	/*
 		进行一些必要初始化，永远不要再 init 中直接调用数据库，不然会破坏数据库加载的顺序
