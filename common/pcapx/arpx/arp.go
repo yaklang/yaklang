@@ -289,7 +289,7 @@ func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		return nil, utils.Errorf("pcap open live %v failed: %s", pcapName, err)
 	}
 
-	err = hanldler.SetBPFFilter("arpx")
+	err = hanldler.SetBPFFilter("arp")
 	if err != nil {
 		return nil, utils.Errorf("bind bpf filter failed: %s", err)
 	}
