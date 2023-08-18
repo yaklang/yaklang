@@ -133,7 +133,6 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 					addTrafficCounter()
 					traffic := traffic
 					swg.Add()
-					sendLog("info", "开始执行模拟规则为[%v]：%v", trafficCounter, traffic.ChaosRule.NameZh)
 					go func() {
 						defer swg.Done()
 						pcapx.InjectChaosTraffic(traffic)
@@ -154,7 +153,6 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			sendLog("info", "模拟场景加载完成，共加载规则: %v", len(generator.ChaosRules))
 			for traffic := range generator.Generate() {
 				traffic := traffic
-				sendLog("info", "开始执行模拟规则为[%v]：%v", trafficCounter, traffic.ChaosRule.NameZh)
 				swg.Add()
 				addTrafficCounter()
 				go func() {

@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -23,7 +24,7 @@ func (h *httpHandler) MatchBytes(i any) bool {
 	panic("implement me")
 }
 
-func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *suricata.Rule) chan *ChaosTraffic {
+func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *suricata.Rule) chan *pcapx.ChaosTraffic {
 	if originRule == nil {
 		return nil
 	}
@@ -31,7 +32,7 @@ func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, orig
 		return nil
 	}
 
-	ch := make(chan *ChaosTraffic)
+	ch := make(chan *pcapx.ChaosTraffic)
 	go (&httpGenerator{
 		chaosRule:  chaosRule,
 		originRule: originRule,
@@ -46,7 +47,7 @@ type httpGenerator struct {
 	chaosRule  *rule.Storage
 	originRule *suricata.Rule
 	maker      *ChaosMaker
-	out        chan *ChaosTraffic
+	out        chan *pcapx.ChaosTraffic
 }
 
 func (h *httpGenerator) generator(count int) {
@@ -69,16 +70,12 @@ func (h *httpGenerator) generator(count int) {
 
 func (h *httpGenerator) toChaosTraffic(raw []byte) {
 	if lowhttp.IsResp(raw) {
-		h.out <- &ChaosTraffic{
-			ChaosRule:    h.chaosRule,
-			SuricataRule: h.originRule,
+		h.out <- &pcapx.ChaosTraffic{
 			HttpResponse: raw,
 		}
 	} else {
-		h.out <- &ChaosTraffic{
-			ChaosRule:    h.chaosRule,
-			SuricataRule: h.originRule,
-			HttpRequest:  raw,
+		h.out <- &pcapx.ChaosTraffic{
+			HttpRequest: raw,
 		}
 	}
 }

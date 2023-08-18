@@ -1,10 +1,10 @@
-package pcapx
+package chaosmaker
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata"
 	"net/http"
 	_ "net/http/pprof"
@@ -21,10 +21,10 @@ func TestChaosRules(t *testing.T) {
 		http.ListenAndServe(":6060", nil)
 	}()
 	for i := range rule.YieldRules(consts.GetGormProfileDatabase(), context.Background()) {
-		mk := chaosmaker.NewChaosMaker()
+		mk := NewChaosMaker()
 		mk.FeedRule(i)
 		for traffic := range mk.Generate() {
-			InjectChaosTraffic(traffic)
+			pcapx.InjectChaosTraffic(traffic)
 		}
 	}
 }
@@ -72,10 +72,10 @@ func TestDebugChaosRules(t *testing.T) {
 		for _, r := range rules {
 			fRule = append(fRule, rule.NewRuleFromSuricata(r))
 		}
-		mk := chaosmaker.NewChaosMaker()
+		mk := NewChaosMaker()
 		mk.FeedRule(fRule...)
 		for traffic := range mk.Generate() {
-			InjectChaosTraffic(traffic)
+			pcapx.InjectChaosTraffic(traffic)
 		}
 	}
 
