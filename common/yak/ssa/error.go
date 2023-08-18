@@ -25,8 +25,8 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, Pos *Position, format string,
 		Kind:    kind,
 	})
 }
-func (f *Function) NewError(kind ErrorKind, format string, arg ...any) {
-	f.NewErrorWithPos(kind, f.currtenPos, format, arg...)
+func (b *builder) NewError(kind ErrorKind, format string, arg ...any) {
+	b.NewErrorWithPos(kind, b.currtenPos, format, arg...)
 }
 func (an anInstruction) NewError(kind ErrorKind, format string, arg ...any) {
 	an.Func.NewErrorWithPos(kind, an.pos, format, arg...)
