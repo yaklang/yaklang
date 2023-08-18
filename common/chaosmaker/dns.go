@@ -5,6 +5,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
@@ -19,7 +20,7 @@ type dnsHandler struct {
 
 var _ chaosHandler = (*dnsHandler)(nil)
 
-func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *ChaosTraffic {
+func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *pcapx.ChaosTraffic {
 	if rule.Protocol != "dns" {
 		return nil
 	}
@@ -52,7 +53,7 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 	}
 	baseDNSLayer.QR = true
 
-	ch := make(chan *ChaosTraffic)
+	ch := make(chan *pcapx.ChaosTraffic)
 	feedback := func(raw []byte) {
 		if raw == nil {
 			return
@@ -140,10 +141,8 @@ func (h *dnsHandler) MatchBytes(i any) bool {
 	return false
 }
 
-func DNSIPBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *ChaosTraffic {
-	return &ChaosTraffic{
-		ChaosRule:            makerRule,
-		SuricataRule:         r,
+func DNSIPBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+	return &pcapx.ChaosTraffic{
 		UDPIPOutboundPayload: raw,
 	}
 }

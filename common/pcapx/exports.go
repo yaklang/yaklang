@@ -4,13 +4,25 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"math/rand"
 	"net"
 )
+
+type ChaosTraffic struct {
+	RawTCP                bool
+	LocalIP               string
+	LinkLayerPayload      []byte
+	TCPIPPayload          []byte
+	UDPIPInboundPayload   []byte
+	UDPIPOutboundPayload  []byte
+	ICMPIPInboundPayload  []byte
+	ICMPIPOutboundPayload []byte
+	HttpRequest           []byte
+	HttpResponse          []byte
+}
 
 func injectWithError(raw []byte, c *Config) error {
 	if c.Iface == "" && PublicInterface != nil {
@@ -362,7 +374,11 @@ func InjectICMPIP(raw []byte, opt ...ConfigOption) {
 	InjectRaw(rawData, opt...)
 }
 
-func InjectChaosTraffic(t *chaosmaker.ChaosTraffic, opts ...ConfigOption) {
+func getStatistics() *Statistics {
+	return globalStatistics
+}
+
+func InjectChaosTraffic(t *ChaosTraffic, opts ...ConfigOption) {
 	if t.HttpRequest != nil {
 		InjectHTTPRequest(t.HttpRequest, opts...)
 	}
@@ -402,10 +418,6 @@ func InjectChaosTraffic(t *chaosmaker.ChaosTraffic, opts ...ConfigOption) {
 	if t.LinkLayerPayload != nil {
 		InjectRaw(t.LinkLayerPayload, opts...)
 	}
-}
-
-func getStatistics() *Statistics {
-	return globalStatistics
 }
 
 var (
