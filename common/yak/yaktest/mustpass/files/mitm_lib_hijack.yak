@@ -1,0 +1,55 @@
+host, port = tcp.MockServe(`HTTP/1.1 200 OK
+Content-Length: 1
+
+a`)
+
+ctx, cancel = context.WithCancel(context.New())
+mitmPort = os.GetRandomAvailableTCPPort()
+
+notModified = false
+notPass = false
+requestModified = false
+go func {
+    defer cancel()
+
+    sleep(1)
+    rsp, req = poc.Get("http://" + str.HostPort(host, port), poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
+    if !string(rsp.RawPacket).Contains("abc") {
+        notModified = true
+    }
+    dump(rsp.RawPacket)
+
+    rsp, req = poc.Get("http://" + str.HostPort(host, port))~
+    if string(rsp.RawPacket).Contains("abc") {
+        notPass = true
+    }
+    dump(rsp.RawPacket)
+
+    rsp, req = poc.Get("http://" + str.HostPort(host, port) + "/ddaa", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
+    if string(rsp.RawPacket).Contains("ccc") {
+       requestModified = true
+    }
+    dump(rsp.RawPacket)
+}
+
+mitm.Start(mitmPort, mitm.hijackHTTPResponse((isHttps, url, rsp, forward, drop) => {
+    if url.Contains("/ddddd") {
+        forward(poc.ReplaceHTTPPacketBody(rsp, "ccc"))
+    }else{
+        forward(poc.ReplaceHTTPPacketBody(rsp, "abc"))
+    }
+}), mitm.context(ctx), mitm.hijackHTTPRequest((isHttps, url, req, forward, drop) => {
+    forward(string(req).Replace("/ddaa", "/ddddd"))
+}))
+
+if notPass {
+    die("not passed")
+}
+
+if notModified {
+    die("not modified")
+}
+
+if !requestModified {
+    die("request is not modified")
+}
