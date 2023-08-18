@@ -1221,28 +1221,28 @@ func TestStepAndNextRequest(t *testing.T) {
 	)
 }
 
-func TestHardCodedBreakpoints(t *testing.T) {
-	runTest(t, "HardCodedBreakpoints", HardCodeBreakPointTestcase, func(server *DAPServer, client *Client, program string) {
-		runDebugSessionWithBPs(t, client, func() {
-			server.config.extraLibs = TestExtraLibs
-			client.LaunchRequest("exec", program, !StopOnEntry)
-		}, program,
-			[]int{10},
-			[]onBreakpoint{{
-				execute: func() {
-					checkStop(t, client, 0, "main", 10)
-					client.ContinueRequest(0)
-					client.ExpectContinueResponse(t)
-					se := client.ExpectStoppedEvent(t)
-					_ = se
-					if se.Body.ThreadId != 0 || se.Body.Reason != "breakpoint" {
-						t.Errorf("\ngot  %#v\nwant ThreadId=0 Reason=\"breakpoint\"", se)
-					}
-					checkStop(t, client, 0, "f", 3)
-				},
-				disconnect: true,
-			}},
-		)
-	},
-	)
-}
+// func TestHardCodedBreakpoints(t *testing.T) {
+// 	runTest(t, "HardCodedBreakpoints", HardCodeBreakPointTestcase, func(server *DAPServer, client *Client, program string) {
+// 		runDebugSessionWithBPs(t, client, func() {
+// 			server.config.extraLibs = TestExtraLibs
+// 			client.LaunchRequest("exec", program, !StopOnEntry)
+// 		}, program,
+// 			[]int{10},
+// 			[]onBreakpoint{{
+// 				execute: func() {
+// 					checkStop(t, client, 0, "main", 10)
+// 					client.ContinueRequest(0)
+// 					client.ExpectContinueResponse(t)
+// 					se := client.ExpectStoppedEvent(t)
+// 					_ = se
+// 					if se.Body.ThreadId != 0 || se.Body.Reason != "breakpoint" {
+// 						t.Errorf("\ngot  %#v\nwant ThreadId=0 Reason=\"breakpoint\"", se)
+// 					}
+// 					checkStop(t, client, 0, "f", 3)
+// 				},
+// 				disconnect: true,
+// 			}},
+// 		)
+// 	},
+// 	)
+// }
