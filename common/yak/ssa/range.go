@@ -12,19 +12,19 @@ type canStartStopToken interface {
 	GetText() string
 }
 
-func (f *Function) SetRange(b canStartStopToken) func() {
-	pos := f.currtenPos
+func (b *builder) SetRange(token canStartStopToken) func() {
+	pos := b.currtenPos
 	// fmt.Printf("debug %v\n", b.GetText())
-	source := strings.Split(b.GetText(), "\n")[0]
-	f.currtenPos = &Position{
+	source := strings.Split(token.GetText(), "\n")[0]
+	b.currtenPos = &Position{
 		SourceCode:  source,
-		StartLine:   b.GetStart().GetLine(),
-		StartColumn: b.GetStart().GetColumn(),
-		EndLine:     b.GetStop().GetLine(),
-		EndColumn:   b.GetStop().GetColumn(),
+		StartLine:   token.GetStart().GetLine(),
+		StartColumn: token.GetStart().GetColumn(),
+		EndLine:     token.GetStop().GetLine(),
+		EndColumn:   token.GetStop().GetColumn(),
 	}
 
 	return func() {
-		f.currtenPos = pos
+		b.currtenPos = pos
 	}
 }

@@ -74,20 +74,15 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		},
 		err: make(SSAErrors, 0),
 		// for build
-		currtenPos:   &Position{},
-		currentBlock: nil,
-		currentDef:   make(map[string]map[*BasicBlock]Value),
-		symbolBlock:  NewBlockSymbolTable("func-block-scope", nil),
 	}
 	p.funcs = append(p.funcs, f)
 	f.symbol.Func = f
 	if parent != nil {
 		parent.AddAnonymous(f)
 		// Pos: parent.currtenPos,
-		f.Pos = parent.currtenPos
+		f.Pos = parent.builder.currtenPos
 	}
-	enter := f.newBasicBlock("entry")
-	f.currentBlock = enter
+	f.EnterBlock = f.newBasicBlock("entry")
 	return f
 }
 func (f *Function) newBasicBlock(name string) *BasicBlock {
@@ -121,7 +116,6 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 }
 
 func (f *Function) Finish() {
-	f.currentBlock = nil
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 	for _, b := range f.Blocks {

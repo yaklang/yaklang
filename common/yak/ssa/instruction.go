@@ -23,7 +23,7 @@ func (f *Field) GetLastValue() Value {
 	return nil
 }
 
-func (f *Function) newCall(target Value, args []Value, isDropError bool) *Call {
+func (f *builder) newCall(target Value, args []Value, isDropError bool) *Call {
 	var freevalue []Value
 	var parent *Function
 	binding := make([]Value, 0, len(freevalue))
@@ -54,10 +54,10 @@ func (f *Function) newCall(target Value, args []Value, isDropError bool) *Call {
 	}
 
 	if parent == nil {
-		parent = f
+		parent = f.Function
 	}
 	getField := func(fun *Function, key string) bool {
-		if v := fun.readField(key); v != nil {
+		if v := fun.builder.readField(key); v != nil {
 			binding = append(binding, v)
 			return true
 		}
@@ -66,7 +66,7 @@ func (f *Function) newCall(target Value, args []Value, isDropError bool) *Call {
 	for index := range freevalue {
 		if para, ok := freevalue[index].(*Parameter); ok { // not modify
 			// find freevalue in parent function
-			if v := parent.readVariable(para.variable); v != nil {
+			if v := parent.builder.readVariable(para.variable); v != nil {
 				switch v := v.(type) {
 				case *Parameter:
 					if !v.isFreevalue {
@@ -79,7 +79,7 @@ func (f *Function) newCall(target Value, args []Value, isDropError bool) *Call {
 					continue
 				}
 			}
-			if parent != f {
+			if parent != f.Function {
 				// find freevalue in current function
 				if v := f.readVariable(para.variable); v != nil {
 					binding = append(binding, v)
@@ -93,8 +93,8 @@ func (f *Function) newCall(target Value, args []Value, isDropError bool) *Call {
 			if getField(parent, field.Key.String()) {
 				continue
 			}
-			if parent != f {
-				if getField(f, field.Key.String()) {
+			if parent != f.Function {
+				if getField(f.Function, field.Key.String()) {
 					continue
 				}
 			}

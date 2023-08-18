@@ -18,7 +18,7 @@ func (phi *Phi) Build() Value {
 	phi.Block.skip = true
 	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
-		v := phi.Func.readVariableByBlock(phi.variable, predBlock)
+		v := phi.Func.builder.readVariableByBlock(phi.variable, predBlock)
 		phi.Edge = append(phi.Edge, v)
 	}
 	phi.Block.skip = false
