@@ -724,8 +724,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.codePointer = codeIndex
 	g.linePointer = code.StartLineNumber
 
-	ShowOpcodes([]*Code{code})
-
 	g.SwitchByOtherFileOpcode(code)
 
 	stackTrace := g.CurrentStackTrace()
