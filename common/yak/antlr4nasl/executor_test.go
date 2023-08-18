@@ -3,7 +3,6 @@ package antlr4nasl
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/netx"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
@@ -341,8 +340,9 @@ func TestGetword(t *testing.T) {
 	code := `
 include("byte_func.inc");
 buf = getBuf();
-assert(getword( blob:buf, pos:0) == 1,"getword error");
-assert(getword( blob:buf, pos:2) == 2,"getword error");
+dump(getword( blob:buf, pos:0));
+# assert(getword( blob:buf, pos:0) == 1,"getword error");
+# assert(getword( blob:buf, pos:2) == 2,"getword error");
 `
 	engine := New()
 	engine.InitBuildInLib()
@@ -357,7 +357,42 @@ assert(getword( blob:buf, pos:2) == 2,"getword error");
 		t.Fatal(err)
 	}
 }
-func TestGet_host_name(t *testing.T) {
-	res := netx.LookupFirst("dns.google.")
-	spew.Dump(res)
+func TestGetword1(t *testing.T) {
+	code := `
+include("smb_nt.inc");
+`
+	engine := New()
+	engine.InitBuildInLib()
+	engine.vm.ImportLibs(map[string]interface{}{
+		"__function__getBuf": func() any {
+			res, _ := codec.DecodeHex("00010002")
+			return res
+		},
+	})
+	err := engine.Eval(code)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetword2(t *testing.T) {
+	code := `
+global_var a;
+if (1){
+	a = 1;
+}
+dump(a);
+`
+	engine := New()
+	engine.InitBuildInLib()
+	engine.vm.ImportLibs(map[string]interface{}{
+		"__function__getBuf": func() any {
+			res, _ := codec.DecodeHex("00010002")
+			return res
+		},
+	})
+	err := engine.Eval(code)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

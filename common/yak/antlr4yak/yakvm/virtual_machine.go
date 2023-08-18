@@ -182,11 +182,10 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		//闭包继承父作用域
 		if v.config.GetClosureSupport() {
 			frame.scope = f.scope
+			frame.CreateAndSwitchSubScope(f.symbolTable)
 		} else {
-			frame.scope = v.rootScope
+			frame.scope = NewScope(f.symbolTable)
 		}
-		frame.CreateAndSwitchSubScope(f.symbolTable)
-
 		for id, arg := range args {
 			frame.CurrentScope().NewValueByID(id, arg)
 		}
@@ -194,7 +193,9 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		if frame.lastStackValue != nil {
 			value = frame.lastStackValue.Value
 		}
-		frame.ExitScope()
+		if v.config.GetClosureSupport() {
+			frame.ExitScope()
+		}
 	}, finalFlags...)
 	if err != nil {
 		return nil, err
