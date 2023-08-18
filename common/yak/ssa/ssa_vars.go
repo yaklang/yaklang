@@ -30,18 +30,17 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 	var result = new(InspectVariableResult)
 	result.VariableName = varName
 
-	if f == nil || f.currentDef == nil {
+	if f == nil || f.symbolTable == nil {
 		return result
 	}
 
-	res, ok := f.currentDef[varName]
+	res, ok := f.symbolTable[varName]
 	if !ok || res == nil {
 		return result
 	}
 	var probablyTypes []string
 	var probablyValue []string
-	for _, vs := range res {
-		v := vs.v
+	for _, v := range res {
 		probablyValue = append(probablyValue, v.String())
 		valType := v.GetType()
 		if valType != nil {

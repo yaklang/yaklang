@@ -41,6 +41,10 @@ var _ LeftValue = (*Field)(nil)
 // --------------- `f.currentDef` hanlder, read && write
 func (f *Function) writeVariable(variable string, value Value) {
 	f.writeVariableByBlock(variable, value, f.currentBlock)
+	if _, ok := f.symbolTable[variable]; !ok {
+		f.symbolTable[variable] = make([]Value, 0, 1)
+	}
+	f.symbolTable[variable] = append(f.symbolTable[variable], value)
 }
 
 func (f *Function) readVariable(variable string) Value {
@@ -54,22 +58,10 @@ func (f *Function) readVariable(variable string) Value {
 }
 
 func (f *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	_, ok := f.currentDef[variable]
-	if !ok {
-		f.currentDef[variable] = make(map[*BasicBlock]*Values)
+	if _, ok := f.currentDef[variable]; !ok {
+		f.currentDef[variable] = make(map[*BasicBlock]Value)
 	}
-	if vs, ok := f.currentDef[variable][block]; !ok {
-		f.currentDef[variable][block] = &Values{
-			v:    value,
-			next: nil,
-		}
-
-	} else {
-		f.currentDef[variable][block] = &Values{
-			v:    value,
-			next: vs,
-		}
-	}
+	f.currentDef[variable][block] = value
 }
 
 func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
@@ -78,7 +70,7 @@ func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value
 	}
 	if map2, ok := f.currentDef[variable]; ok {
 		if value, ok := map2[block]; ok {
-			return value.v
+			return value
 		}
 	}
 	return f.readVariableRecursive(variable, block)
