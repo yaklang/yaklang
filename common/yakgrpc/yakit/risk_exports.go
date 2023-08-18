@@ -249,6 +249,12 @@ func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	}
 }
 
+func WithRiskParam_Ignore(i bool) RiskParamsOpt {
+	return func(r *Risk) {
+		r.Ignore = true
+	}
+}
+
 func CreateRisk(u string, opts ...RiskParamsOpt) *Risk {
 	return _createRisk(u, opts...)
 }
@@ -321,6 +327,11 @@ func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*Risk, er
 }
 
 func _saveRisk(r *Risk) error {
+	if r.Ignore {
+		log.Infof("ignore risk: %v", r.Title)
+		return nil
+	}
+
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
