@@ -7,6 +7,7 @@ out                            : step out function
 r, run                         : run until breakpoint
 watch <expr>                   : set observe breakpoint that is triggered when <expr> is modified
 unwatch <expr>                 : remove <expr> observe breakpoint
+swatch                         : show all observe breakpoints
 obs <expr>                     : observe <expr>
 unobs <expr>                   : un-observe <expr>
 showobs                        : show all observe expressions
