@@ -106,6 +106,12 @@ Host: example.com
 	for _, p := range req.GetPostParams() {
 		freq = freq.FuzzPostParams(p.GetKey(), p.GetValue())
 	}
+	for _, p := range req.GetMultipartParams() {
+		freq = freq.FuzzUploadKVPair(p.GetKey(), p.GetValue())
+	}
+	for _, p := range req.GetMultipartFileParams() {
+		freq = freq.FuzzUploadFileName(p.GetKey(), p.GetValue())
+	}
 	if len(req.GetBody()) > 0 {
 		freq = freq.FuzzPostRaw(string(req.GetBody()))
 	}
