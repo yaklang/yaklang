@@ -414,15 +414,29 @@ func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
 }
 
 func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "NextRequest is not yet supported"))
+	// 等待程序启动
+	ds.WaitProgramStart()
+	ds.debugger.StepNext()
+	ds.sendStepResponse(request.Arguments.ThreadId, &dap.NextResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onStepInRequest(request *dap.StepInRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "StepInRequest is not yet supported"))
+	// 等待程序启动
+	ds.WaitProgramStart()
+	ds.debugger.StepIn()
+	ds.sendStepResponse(request.Arguments.ThreadId, &dap.StepInResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onStepOutRequest(request *dap.StepOutRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "StepOutRequest is not yet supported"))
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	err := ds.debugger.StepOut()
+	if err != nil {
+		ds.sendErrorResponse(request.Request, UnableToHalt, "Unable to halt execution", err.Error())
+		return
+	}
+	ds.sendStepResponse(request.Arguments.ThreadId, &dap.StepOutResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onStepBackRequest(request *dap.StepBackRequest) {
@@ -758,6 +772,17 @@ func (ds *DebugSession) onCancelRequest(request *dap.CancelRequest) {
 
 func (ds *DebugSession) onBreakpointLocationsRequest(request *dap.BreakpointLocationsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "BreakpointLocationsRequest is not yet supported"))
+}
+
+func (ds *DebugSession) sendStepResponse(threadId int, message dap.Message) {
+	ds.send(&dap.ContinuedEvent{
+		Event: *newEvent("continued"),
+		Body: dap.ContinuedEventBody{
+			ThreadId:            threadId,
+			AllThreadsContinued: true,
+		},
+	})
+	ds.send(message)
 }
 
 func (ds *DebugSession) sendErrorResponse(request dap.Request, id int, summary, details string) {

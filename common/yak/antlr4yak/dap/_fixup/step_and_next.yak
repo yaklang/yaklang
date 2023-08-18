@@ -1,0 +1,23 @@
+func square(a) {
+    z = a * a
+    return f(z+a)
+}
+
+func initialize() {
+	return 3, 4
+}
+
+func main() {
+	var a, b
+	a, b = initialize()
+	a = square(a)
+	b = square(b)
+	printf("%d %d\n", a, b)
+}
+
+
+func f(x) {
+	return x
+}
+
+main()

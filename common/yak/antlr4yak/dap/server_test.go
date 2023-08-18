@@ -1179,3 +1179,44 @@ func TestEvaluateCommandRequest(t *testing.T) {
 	},
 	)
 }
+
+func TestStepAndNextRequest(t *testing.T) {
+	runTest(t, "StepAndNextRequest", StepAndNExtTestcase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			server.config.extraLibs = TestExtraLibs
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{7},
+			[]onBreakpoint{{
+				execute: func() {
+					checkStop(t, client, 0, "initialize", 7)
+					expectStop := func(fun string, line int) {
+						t.Helper()
+						se := client.ExpectStoppedEvent(t)
+						if se.Body.Reason != "step" || se.Body.ThreadId != 0 || !se.Body.AllThreadsStopped {
+							t.Errorf("got %#v, want Reason=\"step\", ThreadId=1, AllThreadsStopped=true", se)
+						}
+						checkStop(t, client, 0, fun, line)
+					}
+					client.StepOutRequest(0)
+					client.ExpectStepOutResponse(t)
+					expectStop("main", 12)
+
+					client.NextRequest(0)
+					client.ExpectNextResponse(t)
+					expectStop("main", 13)
+
+					client.StepInRequest(0)
+					client.ExpectStepInResponse(t)
+					expectStop("square", 1)
+
+					client.NextRequest(0)
+					client.ExpectNextResponse(t)
+					expectStop("square", 2)
+				},
+				disconnect: true,
+			}},
+		)
+	},
+	)
+}
