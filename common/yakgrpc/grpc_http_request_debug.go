@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/url"
 	"strings"
 )
 
@@ -64,7 +65,10 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		return utils.Error("unsupported plugin type: " + debugType)
 	}
 
-	var builderResponse, _ = s.HTTPRequestBuilder(stream.Context(), builderParams)
+	builderResponse, err := s.HTTPRequestBuilder(stream.Context(), builderParams)
+	if err != nil {
+		log.Errorf("failed to build http request: %v", err)
+	}
 
 	var reqs []any
 	feed := func(req []byte, isHttps bool) {
@@ -121,27 +125,20 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 					continue
 				}
 				var handledRaw = bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port)))
+				var https = i.GetIsHttps()
 				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
-					https := strings.HasPrefix(res, "https://")
-					feed(lowhttp.UrlToGetRequestPacket(res, handledRaw, https), https)
+					https = strings.HasPrefix(res, "https://")
+					u, _ := url.Parse(res)
+					if u != nil && u.Path != "" && u.Path != "/" {
+						feed(lowhttp.UrlToGetRequestPacket(res, handledRaw, https), https)
+					}
+				}
+
+				if (https && port != 443) || (!https && port != 80) {
+					feed(handledRaw, https)
 					continue
 				}
-
-				if port > 0 {
-					if i.GetIsHttps() && port == 443 {
-						feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
-						continue
-					}
-
-					if !i.GetIsHttps() && port == 80 {
-						feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
-						continue
-					}
-
-					feed(handledRaw, i.GetIsHttps())
-				} else {
-					feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), i.GetIsHttps())
-				}
+				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), https)
 			}
 		})
 	}
