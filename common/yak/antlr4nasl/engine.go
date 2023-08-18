@@ -32,20 +32,15 @@ type Engine struct {
 	buildInMethodHook map[string]func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error)
 	preferences       map[string]any
 	logger            *log.Logger
-	symbolTable       *yakvm.SymbolTable
 }
 
 func NewWithKbs(kbs *NaslKBs) *Engine {
 	table := yakvm.NewSymbolTable()
-	return NewWithKbsWithSymbolTable(kbs, table)
-}
-func NewWithKbsWithSymbolTable(kbs *NaslKBs, table *yakvm.SymbolTable) *Engine {
 	vm := yakvm.NewWithSymbolTable(table)
 	vm.GetConfig().SetClosureSupport(false)
 	vm.GetConfig().SetFunctionNumberCheck(false)
 	vm.GetConfig().SetYVMMode(yakvm.NASL)
 	engine := &Engine{
-		symbolTable:  table,
 		compiler:     visitors.NewCompilerWithSymbolTable(table),
 		vm:           vm,
 		naslLibPatch: make(map[string]func(string) string),
@@ -90,7 +85,7 @@ func NewWithKbsWithSymbolTable(kbs *NaslKBs, table *yakvm.SymbolTable) *Engine {
 	})
 	vm.SetVar("__OpCallCallBack__", func(name string) {
 		// 做一些函数调试的工作
-		if name == "get_http_port" {
+		if name == "http_recv_headers2" {
 			print()
 		}
 	})
@@ -98,7 +93,6 @@ func NewWithKbsWithSymbolTable(kbs *NaslKBs, table *yakvm.SymbolTable) *Engine {
 	engine.scriptObj = NewNaslScriptObject()
 	return engine
 }
-
 func New() *Engine {
 	return NewWithKbs(NewNaslKBs())
 }
@@ -207,26 +201,6 @@ func (e *Engine) RunScript(script *NaslScriptInfo) error {
 }
 
 func (e *Engine) EvalInclude(name string) error {
-	if name == "http_keepalive.inc" {
-		println()
-	}
-	if name == "http_func.inc" {
-		println()
-	}
-	newVarInCurrentScope := func(name string, value *yakvm.Value) {
-		scope := e.vm.CurrentFM().CurrentScope()
-		id, ok := scope.GetSymTable().GetSymbolByVariableName(name)
-		if !ok {
-			panic(utils.Errorf("not found var %s", name))
-		}
-		scope.NewValueByID(id, value)
-	}
-	if v, ok := NaslIncLib[name]; ok {
-		for k, v1 := range v {
-			newVarInCurrentScope(k, v1)
-		}
-		return nil
-	}
 	// 优先从本地文件中查找，否则从内置的文件中查找
 	var sourceBytes []byte
 	libPath := path.Join(e.naslLibsPath, name)
@@ -235,89 +209,16 @@ func (e *Engine) EvalInclude(name string) error {
 		sourceBytes = codes
 	}
 	//本地文件加载失败，从内置文件中加载
-
 	if sourceBytes == nil {
-		if name != "test.inc" {
-			data, err := embed.Asset("data/nasl-incs/" + name)
-			if err != nil {
-				err = utils.Errorf("not found include file: %s", name)
-				e.logger.Error(err)
-				return err
-			}
-			sourceBytes = data
-		} else {
-			sourceBytes = []byte(`function test(a){return a;}`)
+		data, err := embed.Asset("data/nasl-incs/" + name)
+		if err != nil {
+			err = utils.Errorf("not found include file: %s", name)
+			e.logger.Error(err)
+			return err
 		}
+		sourceBytes = data
 	}
-	vm := yakvm.NewWithSymbolTable(e.symbolTable) // 继承符号表，防止函数互相调用时，变量找不到
-	vm.ImportLibs(e.vm.GetGlobalVar())
-	vm.GetConfig().SetYVMMode(yakvm.NASL)
-	vm.GetConfig().SetClosureSupport(false)
-	vm.GetConfig().SetFunctionNumberCheck(false)
-	err = e.Compile(string(sourceBytes))
-	if err != nil {
-		panic(utils.Errorf("compile include file %s error: %s", name, err.Error()))
-	}
-
-	err = vm.ExecYakCode(context.Background(), string(sourceBytes), e.compiler.GetCodes(), yakvm.Inline)
-	if err != nil {
-		e.logger.Error(err)
-		return err
-	} else {
-		vars := vm.GetGlobalScopeVMVars()
-		for k, v := range vars {
-			//scope := e.vm.CurrentFM().CurrentScope()
-			//ids := scope.GetAllIdInScopes()
-			//params := []*yakvm.Value{}
-			//for _, id := range ids {
-			//	val, ok := scope.GetValueByID(id)
-			//	if !ok {
-			//		panic(utils.Errorf("not found var %v", id))
-			//	}
-			//	params = append(params, val)
-			//}
-			if v1, ok := v.Value.(*yakvm.Function); ok { // 当前引擎调用其它引擎的nasl函数
-				function := yakvm.NewFunction([]*yakvm.Code{
-					{
-						Opcode: yakvm.OpPush,
-						Op1:    yakvm.NewAutoValue(vm.CurrentFM().CallYakFunction),
-					},
-					{
-						Opcode: yakvm.OpPush,
-						Op1:    yakvm.NewAutoValue(false),
-					},
-					{
-						Opcode: yakvm.OpPush,
-						Op1:    yakvm.NewAutoValue(v1),
-					},
-					{
-						Opcode: yakvm.OpPush,
-						Op1:    yakvm.NewAutoValue(e.vm.CurrentFM().GetCurrentArgument),
-					},
-					{
-						Opcode: yakvm.OpCall,
-						Unary:  0,
-					},
-					{
-						Opcode: yakvm.OpCall,
-						Unary:  3,
-					},
-					{
-						Opcode: yakvm.OpReturn,
-					},
-				}, e.symbolTable)
-				function.SetName(k)
-				newVarInCurrentScope(k, &yakvm.Value{
-					Literal: "function: " + k,
-					Value:   function,
-				})
-			} else {
-				newVarInCurrentScope(k, v)
-			}
-		}
-		NaslIncLib[name] = vars
-		return nil
-	}
+	return e.safeEvalWithFileName(string(sourceBytes), name)
 }
 func (e *Engine) LoadScript(path string) (*NaslScriptInfo, error) {
 	e.SetDescription(true)

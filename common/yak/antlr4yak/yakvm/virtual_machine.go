@@ -165,17 +165,6 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 func (n *VirtualMachine) GetGlobalVar() map[string]interface{} {
 	return n.globalVar
 }
-func (n *VirtualMachine) GetGlobalScopeVMVars() map[string]*Value {
-	id2Var := n.rootScope.idToValue
-	vars := map[string]*Value{}
-	for id, val := range id2Var {
-		name, ok := n.rootScope.symtbl.GetNameByVariableId(id)
-		if ok {
-			vars[name] = val
-		}
-	}
-	return vars
-}
 
 func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args map[int]*Value, flags ...ExecFlag) (interface{}, error) {
 	var value interface{}
@@ -193,10 +182,10 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		//闭包继承父作用域
 		if v.config.GetClosureSupport() {
 			frame.scope = f.scope
-			frame.CreateAndSwitchSubScope(f.symbolTable)
 		} else {
 			frame.scope = v.rootScope
 		}
+		frame.CreateAndSwitchSubScope(f.symbolTable)
 
 		for id, arg := range args {
 			frame.CurrentScope().NewValueByID(id, arg)
@@ -205,9 +194,7 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		if frame.lastStackValue != nil {
 			value = frame.lastStackValue.Value
 		}
-		if v.config.GetClosureSupport() {
-			frame.ExitScope()
-		}
+		frame.ExitScope()
 	}, finalFlags...)
 	if err != nil {
 		return nil, err
