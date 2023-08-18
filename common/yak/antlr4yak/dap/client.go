@@ -56,6 +56,45 @@ func (c *Client) InitializeRequest() {
 	c.send(request)
 }
 
+func (c *Client) NextRequest(thread int) {
+	request := &dap.NextRequest{Request: *c.newRequest("next")}
+	request.Arguments.ThreadId = thread
+	c.send(request)
+}
+
+func (c *Client) NextInstructionRequest(thread int) {
+	request := &dap.NextRequest{Request: *c.newRequest("next")}
+	request.Arguments.ThreadId = thread
+	request.Arguments.Granularity = "instruction"
+	c.send(request)
+}
+
+func (c *Client) StepInRequest(thread int) {
+	request := &dap.StepInRequest{Request: *c.newRequest("stepIn")}
+	request.Arguments.ThreadId = thread
+	c.send(request)
+}
+
+func (c *Client) StepInInstructionRequest(thread int) {
+	request := &dap.StepInRequest{Request: *c.newRequest("stepIn")}
+	request.Arguments.ThreadId = thread
+	request.Arguments.Granularity = "instruction"
+	c.send(request)
+}
+
+func (c *Client) StepOutRequest(thread int) {
+	request := &dap.StepOutRequest{Request: *c.newRequest("stepOut")}
+	request.Arguments.ThreadId = thread
+	c.send(request)
+}
+
+func (c *Client) StepOutInstructionRequest(thread int) {
+	request := &dap.StepOutRequest{Request: *c.newRequest("stepOut")}
+	request.Arguments.ThreadId = thread
+	request.Arguments.Granularity = "instruction"
+	c.send(request)
+}
+
 func (c *Client) PauseRequest(threadId int) {
 	request := &dap.PauseRequest{Request: *c.newRequest("pause")}
 	request.Arguments.ThreadId = threadId

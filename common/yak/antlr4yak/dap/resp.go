@@ -346,3 +346,63 @@ func (c *Client) CheckStopLocation(t *testing.T, thread int, name string, line i
 		}
 	}
 }
+
+func (c *Client) ExpectStepInResponse(t *testing.T) *dap.StepInResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckStepInResponse(t, m)
+}
+
+func (c *Client) CheckStepInResponse(t *testing.T, m dap.Message) *dap.StepInResponse {
+	t.Helper()
+	_, ok := m.(*dap.ContinuedEvent)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.ContinuedEvent", m)
+	}
+	m = c.ExpectMessage(t)
+	r, ok := m.(*dap.StepInResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.StepInResponse", m)
+	}
+	return r
+}
+
+func (c *Client) ExpectStepOutResponse(t *testing.T) *dap.StepOutResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckStepOutResponse(t, m)
+}
+
+func (c *Client) CheckStepOutResponse(t *testing.T, m dap.Message) *dap.StepOutResponse {
+	t.Helper()
+	_, ok := m.(*dap.ContinuedEvent)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.ContinuedEvent", m)
+	}
+	m = c.ExpectMessage(t)
+	r, ok := m.(*dap.StepOutResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.StepOutResponse", m)
+	}
+	return r
+}
+
+func (c *Client) ExpectNextResponse(t *testing.T) *dap.NextResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckNextResponse(t, m)
+}
+
+func (c *Client) CheckNextResponse(t *testing.T, m dap.Message) *dap.NextResponse {
+	t.Helper()
+	_, ok := m.(*dap.ContinuedEvent)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.ContinuedEvent", m)
+	}
+	m = c.ExpectMessage(t)
+	r, ok := m.(*dap.NextResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.NextResponse", m)
+	}
+	return r
+}
