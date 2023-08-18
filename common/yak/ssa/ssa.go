@@ -108,20 +108,16 @@ type Function struct {
 	Pos  *Position // current position
 
 	// for instruction
-	instReg    map[Instruction]string             // instruction -> virtual register
-	currentDef map[string]map[*BasicBlock]*Values // currentDef[variable][block]value
+	instReg     map[Instruction]string // instruction -> virtual register
+	symbolTable map[string][]Value
 
 	// ssa error
 	err SSAErrors
 
 	currtenPos *Position
 	// for build
-	currentBlock *BasicBlock // current block to build
-}
-
-type Values struct {
-	v    Value
-	next *Values
+	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
+	currentBlock *BasicBlock                      // current block to build
 }
 
 func (f *Function) GetType() Types {
