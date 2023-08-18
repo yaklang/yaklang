@@ -108,7 +108,7 @@ func (b *builder) buildStatement(stmt *yak.StatementContext) {
 
 	}
 	//TODO: include stmt
-	//TODO: defer stmt
+	// defer stmt
 	if s, ok := stmt.DeferStmt().(*yak.DeferStmtContext); ok {
 		b.buildDeferStmt(s)
 	}
@@ -1199,10 +1199,19 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 	} else if stmt.UndefinedLiteral() != nil {
 		return UnDefineConst
 	} else if stmt.CharaterLiteral() != nil {
-		runeChar, _, _, err := strconv.UnquoteChar(stmt.CharaterLiteral().GetText(), '\'')
-		if err != nil {
-			panic("Unhandled charater literal: " + stmt.CharaterLiteral().GetText())
+		lit := stmt.CharaterLiteral().GetText()
+		var s string
+		var err error
+		if lit == "'\\'" {
+			s = "'"
+		} else {
+			lit = strings.ReplaceAll(lit, `"`, `\"`)
+			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
+			if err != nil {
+				b.NewError(Error, "unquote error %s", err)
+			}
 		}
+		runeChar := []rune(s)[0]
 		if runeChar < 256 {
 			return NewConst(byte(runeChar))
 		} else {
@@ -1220,7 +1229,13 @@ func (b *builder) buildLiteral(stmt *yak.LiteralContext) Value {
 		if s, ok := s.(*yak.SliceLiteralContext); ok {
 			return b.buildSliceLiteral(s)
 		} else {
-			panic("Unhandled Slice Literal: " + stmt.SliceLiteral().GetText())
+			b.NewError(Error, "Unhandled Slice Literal: "+stmt.SliceLiteral().GetText())
+		}
+	} else if s := stmt.SliceTypedLiteral(); s != nil {
+		if s, ok := s.(*yak.SliceTypedLiteralContext); ok {
+			return b.buildSliceTypedLiteral(s)
+		} else {
+			b.NewError(Error, "unhandled Slice Typed Literal: "+stmt.SliceTypedLiteral().GetText())
 		}
 	}
 

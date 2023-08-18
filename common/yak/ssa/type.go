@@ -163,8 +163,8 @@ func (itype InterfaceType) String() string {
 		}
 	case Map:
 		// map[T]U
-		if len(itype.Key) == 1 && len(itype.Field) == 1 {
-			ret += fmt.Sprintf("map[%s]%s", itype.Key[0].String(), itype.Field[0].String())
+		if len(itype.keyType) == 1 && len(itype.Field) == 1 {
+			ret += fmt.Sprintf("map[%s]%s", itype.keyType[0].String(), itype.Field[0].String())
 		} else {
 			panic("this interface type not map")
 		}
