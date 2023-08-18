@@ -771,9 +771,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		} else if g.linePointer > g.nextState.lineInedx {
 			// 如果debugger想要步过且确实在后面行,则回调
 			g.HandleForStepNext()
-		} else if g.nextState.state != state {
-			// 如果debugger想要步进且state不同，证明进入了函数，也应该回调
-			g.HandleForStepNext()
 		}
 		return
 	}
