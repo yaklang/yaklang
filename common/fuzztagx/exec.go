@@ -1,10 +1,5 @@
 package fuzztagx
 
-type MethodContext struct {
-	methodTable map[string]BuildInTagFun
-	labelTable  map[string][]*FuzzTagMethod
-}
-
 func ExecuteWithStringHandler(source string, param map[string]BuildInTagFun) ([]string, error) {
 	dataCtx := &MethodContext{
 		methodTable: param,
