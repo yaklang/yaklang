@@ -52,19 +52,19 @@ func New() *Engine {
 			panic(err)
 		}
 	}
-	runtimeLibs := map[string]interface{}{
-		"Breakpoint": func() {
-			if engine.debugMode {
-				debugger := engine.vm.GetDebugger()
-				if debugger != nil {
-					debugger.HandleForBreakPoint()
-				}
-			}
-		},
-	}
+	// runtimeLibs := map[string]interface{}{
+	// 	"Breakpoint": func() {
+	// 		if engine.debugMode {
+	// 			debugger := engine.vm.GetDebugger()
+	// 			if debugger != nil {
+	// 				debugger.HandleForBreakPoint()
+	// 			}
+	// 		}
+	// 	},
+	// }
 
 	engine.ImportLibs(map[string]interface{}{
-		"runtime": runtimeLibs,
+		// "runtime": runtimeLibs,
 
 		"eval": evalFunc,
 		"yakfmt": func(code string) string {
