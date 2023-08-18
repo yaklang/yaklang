@@ -6,8 +6,8 @@ import (
 
 // --------------- for assign
 type LeftValue interface {
-	Assign(Value, *Function)
-	GetValue(*Function) Value
+	Assign(Value, *builder)
+	GetValue(*builder) Value
 }
 
 // --------------- only point variable to value with `f.currentDef`
@@ -16,11 +16,11 @@ type IdentifierLV struct {
 	variable string
 }
 
-func (i *IdentifierLV) Assign(v Value, f *Function) {
+func (i *IdentifierLV) Assign(v Value, f *builder) {
 	f.writeVariable(i.variable, v)
 }
 
-func (i *IdentifierLV) GetValue(f *Function) Value {
+func (i *IdentifierLV) GetValue(f *builder) Value {
 	return f.readVariable(i.variable)
 }
 
@@ -28,11 +28,11 @@ var _ LeftValue = (*IdentifierLV)(nil)
 
 // --------------- point variable to value `f.symbol[variable]value`
 // --------------- it's memory address, not SSA value
-func (field *Field) Assign(v Value, f *Function) {
+func (field *Field) Assign(v Value, f *builder) {
 	f.emitUpdate(field, v)
 }
 
-func (f *Field) GetValue(_ *Function) Value {
+func (f *Field) GetValue(_ *builder) Value {
 	return f
 }
 
@@ -40,61 +40,63 @@ var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` hanlder, read && write
 func (f *Function) writeVariable(variable string, value Value) {
-	f.writeVariableByBlock(variable, value, f.currentBlock)
+	if b := f.builder; b != nil {
+		b.writeVariableByBlock(variable, value, b.currentBlock)
+	}
 	if _, ok := f.symbolTable[variable]; !ok {
 		f.symbolTable[variable] = make([]Value, 0, 1)
 	}
 	f.symbolTable[variable] = append(f.symbolTable[variable], value)
 }
 
-func (f *Function) readVariable(variable string) Value {
-	if t, ok := f.symbolBlock.symbol[variable]; ok {
+func (b *builder) readVariable(variable string) Value {
+	if t, ok := b.symbolBlock.symbol[variable]; ok {
 		variable = t
 	}
-	if f.currentBlock != nil {
+	if b.currentBlock != nil {
 		// for building function
-		return f.readVariableByBlock(variable, f.currentBlock)
+		return b.readVariableByBlock(variable, b.currentBlock)
 	} else {
 		// for finish function
-		return f.readVariableByBlock(variable, f.ExitBlock)
+		return b.readVariableByBlock(variable, b.ExitBlock)
 	}
 }
 
-func (f *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	if _, ok := f.currentDef[variable]; !ok {
-		f.currentDef[variable] = make(map[*BasicBlock]Value)
+func (b *builder) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
+	if _, ok := b.currentDef[variable]; !ok {
+		b.currentDef[variable] = make(map[*BasicBlock]Value)
 	}
-	f.currentDef[variable][block] = value
+	b.currentDef[variable][block] = value
 }
 
-func (f *Function) readVariableByBlock(variable string, block *BasicBlock) Value {
+func (b *builder) readVariableByBlock(variable string, block *BasicBlock) Value {
 	if block.skip {
 		return nil
 	}
-	if map2, ok := f.currentDef[variable]; ok {
+	if map2, ok := b.currentDef[variable]; ok {
 		if value, ok := map2[block]; ok {
 			return value
 		}
 	}
-	return f.readVariableRecursive(variable, block)
+	return b.readVariableRecursive(variable, block)
 }
 
-func (f *Function) readVariableRecursive(variable string, block *BasicBlock) Value {
+func (b *builder) readVariableRecursive(variable string, block *BasicBlock) Value {
 	var v Value
 	// if block in sealedBlock
 	if !block.isSealed {
-		phi := NewPhi(f, block, variable)
+		phi := NewPhi(b.Function, block, variable)
 		block.inCompletePhi = append(block.inCompletePhi, phi)
 		v = phi
 	} else if len(block.Preds) == 0 {
 		// this is enter block  in this function
 	} else if len(block.Preds) == 1 {
-		v = f.readVariableByBlock(variable, block.Preds[0])
+		v = b.readVariableByBlock(variable, block.Preds[0])
 	} else {
-		v = NewPhi(f, block, variable).Build()
+		v = NewPhi(b.Function, block, variable).Build()
 	}
 	if v != nil {
-		f.writeVariableByBlock(variable, v, block)
+		b.writeVariableByBlock(variable, v, block)
 	}
 	return v
 }
@@ -109,26 +111,26 @@ func (b *BasicBlock) Sealed() {
 
 // --------------- `f.freevalue`
 
-func (f *Function) BuildFreeValue(variable string) Value {
+func (f *builder) BuildFreeValue(variable string) Value {
 	// for parent := f.parent; parent != nil; parent = parent.parent {
-	var build func(*Function) Value
-	build = func(fun *Function) Value {
-		if fun == nil {
-			fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.name, fun.name)
+	var build func(*builder) Value
+	build = func(b *builder) Value {
+		if b == nil {
+			fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.name, b.name)
 			return nil
 		}
-		if v := fun.readVariable(variable); v != nil {
+		if v := b.readVariable(variable); v != nil {
 			return v
 		} else {
-			if v := build(fun.parent); v != nil {
+			if v := build(b.parent.builder); v != nil {
 				freevalue := &Parameter{
 					variable:    variable,
-					Func:        fun,
+					Func:        b.Function,
 					user:        []User{},
 					isFreevalue: true,
 				}
-				fun.FreeValues = append(fun.FreeValues, freevalue)
-				fun.writeVariable(variable, freevalue)
+				b.FreeValues = append(b.FreeValues, freevalue)
+				b.writeVariable(variable, freevalue)
 				return freevalue
 			} else {
 				return nil
@@ -139,9 +141,9 @@ func (f *Function) BuildFreeValue(variable string) Value {
 	return build(f)
 }
 
-func (f *Function) CanBuildFreeValue(variable string) bool {
-	for parent := f.parent; parent != nil; parent = parent.parent {
-		if v := parent.readVariable(variable); v != nil {
+func (b *builder) CanBuildFreeValue(variable string) bool {
+	for parent := b.parent; parent != nil; parent = parent.parent {
+		if v := parent.builder.readVariable(variable); v != nil {
 			return true
 		}
 	}
@@ -150,48 +152,48 @@ func (f *Function) CanBuildFreeValue(variable string) bool {
 
 // --------------- `f.symbol` hanlder, read && write
 
-func (f *Function) getFieldWithCreate(i Value, key Value, create bool) *Field {
+func (b *builder) getFieldWithCreate(i Value, key Value, create bool) *Field {
 	if i, ok := i.(*Interface); ok {
 		if field, ok := i.field[key]; ok {
 			return field
 		}
 	}
-	if parent := f.parent; parent != nil {
+	if parent := b.parent; parent != nil {
 		// find in parent
-		if field := parent.readField(key.String()); field != nil {
+		if field := parent.builder.readField(key.String()); field != nil {
 			return field
 		}
 	}
 
 	if create {
 		field := &Field{
-			anInstruction: f.newAnInstuction(),
+			anInstruction: b.newAnInstuction(),
 			Key:           key,
 			I:             i,
 			update:        make([]Value, 0),
 			users:         make([]User, 0),
 		}
 
-		f.emit(field)
+		b.emit(field)
 		fixupUseChain(field)
 		return field
 	} else {
 		return nil
 	}
 }
-func (f *Function) readField(key string) *Field {
-	return f.getFieldWithCreate(f.symbol, NewConst(key), false)
+func (b *builder) readField(key string) *Field {
+	return b.getFieldWithCreate(b.symbol, NewConst(key), false)
 }
-func (f *Function) newField(key string) *Field {
-	return f.getFieldWithCreate(f.symbol, NewConst(key), true)
+func (b *builder) newField(key string) *Field {
+	return b.getFieldWithCreate(b.symbol, NewConst(key), true)
 }
 
-func (f *Function) writeField(key string, v Value) {
-	field := f.getFieldWithCreate(f.symbol, NewConst(key), true)
+func (b *builder) writeField(key string, v Value) {
+	field := b.getFieldWithCreate(b.symbol, NewConst(key), true)
 	if field == nil {
 		panic(fmt.Sprintf("writeField: %s not found", key))
 	}
 	if field.GetLastValue() != v {
-		f.emitUpdate(field, v)
+		b.emitUpdate(field, v)
 	}
 }

@@ -26,21 +26,21 @@ func fixupUseChain(node Node) {
 	}
 }
 
-func (f *Function) emit(i Instruction) {
+func (f *builder) emit(i Instruction) {
 	f.currentBlock.Instrs = append(f.currentBlock.Instrs, i)
 	f.SetReg(i)
 }
 
-func (f *Function) newAnInstuction() anInstruction {
+func (f *builder) newAnInstuction() anInstruction {
 	return anInstruction{
-		Func:  f,
+		Func:  f.Function,
 		Block: f.currentBlock,
 		typs:  make(Types, 0),
 		pos:   f.currtenPos,
 	}
 }
 
-func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
+func (f *builder) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (f *Function) emitArith(op yakvm.OpcodeFlag, x, y Value) *BinOp {
 	return b
 }
 
-func (f *Function) emitIf(cond Value) *If {
+func (f *builder) emitIf(cond Value) *If {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (f *Function) emitIf(cond Value) *If {
 	return ifssa
 }
 
-func (f *Function) emitJump(to *BasicBlock) *Jump {
+func (f *builder) emitJump(to *BasicBlock) *Jump {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -86,7 +86,7 @@ func (f *Function) emitJump(to *BasicBlock) *Jump {
 	return j
 }
 
-func (f *Function) emitSwitch(cond Value, defaultb *BasicBlock, label []switchlabel) *Switch {
+func (f *builder) emitSwitch(cond Value, defaultb *BasicBlock, label []switchlabel) *Switch {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -103,7 +103,7 @@ func (f *Function) emitSwitch(cond Value, defaultb *BasicBlock, label []switchla
 	return sw
 }
 
-func (f *Function) emitReturn(vs []Value) *Return {
+func (f *builder) emitReturn(vs []Value) *Return {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -118,7 +118,7 @@ func (f *Function) emitReturn(vs []Value) *Return {
 	return r
 }
 
-func (f *Function) emitCall(c *Call) *Call {
+func (f *builder) emitCall(c *Call) *Call {
 	if f.currentBlock.finish {
 		return nil
 	}
@@ -127,7 +127,7 @@ func (f *Function) emitCall(c *Call) *Call {
 	return c
 }
 
-func (f *Function) emitInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value) *Interface {
+func (f *builder) emitInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value) *Interface {
 	i := &Interface{
 		anInstruction: f.newAnInstuction(),
 		parentI:       parentI,
@@ -147,10 +147,10 @@ func (f *Function) emitInterface(parentI *Interface, typs Types, low, high, max,
 	return i
 }
 
-func (f *Function) emitInterfaceBuildWithType(typ Types, Len, Cap Value) *Interface {
+func (f *builder) emitInterfaceBuildWithType(typ Types, Len, Cap Value) *Interface {
 	return f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
 }
-func (f *Function) emitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
+func (f *builder) emitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
 	return f.emitInterface(i, i.typs, low, high, max, nil, nil)
 }
 
@@ -178,11 +178,11 @@ func (b *builder) CreateInterfaceWithVs(keys []Value, vs []Value) *Interface {
 	return itf
 }
 
-func (f *Function) emitField(i Value, key Value) *Field {
+func (f *builder) emitField(i Value, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }
 
-func (f *Function) emitUpdate(address *Field, v Value) *Update {
+func (f *builder) emitUpdate(address *Field, v Value) *Update {
 	//use-value-chain: address -> update -> value
 	CheckUpdateType(address.GetType(), v.GetType())
 	s := &Update{
