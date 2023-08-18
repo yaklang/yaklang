@@ -705,7 +705,7 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 			return
 		}
 
-		response.Body = dap.EvaluateResponseBody{Result: yakvm.AsDebugString(value.Value), Type: value.TypeVerbose}
+		response.Body = dap.EvaluateResponseBody{Result: AsDebugString(value.Value), Type: value.TypeVerbose}
 
 		ref := ds.ConvertVariable(value.Value)
 		response.Body.VariablesReference = ref
@@ -835,7 +835,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 		if v.IsBytesOrRunes() {
 			children = append(children, dap.Variable{
 				Name:  "string()",
-				Value: yakvm.AsDebugString(v.Value),
+				Value: AsDebugString(v.Value),
 				Type:  "string",
 			})
 		}
@@ -871,7 +871,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 				Name:               fmt.Sprintf("%s", fieldName),
 				EvaluateName:       fmt.Sprintf("%s.%s", varname, fieldName),
 				Type:               value.Type().String(),
-				Value:              yakvm.AsDebugString(iValue),
+				Value:              AsDebugString(iValue),
 				VariablesReference: ref,
 				IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 				NamedVariables:     yakvm.GetNamedVariableCount(iValue),
@@ -917,7 +917,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 			vari := dap.Variable{
 				Name:               name,
 				EvaluateName:       name,
-				Value:              yakvm.AsDebugString(value.Value),
+				Value:              AsDebugString(value.Value),
 				Type:               value.TypeStr(),
 				VariablesReference: ref,
 				IndexedVariables:   indexed,
@@ -953,7 +953,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				key := keys[i]
 				iKey := key.Interface()
 				keyRef := ds.ConvertVariable(iKey)
-				keyStr := yakvm.AsDebugString(iKey)
+				keyStr := AsDebugString(iKey)
 
 				keyVar := dap.Variable{
 					Name:               fmt.Sprintf("[key %d]", start+i),
@@ -967,7 +967,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				value := refV.MapIndex(key)
 				iValue := value.Interface()
 				valueRef := ds.ConvertVariable(iValue)
-				valueStr := yakvm.AsDebugString(iValue)
+				valueStr := AsDebugString(iValue)
 
 				valueVar := dap.Variable{
 					Name:               fmt.Sprintf("[value %d]", start+i),
@@ -998,7 +998,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 					Name:               fmt.Sprintf("[%d]", idx),
 					EvaluateName:       fmt.Sprintf("%s[%d]", varname, idx),
 					Type:               value.Type().String(),
-					Value:              yakvm.AsDebugString(iValue),
+					Value:              AsDebugString(iValue),
 					VariablesReference: ref,
 					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
