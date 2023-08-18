@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,6 +12,257 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestGRPCMUSTPASS_BuildHTTPRequest_Results(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		IsRawHTTPRequest: true,
+		RawHTTPRequest: []byte(`GET /ac?a=1 HTTP/1.1
+Host: baidu.com
+`),
+	})
+	if err != nil {
+		panic(err)
+	}
+	keepPathQuery := false
+	for _, i := range rsp.Results {
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "/ac?a=1", `{{Hostname}}`) {
+			keepPathQuery = true
+		}
+	}
+	if !keepPathQuery {
+		panic("path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		IsHttps: true,
+		RawHTTPRequest: []byte(`GET /ac?a=1 HTTP/1.1
+Host: baidu.com
+`),
+		Method:    "GET",
+		Path:      []string{"a?c=1", "d?e=2"},
+		GetParams: []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	count := 0
+	ceq1 := false
+	eeq2 := false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?", "a=1", "b=2", "{{Hostname}}", "c=1") {
+			ceq1 = true
+		}
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "d?", "e=2", "{{Hostname}}", "a=1", "b=2") {
+			eeq2 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 2 {
+		panic("count not match, expect 2, got: " + spew.Sprint(count))
+	}
+	if !ceq1 || !eeq2 {
+		panic("no raw (using) path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(
+		context.Background(),
+		&ypb.HTTPRequestBuilderParams{
+			IsHttps: true,
+			RawHTTPRequest: []byte(`GET /ac?a=1 HTTP/1.1
+Host: baidu.com
+`),
+			Method:    "GET",
+			Path:      []string{"a?c=1", "d?e=2"},
+			GetParams: []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
+			Headers: []*ypb.KVPair{
+				{Key: "User-Agent", Value: "yaklangdebugger/1.1"},
+			},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	eeq2 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?", "a=1", "b=2", "{{Hostname}}", "c=1", "User-Agent: yaklang") {
+			ceq1 = true
+		}
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "d?", "e=2", "{{Hostname}}", "a=1", "b=2", "User-Agent: yaklang") {
+			eeq2 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 2 {
+		panic("header count not match, expect 2, got: " + spew.Sprint(count))
+	}
+	if !ceq1 || !eeq2 {
+		panic("header no raw (using) path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method:              "GET",
+		Path:                []string{"a?c=1"},
+		Cookie:              []*ypb.KVPair{{Key: "aaa", Value: "111"}, {Key: "bbb", Value: "222"}},
+		Body:                nil,
+		PostParams:          nil,
+		MultipartParams:     nil,
+		MultipartFileParams: nil,
+	})
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?", "c=1", "{{Hostname}}", "Cookie: ", "aaa=111", "bbb=222") && utils.MatchAnyOfSubString(
+			string(i.HTTPRequest), "Cookie: aaa=111; bbb=222", "Cookie: bbb=222; aaa=111") {
+			ceq1 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 1 {
+		panic("count not match, expect 1, got: " + spew.Sprint(count))
+	}
+	if !ceq1 {
+		panic("cookie no raw (using) path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method:              "GET",
+		Path:                []string{"a?c=1"},
+		Body:                []byte(`aabcdasdf`),
+		PostParams:          nil,
+		MultipartParams:     nil,
+		MultipartFileParams: nil,
+	})
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?c=1", "{{Hostname}}", "aabcdasdf") {
+			ceq1 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 1 {
+		panic("count not match, expect 1, got: " + spew.Sprint(count))
+	}
+	if !ceq1 {
+		panic("body no raw (using) path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method:              "GET",
+		Path:                []string{"a?c=1"},
+		PostParams:          []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
+		MultipartParams:     nil,
+		MultipartFileParams: nil,
+	})
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?c=1", "{{Hostname}}") &&
+			utils.MatchAnyOfSubString(string(i.HTTPRequest), "a=1&b=2", "b=2&a=1") {
+			ceq1 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 1 {
+		panic("count not match, expect 1, got: " + spew.Sprint(count))
+	}
+	if !ceq1 {
+		panic("body no raw (using) path query not keep")
+	}
+
+	// multipart
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method:              "GET",
+		Path:                []string{"a?c=1"},
+		MultipartParams:     []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
+		MultipartFileParams: nil,
+	})
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(
+			string(i.HTTPRequest),
+			"a?c=1", "{{Hostname}}",
+			"name=\"a\"\r\n\r\n1",
+			"name=\"b\"\r\n\r\n2",
+			"Content-Disposition: form-data;",
+			"ype: multipart/form-data; boundary=",
+		) {
+			ceq1 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 1 {
+		panic("count not match, expect 1, got: " + spew.Sprint(count))
+	}
+	if !ceq1 {
+		panic("body no raw (using) path query not keep")
+	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method:              "GET",
+		Path:                []string{"a?c=1"},
+		MultipartParams:     []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
+		MultipartFileParams: []*ypb.KVPair{{Key: "c", Value: "3"}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	count = 0
+	ceq1 = false
+	for _, i := range rsp.Results {
+		count++
+		fmt.Println(string(i.HTTPRequest))
+		if utils.MatchAllOfSubString(
+			string(i.HTTPRequest),
+			"a?c=1", "{{Hostname}}",
+			"name=\"a\"\r\n\r\n1",
+			"name=\"b\"\r\n\r\n2",
+			"Content-Disposition: form-data;",
+			"ype: multipart/form-data; boundary=",
+			`filename="3"`,
+		) {
+			ceq1 = true
+		}
+	}
+	t.Logf("count: %d", count)
+	if count != 1 {
+		panic("count not match, expect 1, got: " + spew.Sprint(count))
+	}
+	if !ceq1 {
+		panic("body no raw (using) path query not keep")
+	}
+}
 
 func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug(t *testing.T) {
 	client, err := NewLocalClient()
