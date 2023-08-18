@@ -50,6 +50,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		Uuid:               uuid.NewV4().String(),
 		OnlineOfficial:     true,
 		IsCorePlugin:       true,
+		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-logo.jpg`,
 	}
 	buildInPlugin[name] = plugin
 	OverWriteYakPlugin(plugin.ScriptName, plugin)
