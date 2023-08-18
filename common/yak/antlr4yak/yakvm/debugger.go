@@ -198,7 +198,11 @@ func (g *Debugger) Init(codes []*Code) {
 
 	for state, codes := range g.codes {
 		for index, code := range codes {
-			currentBundle, ok := g.switchBundleMap[*code.SourceCodeFilePath]
+			sourceCodeFilePath := ""
+			if code.SourceCodeFilePath != nil {
+				sourceCodeFilePath = *code.SourceCodeFilePath
+			}
+			currentBundle, ok := g.switchBundleMap[sourceCodeFilePath]
 			if !ok {
 				currentBundle = NewSwitchBundle()
 				g.switchBundleMap[*code.SourceCodeFilePath] = currentBundle
