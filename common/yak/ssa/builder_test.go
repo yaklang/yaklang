@@ -331,6 +331,36 @@ entry0:
 		CompareYakMain(t, prog, ir)
 	})
 
+	t.Run("Assign_scope", func(t *testing.T) {
+		code := `
+a = 1 
+{
+	// block scope rule
+	a := 2
+	d = a + 2
+	// 2 + 2
+}
+// 1 + 1
+c = a + 1
+
+{
+	// function scope rule 
+	a = 2
+}
+// 2 + 2
+c = a + 2
+		`
+		ir := `
+yak-main
+entry0:
+	<number> t0 = <number> 2 add <number> 2
+	<number> t1 = <number> 1 add <number> 1
+	<number> t2 = <number> 2 add <number> 2
+		`
+		prog := ParseSSA(code)
+		CheckProgram(t, prog)
+		CompareYakMain(t, prog, ir)
+	})
 }
 
 func TestIfStmt(t *testing.T) {

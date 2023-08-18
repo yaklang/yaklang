@@ -118,6 +118,21 @@ type Function struct {
 	// for build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
 	currentBlock *BasicBlock                      // current block to build
+	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
+}
+
+type blockSymbolTable struct {
+	symbol  map[string]string // variable -> variableId(variable-blockid)
+	blockid string
+	next    *blockSymbolTable
+}
+
+func NewBlockSymbolTable(id string, next *blockSymbolTable) *blockSymbolTable {
+	return &blockSymbolTable{
+		symbol:  make(map[string]string),
+		blockid: id,
+		next:    next,
+	}
 }
 
 func (f *Function) GetType() Types {
