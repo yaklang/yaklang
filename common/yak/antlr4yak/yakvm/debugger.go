@@ -569,6 +569,10 @@ func (g *Debugger) GetAllObserveExpressions() map[string]*Value {
 	return g.observeExpressions
 }
 
+func (g *Debugger) GetAllObserveBreakPoint() map[string]*Value {
+	return g.currentObserveBreakPointMap
+}
+
 func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) (int, error) {
 	if _, ok := g.currentBreakPointMap[lineIndex]; !ok {
 		bp := g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)

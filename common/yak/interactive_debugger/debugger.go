@@ -196,6 +196,12 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 				if err := g.RemoveObserveBreakPoint(expr); err != nil {
 					fmt.Printf("Interactive debugger unwatch error: %v\n", err)
 				}
+			case "swatch":
+				observeExprs := g.GetAllObserveBreakPoint()
+				for expr := range observeExprs {
+					fmt.Printf("observe breakpont: %s\n", expr)
+				}
+				fmt.Println()
 			case "obs":
 				if len(commands) < 2 {
 					fmt.Printf("Interactive debugger obs error: obs command need expression\n")
