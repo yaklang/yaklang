@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-func TestExec(t *testing.T) {
-	var testMap = map[string]BuildInTagFun{
+func TestExecuteWithRam(t *testing.T) {
+	var testMap = map[string]func(string) []string{
 		"int": func(i string) []string {
 			return []string{i}
 		},
@@ -74,6 +74,42 @@ func TestExec(t *testing.T) {
 	}
 }
 
+func TestExecute(t *testing.T) {
+	var testMap = map[string]func(string) []string{
+		"int": func(i string) []string {
+			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
+				return strconv.Itoa(i)
+			}).([]string)
+		},
+		"test1": func(s string) []string {
+			return []string{
+				"test1(asdfasdfas)",
+				"test1(asdfasdfas)",
+				"test1(asdfasdfas)",
+				"test1(asdfasdfas)",
+			}
+		},
+		"test": func(s string) []string {
+			return []string{
+				"WRPA:" + s,
+			}
+		},
+		"punc": func(s string) []string {
+			return []string{s + "PUNC"}
+		},
+	}
+	a, err := ExecuteWithStringHandler(
+		//`{{int(1-2)}}abc{{int(1-5)}}`,
+		//`abc{{in}}^t()))1{{a111-5)}}`,
+		`{{xx12:-_(____\)____)}}[[[[}}`,
+		testMap,
+	)
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(a)
+}
+
 func TestExecuteWithHandler(t *testing.T) {
 	for _, v := range [][]string{
 		{"{{int(1-29)}}", "1"},
@@ -107,7 +143,7 @@ func TestExecuteWithHandler(t *testing.T) {
 	} {
 		t, r := v[0], v[1]
 		spew.Dump(t)
-		result, err := ExecuteWithStringHandler(t, map[string]BuildInTagFun{
+		result, err := ExecuteWithStringHandler(t, map[string]func(string) []string{
 			"int": func(s string) []string {
 				return []string{"1"}
 			},
@@ -127,7 +163,7 @@ func TestExecuteWithHandler(t *testing.T) {
 		}
 	}
 
-	var testMap = map[string]BuildInTagFun{
+	var testMap = map[string]func(string) []string{
 		"int": func(i string) []string {
 			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
 				return strconv.Itoa(i)
@@ -157,6 +193,7 @@ func TestExecuteWithHandler(t *testing.T) {
 	}
 
 }
+
 func TestExecuteWithHandlerEscaped(t *testing.T) {
 	for _, v := range [][]string{
 		{"{{test(123123\\))}}", "123123)"},
@@ -164,7 +201,7 @@ func TestExecuteWithHandlerEscaped(t *testing.T) {
 		{"\\){{test(1{{test(\\)1)}}23123\\))}}", "\\)1)123123)"},
 	} {
 		t, r := v[0], v[1]
-		result, err := ExecuteWithStringHandler(t, map[string]BuildInTagFun{
+		result, err := ExecuteWithStringHandler(t, map[string]func(string) []string{
 			"test": func(s string) []string {
 				return []string{s}
 			},
@@ -181,7 +218,7 @@ func TestExecuteWithHandlerEscaped(t *testing.T) {
 		}
 	}
 
-	var testMap = map[string]BuildInTagFun{
+	var testMap = map[string]func(string) []string{
 		"int": func(i string) []string {
 			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
 				return strconv.Itoa(i)
@@ -211,8 +248,9 @@ func TestExecuteWithHandlerEscaped(t *testing.T) {
 	}
 
 }
+
 func TestExecuteWithConciseTag(t *testing.T) {
-	var testMap = map[string]BuildInTagFun{
+	var testMap = map[string]func(string) []string{
 		"print": func(i string) []string {
 			return []string{i}
 		},
@@ -230,7 +268,7 @@ func TestExecuteWithConciseTag(t *testing.T) {
 	}
 }
 func TestExecuteWithMultimethod(t *testing.T) {
-	var m = map[string]BuildInTagFun{
+	var m = map[string]func(string) []string{
 		"s": func(s string) []string {
 			return []string{s + "a"}
 		},
@@ -254,8 +292,26 @@ func TestExecuteWithMultimethod(t *testing.T) {
 		panic("{{  s(s())   }}")
 	}
 }
+func TestExecuteWithNewLine(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"s": func(s string) []string {
+			return []string{s + "a"}
+		},
+	}
+
+	res, err := ExecuteWithStringHandler(`{{s 
+() }}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if len(res) < 1 || res[0] != "a" {
+		panic("exec with new line error")
+	}
+}
+
 func TestExecuteBug1(t *testing.T) {
-	var m = map[string]BuildInTagFun{
+	var m = map[string]func(string) []string{
 		"int": func(s string) []string {
 			return []string{s}
 		},
@@ -271,20 +327,53 @@ func TestExecuteBug1(t *testing.T) {
 	}
 }
 
-func TestExecuteWithNewLine(t *testing.T) {
-	var m = map[string]BuildInTagFun{
-		"s": func(s string) []string {
-			return []string{s + "a"}
+func TestExecuteBug_Execute(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"int": func(s string) []string {
+			return []string{s}
+		},
+		"expr:a": func(s string) []string {
+			if s != "base64(111) " {
+				panic(1)
+			}
+			return []string{"ccc"}
 		},
 	}
 
-	res, err := ExecuteWithStringHandler(`{{s 
-() }}`, m)
+	res, err := ExecuteWithStringHandler(`{{expr:a(base64(111) )}}`, m)
 	spew.Dump(res)
 	if err != nil {
 		panic(err)
 	}
-	if len(res) < 1 || res[0] != "a" {
-		panic("exec with new line error")
+	if res[0] != "ccc" {
+		panic("PANIC!")
+	}
+}
+func TestExecutePrefixTag(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"expr:a": func(s string) []string {
+			return []string{s}
+		},
+	}
+	testData := []string{
+		"base64(111)",
+		" base64(111)",
+		" base64(111) ",
+		" base64(base64(111)) ",
+		"base64(111))))",
+		"base64((111)",
+	}
+	for _, d := range testData {
+		println(d)
+		res, err := ExecuteWithStringHandler(fmt.Sprintf(`{{expr:a(%s)}}`, d), m)
+		if err != nil {
+			panic(utils.Errorf("test data [%v] error: %v", d, err))
+		}
+		if len(res) == 0 {
+			panic("generate error")
+		}
+		if res[0] != d {
+			panic("TestExecutePrefixTag failed")
+		}
 	}
 }
