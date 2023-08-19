@@ -16,6 +16,7 @@ type DataContext struct {
 	currentState state
 	transOk      bool
 	token        string
+	tokenMap     map[state]string
 	methodCtx    *MethodContext
 }
 
@@ -29,7 +30,7 @@ func (d *DataContext) SetIndex(i int) {
 //		return s
 //	}
 func NewDataContext(source string) *DataContext {
-	return &DataContext{source: source, sourceBack: source, stack: utils.NewStack[any]()}
+	return &DataContext{source: source, sourceBack: source, stack: utils.NewStack[any](), tokenMap: make(map[state]string)}
 }
 func (d *DataContext) Generate() ([]string, error) {
 	return nil, nil
