@@ -277,6 +277,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}()
 
+	// hot code
+	var extraOpt []mutate.FuzzConfigOpt
+	if strings.TrimSpace(req.GetHotPatchCode()) != "" {
+		extraOpt = append(extraOpt, yak.Fuzz_WithHotPatch(stream.Context(), req.GetHotPatchCode()))
+	}
+
 	/*
 		Plugins
 	*/
@@ -485,6 +491,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			rawRequest,
 			mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
 			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
+			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
 			mutate.WithPoolOpt_BatchTarget(batchTarget),
@@ -499,8 +506,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_FollowJSRedirect(req.GetFollowJSRedirect()),
 			mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
 			mutate.WithPoolOpt_noFixContentLength(req.GetNoFixContentLength()),
-			mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
-			mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
+			//mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
+			//mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
 			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
 			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
