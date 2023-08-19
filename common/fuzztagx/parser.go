@@ -11,6 +11,7 @@ const (
 	stateEmptyLeft       state = "emptyLeft"
 	stateEmptyRight      state = "emptyRight"
 	stateMethod          state = "method"
+	stateExpParam        state = "exp_param"
 	stateLeftParen       state = "("
 	stateParam           state = "param"
 	stateRightParen      state = ")"
