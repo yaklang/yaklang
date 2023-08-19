@@ -76,6 +76,12 @@ var DatabaseExports = map[string]interface{}{
 	"QueryPayloadGroups":          getPayloadGroups,
 	"DeletePayloadByGroup":        deletePayload,
 
+	"GetProjectKey": func(k any) string {
+		return yakit.GetProjectKey(consts.GetGormProjectDatabase(), k)
+	},
+	"SetProjectKey": func(k, v any) error {
+		return yakit.SetProjectKey(consts.GetGormProjectDatabase(), k, v)
+	},
 	"SetKey": func(k, v interface{}) error {
 		return yakit.SetKey(consts.GetGormProfileDatabase(), k, v)
 	},
