@@ -11,13 +11,12 @@ type DataContext struct {
 	preIndex           int
 	currentByte        byte
 	source, sourceBack string
-
-	toState      state
-	currentState state
-	transOk      bool
-	token        string
-	tokenMap     map[state]string
-	methodCtx    *MethodContext
+	toState            state
+	currentState       state
+	transOk            bool
+	token              string
+	tokenMap           map[state]string
+	methodCtx          *MethodContext
 }
 
 func (d *DataContext) SetIndex(i int) {
