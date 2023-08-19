@@ -19,10 +19,12 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -292,6 +294,23 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		pocs = append(pocs, poc)
 	}
 
+	var batchTarget string
+	if req.GetBatchTargetFile() {
+		if ret := utils.GetFirstExistedFile(string(req.BatchTarget)); ret != "" {
+			fp, err := os.Open(ret)
+			if err != nil {
+				return utils.Errorf("open batch target file failed: %s", err)
+			}
+			raw, _ := io.ReadAll(fp)
+			fp.Close()
+			batchTarget = strings.TrimSpace(string(raw))
+		} else {
+			return utils.Errorf("batch target file not found: %s", req.GetBatchTarget())
+		}
+	} else {
+		batchTarget = string(req.GetBatchTarget())
+	}
+
 	var swg = utils.NewSizedWaitGroup(int(req.GetConcurrent()))
 	defer swg.Wait()
 	var feedbackWg = new(sync.WaitGroup)
@@ -468,6 +487,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
+			mutate.WithPoolOpt_BatchTarget(batchTarget),
 			//mutate.WithPoolOpt_Concurrent(int(concurrent)),
 			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
 			mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
