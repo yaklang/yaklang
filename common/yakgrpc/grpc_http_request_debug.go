@@ -130,7 +130,12 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 					https = strings.HasPrefix(res, "https://")
 					u, _ := url.Parse(res)
 					if u != nil && u.Path != "" && u.Path != "/" {
-						feed(lowhttp.UrlToGetRequestPacket(res, handledRaw, https), https)
+						https, packet, err := lowhttp.ParseUrlToHttpRequestRaw("GET", res)
+						if err != nil {
+							log.Warnf("Parse %v to packet failed: %s", res, err)
+							continue
+						}
+						feed(packet, https)
 					}
 				}
 
