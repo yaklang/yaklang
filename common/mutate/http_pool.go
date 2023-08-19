@@ -38,6 +38,7 @@ type httpPoolConfig struct {
 	Ctx                              context.Context
 	ForceFuzz                        bool
 	ForceFuzzfile                    bool
+	ExtraFuzzOption                  []FuzzConfigOpt
 	FuzzParams                       map[string][]string
 	RequestCountLimiter              int
 	NoFixContentLength               bool
@@ -73,6 +74,12 @@ type httpPoolConfig struct {
 
 	// batch
 	BatchTarget string
+}
+
+func WithPoolOpt_ExtraFuzzOptions(opts ...FuzzConfigOpt) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.ExtraFuzzOption = append(config.ExtraFuzzOption, opts...)
+	}
 }
 
 func WithPoolOpt_BatchTarget(target any) HttpPoolConfigOption {
@@ -697,6 +704,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
 						opts = append(opts, Fuzz_WithParams(config.FuzzParams))
 					}
+					opts = append(opts, config.ExtraFuzzOption...)
 					_, err := FuzzTagExec(string(reqRaw), opts...)
 					if err != nil {
 						log.Errorf("fuzz with callback failed: %s", err)

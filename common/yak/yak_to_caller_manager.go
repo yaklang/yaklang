@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,31 @@ const HOOK_CLAER = "clear"
 
 type YakFunctionCaller struct {
 	Handler func(args ...interface{})
+}
+
+func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
+	if strings.TrimSpace(code) == "" {
+		return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+			return []string{s}
+		})
+	}
+	engine := NewScriptEngine(1)
+	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
+	if err != nil {
+		log.Errorf("load hotpatch code error: %s", err)
+		return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+			return []string{s}
+		})
+	}
+	return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+		var handle, params, _ = strings.Cut(s, "|")
+		results, err := codeEnv.CallYakFunction(ctx, handle, []any{params})
+		if err != nil {
+			log.Errorf("call hotpatch code error: %s", err)
+			return []string{}
+		}
+		return utils.InterfaceToStringSlice(results)
+	})
 }
 
 func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
