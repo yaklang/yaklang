@@ -26,12 +26,17 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expect nil, got %v", err)
 	}
+	count := 0
 	for {
 		rsp, err := recv.Recv()
 		if err != nil {
 			break
 		}
+		count++
 		fmt.Println(string(rsp.RequestRaw))
 		fmt.Println(string(rsp.ResponseRaw))
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
 	}
 }
