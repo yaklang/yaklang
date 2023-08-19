@@ -50,11 +50,13 @@ func init() {
 	actionMap[stateLeftBrace+stateMethod] = actionMap[stateEmptyLeft+stateMethod]
 
 	actionMap[stateMethod+stateLeftParen] = func(ctx *DataContext) { // OnMethodEnd
-		ctx.stack.Peek().(*FuzzTagMethod).name = ctx.token
+		ctx.stack.Peek().(*FuzzTagMethod).name = ctx.tokenMap[stateMethod]
 	}
+	actionMap[stateMethodEmpty+stateLeftParen] = actionMap[stateMethod+stateLeftParen]
+
 	actionMap[stateMethod+stateRightBrace] = func(ctx *DataContext) { // OnMethodEnd
 		method, _ := ctx.Pop()
-		method.(*FuzzTagMethod).name = ctx.token
+		method.(*FuzzTagMethod).name = ctx.tokenMap[stateMethod]
 		itag, _ := ctx.Pop()
 		tag := itag.(*Tag)
 		ctx.PushData(tag)
@@ -160,6 +162,7 @@ func CharAccepter(s string) func(ctx *DataContext) bool {
 			if ctx.currentState != ctx.toState {
 				ctx.token = GetToken(ctx.source[ctx.preIndex:ctx.currentIndex])
 				ctx.preIndex = ctx.currentIndex
+				ctx.tokenMap[ctx.currentState] = ctx.token // 记录这个状态生成的token
 			}
 			if ok {
 				v(ctx)
@@ -177,6 +180,7 @@ func StringLeftBrace() func(ctx *DataContext) bool {
 				if i > 1 {
 					ctx.currentIndex += i - 1
 					ctx.token = GetToken(ctx.source[ctx.preIndex : ctx.currentIndex-1])
+					ctx.tokenMap[ctx.currentState] = ctx.token // 记录这个状态生成的token
 					ctx.preIndex = ctx.currentIndex + 1
 					ctx.transOk = true
 					if v, ok := actionMap[ctx.currentState+ctx.toState]; ok {
@@ -199,6 +203,7 @@ func StringRightBrace() func(ctx *DataContext) bool {
 				if i == 1 {
 					ctx.currentIndex += i
 					ctx.token = GetToken(ctx.source[ctx.preIndex : ctx.currentIndex-1])
+					ctx.tokenMap[ctx.currentState] = ctx.token // 记录这个状态生成的token
 					ctx.preIndex = ctx.currentIndex + 1
 					ctx.transOk = true
 					if v, ok := actionMap[ctx.currentState+ctx.toState]; ok {

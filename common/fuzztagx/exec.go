@@ -1,8 +1,12 @@
 package fuzztagx
 
-func ExecuteWithStringHandler(source string, param map[string]BuildInTagFun) ([]string, error) {
+func ExecuteWithStringHandler(source string, param map[string]func(s string) []string) ([]string, error) {
+	param1 := make(map[string]BuildInTagFun)
+	for k, v := range param {
+		param1[k] = v
+	}
 	dataCtx := &MethodContext{
-		methodTable: param,
+		methodTable: param1,
 		labelTable:  make(map[string][]*FuzzTagMethod),
 	}
 	res, err := Parse(source, dataCtx)
