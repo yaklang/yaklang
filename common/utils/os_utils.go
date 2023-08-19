@@ -171,7 +171,8 @@ func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.Handl
 		}
 		err := server.Serve(lis)
 		if err != nil {
-			panic(err)
+			log.Errorf("mock http server serve failed: %s", err)
+			return
 		}
 	}()
 	err = WaitConnect(HostPort(host, port), 3)
