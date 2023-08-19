@@ -3,7 +3,7 @@ risk.RegisterBeforeRiskSave(risk => {
     dump(risk)
     count ++
 })
-risk.NewRisk("target", risk.title("no"))
+risk.NewRisk("127.0.0.1:111", risk.title("no"))
 if count < 1 {
     die("RegisterBeforeRiskSave not work")
 }

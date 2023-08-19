@@ -49,7 +49,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "fuzz_request_pool.yak"
+	var debugName = "riskcallback.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
