@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -326,10 +327,32 @@ func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*Risk, er
 	return r, _saveRisk(r)
 }
 
+var beforeRiskSave []func(*Risk)
+var beforeRiskSaveMutex = new(sync.Mutex)
+
+func RegisterBeforeRiskSave(f func(*Risk)) {
+	beforeRiskSaveMutex.Lock()
+	defer beforeRiskSaveMutex.Unlock()
+	beforeRiskSave = append(beforeRiskSave, func(risk *Risk) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("risk save callback error: %v", err)
+			}
+		}()
+		f(risk)
+	})
+}
+
 func _saveRisk(r *Risk) error {
 	if r.Ignore {
 		log.Infof("ignore risk: %v", r.Title)
 		return nil
+	}
+
+	beforeRiskSaveMutex.Lock()
+	defer beforeRiskSaveMutex.Unlock()
+	for _, m := range beforeRiskSave {
+		m(r)
 	}
 
 	db := consts.GetGormProjectDatabase()
