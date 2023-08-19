@@ -49,7 +49,21 @@ func init() {
 	actionMap[stateEmptyRight+stateMethod] = actionMap[stateEmptyLeft+stateMethod]
 	actionMap[stateLeftBrace+stateMethod] = actionMap[stateEmptyLeft+stateMethod]
 
+	actionMap[stateExpParam+stateRightParen] = func(ctx *DataContext) {
+		ctx.stack.Peek().(*ExpressionNode).data = ctx.token
+		ctx.Pop()
+	}
 	actionMap[stateMethod+stateLeftParen] = func(ctx *DataContext) { // OnMethodEnd
+		if strings.HasPrefix(ctx.tokenMap[stateMethod], "expr:") { // 表达式函数，这里面要用表达式的语法
+			if ctx.stack.Size() == 4 { // 只有一个Tag，一个函数，说明是RootTag ，要把MethodNode换成ExpNode
+				ctx.Pop()
+				ctx.PushToStack(&ExpressionNode{
+					name: ctx.tokenMap[stateMethod],
+				})
+				ctx.toState = stateExpParam
+				return
+			}
+		}
 		ctx.stack.Peek().(*FuzzTagMethod).name = ctx.tokenMap[stateMethod]
 	}
 	actionMap[stateMethodEmpty+stateLeftParen] = actionMap[stateMethod+stateLeftParen]
@@ -139,6 +153,7 @@ func init() {
 		stateRightParen:      {{CharAccepter(" \r\n"), stateEmptyRight}, {StringRightBrace(), stateRightBrace}, {CharAccepter(""), stateNone}},
 		stateEmptyRight:      {{CharAccepter(" \r\n"), stateEmptyRight}, {CharIdentify(), stateMethod}, {StringRightBrace(), stateRightBrace}},
 		stateRightBrace:      {{CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateNone}},
+		stateExpParam:        {{CharAccepter(")"), stateRightParen}, {CharAccepter(""), stateExpParam}},
 	}
 }
 func CharAccepter(s string) func(ctx *DataContext) bool {

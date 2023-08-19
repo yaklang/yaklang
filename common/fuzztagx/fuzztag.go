@@ -62,6 +62,7 @@ func (s *StringNode) Reset() {
 type ExpressionNode struct {
 	*NodeAttr
 	backpropagation func(s string)
+	name            string
 	data            string
 }
 
