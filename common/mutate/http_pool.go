@@ -70,6 +70,15 @@ type httpPoolConfig struct {
 
 	// RuntimeId
 	RuntimeId string
+
+	// batch
+	BatchTarget string
+}
+
+func WithPoolOpt_BatchTarget(target any) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.BatchTarget = strings.TrimSpace(utils.InterfaceToString(target))
+	}
 }
 
 func _httpPool_RequestCountLimiter(b int) HttpPoolConfigOption {
@@ -457,16 +466,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			if config.SizedWaitGroupInstance != nil {
 				swg = config.SizedWaitGroupInstance
 			}
-			submitTask := func(targetRequest []byte, payloads ...string) {
+
+			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, targetRequest []byte, payloads ...string) {
 				if maxSubmit > 0 && requestCounter >= maxSubmit {
 					return
-				}
-				if config.Ctx != nil {
-					select {
-					case <-config.Ctx.Done():
-						return
-					default:
-					}
 				}
 
 				swg.Add()
@@ -527,13 +530,23 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						port = config.Port
 					}
 
+					// 如果 host 被强制覆盖，那么... 替换空
+					if overrideHost != "" {
+						host, port = "", 0
+					}
+
+					var https = config.IsHttps
+					if overrideHttps {
+						https = true
+					}
+
 					if config.NoFollowRedirect {
 						config.FollowJSRedirect = false
 						config.RedirectTimes = 0
 					}
 
 					rspInstance, err := lowhttp.HTTP(
-						lowhttp.WithHttps(config.IsHttps),
+						lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
 						lowhttp.WithPacketBytes(targetRequest),
@@ -612,6 +625,36 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 				}()
 			}
 
+			submitTask := func(targetRequest []byte, payloads ...string) {
+				if config.Ctx != nil {
+					select {
+					case <-config.Ctx.Done():
+						return
+					default:
+					}
+				}
+				// handle batch target
+				if config.BatchTarget != "" {
+					targetsReplaced := utils.PrettifyListFromStringSplitEx(config.BatchTarget, "\n", ",", "|")
+					for _, newTarget := range targetsReplaced {
+						var overrideHttps = config.IsHttps
+						var overrideHost string
+						if strings.HasPrefix(strings.ToLower(newTarget), "https://") {
+							overrideHttps = true
+						}
+						host, port, _ := utils.ParseStringToHostPort(newTarget)
+						if (overrideHttps && port != 443) || (!overrideHttps && port != 80) {
+							overrideHost = utils.HostPort(host, port)
+						} else {
+							overrideHost = newTarget
+						}
+						overrideTarget := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
+						execSubmitTaskWithoutBatchTarget(overrideHttps, overrideHost, overrideTarget, payloads...)
+					}
+				}
+				execSubmitTaskWithoutBatchTarget(false, "", targetRequest, payloads...)
+			}
+
 			for _, reqRaw := range ret {
 				if config.Ctx != nil {
 					select {
@@ -634,7 +677,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						paramsGetterHandler := config.ExtraRegexpMutateConditionGetter()
 						conds = append(conds, paramsGetterHandler)
 					}
-					var opts []FuzzConfigOpt = []FuzzConfigOpt{
+					var opts = []FuzzConfigOpt{
 						Fuzz_WithResultHandler(func(s string, i []string) bool {
 							select {
 							case <-config.Ctx.Done():
@@ -658,26 +701,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					if err != nil {
 						log.Errorf("fuzz with callback failed: %s", err)
 					}
-					//_, err := QuickMutateWithCallbackEx2(
-					//	string(reqRaw),
-					//	consts.GetGormProfileDatabase(),
-					//	[]func(result *MutateResult) bool{
-					//		func(result *MutateResult) bool {
-					//			select {
-					//			case <-config.Ctx.Done():
-					//				return false
-					//			default:
-					//			}
-					//			if maxSubmit > 0 && requestCounter >= maxSubmit {
-					//				return false
-					//			}
-					//			submitTask([]byte(result.Result), result.Payloads...)
-					//			return true
-					//		},
-					//	}, conds...)
-					//if err != nil {
-					//	log.Errorf("fuzz with callback failed: %s", err)
-					//}
 				} else {
 					submitTask(reqRaw)
 				}
