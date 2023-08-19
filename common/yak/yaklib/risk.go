@@ -53,9 +53,10 @@ func yakitNewRisk(target string, opts ...yakit.RiskParamsOpt) {
 var botClient *bot.Client
 var (
 	RiskExports = map[string]interface{}{
-		"CreateRisk": yakit.CreateRisk,
-		"Save":       yakit.SaveRisk,
-		"NewRisk":    yakitNewRisk,
+		"CreateRisk":             yakit.CreateRisk,
+		"Save":                   yakit.SaveRisk,
+		"RegisterBeforeRiskSave": yakit.RegisterBeforeRiskSave,
+		"NewRisk":                yakitNewRisk,
 		"YieldRiskByTarget": func(target string) chan *yakit.Risk {
 			return yakit.YieldRisksByTarget(consts.GetGormProjectDatabase(), context.Background(), target)
 		},
