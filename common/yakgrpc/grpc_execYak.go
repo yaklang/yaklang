@@ -252,7 +252,16 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 func (s *Server) execRequestInCurrentServerEngine(req *ypb.ExecRequest, moduleName string, ctx context.Context, handler func(
 	result *ypb.ExecResult, logInfo *yaklib.YakitLog,
 ) error, writer io.Writer) error {
-	engine := yak.NewScriptEngine(100)
+	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(func(result *ypb.ExecResult) error {
+		return handler(result, nil)
+	})
+	vAttach := NewVAttachCombinedOutputServer(func(msg *ypb.ExecResult) error {
+		return handler(msg, nil)
+	})
+	go func() {
+		s.AttachCombinedOutput(nil, vAttach)
+	}()
+	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	var fp, err = os.CreateTemp(os.TempDir(), "yakit-plugin-selector-*.txt")
 	if err != nil {
 		return utils.Errorf("create yakit plugin selector failed: %s", err)
