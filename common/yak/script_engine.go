@@ -261,7 +261,7 @@ func initYaklangLib() {
 }
 
 type ScriptEngine struct {
-	swg *utils.SizedWaitGroup
+	swg    *utils.SizedWaitGroup
 	logger **yaklib.YakLogger // 由于logger是要对client设置的，而client可以通过hook设置，所以这里用个二级指针，方便修改 logger
 	tasks  *sync.Map
 
@@ -477,7 +477,11 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	engine.SetVar("getParam", paramGetter)
 	engine.SetVar("getParams", paramGetter)
 	engine.SetVar("param", paramGetter)
-	*e.logger = yaklib.CreateYakLogger(fmt.Sprint(yakAbsFile))
+	yakFileAbsPath := "temporay_script.yak"
+	if yakAbsFile != nil {
+		yakFileAbsPath = fmt.Sprint(yakAbsFile)
+	}
+	*e.logger = yaklib.CreateYakLogger(yakFileAbsPath)
 	engine.SetVar("log", *e.logger) // 设置 log 库
 	(*e.logger).SetEngine(engine)
 	clientIns := *yaklib.GetYakitClientInstance()

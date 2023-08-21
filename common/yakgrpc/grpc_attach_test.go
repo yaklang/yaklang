@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"runtime/debug"
 	"testing"
 	"time"
 )
@@ -31,6 +32,9 @@ import (
 //}
 
 func TestServer_AttachCombinedOutput(t *testing.T) {
+	// 输出调用栈
+	debug.PrintStack()
+	println("run TestServer_AttachCombinedOutput")
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
