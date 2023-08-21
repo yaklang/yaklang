@@ -1213,10 +1213,17 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "host"},
 				cli.IntFlag{Name: "port"},
+				cli.BoolFlag{Name: "debug"},
 			},
 			Action: func(c *cli.Context) error {
 				host := c.String("host")
 				port := c.Int("port")
+				debug := c.Bool("debug")
+
+				// 设置日志级别
+				if debug {
+					log.SetLevel(log.DebugLevel)
+				}
 
 				server, stopChan, err := dap.StartDAPServer(host, port)
 				if err != nil {
