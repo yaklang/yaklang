@@ -48,6 +48,28 @@ func NewVMPanic(i interface{}) *VMPanic {
 	return p
 }
 
+func (v *VMPanic) GetData() interface{} {
+	if v == nil {
+		return nil
+	}
+	return v.data
+}
+
+func (v *VMPanic) GetDataDescription() string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%#v", v.data)
+}
+
+func IsVMPanic(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*VMPanic)
+	return ok
+}
+
 func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string {
 	var codeReview string
 	var codeOrigin string
@@ -163,13 +185,6 @@ func (v *VMPanic) Error() string {
 
 func (v *Frame) recover() *VMPanic {
 	return v.vm.recover()
-}
-
-func (v *VMPanic) GetData() interface{} {
-	if v == nil {
-		return nil
-	}
-	return v.data
 }
 
 func (v *Frame) SetPanicInfo(ps ...*VMPanic) {

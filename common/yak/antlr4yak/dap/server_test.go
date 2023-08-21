@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-dap"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -1246,3 +1247,37 @@ func TestStepAndNextRequest(t *testing.T) {
 // 	},
 // 	)
 // }
+
+func TestPanicBreakpointOnNext(t *testing.T) {
+	runTest(t, "panic", PanicTestcase, func(server *DAPServer, client *Client, program string) {
+		runDebugSessionWithBPs(t, client, func() {
+			log.SetLevel(log.DebugLevel)
+			server.config.extraLibs = TestExtraLibs
+			client.LaunchRequest("exec", program, !StopOnEntry)
+		}, program,
+			[]int{3},
+			[]onBreakpoint{{
+				execute: func() {
+					checkStop(t, client, 0, "main", 3)
+
+					client.NextRequest(0)
+					client.ExpectNextResponse(t)
+
+					text := "\"BOOM!\""
+					se := client.ExpectStoppedEvent(t)
+					if se.Body.ThreadId != 0 || se.Body.Reason != "exception" || se.Body.Description != "panic" || se.Body.Text != text {
+						t.Errorf("\ngot  %#v\nwant ThreadId=0 Reason=\"exception\" Description=\"panic\" Text=%q", se, text)
+					}
+
+					client.ExceptionInfoRequest(0)
+					eInfo := client.ExpectExceptionInfoResponse(t)
+					if eInfo.Body.ExceptionId != "panic" || eInfo.Body.Description != text {
+						t.Errorf("\ngot  %#v\nwant ExceptionId=\"panic\" Description=%q", eInfo, text)
+					}
+				},
+				disconnect: true,
+			}},
+		)
+	},
+	)
+}

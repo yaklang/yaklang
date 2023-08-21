@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
@@ -60,7 +61,8 @@ func (ds *DebugSession) RunProgramInDebugMode(request *dap.LaunchRequest, debug 
 	}
 
 	err = engine.ExecuteMain(string(raw), absPath)
-	if err != nil {
+	// 如果是vmpanic,则已经在debugger中处理了
+	if err != nil && !yakvm.IsVMPanic(err) {
 		ds.sendErrorResponse(request.Request, FailedToLaunch, "Failed to launch",
 			fmt.Sprintf("run file[%s] error: %v", absPath, err))
 	}
