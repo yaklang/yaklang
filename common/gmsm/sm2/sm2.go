@@ -280,7 +280,7 @@ func Encrypt(pub *PublicKey, data []byte, random io.Reader, mode int) ([]byte, e
 		h := sm3.Sm3Sum(tm)
 		c = append(c, h...)
 		ct, ok := kdf(length, x2Buf, y2Buf) // 密文
-		if !ok {
+		if !ok && length > 0 {
 			continue
 		}
 		c = append(c, ct...)
