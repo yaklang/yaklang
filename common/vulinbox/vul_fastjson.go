@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
@@ -40,7 +41,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var dnslog string
 	// 查找dnslog
-	re, err := regexp.Compile(`\w+((\.dnslog\.cn)|(\.ceye\.io)|(\.vcap\.me)|(\.vcap\.io)|(\.xip\.io)|(\.burpcollaborator\.net)|(dnstunnel\.run))`)
+	re, err := regexp.Compile(`\w+\.((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dnstunnel\.run))`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,10 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		}
 	}
 	if dnslog != "" {
-		DnsRecord = append(DnsRecord, dnslog)
+		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second))
+		if ip != "" {
+			DnsRecord = append(DnsRecord, dnslog)
+		}
 	}
 	var js map[string]any
 	err = json.Unmarshal([]byte(data), &js)
