@@ -16,6 +16,52 @@ import (
 	"strings"
 )
 
+func (s *VulinServer) registerPipelineNSmuggle() {
+	smugglePort := utils.GetRandomAvailableTCPPort()
+	pipelinePort := utils.GetRandomAvailableTCPPort()
+
+	pipelineNSmuggleSubroute := s.router.PathPrefix("/http/protocol").Name("HTTP CDN 与 Pipeline 安全").Subrouter()
+	go func() {
+		err := Smuggle(context.Background(), smugglePort)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	err := utils.WaitConnect(utils.HostPort("127.0.0.1", smugglePort), 3)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	addRouteWithVulInfo(pipelineNSmuggleSubroute, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Location", "http://"+utils.HostPort("127.0.0.1", smugglePort))
+			writer.WriteHeader(302)
+		},
+		Path:  `/smuggle`,
+		Title: "HTTP 请求走私案例：HTTP Smuggle",
+	})
+
+	go func() {
+		err := Pipeline(context.Background(), pipelinePort)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	err = utils.WaitConnect(utils.HostPort("127.0.0.1", smugglePort), 3)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	addRouteWithVulInfo(pipelineNSmuggleSubroute, &VulInfo{
+		Path: `/pipeline`,
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Location", "http://"+utils.HostPort("127.0.0.1", smugglePort))
+			writer.WriteHeader(302)
+		},
+		Title: "HTTP Pipeline 正常案例（对照组，并不是漏洞）",
+	})
+}
+
 func Pipeline(ctx context.Context, port int) error {
 	if port <= 0 {
 		port = utils.GetRandomAvailableTCPPort()
@@ -42,7 +88,13 @@ Content-Type: text/html; charset=utf-8
 `))
 	ordinaryRequest = lowhttp.ReplaceHTTPPacketBody(
 		ordinaryRequest, UnsafeRender(
-			"Pipeline demo", []byte("HTTP Pipeline")),
+			"HTTP/1.1 Pipeline", []byte(`
+在 HTTP/1.1 中，默认 Connection: keep-alive 被设置, <br>
+在这种情况下，如果客户端发送了多个请求，服务器会将这些请求串行化，<br>
+也就是说，只有前一个请求完成，才会进行下一个请求。<br>
+<br>
+一般来说，这并不会导致安全问题
+`)),
 		false,
 	)
 
@@ -109,7 +161,17 @@ Content-Type: text/html; charset=utf-8
 `))
 	ordinaryRequest = lowhttp.ReplaceHTTPPacketBody(
 		ordinaryRequest, UnsafeRender(
-			"Pipeline demo", []byte("HTTP Pipeline")),
+			"HTTP/1.1 Smuggle", []byte(`
+在代理服务器反向代理真实服务器的业务场景下，<br>
+如果代理服务器没有正确处理 Transfer-Encoding: chunked 和 Content-Length: ... 的优先级 <br>
+那么，黑客可能会构造一个特殊的请求，这个请求在代理服务器和真实服务器中的解析结果不一致，<br>
+从而导致安全问题。<br>
+<br>
+例如在本端口的服务器中：代理服务器会认为这是一个按照 Content-Length 读 Body 的 HTTP/1.1 的请求，<br>
+代理服务器将会读取到 Body 中的数据，并且拼接传递给真实服务器，<br>
+而真实服务器会认为这是一个按照 Transfer-Encoding: chunked 读 Body 的 HTTP/1.1 的请求，把请求进行错误的分割，同时读到了两个请求造成安全问题<br>
+<br>
+`)),
 		false,
 	)
 
