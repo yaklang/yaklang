@@ -81,6 +81,10 @@ func (d *DAPDebugger) StepNext() error {
 	return nil
 }
 
+func (d *DAPDebugger) VMPanic() *yakvm.VMPanic {
+	return d.debugger.VMPanic()
+}
+
 func (d *DAPDebugger) AddObserveBreakPoint(expr string) error {
 	return d.debugger.AddObserveBreakPoint(expr)
 }
@@ -203,16 +207,10 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 		desc := g.Description()
 		log.Debugf("[dap debugger] callback: %s", desc)
 
-		// 程序结束,发送terminated事件
-		if g.Finished() {
-			d.finished = true
-			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
-			return
-		}
-
 		// 停止事件
 		session := d.session
 		stopReason := g.StopReason()
+		isPanic := stopReason == "exception"
 		if stopReason != "" {
 			frame := g.Frame()
 			threadID := 0
@@ -220,11 +218,18 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 				threadID = int(frame.ThreadID)
 			}
 			event := &dap.StoppedEvent{Event: *newEvent("stopped"), Body: dap.StoppedEventBody{ThreadId: threadID, Reason: stopReason, Description: desc, AllThreadsStopped: true}}
-			if stopReason == "exception" {
-				event.Body.Text = g.VMPanic().Error()
+			if isPanic {
+				event.Body.Text = g.VMPanic().GetDataDescription()
 			}
 
 			session.send(event)
+		}
+
+		// 程序正常结束,发送terminated事件
+		if g.Finished() && !isPanic {
+			d.finished = true
+			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+			return
 		}
 
 		select {

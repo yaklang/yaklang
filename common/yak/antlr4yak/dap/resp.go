@@ -406,3 +406,18 @@ func (c *Client) CheckNextResponse(t *testing.T, m dap.Message) *dap.NextRespons
 	}
 	return r
 }
+
+func (c *Client) ExpectExceptionInfoResponse(t *testing.T) *dap.ExceptionInfoResponse {
+	t.Helper()
+	m := c.ExpectMessage(t)
+	return c.CheckExceptionInfoResponse(t, m)
+}
+
+func (c *Client) CheckExceptionInfoResponse(t *testing.T, m dap.Message) *dap.ExceptionInfoResponse {
+	t.Helper()
+	r, ok := m.(*dap.ExceptionInfoResponse)
+	if !ok {
+		t.Fatalf("got %#v, want *dap.ExceptionInfoResponse", m)
+	}
+	return r
+}

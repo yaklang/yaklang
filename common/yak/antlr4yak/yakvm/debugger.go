@@ -716,6 +716,16 @@ func (g *Debugger) HandleForBreakPoint() {
 	g.Callback()
 }
 
+func (g *Debugger) HandleForPanic(vmPanic *VMPanic) {
+	if !g.Finished() {
+		g.SetFinished()
+		g.SetVMPanic(vmPanic)
+		g.SetDescription("panic")
+		g.SetStopReason("exception")
+		g.Callback()
+	}
+}
+
 func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	g.lock.Lock()

@@ -15,6 +15,7 @@ var (
 	VariablesTestcase          = "variables.yak"
 	StepAndNExtTestcase        = "step_and_next.yak"
 	HardCodeBreakPointTestcase = "hardcode_breakpoint.yak"
+	PanicTestcase              = "panic.yak"
 )
 
 func GetYakTestCasePath(p string) string {
