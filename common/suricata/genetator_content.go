@@ -47,6 +47,9 @@ type ContentGen struct {
 	Len       int
 	noise     noiseFunc
 
+	additionModifiers []ByteMapModifier
+	postHandler       func([]byte) []byte
+
 	// try to trim the content to tryLen
 	// 0 -> the field is not valid
 	tryLen int
@@ -76,6 +79,10 @@ func (c *ContentGen) Gen() []byte {
 		bm.Trim(!c.noLeftTrim, !c.noRightTrim, c.tryLen)
 	}
 	bm.FillLeftWithNoise(c.noise)
+
+	if c.postHandler != nil {
+		return c.postHandler(bm.Bytes())
+	}
 	return bm.Bytes()
 }
 
@@ -205,7 +212,31 @@ func parse2ContentGen(rules []*ContentRule, opts ...ContentGenOpt) *ContentGen {
 		mdf.Modifiers = append(mdf.Modifiers, cm)
 	}
 
+	mdf.Modifiers = append(mdf.Modifiers, mdf.additionModifiers...)
+	mdf.setLen()
 	return mdf
+}
+
+func (c *ContentGen) setLen() {
+	for _, m := range c.Modifiers {
+		switch m := m.(type) {
+		case *ContentModifier:
+			if m.Offset >= 0 {
+				if m.Offset+len(m.Content) > c.Len || m.Relative {
+					c.Len += m.Offset + len(m.Content)
+				}
+			} else {
+				if -m.Offset > c.Len || m.Relative {
+					c.Len = -m.Offset
+				}
+			}
+		case *RegexpModifier:
+			c.Len += len(m.Generator.Generate())
+		}
+	}
+	if c.Len > 2 {
+		c.Len = 1 << (math.Ilogb(float64(c.Len-1)) + 1)
+	}
 }
 
 type ContentGenOpt func(*ContentGen)
@@ -219,5 +250,17 @@ func WithNoise(noise noiseFunc) ContentGenOpt {
 func WithTryLen(Len int) ContentGenOpt {
 	return func(gen *ContentGen) {
 		gen.tryLen = Len
+	}
+}
+
+func WithPostHandler(f func([]byte) []byte) ContentGenOpt {
+	return func(gen *ContentGen) {
+		gen.postHandler = f
+	}
+}
+
+func WithPostModifier(mdf ByteMapModifier) ContentGenOpt {
+	return func(gen *ContentGen) {
+		gen.additionModifiers = append(gen.additionModifiers, mdf)
 	}
 }

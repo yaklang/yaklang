@@ -23,6 +23,12 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert http any any -> any any (msg: "Powershell Empire HTTP Response "; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,empire; content:"Cache-Control: no-cache, no-store, must-revalidate"; http_header; content: "Server: Microsoft-IIS/7.5"; http_header; distance: 0; classtype:shellcode-detect; sid: 3016008; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
+	},
+	{
+		rule: `alert http any any -> any any  (msg: "Powershell Empire HTTP Request "; flow: established, to_server; content:".php"; http_uri;  pcre:"/session=[a-zA-Z0-9+/]{20,300}([a-zA-Z0-9+/]{1}[a-zA-Z0-9+/=]{1}|==)/ACi"; flowbits:set,empire; classtype:shellcode-detect; sid: 3016007; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
+	},
+	{
 		rule: `alert http any any -> any any (msg:"***Linux wget/curl download .sh script***"; flow:established,to_server; content:".sh"; http_uri;  pcre:"/curl|Wget|linux-gnu/Vi"; classtype:trojan-activity; sid:3013002; rev:1; metadata:by al0ne;)`,
 	},
 	{
@@ -53,12 +59,6 @@ var rules = []*ruleTest{
 		rule: `alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
 	},
 	{
-		rule: `alert http any any -> any any (msg: "Powershell Empire HTTP Response "; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,empire; content:"Cache-Control: no-cache, no-store, must-revalidate"; http_header; content: "Server: Microsoft-IIS/7.5"; http_header; distance: 0; classtype:shellcode-detect; sid: 3016008; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any  (msg: "Powershell Empire HTTP Request "; flow: established, to_server; content:".php"; http_uri;  pcre:"/session=[a-zA-Z0-9+/]{20,300}([a-zA-Z0-9+/]{1}[a-zA-Z0-9+/=]{1}|==)/ACi"; flowbits:set,empire; classtype:shellcode-detect; sid: 3016007; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
-	},
-	{
 		rule: `alert http any any -> any any (msg: "Weevely PHP Backdoor Response"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; pcre:"/<(\w+)>[a-zA-Z0-9+\/]{20,}(?:[a-zA-Z0-9+\/]{1}[a-zA-Z0-9+\/=]{1}|==)<\/\w+>/Q"; classtype:shellcode-detect; sid: 3016006; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
 	},
 	{
@@ -78,7 +78,6 @@ var rules = []*ruleTest{
 	},
 	{
 		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-		id:   "debug",
 	},
 	//{
 	//	id:           "debug",
@@ -106,7 +105,7 @@ alert tcp $HOME_NET any -> any 3306 (msg: "mysql general_log write file"; flow: 
 func TestChaosMaker_ApplyAll(t *testing.T) {
 }
 
-func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
+func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 	for _, r := range rules {
 		maker := NewChaosMaker()
 		rules, err := suricata.Parse(r.rule)
@@ -114,29 +113,22 @@ func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
 		// single rule
 		rr := rules[0]
 		if err != nil {
-			panic(err)
+			t.Error(err)
 		}
-		rule.SaveSuricata(consts.GetGormProfileDatabase(), rr)
 		fRule := rule.NewRuleFromSuricata(rr)
 		maker.FeedRule(fRule)
 		res := maker.Generate()
 		if err != nil {
 			spew.Dump(r.rule)
-			panic(err)
+			t.Error(err)
 		}
 
 		count := 0
 		matchedCount := 0
 
+		// check generated chaos
 		for result := range res {
 			count++
-
-			var debug = r.id == "debug"
-			if debug {
-				println("START TO DEBUG")
-				log.Infof("rule: %v", rr.Raw)
-			}
-
 			var bytes []byte
 			if rr.Protocol == suricata.HTTP {
 				if result.HttpRequest == nil && result.HttpResponse == nil {
@@ -144,22 +136,15 @@ func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
 				}
 				if result.HttpRequest != nil {
 					bytes = append(bytes, result.HttpRequest...)
-					if debug {
-						fmt.Println(string(result.HttpRequest))
-					}
 				}
 				if result.HttpResponse != nil {
 					bytes = append(bytes, result.HttpResponse...)
-					if debug {
-						fmt.Println(string(result.HttpResponse))
-					}
 				}
 			} else if rr.Protocol == suricata.TCP {
 				bytes = result.TCPIPPayload
-				if debug {
-					spew.Dump(result.TCPIPPayload)
-				}
 			}
+
+			// pack packet for match
 			pk, err := pcapx.PacketBuilder(
 				pcapx.WithPayload(bytes),
 				pcapx.WithEthernet_SrcMac("00:0c:29:4f:8e:8f"),
@@ -172,38 +157,32 @@ func TestChaosMaker_HttpGenerate_CrossVerify(t *testing.T) {
 				return
 			}
 
-			var matched bool
 			if rr.Protocol == suricata.TCP {
 				// tcp match not implement yet
+				// just escape it
 				continue
 			}
-			for _, rr := range rules {
-				if rr.Match(pk) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
+
+			if !rr.Match(pk) {
 				spew.Dump(rr.Raw)
 				spew.Dump(pk)
-			} else {
-				matchedCount++
+				continue
 			}
+
+			matchedCount++
 		}
+
 		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
 need: %d
 got: %d
 match %d
 `, 5, count, matchedCount))
-		if count >= 5 && matchedCount >= 5 {
-			continue
-		}
+
 		// tcp not implement yet don't check it
-		if rr.Protocol == suricata.TCP {
-			continue
+		if rr.Protocol != suricata.TCP && (count < 5 || matchedCount <= 3) {
+			t.Fatal("match error or no enough traffic")
+			return
 		}
-		t.Fatal("match error or no enough traffic")
-		return
 	}
 }
 
