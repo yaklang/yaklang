@@ -173,7 +173,6 @@ func NewCodeState(codeIndex int, state string) *CodeState {
 		state:     state,
 	}
 }
-
 func (g *Debugger) Init(codes []*Code) {
 	g.StartWGAdd()
 
@@ -194,18 +193,27 @@ func (g *Debugger) Init(codes []*Code) {
 	}
 
 	hasSet := false
+	sourceCodeFilePath := ""
+	var (
+		currentBundle *switchBundle
+		ok            bool
+	)
 
 	for state, codes := range g.codes {
 		for index, code := range codes {
-			sourceCodeFilePath := ""
+			newSourceCodeFilePath := sourceCodeFilePath
 			if code.SourceCodeFilePath != nil {
-				sourceCodeFilePath = *code.SourceCodeFilePath
+				newSourceCodeFilePath = *code.SourceCodeFilePath
 			}
-			currentBundle, ok := g.switchBundleMap[sourceCodeFilePath]
-			if !ok {
-				currentBundle = NewSwitchBundle()
-				g.switchBundleMap[*code.SourceCodeFilePath] = currentBundle
+			if newSourceCodeFilePath != sourceCodeFilePath {
+				sourceCodeFilePath = newSourceCodeFilePath
+				currentBundle, ok = g.switchBundleMap[sourceCodeFilePath]
+				if !ok {
+					currentBundle = NewSwitchBundle()
+					g.switchBundleMap[sourceCodeFilePath] = currentBundle
+				}
 			}
+
 			linesFirstCodeStateMap := currentBundle.linesFirstCodeStateMap
 
 			if _, ok := linesFirstCodeStateMap[code.StartLineNumber]; !ok {
@@ -221,6 +229,9 @@ func (g *Debugger) Init(codes []*Code) {
 		}
 	}
 
+	if !hasSet {
+		panic(errors.New("debugger init error: can't find source c ode in opcodes"))
+	}
 }
 
 func (g *Debugger) InitCallBack() {
