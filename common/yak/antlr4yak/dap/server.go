@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type DAPServer struct {
@@ -53,6 +54,24 @@ func NewDAPServer(config *DAPServerConfig) *DAPServer {
 		config:   config,
 	}
 	return server
+}
+
+func StartDAPServer(ip string, port any) (*DAPServer, chan struct{}, error) {
+	host := utils.HostPort(ip, port)
+
+	listener, err := net.Listen("tcp", host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stopChan := make(chan struct{})
+	config := &DAPServerConfig{
+		listener: listener,
+		stopped:  stopChan,
+	}
+	server := NewDAPServer(config)
+	server.Start()
+	return server, stopChan, nil
 }
 
 func (s *DAPServer) handleConnection(conn net.Conn) {

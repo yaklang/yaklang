@@ -38,6 +38,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/umask"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
 	debugger "github.com/yaklang/yaklang/common/yak/interactive_debugger"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -1211,13 +1212,23 @@ func main() {
 			Usage: "启动dap服务器以调试脚本",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "host"},
+				cli.IntFlag{Name: "port"},
 			},
 			Action: func(c *cli.Context) error {
 				host := c.String("host")
-				if host == "" {
-					host = ":0"
+				port := c.Int("port")
+
+				server, stopChan, err := dap.StartDAPServer(host, port)
+				if err != nil {
+					return err
 				}
-				// todo: start dap server
+				defer server.Stop()
+
+				forceStop := make(chan struct{})
+				select {
+				case <-stopChan:
+				case <-forceStop:
+				}
 
 				return nil
 			},
