@@ -185,6 +185,12 @@ func (c *Client) SetBreakpointsRequestWithArgs(file string, lines []int, conditi
 	c.send(request)
 }
 
+func (c *Client) ExceptionInfoRequest(threadID int) {
+	request := &dap.ExceptionInfoRequest{Request: *c.newRequest("exceptionInfo")}
+	request.Arguments.ThreadId = threadID
+	c.send(request)
+}
+
 func (c *Client) ExpectOutputEventDetaching(t *testing.T) *dap.OutputEvent {
 	t.Helper()
 	return c.ExpectOutputEventRegex(t, `Detaching\n`)

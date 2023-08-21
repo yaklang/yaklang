@@ -743,7 +743,31 @@ func (ds *DebugSession) onCompletionsRequest(request *dap.CompletionsRequest) {
 }
 
 func (ds *DebugSession) onExceptionInfoRequest(request *dap.ExceptionInfoRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "ExceptionRequest is not yet supported"))
+	// 等待launch完成
+	ds.LaunchWg.Wait()
+	// 等待程序启动
+	ds.WaitProgramStart()
+
+	// todo: 处理goroutineID
+	goroutineID := request.Arguments.ThreadId
+
+	var body dap.ExceptionInfoResponseBody
+
+	p := ds.debugger.VMPanic()
+	if p == nil {
+		ds.sendErrorResponse(request.Request, UnableToGetExceptionInfo, "Unable to get exception info", fmt.Sprintf("could not find goroutine %d", goroutineID))
+		return
+	}
+	body.ExceptionId = "panic"
+	body.Description = fmt.Sprintf("%v", p.GetDataDescription())
+	body.Details = &dap.ExceptionDetails{
+		StackTrace: p.Error(),
+	}
+
+	ds.send(&dap.ExceptionInfoResponse{
+		Response: *newResponse(request.Request),
+		Body:     body,
+	})
 }
 
 func (ds *DebugSession) onLoadedSourcesRequest(request *dap.LoadedSourcesRequest) {

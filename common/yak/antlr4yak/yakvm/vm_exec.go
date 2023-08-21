@@ -145,12 +145,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 				log.Error(vmPanic)
 			}
 			debugger := v.vm.debugger
-			if debugger.InRootState() {
-				debugger.SetFinished()
-				debugger.SetVMPanic(vmPanic)
-				debugger.SetStopReason("exception")
-				debugger.Callback()
-			}
+			debugger.HandleForPanic(vmPanic)
 		}
 	}()
 
