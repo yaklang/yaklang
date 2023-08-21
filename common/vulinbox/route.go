@@ -165,15 +165,16 @@ func (s *VulinServer) init() {
 	s.registerPostMessageIframeCase()
 	s.registerSensitive()
 
+	s.registerVulRouter()
+	s.registerMiscRoute()
+	s.registerPipelineNSmuggle()
+
 	// 靶场是否是安全的？
 	if !s.safeMode {
 		s.registerPingCMDI()
 	}
 
 	s.genRoute()
-
-	s.registerVulRouter()
-	s.registerMiscRoute()
 }
 
 var once sync.Once
@@ -297,6 +298,7 @@ func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
+	log.Infof("register: %v to route", info.Title)
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 }
 
