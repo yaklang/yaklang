@@ -569,15 +569,22 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			urlBuf.WriteString(fmt.Sprintf(":%d", port))
 		}
 	}
+	noURI := urlBuf.String()
 	if requestURI == "" {
 		urlBuf.WriteString("/")
 	} else {
-		urlBuf.WriteString(requestURI)
+		if !strings.HasPrefix(requestURI, "/") {
+			urlBuf.WriteString("/")
+		}
+		urlBuf.WriteString(utils.EscapeInvalidUTF8Byte([]byte(requestURI)))
 	}
 	urlStr := urlBuf.String()
 	urlIns, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, utils.Errorf(`parse url %#v failed: %s`, urlStr, err)
+		urlIns, err = url.Parse(noURI)
+		if err != nil {
+			return nil, utils.Errorf(`parse url %#v failed: %s`, urlStr, err)
+		}
 	}
 
 	/*
