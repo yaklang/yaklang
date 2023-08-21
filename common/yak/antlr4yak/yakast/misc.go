@@ -2,6 +2,8 @@ package yakast
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -134,12 +136,26 @@ func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) *Position {
 
 func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) *Position {
 	origin := y.currentEndPosition
+	line, column := GetEndPosition(t)
 	y.currentEndPosition = &Position{
-		LineNumber:   t.GetLine(),
-		ColumnNumber: t.GetColumn() + len(t.GetText()),
+		LineNumber:   line,
+		ColumnNumber: column,
 	}
 	if y.currentEndPosition.ColumnNumber > 0 {
 		y.currentEndPosition.ColumnNumber--
 	}
 	return origin
+}
+
+func GetEndPosition(t antlr.Token) (int, int) {
+	var line, column int
+	str := strings.Split(t.GetText(), "\n")
+	if len(str) > 1 {
+		line = t.GetLine() + len(str) - 1
+		column = len(str[len(str)-1])
+	} else {
+		line = t.GetLine()
+		column = t.GetColumn()
+	}
+	return line, column
 }
