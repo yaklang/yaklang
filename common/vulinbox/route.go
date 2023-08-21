@@ -174,7 +174,6 @@ func (s *VulinServer) init() {
 
 	s.registerVulRouter()
 	s.registerMiscRoute()
-
 }
 
 var once sync.Once
