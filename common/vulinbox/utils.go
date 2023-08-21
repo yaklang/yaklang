@@ -2,8 +2,10 @@ package vulinbox
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -176,4 +178,18 @@ func Failed(writer http.ResponseWriter, r *http.Request, msg string, items ...an
 	writer.Write([]byte("-----------------------------------------------------\n Failed: "))
 	_, _ = writer.Write([]byte(msg))
 	writer.WriteHeader(500)
+}
+
+//go:embed html/template.html
+var templateHtml string
+
+func UnsafeRender(title string, data []byte) []byte {
+	raw, err := unsafeTemplate(templateHtml, map[string]any{
+		"title": title,
+		"data":  string(data),
+	})
+	if err != nil {
+		log.Errorf("unsafe render failed: %v", err)
+	}
+	return raw
 }

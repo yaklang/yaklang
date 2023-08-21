@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -76,6 +75,7 @@ type LowhttpResponse struct {
 	Source             string // 请求源
 	RuntimeId          string
 	FromPlugin         string
+	MultiResponse      bool
 }
 
 func (l *LowhttpResponse) GetDurationFloat() float64 {
@@ -452,7 +452,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		gmTLS                = option.GmTLS
 		host                 = option.Host
 		port                 = option.Port
-		r                    = option.Packet
+		requestPacket        = option.Packet
 		timeout              = option.Timeout
 		retryTimes           = option.RetryTimes
 		retryInStatusCode    = option.RetryInStatusCode
@@ -521,46 +521,104 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if gmTLS {
 		https = true
 	}
-	// 获取url
-	url, err := ExtractURLFromHTTPRequestRaw(r, https)
+
+	/*
+	   extract url
+	*/
+	var urlBuf bytes.Buffer
+	if https {
+		urlBuf.WriteString("https://")
+	} else {
+		urlBuf.WriteString("http://")
+	}
+	var requestURI string
+	var hostInPacket string
+	var haveTE bool
+	var haveCL bool
+	var clInt int
+	var enableHttp2 = false
+	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
+		requestURI = uri
+		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
+			enableHttp2 = true
+		}
+		return nil
+	}, func(line string) {
+		key, value := SplitHTTPHeader(line)
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if strings.ToLower(key) == "host" {
+			hostInPacket = value
+		}
+		if !haveTE && strings.ToLower(key) == "transfer-encoding" {
+			haveTE = true
+		}
+		if !haveCL && strings.ToLower(key) == "content-length" {
+			haveCL = true
+			clInt = utils.Atoi(value)
+		}
+	})
+	if hostInPacket == "" && host == "" {
+		return nil, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
+	}
+	if hostInPacket != "" {
+		urlBuf.WriteString(hostInPacket)
+	} else {
+		urlBuf.WriteString(host)
+		if (https && port != 443) || (!https && port != 80) {
+			urlBuf.WriteString(fmt.Sprintf(":%d", port))
+		}
+	}
+	if requestURI == "" {
+		urlBuf.WriteString("/")
+	} else {
+		urlBuf.WriteString(requestURI)
+	}
+	urlStr := urlBuf.String()
+	urlIns, err := url.Parse(urlStr)
 	if err != nil {
-		if host != "" && port > 0 {
-			var fallbackUrlMaterial []string
-			var handledHost bool
-			SplitHTTPHeadersAndBodyFromPacketEx(r, func(method string, requestUri string, proto string) error {
-				fallbackUrlMaterial = append(fallbackUrlMaterial, method+" "+requestUri+" "+proto)
-				return nil
-			}, func(line string) {
-				if strings.HasPrefix(strings.ToLower(line), "host:") {
-					handledHost = true
-					fallbackUrlMaterial = append(fallbackUrlMaterial, "Host: "+utils.HostPort(host, port))
-				} else {
-					fallbackUrlMaterial = append(fallbackUrlMaterial, line)
+		return nil, utils.Errorf(`parse url %#v failed: %s`, urlStr, err)
+	}
+
+	/*
+		checking pipeline or smuggle
+	*/
+	if haveTE && haveCL {
+		log.Infof("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, auto enable noFixContentLength", spew.Sdump(requestPacket))
+		noFixContentLength = true
+	} else if haveCL && !haveTE && len(originBody) > clInt {
+		SplitHTTPPacket(originBody[clInt:], func(method string, requestUri string, proto string) error {
+			if len(proto) > 5 {
+				if strings.HasPrefix(proto, "HTTP/") {
+					noFixContentLength = true
 				}
-			})
-			if !handledHost {
-				fallbackUrlMaterial = append(fallbackUrlMaterial, "Host: "+utils.HostPort(host, port))
 			}
-			var data = strings.Join(fallbackUrlMaterial, "\r\n") + "\r\n\r\n"
-			url, err = ExtractURLFromHTTPRequestRaw([]byte(data), https)
-			if err != nil {
-				return nil, utils.Errorf("extract(fallback) url from request raw failed! reason: %v", err)
-			}
-		} else {
-			return response, err
+			return utils.Error("pipeline or smuggle detected, auto enable noFixContentLength")
+		}, nil)
+	} else if haveTE && !haveCL {
+		_, after, ok := bytes.Cut(originBody, []byte("0\r\n\r\n"))
+		if ok && len(after) > 0 {
+			SplitHTTPPacket(after, func(method string, requestUri string, proto string) error {
+				if len(proto) > 5 {
+					if strings.HasPrefix(proto, "HTTP/") {
+						noFixContentLength = true
+					}
+				}
+				return utils.Error("pipeline or smuggle detected, auto enable noFixContentLength")
+			}, nil)
 		}
 	}
 
 	// 逐个记录 response 中的内容
-	response.Url = url.String()
+	response.Url = urlIns.String()
 
 	// 获取cookiejar
 	cookiejar := GetCookiejar(session)
 	if session != nil {
-		cookies := cookiejar.Cookies(url)
+		cookies := cookiejar.Cookies(urlIns)
 
 		// 复用session中的cookie
-		r, err = AddOrUpgradeCookie(r, CookiesToString(cookies))
+		requestPacket, err = AddOrUpgradeCookie(requestPacket, CookiesToString(cookies))
 		if err != nil {
 			return response, err
 		}
@@ -568,7 +626,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// 修复 host port
 	if port <= 0 || host == "" {
-		newHost, newPort, err := utils.ParseStringToHostPort(url.String())
+		newHost, newPort, err := utils.ParseStringToHostPort(urlIns.String())
 		if err != nil {
 			return response, err
 		}
@@ -599,21 +657,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	response.RuntimeId = option.RuntimeId
 	response.FromPlugin = option.FromPlugin
 
-	// 修复CRLF
-	r = FixHTTPPacketCRLF(r, noFixContentLength)
-	response.RawRequest = r
-
-	var (
-		enableHttp2 = false
-	)
-	// http2
-	SplitHTTPHeadersAndBodyFromPacketEx(r, func(method string, requestUri string, proto string) error {
-		if forceHttp2 || (strings.HasPrefix(proto, "HTTP/2") && https) {
-			enableHttp2 = true
-		}
-		return errors.New("normal abort")
-	})
-
+	// fix CRLF
+	requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	response.RawRequest = requestPacket
 	response.Http2 = enableHttp2
 
 	//https://github.com/mattn/go-ieproxy
@@ -760,9 +806,9 @@ RECONNECT:
 		//ddl, cancel := context.WithTimeout(context.Background(), timeout)
 		//defer cancel()
 		if option.BeforeDoRequest != nil {
-			r = option.BeforeDoRequest(r)
+			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
-		rsp, err := HTTPRequestToHTTP2("https", utils.HostPort(host, port), conn, r, noFixContentLength)
+		rsp, err := HTTPRequestToHTTP2("https", utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
 		if err != nil {
 			return response, utils.Errorf("yak.http2 error: %s", err)
 		}
@@ -772,9 +818,9 @@ RECONNECT:
 
 	// 写报文
 	if option.BeforeDoRequest != nil {
-		r = option.BeforeDoRequest(r)
+		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
-	_, err = conn.Write(r)
+	_, err = conn.Write(requestPacket)
 	if err != nil {
 		return response, utils.Errorf("write request failed: %s", err)
 	}
@@ -791,21 +837,45 @@ RECONNECT:
 		traceInfo.ServerTime = time.Since(serverTimeStart)
 	}
 
-	rspIns, err := http.ReadResponse(httpResponseReader, nil)
+	var multiResponses []*http.Response
+	var isMultiResponses bool
 
+	firstResponse, err := http.ReadResponse(httpResponseReader, nil)
 	if err != nil {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return response, nil
 		}
 		log.Infof("[lowhttp] read response failed: %s", err)
 	}
-	if rspIns == nil {
+	if firstResponse == nil {
 		if len(responseRaw.Bytes()) == 0 {
 			return response, utils.Errorf("empty result. %v", err.Error())
 		}
 	} else {
-		if rspIns.Body != nil {
-			_, _ = io.Copy(ioutil.Discard, io.LimitReader(rspIns.Body, 10*1024*1024))
+		if firstResponse.Body != nil {
+			_, _ = io.Copy(io.Discard, firstResponse.Body)
+			// read response first
+		}
+		multiResponses = append(multiResponses, firstResponse)
+
+		// handle response
+		for noFixContentLength {
+			// log.Infof("checking next(pipeline/smuggle) response...")
+			_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+			nextResponse, err := http.ReadResponse(httpResponseReader, nil)
+			if err != nil {
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					break
+				}
+				log.Debugf("[lowhttp] read (pipeline/smuggle) response failed: %s", err)
+				break
+			}
+			if nextResponse != nil {
+				multiResponses = append(multiResponses, nextResponse)
+				isMultiResponses = true
+				response.MultiResponse = true
+				_, _ = io.ReadAll(nextResponse.Body)
+			}
 		}
 	}
 
@@ -815,7 +885,7 @@ RECONNECT:
 
 	// 更新cookiejar中的cookie
 	if session != nil {
-		cookiejar.SetCookies(url, rspIns.Cookies())
+		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 
 	// status code retry
@@ -828,7 +898,7 @@ RECONNECT:
 	if len(retryNotInStatusCode) > 0 {
 		// 3xx status code can't retry
 		for _, sc := range retryNotInStatusCode {
-			if rspIns.StatusCode == sc || (rspIns.StatusCode >= 300 && rspIns.StatusCode < 400) {
+			if firstResponse.StatusCode == sc || (firstResponse.StatusCode >= 300 && firstResponse.StatusCode < 400) {
 				retryNotInFlag = false
 				break
 			}
@@ -841,7 +911,7 @@ RECONNECT:
 
 	// in statuscode
 	for _, sc := range retryInStatusCode {
-		if rspIns.StatusCode == sc {
+		if firstResponse.StatusCode == sc {
 			retryFlag = true
 			break
 		}
@@ -855,8 +925,12 @@ STATUSCODERETRY:
 		goto RECONNECT
 	}
 
-	// 在修复 ContentLength 的情况下，默认应该有一个响应被返回。
-	if !noFixContentLength {
+	/*
+		FixHTTPResponse will be executed when:
+		1. SMUGGLE: noFixContentLength is false
+		2. PIPELINE(multi response)
+	*/
+	if !noFixContentLength && !isMultiResponses {
 		// fix
 		//return responseRaw.Bytes(), nil
 		rspRaw, _, err := FixHTTPResponse(responseRaw.Bytes())
