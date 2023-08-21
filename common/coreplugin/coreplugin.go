@@ -50,7 +50,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		Uuid:               uuid.NewV4().String(),
 		OnlineOfficial:     true,
 		IsCorePlugin:       true,
-		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-logo.jpg`,
+		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
 	}
 	buildInPlugin[name] = plugin
 	OverWriteYakPlugin(plugin.ScriptName, plugin)
@@ -220,7 +220,7 @@ func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	backendSha1 := utils.CalcSha1(string(codeBytes))
+	backendSha1 := utils.CalcSha1(string(codeBytes), scriptData.HeadImg)
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
 		log.Infof("add core plugin %v to plugin database", name)
@@ -233,13 +233,14 @@ func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content) == backendSha1 && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content, databasePlugin.HeadImg) == backendSha1 && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
 		log.Infof("start to override existed plugin: %v", name)
 		databasePlugin.Content = string(codeBytes)
 		databasePlugin.IsCorePlugin = true
+		databasePlugin.HeadImg = scriptData.HeadImg
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, databasePlugin)
 		if err != nil {
 			log.Errorf("override %v failed: %s", name, err)
