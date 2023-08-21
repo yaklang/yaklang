@@ -119,6 +119,20 @@ func (c *YakitClient) SetYakLog(logger *YakLogger) {
 // 输入
 func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) error {
 	data := fmt.Sprintf(tmp, items...)
+	logger := c.yakLogger.Info
+	switch level {
+	case "warn":
+		logger = c.yakLogger.Warn
+	case "debug":
+		logger = c.yakLogger.Debug
+	case "error":
+		logger = c.yakLogger.Error
+	}
+	formated := spew.Sprintf(tmp, items...)
+	if len(formated) > 256 {
+		formated = string([]rune(formated)[:100]) + "..."
+	}
+	logger(formated)
 	return c.send(&YakitLog{
 		Level:     level,
 		Data:      data,

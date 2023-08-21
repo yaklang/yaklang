@@ -526,19 +526,15 @@ func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
 }
 
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
-	c.yakLogger.Error(tmp, items...)
 	c.YakitLog("error", tmp, items...)
 }
 func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
-	c.yakLogger.Info(tmp, items...)
 	c.YakitLog("info", tmp, items...)
 }
 func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
-	c.yakLogger.Debug(tmp, items...)
 	c.YakitLog("debug", tmp, items...)
 }
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
-	c.yakLogger.Warn(tmp, items...)
 	c.YakitLog("warn", tmp, items...)
 }
 
