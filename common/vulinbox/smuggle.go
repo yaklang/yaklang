@@ -47,7 +47,7 @@ func (s *VulinServer) registerPipelineNSmuggle() {
 			log.Error(err)
 		}
 	}()
-	err = utils.WaitConnect(utils.HostPort("127.0.0.1", smugglePort), 3)
+	err = utils.WaitConnect(utils.HostPort("127.0.0.1", pipelinePort), 3)
 	if err != nil {
 		log.Error(err)
 		return
@@ -55,7 +55,7 @@ func (s *VulinServer) registerPipelineNSmuggle() {
 	addRouteWithVulInfo(pipelineNSmuggleSubroute, &VulInfo{
 		Path: `/pipeline`,
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
-			writer.Header().Set("Location", "http://"+utils.HostPort("127.0.0.1", smugglePort))
+			writer.Header().Set("Location", "http://"+utils.HostPort("127.0.0.1", pipelinePort))
 			writer.WriteHeader(302)
 		},
 		Title: "HTTP Pipeline 正常案例（对照组，并不是漏洞）",
