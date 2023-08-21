@@ -1,4 +1,4 @@
-package ssa
+package ssa4yak
 
 import "testing"
 

@@ -19,7 +19,7 @@ func (p *Program) InspectVariable(varName string) *InspectVariableResult {
 	result.VariableName = varName
 
 	for _, pkg := range p.Packages {
-		for _, funcIns := range pkg.funcs {
+		for _, funcIns := range pkg.Funcs {
 			result.Merge(funcIns.InspectVariable(varName))
 		}
 	}

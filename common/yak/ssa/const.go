@@ -22,6 +22,7 @@ func NewConstWithUnary(i any, un int) *Const {
 	c.Unary = un
 	return c
 }
+
 func NewConst(i any) *Const {
 	// build new const
 	typ := GetType(i)
