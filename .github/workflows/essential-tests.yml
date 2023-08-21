@@ -87,8 +87,10 @@ jobs:
           - name: Test YakDNS(DoH / TCP / UDP)
             run: go test -timeout 20s ./common/netx/mustpass -v
 
-          - name: Test Suricata Match
-            run: go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
+          - name: Test Suricata Generate && Match
+            run: |
+              go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
+              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker -v
 
           - name: Test Ping
             run: go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v

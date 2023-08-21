@@ -3,7 +3,6 @@ package suricata
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"math"
 )
 
 type Generator interface {
@@ -57,6 +56,8 @@ func (g *Ploadgen) parse() error {
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseChar), WithTryLen(3))
 		case HTTPHeaderNames:
 			g.gen[mdf] = parse2DirectGen(rule)
+		case HTTPHeader, HTTPHeaderRaw:
+			g.gen[mdf] = parse2HeaderGen(rule)
 		case HTTPRequestLine, HTTPResponseLine, HTTPStart:
 			if len(bytes.Fields(rule[0].Content)) == 3 {
 				g.gen[mdf] = parse2DirectGen(rule)
@@ -67,33 +68,5 @@ func (g *Ploadgen) parse() error {
 			g.gen[mdf] = parse2ContentGen(rule, WithNoise(noiseVisable))
 		}
 	}
-
-	// set Len
-	for _, payload := range g.gen {
-		payload, ok := payload.(*ContentGen)
-		if !ok {
-			continue
-		}
-		for _, m := range payload.Modifiers {
-			switch m := m.(type) {
-			case *ContentModifier:
-				if m.Offset >= 0 {
-					if m.Offset+len(m.Content) > payload.Len || m.Relative {
-						payload.Len += m.Offset + len(m.Content)
-					}
-				} else {
-					if -m.Offset > payload.Len || m.Relative {
-						payload.Len = -m.Offset
-					}
-				}
-			case *RegexpModifier:
-				payload.Len += len(m.Generator.Generate())
-			}
-		}
-		if payload.Len > 2 {
-			payload.Len = 1 << (math.Ilogb(float64(payload.Len-1)) + 1)
-		}
-	}
-
 	return nil
 }
