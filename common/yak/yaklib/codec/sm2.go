@@ -99,6 +99,7 @@ func SM2DecryptC1C2C3WithPassword(priKey []byte, data []byte, password []byte) (
 
 func SM2EncryptC1C3C2(pubKey []byte, data []byte) ([]byte, error) {
 	//x509.ReadPublicKeyFromHex()
+	pubKey = bytes.TrimSpace(pubKey)
 	var pub *sm2.PublicKey
 	var err error
 	if bytes.HasPrefix(pubKey, []byte("---")) {
