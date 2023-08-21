@@ -315,7 +315,7 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 }
 
 func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "AttachRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
@@ -329,11 +329,11 @@ func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 }
 
 func (ds *DebugSession) onTerminateRequest(request *dap.TerminateRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "TerminateRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onRestartRequest(request *dap.RestartRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "RestartRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
@@ -368,7 +368,7 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 }
 
 func (ds *DebugSession) onSetFunctionBreakpointsRequest(request *dap.SetFunctionBreakpointsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "SetFunctionBreakpointsRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 // Unlike what DAP documentation claims, this request is always sent
@@ -440,19 +440,19 @@ func (ds *DebugSession) onStepOutRequest(request *dap.StepOutRequest) {
 }
 
 func (ds *DebugSession) onStepBackRequest(request *dap.StepBackRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "StepBackRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onReverseContinueRequest(request *dap.ReverseContinueRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "ReverseContinueRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onRestartFrameRequest(request *dap.RestartFrameRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "RestartFrameRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onGotoRequest(request *dap.GotoRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "GotoRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onPauseRequest(request *dap.PauseRequest) {
@@ -661,7 +661,7 @@ func (ds *DebugSession) onSetExpressionRequest(request *dap.SetExpressionRequest
 }
 
 func (ds *DebugSession) onSourceRequest(request *dap.SourceRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "SourceRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
@@ -687,7 +687,7 @@ func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
 }
 
 func (ds *DebugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "TerminateRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
@@ -731,15 +731,15 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 }
 
 func (ds *DebugSession) onStepInTargetsRequest(request *dap.StepInTargetsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "StepInTargetRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onGotoTargetsRequest(request *dap.GotoTargetsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "GotoTargetRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onCompletionsRequest(request *dap.CompletionsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "CompletionRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onExceptionInfoRequest(request *dap.ExceptionInfoRequest) {
@@ -771,31 +771,31 @@ func (ds *DebugSession) onExceptionInfoRequest(request *dap.ExceptionInfoRequest
 }
 
 func (ds *DebugSession) onLoadedSourcesRequest(request *dap.LoadedSourcesRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "LoadedRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onDataBreakpointInfoRequest(request *dap.DataBreakpointInfoRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "DataBreakpointInfoRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onSetDataBreakpointsRequest(request *dap.SetDataBreakpointsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "SetDataBreakpointsRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onReadMemoryRequest(request *dap.ReadMemoryRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "ReadMemoryRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onDisassembleRequest(request *dap.DisassembleRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "DisassembleRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onCancelRequest(request *dap.CancelRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "CancelRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) onBreakpointLocationsRequest(request *dap.BreakpointLocationsRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "BreakpointLocationsRequest is not yet supported"))
+	ds.sendNotYetImplementedErrorResponse(request.Request)
 }
 
 func (ds *DebugSession) sendStepResponse(threadId int, message dap.Message) {
@@ -1133,4 +1133,9 @@ func newErrorResponse(requestSeq int, command string, message string) *dap.Error
 	er.Message = "unsupported"
 	er.Body = dap.ErrorResponseBody{Error: &dap.ErrorMessage{Format: message, Id: 12345}}
 	return er
+}
+
+func (ds *DebugSession) sendNotYetImplementedErrorResponse(request dap.Request) {
+	ds.sendErrorResponse(request, NotYetImplemented, "Not yet implemented",
+		fmt.Sprintf("cannot process %q request", request.Command))
 }
