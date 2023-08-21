@@ -130,7 +130,7 @@ func (sw *Switch) GetUsers() []User { return nil }
 func (sw *Switch) GetValues() []Value {
 	return append(
 		lo.Map(sw.label,
-			func(label switchlabel, _ int) Value { return label.value },
+			func(label SwitchLabel, _ int) Value { return label.value },
 		),
 		sw.cond,
 	)

@@ -14,6 +14,8 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 	}
 }
 
+func (phi *Phi) Name() string { return phi.variable }
+
 func (phi *Phi) Build() Value {
 	phi.Block.skip = true
 	for _, predBlock := range phi.Block.Preds {

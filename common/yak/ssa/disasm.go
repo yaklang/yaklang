@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (f *Function) SetReg(i Instruction) {
@@ -39,11 +38,11 @@ func getStr(v Node) string {
 	case Instruction:
 		if i, ok := v.(*Interface); ok {
 			if i == i.Func.symbol {
-				return i.Func.name + "-symbol"
+				return i.Func.Name + "-symbol"
 			}
 		}
 		if i, ok := v.(*Field); ok {
-			if i.outCapture {
+			if i.OutCapture {
 				return i.Key.String() + "-capture"
 			}
 		}
@@ -53,7 +52,7 @@ func getStr(v Node) string {
 	case *Parameter:
 		op += v.String()
 	case *Function:
-		op += v.name
+		op += v.Name
 	default:
 		panic("instruction unknow value type: " + v.String())
 	}
@@ -74,14 +73,14 @@ func (f *Function) String() string {
 	return f.DisAsm(DisAsmDefault)
 }
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
-	ret := f.name + " "
+	ret := f.Name + " "
 	ret += strings.Join(
 		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.variable }),
 		", ")
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
-		ret += fmt.Sprintf("parent: %s\n", parent.name)
+		ret += fmt.Sprintf("parent: %s\n", parent.Name)
 	}
 
 	if f.Pos != nil {
@@ -225,7 +224,7 @@ func (sw *Switch) String() string {
 		getStr(sw.cond),
 		sw.defaultBlock.Name,
 		strings.Join(
-			lo.Map(sw.label, func(label switchlabel, _ int) string {
+			lo.Map(sw.label, func(label SwitchLabel, _ int) string {
 				return fmt.Sprintf("%s:%s", getStr(label.value), label.dest.Name)
 			}),
 			", ",
@@ -234,8 +233,28 @@ func (sw *Switch) String() string {
 }
 
 // ----------- BinOp
+var BinaryOpcodeName = map[BinaryOpcode]string{
+	OpAnd:    `and`,
+	OpAndNot: `and-not`,
+	OpOr:     `or`,
+	OpXor:    `xor`,
+	OpShl:    `shl`,
+	OpShr:    `shr`,
+	OpAdd:    `add`,
+	OpSub:    `sub`,
+	OpMod:    `mod`,
+	OpMul:    `mul`,
+	OpDiv:    `div`,
+	OpGt:     `gt`,
+	OpLt:     `lt`,
+	OpLtEq:   `lt-eq`,
+	OpGtEq:   `gt-eq`,
+	OpNotEq:  `neq`,
+	OpEq:     `eq`,
+}
+
 func (b *BinOp) String() string {
-	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), yakvm.OpcodeToName(b.Op), getStr(b.Y))
+	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), BinaryOpcodeName[b.Op], getStr(b.Y))
 }
 
 // ----------- Interface
