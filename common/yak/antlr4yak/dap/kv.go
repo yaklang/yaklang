@@ -1,8 +1,18 @@
 package dap
 
-import "github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+import (
+	"reflect"
 
-type KV struct {
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+)
+
+type ScopeKV struct {
 	Key   string
 	Value *yakvm.Value
+}
+
+type MapKey struct {
+	Key    reflect.Value
+	IKey   interface{}
+	KeyStr string
 }
