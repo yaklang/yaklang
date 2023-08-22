@@ -30,6 +30,7 @@ type DAPDebugger struct {
 	selectFrame *yakvm.Frame // 选择的frame
 
 	finished   bool          // 是否程序已经结束
+	restart    bool          // 是否需要重启
 	timeout    time.Duration // 超时时间
 	inCallback bool          // 是否在回调状态
 	continueCh chan struct{} // 继续执行
@@ -159,6 +160,14 @@ func (d *DAPDebugger) IsFinished() bool {
 	return d.finished
 }
 
+func (d *DAPDebugger) Restart() bool {
+	return d.restart
+}
+
+func (d *DAPDebugger) SetRestart(b bool) {
+	d.restart = b
+}
+
 func (d *DAPDebugger) SetDescription(desc string) {
 	d.debugger.SetDescription(desc)
 }
@@ -228,7 +237,9 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 		// 程序正常结束,发送terminated事件
 		if isNormallyFinished && !d.finished {
 			d.finished = true
-			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+			if !d.restart {
+				d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+			}
 			return
 		}
 
