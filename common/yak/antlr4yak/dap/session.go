@@ -86,6 +86,9 @@ type DebugSession struct {
 
 	// variablesMap  ref -> dap.Variable
 	variablesMap map[int]dap.Variable
+
+	// isRealClient
+	isRealClient bool
 }
 
 func NewDebugSession(conn net.Conn, config *DAPServerConfig) *DebugSession {
@@ -216,6 +219,8 @@ func (ds *DebugSession) dispatchRequest(request dap.Message) {
 }
 
 func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
+	ds.isRealClient = request.Arguments.ClientID != ""
+
 	response := &dap.InitializeResponse{}
 	response.Response = *newResponse(request.Request)
 	response.Body.SupportsEvaluateForHovers = true        // 鼠标悬停时是否支持求值
