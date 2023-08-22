@@ -221,7 +221,7 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsEvaluateForHovers = true        // 鼠标悬停时是否支持求值
 	response.Body.SupportsConditionalBreakpoints = true   // 条件断点
 	response.Body.SupportsConfigurationDoneRequest = true // 是否支持检测配置是否完成的请求,如果支持,则客户端发送一个SupportsConfigurationDoneRequest请求,而适配器会在调试会话的配置已完成时返回configurationDone响应,告诉客户端可以开始执行调试操作（如运行、单步执行等）
-	response.Body.SupportsDataBreakpoints = true          // todo: 是否支持数据断点(即监视和控制特定变量的值，并在变量的值满足特定条件时暂停程序的执行)(未完全支持)
+	response.Body.SupportsDataBreakpoints = false         // 某块内存(变量)被读写时触发的断点
 	response.Body.SupportsStepInTargetsRequest = true     // 支持步入
 	response.Body.SupportsDisassembleRequest = true       // 是否支持反汇编请求(输出opcode)
 	response.Body.SupportTerminateDebuggee = true         // 在调试器终止时是否支持终止调试进程
