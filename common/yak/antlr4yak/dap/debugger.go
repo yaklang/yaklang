@@ -210,8 +210,8 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 		// 停止事件
 		session := d.session
 		stopReason := g.StopReason()
-		isPanic := stopReason == "exception"
-		if stopReason != "" {
+		isPanic, isNormallyFinished := stopReason == "exception", stopReason == "finished"
+		if stopReason != "" && !isNormallyFinished {
 			frame := g.Frame()
 			threadID := 0
 			if frame != nil {
@@ -226,7 +226,7 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 		}
 
 		// 程序正常结束,发送terminated事件
-		if g.Finished() && !isPanic {
+		if isNormallyFinished && !d.finished {
 			d.finished = true
 			d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 			return
