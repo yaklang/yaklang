@@ -143,9 +143,11 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			}
 			if vmPanic != nil {
 				log.Error(vmPanic)
+				debugger := v.vm.debugger
+				if debugger != nil {
+					debugger.HandleForPanic(vmPanic)
+				}
 			}
-			debugger := v.vm.debugger
-			debugger.HandleForPanic(vmPanic)
 		}
 	}()
 

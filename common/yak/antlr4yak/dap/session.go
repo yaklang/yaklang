@@ -379,7 +379,7 @@ func (ds *DebugSession) onSetExceptionBreakpointsRequest(request *dap.SetExcepti
 
 func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
 
-	// 如果stopOnEtry,则在入口时回调
+	// 如果stopOnEntry,则在入口时回调
 	if ds.launchConfig.StopOnEntry {
 		e := &dap.StoppedEvent{
 			Event: *newEvent("stopped"),
