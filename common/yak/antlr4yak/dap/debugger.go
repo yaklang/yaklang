@@ -234,10 +234,10 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 			session.send(event)
 		}
 
-		// 程序正常结束,发送terminated事件
 		if isNormallyFinished && !d.finished {
 			d.finished = true
-			if !d.restart {
+			// 程序正常结束且不需要重启,发送terminated事件(真实client不需要发送,因为不想让client退出)
+			if !d.restart && !d.session.isRealClient {
 				d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 			}
 			return
