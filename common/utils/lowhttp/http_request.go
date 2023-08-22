@@ -68,13 +68,14 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 
 	// applying patch to restore CRLF at body
 	// if `raw` has CRLF at body end (by design HTTP smuggle) and `noFixContentLength` is true
-	if bytes.HasSuffix(raw, []byte(CRLF+CRLF)) && noFixLength {
+
+	if bytes.HasSuffix(raw, []byte(CRLF+CRLF)) && noFixLength && len(body) > 0 {
 		body = append(body, []byte(CRLF+CRLF)...)
 	}
 
 	handleChunked := haveChunkedHeader && !haveContentLength
 	if handleChunked {
-		bodyRaw, _ := ioutil.ReadAll(httputil.NewChunkedReader(bytes.NewBuffer(body)))
+		bodyRaw, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewBuffer(body)))
 		if len(bodyRaw) > 0 {
 			body = bodyRaw
 		}
