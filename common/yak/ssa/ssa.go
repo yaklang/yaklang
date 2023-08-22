@@ -2,9 +2,6 @@ package ssa
 
 import (
 	"sync"
-
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // TODO
@@ -60,24 +57,20 @@ type Program struct {
 	Packages []*Package
 
 	// for build
-	ast *yak.YaklangParser
+	buildOnece sync.Once
 }
 
 type Package struct {
-	name string
+	Name string
 	// point to program
 	Prog *Program
 	// function list
-	funcs []*Function
-
-	// for build
-	buildOnece sync.Once
-	ast        *yak.YaklangParser
+	Funcs []*Function
 }
 
 // implement Value
 type Function struct {
-	name string
+	Name string
 
 	// package
 	Package *Package
@@ -115,7 +108,7 @@ type Function struct {
 	err SSAErrors
 
 	// for builder
-	builder *builder
+	builder *FunctionBuilder
 }
 
 func (f *Function) GetType() Types {
@@ -330,17 +323,25 @@ var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
 
 // ----------- Switch
-type switchlabel struct {
+type SwitchLabel struct {
 	value Value
 	dest  *BasicBlock
 }
+
+func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
+	return SwitchLabel{
+		value: v,
+		dest:  dest,
+	}
+}
+
 type Switch struct {
 	anInstruction
 
 	cond         Value
 	defaultBlock *BasicBlock
 
-	label []switchlabel
+	label []SwitchLabel
 }
 
 var _ Node = (*Switch)(nil)
@@ -350,11 +351,33 @@ var _ Instruction = (*Switch)(nil)
 // data-flow instructions  ----------------------------------------
 // BinOp / UnOp
 
+type BinaryOpcode int
+
+const (
+	// Binary
+	OpShl    BinaryOpcode = iota // <<
+	OpShr                        // >>
+	OpAnd                        // &
+	OpAndNot                     // &^
+	OpOr                         // |
+	OpXor                        // ^
+	OpAdd                        // +
+	OpSub                        // -
+	OpMul                        // *
+	OpDiv                        // /
+	OpMod                        // %
+	OpGt                         // >
+	OpLt                         // <
+	OpGtEq                       // >=
+	OpLtEq                       // <=
+	OpEq                         // ==
+	OpNotEq                      // != <>
+)
+
 // ----------- BinOp
 type BinOp struct {
 	anInstruction
-
-	Op   yakvm.OpcodeFlag
+	Op   BinaryOpcode
 	X, Y Value
 	user []User
 }
@@ -364,10 +387,19 @@ var _ User = (*BinOp)(nil)
 var _ Node = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
 
+type UnaryOpcode int
+
+const (
+	OpNot UnaryOpcode = iota
+	OpPlus
+	OpNeg
+	OpChan
+)
+
 type UnOp struct {
 	anInstruction
 
-	Op yakvm.OpcodeFlag
+	Op UnaryOpcode
 	X  Value
 }
 
@@ -407,7 +439,7 @@ type Field struct {
 	I   Value
 
 	// capture by other function
-	outCapture bool
+	OutCapture bool
 
 	update []Value // value
 

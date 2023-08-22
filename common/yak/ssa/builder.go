@@ -1,8 +1,21 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+)
 
-type builder struct {
+type Builder interface {
+	Build()
+}
+
+// build enter pointer
+// front implement `Builder`
+func (prog *Program) Build(b Builder) {
+	prog.buildOnece.Do(b.Build)
+}
+
+// Function builder API
+type FunctionBuilder struct {
 	*Function
 
 	target *target // for break and continue
@@ -11,27 +24,80 @@ type builder struct {
 
 	// for build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
-	currentBlock *BasicBlock                      // current block to build
-	currtenPos   *Position
-	symbolBlock  *blockSymbolTable //  blockId -> variable -> variableId
+	CurrentBlock *BasicBlock                      // current block to build
+	currtenPos   *Position                        // current position in source code
+	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
 
-	prev *builder
+	prev *FunctionBuilder
 }
 
-func NewBuilder(f *Function, next *builder) *builder {
-	b := &builder{
+func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
+	b := &FunctionBuilder{
 		Function:     f,
 		target:       &target{},
 		deferexpr:    make([]*Call, 0),
 		currentDef:   make(map[string]map[*BasicBlock]Value),
-		currentBlock: nil,
+		CurrentBlock: nil,
 		currtenPos:   nil,
-		symbolBlock:  NewBlockSymbolTable("func-scope", nil),
+		symbolBlock:  nil,
 		prev:         next,
 	}
-	b.currentBlock = f.EnterBlock
+	b.PushBlockSymbolTable()
+	b.CurrentBlock = f.EnterBlock
 	f.builder = b
 	return b
+}
+
+// new function
+func (b *FunctionBuilder) NewFunc() *Function {
+	return b.Package.NewFunctionWithParent("", b.Function)
+}
+
+// handler current function
+
+// function param
+func (b FunctionBuilder) HandlerEllipsis() {
+	b.Param[len(b.Param)-1].typs = append(b.Param[len(b.Param)-1].typs, NewInterfaceType())
+	b.hasEllipsis = true
+}
+
+// get parent function
+func (b FunctionBuilder) GetParentBuilder() *FunctionBuilder {
+	return b.parent.builder
+}
+
+// add current function defer function
+func (b *FunctionBuilder) AddDefer(call *Call) {
+	b.deferexpr = append(b.deferexpr, call)
+}
+
+// finish current function builder
+func (b *FunctionBuilder) Finish() {
+	// set defer function
+	b.CurrentBlock = b.Blocks[len(b.Blocks)-1]
+	for i := len(b.deferexpr) - 1; i >= 0; i-- {
+		b.EmitCall(b.deferexpr[i])
+	}
+	// function finish
+	b.Function.Finish()
+}
+
+// handler position: set new position and return original position for backup
+func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
+	backup := b.currtenPos
+	b.currtenPos = pos
+	return backup
+}
+
+// function stack
+
+func (b *FunctionBuilder) PushFunction(newfunc *Function) *FunctionBuilder {
+	build := NewBuilder(newfunc, b)
+	return build
+}
+
+func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
+	return b.prev
 }
 
 // use in for/switch
@@ -42,18 +108,42 @@ type target struct {
 	_fallthrough *BasicBlock
 }
 
+// target stack
+func (b *FunctionBuilder) PushTarget(_break, _continue, _fallthrough *BasicBlock) {
+	b.target = &target{
+		tail:         b.target,
+		_break:       _break,
+		_continue:    _continue,
+		_fallthrough: _fallthrough,
+	}
+}
+
+func (b *FunctionBuilder) PopTarget() bool {
+	b.target = b.target.tail
+	if b.target == nil {
+		b.NewError(Error, "error target struct this position when build")
+		return false
+	} else {
+		return true
+	}
+}
+
+// get target feild
+func (b *FunctionBuilder) GetBreak() *BasicBlock {
+	return b.target._break
+}
+
+func (b *FunctionBuilder) GetContinue() *BasicBlock {
+	return b.target._continue
+}
+func (b *FunctionBuilder) GetFallthrough() *BasicBlock {
+	return b.target._fallthrough
+}
+
 type blockSymbolTable struct {
 	symbol  map[string]string // variable -> variableId(variable-blockid)
 	blockid string
 	next    *blockSymbolTable
-}
-
-func NewBlockSymbolTable(id string, next *blockSymbolTable) *blockSymbolTable {
-	return &blockSymbolTable{
-		symbol:  make(map[string]string),
-		blockid: id,
-		next:    next,
-	}
 }
 
 var (
@@ -66,26 +156,22 @@ func NewBlockId() string {
 	return ret
 }
 
-func (b *builder) finish() {
-	// set defer function
-	b.currentBlock = b.Blocks[len(b.Blocks)-1]
-	for i := len(b.deferexpr) - 1; i >= 0; i-- {
-		b.emitCall(b.deferexpr[i])
+// block symboltable stack
+func (b *FunctionBuilder) PushBlockSymbolTable() {
+	b.symbolBlock = &blockSymbolTable{
+		symbol:  make(map[string]string),
+		blockid: NewBlockId(),
+		next:    b.symbolBlock,
 	}
-	b.Finish()
 }
 
-func (pkg *Package) build() {
-	main := pkg.NewFunction("yak-main")
-	b := NewBuilder(main, nil)
-	b.build(pkg.ast)
-	b.finish()
+func (b *FunctionBuilder) PopBlockSymbolTable() {
+	b.symbolBlock = b.symbolBlock.next
 }
 
-func (pkg *Package) Build() { pkg.buildOnece.Do(pkg.build) }
-
-func (prog *Program) Build() {
-	for _, pkg := range prog.Packages {
-		pkg.Build()
-	}
+// use block symbol table map variable -> variable+blockid
+func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
+	newtext := text + b.symbolBlock.blockid
+	b.symbolBlock.symbol[text] = newtext
+	return newtext
 }
