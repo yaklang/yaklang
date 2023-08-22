@@ -12,6 +12,9 @@ import (
 
 func AsDebugString(i interface{}, raws ...bool) string {
 	refV := reflect.ValueOf(i)
+	if !refV.IsValid() || refV.IsZero() || refV.IsNil() {
+		return fmt.Sprintf("%#v", i)
+	}
 	typ := refV.Type()
 	kind := typ.Kind()
 	raw := false
