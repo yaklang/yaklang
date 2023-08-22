@@ -1,39 +1,40 @@
-package ssa
+package ssa4yak
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
 )
 
 // check block-graph and value-user chain
-func CheckProgram(t *testing.T, prog *Program) {
+func CheckProgram(t *testing.T, prog *ssa.Program) {
 	// showProg(prog)
 
-	checkInst := func(v Node) {
-		if phi, ok := v.(*Phi); ok {
+	checkInst := func(v ssa.Node) {
+		if phi, ok := v.(*ssa.Phi); ok {
 			if !slices.Contains(phi.GetBlock().Phis, phi) {
 				t.Fatalf("fatal phi inst %s not't in block %s", phi, phi.GetBlock().Name)
 			}
 			// phi is ok return
 			return
 		}
-		if inst, ok := v.(Instruction); ok {
+		if inst, ok := v.(ssa.Instruction); ok {
 			if block := inst.GetBlock(); block != nil {
 				// inst must in inst.block
 				if !slices.Contains(block.Instrs, inst) {
 					t.Fatalf("fatal inst %s not't in block %s", inst, inst.GetBlock().Name)
 				}
-			} else if inst != inst.GetParent().symbol {
+			} else if inst != inst.GetParent().GetSymbol() {
 				t.Fatalf("fatal inst %s not't have block ", inst)
 			}
 		}
 	}
 
-	checkValue := func(value Value) {
-		if user, ok := value.(User); ok {
+	checkValue := func(value ssa.Value) {
+		if user, ok := value.(ssa.User); ok {
 			if slices.Contains(user.GetValues(), value) {
 				t.Fatalf("fatal inst %s has this self", value)
 			}
@@ -45,8 +46,8 @@ func CheckProgram(t *testing.T, prog *Program) {
 			checkInst(user)
 		}
 	}
-	checkUser := func(user User) {
-		if value, ok := user.(Value); ok {
+	checkUser := func(user ssa.User) {
+		if value, ok := user.(ssa.Value); ok {
 			if slices.Contains(value.GetUsers(), user) {
 				t.Fatalf("fatal inst %s has this self", user)
 			}
@@ -60,29 +61,29 @@ func CheckProgram(t *testing.T, prog *Program) {
 		}
 
 	}
-	checkNode := func(node Node) {
+	checkNode := func(node ssa.Node) {
 		// value-user check
-		if value, ok := node.(Value); ok {
+		if value, ok := node.(ssa.Value); ok {
 			checkValue(value)
 		}
-		if user, ok := node.(User); ok {
+		if user, ok := node.(ssa.User); ok {
 			checkUser(user)
 		}
 	}
 
 	for i, pkg := range prog.Packages {
 		if pkg.Prog != prog {
-			t.Fatalf("fatal pkg %s[%d] error pointer to programe", pkg.name, i)
+			t.Fatalf("fatal pkg %s[%d] error pointer to programe", pkg.Name, i)
 		}
-		for i, f := range pkg.funcs {
+		for i, f := range pkg.Funcs {
 			if f.Package != pkg {
-				t.Fatalf("fatal function %s[%d] error pointer to package", f.name, i)
+				t.Fatalf("fatal function %s[%d] error pointer to package", f.Name, i)
 			}
 
-			parent := f.parent
+			parent := f.GetParent()
 			if parent != nil {
 				if !slices.Contains(parent.AnonFuncs, f) {
-					t.Fatalf("fatal function parent %s not't have it %s", parent.name, f.name)
+					t.Fatalf("fatal function parent %s not't have it %s", parent.Name, f.Name)
 				}
 			}
 
@@ -111,7 +112,7 @@ func CheckProgram(t *testing.T, prog *Program) {
 					if inst.GetParent() != f {
 						t.Fatalf("fatal instruction %s[%d] error pointer to function", inst, i)
 					}
-					if node, ok := inst.(Node); ok {
+					if node, ok := inst.(ssa.Node); ok {
 						checkNode(node)
 					}
 				}
@@ -125,7 +126,7 @@ func CheckProgram(t *testing.T, prog *Program) {
 						if e != nil {
 							checkValue(e)
 						} else {
-							t.Fatalf("fatal phi-instruction[%s] edge[%d] for block[%s] is nil!\n", phi.variable, i, b.Preds[i].Name)
+							t.Fatalf("fatal phi-instruction[%s] edge[%d] for block[%s] is nil!\n", phi.Name(), i, b.Preds[i].Name)
 						}
 					}
 				}
@@ -137,11 +138,11 @@ func CheckProgram(t *testing.T, prog *Program) {
 
 }
 
-func showProg(prog *Program) string {
+func showProg(prog *ssa.Program) string {
 	ret := ""
 	for _, pkg := range prog.Packages {
-		for _, f := range pkg.funcs {
-			ret += f.DisAsm(DisAsmDefault)
+		for _, f := range pkg.Funcs {
+			ret += f.DisAsm(ssa.DisAsmDefault)
 		}
 	}
 	fmt.Println(ret)
@@ -188,30 +189,29 @@ func CompareIR(t *testing.T, got, want, fun string) {
 	}
 }
 
-func Compare(t *testing.T, prog *Program, want *TestProgram) {
+func Compare(t *testing.T, prog *ssa.Program, want *TestProgram) {
 	if len(prog.Packages) != len(want.pkg) {
 		t.Fatalf("program package size erro: %d(want) vs %d(got)", len(prog.Packages), len(want.pkg))
 	}
 	for i := range prog.Packages {
 		pkg := prog.Packages[i]
 		want := want.pkg[i]
-		if len(pkg.funcs) != len(want.funs) {
-			t.Fatalf("package's [%s] function size erro: %d(want) vs %d(got)", pkg.name, len(pkg.funcs), len(want.funs))
+		if len(pkg.Funcs) != len(want.funs) {
+			t.Fatalf("package's [%s] function size erro: %d(want) vs %d(got)", pkg.Name, len(pkg.Funcs), len(want.funs))
 		}
-		for i := range pkg.funcs {
-			f := pkg.funcs[i]
-			want, ok := want.funs[f.name]
+		for _, f := range pkg.Funcs {
+			want, ok := want.funs[f.Name]
 			if !ok {
-				t.Fatalf("con't get this function in want: %s", f.name)
+				t.Fatalf("con't get this function in want: %s", f.Name)
 			}
 			got := f.String()
-			CompareIR(t, got, want, f.name)
+			CompareIR(t, got, want, f.Name)
 		}
 	}
 
 }
 
-func CompareYakMain(t *testing.T, prog *Program, ir string) {
+func CompareYakMain(t *testing.T, prog *ssa.Program, ir string) {
 	want := &TestProgram{
 		[]TestPackage{
 			{
@@ -224,7 +224,7 @@ func CompareYakMain(t *testing.T, prog *Program, ir string) {
 	Compare(t, prog, want)
 }
 
-func CompareYakFunc(t *testing.T, prog *Program, ir []string) {
+func CompareYakFunc(t *testing.T, prog *ssa.Program, ir []string) {
 	funs := make(map[string]string)
 	for _, ir := range ir {
 		irs := strings.Split(ir, "\n")

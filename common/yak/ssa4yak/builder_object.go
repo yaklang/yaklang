@@ -1,22 +1,23 @@
-package ssa
+package ssa4yak
 
 import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type ExpressionListMultiline interface {
 	ExpressionListMultiline() yak.IExpressionListMultilineContext
 }
 
-func (b *builder) buildSliceFromExprList(stmt ExpressionListMultiline) Value {
+func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Value {
 	_s := stmt.ExpressionListMultiline()
 	if _s == nil {
-		b.NewError(Warn, "slice literal not have expression")
-		return b.emitInterfaceBuildWithType(nil, NewConst(0), NewConst(0))
+		b.NewError(ssa.Warn, "slice literal not have expression")
+		return b.EmitInterfaceBuildWithType(nil, ssa.NewConst(0), ssa.NewConst(0))
 	}
 	s, ok := _s.(*yak.ExpressionListMultilineContext)
 	if !ok {
-		b.NewError(Error, "slice literal expression parse error")
+		b.NewError(ssa.Error, "slice literal expression parse error")
 		return nil
 	}
 	vs := b.buildExpressionListMultiline(s)
@@ -24,14 +25,14 @@ func (b *builder) buildSliceFromExprList(stmt ExpressionListMultiline) Value {
 }
 
 // slice literal
-func (b *builder) buildSliceLiteral(stmt *yak.SliceLiteralContext) Value {
+func (b *astbuilder) buildSliceLiteral(stmt *yak.SliceLiteralContext) ssa.Value {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 	return b.buildSliceFromExprList(stmt)
 }
 
 // slice typed literal
-func (b *builder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) Value {
+func (b *astbuilder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) ssa.Value {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 
@@ -39,9 +40,9 @@ func (b *builder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) Val
 
 	if s, ok := stmt.SliceTypeLiteral().(*yak.SliceTypeLiteralContext); ok {
 		typ := b.buildSliceTypeLiteral(s)
-		slice.SetType(Types{typ})
+		slice.SetType(ssa.Types{typ})
 	} else {
-		b.NewError(Warn, "slice type not set")
+		b.NewError(ssa.Warn, "slice type not set")
 	}
 
 	return slice
@@ -51,22 +52,22 @@ type MapPairs interface {
 	MapPairs() yak.IMapPairsContext
 }
 
-func (b *builder) buildMapFromMapPairs(stmt MapPairs) Value {
+func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	_s := stmt.MapPairs()
 	if _s == nil {
-		b.NewError(Warn, "map literal not have map pairs")
-		return b.emitInterfaceBuildWithType(nil, NewConst(0), NewConst(0))
+		b.NewError(ssa.Warn, "map literal not have map pairs")
+		return b.EmitInterfaceBuildWithType(nil, ssa.NewConst(0), ssa.NewConst(0))
 	}
 	s, ok := _s.(*yak.MapPairsContext)
 	if !ok {
-		b.NewError(Error, "map literal map pairs parse error")
+		b.NewError(ssa.Error, "map literal map pairs parse error")
 		return nil
 	}
 	allPair := s.AllMapPair()
 
 	// itf :=
-	keys := make([]Value, 0, len(allPair))
-	values := make([]Value, 0, len(allPair))
+	keys := make([]ssa.Value, 0, len(allPair))
+	values := make([]ssa.Value, 0, len(allPair))
 	for _, p := range allPair {
 		p := p.(*yak.MapPairContext)
 		keys = append(keys, b.buildExpression(p.Expression(0).(*yak.ExpressionContext)))
@@ -76,7 +77,7 @@ func (b *builder) buildMapFromMapPairs(stmt MapPairs) Value {
 }
 
 // map literal
-func (b *builder) buildMapLiteral(stmt *yak.MapLiteralContext) Value {
+func (b *astbuilder) buildMapLiteral(stmt *yak.MapLiteralContext) ssa.Value {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 
@@ -84,14 +85,14 @@ func (b *builder) buildMapLiteral(stmt *yak.MapLiteralContext) Value {
 		if s, ok := s.(*yak.MapTypedLiteralContext); ok {
 			return b.buildMapTypedLiteral(s)
 		} else {
-			b.NewError(Error, "map typed literal parse error")
+			b.NewError(ssa.Error, "map typed literal parse error")
 		}
 	}
-	return b.builder.buildMapFromMapPairs(stmt)
+	return b.buildMapFromMapPairs(stmt)
 }
 
 // map typed literal
-func (b *builder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) Value {
+func (b *astbuilder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) ssa.Value {
 	recover := b.SetRange(stmt.BaseParserRuleContext)
 	defer recover()
 
@@ -99,9 +100,9 @@ func (b *builder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) Value {
 
 	if s, ok := stmt.MapTypeLiteral().(*yak.MapTypeLiteralContext); ok {
 		typ := b.buildMapTypeLiteral(s)
-		maps.SetType(Types{typ})
+		maps.SetType(ssa.Types{typ})
 	} else {
-		b.NewError(Warn, "map type not set")
+		b.NewError(ssa.Warn, "map type not set")
 
 	}
 

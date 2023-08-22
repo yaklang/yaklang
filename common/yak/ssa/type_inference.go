@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func ParseTypesFromValues(vs []Value) Types {
@@ -78,7 +77,7 @@ func (c *Call) InferenceType() {
 	case *Function:
 		ret := inst.Return
 		if len(ret) == 0 {
-			fmt.Printf("warn: function %s return type is nil\n", inst.name)
+			fmt.Printf("warn: function %s return type is nil\n", inst.Name)
 		} else if len(ret) == 1 {
 			typs = inst.Return[0].GetType()
 		} else {
@@ -103,7 +102,7 @@ func (sw *Switch) InferenceType() {
 }
 
 func (b *BinOp) InferenceType() {
-	if b.Op >= yakvm.OpGt && b.Op <= yakvm.OpNotEq {
+	if b.Op >= OpGt && b.Op <= OpNotEq {
 		b.typs = []Type{BasicTypesKind[Boolean]}
 		return
 	}

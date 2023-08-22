@@ -25,7 +25,7 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, Pos *Position, format string,
 		Kind:    kind,
 	})
 }
-func (b *builder) NewError(kind ErrorKind, format string, arg ...any) {
+func (b *FunctionBuilder) NewError(kind ErrorKind, format string, arg ...any) {
 	b.NewErrorWithPos(kind, b.currtenPos, format, arg...)
 }
 func (an anInstruction) NewError(kind ErrorKind, format string, arg ...any) {
@@ -35,7 +35,7 @@ func (an anInstruction) NewError(kind ErrorKind, format string, arg ...any) {
 func (prog *Program) GetErrors() SSAErrors {
 	result := make(SSAErrors, 0)
 	for _, pkg := range prog.Packages {
-		for _, fun := range pkg.funcs {
+		for _, fun := range pkg.Funcs {
 			result = append(result, fun.err...)
 		}
 	}
