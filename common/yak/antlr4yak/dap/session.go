@@ -319,13 +319,20 @@ func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
 }
 
 func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
-	defer ds.config.triggerServerStop()
-	// ? unset debugger
-	// ds.debugger = nil
+	restart := false
+	if request.Arguments != nil {
+		restart = request.Arguments.Restart
+	}
+	if !restart {
+		defer ds.config.triggerServerStop()
+	}
 
 	ds.logToConsole("Detaching")
 	ds.send(&dap.DisconnectResponse{Response: *newResponse(request.Request)})
-	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated"), Body: dap.TerminatedEventBody{Restart: restart}})
+	// ? unset debugger
+	// ds.debugger = nil
+
 }
 
 func (ds *DebugSession) onTerminateRequest(request *dap.TerminateRequest) {
@@ -387,7 +394,6 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 		}
 		ds.send(e)
 
-		ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'dbg help' for help info.\n", consts.GetYakVersion()))
 	} else {
 		// 等待launch完成
 		ds.LaunchWg.Wait()
@@ -396,6 +402,7 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 
 		ds.debugger.Continue()
 	}
+	ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'dbg help' for help info.\n", consts.GetYakVersion()))
 
 	ds.send(&dap.ConfigurationDoneResponse{Response: *newResponse(request.Request)})
 }

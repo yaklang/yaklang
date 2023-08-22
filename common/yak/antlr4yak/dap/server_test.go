@@ -120,6 +120,7 @@ func runDebugSessionWithBPs(t *testing.T, client *Client, cmdRequest func(), sou
 	}
 
 	client.ConfigurationDoneRequest()
+	client.ExpectOutputEventHelpInfo(t)
 	client.ExpectConfigurationDoneResponse(t)
 
 	for _, onBP := range onBPs {
@@ -657,6 +658,7 @@ func TestLaunchContinueOnEntry(t *testing.T) {
 		}
 		// 5 >> configurationDone, << stopped, << configurationDone
 		client.ConfigurationDoneRequest()
+		client.ExpectOutputEventHelpInfo(t)
 		cdResp := client.ExpectConfigurationDoneResponse(t)
 		if cdResp.Seq != 0 || cdResp.RequestSeq != 5 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=5", cdResp)
@@ -712,6 +714,7 @@ func TestPreSetBreakPoint(t *testing.T) {
 		client.ExpectSetExceptionBreakpointsResponse(t)
 
 		client.ConfigurationDoneRequest()
+		client.ExpectOutputEventHelpInfo(t)
 		client.ExpectConfigurationDoneResponse(t)
 
 		// wait program run to breakpoint 2
