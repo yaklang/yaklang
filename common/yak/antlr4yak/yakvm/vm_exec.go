@@ -64,6 +64,9 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	if !isContinue {
 		v.codePointer = 0
 	}
+	// 设置线程ID
+	v.ThreadID = int(v.vm.ThreadIDCount)
+
 	//退出代码 // -1代表异常，0代表代码执行到最后，1代表通过panic、return等方式退出
 	v.exitCode = ErrorExit
 	deferStack := vmstack.New()
