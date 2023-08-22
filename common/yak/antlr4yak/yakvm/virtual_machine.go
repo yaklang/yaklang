@@ -105,7 +105,7 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 		globalVar: make(map[string]interface{}),
 		config:    NewVMConfig(),
 		//debug
-		ThreadIDCount: 0,
+		ThreadIDCount: 1, // 初始是1
 	}
 	return v
 }
@@ -212,9 +212,6 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 }
 func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, args map[int]*Value) error {
 	return v.Exec(ctx, func(frame *Frame) {
-		// 设置线程ID
-		frame.ThreadID = int(v.ThreadIDCount)
-
 		name := f.GetActualName()
 		frame.SetVerbose("function: " + name)
 		frame.SetFunction(f)

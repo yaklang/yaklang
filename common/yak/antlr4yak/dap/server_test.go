@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/go-dap"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -130,7 +129,7 @@ func runDebugSessionWithBPs(t *testing.T, client *Client, cmdRequest func(), sou
 			disconnect()
 			return
 		}
-		client.ContinueRequest(0)
+		client.ContinueRequest(1)
 		client.ExpectContinueResponse(t)
 	}
 
@@ -453,7 +452,7 @@ func TestStopWithTarget(t *testing.T) {
 		"client_close":           func(c *Client, forceStop chan struct{}) { c.Close() },
 		"disconnect_before_exit": func(c *Client, forceStop chan struct{}) { c.DisconnectRequest() },
 		"disconnect_after_exit": func(c *Client, forceStop chan struct{}) {
-			c.ContinueRequest(0)
+			c.ContinueRequest(1)
 			c.ExpectContinueResponse(t)
 
 			c.ExpectTerminatedEvent(t) // program finished, recv terminated event
@@ -553,7 +552,7 @@ func TestLaunchStopOnEntry(t *testing.T) {
 
 		// 一开始stopOnEntry,所以要continue,由于continue后会直接执行结束,所以会收到terminated事件
 		// 6 >> continue, << continue, << terminated
-		client.ContinueRequest(0)
+		client.ContinueRequest(1)
 		cResp := client.ExpectContinueResponse(t)
 		if cResp.Seq != 0 || cResp.RequestSeq != 6 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6", cResp)
@@ -569,22 +568,22 @@ func TestLaunchStopOnEntry(t *testing.T) {
 		if tResp.Seq != 0 || tResp.RequestSeq != 7 || len(tResp.Body.Threads) != 1 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", tResp)
 		}
-		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] __yak_main__" {
-			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] __yak_main__\"", tResp)
+		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 1 || tResp.Body.Threads[0].Name != "[Yak 1] __yak_main__" {
+			t.Errorf("\ngot %#v\nwant Id=1, Name=\"[Yak 1] __yak_main__\"", tResp)
 		}
 
 		// 8 >> stackTrace, << error
-		client.StackTraceRequest(1, 0, 20)
+		client.StackTraceRequest(2, 0, 20)
 		steResp := client.ExpectInvisibleErrorResponse(t)
-		if steResp.Seq != 0 || steResp.RequestSeq != 8 || steResp.Success || !checkErrorMessageFormat(steResp.Body.Error, "Unable to produce stack trace: Can't found Goroutine 1 stack trace") {
-			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=8 Format=\"Unable to produce stack trace: Can't found Goroutine 1 stack trace\"", steResp)
+		if steResp.Seq != 0 || steResp.RequestSeq != 8 || steResp.Success || !checkErrorMessageFormat(steResp.Body.Error, "Unable to produce stack trace: Can't found Goroutine 2 stack trace") {
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=8 Format=\"Unable to produce stack trace: Can't found Goroutine 2 stack trace\"", steResp)
 		}
 
 		// 9 >> stackTrace, << stackTrace
-		client.StackTraceRequest(0, 0, 20)
+		client.StackTraceRequest(1, 0, 20)
 		stResp := client.ExpectStackTraceResponse(t)
 		if stResp.Seq != 0 || stResp.RequestSeq != 9 || !stResp.Success || stResp.Body.TotalFrames != 1 {
-			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=8 len(StackTraces)=1 ", stResp)
+			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=9 len(StackTraces)=1 ", stResp)
 		}
 
 		// 10 >> evaluate, << error
@@ -603,7 +602,7 @@ func TestLaunchStopOnEntry(t *testing.T) {
 		}
 
 		// 12 >> continue, << continue
-		client.ContinueRequest(0)
+		client.ContinueRequest(1)
 		contResp := client.ExpectContinueResponse(t)
 		if contResp.Seq != 0 || contResp.RequestSeq != 12 || !contResp.Body.AllThreadsContinued {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=12 Body.AllThreadsContinued=true", contResp)
@@ -672,8 +671,8 @@ func TestLaunchContinueOnEntry(t *testing.T) {
 		if tResp.Seq != 0 || tResp.RequestSeq != 6 || len(tResp.Body.Threads) != 1 {
 			t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", tResp)
 		}
-		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 0 || tResp.Body.Threads[0].Name != "[Yak 0] __yak_main__" {
-			t.Errorf("\ngot %#v\nwant Id=0, Name=\"[Yak 0] __yak_main__\"", tResp)
+		if len(tResp.Body.Threads) < 1 || tResp.Body.Threads[0].Id != 1 || tResp.Body.Threads[0].Name != "[Yak 1] __yak_main__" {
+			t.Errorf("\ngot %#v\nwant Id=1, Name=\"[Yak 1] __yak_main__\"", tResp)
 		}
 
 		// 7 >> disconnect, << disconnect
@@ -730,19 +729,19 @@ func TestPreSetBreakPoint(t *testing.T) {
 				if len(m.Body.Threads) != 1 {
 					t.Errorf("\ngot %#v\nwant Seq=0, RequestSeq=6 len(Threads)=1", m)
 				}
-				if len(m.Body.Threads) < 1 || m.Body.Threads[0].Id != 0 || m.Body.Threads[0].Name != "[Yak 0] test" {
-					t.Errorf("\ngot  %#v\nwant Id=0, Name=\"[Yak 0] test\"", m.Body.Threads)
+				if len(m.Body.Threads) < 1 || m.Body.Threads[0].Id != 1 || m.Body.Threads[0].Name != "[Yak 1] test" {
+					t.Errorf("\ngot  %#v\nwant Id=1, Name=\"[Yak 1] test\"", m.Body.Threads)
 				}
 			case *dap.StoppedEvent:
-				if m.Body.Reason != "breakpoint" || m.Body.ThreadId != 0 || !m.Body.AllThreadsStopped || m.Body.Description != "Trigger normal breakpoint at line 2 in test" {
-					t.Errorf("got %#v, want Body={Reason=\"breakpoint\", ThreadId=0, AllThreadsStopped=true}", m)
+				if m.Body.Reason != "breakpoint" || m.Body.ThreadId != 1 || !m.Body.AllThreadsStopped || m.Body.Description != "Trigger normal breakpoint at line 2 in test" {
+					t.Errorf("got %#v, want Body={Reason=\"breakpoint\", ThreadId=1, AllThreadsStopped=true}", m)
 				}
 			default:
 				t.Fatalf("got %#v, want ThreadsResponse or StoppedEvent", m)
 			}
 		}
 
-		client.StackTraceRequest(0, 0, 20)
+		client.StackTraceRequest(1, 0, 20)
 		stResp := client.ExpectStackTraceResponse(t)
 		if stResp.Body.TotalFrames != 2 {
 			t.Errorf("\ngot %#v\nwant TotalFrames=2", stResp.Body.TotalFrames)
@@ -774,7 +773,7 @@ func TestPreSetBreakPoint(t *testing.T) {
 		checkVarExact(t, args, 0, "a", "a", "1", "int", noChildren)
 		checkVarExact(t, args, 1, "b", "b", "2", "int", noChildren)
 
-		client.ContinueRequest(0)
+		client.ContinueRequest(1)
 		ctResp := client.ExpectContinueResponse(t)
 		if !ctResp.Body.AllThreadsContinued {
 			t.Errorf("\ngot  %#v\nwant AllThreadsContinued=true", ctResp.Body)
@@ -833,14 +832,14 @@ func TestStackTraceRequest(t *testing.T) {
 						"OOB startFrame returns empty trace":      {NumFrames, 0, "Increment", -1, -1, 0, NumFrames, true},
 					}
 					for name, tc := range tests {
-						client.StackTraceRequest(0, tc.startFrame, tc.levels)
+						client.StackTraceRequest(1, tc.startFrame, tc.levels)
 						stResp = client.ExpectStackTraceResponse(t)
 						checkStackFramesNamed(name, t, stResp,
 							tc.wantStartName, tc.wantStartLine, tc.wantStartFrame, tc.wantFramesReturned, tc.wantFramesAvailable, tc.exact)
 					}
 
 					// check all frames
-					client.StackTraceRequest(0, 0, 0)
+					client.StackTraceRequest(1, 0, 0)
 					stResp = client.ExpectStackTraceResponse(t)
 					frames := stResp.Body.StackFrames
 					want := []struct {
@@ -869,7 +868,7 @@ func TestStackTraceRequest(t *testing.T) {
 			},
 				{
 					execute: func() {
-						client.StackTraceRequest(0, 0, 0)
+						client.StackTraceRequest(1, 0, 0)
 						stResp = client.ExpectStackTraceResponse(t)
 						checkStackFramesExact(t, stResp, "__yak_main__", 13, 0, 1, 1)
 					},
@@ -886,16 +885,16 @@ func TestThreadsRequest(t *testing.T) {
 			[]int{6},
 			[]onBreakpoint{{
 				execute: func() {
-					checkStop(t, client, 0, "__yak_main__", 6)
+					checkStop(t, client, 1, "__yak_main__", 6)
 					client.SetBreakpointsRequest(program, []int{3})
 					client.ExpectSetBreakpointsResponse(t)
 
-					client.ContinueRequest(0)
+					client.ContinueRequest(1)
 					client.ExpectContinueResponse(t)
 
 					se := client.ExpectStoppedEvent(t)
-					if se.Body.Reason != "breakpoint" || se.Body.ThreadId == 0 {
-						t.Errorf("got %#v, want Reason=%q, ThreadId!=0", se, "breakpoint")
+					if se.Body.Reason != "breakpoint" || se.Body.ThreadId == 1 {
+						t.Errorf("got %#v, want Reason=%q, ThreadId!=1", se, "breakpoint")
 					}
 
 					client.ThreadsRequest()
@@ -933,7 +932,7 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					var ref int
 					frameID := 1
 
-					client.StackTraceRequest(0, 0, 20)
+					client.StackTraceRequest(1, 0, 20)
 					stack := client.ExpectStackTraceResponse(t)
 					checkStackFramesExact(t, stack, "foobar", 28, 0, 2, 2)
 
@@ -1140,7 +1139,7 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					}
 
 					// map
-					ref = checkVarExact(t, locals, -1, "mp", "mp", `map[int]interface {}{"1": 42, "2": 43}`, "map[int]interface {}", hasChildren)
+					ref = checkVarExact(t, locals, -1, "mp", "mp", `map[int]interface {}{1: 42, 2: 43}`, "map[int]interface {}", hasChildren)
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						mp := client.ExpectVariablesResponse(t)
@@ -1169,7 +1168,7 @@ func TestEvaluateCommandRequest(t *testing.T) {
 			[]int{2},
 			[]onBreakpoint{{
 				execute: func() {
-					checkStop(t, client, 0, "__yak_main__", 2)
+					checkStop(t, client, 1, "__yak_main__", 2)
 					client.EvaluateRequest("dbg help", 0, "repl")
 					got := client.ExpectEvaluateResponse(t)
 					checkEval(t, got, HelpInfo, noChildren)
@@ -1190,14 +1189,14 @@ func TestStepAndNextRequest(t *testing.T) {
 			[]int{7},
 			[]onBreakpoint{{
 				execute: func() {
-					checkStop(t, client, 0, "initialize", 7)
+					checkStop(t, client, 1, "initialize", 7)
 					expectStop := func(fun string, line int) {
 						t.Helper()
 						se := client.ExpectStoppedEvent(t)
-						if se.Body.Reason != "step" || se.Body.ThreadId != 0 || !se.Body.AllThreadsStopped {
-							t.Errorf("got %#v, want Reason=\"step\", ThreadId=0, AllThreadsStopped=true", se)
+						if se.Body.Reason != "step" || se.Body.ThreadId != 1 || !se.Body.AllThreadsStopped {
+							t.Errorf("got %#v, want Reason=\"step\", ThreadId=1, AllThreadsStopped=true", se)
 						}
-						checkStop(t, client, 0, fun, line)
+						checkStop(t, client, 1, fun, line)
 					}
 					client.StepOutRequest(0)
 					client.ExpectStepOutResponse(t)
@@ -1251,25 +1250,24 @@ func TestStepAndNextRequest(t *testing.T) {
 func TestPanicBreakpointOnNext(t *testing.T) {
 	runTest(t, "panic", PanicTestcase, func(server *DAPServer, client *Client, program string) {
 		runDebugSessionWithBPs(t, client, func() {
-			log.SetLevel(log.DebugLevel)
 			server.config.extraLibs = TestExtraLibs
 			client.LaunchRequest("exec", program, !StopOnEntry)
 		}, program,
 			[]int{3},
 			[]onBreakpoint{{
 				execute: func() {
-					checkStop(t, client, 0, "main", 3)
+					checkStop(t, client, 1, "main", 3)
 
 					client.NextRequest(0)
 					client.ExpectNextResponse(t)
 
 					text := "\"BOOM!\""
 					se := client.ExpectStoppedEvent(t)
-					if se.Body.ThreadId != 0 || se.Body.Reason != "exception" || se.Body.Description != "panic" || se.Body.Text != text {
-						t.Errorf("\ngot  %#v\nwant ThreadId=0 Reason=\"exception\" Description=\"panic\" Text=%q", se, text)
+					if se.Body.ThreadId != 1 || se.Body.Reason != "exception" || se.Body.Description != "panic" || se.Body.Text != text {
+						t.Errorf("\ngot  %#v\nwant ThreadId=1 Reason=\"exception\" Description=\"panic\" Text=%q", se, text)
 					}
 
-					client.ExceptionInfoRequest(0)
+					client.ExceptionInfoRequest(1)
 					eInfo := client.ExpectExceptionInfoResponse(t)
 					if eInfo.Body.ExceptionId != "panic" || eInfo.Body.Description != text {
 						t.Errorf("\ngot  %#v\nwant ExceptionId=\"panic\" Description=%q", eInfo, text)
