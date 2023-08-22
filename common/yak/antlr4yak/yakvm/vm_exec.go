@@ -144,11 +144,16 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 				}
 				return
 			}
+			debugger := v.vm.debugger
 			if vmPanic != nil {
 				log.Error(vmPanic)
-				debugger := v.vm.debugger
 				if debugger != nil {
 					debugger.HandleForPanic(vmPanic)
+				}
+			} else if v.parent == nil { // 程序正常退出
+				if debugger != nil {
+					debugger.SetFinished()
+					debugger.HandleForNormallyFinished()
 				}
 			}
 		}
