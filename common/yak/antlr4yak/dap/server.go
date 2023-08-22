@@ -17,18 +17,20 @@ type DAPServer struct {
 
 func (s *DAPServer) Start() {
 	go func() {
-		conn, err := s.listener.Accept()
-		if err != nil {
-			select {
-			case <-s.config.stopped:
-			default:
-				log.Errorf("Error accepting client connection: %v", err)
-				s.config.triggerServerStop()
+		for {
+			conn, err := s.listener.Accept()
+			if err != nil {
+				select {
+				case <-s.config.stopped:
+				default:
+					log.Errorf("Error accepting client connection: %v", err)
+					s.config.triggerServerStop()
+				}
+				return
 			}
-			return
+			log.Infof("Accept connection from %v", conn.RemoteAddr())
+			go s.handleConnection(conn)
 		}
-		log.Infof("Accept connection from %v", conn.RemoteAddr())
-		go s.handleConnection(conn)
 	}()
 }
 

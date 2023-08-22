@@ -320,8 +320,9 @@ func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
 
 func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 	restart := false
-	if request.Arguments != nil {
-		restart = request.Arguments.Restart
+	args := request.Arguments
+	if args != nil {
+		restart = args.Restart
 	}
 	if !restart {
 		defer ds.config.triggerServerStop()
@@ -329,7 +330,11 @@ func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 
 	ds.logToConsole("Detaching")
 	ds.send(&dap.DisconnectResponse{Response: *newResponse(request.Request)})
-	ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated"), Body: dap.TerminatedEventBody{Restart: restart}})
+	if !restart {
+		ds.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
+	} else {
+		ds.debugger.SetRestart(true)
+	}
 	// ? unset debugger
 	// ds.debugger = nil
 
