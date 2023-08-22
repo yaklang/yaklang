@@ -8,14 +8,14 @@ import (
 type GernerateFuncTyp func() (path string)
 
 var (
-	SimpleYakTestCase          = "simple.yak"
-	FuncCallTestcase           = "func_call.yak"
-	IncrementTestcase          = "increment.yak"
-	GoroutineTestcase          = "goroutine.yak"
-	VariablesTestcase          = "variables.yak"
-	StepAndNExtTestcase        = "step_and_next.yak"
-	HardCodeBreakPointTestcase = "hardcode_breakpoint.yak"
-	PanicTestcase              = "panic.yak"
+	SimpleYakTestCase   = "simple.yak"
+	FuncCallTestcase    = "func_call.yak"
+	IncrementTestcase   = "increment.yak"
+	GoroutineTestcase   = "goroutine.yak"
+	VariablesTestcase   = "variables.yak"
+	StepAndNExtTestcase = "step_and_next.yak"
+	// HardCodeBreakPointTestcase = "hardcode_breakpoint.yak"
+	PanicTestcase = "panic.yak"
 )
 
 func GetYakTestCasePath(p string) string {
