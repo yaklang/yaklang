@@ -924,12 +924,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	if triggered {
 		g.HandleForBreakPoint()
 	}
-
-	if g.codePointer == len(g.Codes())-1 && g.State() == "" {
-		g.SetFinished()
-		g.HandleForNormallyFinished()
-	}
-
 }
 
 func (g *Debugger) Callback() {
