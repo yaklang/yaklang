@@ -947,8 +947,8 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 		valuesMap := v.GetAllNameAndValueInScopes()
 
 		// 排序保证顺序一致
-		values := lo.MapToSlice(valuesMap, func(key string, value *yakvm.Value) *KV {
-			return &KV{key, value}
+		values := lo.MapToSlice(valuesMap, func(key string, value *yakvm.Value) *ScopeKV {
+			return &ScopeKV{key, value}
 		})
 		sort.SliceStable(values, func(i, j int) bool {
 			return values[i].Key < values[j].Key
@@ -993,16 +993,26 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 		switch refV.Kind() {
 		case reflect.Map:
 			keys := refV.MapKeys()
+			mapKeys := lo.Map(keys, func(item reflect.Value, index int) *MapKey {
+				iKey := item.Interface()
+				return &MapKey{item, iKey, AsDebugString(iKey)}
+			})
+			// 排序保证顺序一致
+			sort.SliceStable(mapKeys, func(i, j int) bool {
+				return mapKeys[i].KeyStr < mapKeys[j].KeyStr
+			})
+
 			cap := (len(keys) - start) * 2
 			if cap < 0 {
 				cap = 0
 			}
 			children = make([]dap.Variable, 0, cap)
-			for i := start; i < len(keys); i++ {
-				key := keys[i]
-				iKey := key.Interface()
+			for i := start; i < len(mapKeys); i++ {
+				mKey := mapKeys[i]
+				key := mKey.Key
+				iKey := mKey.IKey
 				keyRef := ds.ConvertVariable(iKey)
-				keyStr := AsDebugString(iKey)
+				keyStr := mKey.KeyStr
 
 				keyVar := dap.Variable{
 					Name:               fmt.Sprintf("[key %d]", start+i),
