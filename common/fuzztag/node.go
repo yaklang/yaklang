@@ -396,6 +396,10 @@ var methodAlias = new(sync.Map)
 
 func SetMethodAlias(origin string, names ...string) {
 	for _, i := range names {
+		if existingOrigin, ok := methodAlias.Load(i); ok {
+			// 提醒：新的 origin 覆盖了旧的 origin
+			log.Warnf("Alias fuzztag {{%s}} for {{%s}} is being overwritten by {{%s}}.", i, existingOrigin, origin)
+		}
 		methodAlias.Store(i, origin)
 	}
 }
