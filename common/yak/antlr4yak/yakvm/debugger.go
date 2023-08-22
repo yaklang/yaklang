@@ -986,6 +986,7 @@ func (g *Debugger) GetVariablesRef(v interface{}) (int, bool) {
 
 func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, CompilerWrapperInterface, error) {
 	var err error
+	frame = NewSubFrame(frame)
 	frame.EnableDebuggerEval()
 	sym, err := frame.CurrentScope().GetSymTable().GetRoot()
 	if err != nil {
@@ -1011,8 +1012,7 @@ func (g *Debugger) CompileWithFrameID(code string, frameID int) (*Frame, Compile
 }
 
 func (g *Debugger) Compile(code string) (*Frame, CompilerWrapperInterface, error) {
-	frame := NewSubFrame(g.frame)
-	return g.CompileWithFrame(code, frame)
+	return g.CompileWithFrame(code, g.frame)
 }
 
 func (g *Debugger) evalExpressionWithOpCodes(opcode []*Code, frame *Frame) (*Value, error) {
