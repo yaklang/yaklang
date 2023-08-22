@@ -428,27 +428,27 @@ func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
 func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
 	// 等待程序启动
 	ds.WaitProgramStart()
-	ds.debugger.StepNext()
 	ds.sendStepResponse(request.Arguments.ThreadId, &dap.NextResponse{Response: *newResponse(request.Request)})
+	ds.debugger.StepNext()
 }
 
 func (ds *DebugSession) onStepInRequest(request *dap.StepInRequest) {
 	// 等待程序启动
 	ds.WaitProgramStart()
-	ds.debugger.StepIn()
 	ds.sendStepResponse(request.Arguments.ThreadId, &dap.StepInResponse{Response: *newResponse(request.Request)})
+	ds.debugger.StepIn()
 }
 
 func (ds *DebugSession) onStepOutRequest(request *dap.StepOutRequest) {
 	// 等待程序启动
 	ds.WaitProgramStart()
 
+	ds.sendStepResponse(request.Arguments.ThreadId, &dap.StepOutResponse{Response: *newResponse(request.Request)})
 	err := ds.debugger.StepOut()
 	if err != nil {
 		ds.sendErrorResponse(request.Request, UnableToHalt, "Unable to halt execution", err.Error())
 		return
 	}
-	ds.sendStepResponse(request.Arguments.ThreadId, &dap.StepOutResponse{Response: *newResponse(request.Request)})
 }
 
 func (ds *DebugSession) onStepBackRequest(request *dap.StepBackRequest) {
