@@ -771,8 +771,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			} else {
 				g.description = fmt.Sprintf("Runtime error: %v", r)
 			}
-			g.SetStopReason("exception")
-			g.Callback()
+			g.HandleForPanic(NewVMPanic(r))
 		}
 	}()
 
@@ -927,6 +926,12 @@ func (g *Debugger) Callback() {
 	g.Add()
 	defer g.WaitGroupDone()
 	defer g.ResetStopReason()
+
+	// 处理stopOnEtry的情况
+	if !g.started {
+		g.started = true
+		g.StartWGDone()
+	}
 
 	// 更新观察表达式
 	if len(g.observeExpressions) > 0 {
