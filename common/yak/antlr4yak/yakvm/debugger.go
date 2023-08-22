@@ -716,6 +716,11 @@ func (g *Debugger) HandleForBreakPoint() {
 	g.Callback()
 }
 
+func (g *Debugger) HandleForNormallyFinished() {
+	g.SetStopReason("finished")
+	g.Callback()
+}
+
 func (g *Debugger) HandleForPanic(vmPanic *VMPanic) {
 	if !g.Finished() {
 		g.SetFinished()
@@ -918,6 +923,11 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	if triggered {
 		g.HandleForBreakPoint()
+	}
+
+	if g.codePointer == len(g.Codes())-1 && g.State() == "" {
+		g.SetFinished()
+		g.HandleForNormallyFinished()
 	}
 
 }
