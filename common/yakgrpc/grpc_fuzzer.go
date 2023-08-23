@@ -576,6 +576,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 				}
 			}
+			extractorResultsOrigin := extractorResults
 			for _, p := range req.GetParams() {
 				extractorResults = append(extractorResults, &ypb.KVPair{Key: p.GetKey(), Value: p.GetValue()})
 			}
@@ -593,7 +594,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					SubMatchers:         httpTplMatcher,
 				}
 				matcherParams := utils.CopyMapInterface(mergedParams)
-				for _, kv := range extractorResults {
+				for _, kv := range extractorResultsOrigin {
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
 				httpTPLmatchersResult, err = ins.Execute(result.LowhttpResponse, matcherParams)
