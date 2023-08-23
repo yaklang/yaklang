@@ -64,10 +64,11 @@ type Debugger struct {
 	// breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
 
 	// 用于步过，步入，步出
-	jmpIndex    int
-	stepOut     bool
-	nextState   *StepStack
-	stepInState *StepStack
+	jmpIndex int
+	// stepOut      bool
+	nextState    *StepStack
+	stepInState  *StepStack
+	stepoutState *StepStack
 
 	// 停止
 	halt bool
@@ -98,6 +99,7 @@ type Debugger struct {
 type StepStack struct {
 	code                 *Code
 	lineInedx, codeIndex int
+	stackLen             int
 	state                string
 	stateName            string
 	frame                *Frame
@@ -150,10 +152,23 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 	return debugger
 }
 
-func NewStepStackWithLineIndex(lineInedx int, state string) *StepStack {
+func NewStepStack(lineInedx int) *StepStack {
 	return &StepStack{
 		lineInedx: lineInedx,
-		state:     state,
+	}
+}
+
+func NewStepStackWithFrame(lineInedx int, frame *Frame) *StepStack {
+	return &StepStack{
+		lineInedx: lineInedx,
+		frame:     frame,
+	}
+}
+
+func NewStepStackWithStackLen(lineInedx, stackLen int) *StepStack {
+	return &StepStack{
+		lineInedx: lineInedx,
+		stackLen:  stackLen,
 	}
 }
 
@@ -230,7 +245,7 @@ func (g *Debugger) Init(codes []*Code) {
 	}
 
 	if !hasSet {
-		panic(errors.New("debugger init error: can't find source c ode in opcodes"))
+		panic(errors.New("debugger init error: can't find source code in opcodes"))
 	}
 }
 
@@ -666,20 +681,20 @@ func (g *Debugger) DisableBreakpointsInLine(lineIndex int) {
 }
 
 func (g *Debugger) StepNext() error {
-	g.nextState = NewStepStackWithLineIndex(g.linePointer, g.State())
+	g.nextState = NewStepStack(g.linePointer)
 	return nil
 }
 
 func (g *Debugger) StepIn() error {
 	g.GetLineFirstCode(g.linePointer)
-	g.stepInState = NewStepStackWithLineIndex(g.linePointer, g.State())
+	g.stepInState = NewStepStackWithFrame(g.linePointer, g.frame)
 	return nil
 }
 
 func (g *Debugger) StepOut() error {
 	stackTrace := g.CurrentStackTrace()
 	if stackTrace != nil && stackTrace.Len() > 0 {
-		g.stepOut = true
+		g.stepoutState = NewStepStackWithStackLen(g.linePointer, stackTrace.Len())
 		return nil
 	} else {
 		return utils.Errorf("Can't not step out")
@@ -707,7 +722,7 @@ func (g *Debugger) HandleForStepIn() {
 }
 
 func (g *Debugger) HandleForStepOut() {
-	g.stepOut = false
+	g.stepoutState = nil
 	g.SetStopReason("step")
 	g.Callback()
 }
@@ -814,8 +829,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	// 步入
 	if g.stepInState != nil {
-		// 如果debugger想要步进且state不同，则回调
-		if g.stepInState.state != state {
+		// 如果debugger想要步进且frame不同，则回调
+		if g.stepInState.frame != frame {
 			g.HandleForStepIn()
 		} else if g.stepInState.lineInedx < g.linePointer {
 			// 如果已经超出此行，则回调
@@ -825,19 +840,11 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 
 	// 步出
-	if stackTrace != nil && stackTrace.Len() > 0 {
-		stepStack := stackTrace.Peek().(*StepStack)
-		// pop stepIn栈
-		if stepStack.state == state && g.codePointer > stepStack.codeIndex {
-			stackTrace.Pop()
-			// 如果debugger想要步出且执行到了call后面的opcode，则应该回调
-			if g.stepOut {
-				g.HandleForStepOut()
-			}
+	if g.stepoutState != nil {
+		// 当前堆栈长度小于stepoutState.stackLen,则回调
+		if stackTrace.Len() < g.stepoutState.stackLen {
+			g.HandleForStepOut()
 		}
-	}
-	// 如果处于stepOut状态，则不应该触发断点
-	if g.stepOut {
 		return
 	}
 

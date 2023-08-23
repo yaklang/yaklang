@@ -439,12 +439,14 @@ c = 3`
 		}
 	}
 	in := false
+	n := 0
 	stepIn, stepOut := false, false
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
 		}
 		in = true
+		n++
 		if !stepIn {
 			g.StepIn()
 			stepIn = true
@@ -466,6 +468,8 @@ c = 3`
 	RunTestDebugger(code, init, callback)
 	if !in {
 		t.Fatal("callback not called")
+	} else if n < 3 {
+		t.Fatal("callback not called enough")
 	}
 }
 
