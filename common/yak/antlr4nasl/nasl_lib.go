@@ -881,7 +881,9 @@ func init() {
 			pattern := params.getParamByName("pattern").String()
 			s := params.getParamByName("string").String()
 			replace := params.getParamByName("replace").String()
-
+			if s == "<nil>" {
+				println()
+			}
 			if icase {
 				pattern = "(?i)" + pattern
 			}
@@ -889,7 +891,24 @@ func init() {
 			if err != nil {
 				return s, err
 			}
-			return re.ReplaceAllString(s, replace), nil
+			newReplace := ""
+			for i := 0; i < len(replace); i++ {
+				ch := replace[i]
+				if ch == '\\' {
+					if i+1 >= len(replace) {
+						newReplace += string(ch)
+						continue
+					}
+					nextCh := replace[i+1]
+					if nextCh >= '0' && nextCh <= '9' {
+						newReplace += "$" + string(nextCh)
+						i++
+						continue
+					}
+				}
+				newReplace += string(ch)
+			}
+			return re.ReplaceAllString(s, newReplace), nil
 		},
 		"egrep": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) { // 返回值应该是匹配内容
 			pattern := params.getParamByName("pattern").String()
