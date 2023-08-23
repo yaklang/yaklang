@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
@@ -112,11 +113,11 @@ func newMatchCtx(pk gopacket.Packet, r *rule.Rule, hs ...matchHandler) *matchCon
 
 func matchMutex(c *matchContext) error {
 	switch c.Rule.Protocol {
-	case data.DNS:
+	case protocol.DNS:
 		c.Attach(ipMatcher, portMatcher, dnsIniter)
-	case data.HTTP:
+	case protocol.HTTP:
 		c.Attach(ipMatcher, portMatcher, httpIniter)
-	case data.TCP:
+	case protocol.TCP:
 		c.Attach(ipMatcher, portMatcher, tcpIniter)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)

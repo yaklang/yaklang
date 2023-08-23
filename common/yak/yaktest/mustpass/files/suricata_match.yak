@@ -11,5 +11,5 @@ for _,c = range data {
     assert len(rules)==1 , "rules count wrong"
     rule = rules[0]
     stream,_ = codec.DecodeHex(c[1])
-    assert rule.Match(stream)==c[2] , "match wrong"
+    assert suricata.SuricataMatcher(rule).Match(stream)==c[2] , "match wrong"
 }
