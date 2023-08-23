@@ -16,7 +16,26 @@ import (
 var debugScript string
 
 func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
-	return s.debugScript(req.GetInput(), req.GetPluginType(), req.GetCode(), stream, req.GetHTTPRequestTemplate())
+	var input = req.GetInput()
+	if input == "" && req.GetHTTPRequestTemplate() == nil {
+		return utils.Error("input / input packet is empty")
+	}
+
+	if input == "" {
+		if req.GetHTTPRequestTemplate().GetIsRawHTTPRequest() {
+			urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetHTTPRequestTemplate().GetRawHTTPRequest(), req.GetHTTPRequestTemplate().GetIsHttps())
+			if err != nil {
+				return utils.Errorf("extract (target) url from raw http request failed: %v", err)
+			}
+			input = urlIns.String()
+		}
+	}
+
+	if input == "" {
+		return utils.Error("cannot find/extract debug target")
+	}
+
+	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, req.GetHTTPRequestTemplate())
 }
 
 func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {

@@ -13,6 +13,43 @@ import (
 	"testing"
 )
 
+func TestGRPCMUSTPASS_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("a"))
+	})
+	target := utils.HostPort(host, port)
+
+	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(3), &ypb.DebugPluginRequest{
+		Code: `mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+	dump(url)
+}`,
+		PluginType: "mitm",
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			IsRawHTTPRequest: true,
+			RawHTTPRequest: []byte(`GET / HTTP/1.1
+Host: ` + target + `
+`),
+		},
+	})
+	if err != nil {
+		spew.Dump(err)
+		panic(err)
+	}
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(rsp)
+	}
+}
+
 func TestGRPCMUSTPASS_BuildHTTPRequest_Results(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
