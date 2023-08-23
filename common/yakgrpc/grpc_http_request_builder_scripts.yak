@@ -15,6 +15,7 @@ Init Yakit
 */
 yakit.AutoInitYakit()
 yakit.Info("Start to load plugin: %v", pluginName)
+yakit.Info("RuntimeID: %v", RUNTIME_ID)
 
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
