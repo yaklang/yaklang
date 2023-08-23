@@ -1123,3 +1123,51 @@ entry0:
 	})
 
 }
+
+func TestTarget(t *testing.T) {
+	// test for break continue fallthough
+	code := `
+a = 2
+for i=0; i<10; i++ {
+	switch a + 1 {
+	case 1:
+		break
+	case 2:
+		fallthrough
+	default:
+		continue
+	}
+}	
+	`
+	ir := `
+yak-main
+entry0:
+        jump -> loop.header1
+loop.header1: <- entry0 loop.latch4
+        <number> t12 = phi [<number> 0, entry0] [<number> t10, loop.latch4]
+        <boolean> t0 = <number> t12 lt <number> 10
+        If [<boolean> t0] true -> loop.body2, false -> loop.exit3
+loop.body2: <- loop.header1
+        <number> t3 = <number> 2 add <number> 1
+        switch <number> t3 default:[switch.default6] {<number> 1:switch.handler7, <number> 2:switch.handler8}
+loop.exit3: <- loop.header1
+        jump -> b10
+loop.latch4: <- switch.default6 b9
+        <number> t10 = <number> t12 add <number> 1
+        jump -> loop.header1
+switch.done5: <- switch.handler7
+        jump -> b9
+switch.default6: <- loop.body2 switch.handler8
+        jump -> loop.latch4
+switch.handler7: <- loop.body2
+        jump -> switch.done5
+switch.handler8: <- loop.body2
+        jump -> switch.default6
+b9: <- switch.done5
+        jump -> loop.latch4
+b10: <- loop.exit3
+`
+	prog := ParseSSA(code)
+	CheckProgram(t, prog)
+	CompareYakMain(t, prog, ir)
+}
