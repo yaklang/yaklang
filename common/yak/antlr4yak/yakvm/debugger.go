@@ -66,12 +66,10 @@ type Debugger struct {
 	codePointer                   int
 	linePointer                   int
 	currentLinesFirstCodeStateMap LinesFirstCodeStateMap // 每行第一个opcode索引
-	// lineFirstCodeStateMap         map[string]LinesFirstCodeStateMap // 文件路径 -> LinesFirstCodeStateMap
 
 	// 断点
 	breakPointCount      int32
 	currentBreakPointMap BreakpointMap // 行 -> 断点
-	// breakpointMap        map[string]BreakpointMap // 文件路径 -> 断点
 
 	// 用于步过，步入，步出
 	jmpIndex int
@@ -769,9 +767,9 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	state, stateName := g.State(), g.StateName()
 	code := g.GetCode(state, codeIndex)
-	line, _, _, _ := GetCodeNumber(code)
+	lineIndex, _, _, _ := GetCodeNumber(code)
 	g.codePointer = codeIndex
-	g.linePointer = line
+	g.linePointer = lineIndex
 
 	g.SwitchByOtherFileOpcode(code)
 
@@ -831,6 +829,13 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			g.HandleForStepOut()
 		}
 		return
+	} else {
+		// 如果不处于next状态,jmpIndex应该清空
+		defer func() {
+			if g.jmpIndex != -1 {
+				g.jmpIndex = -1
+			}
+		}()
 	}
 
 	// 步入
@@ -873,7 +878,6 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 
 	triggered := false
-
 	// 如果存在于断点列表中，则回调
 	for _, breakpoint := range g.currentBreakPointMap {
 
@@ -887,10 +891,10 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			continue
 		}
 
-		// 行断点,包含普通断点和条件断点
-		if breakpoint.CodeIndex == codeIndex {
+		// 行断点,包含普通断点和条件断点, 当代码jump之后,判断条件会放宽,只需要满足行号相同即可
+		//
+		if breakpoint.CodeIndex == codeIndex || (g.jmpIndex != -1 && breakpoint.LineIndex == lineIndex) {
 			// 条件断点
-
 			condition, hitCondition := breakpoint.Condition, breakpoint.HitCondition
 			if condition == "" {
 				// 如果命中次数大于0，则命中次数减1,如果还大于0则不断点
