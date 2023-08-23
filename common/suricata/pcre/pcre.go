@@ -23,12 +23,12 @@ type PCRE struct {
 	startsWith       bool
 }
 
-type PCREMatcher struct {
+type Matcher struct {
 	*PCRE
 	matcher *regexp2.Regexp
 }
 
-type PCREGenerator struct {
+type Generator struct {
 	*PCRE
 	generator regen.Generator
 }
@@ -115,12 +115,12 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 	return &pcre, nil
 }
 
-func (p *PCRE) Matcher() (*PCREMatcher, error) {
+func (p *PCRE) Matcher() (*Matcher, error) {
 	matcher, err := regexp2.Compile(p.expr, p.opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
-	return &PCREMatcher{
+	return &Matcher{
 		PCRE:    p,
 		matcher: matcher,
 	}, nil
@@ -142,14 +142,14 @@ func (p *PCRE) StartsWith() bool {
 	return p.startsWith
 }
 
-func (p *PCRE) Generator() (*PCREGenerator, error) {
+func (p *PCRE) Generator() (*Generator, error) {
 	generator, err := regen.NewGeneratorOne(p.expr, &regen.GeneratorArgs{
 		Flags: syntax.Perl,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
-	return &PCREGenerator{
+	return &Generator{
 		PCRE:      p,
 		generator: generator,
 	}, nil
@@ -159,7 +159,7 @@ func (p *PCRE) IgnoreCase() bool {
 	return p.opts&regexp2.IgnoreCase != 0
 }
 
-func (p *PCREMatcher) Match(content []byte) []data.Matched {
+func (p *Matcher) Match(content []byte) []data.Matched {
 	var matches []data.Matched
 	match, _ := p.matcher.FindStringMatch(string(content))
 	for match != nil {
@@ -172,7 +172,7 @@ func (p *PCREMatcher) Match(content []byte) []data.Matched {
 	return matches
 }
 
-func (p *PCREGenerator) Generate() []byte {
+func (p *Generator) Generate() []byte {
 	strs := p.generator.Generate()
 	if len(strs) == 0 {
 		return nil
