@@ -101,6 +101,10 @@ func AsDebugString(i interface{}, raws ...bool) string {
 			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, fieldStr)
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
+	} else if refV.CanInt() || refV.CanUint() {
+		return fmt.Sprintf("%d", i)
+	} else if refV.CanFloat() {
+		return fmt.Sprintf("%f", i)
 	}
 	return fmt.Sprintf("%#v", i)
 }
