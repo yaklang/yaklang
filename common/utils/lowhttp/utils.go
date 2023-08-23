@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	CRLF = "\r\n"
+	CRLF       = "\r\n"
+	DoubleCRLF = "\r\n\r\n"
 )
 
 var (

@@ -450,7 +450,10 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 
 abc
 --------------------------123--`))
-	if codec.Md5(results) != codec.Md5(FixHTTPRequestOut(results)) {
+	results2 := FixHTTPRequestOut(results)
+	spew.Dump(results)
+	spew.Dump(results2)
+	if codec.Md5(results) != codec.Md5(results2) {
 		panic("FixHTTPRequest is unstable")
 	}
 	spew.Dump(results)

@@ -339,16 +339,19 @@ func ZeroUnPadding(originData []byte) []byte {
 	return bytes.TrimRight(originData, "\x00")
 }
 
+func HTTPChunkedDecodeWithRestBytes(raw []byte) ([]byte, []byte) {
+	return readHTTPChunkedData(raw)
+}
+
 func HTTPChunkedDecode(raw []byte) ([]byte, error) {
-	reader := httputil.NewChunkedReader(bytes.NewBuffer(raw))
-	raw, err := io.ReadAll(reader)
-	if raw == nil {
-		return nil, err
+	if string(raw) == "" {
+		return nil, errors.New("empty input")
 	}
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		log.Warnf("http chunked decode failed: %v", err)
+	var results, _ = readHTTPChunkedData(raw)
+	if len(results) > 0 {
+		return results, nil
 	}
-	return raw, nil
+	return nil, errors.Errorf("parse %v to http chunked failed", strconv.Quote(string(raw)))
 }
 
 func GbkToUtf8(s []byte) ([]byte, error) {
