@@ -132,6 +132,12 @@ func TestMutateQuick(t *testing.T) {
 	if len(results) != 2 {
 		panic(len(results))
 	}
+
+	results = MutateQuick(`{{int(1-20||2)}}`)
+	spew.Dump(results)
+	if len(results) != 10 {
+		panic(len(results))
+	}
 }
 func TestAlias(t *testing.T) {
 	results := MutateQuick(`{{rs(2)}}`)
