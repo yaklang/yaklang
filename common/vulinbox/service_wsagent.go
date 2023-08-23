@@ -5,7 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net/http"
@@ -160,9 +160,9 @@ func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
 		return nil, nil
 	}
 
-	var appendRules []*suricata.Rule
+	var appendRules []*rule.Rule
 	for _, v := range subscribe.Rules {
-		rules, err := suricata.Parse(v)
+		rules, err := rule.Parse(v)
 		if err != nil {
 			return nil, err
 		}
@@ -181,9 +181,9 @@ func (r *VulinServer) handleUnsubscribe(a []byte) (any, error) {
 		return nil, nil
 	}
 
-	var removeRules []*suricata.Rule
+	var removeRules []*rule.Rule
 	for _, v := range unsubscribe.Rules {
-		rules, err := suricata.Parse(v)
+		rules, err := rule.Parse(v)
 		if err != nil {
 			return nil, err
 		}
