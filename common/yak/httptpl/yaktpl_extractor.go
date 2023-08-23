@@ -1,15 +1,14 @@
 package httptpl
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/antchfx/htmlquery"
 	"github.com/antchfx/xmlquery"
 	"github.com/asaskevich/govalidator"
-	"github.com/bcicen/jstream"
 	"github.com/gobwas/httphead"
 	"github.com/itchyny/gojq"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -263,24 +262,29 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 	for _, bodyRaw := range jsonextractor.ExtractStandardJSON(string(body)) {
 		skipJson = true
 		if govalidator.IsJSON(bodyRaw) {
-			for i := 0; i < strings.Count(bodyRaw, "{")+2; i++ {
-				for k := range jstream.NewDecoder(bytes.NewBufferString(bodyRaw), i).Stream() {
-					switch k.ValueType {
-					case jstream.Object:
-						data := utils.InterfaceToMapInterface(k.Value)
-						if data == nil {
-							continue
-						}
-						for k, v := range data {
-							switch v.(type) {
-							case string, int64, float64, []int8, []byte, bool, float32:
-								addResult(k, fmt.Sprintf("%v", v))
-							default:
-							}
-						}
-					}
-				}
-			}
+			result := gjson.Parse(bodyRaw)
+			result.ForEach(func(key, value gjson.Result) bool {
+				addResult(key.String(), value.String())
+				return true
+			})
+			//for i := 0; i < strings.Count(bodyRaw, "{")+2; i++ {
+			//	for k := range jstream.NewDecoder(bytes.NewBufferString(bodyRaw), i).Stream() {
+			//		switch k.ValueType {
+			//		case jstream.Object:
+			//			data := utils.InterfaceToMapInterface(k.Value)
+			//			if data == nil {
+			//				continue
+			//			}
+			//			for k, v := range data {
+			//				switch v.(type) {
+			//				case string, int64, float64, []int8, []byte, bool, float32:
+			//					addResult(k, fmt.Sprintf("%v", v))
+			//				default:
+			//				}
+			//			}
+			//		}
+			//	}
+			//}
 		}
 	}
 
