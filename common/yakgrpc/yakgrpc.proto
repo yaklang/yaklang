@@ -220,6 +220,7 @@ service Yak {
 
   // 编码解码
   rpc Codec(CodecRequest) returns (CodecResponse);
+  rpc NewCodec(CodecRequestFlow) returns (CodecResponse);
   rpc PacketPrettifyHelper(PacketPrettifyHelperRequest) returns (PacketPrettifyHelperResponse);
 
   // Payload 相关接口
@@ -2864,6 +2865,20 @@ message CodecRequest {
   string ScriptName = 5;
 
   // 如果 InputBytes 设置了，将会无条件覆盖 Text
+  bytes InputBytes = 6;
+}
+
+message CodecWork{
+  string CodecType = 1;
+  string Script = 2;
+  string PluginName = 3;
+  repeated ExecParamItem Params = 4;
+}
+
+message CodecRequestFlow{
+  string Text = 1;
+  bool Auto = 2;
+  repeated CodecWork WorkFlow = 3;
   bytes InputBytes = 6;
 }
 

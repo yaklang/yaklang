@@ -389,6 +389,7 @@ type YakClient interface {
 	HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnalysisMaterial, opts ...grpc.CallOption) (*HTTPRequestAnalysis, error)
 	// 编码解码
 	Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error)
+	NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error)
 	PacketPrettifyHelper(ctx context.Context, in *PacketPrettifyHelperRequest, opts ...grpc.CallOption) (*PacketPrettifyHelperResponse, error)
 	// Payload 相关接口
 	QueryPayload(ctx context.Context, in *QueryPayloadRequest, opts ...grpc.CallOption) (*QueryPayloadResponse, error)
@@ -1647,6 +1648,15 @@ func (c *yakClient) HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnal
 func (c *yakClient) Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error) {
 	out := new(CodecResponse)
 	err := c.cc.Invoke(ctx, Yak_Codec_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error) {
+	out := new(CodecResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/NewCodec", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4155,6 +4165,7 @@ type YakServer interface {
 	HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error)
 	// 编码解码
 	Codec(context.Context, *CodecRequest) (*CodecResponse, error)
+	NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error)
 	PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error)
 	// Payload 相关接口
 	QueryPayload(context.Context, *QueryPayloadRequest) (*QueryPayloadResponse, error)
@@ -4641,6 +4652,9 @@ func (UnimplementedYakServer) HTTPRequestAnalyzer(context.Context, *HTTPRequestA
 }
 func (UnimplementedYakServer) Codec(context.Context, *CodecRequest) (*CodecResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Codec not implemented")
+}
+func (UnimplementedYakServer) NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewCodec not implemented")
 }
 func (UnimplementedYakServer) PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PacketPrettifyHelper not implemented")
@@ -6669,6 +6683,24 @@ func _Yak_Codec_Handler(srv interface{}, ctx context.Context, dec func(interface
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).Codec(ctx, req.(*CodecRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_NewCodec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CodecRequestFlow)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).NewCodec(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/NewCodec",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).NewCodec(ctx, req.(*CodecRequestFlow))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -10549,6 +10581,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Codec",
 			Handler:    _Yak_Codec_Handler,
+		},
+		{
+			MethodName: "NewCodec",
+			Handler:    _Yak_NewCodec_Handler,
 		},
 		{
 			MethodName: "PacketPrettifyHelper",
