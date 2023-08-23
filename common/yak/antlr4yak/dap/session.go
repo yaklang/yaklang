@@ -925,13 +925,17 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 		children = make([]dap.Variable, length)
 		refT := refV.Type()
 		varname := ds.GetEvaluateName(i)
+		refV = SafeReflectValue(refV)
 
 		for i := start; i < length; i++ {
 			fieldName := refT.Field(i).Name
 
 			value := refV.Field(i)
-			iValue := value.Interface()
-			ref := ds.ConvertVariable(iValue)
+			iValue := SafeReflectStructFieldInterface(refV, refV.Field(i))
+			ref := -1
+			if iValue != nil {
+				ref = ds.ConvertVariable(iValue)
+			}
 
 			vari := dap.Variable{
 				Name:               fmt.Sprintf("%s", fieldName),
