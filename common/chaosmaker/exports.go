@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/suricata/match"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -38,6 +39,7 @@ func LoadSuricataToDatabase(raw string) error {
 
 var (
 	ChaosMakerExports = map[string]any{
+		"SuricataMatcher":        match.New,
 		"ParseSuricata":          surirule.Parse,
 		"YieldRules":             yieldRules,
 		"YieldRulesByKeyword":    YieldRulesByKeywords,
