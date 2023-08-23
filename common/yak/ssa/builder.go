@@ -130,14 +130,29 @@ func (b *FunctionBuilder) PopTarget() bool {
 
 // get target feild
 func (b *FunctionBuilder) GetBreak() *BasicBlock {
-	return b.target._break
+	for target := b.target; target != nil; target = target.tail {
+		if target._break != nil {
+			return target._break
+		}
+	}
+	return nil
 }
 
 func (b *FunctionBuilder) GetContinue() *BasicBlock {
-	return b.target._continue
+	for target := b.target; target != nil; target = target.tail {
+		if target._continue != nil {
+			return target._continue
+		}
+	}
+	return nil
 }
 func (b *FunctionBuilder) GetFallthrough() *BasicBlock {
-	return b.target._fallthrough
+	for target := b.target; target != nil; target = target.tail {
+		if target._fallthrough != nil {
+			return target._fallthrough
+		}
+	}
+	return nil
 }
 
 type blockSymbolTable struct {
