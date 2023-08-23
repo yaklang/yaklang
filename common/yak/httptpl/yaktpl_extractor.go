@@ -267,24 +267,6 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 				addResult(key.String(), value.String())
 				return true
 			})
-			//for i := 0; i < strings.Count(bodyRaw, "{")+2; i++ {
-			//	for k := range jstream.NewDecoder(bytes.NewBufferString(bodyRaw), i).Stream() {
-			//		switch k.ValueType {
-			//		case jstream.Object:
-			//			data := utils.InterfaceToMapInterface(k.Value)
-			//			if data == nil {
-			//				continue
-			//			}
-			//			for k, v := range data {
-			//				switch v.(type) {
-			//				case string, int64, float64, []int8, []byte, bool, float32:
-			//					addResult(k, fmt.Sprintf("%v", v))
-			//				default:
-			//				}
-			//			}
-			//		}
-			//	}
-			//}
 		}
 	}
 
