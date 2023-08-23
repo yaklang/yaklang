@@ -765,3 +765,155 @@ println("finish")`, file.Name())
 		t.Fatal("callback not called")
 	}
 }
+
+func TestDebugger_Try(t *testing.T) {
+	t.Run("try", func(t *testing.T) {
+		code := `try{
+			a=1
+		} catch {
+			println(0)
+		}`
+		init := func(g *yakvm.Debugger) {
+			_, err := g.SetNormalBreakPoint(2)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		in := false
+
+		n := 0
+		callback := func(g *yakvm.Debugger) {
+			if n > 2 || g.Finished() {
+				return
+			}
+			in = true
+
+			checkLine := func(lineIndex int) {
+				if g.CurrentLine() != lineIndex {
+					t.Fatalf("%d: line %d not reached, current line: %d", n, lineIndex, g.CurrentLine())
+				}
+			}
+
+			if n == 0 {
+				checkLine(2)
+				g.StepNext()
+			} else if n == 1 {
+				checkLine(3)
+				g.StepNext()
+			} else if n == 2 {
+				checkLine(5)
+			}
+			n++
+		}
+
+		RunTestDebugger(code, init, callback)
+		if !in {
+			t.Fatal("callback not called")
+		} else if n != 3 {
+			t.Fatal("callback not called enough")
+		}
+	})
+	t.Run("try-catch", func(t *testing.T) {
+		code := `try{
+			panic("111")
+		} catch {
+			println(0)
+		}`
+		init := func(g *yakvm.Debugger) {
+			_, err := g.SetNormalBreakPoint(2)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		in := false
+
+		n := 0
+		callback := func(g *yakvm.Debugger) {
+			if n > 2 || g.Finished() {
+				return
+			}
+			in = true
+
+			checkLine := func(lineIndex int) {
+				if g.CurrentLine() != lineIndex {
+					t.Fatalf("%d: line %d not reached, current line: %d", n, lineIndex, g.CurrentLine())
+				}
+			}
+
+			if n == 0 {
+				checkLine(2)
+				g.StepNext()
+			} else if n == 1 {
+				checkLine(3)
+				g.StepNext()
+			} else if n == 2 {
+				checkLine(4)
+			}
+			n++
+		}
+
+		RunTestDebugger(code, init, callback)
+		if !in {
+			t.Fatal("callback not called")
+		} else if n != 3 {
+			t.Fatal("callback not called enough")
+		}
+	})
+
+	t.Run("try-catch-finally", func(t *testing.T) {
+		code := `try{
+			panic("111")
+		} catch {
+			println(0)
+		} finally {
+			println(1)
+		}`
+		init := func(g *yakvm.Debugger) {
+			_, err := g.SetNormalBreakPoint(2)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		in := false
+
+		n := 0
+		callback := func(g *yakvm.Debugger) {
+			if n > 4 || g.Finished() {
+				return
+			}
+			in = true
+
+			checkLine := func(lineIndex int) {
+				if g.CurrentLine() != lineIndex {
+					t.Fatalf("%d: line %d not reached, current line: %d", n, lineIndex, g.CurrentLine())
+				}
+			}
+
+			if n == 0 {
+				checkLine(2)
+				g.StepNext()
+			} else if n == 1 {
+				checkLine(3)
+				g.StepNext()
+			} else if n == 2 {
+				checkLine(4)
+				g.StepNext()
+			} else if n == 3 {
+				checkLine(5)
+				g.StepNext()
+			} else if n == 4 {
+				checkLine(6)
+				g.StepNext()
+			}
+			n++
+		}
+
+		RunTestDebugger(code, init, callback)
+		if !in {
+			t.Fatal("callback not called")
+		} else if n != 5 {
+			t.Fatal("callback not called enough")
+		}
+	})
+
+}
