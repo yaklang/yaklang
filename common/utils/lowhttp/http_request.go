@@ -74,6 +74,9 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 			}
 			if !haveContentLength && strings.ToLower(key) == "content-length" {
 				haveContentLength = true
+				if noFixLength {
+					return line
+				}
 				return fmt.Sprintf(`%v: %v`, key, plrand)
 			}
 			if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
@@ -139,7 +142,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		plrandHandled = true
 	}
 
-	if !plrandHandled && haveContentLength {
+	if !plrandHandled && haveContentLength && !noFixLength {
 		header = strings.Replace(header, plrand, strconv.Itoa(len(body)), 1)
 	}
 

@@ -438,6 +438,7 @@ func SplitHTTPPacket(
 		}
 	}
 
+	var haveCl = false
 	for {
 		//lineBytes, _, err := reader.ReadLine()
 		lineBytes, err := utils.BufioReadLine(reader)
@@ -457,6 +458,11 @@ func SplitHTTPPacket(
 			if skipHeader {
 				break
 			}
+			k, _ := SplitHTTPHeader(hooked)
+			switch strings.ToLower(k) {
+			case "content-length":
+				haveCl = true
+			}
 			lineBytes = []byte(hooked)
 		}
 		if skipHeader {
@@ -471,16 +477,16 @@ func SplitHTTPPacket(
 		return headersRaw, nil
 	}
 
-	//if bytes.HasSuffix(bodyRaw, []byte(CRLF+CRLF)) {
-	//	bodyRaw = bodyRaw[:len(bodyRaw)-4]
-	//}
+	if len(bytes.TrimSpace(bodyRaw)) == 0 && !haveCl {
+		bodyRaw = nil
+	}
 
 	// 单独修复请求中的问题
-	if !strings.HasPrefix(headersRaw, "HTTP/") {
-		if bytes.HasSuffix(bodyRaw, []byte("\n\n")) {
-			bodyRaw = bodyRaw[:len(bodyRaw)-2]
-		}
-	}
+	//if !strings.HasPrefix(headersRaw, "HTTP/") {
+	//	if bytes.HasSuffix(bodyRaw, []byte("\n\n")) {
+	//		bodyRaw = bodyRaw[:len(bodyRaw)-2]
+	//	}
+	//}
 
 	return headersRaw, bodyRaw
 }

@@ -58,6 +58,28 @@ Content-Type: text/html
 -----------------------------9051914041544843365972754266--
 `
 
+func TestFixHTTPPacketCRLF6(t *testing.T) {
+	postPacket := `POST / HTTP/1.1
+Host: localhost:8000
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:29.0) Gecko/20100101 Firefox/29.0
+
+
+
+`
+	println(strconv.Quote(postPacket))
+	header, body := SplitHTTPPacketFast(postPacket)
+	if string(body) != "" {
+		t.Fatal("body should be empty")
+	}
+
+	spew.Dump(header, body)
+	raw := FixHTTPPacketCRLF([]byte(postPacket), false)
+	spew.Dump(raw)
+	if !bytes.HasSuffix(raw, []byte("Firefox/29.0\r\nContent-Length: 0\r\n\r\n")) {
+		t.FailNow()
+	}
+}
+
 func TestFixHTTPPacketCRLF(t *testing.T) {
 	var raw []byte
 	raw = FixHTTPPacketCRLF([]byte(`GET / HTTP/1.1
