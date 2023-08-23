@@ -1124,13 +1124,15 @@ func (ds *DebugSession) ConvertVariable(v interface{}) int {
 	}
 
 	refV := reflect.ValueOf(v)
-	switch refV.Kind() {
-	case reflect.Ptr:
+	if refV.Kind() == reflect.Ptr {
 		refV = refV.Elem()
-		if refV.Kind() != reflect.Struct {
+	}
+	switch refV.Kind() {
+	case reflect.Map, reflect.Array, reflect.Slice:
+	case reflect.Struct:
+		if refV.NumField() == 0 {
 			return 0
 		}
-	case reflect.Map, reflect.Array, reflect.Slice, reflect.Struct:
 	default:
 		return 0
 	}
