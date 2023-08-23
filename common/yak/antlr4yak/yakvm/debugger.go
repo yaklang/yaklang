@@ -162,22 +162,10 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 	return debugger
 }
 
-func NewStepStack(lineInedx int) *StepStack {
-	return &StepStack{
-		lineInedx: lineInedx,
-	}
-}
-
-func NewStepStackWithFrame(lineInedx int, frame *Frame) *StepStack {
+func NewStepStack(lineInedx int, frame *Frame, stackLen int) *StepStack {
 	return &StepStack{
 		lineInedx: lineInedx,
 		frame:     frame,
-	}
-}
-
-func NewStepStackWithStackLen(lineInedx, stackLen int) *StepStack {
-	return &StepStack{
-		lineInedx: lineInedx,
 		stackLen:  stackLen,
 	}
 }
@@ -688,20 +676,27 @@ func (g *Debugger) DisableBreakpointsInLine(lineIndex int) {
 }
 
 func (g *Debugger) StepNext() error {
-	g.nextState = NewStepStack(g.linePointer)
+	stackTrace := g.CurrentStackTrace()
+	stackLen := 0
+	if stackTrace != nil {
+		stackLen = stackTrace.Len()
+	}
+	g.nextState = NewStepStack(g.linePointer, g.frame, stackLen)
 	return nil
 }
 
 func (g *Debugger) StepIn() error {
 	g.GetLineFirstCode(g.linePointer)
-	g.stepInState = NewStepStackWithFrame(g.linePointer, g.frame)
+	// 不会用到stackLen,所以设置为-1
+	g.stepInState = NewStepStack(g.linePointer, g.frame, -1)
 	return nil
 }
 
 func (g *Debugger) StepOut() error {
 	stackTrace := g.CurrentStackTrace()
 	if stackTrace != nil && stackTrace.Len() > 0 {
-		g.stepoutState = NewStepStackWithStackLen(g.linePointer, stackTrace.Len())
+		// 不会用到frame,所以设置为nil
+		g.stepoutState = NewStepStack(g.linePointer, nil, stackTrace.Len())
 		return nil
 	} else {
 		return utils.Errorf("Can't not step out")
@@ -828,9 +823,12 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		if g.jmpIndex == codeIndex {
 			g.jmpIndex = -1
 			g.HandleForStepNext()
-		} else if g.linePointer > g.nextState.lineInedx {
+		} else if g.nextState.frame == frame && g.linePointer > g.nextState.lineInedx {
 			// 如果debugger想要步过且确实在后面行,则回调
 			g.HandleForStepNext()
+		} else if stackTrace.Len() < g.nextState.stackLen {
+			// 当堆栈长度小于stepoutState.stackLen,有可能是一个函数返回了,也应该回调
+			g.HandleForStepOut()
 		}
 		return
 	}
