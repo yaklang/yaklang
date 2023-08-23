@@ -784,8 +784,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	if code.Opcode == OpCall {
 		v := frame.peekN(code.Unary)
-		// 如果同步调用函数，则push stepIn栈
-		if v != nil && v.Callable() {
+		// 如果同步调用yak函数，则push stepIn栈
+		if v != nil && v.IsYakFunction() {
 			defer func() {
 				if stackTrace != nil {
 					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame))
