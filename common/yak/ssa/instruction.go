@@ -1,7 +1,5 @@
 package ssa
 
-import "fmt"
-
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
@@ -50,7 +48,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	default:
 		// other
 		// con't call
-		panic("call target is con't call: " + target.String())
+		f.NewError(Error, "call target is con't call: "+target.String())
 	}
 
 	if parent == nil {
@@ -86,7 +84,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 					continue
 				}
 			}
-			panic(fmt.Sprintf("call target clouse binding variable not found: %s", para))
+			f.NewError(Error, "call target clouse binding variable not found: %s", para)
 		}
 
 		if field, ok := freevalue[index].(*Field); ok { // will modify in function must field
@@ -98,7 +96,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 					continue
 				}
 			}
-			panic(fmt.Sprintf("call target clouse binding variable not found: %s", field))
+			f.NewError(Error, "call target clouse binding variable not found: %s", field)
 		}
 	}
 	c := &Call{
