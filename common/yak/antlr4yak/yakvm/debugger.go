@@ -769,6 +769,12 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 				}
 			}()
 		}
+	} else if code.Opcode == OpReturn {
+		defer func() {
+			if stackTrace != nil {
+				stackTrace.Pop()
+			}
+		}()
 	}
 
 	// 更新ThreadStackTrace
