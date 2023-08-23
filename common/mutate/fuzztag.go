@@ -732,21 +732,38 @@ func init() {
 			var enablePadding = false
 			var paddingLength = 4
 			var paddingRight = false
+			var step = 1
 
-			splitted := strings.SplitN(s, "|", 2)
-			if len(splitted) > 1 {
-				s = splitted[0]
-				paddingSuffix := strings.TrimSpace(splitted[1])
+			// 使用管道符号分割参数
+			parts := strings.Split(s, "|")
+
+			if len(parts) > 1 {
+				s = parts[0]
+				paddingSuffix := strings.TrimSpace(parts[1])
 				enablePadding = true
 				paddingRight = strings.HasPrefix(paddingSuffix, "-")
 				rawLen := strings.TrimLeft(paddingSuffix, "-")
 				paddingLength, _ = strconv.Atoi(rawLen)
 			}
 
+			if len(parts) > 2 {
+				step, _ = strconv.Atoi(parts[2])
+			}
+
 			ints := utils.ParseStringToPorts(s)
 			if len(ints) <= 0 {
 				return []string{""}
 			}
+
+			if step > 1 {
+				// 按步长生成结果
+				var filteredResults []int
+				for i := 0; i < len(ints); i += step {
+					filteredResults = append(filteredResults, ints[i])
+				}
+				ints = filteredResults
+			}
+
 			var results []string
 			for _, i := range ints {
 				r := fmt.Sprint(i)
@@ -763,7 +780,7 @@ func init() {
 			return results
 		},
 		Alias:       []string{"port", "ports", "integer", "i"},
-		Description: "生成一个整数以及范围，例如 {{int(1,2,3,4,5)}} 生成 1,2,3,4,5 中的一个整数，也可以使用 {{int(1-5)}} 生成 1-5 的整数，也可以使用 `{{int(1-5|4)}}` 生成 1-5 的整数，但是每个整数都是 4 位数，例如 0001, 0002, 0003, 0004, 0005",
+		Description: "生成一个整数以及范围，例如 {{int(1,2,3,4,5)}} 生成 1,2,3,4,5 中的一个整数，也可以使用 {{int(1-5)}} 生成 1-5 的整数，也可以使用 `{{int(1-5|4)}}` 生成 1-5 的整数，但是每个整数都是 4 位数，例如 0001, 0002, 0003, 0004, 0005，还可以使用 `{{int(1-10|2|3)}}` 来生成带有步长的整数列表。",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randint",
