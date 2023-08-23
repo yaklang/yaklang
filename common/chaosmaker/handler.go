@@ -3,7 +3,7 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"sync"
 )
 
@@ -14,7 +14,7 @@ import (
 */
 
 type chaosHandler interface {
-	Generator(maker *ChaosMaker, chaosRule *rule.Storage, rule *suricata.Rule) chan *pcapx.ChaosTraffic
+	Generator(maker *ChaosMaker, chaosRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic
 	MatchBytes(i any) bool
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -16,7 +16,7 @@ func ParseRuleFromRawSuricataRules(content string) []*rule.Storage {
 	var rules []*rule.Storage
 	for line := range utils.ParseLines(content) {
 		log.Infof("start to handle line: %v", line)
-		raw, err := suricata.Parse(line)
+		raw, err := surirule.Parse(line)
 		if err != nil {
 			log.Errorf("cannot parse suricata raw rules: %s", err)
 			continue

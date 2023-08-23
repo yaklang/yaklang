@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
@@ -26,6 +26,10 @@ func NewChaosMaker() *ChaosMaker {
 	return &ChaosMaker{LocalIPAddress: utils.GetLocalIPAddress()}
 }
 
+func (c *ChaosMaker) FeedRule(a ...*rule.Storage) {
+	c.ChaosRules = append(c.ChaosRules, a...)
+}
+
 func (c *ChaosMaker) ApplyAll() error {
 	for r := range rule.YieldRules(
 		consts.GetGormProfileDatabase().Model(&rule.Storage{}),
@@ -34,10 +38,6 @@ func (c *ChaosMaker) ApplyAll() error {
 		c.FeedRule(r)
 	}
 	return nil
-}
-
-func (c *ChaosMaker) FeedRule(a ...*rule.Storage) {
-	c.ChaosRules = append(c.ChaosRules, a...)
 }
 
 func (c *ChaosMaker) Generate() chan *pcapx.ChaosTraffic {
@@ -104,7 +104,7 @@ func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *pcapx.Ch
 		return nil, utils.Error("rule is nil")
 	}
 
-	rules, err := suricata.Parse(originRule.SuricataRaw)
+	rules, err := surirule.Parse(originRule.SuricataRaw)
 	if err != nil {
 		return nil, utils.Errorf("parse suricata rule failed: %v", err)
 	}

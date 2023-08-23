@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 )
@@ -21,7 +21,7 @@ type udpHandler struct {
 
 var _ chaosHandler = (*udpHandler)(nil)
 
-func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *pcapx.ChaosTraffic {
+func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic {
 	if rule.Protocol != "udp" {
 		return nil
 	}
@@ -96,7 +96,7 @@ func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 		defer close(ch)
 
 		var payloads string
-		var extraRules []*suricata.ContentRule
+		var extraRules []*surirule.ContentRule
 		for _, r := range rule.ContentRuleConfig.ContentRules {
 			if r.Negative {
 				continue
@@ -105,7 +105,8 @@ func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 			if r.PCRE == "" {
 				continue
 			}
-			extraRules = append(extraRules, r.PCREStringGenerator(2)...)
+			// todo: fix pcre generator
+			// extraRules = append(extraRules, r.PCREStringGenerator(2)...)
 		}
 
 		for _, r := range extraRules {
@@ -171,13 +172,13 @@ func (h *udpHandler) MatchBytes(i interface{}) bool {
 	panic("implement me")
 }
 
-func UDPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+func UDPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
 	return &pcapx.ChaosTraffic{
 		UDPIPInboundPayload: raw,
 	}
 }
 
-func UDPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+func UDPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
 	return &pcapx.ChaosTraffic{
 		UDPIPOutboundPayload: raw,
 	}

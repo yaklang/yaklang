@@ -6,7 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	rule2 "github.com/yaklang/yaklang/common/suricata/rule"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 )
@@ -20,7 +21,7 @@ type dnsHandler struct {
 
 var _ chaosHandler = (*dnsHandler)(nil)
 
-func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *pcapx.ChaosTraffic {
+func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic {
 	if rule.Protocol != "dns" {
 		return nil
 	}
@@ -31,7 +32,7 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 
 	dnsRule := rule.ContentRuleConfig.DNS
 	if dnsRule == nil {
-		dnsRule = &suricata.DNSRule{}
+		dnsRule = &rule2.DNSRule{}
 	}
 
 	var baseUDPLayer = &layers.UDP{}
@@ -64,7 +65,7 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 		defer close(ch)
 
 		var payloads string
-		var extraRules []*suricata.ContentRule
+		var extraRules []*surirule.ContentRule
 		for _, r := range rule.ContentRuleConfig.ContentRules {
 			if r.Negative {
 				continue
@@ -73,7 +74,8 @@ func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 			if r.PCRE == "" {
 				continue
 			}
-			extraRules = append(extraRules, r.PCREStringGenerator(2)...)
+			// todo: fix pcre generate
+			extraRules = append(extraRules)
 		}
 
 		for _, r := range extraRules {
@@ -141,7 +143,7 @@ func (h *dnsHandler) MatchBytes(i any) bool {
 	return false
 }
 
-func DNSIPBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+func DNSIPBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
 	return &pcapx.ChaosTraffic{
 		UDPIPOutboundPayload: raw,
 	}
