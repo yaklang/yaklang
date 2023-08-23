@@ -1209,16 +1209,22 @@ func main() {
 		// dap
 		{
 			Name:  "dap",
-			Usage: "启动dap服务器以调试脚本",
+			Usage: "启动基于调试适配器协议(dap)的服务器以调试脚本",
 			Flags: []cli.Flag{
-				cli.StringFlag{Name: "host"},
-				cli.IntFlag{Name: "port"},
-				cli.BoolFlag{Name: "debug"},
+				cli.StringFlag{Name: "host", Usage: "debugger adapter listen host"},
+				cli.IntFlag{Name: "port", Usage: "debugger adapter listen port"},
+				cli.BoolFlag{Name: "debug", Usage: "debug mode"},
+				cli.BoolFlag{Name: "version,v", Usage: "show dap version"},
 			},
 			Action: func(c *cli.Context) error {
 				host := c.String("host")
 				port := c.Int("port")
 				debug := c.Bool("debug")
+				versionFlag := c.Bool("version")
+				if versionFlag {
+					fmt.Printf("Debugger Adapter version: %v\n", dap.DAVersion)
+					return nil
+				}
 
 				// 设置日志级别
 				if debug {
