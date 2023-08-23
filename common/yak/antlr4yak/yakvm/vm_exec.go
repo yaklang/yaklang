@@ -136,7 +136,8 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 		v.scope = scopeBack
 		v.lastStackValue = returnVal
 
-		if v.vm.debugMode {
+		// 如果isContinue,则证明是在tryBlock里面执行的,不需要处理异常以及回调
+		if !isContinue && v.vm.debugMode {
 			if v.indebuggerEval {
 				if ierr != nil {
 					// 在debugger中执行代码,直接panic由debugger捕获
