@@ -61,7 +61,7 @@ func (m *ContentModifier) Modify(payload *bytemap.ByteMap) error {
 }
 
 type RegexpModifier struct {
-	Generator *pcre.PCREGenerator
+	Generator *pcre.Generator
 }
 
 func (m *RegexpModifier) Modify(payload *bytemap.ByteMap) error {
