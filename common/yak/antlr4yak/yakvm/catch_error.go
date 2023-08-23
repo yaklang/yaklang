@@ -26,7 +26,7 @@ func (v *Frame) catchErrorRun(catchCodeIndex, id int) (err interface{}) {
 
 		//出现错误后为 err 赋值并跳转到 catch block
 		if err != nil {
-			v.codePointer = catchCodeIndex
+			v.setCodeIndex(catchCodeIndex)
 			if id > 0 {
 				NewValueRef(id).Assign(v, NewAutoValue(err))
 			}
