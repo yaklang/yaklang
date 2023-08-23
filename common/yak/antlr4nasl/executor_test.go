@@ -377,11 +377,8 @@ include("smb_nt.inc");
 
 func TestGetword2(t *testing.T) {
 	code := `
-global_var a;
-if (1){
-	a = 1;
-}
-dump(a);
+res = ereg_replace(string:"111a",pattern:"\d+(.*)",replace:"\1");
+dump(res);
 `
 	engine := New()
 	engine.InitBuildInLib()
