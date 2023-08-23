@@ -5,8 +5,7 @@ import "fmt"
 type ErrorKind int
 
 const (
-	Info ErrorKind = iota
-	Warn
+	Warn ErrorKind = iota
 	Error
 )
 
@@ -53,8 +52,6 @@ func (errs SSAErrors) String() string {
 func (err SSAError) String() string {
 	ret := ""
 	switch err.Kind {
-	case Info:
-		ret += "info:"
 	case Warn:
 		ret += "warn:"
 	case Error:
