@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"golang.org/x/net/http2"
 )
@@ -603,9 +604,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			return utils.Error("pipeline or smuggle detected, auto enable noFixContentLength")
 		}, nil)
 	} else if haveTE && !haveCL {
-		_, after, ok := bytes.Cut(originBody, []byte("0\r\n\r\n"))
-		if ok && len(after) > 0 {
-			SplitHTTPPacket(after, func(method string, requestUri string, proto string) error {
+		// have transfer-encoding and no cl!
+		var body, nextPacket = codec.HTTPChunkedDecodeWithRestBytes(originBody)
+		_ = body
+		nextPacket = bytes.TrimLeftFunc(nextPacket, unicode.IsSpace)
+		if len(nextPacket) > 0 {
+			SplitHTTPPacket(nextPacket, func(method string, requestUri string, proto string) error {
 				if len(proto) > 5 {
 					if strings.HasPrefix(proto, "HTTP/") {
 						noFixContentLength = true

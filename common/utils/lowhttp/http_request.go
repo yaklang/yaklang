@@ -39,50 +39,76 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	return []byte(header + string(body))
 }
 
-var mayNoCLRE = regexp.MustCompile(`^((GET)|(HEAD)|(DELETE)|(OPTIONS)|(CONNECT)) `)
-
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
 	var isMultipart bool
 	var haveChunkedHeader bool
 	var haveContentLength bool
-	header, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
-		key, value := SplitHTTPHeader(line)
+	var isRequest bool
+	var isResponse bool
+	var contentLengthIsNotRecommanded bool
 
-		var keyLower = strings.ToLower(key)
-		var valLower = strings.ToLower(value)
+	var plrand = fmt.Sprintf("[[REPLACE_CONTENT_LENGTH:%v]]", utils.RandStringBytes(20))
+	var plrandHandled = false
+	header, body := SplitHTTPPacket(
+		raw,
+		func(m, u, proto string) error {
+			isRequest = true
+			switch m {
+			case "GET", "HEAD", "DELETE", "OPTIONS", "CONNECT":
+				contentLengthIsNotRecommanded = true
+			}
+			return nil
+		},
+		func(proto string, code int, codeMsg string) error {
+			isResponse = true
+			return nil
+		},
+		func(line string) string {
+			key, value := SplitHTTPHeader(line)
+			var keyLower = strings.ToLower(key)
+			var valLower = strings.ToLower(value)
+			if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
+				isMultipart = true
+			}
+			if !haveContentLength && strings.ToLower(key) == "content-length" {
+				haveContentLength = true
+				return fmt.Sprintf(`%v: %v`, key, plrand)
+			}
+			if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
+				haveChunkedHeader = true
+			}
+			return line
+		},
+	)
 
-		if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
-			isMultipart = true
-		}
-
-		if !haveContentLength && strings.ToLower(key) == "content-length" {
-			haveContentLength = true
-		}
-
-		if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
-			haveChunkedHeader = true
-		}
-	})
+	// cl te existed at the same time, handle smuggle!
+	var smuggleCase = isRequest && haveContentLength && haveChunkedHeader
+	_ = smuggleCase
 
 	// applying patch to restore CRLF at body
 	// if `raw` has CRLF at body end (by design HTTP smuggle) and `noFixContentLength` is true
-
 	if bytes.HasSuffix(raw, []byte(CRLF+CRLF)) && noFixLength && len(body) > 0 {
 		body = append(body, []byte(CRLF+CRLF)...)
 	}
 
+	_ = isResponse
 	handleChunked := haveChunkedHeader && !haveContentLength
+	var restBody []byte
 	if handleChunked {
-		bodyRaw, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewBuffer(body)))
-		if len(bodyRaw) > 0 {
-			body = bodyRaw
+		// chunked body is very complex
+		// if multiRequest: extract and remove body suffix
+		var bodyDecode []byte
+		bodyDecode, restBody = codec.HTTPChunkedDecodeWithRestBytes(body)
+		if len(bodyDecode) > 0 {
+			readLen := len(body) - len(restBody)
+			body = body[:readLen]
 		}
 	}
 
-	if isMultipart {
-		// 修复数据包的 Boundary
+	/* boundary fix */
+	if isRequest && isMultipart {
 		boundary, fixed := FixMultipartBody(body)
 		if boundary != "" {
 			header = string(ReplaceMIMEType([]byte(header), "multipart/form-data; boundary="+boundary))
@@ -90,32 +116,42 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		}
 	}
 
-	var headerTop20 string
-	if len(raw) > 10 {
-		headerTop20 = string(raw[:10])
-	} else {
-		headerTop20 = string(raw[:])
-	}
-	if !handleChunked && !noFixLength {
-		if len(body) != 0 || !mayNoCLRE.MatchString(headerTop20) {
-			// 修复 Content-Length
-			fixed := fmt.Sprintf("Content-Length: %v\r\n", len(body))
-			if _contentLengthRE.MatchString(header) {
-				header = _contentLengthRE.ReplaceAllString(header, fixed)
-			} else {
-				header = strings.TrimRight(header, CRLF)
-				header += CRLF + fixed + CRLF
-			}
+	if !noFixLength && !haveChunkedHeader {
+		if haveContentLength {
+			// have CL
+			// only cl && no chunked && fix length
+			// fix content-length
+			header = strings.Replace(header, plrand, strconv.Itoa(len(body)), 1)
 		} else {
-			header = _contentLengthRE.ReplaceAllString(header, "")
+			bodyLength := len(body)
+			if bodyLength > 0 {
+				// no CL
+				// fix content-length
+				header = strings.TrimRight(header, CRLF)
+				header += fmt.Sprintf("\r\nContent-Length: %v\r\n\r\n", bodyLength)
+			} else {
+				if !contentLengthIsNotRecommanded {
+					header = strings.TrimRight(header, CRLF)
+					header += "\r\nContent-Length: 0\r\n\r\n"
+				}
+			}
 		}
+		plrandHandled = true
 	}
 
-	if body != nil && handleChunked {
-		body = codec.HTTPChunkedEncode(body)
+	if !plrandHandled && haveContentLength {
+		header = strings.Replace(header, plrand, strconv.Itoa(len(body)), 1)
 	}
 
-	return []byte(header + string(body))
+	var buf bytes.Buffer
+	buf.Write([]byte(header))
+	if len(body) > 0 {
+		buf.Write(body)
+	}
+	if len(restBody) > 0 {
+		buf.Write(restBody)
+	}
+	return buf.Bytes()
 }
 
 func FixHTTPRequestOut(raw []byte) []byte {
