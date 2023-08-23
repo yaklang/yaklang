@@ -447,3 +447,84 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		t.Fatalf("time cost is not expected: %v", ret)
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_Extractor_Kv(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	targetHost, targetPort := lowhttp.DebugEchoServer()
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Extractors: []*ypb.HTTPResponseExtractor{
+			{
+				Name:   "test",
+				Type:   "kv",
+				Scope:  "body",
+				Groups: []string{"int_2"},
+			},
+			{
+				Name:   "test2",
+				Type:   "kv",
+				Scope:  "body",
+				Groups: []string{"float"},
+			},
+			{
+				Name:   "test4",
+				Type:   "kv",
+				Scope:  "body",
+				Groups: []string{"map"},
+			},
+		},
+		Concurrent: 7,
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+Content-Type: application/json
+
+{
+  "int": -2147483648,
+  "int_2": 9223372036854775807,
+  "string": "I AM STRING",
+  "float": 0.000000000000001,
+  "map": {
+    "key": "value"
+  }
+}
+`})
+	if err != nil {
+		panic(err)
+	}
+
+	matchedCount := 0
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		res := rsp.GetExtractedResults()
+
+		for _, v := range res {
+			value := strings.ReplaceAll(v.Value, " ", "")
+			value = strings.ReplaceAll(value, "\n", "")
+			if v.Key == "test" && value == "9223372036854775807" {
+				matchedCount++
+			}
+			if v.Key == "test2" && value == "0.000000000000001" {
+				matchedCount++
+			}
+			if v.Key == "test4" && value == `{"key":"value"}` {
+				matchedCount++
+			}
+		}
+		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		fmt.Println(string(rsp.GetRequestRaw()))
+	}
+
+	if matchedCount != 3 {
+		t.Log("extractor kv failed")
+		t.FailNow()
+	}
+}
