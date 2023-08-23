@@ -1,4 +1,4 @@
-package data
+package protocol
 
 const (
 	TCP  = "tcp"

@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata/data"
+	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/match"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
@@ -130,7 +130,7 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 		for result := range res {
 			count++
 			var bytes []byte
-			if rr.Protocol == data.HTTP {
+			if rr.Protocol == protocol.HTTP {
 				if result.HttpRequest == nil && result.HttpResponse == nil {
 					panic("Empty Result")
 				}
@@ -140,7 +140,7 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 				if result.HttpResponse != nil {
 					bytes = append(bytes, result.HttpResponse...)
 				}
-			} else if rr.Protocol == data.TCP {
+			} else if rr.Protocol == protocol.TCP {
 				bytes = result.TCPIPPayload
 			}
 
@@ -166,9 +166,9 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 			matchedCount++
 		}
 		var need int
-		if rr.Protocol == data.HTTP {
+		if rr.Protocol == protocol.HTTP {
 			need = 5
-		} else if rr.Protocol == data.TCP {
+		} else if rr.Protocol == protocol.TCP {
 			need = rr.ContentRuleConfig.Thresholding.Repeat()
 		}
 		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
@@ -178,7 +178,7 @@ match %d
 `, need, count, matchedCount))
 
 		// tcp not implement yet don't check it
-		if rr.Protocol != data.TCP && (count < 5 || matchedCount <= 3) {
+		if rr.Protocol != protocol.TCP && (count < 5 || matchedCount <= 3) {
 			t.Fatal("match error or no enough traffic")
 			return
 		}
