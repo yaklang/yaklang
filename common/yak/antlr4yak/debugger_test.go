@@ -236,9 +236,9 @@ for range 10 {
 	}
 	in := false
 
-	next := 0
+	n := 0
 	callback := func(g *yakvm.Debugger) {
-		if next > 2 || g.Finished() {
+		if n > 4 || g.Finished() {
 			return
 		}
 		in = true
@@ -250,35 +250,43 @@ for range 10 {
 				t.Fatal("a not found")
 			}
 			if v.Int() != wanted {
-				t.Fatalf("a(%d) != %d in line %d", v.Int(), wanted, g.CurrentLine())
+				t.Fatalf("%d: a(%d) != %d in line %d", v.Int(), n, wanted, g.CurrentLine())
 			}
 		}
 		checkLine := func(lineIndex int) {
 			if g.CurrentLine() != lineIndex {
-				t.Fatalf("line %d not reached", lineIndex)
+				t.Fatalf("%d: line %d not reached, current line: %d", n, lineIndex, g.CurrentLine())
 			}
 		}
 
-		if next == 0 {
+		if n == 0 {
 			checkLine(3)
 			checkA(1)
 			g.StepNext()
-			next++
-		} else if next == 1 {
+		} else if n == 1 {
+			checkLine(4)
+			checkA(2)
+			g.StepNext()
+		} else if n == 2 {
 			checkLine(2)
 			checkA(2)
 			g.StepNext()
-			next++
-		} else if next == 2 {
+		} else if n == 3 {
 			checkLine(3)
 			checkA(2)
-			next++
+			g.StepNext()
+		} else if n == 4 {
+			checkLine(4)
+			checkA(3)
 		}
+		n++
 	}
 
 	RunTestDebugger(code, init, callback)
 	if !in {
 		t.Fatal("callback not called")
+	} else if n != 5 {
+		t.Fatal("callback not called enough")
 	}
 }
 
@@ -298,7 +306,7 @@ println(a)
 	}
 	in := false
 
-	next := 0
+	n := 0
 	callback := func(g *yakvm.Debugger) {
 		if g.Finished() {
 			return
@@ -321,21 +329,21 @@ println(a)
 			}
 		}
 
-		if next == 0 {
+		if n == 0 {
 			checkLine(4)
 			g.StepNext()
-			next++
-		} else if next == 1 {
+		} else if n == 1 {
 			checkLine(5)
 			checkA(2)
-			g.StepNext()
-			next++
 		}
+		n++
 	}
 
 	RunTestDebugger(code, init, callback)
 	if !in {
 		t.Fatal("callback not called")
+	} else if n != 2 {
+		t.Fatal("callback not called enough")
 	}
 }
 
@@ -372,24 +380,19 @@ if a == 2 {
 		if n == 0 {
 			checkLine(2)
 			g.StepNext()
-			n++
 		} else if n == 1 {
 			checkLine(4)
 			g.StepNext()
-			n++
 		} else if n == 2 {
 			checkLine(6)
 			g.StepNext()
-			n++
 		} else if n == 3 {
 			checkLine(7)
 			g.StepNext()
-			n++
 		} else if n == 4 {
 			checkLine(8)
-			g.StepNext()
-			n++
 		}
+		n++
 	}
 
 	RunTestDebugger(code, init, callback)
