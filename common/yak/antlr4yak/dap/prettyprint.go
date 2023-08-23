@@ -10,6 +10,23 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
+func SafeReflectValue(refV reflect.Value) reflect.Value {
+	if !refV.CanAddr() {
+		newRefV := reflect.New(refV.Type()).Elem()
+		newRefV.Set(refV)
+		refV = newRefV
+	}
+	return refV
+}
+
+func SafeReflectStructFieldInterface(refV reflect.Value, field reflect.Value) interface{} {
+	if refV.CanAddr() {
+		field := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+		return field.Interface()
+	}
+	return nil
+}
+
 func AsDebugString(i interface{}, raws ...bool) string {
 	refV := reflect.ValueOf(i)
 	if !refV.IsValid() {
@@ -76,12 +93,10 @@ func AsDebugString(i interface{}, raws ...bool) string {
 		}
 		for i := 0; i < refV.NumField(); i++ {
 			field := refV.Field(i)
-			fieldStr := ""
-			if refV.CanAddr() {
-				field := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
-				fieldStr = AsDebugString(field.Interface())
-			} else {
-				fieldStr = "<Unavailable>"
+			fieldStr := "<Unavailable>"
+			iField := SafeReflectStructFieldInterface(refV, field)
+			if iField != nil {
+				fieldStr = AsDebugString(iField)
 			}
 			content[i] = fmt.Sprintf("%s: %s", typ.Field(i).Name, fieldStr)
 		}
