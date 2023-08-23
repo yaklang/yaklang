@@ -497,14 +497,20 @@ func (g *Debugger) stepStackToStackTrace(stepStack *StepStack) StackTrace {
 	if !ok {
 		fid = -1
 	}
+	code := stepStack.code
+	line, column := code.StartLineNumber, code.StartColumnNumber
+	if code.Opcode == OpScopeEnd {
+		line, column = code.EndLineNumber, code.EndColumnNumber
+	}
+
 	return StackTrace{
 		ID:         fid,
 		Name:       stepStack.stateName,
 		Frame:      frame,
-		SourceCode: stepStack.code.SourceCodePointer,
-		Source:     stepStack.code.SourceCodeFilePath,
-		Line:       stepStack.code.StartLineNumber,
-		Column:     stepStack.code.StartColumnNumber,
+		SourceCode: code.SourceCodePointer,
+		Source:     code.SourceCodeFilePath,
+		Line:       line,
+		Column:     column,
 		EndLine:    stepStack.code.EndLineNumber,
 		EndColumn:  stepStack.code.EndColumnNumber,
 	}
