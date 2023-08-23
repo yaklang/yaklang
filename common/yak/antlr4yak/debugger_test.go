@@ -223,6 +223,69 @@ for range 10 {
 	}
 }
 
+func TestDebugger_Continue(t *testing.T) {
+	code := `a = 1
+for range 10 {
+	a++
+}`
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetNormalBreakPoint(2)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	n := 0
+	callback := func(g *yakvm.Debugger) {
+		if n > 4 || g.Finished() {
+			return
+		}
+		in = true
+
+		checkA := func(wanted int) {
+			scope := g.Frame().CurrentScope()
+			v, ok := scope.GetValueByName("a")
+			if !ok {
+				t.Fatal("a not found")
+			}
+			if v.Int() != wanted {
+				t.Fatalf("%d: a(%d) != %d in line %d", v.Int(), n, wanted, g.CurrentLine())
+			}
+		}
+		checkLine := func(lineIndex int) {
+			if g.CurrentLine() != lineIndex {
+				t.Fatalf("%d: line %d not reached, current line: %d", n, lineIndex, g.CurrentLine())
+			}
+		}
+
+		if n == 0 {
+			checkLine(2)
+			checkA(1)
+		} else if n == 1 {
+			checkLine(2)
+			checkA(2)
+		} else if n == 2 {
+			checkLine(2)
+			checkA(3)
+		} else if n == 3 {
+			checkLine(2)
+			checkA(4)
+		} else if n == 4 {
+			checkLine(2)
+			checkA(5)
+		}
+		n++
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	} else if n != 5 {
+		t.Fatal("callback not called enough")
+	}
+}
+
 func TestDebugger_StepNext(t *testing.T) {
 	code := `a = 1
 for range 10 {
