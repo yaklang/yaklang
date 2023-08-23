@@ -277,6 +277,10 @@ var OpcodeVerboseName = map[OpcodeFlag]string{
 	OpRecover:  `recover`,
 	OpPanic:    `panic`,
 	OpEllipsis: `ellipsis`,
+
+	OpCatchError:     `catch-error`,
+	OpStopCatchError: `stop-catch-error`,
+	OpExit:           `exit`,
 }
 
 type Code struct {
@@ -324,7 +328,7 @@ func (c *Code) String() string {
 	if !ok {
 		op = "unknown[" + fmt.Sprint(c.Opcode) + "]"
 	}
-	buf.WriteString(fmt.Sprintf("OP:%-10s", op) + " ")
+	buf.WriteString(fmt.Sprintf("OP:%-20s", op) + " ")
 	switch c.Opcode {
 	case OpBitwiseNot, OpAnd, OpAndNot, OpOr, OpXor, OpShl, OpShr:
 	case OpTypeCast:
@@ -361,6 +365,9 @@ func (c *Code) String() string {
 		buf.WriteString(fmt.Sprintf("-> %d (-%d scope) mode: %v", c.Unary, c.Op1.Int(), c.Op2.String()))
 	case OpList, OpPushRef, OpNewMap, OpNewMapWithType, OpNewSlice, OpNewSliceWithType, OpPushLeftRef:
 		buf.WriteString(fmt.Sprint(c.Unary))
+	case OpCatchError:
+		buf.WriteString(fmt.Sprintf("err -> %d", c.Op1.Int()+1))
+	case OpStopCatchError, OpExit:
 	default:
 		if c.Unary > 0 {
 			buf.WriteString("off:" + fmt.Sprint(c.Unary) + " ")
