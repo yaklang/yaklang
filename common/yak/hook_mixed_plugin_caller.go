@@ -372,6 +372,12 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 			if err != nil {
 				return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
 			}
+
+			if ins.ForceInteractive {
+				log.Infof("script[%v] is interactive, skip load", name)
+				return nil
+			}
+
 			code = ins.Content
 			if ins.Type == "port-scan" {
 				forPortScan = true

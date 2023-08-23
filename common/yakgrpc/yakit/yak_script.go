@@ -39,6 +39,11 @@ type YakScript struct {
 	// History string
 	IsHistory bool `json:"is_history"`
 
+	// Force Interactive
+	// Means that this script will be executed in interactive mode
+	// cannot load as a plugin or a module by mix caller
+	ForceInteractive bool `json:"force_interactive"`
+
 	FromStore bool `json:"from_store"`
 
 	IsGeneralModule      bool   `json:"is_general_module"`

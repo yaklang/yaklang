@@ -124,8 +124,20 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 				if host == "" {
 					continue
 				}
-				var handledRaw = bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port)))
-				var https = i.GetIsHttps()
+
+				var targetAddr string
+				https := i.GetIsHttps()
+				if port != 0 {
+					if https && port != 443 {
+						targetAddr = utils.HostPort(host, port)
+					} else if !https && port != 80 {
+						targetAddr = utils.HostPort(host, port)
+					}
+				} else {
+					targetAddr = host
+				}
+
+				var handledRaw = bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(targetAddr))
 				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
 					https = strings.HasPrefix(res, "https://")
 					u, _ := url.Parse(res)
