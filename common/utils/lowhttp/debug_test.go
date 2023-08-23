@@ -1,7 +1,9 @@
 package lowhttp
 
 import (
+	"context"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -26,4 +28,10 @@ Host: asdfasdfasdf
 	} else {
 		t.Error("BUG")
 	}
+}
+
+func TestDebugEchoServerContext(t *testing.T) {
+	ip, port := DebugEchoServerContext(context.Background())
+	log.Infof("ip: %s:%d", ip, port)
+	select {}
 }
