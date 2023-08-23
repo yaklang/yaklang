@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
@@ -23,7 +23,7 @@ type icmpHandler struct {
 
 var _ chaosHandler = (*icmpHandler)(nil)
 
-func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *suricata.Rule) chan *pcapx.ChaosTraffic {
+func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic {
 	if rule.Protocol != "icmp" {
 		return nil
 	}
@@ -103,7 +103,7 @@ func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule
 		defer close(ch)
 
 		var payloads string
-		var extraRules []*suricata.ContentRule
+		var extraRules []*surirule.ContentRule
 		for _, r := range rule.ContentRuleConfig.ContentRules {
 			if r.Negative {
 				continue
@@ -112,7 +112,8 @@ func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule
 			if r.PCRE == "" {
 				continue
 			}
-			extraRules = append(extraRules, r.PCREStringGenerator(1)...)
+			// todo: fix pcre generaote
+			extraRules = append(extraRules)
 		}
 
 		for _, r := range extraRules {
@@ -192,13 +193,13 @@ func parseCondition(condition string) int {
 	}
 }
 
-func ICMPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+func ICMPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
 	return &pcapx.ChaosTraffic{
 		ICMPIPInboundPayload: raw,
 	}
 }
 
-func ICMPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *suricata.Rule, raw []byte) *pcapx.ChaosTraffic {
+func ICMPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
 	return &pcapx.ChaosTraffic{
 		ICMPIPOutboundPayload: raw,
 	}

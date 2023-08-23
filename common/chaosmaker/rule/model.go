@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
-	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -213,7 +213,7 @@ func init() {
 	})
 }
 
-func NewRuleFromSuricata(s *suricata.Rule) *Storage {
+func NewRuleFromSuricata(s *rule.Rule) *Storage {
 	return &Storage{
 		SuricataRaw: s.Raw,
 		Protocol:    s.Protocol,
@@ -224,7 +224,7 @@ func NewRuleFromSuricata(s *suricata.Rule) *Storage {
 	}
 }
 
-func SaveSuricata(db *gorm.DB, s *suricata.Rule) error {
+func SaveSuricata(db *gorm.DB, s *rule.Rule) error {
 	r := NewRuleFromSuricata(s)
 	return UpsertRule(db, r.CalcHash(), r)
 }

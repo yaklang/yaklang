@@ -89,7 +89,7 @@ jobs:
 
           - name: Test Suricata Generate && Match
             run: |
-              go test -timeout 20s -run TestMUSTPASS* ./common/suricata -v
+              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/... -v
               go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker -v
 
           - name: Test Ping
