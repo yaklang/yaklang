@@ -282,7 +282,7 @@ for range 10 {
 	}
 }
 
-func TestDebugger_StepNext2(t *testing.T) {
+func TestDebugger_StepNext_JmpFunction(t *testing.T) {
 	code := `f = func(v) {
 	return v+1
 }
@@ -336,6 +336,67 @@ println(a)
 	RunTestDebugger(code, init, callback)
 	if !in {
 		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_StepNext_If(t *testing.T) {
+	code := `a = 1
+if a == 2 {
+	println(a)
+} else if a == 0 {
+	println(a)
+} else {
+	println(a)
+}
+`
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetNormalBreakPoint(2)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	n := 0
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+		checkLine := func(lineIndex int) {
+			if g.CurrentLine() != lineIndex {
+				t.Fatalf("line %d not reached", lineIndex)
+			}
+		}
+
+		if n == 0 {
+			checkLine(2)
+			g.StepNext()
+			n++
+		} else if n == 1 {
+			checkLine(4)
+			g.StepNext()
+			n++
+		} else if n == 2 {
+			checkLine(6)
+			g.StepNext()
+			n++
+		} else if n == 3 {
+			checkLine(7)
+			g.StepNext()
+			n++
+		} else if n == 4 {
+			checkLine(8)
+			g.StepNext()
+			n++
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	} else if n != 5 {
+		t.Fatal("callback not called enough")
 	}
 }
 
