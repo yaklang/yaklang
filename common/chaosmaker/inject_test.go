@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"net/http"
 	_ "net/http/pprof"
 	"testing"
@@ -64,7 +64,7 @@ func TestDebugChaosRules(t *testing.T) {
 		//},
 	}
 	for _, testRule := range testRules {
-		rules, err := suricata.Parse(testRule.rule)
+		rules, err := surirule.Parse(testRule.rule)
 		if err != nil {
 			panic(err)
 		}

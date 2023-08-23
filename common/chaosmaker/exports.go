@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/suricata"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
@@ -26,7 +26,7 @@ func YieldRulesByKeywords(keywords string, protos ...string) chan *rule.Storage 
 }
 
 func LoadSuricataToDatabase(raw string) error {
-	rules, err := suricata.Parse(raw)
+	rules, err := surirule.Parse(raw)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func LoadSuricataToDatabase(raw string) error {
 
 var (
 	ChaosMakerExports = map[string]any{
-		"ParseSuricata":          suricata.Parse,
+		"ParseSuricata":          surirule.Parse,
 		"YieldRules":             yieldRules,
 		"YieldRulesByKeyword":    YieldRulesByKeywords,
 		"LoadSuricataToDatabase": LoadSuricataToDatabase,

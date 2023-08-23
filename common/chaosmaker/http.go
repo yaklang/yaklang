@@ -4,17 +4,19 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata"
+	"github.com/yaklang/yaklang/common/suricata/generate"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-const GENCOUNT = 5
-
 func init() {
-	chaosMap.Store("suricata-http", &httpHandler{})
+	chaosMap.Store("suricata-http", &httpHandler{
+		GenCountPerRule: 5,
+	})
 }
 
 type httpHandler struct {
+	GenCountPerRule int
 }
 
 var _ chaosHandler = (*httpHandler)(nil)
@@ -24,7 +26,7 @@ func (h *httpHandler) MatchBytes(i any) bool {
 	panic("implement me")
 }
 
-func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *suricata.Rule) chan *pcapx.ChaosTraffic {
+func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan *pcapx.ChaosTraffic {
 	if originRule == nil {
 		return nil
 	}
@@ -38,31 +40,26 @@ func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, orig
 		originRule: originRule,
 		maker:      maker,
 		out:        ch,
-	}).generator(GENCOUNT)
+	}).generator(h.GenCountPerRule)
 
 	return ch
 }
 
 type httpGenerator struct {
 	chaosRule  *rule.Storage
-	originRule *suricata.Rule
+	originRule *surirule.Rule
 	maker      *ChaosMaker
 	out        chan *pcapx.ChaosTraffic
 }
 
 func (h *httpGenerator) generator(count int) {
-	surigen, err := suricata.NewPloadgen(h.originRule.ContentRuleConfig.ContentRules)
+	surigen, err := generate.NewRulegen(h.originRule)
 	if err != nil {
-		log.Warnf("suricata.NewPloadgen failed: %v", err)
+		log.Warnf("suricata.NewRulegen failed: %v", err)
 	}
 
 	for i := 0; i < count; i++ {
-		raw, err := surigen.Gen()
-		if err != nil {
-			log.Warnf("surigen.Gen failed: %v", err)
-			continue
-		}
-		h.toChaosTraffic(raw)
+		h.toChaosTraffic(surigen.Gen())
 	}
 
 	close(h.out)
