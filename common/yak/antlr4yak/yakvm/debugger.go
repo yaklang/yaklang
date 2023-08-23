@@ -34,6 +34,16 @@ func NewSwitchBundle() *switchBundle {
 	}
 }
 
+func GetCodeNumber(code *Code) (int, int, int, int) {
+	startLine, startColumn := code.StartLineNumber, code.StartColumnNumber
+	endLine, endColumn := code.EndLineNumber, code.EndColumnNumber
+	// 对ScopeEnd做特殊处理
+	if code.Opcode == OpScopeEnd {
+		startLine, startColumn = endLine, endColumn
+	}
+	return startLine, startColumn, endLine, endColumn
+}
+
 type Debugger struct {
 	vm           *VirtualMachine
 	once         sync.Once
@@ -513,10 +523,7 @@ func (g *Debugger) stepStackToStackTrace(stepStack *StepStack) StackTrace {
 		fid = -1
 	}
 	code := stepStack.code
-	line, column := code.StartLineNumber, code.StartColumnNumber
-	if code.Opcode == OpScopeEnd {
-		line, column = code.EndLineNumber, code.EndColumnNumber
-	}
+	startLine, startColumn, endLine, endColumn := GetCodeNumber(code)
 
 	return StackTrace{
 		ID:         fid,
@@ -524,10 +531,10 @@ func (g *Debugger) stepStackToStackTrace(stepStack *StepStack) StackTrace {
 		Frame:      frame,
 		SourceCode: code.SourceCodePointer,
 		Source:     code.SourceCodeFilePath,
-		Line:       line,
-		Column:     column,
-		EndLine:    stepStack.code.EndLineNumber,
-		EndColumn:  stepStack.code.EndColumnNumber,
+		Line:       startLine,
+		Column:     startColumn,
+		EndLine:    endLine,
+		EndColumn:  endColumn,
 	}
 }
 
@@ -767,8 +774,9 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	state, stateName := g.State(), g.StateName()
 	code := g.GetCode(state, codeIndex)
+	line, _, _, _ := GetCodeNumber(code)
 	g.codePointer = codeIndex
-	g.linePointer = code.StartLineNumber
+	g.linePointer = line
 
 	g.SwitchByOtherFileOpcode(code)
 

@@ -16,7 +16,12 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+
+	ifBlock := i.Block(0)
+	if ifBlock == nil {
+		y.panicCompilerError(compileError, "no if code block")
+	}
+	recoverRange := y.SetRange(ifBlock)
 	defer recoverRange()
 	y.writeString("if ")
 
@@ -34,10 +39,7 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	var jmpfCode = y.pushJmpIfFalse()
 
 	// 编译 block
-	ifBlock := i.Block(0)
-	if ifBlock == nil {
-		y.panicCompilerError(compileError, "no if code block")
-	}
+
 	y.VisitBlock(ifBlock)
 
 	var jmpToEnd []*yakvm.Code
