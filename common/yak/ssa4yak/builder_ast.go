@@ -42,6 +42,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	// declear Variable Expression
 	if s, ok := stmt.DeclearVariableExpressionStmt().(*yak.DeclearVariableExpressionStmtContext); ok {
 		b.buildDeclearVariableExpressionStmt(s)
+		return
 	}
 
 	// assign Expression
@@ -53,11 +54,13 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	// expression
 	if s, ok := stmt.ExpressionStmt().(*yak.ExpressionStmtContext); ok {
 		b.buildExpressionStmt(s)
+		return
 	}
 
 	// block
 	if s, ok := stmt.Block().(*yak.BlockContext); ok {
 		b.buildBlock(s)
+		return
 	}
 
 	//TODO: try Stmt
@@ -65,10 +68,12 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	// if stmt
 	if s, ok := stmt.IfStmt().(*yak.IfStmtContext); ok {
 		b.buildIfStmt(s, nil)
+		return
 	}
 
 	if s, ok := stmt.SwitchStmt().(*yak.SwitchStmtContext); ok {
 		b.buildSwitchStmt(s)
+		return
 	}
 
 	//TODO: for range stmt
@@ -76,6 +81,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	// for stmt
 	if s, ok := stmt.ForStmt().(*yak.ForStmtContext); ok {
 		b.buildForStmt(s)
+		return
 	}
 
 	// break stmt
@@ -83,33 +89,38 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _break := b.GetBreak(); _break != nil {
 			b.EmitJump(_break)
 		} else {
-			panic("unexpection break stmt")
+			b.NewError(ssa.Error, "unexpection break stmt")
 		}
+		return
 	}
 	// return stmt
 	if s, ok := stmt.ReturnStmt().(*yak.ReturnStmtContext); ok {
 		b.buildReturnStmt(s)
+		return
 	}
 	// continue stmt
 	if _, ok := stmt.ContinueStmt().(*yak.ContinueStmtContext); ok {
 		if _continue := b.GetContinue(); _continue != nil {
 			b.EmitJump(_continue)
 		} else {
-			panic("unexpection continue stmt")
+			b.NewError(ssa.Error, "unexpection continue stmt")
 		}
+		return
 	}
 
 	if _, ok := stmt.FallthroughStmt().(*yak.FallthroughStmtContext); ok {
 		if _fall := b.GetFallthrough(); _fall != nil {
 			b.EmitJump(_fall)
 		} else {
-			panic("unexpection fallthrough stmt")
+			b.NewError(ssa.Error, "unexpection fallthrough stmt")
 		}
+		return
 	}
 	//TODO: include stmt
 	// defer stmt
 	if s, ok := stmt.DeferStmt().(*yak.DeferStmtContext); ok {
 		b.buildDeferStmt(s)
+		return
 	}
 	//TODO: go stmt
 	//TODO: assert stmt
@@ -225,6 +236,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		} else {
 			// not found expression; default is true
 			cond = ssa.NewConst(true)
+			b.NewError(ssa.Warn, "if condition expression is nil, default is true")
 		}
 
 		if third, ok := condition.ForThirdExpr().(*yak.ForThirdExprContext); ok {
@@ -319,6 +331,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 		cond = b.buildExpression(expr)
 	} else {
 		// expression is nil
+		b.NewError(ssa.Warn, "switch expression is nil")
 	}
 	enter := b.CurrentBlock
 	allcase := stmt.AllCase()
@@ -354,9 +367,11 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 			} else {
 				_fallthrough = handlers[i+1]
 			}
-			b.PushTarget(nil, nil, _fallthrough)
+			b.PushTarget(done, nil, _fallthrough) // fall throught just jump to next handler
+			// build handlers block
 			b.CurrentBlock = handlers[i]
 			b.buildStatementList(stmtlist)
+			// jump handlers-block -> done
 			b.EmitJump(done)
 			b.PopTarget()
 		}
@@ -364,11 +379,13 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	// default
 	if stmt.Default() != nil {
 		if stmtlist, ok := stmt.StatementList(len(allcase)).(*yak.StatementListContext); ok {
-			b.PushTarget(nil, nil, nil)
+			b.PushTarget(done, nil, nil) // con't fallthrough
+			// build default block
 			b.CurrentBlock = defaultb
 			b.buildStatementList(stmtlist)
+			// jump default -> done
 			b.EmitJump(done)
-			b.PopTarget()
+			b.PopTarget() // pop target
 		}
 	}
 
@@ -552,7 +569,7 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 			lvalues[0].Assign(_interface, b.FunctionBuilder)
 		} else {
 			// (n) = (m) && n!=m  faltal
-			panic(fmt.Sprintf("multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues)))
+			b.NewError(ssa.Error, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
 		}
 	}
 }
@@ -691,7 +708,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		expr := b.buildExpression(s)
 		if expr == nil {
-			panic("leftexpression expression is nil")
+			b.NewError(ssa.Error, "leftexpression expression is nil")
 		}
 
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
@@ -699,7 +716,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			if expr, ok := expr.(*ssa.Interface); ok {
 				return b.EmitField(expr, index)
 			} else {
-				panic("leftexprssion exprssion is not interface")
+				b.NewError(ssa.Error, "leftexprssion exprssion is not interface")
 			}
 		}
 
@@ -747,7 +764,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		} else if b.CanBuildFreeValue(text) {
 			return b.BuildFreeValue(text)
 		} else {
-			b.NewError(ssa.Warn, "Expression: undefine value %s", s.GetText())
+			b.NewError(ssa.Error, "Expression: undefine value %s", s.GetText())
 			return nil
 		}
 	}
@@ -765,7 +782,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
 		expr, ok := getValue(0).(*ssa.Interface)
 		if !ok {
-			panic("expression slice need expression")
+			b.NewError(ssa.Error, "expression slice need expression")
 		}
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
@@ -775,7 +792,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		} else if len(keys) == 3 {
 			return b.EmitInterfaceSlice(expr, keys[0], keys[1], keys[2])
 		} else {
-			panic("")
+			b.NewError(ssa.Error, "slice call expression argument too much")
 		}
 	}
 
@@ -900,7 +917,8 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 		typ = b.buildTypeLiteral(s)
 	}
 	if typ == nil {
-		panic("")
+		b.NewError(ssa.Error, "not set type in make expression")
+		return nil
 	}
 
 	var exprs []ssa.Value
@@ -919,7 +937,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 			} else if len(exprs) == 2 {
 				return b.EmitInterfaceBuildWithType(ssa.Types{typ}, exprs[0], exprs[1])
 			} else {
-				panic("make slice expression error!")
+				b.NewError(ssa.Error, "make slice expression argument too much!")
 			}
 		case ssa.Map:
 		case ssa.Struct:
@@ -927,7 +945,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	case *ssa.ChanType:
 		fmt.Printf("debug %v\n", "make chan")
 	default:
-		panic("make unknow type")
+		b.NewError(ssa.Error, "make unknow type")
 	}
 	return nil
 }
@@ -1049,7 +1067,7 @@ func (b *astbuilder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDecl
 			v := b.buildExpression(expression)
 			b.EmitReturn([]ssa.Value{v})
 		} else {
-			panic("BUG: arrow function need expression or block at least")
+			b.NewError(ssa.Error, "BUG: arrow function need expression or block at least")
 		}
 	} else {
 		// this global function
@@ -1097,7 +1115,8 @@ func (b *astbuilder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt
 			}
 		}
 	}
-	panic("call target is nil")
+	b.NewError(ssa.Error, "call target is nil")
+	return nil
 }
 
 // function call
@@ -1143,10 +1162,12 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	exprs := stmt.AllExpression()
 	values := make([]ssa.Value, len(exprs))
 	if len(exprs) == 0 {
-		panic("slicecall expression is zero")
+		b.NewError(ssa.Error, "slicecall expression is zero")
+		return nil
 	}
 	if len(exprs) > 3 {
-		panic("slicecall expression too much")
+		b.NewError(ssa.Error, "slicecall expression too much")
+		return nil
 	}
 	for i, expr := range exprs {
 		if s, ok := expr.(*yak.ExpressionContext); ok {
@@ -1170,7 +1191,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 	} else if s, ok := stmt.BoolLiteral().(*yak.BoolLiteralContext); ok {
 		boolLit, err := strconv.ParseBool(s.GetText())
 		if err != nil {
-			panic("Unhandled bool literal")
+			b.NewError(ssa.Error, "Unhandled bool literal")
 		}
 		return ssa.NewConst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
@@ -1186,6 +1207,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
 			if err != nil {
 				b.NewError(ssa.Error, "unquote error %s", err)
+				return nil
 			}
 		}
 		runeChar := []rune(s)[0]
@@ -1226,7 +1248,6 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 
 	// mixed
 
-	// panic("Not Implemented Expr Parse YET: " + stmt.GetText())
 	return nil
 }
 
@@ -1255,6 +1276,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 		}
 		if err != nil {
 			b.NewError(ssa.Error, "const parse %s as integer literal... is to large for int64: %v", originIntStr, err)
+			return nil
 		}
 		if resultInt64 > math.MaxInt {
 			return ssa.NewConst(int64(resultInt64))
