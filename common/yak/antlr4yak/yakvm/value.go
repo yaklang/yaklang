@@ -346,6 +346,10 @@ func NewStringSliceValue(i []string) *Value {
 }
 
 func (v *Value) Type() reflect.Type {
+	if v == nil || v.Value == nil {
+		return nil
+	}
+
 	t, ok := v.Value.(reflect.Type)
 	if ok {
 		return t
@@ -354,6 +358,9 @@ func (v *Value) Type() reflect.Type {
 }
 
 func (v *Value) TypeStr() string {
+	if v == nil || v.Value == nil {
+		return ""
+	}
 	if v.IsType() {
 		return "type"
 	}
@@ -361,30 +368,48 @@ func (v *Value) TypeStr() string {
 }
 
 func (v *Value) IsType() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	_, ok := v.Value.(reflect.Type)
 	return ok
 }
 
 func (v *Value) IsChannel() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	t := reflect.TypeOf(v.Value).Kind()
 	return t == reflect.Chan
 }
 
 func (v *Value) IsMap() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	t := reflect.TypeOf(v.Value).Kind()
 	return t == reflect.Map
 }
 
 func (v *Value) Rangeable() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	rk := reflect.TypeOf(v.Value).Kind()
 	return rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || v.IsInt64()
 }
 
 func (v *Value) GetIndexedVariableCount() int {
+	if v == nil || v.Value == nil {
+		return 0
+	}
 	return GetIndexedVariableCount(v.Value)
 }
 
 func (v *Value) GetNamedVariableCount() int {
+	if v == nil || v.Value == nil {
+		return 0
+	}
 	return GetNamedVariableCount(v.Value)
 }
 
@@ -393,15 +418,15 @@ func (v *Value) Callable() bool {
 }
 
 func (v *Value) IsYakFunction() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	_, ok := v.Value.(*Function)
 	return ok
 }
 
 func (v *Value) NativeCallable() bool {
-	if v == nil {
-		return false
-	}
-	if v.Value == nil {
+	if v == nil || v.Value == nil {
 		return false
 	}
 	kind := reflect.TypeOf(v.Value).Kind()
@@ -424,10 +449,16 @@ func (v *Value) AsString() string {
 }
 
 func (v *Value) IsBytesOrRunes() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	return IsBytesOrRunes(v.Value)
 }
 
 func (v *Value) IsStringOrBytes() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	_, ok := v.Value.(string)
 	if !ok {
 		_, ok := v.Value.([]byte)
@@ -437,12 +468,15 @@ func (v *Value) IsStringOrBytes() bool {
 }
 
 func (v *Value) IsString() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
 	_, ok := v.Value.(string)
 	return ok
 }
 
 func (v *Value) String() string {
-	if v == nil {
+	if v == nil || v.Value == nil {
 		return "-"
 	}
 
@@ -481,6 +515,10 @@ func (v *Value) IsIdentifier() bool {
 }
 
 func (v *Value) IsByte() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
+
 	switch v.Value.(type) {
 	case uint8:
 		return true
@@ -489,6 +527,10 @@ func (v *Value) IsByte() bool {
 }
 
 func (v *Value) IsFloat() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
+
 	switch v.Value.(type) {
 	case float64, float32:
 		return true
@@ -497,6 +539,10 @@ func (v *Value) IsFloat() bool {
 }
 
 func (v *Value) IsBool() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
+
 	switch v.Value.(type) {
 	case bool:
 		return true
@@ -505,11 +551,19 @@ func (v *Value) IsBool() bool {
 }
 
 func (v *Value) IsBytes() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
+
 	_, ok := v.Value.([]byte)
 	return ok
 }
 
 func (v *Value) Bytes() []byte {
+	if v == nil || v.Value == nil {
+		return nil
+	}
+
 	b, ok := v.Value.([]byte)
 	if ok {
 		return b
@@ -518,11 +572,7 @@ func (v *Value) Bytes() []byte {
 }
 
 func (v *Value) IsUndefined() bool {
-	if v == nil {
-		return true
-	}
-
-	if v.Value == nil {
+	if v == nil || v.Value == nil {
 		return true
 	}
 
@@ -534,6 +584,10 @@ func (v *Value) IsUndefined() bool {
 }
 
 func (v *Value) Bool() bool {
+	if v == nil || v.Value == nil {
+		return false
+	}
+
 	switch b := v.Value.(type) {
 	case bool:
 		return b
@@ -573,11 +627,17 @@ func (v *Value) ValueListToInterface() interface{} {
 }
 
 func (v *Value) Codes() []*Code {
+	if v == nil || v.Value == nil {
+		return nil
+	}
 	codes, _ := v.Value.([]*Code)
 	return codes
 }
 
 func (v *Value) ValueList() []*Value {
+	if v == nil || v.Value == nil {
+		return nil
+	}
 	i, _ := v.Value.([]*Value)
 	return i
 }
@@ -629,7 +689,7 @@ func (v *Value) GlobalAssignBySymbol(table *Scope, val *Value) {
 }
 
 func (v *Value) IsIterable() bool {
-	if v == nil {
+	if v == nil || v.Value == nil {
 		return false
 	}
 	rk := reflect.TypeOf(v.Value).Kind()
@@ -637,10 +697,16 @@ func (v *Value) IsIterable() bool {
 }
 
 func (v *Value) CallSliceIndex(i int) interface{} {
+	if v == nil || v.Value == nil {
+		return nil
+	}
 	return reflect.ValueOf(v.Value).Index(i).Interface()
 }
 
 func (v *Value) Len() int {
+	if v == nil || v.Value == nil {
+		return 0
+	}
 	return reflect.ValueOf(v.Value).Len()
 }
 
@@ -701,6 +767,9 @@ func (v *Value) LuaFalse() bool {
 }
 
 func (v *Value) Float64() float64 {
+	if v == nil || v.Value == nil {
+		return float64(0)
+	}
 	switch ret := v.Value.(type) {
 	case float64:
 		return ret

@@ -981,6 +981,10 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 			name, value := kv.Key, kv.Value
 
 			ref := ds.ConvertVariable(value.Value)
+			typ := ""
+			if value != nil {
+				typ = value.TypeStr()
+			}
 
 			indexed := value.GetIndexedVariableCount()
 			named := value.GetNamedVariableCount()
@@ -988,7 +992,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				Name:               name,
 				EvaluateName:       name,
 				Value:              AsDebugString(value.Value),
-				Type:               value.TypeStr(),
+				Type:               typ,
 				VariablesReference: ref,
 				IndexedVariables:   indexed,
 				NamedVariables:     named,
