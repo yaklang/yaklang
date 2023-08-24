@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -158,8 +159,12 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 				buffer := gopacket.NewSerializeBuffer()
 				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
 				if err != nil {
-					t.Error(err)
-					return
+					t.Log(err)
+					linklayer = &layers.Ethernet{
+						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
+						EthernetType: layers.EthernetTypeIPv4,
+					}
 				}
 				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
 					linklayer,
