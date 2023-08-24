@@ -16,32 +16,35 @@ import (
 	"time"
 )
 
+func YakitOutputToExecResult(i interface{}) *ypb.ExecResult {
+	switch ret := i.(type) {
+	case *YakitProgress:
+		raw, _ := YakitMessageGenerator(ret)
+		return &ypb.ExecResult{
+			IsMessage: true,
+			Message:   raw,
+		}
+	case *YakitLog:
+		raw, _ := YakitMessageGenerator(ret)
+		if raw != nil {
+			return &ypb.ExecResult{
+				IsMessage: true,
+				Message:   raw,
+			}
+		}
+	}
+	return nil
+}
+
 // NewVirtualYakitClient 用于脚本执行结果在 grpc 调用时的消息传递
 func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	remoteClient := NewYakitClient("")
 	remoteClient.send = func(i interface{}) error { // 对于脚本传递的消息，需要封装成 ExecResult
-		switch ret := i.(type) {
-		case *YakitProgress:
-			raw, _ := YakitMessageGenerator(ret)
-			if err := h(&ypb.ExecResult{
-				IsMessage: true,
-				Message:   raw,
-			}); err != nil {
-				return err
-			}
-		case *YakitLog:
-			raw, _ := YakitMessageGenerator(ret)
-			if raw != nil {
-				if err := h(&ypb.ExecResult{
-					IsMessage: true,
-					Message:   raw,
-				}); err != nil {
-					return err
-				}
-			}
-
+		result := YakitOutputToExecResult(i)
+		if result != nil {
+			return h(result)
 		}
-		return nil
+		return fmt.Errorf("convert to ExecResult failed: `%v`", i)
 	}
 	return remoteClient
 }
