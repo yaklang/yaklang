@@ -32,8 +32,11 @@ func (v *Frame) nextCode() {
 }
 
 func (v *Frame) setCodeIndex(i int) {
-	if v.vm.debugMode && v.vm.debugger.jmpIndex == -1 {
-		v.vm.debugger.jmpIndex = i
+	if v.vm.debugMode && v.vm.debugger.jmpState == nil {
+		v.vm.debugger.jmpState = &DebuggerState{
+			codeIndex: i,
+			frame:     v,
+		}
 	}
 
 	v.codePointer = i
