@@ -79,23 +79,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		atomic.AddInt64(&trafficCounter, 1)
 	}
 	var start = time.Now()
-	sendLogger := yaklib.NewVirtualYakitClient(func(i interface{}) error {
-		if i == nil {
-			return nil
-		}
-		if ret, ok := i.(*yaklib.YakitLog); ok {
-			raw, _ := yaklib.YakitMessageGenerator(ret)
-			if raw != nil {
-				if err := stream.Send(&ypb.ExecResult{
-					IsMessage: true,
-					Message:   raw,
-				}); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+	sendLogger := yaklib.NewVirtualYakitClient(stream.Send)
 	go func() {
 		for {
 			select {

@@ -24,9 +24,8 @@ import (
 	"time"
 )
 
-var emptyVirtualClient = NewVirtualYakitClient(func(i interface{}) error {
-	log.Error("not set yakit client")
-	return nil
+var emptyVirtualClient = NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+	return fmt.Errorf("empty virtual client")
 })
 var YakitExports = map[string]interface{}{
 	"NewClient":       NewYakitClient,
@@ -536,12 +535,8 @@ func AutoInitYakit() *YakitClient {
 		InitYakit(client)
 		return client
 	} else {
-		client := NewVirtualYakitClient(func(i interface{}) error {
-			log.Error("not set yakit client")
-			return nil
-		})
-		InitYakit(client)
-		return client
+		InitYakit(emptyVirtualClient)
+		return emptyVirtualClient
 	}
 
 }

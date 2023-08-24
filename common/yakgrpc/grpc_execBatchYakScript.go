@@ -323,32 +323,15 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 				//	})
 				//	return nil
 				//}, ioutil.Discard)
-
-				var logToExecResult = func(l *yaklib.YakitLog) *ypb.ExecResult {
-					return yaklib.NewYakitLogExecResult(l.Level, l.Data)
-				}
-				var feedbackClient = yaklib.NewVirtualYakitClient(func(i interface{}) error {
-					switch ret := i.(type) {
-					case *ypb.ExecResult:
-						stream.Send(&ypb.ExecBatchYakScriptResult{
-							Status:     "data",
-							Result:     ret,
-							Target:     target,
-							ExtraParam: extraParams,
-							TaskId:     taskId,
-							Timestamp:  time.Now().Unix(),
-						})
-					case *yaklib.YakitLog:
-						stream.Send(&ypb.ExecBatchYakScriptResult{
-							Status:     "data",
-							Result:     logToExecResult(ret),
-							Target:     target,
-							ExtraParam: extraParams,
-							TaskId:     taskId,
-							Timestamp:  time.Now().Unix(),
-						})
-					}
-					return nil
+				var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+					return stream.Send(&ypb.ExecBatchYakScriptResult{
+						Status:     "data",
+						Result:     result,
+						Target:     target,
+						ExtraParam: extraParams,
+						TaskId:     taskId,
+						Timestamp:  time.Now().Unix(),
+					})
 				})
 				engine.HookOsExit()
 				engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
