@@ -72,11 +72,11 @@ type Debugger struct {
 	currentBreakPointMap BreakpointMap // 行 -> 断点
 
 	// 用于步过，步入，步出
-	jmpIndex int
+	jmpState *DebuggerState
 	// stepOut      bool
-	nextState    *StepStack
-	stepInState  *StepStack
-	stepoutState *StepStack
+	nextState    *DebuggerState
+	stepInState  *DebuggerState
+	stepoutState *DebuggerState
 
 	// 停止
 	halt bool
@@ -89,7 +89,7 @@ type Debugger struct {
 
 	// 堆栈跟踪
 	StackTraces      map[int]*vmstack.Stack // threadID -> stacktraces
-	ThreadStackTrace map[int]*StepStack     // 每个线程对应的当前的stackTrace
+	ThreadStackTrace map[int]*DebuggerState // 每个线程对应的当前的stackTrace
 
 	// Reference,用于存储帧,作用域,变量引用的信息
 	Reference *Reference
@@ -104,11 +104,10 @@ type Debugger struct {
 	switchBundleMap map[string]*switchBundle
 }
 
-type StepStack struct {
+type DebuggerState struct {
 	code                 *Code
 	lineInedx, codeIndex int
 	stackLen             int
-	state                string
 	stateName            string
 	frame                *Frame
 }
@@ -139,9 +138,8 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 	debugger := &Debugger{
 		started:          false,
 		finished:         false,
-		jmpIndex:         -1,
 		StackTraces:      map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
-		ThreadStackTrace: make(map[int]*StepStack, 0),
+		ThreadStackTrace: make(map[int]*DebuggerState, 0),
 		vm:               vm,
 		startWG:          sync.WaitGroup{},
 		wg:               sync.WaitGroup{},
@@ -158,24 +156,6 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 	}
 	debugger.Init(codes)
 	return debugger
-}
-
-func NewStepStack(lineInedx int, frame *Frame, stackLen int) *StepStack {
-	return &StepStack{
-		lineInedx: lineInedx,
-		frame:     frame,
-		stackLen:  stackLen,
-	}
-}
-
-func NewStepStackWithCodeIndex(code *Code, codeIndex int, state, stateName string, frame *Frame) *StepStack {
-	return &StepStack{
-		code:      code,
-		codeIndex: codeIndex,
-		state:     state,
-		stateName: stateName,
-		frame:     frame,
-	}
 }
 
 func NewCodeState(codeIndex int, state string) *CodeState {
@@ -502,18 +482,18 @@ func (g *Debugger) GetLineFirstCode(lineIndex int) (*Code, int, string) {
 	}
 }
 
-func (g *Debugger) stepStackToStackTrace(stepStack *StepStack) StackTrace {
-	frame := stepStack.frame
+func (g *Debugger) debuggerStateToStackTrace(state *DebuggerState) StackTrace {
+	frame := state.frame
 	fid, ok := g.Reference.FrameHM.getReverse(frame)
 	if !ok {
 		fid = -1
 	}
-	code := stepStack.code
+	code := state.code
 	startLine, startColumn, endLine, endColumn := GetCodeNumber(code)
 
 	return StackTrace{
 		ID:         fid,
-		Name:       stepStack.stateName,
+		Name:       state.stateName,
 		Frame:      frame,
 		SourceCode: code.SourceCodePointer,
 		Source:     code.SourceCodeFilePath,
@@ -544,15 +524,15 @@ func (g *Debugger) GetStackTraces() map[int]*StackTraces {
 		sts := make([]StackTrace, stack.Len()+1)
 
 		// 加入ThreadStackTrace
-		if stepStack, ok := g.ThreadStackTrace[threadID]; ok && stepStack.code != nil {
-			sts[0] = g.stepStackToStackTrace(stepStack)
+		if state, ok := g.ThreadStackTrace[threadID]; ok && state.code != nil {
+			sts[0] = g.debuggerStateToStackTrace(state)
 		}
 
 		index2 := 1
 		stack.GetAll(func(i any) {
-			if stepStack, ok := i.(*StepStack); ok {
-				if stepStack.code != nil {
-					sts[index2] = g.stepStackToStackTrace(stepStack)
+			if state, ok := i.(*DebuggerState); ok {
+				if state.code != nil {
+					sts[index2] = g.debuggerStateToStackTrace(state)
 					index2++
 				}
 			}
@@ -679,22 +659,33 @@ func (g *Debugger) StepNext() error {
 	if stackTrace != nil {
 		stackLen = stackTrace.Len()
 	}
-	g.nextState = NewStepStack(g.linePointer, g.frame, stackLen)
+	g.nextState = &DebuggerState{
+		lineInedx: g.linePointer,
+		frame:     g.frame,
+		stackLen:  stackLen,
+	}
 	return nil
 }
 
 func (g *Debugger) StepIn() error {
 	g.GetLineFirstCode(g.linePointer)
 	// 不会用到stackLen,所以设置为-1
-	g.stepInState = NewStepStack(g.linePointer, g.frame, -1)
+	g.stepInState = &DebuggerState{
+		lineInedx: g.linePointer,
+		frame:     g.frame,
+	}
 	return nil
 }
 
 func (g *Debugger) StepOut() error {
 	stackTrace := g.CurrentStackTrace()
-	if stackTrace != nil && stackTrace.Len() > 0 {
+	stackLen := stackTrace.Len()
+	if stackTrace != nil && stackLen > 0 {
 		// 不会用到frame,所以设置为nil
-		g.stepoutState = NewStepStack(g.linePointer, nil, stackTrace.Len())
+		g.stepoutState = &DebuggerState{
+			lineInedx: g.linePointer,
+			stackLen:  stackLen,
+		}
 		return nil
 	} else {
 		return utils.Errorf("Can't not step out")
@@ -781,7 +772,12 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		if v != nil && v.IsYakFunction() {
 			defer func() {
 				if stackTrace != nil {
-					stackTrace.Push(NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame))
+					stackTrace.Push(&DebuggerState{
+						code:      code,
+						codeIndex: codeIndex,
+						stateName: stateName,
+						frame:     frame,
+					})
 				}
 			}()
 		}
@@ -794,7 +790,12 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 
 	// 更新ThreadStackTrace
-	g.ThreadStackTrace[g.frame.ThreadID] = NewStepStackWithCodeIndex(code, codeIndex, state, stateName, frame)
+	g.ThreadStackTrace[g.frame.ThreadID] = &DebuggerState{
+		code:      code,
+		codeIndex: codeIndex,
+		stateName: stateName,
+		frame:     frame,
+	}
 
 	// 捕捉错误
 	defer func() {
@@ -818,8 +819,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	// 步进
 	if g.nextState != nil {
 		// 如果debugger想要步过且出现了jmp,则回调
-		if g.jmpIndex == codeIndex {
-			g.jmpIndex = -1
+		if g.jmpState != nil && g.jmpState.codeIndex == codeIndex && g.jmpState.frame == frame {
+			g.jmpState = nil
 			g.HandleForStepNext()
 		} else if g.nextState.frame == frame && g.linePointer > g.nextState.lineInedx {
 			// 如果debugger想要步过且确实在后面行,则回调
@@ -832,8 +833,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	} else {
 		// 如果不处于next状态,jmpIndex应该清空
 		defer func() {
-			if g.jmpIndex != -1 {
-				g.jmpIndex = -1
+			if g.jmpState != nil {
+				g.jmpState = nil
 			}
 		}()
 	}
@@ -893,7 +894,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 		// 行断点,包含普通断点和条件断点, 当代码jump之后,判断条件会放宽,只需要满足行号相同即可
 		//
-		if breakpoint.CodeIndex == codeIndex || (g.jmpIndex != -1 && breakpoint.LineIndex == lineIndex) {
+		if breakpoint.CodeIndex == codeIndex || (g.jmpState != nil && breakpoint.LineIndex == lineIndex) {
 			// 条件断点
 			condition, hitCondition := breakpoint.Condition, breakpoint.HitCondition
 			if condition == "" {
