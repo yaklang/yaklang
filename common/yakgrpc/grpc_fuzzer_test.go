@@ -448,6 +448,81 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_Matcher(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	targetHost, targetPort := lowhttp.DebugEchoServer()
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Params: []*ypb.FuzzerParamItem{
+			{
+				Key:   "r1",
+				Value: "{{rand_int(1000,4000)}}",
+				Type:  "",
+			},
+			{
+				Key:   "r2",
+				Value: "{{rand_int(1000,4000)}}",
+				Type:  "",
+			},
+			{
+				Key:   "res",
+				Value: "{{int(r1) + int(r2)}}",
+				Type:  "",
+			},
+		},
+		Matchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "word",
+				Scope:       "body",
+				Condition:   "and",
+				Group:       []string{"{{res}}"},
+				ExprType:    "nuclei-dsl",
+			},
+			{
+				MatcherType: "word",
+				Scope:       "body",
+				Condition:   "and",
+				Group:       []string{"{{xxxxx}}"},
+				ExprType:    "nuclei-dsl",
+			},
+		},
+		Concurrent: 7,
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+key1: {{params(r1)}}
+key2: {{params(r2)}}
+key3: {{params(res)}}
+
+a={{base64dec(e3tyZXN9fQ==)}}&b={{base64dec(e3t4eHh4eH19)}}
+`})
+	if err != nil {
+		panic(err)
+	}
+
+	matched := false
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+
+		matched = rsp.MatchedByMatcher
+		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		fmt.Println(string(rsp.GetRequestRaw()))
+	}
+
+	if !matched {
+		t.Log("NO MATCHED")
+		t.FailNow()
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_Extractor_Kv(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
