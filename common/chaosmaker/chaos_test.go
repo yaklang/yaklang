@@ -156,7 +156,11 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 				}
 			} else if rr.Protocol == protocol.TCP {
 				buffer := gopacket.NewSerializeBuffer()
-				linklayer, _ := pcapx.GetPublicToServerLinkLayerIPv4()
+				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
+				if err != nil {
+					t.Error(err)
+					return
+				}
 				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
 					linklayer,
 					gopacket.Payload(result.TCPIPPayload),
