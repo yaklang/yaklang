@@ -2939,6 +2939,7 @@ message FuzzerParamItem {
   string Value = 2;
 
   // nuclei-dsl / raw
+  // fuzztag
   string Type = 3;
 }
 
