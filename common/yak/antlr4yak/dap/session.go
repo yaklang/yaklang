@@ -519,9 +519,9 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 					Name:      stackTrace.Name,
 					Source:    &dap.Source{Name: filepath.Base(source), Path: source},
 					Line:      stackTrace.Line,
-					Column:    stackTrace.Column,
+					Column:    stackTrace.Column + 1,
 					EndLine:   stackTrace.EndLine,
-					EndColumn: stackTrace.EndColumn,
+					EndColumn: stackTrace.EndColumn + 1,
 				})
 
 			}
