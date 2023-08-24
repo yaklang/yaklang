@@ -39,6 +39,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	debugger "github.com/yaklang/yaklang/common/yak/interactive_debugger"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -1243,6 +1244,45 @@ func main() {
 				case <-forceStop:
 				}
 
+				return nil
+			},
+		},
+
+		// fmt
+		{
+			Name:  "fmt",
+			Usage: "格式化代码",
+			Flags: []cli.Flag{
+				cli.BoolFlag{Name: "version,v", Usage: "show formatter version"},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Bool("version") {
+					fmt.Printf("Formatter version: %v\n", yakast.FormatterVersion)
+					return nil
+				}
+				args := c.Args()
+				file := args[0]
+				if file != "" {
+					var (
+						err error
+					)
+					absFile := file
+					if !filepath.IsAbs(absFile) {
+						absFile, err = filepath.Abs(absFile)
+						if err != nil {
+							return utils.Errorf("fetch abs file path failed: %s", err)
+						}
+					}
+					raw, err := os.ReadFile(file)
+					if err != nil {
+						return err
+					}
+					vt := yakast.NewYakCompiler()
+					vt.Compiler(string(raw))
+					fmt.Printf("%s", vt.GetFormattedCode())
+				} else {
+					return utils.Errorf("empty yak file")
+				}
 				return nil
 			},
 		},
