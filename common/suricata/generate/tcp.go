@@ -33,7 +33,7 @@ func newTCPGen(r *rule.Rule) (*TCPGen, error) {
 		case modifier.Default:
 			g.payload = parse2ContentGen(r, WithNoise(noiseAll))
 		default:
-			log.Warnf("not support modifier %s", mdf)
+			log.Warnf("not support modifier %v", mdf)
 		}
 	}
 
