@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/gopacket"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -24,6 +25,12 @@ type ruleTest struct {
 
 // test table
 var rules = []*ruleTest{
+	{
+		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	},
+	{
+		rule: `alert tcp any any -> any 3306 (msg:"ET SCAN MYSQL 4.0 brute force root login attempt"; flow:to_server,established; content:"|01|"; offset:3; depth:4; content:"root|00|"; nocase; distance:5; within:10; threshold:type both,track by_src,count 5,seconds 60; reference:url,www.redferni.uklinux.net/mysql/MySQL-323.html; reference:url,doc.emergingthreats.net/2001906; classtype:protocol-command-decode; sid:2001906; rev:6; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	},
 	{
 		rule: `alert http any any -> any any (msg: "Powershell Empire HTTP Response "; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,empire; content:"Cache-Control: no-cache, no-store, must-revalidate"; http_header; content: "Server: Microsoft-IIS/7.5"; http_header; distance: 0; classtype:shellcode-detect; sid: 3016008; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
 	},
@@ -75,12 +82,6 @@ var rules = []*ruleTest{
 	{
 		rule: `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 	},
-	{
-		rule: `alert tcp any any -> any 3306 (msg:"ET SCAN MYSQL 4.0 brute force root login attempt"; flow:to_server,established; content:"|01|"; offset:3; depth:4; content:"root|00|"; nocase; distance:5; within:5; threshold:type both,track by_src,count 5,seconds 60; reference:url,www.redferni.uklinux.net/mysql/MySQL-323.html; reference:url,doc.emergingthreats.net/2001906; classtype:protocol-command-decode; sid:2001906; rev:6; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
-	{
-		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
 	//{
 	//	id:           "debug",
 	//	rule:         `alert http any any -> any any (msg:"CobatlStrikt team servers 200 OK Space"; flow:from_server,established; content:"200"; http_stat_code; content:"HTTP/1.1 200 OK|20|"; threshold: type both, track by_src, count 3, seconds 60; reference:url,blog.fox-it.com/2019/02/26/identifying-cobalt-strike-team-servers-in-the-wild/;  sid:3016011; rev:1; metadata:created_at 2019_02_27,by al0ne;)`,
@@ -129,34 +130,42 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 		// check generated chaos
 		for result := range res {
 			count++
-			var bytes []byte
+			var pk []byte
 			if rr.Protocol == protocol.HTTP {
+				var payload []byte
 				if result.HttpRequest == nil && result.HttpResponse == nil {
 					panic("Empty Result")
 				}
 				if result.HttpRequest != nil {
-					bytes = append(bytes, result.HttpRequest...)
+					payload = result.HttpRequest
 				}
 				if result.HttpResponse != nil {
-					bytes = append(bytes, result.HttpResponse...)
+					payload = result.HttpResponse
+				}
+				// pack packet for match
+				pk, err = pcapx.PacketBuilder(
+					pcapx.WithPayload(payload),
+					pcapx.WithEthernet_SrcMac("00:0c:29:4f:8e:8f"),
+					pcapx.WithEthernet_DstMac("00:0c:29:4f:8e:81"),
+					pcapx.WithIPv4_SrcIP("1.1.1.1"),
+					pcapx.WithIPv4_DstIP("2.2.2.2"),
+				)
+				if err != nil {
+					t.Error(err)
+					return
 				}
 			} else if rr.Protocol == protocol.TCP {
-				bytes = result.TCPIPPayload
+				buffer := gopacket.NewSerializeBuffer()
+				linklayer, _ := pcapx.GetPublicToServerLinkLayerIPv4()
+				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
+					linklayer,
+					gopacket.Payload(result.TCPIPPayload),
+				); err != nil {
+					t.Error(err)
+					return
+				}
+				pk = buffer.Bytes()
 			}
-
-			// pack packet for match
-			pk, err := pcapx.PacketBuilder(
-				pcapx.WithPayload(bytes),
-				pcapx.WithEthernet_SrcMac("00:0c:29:4f:8e:8f"),
-				pcapx.WithEthernet_DstMac("00:0c:29:4f:8e:81"),
-				pcapx.WithIPv4_SrcIP("1.1.1.1"),
-				pcapx.WithIPv4_DstIP("2.2.2.2"),
-			)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-
 			if !match.New(rr).Match(pk) {
 				spew.Dump(rr.Raw)
 				spew.Dump(pk)
@@ -169,7 +178,7 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 		if rr.Protocol == protocol.HTTP {
 			need = 5
 		} else if rr.Protocol == protocol.TCP {
-			need = rr.ContentRuleConfig.Thresholding.Repeat()
+			need = utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
 		}
 		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
 need: %d
@@ -178,7 +187,7 @@ match %d
 `, need, count, matchedCount))
 
 		// tcp not implement yet don't check it
-		if rr.Protocol != protocol.TCP && (count < 5 || matchedCount <= 3) {
+		if count < need || matchedCount <= int(0.6*float64(need)) {
 			t.Fatal("match error or no enough traffic")
 			return
 		}
