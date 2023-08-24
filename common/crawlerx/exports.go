@@ -6,6 +6,8 @@ var CrawlerXExports = map[string]interface{}{
 	"StartCrawler": StartCrawler,
 
 	"browserInfo":       WithBrowserInfo,
+	"saveToDB":          WithSaveToDB,
+	"runtimeId":         WithRuntimeID,
 	"maxUrl":            WithMaxUrl,
 	"maxDepth":          WithMaxDepth,
 	"concurrent":        WithConcurrent,
