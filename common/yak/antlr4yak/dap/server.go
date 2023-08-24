@@ -3,6 +3,7 @@ package dap
 import (
 	"io"
 	"net"
+	"strings"
 
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/log"
@@ -23,7 +24,9 @@ func (s *DAPServer) Start() {
 				select {
 				case <-s.config.stopped:
 				default:
-					log.Errorf("Error accepting client connection: %v", err)
+					if !strings.Contains(err.Error(), "use of closed network connection") {
+						log.Errorf("Error accepting client connection: %v", err)
+					}
 					s.config.triggerServerStop()
 				}
 				return
