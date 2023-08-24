@@ -144,28 +144,27 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 		if ok {
 			return val.Value, true
 		}
-		// 如果不存在，根也找不到，那么就直接全局找
-		var_, ok := n.globalVar[name]
-		if ok {
-			return var_, true
-		}
-
-		if n.globalVarFallback != nil {
-			hijackedGlobal := n.globalVarFallback(name)
-			if hijackedGlobal != nil {
-				return hijackedGlobal, true
-			}
-		}
-
-		return undefined, false
 	} else {
 		// ivm 存在的时候，从 frame 中找变量
 		val, ok := ivm.(*Frame).CurrentScope().GetValueByName(name)
 		if ok {
 			return val.Value, true
 		}
-		return undefined, false
 	}
+	// 如果不存在，根也找不到，那么就直接全局找
+	var_, ok := n.globalVar[name]
+	if ok {
+		return var_, true
+	}
+
+	if n.globalVarFallback != nil {
+		hijackedGlobal := n.globalVarFallback(name)
+		if hijackedGlobal != nil {
+			return hijackedGlobal, true
+		}
+	}
+
+	return undefined, false
 }
 func (n *VirtualMachine) GetGlobalVar() map[string]interface{} {
 	return n.globalVar

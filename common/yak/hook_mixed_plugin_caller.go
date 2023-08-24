@@ -230,7 +230,6 @@ func (m *MixPluginCaller) SetDividedContext(b bool) {
 	}
 	m.callers.SetDividedContext(b)
 }
-
 func NewMixPluginCaller() (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
@@ -241,7 +240,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		websiteParamsFilter: filter.NewFilter(),
 		callers:             NewYakToCallerManager(),
 		feedbackHandler: func(result *ypb.ExecResult) error {
-			return yaklib.GetYakitClientInstance().Output(result)
+			return fmt.Errorf("feedback handler not set")
 		},
 	}
 	c.SetLoadPluginTimeout(10)

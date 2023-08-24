@@ -507,9 +507,9 @@ func yakitError(c *YakitClient) func(tmp string, items ...interface{}) {
 	}
 }
 
-func yakitOutput(c *YakitClient) func(i interface{}) {
-	return func(i interface{}) {
-		c.Output(i)
+func yakitOutput(c *YakitClient) func(i interface{}) error {
+	return func(i interface{}) error {
+		return c.Output(i)
 	}
 }
 

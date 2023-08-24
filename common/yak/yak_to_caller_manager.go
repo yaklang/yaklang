@@ -89,15 +89,10 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		if id == "" {
-			BindYakitPluginContextToEngine(engine, pluginContext)
-		} else {
-			BindYakitPluginContextToEngine(engine, &YakitPluginContext{
-				PluginName: id,
-				RuntimeId:  pluginContext.RuntimeId,
-				Proxy:      pluginContext.Proxy,
-			})
+		if id != "" {
+			pluginContext.RuntimeId = id
 		}
+		BindYakitPluginContextToEngine(engine, pluginContext)
 		return nil
 	})
 	engine.HookOsExit()
@@ -260,8 +255,6 @@ func (y *YakToCallerManager) SetForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Set(ctx, code, func(engine *antlr4yak.Engine) error {
-		antlr4engine := engine
-		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(caller))
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
 		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
 		engine.SetVar("yakit_status", func(id string, i interface{}) {
@@ -490,7 +483,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	var pluginName string
 	var runtimeId string
 	var proxy string
-
 	if pluginContext == nil {
 		return
 	}
@@ -498,7 +490,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	runtimeId = pluginContext.RuntimeId
 	pluginName = pluginContext.PluginName
 	proxy = pluginContext.Proxy
-
 	// inject meta vars
 	for _, method := range []string{
 		"Get", "Post",
@@ -692,6 +683,21 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				log.Infof("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
 				manager.SetRuntimeId(runtimeId)
 				manager.SetProxy(proxy)
+				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
+					yakitLib, ok := nIns.GetVar("yakit")
+					if ok && yakitLib != nil {
+						if v, ok := yakitLib.(map[string]interface{}); ok {
+							if v2, ok := v["Output"]; ok {
+								if v3, ok := v2.(func(i interface{}) error); ok {
+									return v3(result)
+								} else {
+									return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+								}
+							}
+						}
+					}
+					return fmt.Errorf("not found current engine yakit.Output")
+				})
 				return manager, nil
 			}
 		}
@@ -711,8 +717,6 @@ func (y *YakToCallerManager) AddForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
-		antlr4engine := engine
-		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(caller))
 		engine.SetVar("RUNTIME_ID", y.runtimeId)
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
