@@ -261,30 +261,7 @@ func (y *YakToCallerManager) SetForYakit(
 	db := consts.GetGormProjectDatabase()
 	return y.Set(ctx, code, func(engine *antlr4yak.Engine) error {
 		antlr4engine := engine
-		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
-			switch ret := i.(type) {
-			case *yaklib.YakitProgress:
-				raw, _ := yaklib.YakitMessageGenerator(ret)
-				if err := caller(&ypb.ExecResult{
-					IsMessage: true,
-					Message:   raw,
-				}); err != nil {
-					return err
-				}
-			case *yaklib.YakitLog:
-				raw, _ := yaklib.YakitMessageGenerator(ret)
-				if raw != nil {
-					if err := caller(&ypb.ExecResult{
-						IsMessage: true,
-						Message:   raw,
-					}); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		}))
-
+		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(caller))
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
 		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
 		engine.SetVar("yakit_status", func(id string, i interface{}) {
@@ -735,30 +712,7 @@ func (y *YakToCallerManager) AddForYakit(
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
 		antlr4engine := engine
-		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
-			switch ret := i.(type) {
-			case *yaklib.YakitProgress:
-				raw, _ := yaklib.YakitMessageGenerator(ret)
-				if err := caller(&ypb.ExecResult{
-					IsMessage: true,
-					Message:   raw,
-				}); err != nil {
-					return err
-				}
-			case *yaklib.YakitLog:
-				raw, _ := yaklib.YakitMessageGenerator(ret)
-				if raw != nil {
-					if err := caller(&ypb.ExecResult{
-						IsMessage: true,
-						Message:   raw,
-					}); err != nil {
-						return err
-					}
-				}
-
-			}
-			return nil
-		}))
+		yaklib.SetEngineClient(antlr4engine, yaklib.NewVirtualYakitClient(caller))
 		engine.SetVar("RUNTIME_ID", y.runtimeId)
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
