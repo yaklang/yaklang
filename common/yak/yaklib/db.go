@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strings"
 )
 
 const (
@@ -34,6 +35,24 @@ func saveYakitPlugin(scriptName string, typeStr string, content interface{}) err
 	})
 }
 
+func saveHTTPFlowFromRaw(url string, req, rsp []byte, typeStr string) error {
+	return saveHTTPFlowFromRawWithType(url, req, rsp, "basic-crawler")
+}
+
+func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) error {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return utils.Error("empty database")
+	}
+	var https = false
+	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+		https = true
+	}
+	// basic-crawler
+	_, err := yakit.SaveFromHTTPFromRaw(db, https, req, rsp, typeStr, url, "")
+	return err
+}
+
 var DatabaseExports = map[string]interface{}{
 	// Download IP
 	"DownloadGeoIP": DownloadMMDB,
@@ -41,6 +60,8 @@ var DatabaseExports = map[string]interface{}{
 	"QueryIPForIPS": QueryIPForISP,
 
 	// 写入资产
+	"SaveHTTPFlowFromRaw":            saveHTTPFlowFromRaw,
+	"SaveHTTPFlowFromRawWithType":    saveHTTPFlowFromRawWithType,
 	"SaveHTTPFlowFromNative":         saveCrawler,
 	"SaveHTTPFlowFromNativeWithType": saveHTTPFlowWithType,
 	"SavePortFromResult":             savePortFromObj,
