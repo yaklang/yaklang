@@ -211,6 +211,11 @@ func parse2ContentGen(rules []*rule.ContentRule, opts ...ContentGenOpt) *Content
 			continue
 		}
 
+		// try fix
+		if cm.Range < 0 {
+			cm.Range = 0
+		}
+
 		mdf.Modifiers = append(mdf.Modifiers, cm)
 	}
 
