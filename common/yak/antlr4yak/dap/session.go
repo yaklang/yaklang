@@ -885,27 +885,12 @@ func (s *DebugSession) sendInternalErrorResponse(seq int, details string) {
 
 func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Variable {
 	children := []dap.Variable{} // must return empty array, not null, if no children
+	literal := ""
 	// metadata
 	switch v := i.(type) {
 	case *yakvm.Value:
-		length := v.GetIndexedVariableCount()
-		if length > 0 {
-			children = append(children, dap.Variable{
-				Name:         "len()",
-				Value:        fmt.Sprintf("%d", length),
-				Type:         "int",
-				EvaluateName: fmt.Sprintf("len(%s)", v.Literal),
-			})
-		}
-
-		if v.IsBytesOrRunes() {
-			children = append(children, dap.Variable{
-				Name:  "string()",
-				Value: AsDebugString(v.Value),
-				Type:  "string",
-			})
-		}
-		return children
+		literal = v.Literal
+		i = v.Value
 	case *yakvm.Scope:
 		// ? scope没有metadata
 		return children
@@ -952,6 +937,27 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 
 			children[i] = vari
 		}
+	}
+
+	if yakvm.IsBytesOrRunes(i) {
+		children = append(children, dap.Variable{
+			Name:  "string()",
+			Value: AsDebugString(i),
+			Type:  "string",
+		})
+	}
+
+	length := yakvm.GetIndexedVariableCount(i)
+	if length > 0 {
+		lenChild := dap.Variable{
+			Name:  "len()",
+			Value: fmt.Sprintf("%d", length),
+			Type:  "int",
+		}
+		if literal != "" {
+			lenChild.EvaluateName = fmt.Sprintf("len(%s)", literal)
+		}
+		children = append(children, lenChild)
 	}
 
 	return children
