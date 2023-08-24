@@ -9,26 +9,36 @@ const (
 	Error
 )
 
+type ErrorTag string
+
+const (
+	SSATAG     ErrorTag = "ssa"
+	ASTTAG     ErrorTag = "ast"
+	ANALYZETag ErrorTag = "analyzer"
+)
+
 type SSAError struct {
 	Pos     *Position
+	tag     ErrorTag
 	Message string
 	Kind    ErrorKind
 }
 
 type SSAErrors []*SSAError
 
-func (f *Function) NewErrorWithPos(kind ErrorKind, Pos *Position, format string, arg ...any) {
+func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, format string, arg ...any) {
 	f.err = append(f.err, &SSAError{
 		Pos:     Pos,
+		tag:     tag,
 		Message: fmt.Sprintf(format, arg...),
 		Kind:    kind,
 	})
 }
-func (b *FunctionBuilder) NewError(kind ErrorKind, format string, arg ...any) {
-	b.NewErrorWithPos(kind, b.currtenPos, format, arg...)
+func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
+	b.NewErrorWithPos(kind, tag, b.currtenPos, format, arg...)
 }
-func (an anInstruction) NewError(kind ErrorKind, format string, arg ...any) {
-	an.Func.NewErrorWithPos(kind, an.pos, format, arg...)
+func (an anInstruction) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
+	an.Func.NewErrorWithPos(kind, tag, an.pos, format, arg...)
 }
 
 func (prog *Program) GetErrors() SSAErrors {
@@ -50,12 +60,13 @@ func (errs SSAErrors) String() string {
 }
 
 func (err SSAError) String() string {
-	ret := ""
+	var kind string
 	switch err.Kind {
 	case Warn:
-		ret += "warn:"
+		kind = "warn"
 	case Error:
-		ret += "error:"
+		kind = "error"
 	}
-	return ret + err.Message
+
+	return fmt.Sprintf("%s-%s:%s", kind, string(err.tag), err.Message)
 }
