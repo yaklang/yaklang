@@ -808,6 +808,12 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "ip_address", params.GetExcludeInIP())
 	}
 
+	db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", params.IncludePath)
+	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.ExcludePath)
+	db = bizhelper.FuzzQueryStringArrayOrLike(db, "response", params.IncludeSuffix)
+	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "response", params.ExcludeSuffix)
+	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.ExcludeContentType)
+
 	if len(params.GetExcludeId()) > 0 {
 		for _, id := range params.GetExcludeId() {
 			db = db.Where("id <> ?", id)

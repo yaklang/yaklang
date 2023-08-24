@@ -3213,6 +3213,12 @@ message QueryHTTPFlowRequest {
   string RuntimeId = 31;
   string FromPlugin = 32;
   bool  Full = 33;
+
+  repeated string IncludePath = 34;
+  repeated string ExcludePath = 35;
+  repeated string IncludeSuffix = 36;
+  repeated string ExcludeSuffix = 37;
+  repeated string ExcludeContentType = 38;
 }
 
 message DeleteHTTPFlowRequest {
