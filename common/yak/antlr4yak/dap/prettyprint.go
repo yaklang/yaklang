@@ -49,12 +49,8 @@ func AsDebugString(i interface{}, raws ...bool) string {
 		length := refV.Len()
 		if length > 0 {
 			elemKind := refV.Index(0).Kind()
-			if elemKind == reflect.Uint8 { // []byte
-				v := i.([]byte)
-				return string(v)
-			} else if elemKind == reflect.Int32 { // []rune
-				v := i.([]rune)
-				return string(v)
+			if elemKind == reflect.Uint8 || elemKind == reflect.Int32 { // []byte or []rune
+				return fmt.Sprintf("%q", i)
 			}
 		}
 		content := make([]string, length)
@@ -63,8 +59,7 @@ func AsDebugString(i interface{}, raws ...bool) string {
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
 	} else if kind == reflect.String {
-		s := i.(string)
-		return fmt.Sprintf("%q", s)
+		return fmt.Sprintf("%q", i)
 	} else if kind == reflect.Map {
 		content := make([]string, refV.Len())
 		keys := refV.MapKeys()
