@@ -187,7 +187,7 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		return utils.Error("unsupported plugin type: " + debugType)
 	}
 
-	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(func(result *ypb.ExecResult) error {
+	var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	})
