@@ -6,11 +6,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-type HeaderGen []*ContentGen
+type HTTPHeaderGen []*ContentGen
 
-func parse2HeaderGen(rules []*rule.ContentRule) *HeaderGen {
+func parse2HeaderGen(rules []*rule.ContentRule) *HTTPHeaderGen {
 	ctg := parse2ContentGen(rules)
-	var hdg HeaderGen
+	var hdg HTTPHeaderGen
 	tmp := new(ContentGen)
 	tmp.noise = noiseChar
 	for _, mdf := range ctg.Modifiers {
@@ -40,7 +40,7 @@ func parse2HeaderGen(rules []*rule.ContentRule) *HeaderGen {
 	return &hdg
 }
 
-func (h *HeaderGen) Gen() []byte {
+func (h *HTTPHeaderGen) Gen() []byte {
 	var res []byte
 	for _, gen := range *h {
 		tmp := gen.Gen()

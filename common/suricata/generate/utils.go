@@ -3,6 +3,8 @@ package generate
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/suricata/data"
+	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/rule"
 	"math/rand"
 )
 
@@ -47,4 +49,12 @@ func bytesIndexAll(s []byte, sep []byte, nocase bool) []data.Matched {
 	}
 
 	return indexes
+}
+
+func contentRuleMap(rules []*rule.ContentRule) map[modifier.Modifier][]*rule.ContentRule {
+	var mp = make(map[modifier.Modifier][]*rule.ContentRule)
+	for _, r := range rules {
+		mp[r.Modifier] = append(mp[r.Modifier], r)
+	}
+	return mp
 }

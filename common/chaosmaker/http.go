@@ -21,11 +21,6 @@ type httpHandler struct {
 
 var _ chaosHandler = (*httpHandler)(nil)
 
-func (h *httpHandler) MatchBytes(i any) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan *pcapx.ChaosTraffic {
 	if originRule == nil {
 		return nil
@@ -75,4 +70,9 @@ func (h *httpGenerator) toChaosTraffic(raw []byte) {
 			HttpRequest: raw,
 		}
 	}
+}
+
+func (h *httpHandler) MatchBytes(i any) bool {
+	//TODO implement me
+	panic("implement me")
 }
