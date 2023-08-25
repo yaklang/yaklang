@@ -262,6 +262,18 @@ func (n *Engine) Var(name string) interface{} {
 	v, _ := n.vm.GetVar(name)
 	return v
 }
+func (n *Engine) GetFieldVar(names ...string) (interface{}, bool) {
+	var res interface{}
+	for _, name := range names {
+		v, ok := n.vm.GetVar(name)
+		if ok {
+			res = v
+		} else {
+			return nil, false
+		}
+	}
+	return res, true
+}
 func (n *Engine) GetVar(name string) (interface{}, bool) {
 	return n.vm.GetVar(name)
 }
@@ -420,7 +432,4 @@ func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interf
 		return nil, nil
 	}
 	return val.Value, nil
-}
-func (e *Engine) RuntimeInfo(infoType string) any {
-	return e.vm.RuntimeInfo(infoType)
 }

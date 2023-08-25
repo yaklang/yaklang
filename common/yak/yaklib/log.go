@@ -77,8 +77,16 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 	return res
 }
 func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
-	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) any {
-		return engine.RuntimeInfo(infoType)
+	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (any, error) {
+		getRuntimeInfo, ok := engine.GetFieldVar("runtime", "GetInfo")
+		if ok {
+			if v, ok := getRuntimeInfo.(func(string, ...any) (any, error)); ok {
+				return v(infoType)
+			} else {
+				return nil, fmt.Errorf("call runtime.GetInfo error: maybe runtime.GetInfo function has changed")
+			}
+		}
+		return nil, fmt.Errorf("not found runtime.GetInfo")
 	})
 }
 
