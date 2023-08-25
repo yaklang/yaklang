@@ -1,12 +1,13 @@
 package coreplugin
 
 import (
+	"strings"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
 var (
@@ -58,7 +59,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		log.Info("start to load core plugin")
+		log.Debug("start to load core plugin")
 		registerBuildInPlugin(
 			"mitm", "CSRF 表单保护与 CORS 配置不当检测",
 			withPluginHelp("检测应用是否存在 CSRF 表单保护，以及 CORS 配置不当"),
