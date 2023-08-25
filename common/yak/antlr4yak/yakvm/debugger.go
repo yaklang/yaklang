@@ -1060,18 +1060,15 @@ func (g *Debugger) CompileWithFrame(code string, frame *Frame) (*Frame, Compiler
 	var err error
 	frame = NewSubFrame(frame)
 	frame.EnableDebuggerEval()
-	sym, err := frame.CurrentScope().GetSymTable().GetRoot()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "find symboltable error")
-	}
+	sym := frame.CurrentScope().GetSymTable()
 
-	YakDebugCompiler = YakDebugCompiler.NewWithSymbolTable(sym)
-	YakDebugCompiler.Compiler(code)
+	c := YakDebugCompiler.NewWithSymbolTable(sym)
+	c.Compiler(code)
 	exist, err := YakDebugCompiler.GetNormalErrors()
 	if exist {
 		return nil, nil, errors.Wrap(err, "compile code error")
 	}
-	return frame, YakDebugCompiler, nil
+	return frame, c, nil
 }
 
 func (g *Debugger) CompileWithFrameID(code string, frameID int) (*Frame, CompilerWrapperInterface, error) {
