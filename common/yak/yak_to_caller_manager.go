@@ -90,7 +90,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		if id != "" {
-			pluginContext.RuntimeId = id
+			pluginContext.PluginName = id
 		}
 		BindYakitPluginContextToEngine(engine, pluginContext)
 		return nil

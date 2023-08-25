@@ -226,7 +226,9 @@ func (c *YakitClient) Save(t interface{}) error {
 func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	//修改yakit库的客户端
 	e.ImportSubLibs("yakit", GetExtYakitLibByClient(client))
-
+	e.ImportSubLibs("risk", map[string]interface{}{
+		"NewRisk": YakitNewRiskBuilder(client),
+	})
 	//修改全局默认客户端
 	InitYakit(client)
 }
