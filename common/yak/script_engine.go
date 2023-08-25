@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"path/filepath"
 	"sync"
 	"time"
@@ -253,6 +254,9 @@ func initYaklangLib() {
 
 	// sca
 	yaklang.Import("sca", sca.Exports)
+
+	// git
+	yaklang.Import("git", yakgit.Exports)
 }
 
 type ScriptEngine struct {

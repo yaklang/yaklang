@@ -70,7 +70,7 @@ func initializeDatabase(projectDatabase string, profileDBName string) error {
 	consts.InitilizeDatabase(projectDatabase, profileDBName)
 	_, err := consts.InitializeCVEDatabase()
 	if err != nil {
-		log.Infof("initialized cve database warning: %s", err)
+		log.Debugf("initialized cve database warning: %s", err)
 	}
 
 	// 这个顺序一般不要换

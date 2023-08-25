@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"os"
 )
 
 func init() {
@@ -33,27 +34,13 @@ func clone(u string, localPath string, opt ...Option) error {
 		c.Context, c.Cancel = context.WithCancel(context.Background())
 	}
 
-	var auth gitHttp.AuthMethod
-	if c.Username != "" && c.Password != "" {
-		auth = &gitHttp.BasicAuth{
-			Username: c.Username,
-			Password: c.Password,
-		}
-	}
-
-	var recursiveSubmodule git.SubmoduleRescursivity
-	if c.RecursiveSubmodule {
-		recursiveSubmodule = git.SubmoduleRescursivity(10)
-	} else {
-		recursiveSubmodule = git.NoRecurseSubmodules
-	}
-
 	respos, err := git.PlainCloneContext(c.Context, localPath, false, &git.CloneOptions{
 		URL:               u,
-		Auth:              auth,
+		Auth:              c.ToAuth(),
 		Depth:             c.Depth,
-		RecurseSubmodules: recursiveSubmodule,
+		RecurseSubmodules: c.ToRecursiveSubmodule(),
 		InsecureSkipTLS:   !c.VerifyTLS,
+		Progress:          os.Stdout,
 	})
 	if err != nil {
 		return utils.Errorf("git clone: %v to %v failed: %s", u, localPath)
