@@ -361,26 +361,38 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	// 等待init完成
 	debugger.WaitInit()
 
-	source := debugger.source
-
 	response := &dap.SetBreakpointsResponse{Response: *newResponse(request.Request), Body: dap.SetBreakpointsResponseBody{}}
 
-	// todo: 多文件调试,处理arguments.Source
+	path := request.Arguments.Source.Path
 
 	// todo: supportsLogPoints,处理arguments.Breakpoints.LogMessage
 
-	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
+	responseBreakPoints := make([]dap.Breakpoint, 0)
+	existLines := make([]int, len(request.Arguments.Breakpoints))
+
 	for i, b := range request.Arguments.Breakpoints {
-		bp := &response.Body.Breakpoints[i]
-
-		ref, err := debugger.SetBreakPoint(b.Line, b.Condition, b.HitCondition)
-		bp.Id = ref
-		bp.Line = b.Line
-		bp.Source = &dap.Source{Path: source.AbsPath, Name: source.Name}
-		bp.Verified = (err == nil)
-		// todo: 当存在error的时候,是否需要设置breakpoint?
+		line := b.Line
+		existLines[i] = line
+		// 如果已经存在节点,则修改其condition
+		if bp, ok := ds.debugger.ExistBreakPoint(path, line); ok {
+			bp.Condition = b.Condition
+			bp.HitCondition = b.HitCondition
+		} else {
+			// 如果没有存在节点则创建并返回
+			ref, err := ds.debugger.SetBreakPoint(path, line, b.Condition, b.HitCondition)
+			responseBreakPoints = append(responseBreakPoints,
+				dap.Breakpoint{
+					Id:       ref,
+					Line:     line,
+					Source:   &dap.Source{Path: path, Name: filepath.Base(path)},
+					Verified: (err == nil),
+				})
+		}
 	}
+	// 清除其他断点
+	ds.debugger.ClearOtherBreakPoints(path, existLines)
 
+	response.Body.Breakpoints = responseBreakPoints
 	ds.send(response)
 }
 
