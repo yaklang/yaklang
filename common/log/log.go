@@ -37,7 +37,7 @@ const (
 
 type Logger struct {
 	*golog.Logger
-	vmRuntimeInfoGetter func(infoType string) any
+	vmRuntimeInfoGetter func(infoType string) (any, error)
 	name                string
 }
 
@@ -112,7 +112,12 @@ func GetLogger(name string) *Logger {
 		logger.Handle(func(l *golog.Log) bool {
 			line := -1
 			if logger.vmRuntimeInfoGetter != nil {
-				line = logger.vmRuntimeInfoGetter("line").(int)
+				l, err := logger.vmRuntimeInfoGetter("line")
+				if err == nil {
+					line = l.(int)
+				} else {
+					fmt.Println(err)
+				}
 			}
 			return formatter(l, name, line)
 		})
@@ -126,7 +131,7 @@ func GetLogger(name string) *Logger {
 func (l *Logger) SetName(name string) {
 	l.name = name
 }
-func (l *Logger) SetVMRuntimeInfoGetter(f func(infoType string) any) {
+func (l *Logger) SetVMRuntimeInfoGetter(f func(infoType string) (any, error)) {
 	l.vmRuntimeInfoGetter = f
 }
 func CheckLogDir(dir string) error {

@@ -345,11 +345,3 @@ func (v *VirtualMachine) GetConfig() *VirtualMachineConfig {
 func (v *VirtualMachine) SetConfig(config *VirtualMachineConfig) {
 	v.config = config
 }
-func (e *VirtualMachine) RuntimeInfo(infoType string) any {
-	switch infoType {
-	case "line":
-		return e.CurrentFM().CurrentCode().StartLineNumber
-	default:
-		return nil
-	}
-}
