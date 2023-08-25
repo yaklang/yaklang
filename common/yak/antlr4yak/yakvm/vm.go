@@ -126,7 +126,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
 		return true
 	})
-
+	ImportRuntimeLib(frame)
 	return frame
 }
 
