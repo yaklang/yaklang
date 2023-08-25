@@ -106,8 +106,16 @@ func (d *DAPDebugger) GetAllObserveExpressions() map[string]*yakvm.Value {
 	return d.debugger.GetAllObserveExpressions()
 }
 
-func (d *DAPDebugger) SetBreakPoint(lineIndex int, condition, hitCondition string) (int, error) {
-	return d.debugger.SetBreakPoint(lineIndex, condition, hitCondition)
+func (d *DAPDebugger) ExistBreakPoint(path string, lineIndex int) (*yakvm.Breakpoint, bool) {
+	return d.debugger.ExistBreakPointInLineWithSource(path, lineIndex)
+}
+
+func (d *DAPDebugger) SetBreakPoint(path string, lineIndex int, condition, hitCondition string) (int, error) {
+	return d.debugger.SetBreakPointWithSource(path, lineIndex, condition, hitCondition)
+}
+
+func (d *DAPDebugger) ClearOtherBreakPoints(path string, existLines []int) {
+	d.debugger.ClearOtherBreakpointsWithSource(path, existLines)
 }
 
 func (d *DAPDebugger) EvalExpression(expr string, frameID int) (*yakvm.Value, error) {

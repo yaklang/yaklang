@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
@@ -187,7 +188,6 @@ func (g *Debugger) Init(codes []*Code) {
 	sourceCodeFilePath := ""
 	var (
 		currentBundle *switchBundle
-		ok            bool
 	)
 
 	for state, codes := range g.codes {
@@ -198,11 +198,7 @@ func (g *Debugger) Init(codes []*Code) {
 			}
 			if newSourceCodeFilePath != sourceCodeFilePath {
 				sourceCodeFilePath = newSourceCodeFilePath
-				currentBundle, ok = g.switchBundleMap[sourceCodeFilePath]
-				if !ok {
-					currentBundle = NewSwitchBundle()
-					g.switchBundleMap[sourceCodeFilePath] = currentBundle
-				}
+				currentBundle = g.getSwitchBundle(sourceCodeFilePath)
 			}
 
 			linesFirstCodeStateMap := currentBundle.linesFirstCodeStateMap
@@ -232,23 +228,37 @@ func (g *Debugger) InitCallBack() {
 }
 
 func (g *Debugger) SwitchByOtherFileOpcode(code *Code) {
+	if code.SourceCodeFilePath == nil {
+		return
+	}
 	newFilePath := *code.SourceCodeFilePath
+
 	if newFilePath != g.sourceFilePath {
 		g.sourceFilePath = newFilePath
 		g.sourceCode = *code.SourceCodePointer
 		g.sourceCodeLines = strings.Split(strings.ReplaceAll(g.sourceCode, "\r", ""), "\n")
 
-		currentBundle, ok := g.switchBundleMap[newFilePath]
-		if !ok {
-			currentBundle = NewSwitchBundle()
-			g.switchBundleMap[newFilePath] = currentBundle
-		}
+		currentBundle := g.getSwitchBundle(newFilePath)
 
 		// 修改currentLinesFirstCodeStateMap, currentBreakPointMap, currentObserveBreakPointMap
 		g.currentLinesFirstCodeStateMap = currentBundle.linesFirstCodeStateMap
 		g.currentBreakPointMap = currentBundle.breakpointMap
 		g.currentObserveBreakPointMap = currentBundle.observeBreakPointMap
 	}
+}
+
+func (g *Debugger) getBreakpointMapBySource(path string) map[int]*Breakpoint {
+	return g.getSwitchBundle(path).breakpointMap
+}
+
+func (g *Debugger) getSwitchBundle(path string) *switchBundle {
+	path = strings.ToLower(path)
+	bundle, ok := g.switchBundleMap[path]
+	if !ok {
+		bundle = NewSwitchBundle()
+		g.switchBundleMap[path] = bundle
+	}
+	return bundle
 }
 
 func (g *Debugger) StartWGAdd() {
@@ -591,14 +601,24 @@ func (g *Debugger) GetAllObserveBreakPoint() map[string]*Value {
 	return g.currentObserveBreakPointMap
 }
 
-func (g *Debugger) addBreakPoint(codeIndex, lineIndex int, condition, hitCondition, state string) (int, error) {
-	if _, ok := g.currentBreakPointMap[lineIndex]; !ok {
+func (g *Debugger) addBreakPoint(path string, codeIndex, lineIndex int, condition, hitCondition, state string) (int, error) {
+	breakpointMap := g.getBreakpointMapBySource(path)
+	if _, ok := breakpointMap[lineIndex]; !ok {
 		bp := g.NewBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
-		g.currentBreakPointMap[lineIndex] = bp
+		breakpointMap[lineIndex] = bp
 		ref := g.AddBreakPointRef(bp)
 		return ref, nil
 	} else {
 		return -1, errors.Errorf("breakpoint already exists in line %d", lineIndex)
+	}
+}
+
+func (g *Debugger) ExistBreakPointInLineWithSource(path string, lineIndex int) (*Breakpoint, bool) {
+	breakpointMap := g.getBreakpointMapBySource(path)
+	if bp, ok := breakpointMap[lineIndex]; ok {
+		return bp, true
+	} else {
+		return nil, false
 	}
 }
 
@@ -607,7 +627,16 @@ func (g *Debugger) SetBreakPoint(lineIndex int, condition, hitCondition string) 
 	if code == nil {
 		return -1, utils.Errorf("Can't set breakPoint in line %d", lineIndex)
 	} else {
-		return g.addBreakPoint(codeIndex, lineIndex, condition, hitCondition, state)
+		return g.addBreakPoint("", codeIndex, lineIndex, condition, hitCondition, state)
+	}
+}
+
+func (g *Debugger) SetBreakPointWithSource(path string, lineIndex int, condition, hitCondition string) (int, error) {
+	code, codeIndex, state := g.GetLineFirstCode(lineIndex)
+	if code == nil {
+		return -1, utils.Errorf("Can't set breakPoint in line %d", lineIndex)
+	} else {
+		return g.addBreakPoint(path, codeIndex, lineIndex, condition, hitCondition, state)
 	}
 }
 
@@ -622,6 +651,16 @@ func (g *Debugger) ClearAllBreakPoints() {
 func (g *Debugger) ClearBreakpointsInLine(lineIndex int) {
 	if _, ok := g.currentBreakPointMap[lineIndex]; ok {
 		delete(g.currentBreakPointMap, lineIndex)
+	}
+}
+
+func (g *Debugger) ClearOtherBreakpointsWithSource(path string, existLines []int) {
+	breakpointMap := g.getBreakpointMapBySource(path)
+	// 清除除了existLines外所有的Breakpoint
+	for lineIndex := range breakpointMap {
+		if !lo.Contains(existLines, lineIndex) {
+			delete(breakpointMap, lineIndex)
+		}
 	}
 }
 
