@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -853,24 +854,32 @@ func main() {
 				println(d)
 			}
 		}},
-		{Name: "version", Action: func(c *cli.Context) {
-			if gitHash != "" {
-				fmt.Printf(`Yak Language Build Info:
-    Version: %v-%v
-    GoVersion: %v
-    GitHash: %v
-    BuildTime: %v
-
-`, yakVersion, gitHash, goVersion, gitHash, buildTime)
-			} else {
-				fmt.Printf(`Yak Language Build Info:
-    Version: %v
-    GoVersion: %v
-    BuildTime: %v
-
-`, yakVersion, goVersion, buildTime)
-			}
-		}},
+		{Name: "version",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "json",
+					Usage: "output as json",
+				},
+			},
+			Action: func(c *cli.Context) {
+				infoMap := map[string]string{"Version": yakVersion, "GoVersion": goVersion, "BuildTime": buildTime}
+				if gitHash != "" {
+					infoMap["GitHash"] = gitHash
+				}
+				if c.Bool("json") {
+					b, err := json.Marshal(infoMap)
+					if err != nil {
+						log.Error(err)
+						return
+					}
+					fmt.Printf("%s", b)
+				} else {
+					fmt.Println("Yak Language Build Info:")
+					for k, v := range infoMap {
+						fmt.Printf("    %v: %v\n", k, v)
+					}
+				}
+			}},
 		{
 			Name: "tunnel",
 			Flags: []cli.Flag{
