@@ -21,33 +21,36 @@ func addCounter() int {
 	riskCounter++
 	return riskCounter
 }
-
-func yakitNewRisk(target string, opts ...yakit.RiskParamsOpt) {
-	risk, _ := yakit.NewRisk(target, opts...)
-	if risk != nil {
-		if botClient == nil {
-			log.Info("start to create bot client")
-			client := bot.FromEnv()
-			if client != nil && len(client.Configs()) > 0 {
-				botClient = client
+func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.RiskParamsOpt) {
+	return func(target string, opts ...yakit.RiskParamsOpt) {
+		risk, _ := yakit.NewRisk(target, opts...)
+		if risk != nil {
+			if botClient == nil {
+				log.Info("start to create bot client")
+				client := bot.FromEnv()
+				if client != nil && len(client.Configs()) > 0 {
+					botClient = client
+				}
 			}
-		}
-		if botClient != nil {
-			title := risk.TitleVerbose
-			if title == "" {
-				title = risk.Title
-			}
-			log.Infof("use bot notify risk: %s", risk.Title)
-			botClient.SendMarkdown(fmt.Sprintf(`# Yakit 发现 Risks
+			if botClient != nil {
+				title := risk.TitleVerbose
+				if title == "" {
+					title = risk.Title
+				}
+				log.Infof("use bot notify risk: %s", risk.Title)
+				botClient.SendMarkdown(fmt.Sprintf(`# Yakit 发现 Risks
 
 风险标题：%v
 
 风险目标：%v
 
 `, title, risk.IP))
+			}
+			client.Output(&YakitStatusCard{
+				Id: "漏洞/风险", Data: fmt.Sprint(fmt.Sprint(addCounter())), Tags: nil,
+			})
+			client.Output(risk)
 		}
-		yakitStatusCard("漏洞/风险", fmt.Sprint(addCounter()))
-		yakitOutputHelper(risk)
 	}
 }
 
@@ -56,8 +59,8 @@ var (
 	RiskExports = map[string]interface{}{
 		"CreateRisk":             yakit.CreateRisk,
 		"Save":                   yakit.SaveRisk,
+		"NewRisk":    YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave": yakit.RegisterBeforeRiskSave,
-		"NewRisk":                yakitNewRisk,
 		"YieldRiskByTarget": func(target string) chan *yakit.Risk {
 			return yakit.YieldRisksByTarget(consts.GetGormProjectDatabase(), context.Background(), target)
 		},

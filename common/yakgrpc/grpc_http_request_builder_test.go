@@ -350,7 +350,7 @@ aaabbbaaabbb`))
 	var host, port = utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to decug mock http on: %v", utils.HostPort(host, port))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
-		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
+		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`);risk.NewRisk(`baidu.com`);}",
 		PluginType: "port-scan",
 		Input:      utils.HostPort(host, port),
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{

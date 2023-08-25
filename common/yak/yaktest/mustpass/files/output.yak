@@ -1,0 +1,2 @@
+log.info("a")
+yakit.Info("a")
