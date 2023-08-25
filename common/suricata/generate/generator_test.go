@@ -18,7 +18,7 @@ func TestNewSurigen(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		surigen, err := NewRulegen(r[0])
+		surigen, err := New(r[0])
 		if err != nil {
 			t.Error(err)
 		}
@@ -40,7 +40,7 @@ func TestGen(t *testing.T) {
 		rules, _ := rule.Parse(c)
 		assert.Equal(t, len(rules), 1)
 		rule := rules[0]
-		generator, _ := NewRulegen(rule)
+		generator, _ := New(rule)
 		assert.NotNil(t, generator)
 		output := generator.Gen()
 		spew.Dump(output)

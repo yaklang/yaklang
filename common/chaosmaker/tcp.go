@@ -54,9 +54,9 @@ type tcpGenerator struct {
 }
 
 func (t *tcpGenerator) generator(count int) {
-	surigen, err := generate.NewRulegen(t.originRule)
+	surigen, err := generate.New(t.originRule)
 	if err != nil {
-		log.Warnf("suricata.NewRulegen failed: %v", err)
+		log.Warnf("new generator failed: %v", err)
 	}
 
 	for i := 0; i < count; i++ {

@@ -14,7 +14,7 @@ type Generator interface {
 	Gen() []byte
 }
 
-func NewRulegen(r *rule.Rule) (Generator, error) {
+func New(r *rule.Rule) (Generator, error) {
 	switch r.Protocol {
 	case protocol.HTTP:
 		return newHTTPGen(r)

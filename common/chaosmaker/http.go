@@ -48,9 +48,9 @@ type httpGenerator struct {
 }
 
 func (h *httpGenerator) generator(count int) {
-	surigen, err := generate.NewRulegen(h.originRule)
+	surigen, err := generate.New(h.originRule)
 	if err != nil {
-		log.Warnf("suricata.NewRulegen failed: %v", err)
+		log.Warnf("new generator failed: %v", err)
 	}
 
 	for i := 0; i < count; i++ {
