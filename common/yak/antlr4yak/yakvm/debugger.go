@@ -252,6 +252,9 @@ func (g *Debugger) getBreakpointMapBySource(path string) map[int]*Breakpoint {
 }
 
 func (g *Debugger) getSwitchBundle(path string) *switchBundle {
+	if path == "" {
+		return g.switchBundleMap[g.sourceFilePath]
+	}
 	path = strings.ToLower(path)
 	bundle, ok := g.switchBundleMap[path]
 	if !ok {
