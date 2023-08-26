@@ -1,7 +1,19 @@
 targetUrl = f`${VULINBOX}/gitserver/website-repository.git/`
 dump(targetUrl)
-os.RemoveAll(`/tmp/website-repository.git/`)
-git.Clone(targetUrl, "/tmp/website-repository.git/")~
+localReposDir = `/tmp/website-repository.git/`
+os.RemoveAll(localReposDir)
+git.Clone(targetUrl, localReposDir)~
 ret := string(file.ReadFile(`/tmp/website-repository.git/index.html`)~)
 dump(ret)
 assert `<title>AAABBBCCC</title>` in ret
+
+count = 0
+refCount = 0
+die(git.IterateCommit(localReposDir, git.handleCommit(i => {
+    count++
+}), git.handleReference(i => {
+    refCount ++
+})))
+dump(count, refCount)
+if count < 3 { die("COMMIT IS TOO LESS") }
+if refCount < 3 { die("REF IS TOO LESS") }
