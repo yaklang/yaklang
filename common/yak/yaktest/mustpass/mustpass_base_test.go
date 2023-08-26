@@ -117,7 +117,7 @@ func TestMustPass(t *testing.T) {
 
 	for _, i := range cases {
 		t.Run(i[0], func(t *testing.T) {
-			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
+			_, err := yak.Execute(i[1], map[string]any{
 				"VULINBOX": vulinboxAddr,
 			})
 			if err != nil {
