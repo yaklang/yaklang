@@ -3,6 +3,8 @@ package yakgit
 import (
 	"context"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
@@ -27,6 +29,12 @@ type config struct {
 	CheckoutCreate bool
 	CheckoutForce  bool
 	CheckoutKeep   bool
+
+	// handler
+	HandleGitReference func(r *plumbing.Reference) error
+	FilterGitReference func(r *plumbing.Reference) bool
+	HandleGitCommit    func(r *object.Commit) error
+	FilterGitCommit    func(r *object.Commit) bool
 }
 
 func NewConfig() *config {
@@ -63,6 +71,34 @@ func (c *config) ToAuth() gitHttp.AuthMethod {
 }
 
 type Option func(*config) error
+
+func WithHandleGitReference(f func(r *plumbing.Reference) error) Option {
+	return func(c *config) error {
+		c.HandleGitReference = f
+		return nil
+	}
+}
+
+func WithFilterGitReference(f func(r *plumbing.Reference) bool) Option {
+	return func(c *config) error {
+		c.FilterGitReference = f
+		return nil
+	}
+}
+
+func WithHandleGitCommit(f func(r *object.Commit) error) Option {
+	return func(c *config) error {
+		c.HandleGitCommit = f
+		return nil
+	}
+}
+
+func WithFilterGitCommit(f func(r *object.Commit) bool) Option {
+	return func(c *config) error {
+		c.FilterGitCommit = f
+		return nil
+	}
+}
 
 func WithVerifyTLS(b bool) Option {
 	return func(c *config) error {
