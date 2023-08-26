@@ -17,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -341,20 +340,10 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		}
 		result = string(raw)
 	case "packet-from-url":
-		var r *http.Request
-		if !(strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) {
-			text = "http://" + text
-		}
-		r, err = http.NewRequest("GET", text, http.NoBody)
+		raw, err = lowhttp.UrlToHTTPRequest(text)
 		if err != nil {
-			break
+			return nil, utils.Errorf("codec[%v] failed: %s", "packet-from-url", err)
 		}
-
-		raw, err = utils.HttpDumpWithBody(r, true)
-		if err != nil {
-			break
-		}
-		raw = lowhttp.FixHTTPRequest(raw)
 		result = string(raw)
 	case "pretty-packet":
 		headers, bytes := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(text))
@@ -801,20 +790,10 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 			}
 			result = string(raw)
 		case "packet-from-url":
-			var r *http.Request
-			if !(strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) {
-				text = "http://" + text
-			}
-			r, err = http.NewRequest("GET", text, http.NoBody)
+			raw, err = lowhttp.UrlToHTTPRequest(text)
 			if err != nil {
-				break
+				return nil, utils.Errorf("codec[%v] failed: %s", "packet-from-url", err)
 			}
-
-			raw, err = utils.HttpDumpWithBody(r, true)
-			if err != nil {
-				break
-			}
-			raw = lowhttp.FixHTTPRequest(raw)
 			result = string(raw)
 		case "pretty-packet":
 			headers, bytes := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(text))
