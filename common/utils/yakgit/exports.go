@@ -1,11 +1,12 @@
 package yakgit
 
 var Exports = map[string]any{
-	"SetProxy": SetProxy,
-	"Clone":    clone,
-	"Pull":     pull,
-	"Fetch":    fetch,
-	"Checkout": checkout,
+	"SetProxy":      SetProxy,
+	"Clone":         clone,
+	"Pull":          pull,
+	"Fetch":         fetch,
+	"Checkout":      checkout,
+	"IterateCommit": EveryCommit,
 
 	"auth":           WithUsernamePassword,
 	"context":        WithContext,
@@ -19,4 +20,10 @@ var Exports = map[string]any{
 	"checkoutKeep":   WithCheckoutKeep,
 	"noFetchTags":    WithNoFetchTags,
 	"fetchAllTags":   WithFetchAllTags,
+
+	// inspect
+	"handleCommit":    WithHandleGitCommit,
+	"filterCommit":    WithFilterGitCommit,
+	"handleReference": WithHandleGitReference,
+	"filterReference": WithFilterGitReference,
 }
