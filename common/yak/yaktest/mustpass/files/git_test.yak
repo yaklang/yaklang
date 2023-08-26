@@ -1,0 +1,7 @@
+targetUrl = f`${VULINBOX}/gitserver/website-repository.git/`
+dump(targetUrl)
+os.RemoveAll(`/tmp/website-repository.git/`)
+git.Clone(targetUrl, "/tmp/website-repository.git/")~
+ret := string(file.ReadFile(`/tmp/website-repository.git/index.html`)~)
+dump(ret)
+assert `<title>AAABBBCCC</title>` in ret

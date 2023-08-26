@@ -49,7 +49,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "riskcallback.yak"
+	var debugName = "git_test.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
@@ -68,7 +68,7 @@ func TestMustPassDebug(t *testing.T) {
 	totalTest := t
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
-			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
+			_, err := yak.Execute(i[1], map[string]any{
 				"VULINBOX": vulinboxAddr,
 			})
 			if err != nil {
