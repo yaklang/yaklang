@@ -198,7 +198,7 @@ func _getArgs() []string {
 func _cliFromString(name string, opts ...setCliExtraParam) (string, *cliExtraParams) {
 	param := _getExtraParams(name, opts...)
 	index := param.foundArgsIndex()
-	if index <= 0 {
+	if index < 0 {
 		return utils.InterfaceToString(param.GetDefaultValue("")), param
 	}
 	args := _getArgs()
