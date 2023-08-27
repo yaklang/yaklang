@@ -56,6 +56,17 @@ func NewWebShell(url string, opts ...ShellConfig) (BaseShellManager, error) {
 	}
 }
 
+func NewBehinderManager(url string, opts ...ShellConfig) (*Behinder, error) {
+	info := &ypb.WebShell{
+		Url: url,
+	}
+	opts = append(opts, SetBeinderTool())
+	for _, opt := range opts {
+		opt(info)
+	}
+	return NewBehinder(info)
+}
+
 func SaveShell(manager BaseShellManager) {
 
 }
