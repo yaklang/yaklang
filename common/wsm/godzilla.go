@@ -45,7 +45,7 @@ type Godzilla struct {
 	CustomEncoder EncoderFunc
 }
 
-func NewGodzilla(ys *ypb.WebShell) *Godzilla {
+func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 	client := utils.NewDefaultHTTPClient()
 	gs := &Godzilla{
 		Url:             ys.GetUrl(),
@@ -67,7 +67,7 @@ func NewGodzilla(ys *ypb.WebShell) *Godzilla {
 	}
 	gs.setHeaders()
 	//gs.setProxy()
-	return gs
+	return gs, nil
 }
 
 func (g *Godzilla) setDefaultParams() map[string]string {
@@ -375,6 +375,17 @@ func (g *Godzilla) close() (bool, error) {
 
 func (g *Godzilla) Encoder(encoderFunc func(raw []byte) ([]byte, error)) {
 	g.CustomEncoder = encoderFunc
+}
+
+func (g *Godzilla) String() string {
+	return fmt.Sprintf(
+		"Url: %s, SecretKey: %x, ShellScript: %s, Proxy: %s, Headers: %v",
+		g.Url,
+		g.SecretKey,
+		g.ShellScript,
+		g.Proxy,
+		g.Headers,
+	)
 }
 
 func (g *Godzilla) Ping(opts ...behinder.ParamsConfig) (bool, error) {

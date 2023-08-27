@@ -590,6 +590,13 @@ type YakClient interface {
 	GenerateYsoCode(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoCodeResponse, error)
 	GenerateYsoBytes(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoBytesResponse, error)
 	YsoDump(ctx context.Context, in *YsoBytesObject, opts ...grpc.CallOption) (*YsoDumpResponse, error)
+	// WebShell
+	CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*Empty, error)
+	DeleteWebShell(ctx context.Context, in *DeleteWebShellRequest, opts ...grpc.CallOption) (*Empty, error)
+	UpdateWebShellById(ctx context.Context, in *UpdateWebShellRequest, opts ...grpc.CallOption) (*Empty, error)
+	QueryWebShells(ctx context.Context, in *QueryWebShellsRequest, opts ...grpc.CallOption) (*QueryWebShellsResponse, error)
+	Ping(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error)
+	GetBasicInfo(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error)
 	// DNSLog / ICMP / RandomTrigger
 	SetYakBridgeLogServer(ctx context.Context, in *YakDNSLogBridgeAddr, opts ...grpc.CallOption) (*Empty, error)
 	GetCurrentYakBridgeLogServer(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakDNSLogBridgeAddr, error)
@@ -3274,6 +3281,60 @@ func (c *yakClient) YsoDump(ctx context.Context, in *YsoBytesObject, opts ...grp
 	return out, nil
 }
 
+func (c *yakClient) CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/CreateWebShell", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteWebShell(ctx context.Context, in *DeleteWebShellRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteWebShell", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateWebShellById(ctx context.Context, in *UpdateWebShellRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/UpdateWebShellById", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryWebShells(ctx context.Context, in *QueryWebShellsRequest, opts ...grpc.CallOption) (*QueryWebShellsResponse, error) {
+	out := new(QueryWebShellsResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryWebShells", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) Ping(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error) {
+	out := new(WebShellResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetBasicInfo(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error) {
+	out := new(WebShellResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetBasicInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) SetYakBridgeLogServer(ctx context.Context, in *YakDNSLogBridgeAddr, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_SetYakBridgeLogServer_FullMethodName, in, out, opts...)
@@ -5239,6 +5300,13 @@ type YakServer interface {
 	GenerateYsoCode(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoCodeResponse, error)
 	GenerateYsoBytes(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoBytesResponse, error)
 	YsoDump(context.Context, *YsoBytesObject) (*YsoDumpResponse, error)
+	// WebShell
+	CreateWebShell(context.Context, *WebShell) (*Empty, error)
+	DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error)
+	UpdateWebShellById(context.Context, *UpdateWebShellRequest) (*Empty, error)
+	QueryWebShells(context.Context, *QueryWebShellsRequest) (*QueryWebShellsResponse, error)
+	Ping(context.Context, *WebShellRequest) (*WebShellResponse, error)
+	GetBasicInfo(context.Context, *WebShellRequest) (*WebShellResponse, error)
 	// DNSLog / ICMP / RandomTrigger
 	SetYakBridgeLogServer(context.Context, *YakDNSLogBridgeAddr) (*Empty, error)
 	GetCurrentYakBridgeLogServer(context.Context, *Empty) (*YakDNSLogBridgeAddr, error)
@@ -6005,6 +6073,24 @@ func (UnimplementedYakServer) GenerateYsoBytes(context.Context, *YsoOptionsReque
 }
 func (UnimplementedYakServer) YsoDump(context.Context, *YsoBytesObject) (*YsoDumpResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method YsoDump not implemented")
+}
+func (UnimplementedYakServer) CreateWebShell(context.Context, *WebShell) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateWebShell not implemented")
+}
+func (UnimplementedYakServer) DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteWebShell not implemented")
+}
+func (UnimplementedYakServer) UpdateWebShellById(context.Context, *UpdateWebShellRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateWebShellById not implemented")
+}
+func (UnimplementedYakServer) QueryWebShells(context.Context, *QueryWebShellsRequest) (*QueryWebShellsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryWebShells not implemented")
+}
+func (UnimplementedYakServer) Ping(context.Context, *WebShellRequest) (*WebShellResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedYakServer) GetBasicInfo(context.Context, *WebShellRequest) (*WebShellResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBasicInfo not implemented")
 }
 func (UnimplementedYakServer) SetYakBridgeLogServer(context.Context, *YakDNSLogBridgeAddr) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetYakBridgeLogServer not implemented")
@@ -10056,6 +10142,114 @@ func _Yak_YsoDump_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateWebShell_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WebShell)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateWebShell(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/CreateWebShell",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateWebShell(ctx, req.(*WebShell))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteWebShell_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteWebShellRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteWebShell(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeleteWebShell",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteWebShell(ctx, req.(*DeleteWebShellRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateWebShellById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWebShellRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateWebShellById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/UpdateWebShellById",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateWebShellById(ctx, req.(*UpdateWebShellRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryWebShells_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryWebShellsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryWebShells(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryWebShells",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryWebShells(ctx, req.(*QueryWebShellsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WebShellRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).Ping(ctx, req.(*WebShellRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetBasicInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WebShellRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetBasicInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetBasicInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetBasicInfo(ctx, req.(*WebShellRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_SetYakBridgeLogServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(YakDNSLogBridgeAddr)
 	if err := dec(in); err != nil {
@@ -13075,6 +13269,30 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "YsoDump",
 			Handler:    _Yak_YsoDump_Handler,
+		},
+		{
+			MethodName: "CreateWebShell",
+			Handler:    _Yak_CreateWebShell_Handler,
+		},
+		{
+			MethodName: "DeleteWebShell",
+			Handler:    _Yak_DeleteWebShell_Handler,
+		},
+		{
+			MethodName: "UpdateWebShellById",
+			Handler:    _Yak_UpdateWebShellById_Handler,
+		},
+		{
+			MethodName: "QueryWebShells",
+			Handler:    _Yak_QueryWebShells_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _Yak_Ping_Handler,
+		},
+		{
+			MethodName: "GetBasicInfo",
+			Handler:    _Yak_GetBasicInfo_Handler,
 		},
 		{
 			MethodName: "SetYakBridgeLogServer",

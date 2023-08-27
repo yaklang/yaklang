@@ -1,7 +1,7 @@
 package wsm
 
 import (
-	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -17,6 +17,7 @@ type BaseShellManager interface {
 	Ping(opts ...behinder.ParamsConfig) (bool, error)
 	BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error)
 	CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error)
+	String() string
 }
 
 type Wsm struct {
@@ -27,37 +28,32 @@ func (w Wsm) Ping() (bool, error) {
 	panic("implement me")
 }
 
-func NewWsm(s *ypb.WebShell) (BaseShellManager, error) {
-	var m BaseShellManager
-	var err error
+func NewWebShellManager(s *ypb.WebShell) (BaseShellManager, error) {
 	switch s.GetShellType() {
 	case ypb.ShellType_Behinder.String():
-		m = NewBehinder(s)
+		return NewBehinder(s)
 	case ypb.ShellType_Godzilla.String():
-		m = NewGodzilla(s)
+		return NewGodzilla(s)
 	default:
-		panic(fmt.Sprintf("unsupported option %s", s.GetShellType()))
+		return nil, utils.Errorf("unsupported shell type %s", s.GetShellType())
 	}
-	return m, err
 }
 
-func NewWebShell(url string, opts ...ShellConfig) BaseShellManager {
+func NewWebShell(url string, opts ...ShellConfig) (BaseShellManager, error) {
 	info := &ypb.WebShell{
 		Url: url,
 	}
-	var bm BaseShellManager
 	for _, opt := range opts {
 		opt(info)
 	}
 	switch info.ShellType {
 	case ypb.ShellType_Behinder.String():
-		bm = NewBehinder(info)
+		return NewBehinder(info)
 	case ypb.ShellType_Godzilla.String():
-		bm = NewGodzilla(info)
+		return NewGodzilla(info)
 	default:
-		panic(fmt.Sprintf("unsupported option %s", info.GetShellType()))
+		return nil, utils.Errorf("unsupported shell type %s", info.GetShellType())
 	}
-	return bm
 }
 
 func SaveShell(manager BaseShellManager) {
