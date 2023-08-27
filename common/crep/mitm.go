@@ -304,6 +304,11 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		/*
 		 use buildin cert domains
 		*/
+		_, ok1 := req.Header["content-type"]
+		_, ok2 := req.Header["Content-Type"]
+		if ok1 && ok2 {
+			log.Errorf("request: %s has both content-type and Content-Type header", req.URL.String())
+		}
 
 		//log.Infof("hostname: %v", req.URL.Hostname())
 		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
@@ -371,6 +376,10 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				}
 				log.Errorf("parse request url failed: %s", err)
 				return nil
+			}
+
+			if ct, ok := req.Header["content-type"]; ok {
+				fmt.Println(ct)
 			}
 
 			hijackedRaw, err := utils.HttpDumpWithBody(req, true)

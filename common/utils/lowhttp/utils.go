@@ -229,6 +229,9 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	}
 	noPath := raw
 	if r.RequestURI != "" {
+		if !strings.HasPrefix(r.RequestURI, "/") {
+			raw += "/"
+		}
 		raw += r.RequestURI
 	} else {
 		u := r.URL

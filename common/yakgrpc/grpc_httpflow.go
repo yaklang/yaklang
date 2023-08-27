@@ -73,6 +73,12 @@ func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequ
 }
 
 func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	paging, data, err := yakit.QueryHTTPFlow(s.GetProjectDatabase(), req)
 	if err != nil {
 		return nil, err

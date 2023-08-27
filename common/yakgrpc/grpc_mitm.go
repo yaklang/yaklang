@@ -1041,6 +1041,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = handled
 		}
 
+		if !bytes.HasPrefix(req, []byte("CONNECT")) {
+			log.Info("not CONNECT")
+		}
+
 		var matchedRules []*ypb.MITMContentReplacer
 		matchedRulesP := &matchedRules
 		ctx := context.WithValue(originReqIns.Context(), REQUEST_CONTEXT_KEY_MatchedRules, matchedRulesP)
@@ -1150,7 +1154,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-		
+
 		// 开始劫持
 		counter := time.Now().UnixNano()
 		select {
