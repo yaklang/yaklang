@@ -104,12 +104,15 @@ func CharsetToUTF8(bodyRaw []byte, mimeType string, originCharset string) ([]byt
 	default:
 		encodeHandler, _ = charsetPrescan(bodyRaw)
 		if encodeHandler == nil && checkingGB18030 && !utf8.Valid(bodyRaw) {
-			// 如果无法检测编码，就看看18030是不是符合
-			replaced, _ := codec.GB18030ToUtf8(bodyRaw)
-			if replaced != nil {
-				handledChineseEncoding = true
-				bodyRaw = replaced
-			}
+			//// 如果无法检测编码，就看看18030是不是符合
+			//replaced, err := codec.GB18030ToUtf8(bodyRaw)
+			//if err != nil {
+			//	log.Debugf("gb18030 to utf8 failed: %v", err)
+			//}
+			//if replaced != nil {
+			//	handledChineseEncoding = true
+			//	bodyRaw = replaced
+			//}
 		}
 	}
 

