@@ -553,9 +553,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		return err
 	}
 
-	var rawData_, _ = utils.HttpDumpWithBody(req, true)
-	fmt.Println(string(rawData_))
-
 	link(req, ctx, p)
 	defer unlink(req, p)
 

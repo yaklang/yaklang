@@ -1040,11 +1040,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if handled != nil {
 			req = handled
 		}
-
-		if !bytes.HasPrefix(req, []byte("CONNECT")) {
-			log.Info("not CONNECT")
-		}
-
 		var matchedRules []*ypb.MITMContentReplacer
 		matchedRulesP := &matchedRules
 		ctx := context.WithValue(originReqIns.Context(), REQUEST_CONTEXT_KEY_MatchedRules, matchedRulesP)
