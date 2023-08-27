@@ -2505,12 +2505,13 @@ message WebShell {
   string Charset = 6;
   string ShellType = 7;
   string ShellScript = 8;
-  bool State = 9;
+  bool Status = 9;
   string Tag = 10;
   //    Proxy
   string Proxy = 11;
-  int64 CreatedAt = 12;
-  int64 UpdatedAt = 13;
+  map<string, string> Headers = 12;
+  int64 CreatedAt = 13;
+  int64 UpdatedAt = 14;
 }
 message WebShellRequest {
   int64 Id = 1;
