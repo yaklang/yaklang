@@ -13,13 +13,31 @@ import (
 func TestNewWebShell(t *testing.T) {
 
 	url := "http://127.0.0.1:8080/S2-032/bx3.jsp"
-	bx, _ := NewWebShell(url, SetBeinderTool(), SetSecretKey("rebeyond"), SetShellScript("jsp"), SetProxy("http://127.0.0.1:9999"))
-	//bx.Encoder(func(raw []byte) ([]byte, error) {
-	//	//b := bx.(*Behinder)
-	//	//want := base64.StdEncoding.EncodeToString(raw)
-	//	//return []byte(want), nil
-	//	return raw, nil
-	//})
+	//url = "http://127.0.0.1:8080/S2-032/bs4.jsp"
+	url = "http://127.0.0.1:8080/S2-032/bs4-json.jsp"
+	bx, _ := NewBehinderManager(url,
+		SetSecretKey("rebeyond"),
+		SetShellScript("jsp"),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	bx.Encoder(func(reqBody []byte) ([]byte, error) {
+		//jsonStr := `{"id":"1","body":{"user":"lucky"}}`
+		//encodedData := base64.StdEncoding.EncodeToString(reqBody)
+		//encodedData = strings.ReplaceAll(encodedData, "+", "<")
+		//encodedData = strings.ReplaceAll(encodedData, "/", ">")
+		//jsonStr = strings.ReplaceAll(jsonStr, "lucky", encodedData)
+		//return []byte(jsonStr), nil
+		return reqBody, nil
+	})
+	bx.Decoder(func(rspBody []byte) ([]byte, error) {
+		//rspBody = rspBody[26 : len(rspBody)-3]
+		//decodedData, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(strings.ReplaceAll(string(rspBody), "<", "+"), ">", "/"))
+		//if err != nil {
+		//	return nil, err
+		//}
+		//return decodedData, nil
+		return rspBody, nil
+	})
 	ping, err := bx.Ping()
 	if err != nil {
 		return
