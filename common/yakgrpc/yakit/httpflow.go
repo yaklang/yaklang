@@ -855,6 +855,12 @@ func QuickSearchMITMHTTPFlowCount(token string) int {
 }
 
 func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
 	}

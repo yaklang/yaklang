@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/pkg/errors"
@@ -39,6 +40,24 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	return []byte(header + string(body))
 }
 
+var _noContentLengthHeader = map[string]bool{
+	"GET":     true,
+	"HEAD":    true,
+	"DELETE":  true,
+	"OPTIONS": true,
+	"CONNECT": true,
+	"get":     true,
+	"head":    true,
+	"delete":  true,
+	"options": true,
+	"connect": true,
+}
+
+func ShouldRemoveZeroContentLengthHeader(s string) bool {
+	_, ok := _noContentLengthHeader[s]
+	return ok
+}
+
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
@@ -55,10 +74,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		raw,
 		func(m, u, proto string) error {
 			isRequest = true
-			switch m {
-			case "GET", "HEAD", "DELETE", "OPTIONS", "CONNECT":
-				contentLengthIsNotRecommanded = true
-			}
+			contentLengthIsNotRecommanded = ShouldRemoveZeroContentLengthHeader(m)
 			return nil
 		},
 		func(proto string, code int, codeMsg string) error {
@@ -540,113 +556,261 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 }
 
 func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
-	return ReadHTTPRequestEx(reader, false)
-}
-
-func ReadHTTPResponseEx(reader *bufio.Reader, loadbody bool) (*http.Response, []byte, error) {
-	var buf bytes.Buffer
-	rsp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(reader, &buf)), nil)
-	if err != nil {
-		return nil, buf.Bytes(), err
-	}
-
-	if loadbody {
-		var finalBody, _ = ioutil.ReadAll(rsp.Body)
-		rsp.Body = ioutil.NopCloser(bytes.NewBuffer(finalBody))
-	}
-
-	var cache = make(map[string]string)
-	// 这里用来恢复 Req 的大小写
-	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
-		if index := strings.Index(line, ":"); index > 0 {
-			key := line[:index]
-			ckey := textproto.CanonicalMIMEHeaderKey(key)
-			_, ok := commonHeader[ckey]
-			// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
-			if ckey != key && !ok {
-				cache[ckey] = key
-			}
-		}
-	})
-
-	for ckey, key := range cache {
-		values, ok := rsp.Header[ckey]
-		if ok {
-			rsp.Header[key] = values
-			delete(rsp.Header, ckey)
-		}
-	}
-
-	return rsp, buf.Bytes(), nil
-}
-
-func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, error) {
-	var buf bytes.Buffer
-	req, err := http.ReadRequest(bufio.NewReader(io.TeeReader(reader, &buf)))
+	req, err := ReadHTTPRequestEx(reader, false)
 	if err != nil {
 		return nil, err
 	}
+	return req, nil
+}
 
-	if utils.IsHttpOrHttpsUrl(req.RequestURI) {
-		u, _ := url.Parse(req.RequestURI)
-		if u != nil {
-			req.URL = u
-			req.Host = u.Host
-			if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
-				req.RequestURI = u.RequestURI()
+func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("ReadHTTPRequestEx panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	var req = &http.Request{
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Form:       nil,
+		Body:       http.NoBody,
+		RequestURI: "", // do not handle it as client
+		TLS:        nil,
+	}
+
+	//defer func() {
+	//	if req != nil {
+	//		if req.Body != nil {
+	//			raw, _ := io.ReadAll(req.Body)
+	//			req.Body = io.NopCloser(bytes.NewBuffer(raw))
+	//			if len(raw) > 0 {
+	//				spew.Dump(raw)
+	//			}
+	//		}
+	//	}
+	//}()
+
+	// parse first line
+	firstLine, err := utils.BufioReadLine(reader)
+	if err != nil {
+		return nil, utils.Errorf(`Read Request FirstLine Failed: %s`, err)
+	}
+
+	// handle proto
+	method, uri, proto, ok := parseRequestLine(string(firstLine))
+	if ok {
+		req.Method = method
+		req.RequestURI = uri
+		req.Proto = proto
+		_, after, ok := strings.Cut(proto, "/")
+		if ok {
+			major, minor, _ := strings.Cut(after, ".")
+			req.ProtoMajor, _ = strconv.Atoi(major)
+			req.ProtoMinor, _ = strconv.Atoi(minor)
+		}
+	} else {
+		return nil, utils.Errorf(`Parse Request FirstLine(%v) Failed: %s`, strconv.Quote(string(firstLine)), firstLine)
+	}
+
+	// uri is very complex
+	// utf8 valid or not
+	before, fragment, _ := strings.Cut(req.RequestURI, "#")
+	urlIns, _ := url.ParseRequestURI(before)
+	if urlIns == nil {
+		// remove : begin
+		// utf8 invalid
+		urlIns = new(url.URL)
+		var schemaRaw, after, ok = strings.Cut(req.RequestURI, "://")
+		if ok {
+			urlIns.Scheme = schemaRaw
+		} else {
+			after = req.RequestURI
+		}
+		if strings.HasPrefix(after, "/") {
+			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+		} else if strings.Contains(after, "/") {
+			var hostraw, after, _ = strings.Cut(after, "/")
+			after = "/" + after
+			if strings.Contains(hostraw, "@") {
+				var userinfo, hostport string
+				userinfo, hostport, _ = strings.Cut(hostraw, "@")
+				urlIns.User = url.UserPassword(userinfo, "")
+				urlIns.Host = hostport
 			} else {
-				req.RequestURI = u.Path
+				urlIns.Host = hostraw
+			}
+			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+		} else {
+			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+		}
+	}
+	if urlIns != nil {
+		urlIns.Fragment = fragment
+	}
+	req.URL = urlIns
+
+	// close is default in 0.9 or 1.0
+	var defaultClose = (req.ProtoMajor == 1 && req.ProtoMinor == 0) || req.ProtoMajor < 1
+
+	var header = make(http.Header)
+	var useContentLength = false
+	var contentLengthInt = 0
+	var useTransferEncodingChunked = false
+	for {
+		lineBytes, err := utils.BufioReadLine(reader)
+		if err != nil {
+			break
+		}
+
+		if len(bytes.TrimSpace(lineBytes)) == 0 {
+			break
+		}
+
+		before, after, _ := bytes.Cut(lineBytes, []byte{':'})
+		keyStr := string(before)
+		valStr := strings.TrimLeftFunc(string(after), unicode.IsSpace)
+
+		if _, isCommonHeader := commonHeader[keyStr]; isCommonHeader {
+			keyStr = http.CanonicalHeaderKey(keyStr)
+		}
+		switch strings.ToLower(keyStr) {
+		case "content-length":
+			useContentLength = true
+			contentLengthInt = utils.Atoi(valStr)
+			if contentLengthInt != 0 || !ShouldRemoveZeroContentLengthHeader(method) {
+				header.Set(keyStr, valStr)
+			}
+			continue
+		case "content-type":
+			header.Set(keyStr, valStr)
+			continue
+		case `transfer-encoding`:
+			if strings.EqualFold(string(after), "chunked") {
+				useTransferEncodingChunked = true
+			}
+			continue
+		case "host":
+			req.Host = valStr
+		case "connection":
+			if strings.EqualFold(valStr, "close") {
+				defaultClose = true
+			} else if strings.EqualFold(valStr, "keep-alive") {
+				defaultClose = false
 			}
 		}
+		header[keyStr] = append(header[keyStr], valStr)
+	}
+	req.Close = defaultClose
+	req.Header = header
+
+	// handle body
+	if useContentLength && useTransferEncodingChunked && contentLengthInt > 0 {
+		log.Info("content-length and transfer-encoding chunked both exist, try smuggle? use max length!")
+		chunkedReader, newReader := codec.HTTPChunkedDecoderWithRestBytes(reader)
+		if len(chunkedReader) > contentLengthInt {
+			// use chunked as body
+			req.ContentLength = int64(len(chunkedReader))
+			req.Body = io.NopCloser(bytes.NewReader(chunkedReader))
+			reader.Reset(newReader)
+		} else {
+			// use content-length
+			req.ContentLength = int64(len(chunkedReader))
+			reader.Reset(io.MultiReader(bytes.NewReader(chunkedReader), newReader))
+			req.Body = io.NopCloser(io.LimitReader(reader, int64(contentLengthInt)))
+		}
+	} else if !useContentLength && useTransferEncodingChunked {
+		bodyRaw, newReader := codec.HTTPChunkedDecoderWithRestBytes(reader)
+		reader.Reset(newReader)
+		if len(bodyRaw) > 0 {
+			req.ContentLength = int64(len(bodyRaw))
+			req.Body = io.NopCloser(bytes.NewReader(bodyRaw))
+		}
+	} else {
+		// use content-length as default
+		req.ContentLength = int64(contentLengthInt)
+		if contentLengthInt > 0 {
+			req.Body = io.NopCloser(io.LimitReader(reader, int64(contentLengthInt)))
+		}
 	}
 
-	if loadbody {
-		var finalBody, _ = ioutil.ReadAll(req.Body)
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(finalBody))
+	if req.URL != nil && req.URL.Host != "" {
+		req.Host = req.URL.Host
 	}
 
-	var cache = make(map[string]string)
-	var host = req.Host
-	var cachedHeader = make(map[string][]string)
-	// 这里用来恢复 Req 的大小写
-	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
-		key, value := SplitHTTPHeader(line)
-		cachedHeader[key] = append(cachedHeader[key], value)
-
-		if strings.ToLower(key) == "host" && value != "" {
-			host = value
-		}
-
-		ckey := textproto.CanonicalMIMEHeaderKey(key)
-		_, ok := commonHeader[ckey]
-		// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
-		if ckey != key && !ok {
-			cache[ckey] = key
-		}
-	})
-
-	for ckey, key := range cache {
-		values, ok := req.Header[ckey]
-		if ok {
-			req.Header[key] = values
-			delete(req.Header, ckey)
-		}
-	}
-
-	for key, values := range cachedHeader {
-		req.Header[key] = values
-	}
-	req.Host = host
-
-	//black magic fix when browser use http proxy the RequestURI is not canonical
-	if strings.HasPrefix(req.RequestURI, "http://") || strings.HasPrefix(req.RequestURI, "https://") {
-		if req.Header.Get("Host") == "" {
-			req.Header.Add("Host", req.URL.Host)
-		}
-		req.RequestURI = req.URL.RequestURI()
+	if req.Host == "http" {
+		log.Errorf("http host is http, %s", req.RequestURI)
 	}
 
 	return req, nil
+
+	//req, err := http.ReadRequest(bufio.NewReader(io.TeeReader(reader, &buf)))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//if utils.IsHttpOrHttpsUrl(req.RequestURI) {
+	//	u, _ := url.Parse(req.RequestURI)
+	//	if u != nil {
+	//		req.URL = u
+	//		req.Host = u.Host
+	//		if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
+	//			req.RequestURI = u.RequestURI()
+	//		} else {
+	//			req.RequestURI = u.Path
+	//		}
+	//	}
+	//}
+	//
+	//if loadbody {
+	//	var finalBody, _ = io.ReadAll(req.Body)
+	//	req.Body = io.NopCloser(bytes.NewBuffer(finalBody))
+	//}
+	//
+	//var cache = make(map[string]string)
+	//var host = req.Host
+	//var cachedHeader = make(map[string][]string)
+	//// 这里用来恢复 Req 的大小写
+	//SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
+	//	key, value := SplitHTTPHeader(line)
+	//	cachedHeader[key] = append(cachedHeader[key], value)
+	//
+	//	if strings.ToLower(key) == "host" && value != "" {
+	//		host = value
+	//	}
+	//
+	//	ckey := textproto.CanonicalMIMEHeaderKey(key)
+	//	_, ok := commonHeader[ckey]
+	//	// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
+	//	if ckey != key && !ok {
+	//		cache[ckey] = key
+	//	}
+	//})
+	//
+	//for ckey, key := range cache {
+	//	values, ok := req.Header[ckey]
+	//	if ok {
+	//		req.Header[key] = values
+	//		delete(req.Header, ckey)
+	//	}
+	//}
+	//
+	//for key, values := range cachedHeader {
+	//	req.Header[key] = values
+	//}
+	//req.Host = host
+	//
+	////black magic fix when browser use http proxy the RequestURI is not canonical
+	//if strings.HasPrefix(req.RequestURI, "http://") || strings.HasPrefix(req.RequestURI, "https://") {
+	//	if req.Header.Get("Host") == "" {
+	//		req.Header.Add("Host", req.URL.Host)
+	//	}
+	//	req.RequestURI = req.URL.RequestURI()
+	//}
+	//
+	//return req, nil
 }
 
 func ReadHTTPPacketSafe(r *bufio.Reader) ([]byte, error) {

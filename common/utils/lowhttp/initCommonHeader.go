@@ -1,59 +1,41 @@
 package lowhttp
 
-import "sync"
-
 // commonHeader interns common header strings.
-var commonHeader map[string]string
-
-var commonHeaderOnce sync.Once
-
-func init() {
-	commonHeaderOnce.Do(initCommonHeader)
-}
-
-func initCommonHeader() {
-	commonHeader = make(map[string]string)
-	for _, v := range []string{
-		"Accept",
-		"Accept-Charset",
-		"Accept-Encoding",
-		"Accept-Language",
-		"Accept-Ranges",
-		"Cache-Control",
-		"Cc",
-		"Connection",
-		"Content-Id",
-		"Content-Language",
-		"Content-Length",
-		"Content-Transfer-Encoding",
-		"Content-Type",
-		"Cookie",
-		"Date",
-		"Dkim-Signature",
-		"Etag",
-		"Expires",
-		"From",
-		"Host",
-		"If-Modified-Since",
-		"If-None-Match",
-		"In-Reply-To",
-		"Last-Modified",
-		"Location",
-		"Message-Id",
-		"Mime-Version",
-		"Pragma",
-		"Received",
-		"Return-Path",
-		"Server",
-		"Set-Cookie",
-		"Subject",
-		"To",
-		"User-Agent",
-		"Via",
-		"X-Forwarded-For",
-		"X-Imforwards",
-		"X-Powered-By",
-	} {
-		commonHeader[v] = v
-	}
+var commonHeader = map[string]string{
+	"Accept":                    "Accept",
+	"Accept-Charset":            "Accept-Charset",
+	"Accept-Encoding":           "Accept-Encoding",
+	"Accept-Language":           "Accept-Language",
+	"Accept-Ranges":             "Accept-Ranges",
+	"Cache-Control":             "Cache-Control",
+	"Cc":                        "Cc",
+	"Connection":                "Connection",
+	"Content-Id":                "Content-Id",
+	"Content-Language":          "Content-Language",
+	"Content-Length":            "Content-Length",
+	"Content-Transfer-Encoding": "Content-Transfer-Encoding",
+	"Content-Type":              "Content-Type",
+	"Cookie":                    "Cookie",
+	"Date":                      "Date",
+	"Etag":                      "Etag",
+	"Expires":                   "Expires",
+	"From":                      "From",
+	"Host":                      "Host",
+	"If-Modified-Since":         "If-Modified-Since",
+	"If-None-Match":             "If-None-Match",
+	"In-Reply-To":               "In-Reply-To",
+	"Last-Modified":             "Last-Modified",
+	"Location":                  "Location",
+	"Message-Id":                "Message-Id",
+	"Mime-Version":              "Mime-Version",
+	"Pragma":                    "Pragma",
+	"Received":                  "Received",
+	"Return-Path":               "Return-Path",
+	"Server":                    "Server",
+	"Set-Cookie":                "Set-Cookie",
+	"Subject":                   "Subject",
+	"To":                        "To",
+	"User-Agent":                "User-Agent",
+	"X-Forwarded-For":           "X-Forwarded-For",
+	"X-Powered-By":              "X-Powered-By",
 }
