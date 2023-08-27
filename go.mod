@@ -110,6 +110,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
 	github.com/xiecat/wsm v0.1.3
+	github.com/ysmood/gson v0.7.1
 	golang.org/x/crypto v0.10.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/net v0.11.0
@@ -212,7 +213,6 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
-	github.com/ysmood/gson v0.7.1 // indirect
 	github.com/ysmood/leakless v0.8.0 // indirect
 	github.com/yuin/charsetutil v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
