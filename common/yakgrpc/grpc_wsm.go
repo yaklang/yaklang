@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -107,16 +108,18 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 	if err != nil {
 		return nil, err
 	}
-	w, err := wsm.NewWsm(shell)
+	w, err := wsm.NewWebShellManager(shell)
 	if err != nil {
 		return nil, err
 	}
 	g, ok := w.(*wsm.Godzilla)
-	if ok {
-		err := g.InjectPayload()
-		if err != nil {
-			return nil, err
-		}
+	if !ok {
+		return nil, fmt.Errorf("expected *wsm.Godzilla, got %T", w)
+	}
+
+	err = g.InjectPayload()
+	if err != nil {
+		return nil, err
 	}
 	ping, err := w.Ping()
 	shell.State = ping
@@ -144,7 +147,7 @@ func (s *Server) GetBasicInfo(ctx context.Context, req *ypb.WebShellRequest) (*y
 	if err != nil {
 		return nil, err
 	}
-	w, err := wsm.NewWsm(shell)
+	w, err := wsm.NewWebShellManager(shell)
 	if err != nil {
 		return nil, err
 	}
