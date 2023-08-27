@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 )
 
 type Behinder struct {
@@ -33,7 +32,7 @@ type Behinder struct {
 	CustomEncoder EncoderFunc
 }
 
-func NewBehinder(ys *ypb.WebShell) *Behinder {
+func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 	client := utils.NewDefaultHTTPClient()
 
 	bs := &Behinder{
@@ -55,10 +54,10 @@ func NewBehinder(ys *ypb.WebShell) *Behinder {
 		return payload, nil
 	}
 	bs.setHeaders()
-	if len(bs.Proxy) != 0 {
-		bs.setProxy()
-	}
-	return bs
+	//if len(bs.Proxy) != 0 {
+	//	bs.setProxy()
+	//}
+	return bs, nil
 }
 
 func (b *Behinder) setHeaders() {
@@ -79,13 +78,13 @@ func (b *Behinder) setHeaders() {
 	}
 }
 
-func (b *Behinder) setProxy() {
-	b.Client.Transport = &http.Transport{
-		Proxy: func(r *http.Request) (*url.URL, error) {
-			return url.Parse(b.Proxy)
-		},
-	}
-}
+//func (b *Behinder) setProxy() {
+//	b.Client.Transport = &http.Transport{
+//		Proxy: func(r *http.Request) (*url.URL, error) {
+//			return url.Parse(b.Proxy)
+//		},
+//	}
+//}
 
 func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string) ([]byte, error) {
 	var code []byte
@@ -161,24 +160,34 @@ func (b *Behinder) post(data []byte) ([]byte, error) {
 	for k, v := range b.Headers {
 		request.Header.Set(k, v)
 	}
-	resp, err := b.Client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error(err)
-		}
-	}(resp.Body)
-	raw, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	raw = bytes.TrimRight(raw, "\r\n\r\n")
-	if len(raw) == 0 {
-		return nil, utils.Error("返回数据为空")
-	}
+	lresp, err := lowhttp.HTTP(
+		lowhttp.WithRequest(request),
+		lowhttp.WithVerifyCertificate(false),
+		lowhttp.WithTimeoutFloat(15),
+		lowhttp.WithProxy(b.Proxy),
+	)
+
+	//resp, err := b.Client.Do(request)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//defer func(Body io.ReadCloser) {
+	//	err := Body.Close()
+	//	if err != nil {
+	//		log.Error(err)
+	//	}
+	//}(resp.Body)
+	//raw, err := ioutil.ReadAll(resp.Body)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//raw = bytes.TrimRight(raw, "\r\n\r\n")
+	//if len(raw) == 0 {
+	//	return nil, utils.Error("返回数据为空")
+	//}
+
+	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(lresp.RawPacket)
+
 	return raw, nil
 }
 
@@ -211,6 +220,17 @@ func (b *Behinder) Unmarshal(bts []byte, m map[string]string) error {
 	}
 
 	return nil
+}
+
+func (b *Behinder) String() string {
+	return fmt.Sprintf(
+		"Url: %s, SecretKey: %x, ShellScript: %s, Proxy: %s, Headers: %v",
+		b.Url,
+		b.SecretKey,
+		b.ShellScript,
+		b.Proxy,
+		b.Headers,
+	)
 }
 
 func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
