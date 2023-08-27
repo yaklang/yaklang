@@ -421,14 +421,14 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				}
 				if isHttps {
 					hijackedReq.TLS = req.TLS
-				}
-
-				if req.ProtoMajor != 2 {
-					hijackedReq, err = utils.FixHTTPRequestForHTTPDoWithHttps(hijackedReq, isHttps)
-					if err != nil {
-						log.Errorf("fix mitm-hijacked http.Request failed: %s", err)
-						return nil
+					if hijackedReq.URL != nil {
+						hijackedReq.URL.Scheme = "https"
 					}
+				}
+				if req.ProtoMajor != 2 {
+					hijackedReq.Proto = "HTTP/1.1"
+					hijackedReq.ProtoMajor = 1
+					hijackedReq.ProtoMinor = 1
 				}
 
 				*req = *hijackedReq.WithContext(req.Context())

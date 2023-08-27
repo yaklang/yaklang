@@ -564,13 +564,6 @@ func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
 }
 
 func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("ReadHTTPRequestEx panic: %v", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-
 	var req = &http.Request{
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
@@ -580,6 +573,13 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 		RequestURI: "", // do not handle it as client
 		TLS:        nil,
 	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("ReadHTTPRequestEx panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 
 	//defer func() {
 	//	if req != nil {
@@ -617,34 +617,46 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 
 	// uri is very complex
 	// utf8 valid or not
+	if strings.Contains(uri, "://") && method == "CONNECT" {
+		fmt.Println("DEBUG")
+	}
 	before, fragment, _ := strings.Cut(req.RequestURI, "#")
 	urlIns, _ := url.ParseRequestURI(before)
 	if urlIns == nil {
 		// remove : begin
 		// utf8 invalid
 		urlIns = new(url.URL)
-		var schemaRaw, after, ok = strings.Cut(req.RequestURI, "://")
-		if ok {
-			urlIns.Scheme = schemaRaw
+		if method == "CONNECT" {
+			urlIns.Host = before
 		} else {
-			after = req.RequestURI
-		}
-		if strings.HasPrefix(after, "/") {
-			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
-		} else if strings.Contains(after, "/") {
-			var hostraw, after, _ = strings.Cut(after, "/")
-			after = "/" + after
-			if strings.Contains(hostraw, "@") {
-				var userinfo, hostport string
-				userinfo, hostport, _ = strings.Cut(hostraw, "@")
-				urlIns.User = url.UserPassword(userinfo, "")
-				urlIns.Host = hostport
-			} else {
-				urlIns.Host = hostraw
+			var after = req.RequestURI
+			if utils.IsHttpOrHttpsUrl(req.RequestURI) {
+				var schemaRaw, rest, ok = strings.Cut(req.RequestURI, "://")
+				if ok {
+					if strings.Contains(schemaRaw, ".") {
+						fmt.Println("DEBUG")
+					}
+					urlIns.Scheme = schemaRaw
+					after = rest
+				}
 			}
-			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
-		} else {
-			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			if strings.HasPrefix(after, "/") {
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			} else if strings.Contains(after, "/") {
+				var hostraw, after, _ = strings.Cut(after, "/")
+				after = "/" + after
+				if strings.Contains(hostraw, "@") {
+					var userinfo, hostport string
+					userinfo, hostport, _ = strings.Cut(hostraw, "@")
+					urlIns.User = url.UserPassword(userinfo, "")
+					urlIns.Host = hostport
+				} else {
+					urlIns.Host = hostraw
+				}
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			} else {
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			}
 		}
 	}
 	if urlIns != nil {
@@ -662,7 +674,7 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 	for {
 		lineBytes, err := utils.BufioReadLine(reader)
 		if err != nil {
-			break
+			return nil, err
 		}
 
 		if len(bytes.TrimSpace(lineBytes)) == 0 {
