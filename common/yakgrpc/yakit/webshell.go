@@ -21,10 +21,11 @@ type WebShell struct {
 	// 冰蝎还是哥斯拉,或者是其他
 	ShellType string `json:"shell_type"`
 	// 脚本语言
-	ShellScript string `json:"shell_script"`
-	State       bool   `json:"state"`
-	Tag         string `json:"tag"`
-	Hash        string `json:"hash"`
+	ShellScript string            `json:"shell_script"`
+	Headers     map[string]string `json:"headers"`
+	Status      bool              `json:"status"`
+	Tag         string            `json:"tag"`
+	Hash        string            `json:"hash"`
 }
 
 func (w *WebShell) CalcHash() string {
@@ -56,7 +57,7 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 		Charset:     w.Charset,
 		ShellType:   w.ShellType,
 		ShellScript: w.ShellScript,
-		State:       w.State,
+		Status:      w.Status,
 		Tag:         w.Tag,
 		CreatedAt:   w.CreatedAt.Unix(),
 		UpdatedAt:   w.UpdatedAt.Unix(),
