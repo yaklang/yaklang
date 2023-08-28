@@ -27,27 +27,11 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	f.SetReg(i)
 }
 
-func (f *FunctionBuilder) newAnInstuction() anInstruction {
-	return anInstruction{
-		Func:  f.Function,
-		Block: f.CurrentBlock,
-		typs:  make(Types, 0),
-		pos:   f.currtenPos,
-	}
-}
-
-func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) *BinOp {
+func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	b := &BinOp{
-		anInstruction: f.newAnInstuction(),
-		Op:            op,
-		X:             x,
-		Y:             y,
-		user:          []User{},
-	}
-	fixupUseChain(b)
+	b := NewBinOp(op, x, y, f.CurrentBlock)
 	f.emit(b)
 	return b
 }
@@ -56,11 +40,7 @@ func (f *FunctionBuilder) EmitIf(cond Value) *If {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	ifssa := &If{
-		anInstruction: f.newAnInstuction(),
-		Cond:          cond,
-	}
-	fixupUseChain(ifssa)
+	ifssa := NewIf(cond, f.CurrentBlock)
 	f.emit(ifssa)
 	f.CurrentBlock.finish = true
 	return ifssa
@@ -70,12 +50,7 @@ func (f *FunctionBuilder) EmitJump(to *BasicBlock) *Jump {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-
-	j := &Jump{
-		anInstruction: f.newAnInstuction(),
-		To:            to,
-	}
-	j.anInstruction.pos = nil
+	j := NewJump(to, f.CurrentBlock)
 	f.emit(j)
 	f.CurrentBlock.AddSucc(to)
 	f.CurrentBlock.finish = true
@@ -86,14 +61,7 @@ func (f *FunctionBuilder) EmitSwitch(cond Value, defaultb *BasicBlock, label []S
 	if f.CurrentBlock.finish {
 		return nil
 	}
-
-	sw := &Switch{
-		anInstruction: f.newAnInstuction(),
-		cond:          cond,
-		defaultBlock:  defaultb,
-		label:         label,
-	}
-	fixupUseChain(sw)
+	sw := NewSwitch(cond, defaultb, label, f.CurrentBlock)
 	f.emit(sw)
 	f.CurrentBlock.finish = true
 	return sw
@@ -103,12 +71,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	r := &Return{
-		anInstruction: f.newAnInstuction(),
-		Results:       vs,
-	}
-	fixupUseChain(r)
-	f.Return = append(f.Return, r)
+	r := NewReturn(vs, f.CurrentBlock)
 	f.emit(r)
 	f.CurrentBlock.finish = true
 	return r
@@ -124,22 +87,8 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 }
 
 func (f *FunctionBuilder) emitInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value) *Interface {
-	i := &Interface{
-		anInstruction: f.newAnInstuction(),
-		parentI:       parentI,
-		low:           low,
-		high:          high,
-		max:           max,
-		field:         make(map[Value]*Field, 0),
-		Len:           Len,
-		Cap:           Cap,
-		users:         make([]User, 0),
-	}
-	if typs != nil {
-		i.anInstruction.typs = typs
-	}
+	i := NewInterface(parentI, typs, low, high, max, Len, Cap, f.CurrentBlock)
 	f.emit(i)
-	fixupUseChain(i)
 	return i
 }
 
@@ -156,7 +105,6 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 		hasKey = false
 	}
 	lValueLen := NewConst(len(vs))
-	// typ := ParseInterfaceTypes(vs)
 	typ := NewInterfaceType()
 	itf := b.EmitInterfaceBuildWithType(Types{typ}, lValueLen, lValueLen)
 	for i, rv := range vs {
@@ -180,13 +128,8 @@ func (f *FunctionBuilder) EmitField(i Value, key Value) *Field {
 
 func (f *FunctionBuilder) emitUpdate(address *Field, v Value) *Update {
 	//use-value-chain: address -> update -> value
-	CheckUpdateType(address.GetType(), v.GetType())
-	s := &Update{
-		anInstruction: f.newAnInstuction(),
-		value:         v,
-		address:       address,
-	}
+	// CheckUpdateType(address.GetType(), v.GetType())
+	s := NewUpdate(address, v, f.CurrentBlock)
 	f.emit(s)
-	fixupUseChain(s)
 	return s
 }
