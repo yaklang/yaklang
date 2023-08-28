@@ -18,7 +18,7 @@ func removeUser(users []User, u User) {
 	// if users == nil {
 	// 	return
 	// }
-	if index := slices.Index(users, u); index > 0 {
+	if index := slices.Index(users, u); index > -1 {
 		users[index] = nil
 	}
 }
@@ -84,7 +84,7 @@ func (i *If) AddValue(v Value)   {}
 
 // ----------- Return
 func (r *Return) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(r.Results, v); index > 0 {
+	if index := slices.Index(r.Results, v); index > -1 {
 		r.Results[index] = to
 	} else {
 		panic("return not use this value")
@@ -98,7 +98,7 @@ func (r *Return) AddValue(v Value)   {}
 
 // ----------- Call
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(c.Args, v); index > 0 {
+	if index := slices.Index(c.Args, v); index > -1 {
 		c.Args[index] = to
 	} else {
 		panic("return not use this value")
@@ -206,7 +206,7 @@ func (i *Interface) AddValue(_ Value)   {}
 
 // ----------- Field
 func (f *Field) ReplaceValue(v, to Value) {
-	if index := slices.Index(f.update, v); index > 0 {
+	if index := slices.Index(f.update, v); index > -1 {
 		f.update[index] = to
 	} else {
 		panic("field not use this value")
