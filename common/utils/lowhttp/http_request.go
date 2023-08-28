@@ -561,6 +561,7 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 	var useContentLength = false
 	var contentLengthInt = 0
 	var useTransferEncodingChunked = false
+	var contentEncoding string
 	for {
 		lineBytes, err := utils.BufioReadLine(reader)
 		if err != nil {
@@ -590,12 +591,15 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 			header.Set(keyStr, valStr)
 			continue
 		case `transfer-encoding`:
-			if strings.EqualFold(string(after), "chunked") {
+			if strings.EqualFold(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
 			continue
 		case "host":
 			req.Host = valStr
+		case "content-encoding":
+			contentEncoding = valStr
+			continue
 		case "connection":
 			if strings.EqualFold(valStr, "close") {
 				defaultClose = true
@@ -635,6 +639,24 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 		req.ContentLength = int64(contentLengthInt)
 		if contentLengthInt > 0 {
 			req.Body = io.NopCloser(io.LimitReader(reader, int64(contentLengthInt)))
+		}
+	}
+
+	bodyRaw, err := io.ReadAll(req.Body)
+	if err != nil && err != io.EOF {
+		return nil, utils.Errorf("read body error: %s", err)
+	}
+	req.Body = io.NopCloser(bytes.NewReader(bodyRaw))
+
+	if contentEncoding != "" {
+		decodeBodyRaw, fixed := ContentEncodingDecode(contentEncoding, bodyRaw)
+		if fixed {
+			req.ContentLength = int64(len(decodeBodyRaw))
+			req.Body = io.NopCloser(bytes.NewReader(decodeBodyRaw))
+			req.Header.Set("Content-Length", strconv.Itoa(len(decodeBodyRaw)))
+		} else {
+			log.Warnf("content-encoding %s decode failed, %s", contentEncoding, req.RequestURI)
+			req.Header.Set("Content-Encoding", contentEncoding)
 		}
 	}
 

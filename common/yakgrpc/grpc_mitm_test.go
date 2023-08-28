@@ -295,6 +295,7 @@ log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
+println(string(req))
 if rsp.Contains(getParam("token")) {
 		println("gzip auto decode success")	
 }else{
