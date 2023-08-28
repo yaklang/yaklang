@@ -91,15 +91,4 @@ func NewFunctionDefine(name string, ParamTyp, ReturnTyp []Types, hasEllipsis boo
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
-	for _, b := range f.Blocks {
-		//TODO: use worklist avoid repeat inference
-		for _, phi := range b.Phis {
-			phi.InferenceType()
-		}
-		for _, i := range b.Instrs {
-			if u, ok := i.(User); ok {
-				u.InferenceType()
-			}
-		}
-	}
 }

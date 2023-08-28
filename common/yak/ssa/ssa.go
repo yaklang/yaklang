@@ -36,9 +36,6 @@ type User interface {
 	AddValue(Value)
 
 	ReplaceValue(Value, Value)
-
-	// inference type
-	InferenceType()
 }
 
 type Instruction interface {
