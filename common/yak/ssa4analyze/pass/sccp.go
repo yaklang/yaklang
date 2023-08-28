@@ -21,17 +21,18 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	edge = make(Edge)
 	ifstmt := make([]*ssa.If, 0)
 	switchstmt := make([]*ssa.Switch, 0)
+	deleteStmt := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
 		for _, inst := range b.Instrs {
 			switch inst := inst.(type) {
 			case *ssa.BinOp:
 				if ret := handlerBinOp(inst); ret != inst {
-					ssa.DeleteInst(inst)
+					deleteStmt = append(deleteStmt, inst)
 				}
 			case *ssa.UnOp:
 				if ret := handlerUnOp(inst); ret != inst {
-					ssa.DeleteInst(inst)
+					deleteStmt = append(deleteStmt, inst)
 				}
 			// collect if and switch
 			case *ssa.If:
@@ -40,6 +41,10 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 				switchstmt = append(switchstmt, inst)
 			}
 		}
+	}
+
+	for _, inst := range deleteStmt {
+		ssa.DeleteInst(inst)
 	}
 
 	// handler edge
