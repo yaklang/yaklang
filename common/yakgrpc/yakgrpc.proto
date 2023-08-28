@@ -2872,7 +2872,7 @@ message CodecWork{
   string CodecType = 1;
   string Script = 2;
   string PluginName = 3;
-  repeated ExecParamItem Params = 4;
+  repeated ExecParamItem Params = 5;
 }
 
 message CodecRequestFlow{
