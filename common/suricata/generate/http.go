@@ -2,6 +2,7 @@ package generate
 
 import (
 	"bytes"
+	"errors"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -14,7 +15,11 @@ type HTTPGen struct {
 	gen   map[modifier.Modifier]ModifierGenerator
 }
 
-func newHTTPGen(r *rule.Rule) (*HTTPGen, error) {
+func newHTTPGen(r *rule.Rule) (Generator, error) {
+	if r.ContentRuleConfig == nil {
+		return nil, errors.New("empty content rule config")
+	}
+
 	g := &HTTPGen{
 		rules: r.ContentRuleConfig.ContentRules,
 		gen:   make(map[modifier.Modifier]ModifierGenerator),

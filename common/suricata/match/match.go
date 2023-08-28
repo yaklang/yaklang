@@ -22,6 +22,9 @@ func New(r *rule.Rule) *Matcher {
 }
 
 func (m *Matcher) Match(flow []byte) bool {
+	if len(flow) == 0 {
+		return false
+	}
 	pk := gopacket.NewPacket(flow, layers.LayerTypeEthernet, gopacket.NoCopy)
 	matcher := newMatchCtx(pk, m.rule, matchMutex)
 	err := matcher.Next()
@@ -119,6 +122,8 @@ func matchMutex(c *matchContext) error {
 		c.Attach(ipMatcher, portMatcher, httpIniter)
 	case protocol.TCP:
 		c.Attach(ipMatcher, portMatcher, tcpIniter)
+	case protocol.UDP:
+		c.Attach(ipMatcher, portMatcher, udpIniter)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
 	}

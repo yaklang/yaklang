@@ -1,15 +1,11 @@
 package chaosmaker
 
 import (
-	"encoding/binary"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
+	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils"
-	"net"
 )
 
 func init() {
@@ -30,140 +26,12 @@ func (h *udpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule 
 		return nil
 	}
 
-	if rule.ContentRuleConfig.UdpConfig == nil {
-		log.Errorf("[BUG]: not prepared udp config from: %v", rule.Raw)
-		return nil
-	}
-	var toServer bool
-	var toClient bool
-
-	if rule.ContentRuleConfig.Flow != nil {
-		toServer = rule.ContentRuleConfig.Flow.ToServer
-		toClient = rule.ContentRuleConfig.Flow.ToClient
-	} else {
-		toServer = true
-		toClient = true
-	}
-
-	var isInUdpHeader = rule.ContentRuleConfig.UdpConfig.UDPHeader
-
-	var baseUDPLayer = &layers.UDP{}
-
-	// 定义IPv4报文头部
-	baseIPLayer := &layers.IPv4{
-		Version:  4,                    // 版本号
-		TTL:      64,                   // 生存时间
-		Protocol: layers.IPProtocolUDP, // 协议类型
-	}
-
-	toBytes := func(ipLayer *layers.IPv4, udpLayer *layers.UDP, payloads ...gopacket.Payload) []byte {
-		var actPayloads []byte
-		if len(payloads) > 0 {
-			for _, p := range payloads {
-				actPayloads = append(actPayloads, p...)
-			}
-		}
-
-		udpLayer.SetNetworkLayerForChecksum(ipLayer)
-
-		buffer := gopacket.NewSerializeBuffer()
-		err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
-		}, ipLayer, udpLayer, gopacket.Payload(actPayloads))
-		if err != nil {
-			log.Error(err)
-			return nil
-		}
-		return buffer.Bytes()
-	}
-
 	ch := make(chan *pcapx.ChaosTraffic)
-	feedback := func(raw []byte) {
-		if raw == nil {
-			return
-		}
-		if toClient {
-			ch <- UDPIPInboundBytesToChaosTraffic(makerRule, rule, raw)
-		}
+	go (&udpGenerator{
+		originRule: rule,
+		out:        ch,
+	}).generator(5)
 
-		if toServer {
-			ch <- UDPIPOutboundBytesToChaosTraffic(makerRule, rule, raw)
-		}
-
-	}
-	go func() {
-		defer close(ch)
-
-		var payloads string
-		var extraRules []*surirule.ContentRule
-		for _, r := range rule.ContentRuleConfig.ContentRules {
-			if r.Negative {
-				continue
-			}
-			payloads += string(r.Content)
-			if r.PCRE == "" {
-				continue
-			}
-			// todo: fix pcre generator
-			// extraRules = append(extraRules, r.PCREStringGenerator(2)...)
-		}
-
-		for _, r := range extraRules {
-			payloads += string(r.Content)
-		}
-
-		if isInUdpHeader {
-			baseUDPLayer.Length = binary.BigEndian.Uint16([]byte(payloads))
-		}
-
-		if toServer {
-			// IP 层
-			baseIPLayer.SrcIP = net.ParseIP(maker.LocalIPAddress)
-			if baseIPLayer.SrcIP == nil {
-				log.Error("fetch local ip address failed")
-				return
-			}
-			baseIPLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
-
-			// 表示这是对外发送的数据包
-			dstPort := uint16(rule.DestinationPort.GetAvailablePort())
-			srcPort := uint16(rule.SourcePort.GetHighPort())
-			baseUDPLayer.SrcPort = layers.UDPPort(srcPort)
-			baseUDPLayer.DstPort = layers.UDPPort(dstPort)
-
-			for i := 0; i < rule.ContentRuleConfig.Thresholding.Repeat(); i++ {
-				if isInUdpHeader {
-					feedback(toBytes(baseIPLayer, baseUDPLayer))
-					continue
-				}
-				feedback(toBytes(baseIPLayer, baseUDPLayer, gopacket.Payload(payloads)))
-			}
-		}
-
-		if toClient {
-			baseIPLayer.DstIP = net.ParseIP(maker.LocalIPAddress)
-			if baseIPLayer.DstIP == nil {
-				log.Error("fetch local ip address failed")
-				return
-			}
-			baseIPLayer.SrcIP = net.ParseIP(utils.GetRandomIPAddress())
-
-			// 这是主机接收到的包
-			dstPort := uint16(rule.DestinationPort.GetAvailablePort())
-			srcPort := uint16(rule.SourcePort.GetHighPort())
-			baseUDPLayer.SrcPort = layers.UDPPort(srcPort)
-			baseUDPLayer.DstPort = layers.UDPPort(dstPort)
-
-			for i := 0; i < rule.ContentRuleConfig.Thresholding.Repeat(); i++ {
-				if isInUdpHeader {
-					feedback(toBytes(baseIPLayer, baseUDPLayer))
-					continue
-				}
-				feedback(toBytes(baseIPLayer, baseUDPLayer, gopacket.Payload(payloads)))
-			}
-		}
-	}()
 	return ch
 }
 
@@ -172,14 +40,38 @@ func (h *udpHandler) MatchBytes(i interface{}) bool {
 	panic("implement me")
 }
 
-func UDPIPInboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
-	return &pcapx.ChaosTraffic{
-		UDPIPInboundPayload: raw,
-	}
+type udpGenerator struct {
+	originRule *surirule.Rule
+	out        chan *pcapx.ChaosTraffic
 }
 
-func UDPIPOutboundBytesToChaosTraffic(makerRule *rule.Storage, r *surirule.Rule, raw []byte) *pcapx.ChaosTraffic {
-	return &pcapx.ChaosTraffic{
-		UDPIPOutboundPayload: raw,
+func (t *udpGenerator) generator(count int) {
+	surigen, err := generate.New(t.originRule)
+	if err != nil {
+		log.Warnf("new generator failed: %v", err)
 	}
+	var toServer = true
+	var toClient = true
+
+	if t.originRule.ContentRuleConfig.Flow != nil {
+		toServer = t.originRule.ContentRuleConfig.Flow.ToServer
+		toClient = t.originRule.ContentRuleConfig.Flow.ToClient
+	}
+
+	for i := 0; i < count; i++ {
+		raw := surigen.Gen()
+		if raw == nil {
+			return
+		}
+		if toServer {
+			t.out <- &pcapx.ChaosTraffic{
+				UDPIPOutboundPayload: raw,
+			}
+		} else if toClient {
+			t.out <- &pcapx.ChaosTraffic{
+				UDPIPInboundPayload: raw,
+			}
+		}
+	}
+	close(t.out)
 }
