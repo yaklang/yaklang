@@ -84,7 +84,7 @@ func (s *Server) QueryWebShells(ctx context.Context, req *ypb.QueryWebShellsRequ
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
-	p, res, err := yakit.QueryWebShell(db, req)
+	p, res, err := yakit.QueryWebShells(db, req)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 		return nil, err
 	}
 	ping, err := w.Ping()
-	shell.State = ping
+	shell.Status = ping
 	if err != nil {
 		yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
 		return nil, err

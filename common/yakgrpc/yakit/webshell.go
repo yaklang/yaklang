@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"encoding/json"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -21,11 +22,12 @@ type WebShell struct {
 	// 冰蝎还是哥斯拉,或者是其他
 	ShellType string `json:"shell_type"`
 	// 脚本语言
-	ShellScript string            `json:"shell_script"`
-	Headers     map[string]string `json:"headers"`
-	Status      bool              `json:"status"`
-	Tag         string            `json:"tag"`
-	Hash        string            `json:"hash"`
+	ShellScript string `json:"shell_script"`
+	Headers     string `json:"headers" gorm:"type:json"`
+	Status      bool   `json:"status"`
+	Tag         string `json:"tag"`
+	Remark      string `json:"remark"`
+	Hash        string `json:"hash"`
 }
 
 func (w *WebShell) CalcHash() string {
@@ -47,7 +49,13 @@ func (w *WebShell) BeforeSave() error {
 }
 
 func (w *WebShell) ToGRPCModel() *ypb.WebShell {
-
+	headers := make(map[string]string)
+	if w.Headers != "" {
+		err := json.Unmarshal([]byte(w.Headers), &headers)
+		if err != nil {
+			return nil
+		}
+	}
 	return &ypb.WebShell{
 		Id:          int64(w.ID),
 		Url:         w.Url,
@@ -59,6 +67,8 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 		ShellScript: w.ShellScript,
 		Status:      w.Status,
 		Tag:         w.Tag,
+		Remark:      w.Remark,
+		Headers:     headers,
 		CreatedAt:   w.CreatedAt.Unix(),
 		UpdatedAt:   w.UpdatedAt.Unix(),
 	}
@@ -108,7 +118,7 @@ func GetWebShell(db *gorm.DB, id int64) (*ypb.WebShell, error) {
 	return req.ToGRPCModel(), nil
 }
 
-func QueryWebShell(db *gorm.DB, params *ypb.QueryWebShellsRequest) (*bizhelper.Paginator, []*WebShell, error) {
+func QueryWebShells(db *gorm.DB, params *ypb.QueryWebShellsRequest) (*bizhelper.Paginator, []*WebShell, error) {
 	if params == nil {
 		return nil, nil, utils.Errorf("empty params")
 	}
