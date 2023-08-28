@@ -26,3 +26,48 @@ func TestGRPCMUSTPASS_CODEC_AUTODECODE(t *testing.T) {
 		t.Fatal("AUTO DECODE BASE64 SMOKING TEST FAILED")
 	}
 }
+
+func TestGRPCNewCodec(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType:  "base64",
+			Script:     "",
+			PluginName: "",
+			Params:     nil,
+		},
+		{
+			CodecType:  "base64-decode",
+			Script:     "",
+			PluginName: "",
+			Params:     nil,
+		},
+		{
+			CodecType: "custom-script",
+			Script: `
+handle = func(origin) {
+    return origin + "test"
+}
+`,
+			PluginName: "",
+			Params:     nil,
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       "test",
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	if !(rsp.GetResult() == "testtest") {
+		t.Fatal("workflow codec fail")
+	}
+}
