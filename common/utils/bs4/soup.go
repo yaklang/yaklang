@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	netURL "net/url"
 	"strings"
 )
@@ -199,7 +199,7 @@ func PostWithClient(url string, bodyType string, body interface{}, client *http.
 
 	if debug {
 		// Save a copy of this request for debugging.
-		requestDump, err := httputil.DumpRequest(req, true)
+		requestDump, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {
 			fmt.Println(err)
 		}

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"sort"
@@ -119,7 +118,7 @@ type FuzzHTTPRequestIf interface {
 }
 
 func rebuildHTTPRequest(req *http.Request, contentLength int64) (*http.Request, error) {
-	raw, err := httputil.DumpRequest(req, true)
+	raw, err := utils.DumpHTTPRequest(req, true)
 	if err != nil {
 		return nil, utils.Errorf("parse request to bytes failed: %s", err)
 	}
@@ -376,14 +375,14 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	case http.Request:
 		r := &ret
 		_fixHttpsPorts(r)
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			return nil, utils.Errorf("dump request out failed: %s", err)
 		}
 		originHttpRequest = raw
 	case *http.Request:
 		_fixHttpsPorts(ret)
-		raw, err := httputil.DumpRequest(ret, true)
+		raw, err := utils.DumpHTTPRequest(ret, true)
 		if err != nil {
 			return nil, utils.Errorf("dump request out failed: %s", err)
 		}

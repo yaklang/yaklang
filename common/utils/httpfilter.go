@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"net/http"
-	"net/http/httputil"
 	"regexp"
 	"sort"
 	"strings"
@@ -55,7 +54,7 @@ func (h *httpPacketFilterCondition) IsAllowed(req *http.Request, rsp *http.Respo
 			op1 = h.Op1
 			op2 = req.RequestURI
 		case httpFilter_RequestRaw:
-			raw, _ := httputil.DumpRequest(req, true)
+			raw, _ := DumpHTTPRequest(req, true)
 			matched, err = regexp.Match(h.Op1, raw)
 			op1 = h.Op1
 			op2 = EscapeInvalidUTF8Byte(raw)

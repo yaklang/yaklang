@@ -239,11 +239,13 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 			header.Set(keyStr, valStr)
 			continue
 		}
-		if firstCap := keyStr[0]; 'A' <= firstCap && firstCap <= 'Z' {
-			header.Add(keyStr, valStr)
-		} else {
-			header[keyStr] = append(header[keyStr], valStr)
-		}
+		header[keyStr] = append(header[keyStr], valStr)
+
+		//if firstCap := keyStr[0]; 'A' <= firstCap && firstCap <= 'Z' {
+		//	header.Add(keyStr, valStr)
+		//} else {
+		//	header[keyStr] = append(header[keyStr], valStr)
+		//}
 	}
 	req.Close = defaultClose
 	req.Header = header
