@@ -12,12 +12,12 @@ type ExpressionListMultiline interface {
 func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Value {
 	_s := stmt.ExpressionListMultiline()
 	if _s == nil {
-		b.NewError(ssa.Warn, ssa.ASTTAG, "slice literal not have expression")
+		b.NewError(ssa.Warn, TAG, "slice literal not have expression")
 		return b.EmitInterfaceBuildWithType(nil, ssa.NewConst(0), ssa.NewConst(0))
 	}
 	s, ok := _s.(*yak.ExpressionListMultilineContext)
 	if !ok {
-		b.NewError(ssa.Error, ssa.ASTTAG, "slice literal expression parse error")
+		b.NewError(ssa.Error, TAG, "slice literal expression parse error")
 		return nil
 	}
 	vs := b.buildExpressionListMultiline(s)
@@ -42,7 +42,7 @@ func (b *astbuilder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) 
 		typ := b.buildSliceTypeLiteral(s)
 		slice.SetType(ssa.Types{typ})
 	} else {
-		b.NewError(ssa.Warn, ssa.ASTTAG, "slice type not set")
+		b.NewError(ssa.Warn, TAG, "slice type not set")
 	}
 
 	return slice
@@ -55,12 +55,12 @@ type MapPairs interface {
 func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	_s := stmt.MapPairs()
 	if _s == nil {
-		b.NewError(ssa.Warn, ssa.ASTTAG, "map literal not have map pairs")
+		b.NewError(ssa.Warn, TAG, "map literal not have map pairs")
 		return b.EmitInterfaceBuildWithType(nil, ssa.NewConst(0), ssa.NewConst(0))
 	}
 	s, ok := _s.(*yak.MapPairsContext)
 	if !ok {
-		b.NewError(ssa.Error, ssa.ASTTAG, "map literal map pairs parse error")
+		b.NewError(ssa.Error, TAG, "map literal map pairs parse error")
 		return nil
 	}
 	allPair := s.AllMapPair()
@@ -85,7 +85,7 @@ func (b *astbuilder) buildMapLiteral(stmt *yak.MapLiteralContext) ssa.Value {
 		if s, ok := s.(*yak.MapTypedLiteralContext); ok {
 			return b.buildMapTypedLiteral(s)
 		} else {
-			b.NewError(ssa.Error, ssa.ASTTAG, "map typed literal parse error")
+			b.NewError(ssa.Error, TAG, "map typed literal parse error")
 		}
 	}
 	return b.buildMapFromMapPairs(stmt)
@@ -102,7 +102,7 @@ func (b *astbuilder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) ssa.
 		typ := b.buildMapTypeLiteral(s)
 		maps.SetType(ssa.Types{typ})
 	} else {
-		b.NewError(ssa.Warn, ssa.ASTTAG, "map type not set")
+		b.NewError(ssa.Warn, TAG, "map type not set")
 
 	}
 
