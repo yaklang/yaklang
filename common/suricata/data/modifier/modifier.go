@@ -48,6 +48,9 @@ const (
 
 	// TCP
 	TCPHDR
+
+	// UDP
+	UDPHDR
 )
 
 var HTTP_REQ_ONLY = []Modifier{
@@ -72,4 +75,8 @@ var HTTP_RESP_ONLY = []Modifier{
 	HTTPResponseBody,
 	HTTPServer,
 	HTTPLocation,
+}
+
+func IsHTTPModifier(mdf Modifier) bool {
+	return mdf >= HTTPUri && mdf <= HTTPHeaderNames
 }
