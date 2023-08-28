@@ -155,6 +155,24 @@ func (b *BinOp) RemoveUser(u User) { removeUser(b.user, u) }
 func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
 func (b *BinOp) AddValue(v Value)   {}
 
+// ----------- UnOp
+
+func (u *UnOp) ReplaceValue(v Value, to Value) {
+	if u.X == v {
+		u.X = to
+	} else {
+		panic("unop not use this value")
+	}
+}
+
+func (b *UnOp) GetUsers() []User { return b.user }
+func (b *UnOp) AddUser(u User)   { b.user = append(b.user, u) }
+
+func (b *UnOp) RemoveUser(u User) { removeUser(b.user, u) }
+
+func (b *UnOp) GetValues() []Value { return []Value{b.X} }
+func (b *UnOp) AddValue(v Value)   {}
+
 // ----------- Interface
 func (i *Interface) ReplaceValue(v, to Value) {
 	if i.Cap == v {
