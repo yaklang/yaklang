@@ -156,6 +156,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 		buf.WriteString(CRLF)
 	}
 
+	shrinkHeader(rsp.Header, "content-length")
 	for k := range rsp.Header {
 		switch strings.ToLower(k) {
 		case "transfer-encoding", "content-length", "server":

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 	"time"
 
@@ -71,7 +70,7 @@ func (q *Quake360Client) UserInfo() (*quakeUserInfo, error) {
 	req.Header.Set("User-Agent", "curl/7.64.1")
 
 	Debug(func() {
-		reqRaw, err := httputil.DumpRequestOut(req, true)
+		reqRaw, err := DumpHTTPRequest(req, true)
 		if err != nil {
 			return
 		}
@@ -137,7 +136,7 @@ func (q *Quake360Client) QueryNext(start, size int, queries ...string) (*gjson.R
 	req.Header.Set("User-Agent", "curl/7.64.1")
 
 	Debug(func() {
-		reqRaw, err := httputil.DumpRequestOut(req, true)
+		reqRaw, err := DumpHTTPRequest(req, true)
 		if err != nil {
 			return
 		}
