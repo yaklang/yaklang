@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -83,7 +84,7 @@ func shrinkHeader(header http.Header, key string) {
 // if loadBody is true, it will load body to memory
 //
 // transfer-encoding is a special header
-func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
+func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byte, error) {
 	if rsp == nil {
 		return nil, Error("nil response")
 	}
@@ -123,7 +124,12 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 		}
 	}
 
-	var buf = new(bytes.Buffer)
+	var cacheBuf = new(bytes.Buffer)
+	var wrs = make([]io.Writer, 0, len(wr)+1)
+	wrs = append(wrs, cacheBuf)
+	wrs = append(wrs, wr...)
+
+	var buf = bufio.NewWriter(io.MultiWriter(wrs...))
 
 	// handle proto
 	protoRaw := rsp.Proto
@@ -146,6 +152,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 	}
 	buf.WriteString(rsp.Status)
 	buf.WriteString(CRLF)
+	buf.Flush()
 
 	// handle server first
 	shrinkHeader(rsp.Header, "server")
@@ -154,6 +161,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 		buf.WriteString("Server: ")
 		buf.WriteString(ret)
 		buf.WriteString(CRLF)
+		buf.Flush()
 	}
 
 	shrinkHeader(rsp.Header, "content-length")
@@ -168,6 +176,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 		buf.WriteString(CRLF)
 	}
 
+	buf.Flush()
 	if rsp.Body == nil {
 		rsp.Body = http.NoBody
 	}
@@ -177,6 +186,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 	if transferEncodingChunked {
 		rsp.ContentLength = -1 // unknown
 		buf.WriteString("Transfer-Encoding: chunked\r\n")
+		buf.Flush()
 		if haveBody {
 			decode, fixed, _ := codec.ReadHTTPChunkedDataWithFixed(rawBody)
 			if len(decode) == 0 {
@@ -193,6 +203,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 			buf.WriteString("Content-Length: ")
 			buf.WriteString(strconv.FormatInt(contentLengthInt, 10))
 			buf.WriteString(CRLF)
+			buf.Flush()
 		}
 	}
 
@@ -200,7 +211,8 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
 	if loadBody {
 		buf.Write(rawBody)
 	}
-	return buf.Bytes(), nil
+	buf.Flush()
+	return cacheBuf.Bytes(), nil
 }
 
 // DumpHTTPRequest dumps http request to bytes
