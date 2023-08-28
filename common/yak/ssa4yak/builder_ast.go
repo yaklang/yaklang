@@ -194,36 +194,27 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// current := f.currentBlock
-	enter := b.CurrentBlock
-	header := b.NewBasicBlockUnSealed("loop.header")
-
-	body := b.NewBasicBlock("loop.body")
-	exit := b.NewBasicBlock("loop.exit")
-	latch := b.NewBasicBlock("loop.latch")
+	loop := b.BuildLoop()
 	var endThird *yak.ForThirdExprContext
 	endThird = nil
 
-	var cond ssa.Value
+	// var cond ssa.Value
+	var cond *yak.ExpressionContext
 	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		// if only expression; just build expression in header;
-		cond = b.buildExpression(e)
+		cond = e
 	} else if condition, ok := stmt.ForStmtCond().(*yak.ForStmtCondContext); ok {
 		if first, ok := condition.ForFirstExpr().(*yak.ForFirstExprContext); ok {
 			// first expression is initialization, in enter block
-			b.CurrentBlock = enter
+			loop.BuildFirstExpr(func() {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
 				b.ForExpr(first)
 				recoverRange()
-
+			})
 		}
 		if expr, ok := condition.Expression().(*yak.ExpressionContext); ok {
 			// build expression in header
-			b.CurrentBlock = header
-			cond = b.buildExpression(expr)
-		} else {
-			// not found expression; default is true
-			cond = ssa.NewConst(true)
-			b.NewError(ssa.Warn, TAG, "if condition expression is nil, default is true")
+			cond = expr
 		}
 
 		if third, ok := condition.ForThirdExpr().(*yak.ForThirdExprContext); ok {
@@ -231,31 +222,23 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 			endThird = third
 		}
 	}
-	// jump enter->header
-	b.CurrentBlock = enter
-	b.EmitJump(header)
-	// build if in header end; to exit or body
-	b.CurrentBlock = header
-	ifssa := b.EmitIf(cond)
-	ifssa.AddFalse(exit)
-	ifssa.AddTrue(body)
 
+	loop.BuildCondtion(func() ssa.Value {
+		condition := b.buildExpression(cond)
+		if condition == nil {
+			condition = ssa.NewConst(true)
+			b.NewError(ssa.Warn, TAG, "if condition expression is nil, default is true")
+		}
+		return condition
+	})
 	//  build body
-	b.CurrentBlock = body
-	if block, ok := stmt.Block().(*yak.BlockContext); ok {
-		b.PushTarget(exit, latch, nil) // push target for break and continue
-		b.buildBlock(block)            // block can create block
-		b.PopTarget()                  // pop
-		// // f.currentBlock is end block in body
-		// body = b.CurrentBlock
-	}
-	// jump body -> latch
-	b.EmitJump(latch)
-
+	loop.BuildBody(func() {
+		if block, ok := stmt.Block().(*yak.BlockContext); ok {
+			b.buildBlock(block)
+		}
+	})
 	// build latch
-	b.CurrentBlock = latch
-
-
+	loop.BuildLatch(func() {
 		if endThird != nil {
 			// build third expression in loop.latch
 			recoverRange := b.SetRange(endThird.BaseParserRuleContext)
@@ -263,17 +246,8 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 			recoverRange()
 
 		}
-	b.EmitJump(header)
-
-	// now header sealed
-	header.Sealed()
-
-	rest := b.NewBasicBlock("")
-	// jump exit -> rest
-	b.CurrentBlock = exit
-	b.EmitJump(rest)
-	// continue in rest code
-	b.CurrentBlock = rest
+	})
+	loop.Finish()
 }
 
 type forExpr interface {
