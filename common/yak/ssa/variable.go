@@ -49,6 +49,10 @@ func (f *Function) WriteVariable(variable string, value Value) {
 	if b := f.builder; b != nil {
 		b.writeVariableByBlock(variable, value, b.CurrentBlock)
 	}
+	f.WriteSymbolTable(variable, value)
+}
+
+func (f *Function) WriteSymbolTable(variable string, value Value) {
 	if _, ok := f.symbolTable[variable]; !ok {
 		f.symbolTable[variable] = make([]Value, 0, 1)
 	}

@@ -29,6 +29,7 @@ func (phi *Phi) Build() Value {
 		block := phi.Block
 		block.Phis = append(block.Phis, phi)
 		phi.Func.SetReg(phi)
+		phi.Func.WriteSymbolTable(phi.variable, phi)
 	}
 	fixupUseChain(v)
 	return v
