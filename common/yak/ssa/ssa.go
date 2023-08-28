@@ -398,7 +398,14 @@ type UnOp struct {
 
 	Op UnaryOpcode
 	X  Value
+
+	user []User
 }
+
+var _ Value = (*UnOp)(nil)
+var _ User = (*UnOp)(nil)
+var _ Node = (*UnOp)(nil)
+var _ Instruction = (*UnOp)(nil)
 
 // special instruction ------------------------------------------
 

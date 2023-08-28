@@ -257,6 +257,19 @@ func (b *BinOp) String() string {
 	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), BinaryOpcodeName[b.Op], getStr(b.Y))
 }
 
+// ----------- UnOp
+var UnaryOpcodeName = map[UnaryOpcode]string{
+	OpNone: ``,
+	OpNot:  `not`,
+	OpPlus: `plus`,
+	OpNeg:  `neg`,
+	OpChan: `chan`,
+}
+
+func (u *UnOp) String() string {
+	return fmt.Sprintf("%s = %s %s", getStr(u), UnaryOpcodeName[u.Op], getStr(u.X))
+}
+
 // ----------- Interface
 func (i *Interface) String() string {
 	return fmt.Sprintf(
