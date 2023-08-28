@@ -79,7 +79,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	rsp.ProtoMajor = codec.Atoi(major)
 	rsp.ProtoMinor = codec.Atoi(minor)
 	if rsp.StatusCode < 100 {
-		return nil, Errorf("invalid firstline: %d", strconv.Quote(string(firstLine)))
+		return nil, Errorf("invalid first line: %v", strconv.Quote(string(firstLine)))
 	}
 
 	// header
