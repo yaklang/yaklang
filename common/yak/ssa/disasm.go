@@ -221,11 +221,11 @@ func (c *Call) String() string {
 func (sw *Switch) String() string {
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
-		getStr(sw.cond),
-		sw.defaultBlock.Name,
+		getStr(sw.Cond),
+		sw.DefaultBlock.Name,
 		strings.Join(
-			lo.Map(sw.label, func(label SwitchLabel, _ int) string {
-				return fmt.Sprintf("%s:%s", getStr(label.value), label.dest.Name)
+			lo.Map(sw.Label, func(label SwitchLabel, _ int) string {
+				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.Name)
 			}),
 			", ",
 		),

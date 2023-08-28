@@ -321,24 +321,24 @@ var _ Instruction = (*Call)(nil)
 
 // ----------- Switch
 type SwitchLabel struct {
-	value Value
-	dest  *BasicBlock
+	Value Value
+	Dest  *BasicBlock
 }
 
 func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
 	return SwitchLabel{
-		value: v,
-		dest:  dest,
+		Value: v,
+		Dest:  dest,
 	}
 }
 
 type Switch struct {
 	anInstruction
 
-	cond         Value
-	defaultBlock *BasicBlock
+	Cond         Value
+	DefaultBlock *BasicBlock
 
-	label []SwitchLabel
+	Label []SwitchLabel
 }
 
 var _ Node = (*Switch)(nil)
