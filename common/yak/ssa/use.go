@@ -8,7 +8,7 @@ import (
 func ReplaceValue(v Value, to Value) {
 	for _, user := range v.GetUsers() {
 		user.ReplaceValue(v, to)
-		user.InferenceType()
+		// user.InferenceType()
 		to.AddUser(user)
 		v.RemoveUser(user)
 	}
