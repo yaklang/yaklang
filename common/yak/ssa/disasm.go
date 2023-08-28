@@ -149,6 +149,9 @@ func (b *BasicBlock) String() string {
 			ret += pred.Name + " "
 		}
 	}
+	if b.Condition != nil {
+		ret += " (" + b.Condition.String() + ")"
+	}
 	return ret
 }
 

@@ -1,6 +1,8 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func (f *Function) NewBasicBlock(name string) *BasicBlock {
 	return f.newBasicBlockWithSealed(name, true)
@@ -30,6 +32,26 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 	}
 	f.Blocks = append(f.Blocks, b)
 	return b
+}
+
+/*
+	if condition is true  :  1 reach
+	if condition is false : -1 unreach
+	if condition need calc: 0  unknow
+*/
+
+func (b *BasicBlock) Reachable() int {
+	if c, ok := b.Condition.(*Const); ok {
+		if c.IsBoolean() {
+			if c.Boolean() {
+				return 1
+			} else {
+				return -1
+			}
+		}
+	}
+
+	return 0
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {

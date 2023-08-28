@@ -127,6 +127,11 @@ type BasicBlock struct {
 	// basicblock graph
 	Preds, Succs []*BasicBlock
 
+	/*
+		if Condition == true: this block reach
+	*/
+	Condition Value
+
 	// instruction list
 	Instrs []Instruction
 	Phis   []*Phi
