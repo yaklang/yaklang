@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+
 func TestReadConnWithTimeout(t *testing.T) {
 	token := uuid.New().String()
 	lis, err := memconn.Listen("memu", token)
