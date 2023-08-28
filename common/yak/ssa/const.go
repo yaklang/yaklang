@@ -10,7 +10,7 @@ var (
 	UnDefineConst = &Const{
 		user:  []User{},
 		value: nil,
-		typ:   []Type{BasicTypesKind[Undefine]},
+		typ:   []Type{BasicTypesKind[UndefineType]},
 		str:   "Undefine",
 		Unary: 0,
 	}
@@ -40,4 +40,58 @@ func NewConst(i any) *Const {
 	// assert newConst(1) ==newConst(1)
 	ConstMap[i] = c
 	return c
+}
+
+func (c *Const) IsBoolean() bool {
+	return c.typ[0] == BasicTypesKind[Boolean]
+}
+
+func (c *Const) Boolean() bool {
+	return c.value.(bool)
+}
+
+func (c *Const) IsNumber() bool {
+	return c.typ[0] == BasicTypesKind[Number]
+}
+
+func (c *Const) Number() int64 {
+	switch ret := c.value.(type) {
+	case int:
+		return int64(ret)
+	case int8:
+		return int64(ret)
+	case int16:
+		return int64(ret)
+	case int32:
+		return int64(ret)
+	case int64:
+		return ret
+	case uint:
+		return int64(ret)
+	case uint8:
+		return int64(ret)
+	case uint16:
+		return int64(ret)
+	case uint32:
+		return int64(ret)
+	case uint64:
+		return int64(ret)
+	}
+	return 0
+}
+
+func (c *Const) IsFloat() bool {
+	return c.typ[0] == BasicTypesKind[Float]
+}
+
+func (c *Const) Float() float64 {
+	if c.IsFloat() {
+		return c.value.(float64)
+	} else {
+		return float64(c.Number())
+	}
+}
+
+func (c *Const) IsString() bool {
+	return c.typ[0] == BasicTypesKind[String]
 }

@@ -46,11 +46,13 @@ type TypeKind int
 
 const (
 	Number TypeKind = iota
+	Float
 	String
 	Boolean
-	Undefine // undefine is nil in golnag
-	Null     //
-	Any      // any type
+	UndefineType // undefine is nil in golnag
+	Null         //
+	Any          // any type
+	ErrorType
 )
 
 type BasicType struct {
@@ -63,12 +65,14 @@ func (b BasicType) String() string {
 }
 
 var BasicTypesKind = []BasicType{
-	Number:   {Number, "number"},
-	String:   {String, "string"},
-	Boolean:  {Boolean, "boolean"},
-	Undefine: {Undefine, "undefine"},
-	Null:     {Null, "null"},
-	Any:      {Any, "any"},
+	Number:       {Number, "number"},
+	Float:        {Float, "float"},
+	String:       {String, "string"},
+	Boolean:      {Boolean, "boolean"},
+	UndefineType: {UndefineType, "undefine"},
+	Null:         {Null, "null"},
+	Any:          {Any, "any"},
+	ErrorType:    {ErrorType, "error"},
 }
 
 func GetType(i any) Type {
@@ -83,7 +87,7 @@ func GetTypeByStr(typ string) Type {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64":
 		return BasicTypesKind[Number]
 	case "float", "float32", "float64", "double":
-		return BasicTypesKind[Number]
+		return BasicTypesKind[Float]
 	case "string":
 		return BasicTypesKind[String]
 	case "bool":
