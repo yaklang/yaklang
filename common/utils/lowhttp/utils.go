@@ -6,6 +6,7 @@ import (
 	"compress/flate"
 	"compress/zlib"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math"
@@ -53,7 +54,7 @@ func parseResponseLine(line string) (string, int, string, bool) {
 		proto = blocks[0]
 	}
 	if lenOfBlocks > 1 {
-		code = utils.Atoi(blocks[1])
+		code = codec.Atoi(blocks[1])
 	}
 	if lenOfBlocks > 2 {
 		status = blocks[2]

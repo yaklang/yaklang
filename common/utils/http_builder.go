@@ -71,6 +71,8 @@ func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok boo
 }
 
 func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
+	var rawPacket = new(bytes.Buffer)
+
 	var req = &http.Request{
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
@@ -100,6 +102,8 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 	if err != nil {
 		return nil, Errorf(`Read Request FirstLine Failed: %s`, err)
 	}
+	rawPacket.Write(firstLine)
+	rawPacket.WriteString(CRLF)
 
 	// handle proto
 	method, uri, proto, ok := ParseHTTPRequestLine(string(firstLine))
@@ -184,10 +188,13 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 	for {
 		lineBytes, err := BufioReadLine(reader)
 		if err != nil {
-			return nil, err
+			return nil, Errorf(`Read Request Header Failed: %s`, err)
 		}
+		rawPacket.Write(lineBytes)
+		rawPacket.WriteString(CRLF)
 
 		if len(bytes.TrimSpace(lineBytes)) == 0 {
+			rawPacket.WriteString(CRLF)
 			break
 		}
 
@@ -203,7 +210,7 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 		switch strings.ToLower(keyStr) {
 		case "content-length":
 			useContentLength = true
-			contentLengthInt = Atoi(valStr)
+			contentLengthInt = codec.Atoi(valStr)
 			if contentLengthInt != 0 || !ShouldRemoveZeroContentLengthHeader(method) {
 				header.Set(keyStr, valStr)
 			}
@@ -272,23 +279,24 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 		bodyRawBuf.Write(bodyRaw)
 	}
 
+	rawPacket.Write(bodyRawBuf.Bytes())
+
 	if bodyRawBuf.Len() == 0 {
 		req.Body = http.NoBody
 	} else {
 		req.Body = io.NopCloser(bodyRawBuf)
 	}
-
 	if req.URL != nil && req.URL.Host != "" {
 		req.Host = req.URL.Host
 	}
-
-	if req.Host == "http" {
-		log.Errorf("http host is http, %s", req.RequestURI)
-	}
-
 	return req, nil
 }
 
+// FixHTTPRequestForGolangNativeHTTPClient
+// utils.Read/DumpRequest is working as pair...
+// if u want to use transport(golang native)
+// do this `FixHTTPRequestForGolangNativeHTTPClient` helps
+// because golang native transport will encode chunked body again
 func FixHTTPRequestForGolangNativeHTTPClient(req *http.Request) {
 	if req == nil {
 		return
@@ -300,6 +308,21 @@ func FixHTTPRequestForGolangNativeHTTPClient(req *http.Request) {
 			req.Body = io.NopCloser(bytes.NewReader(result))
 		} else {
 			req.Body = io.NopCloser(bytes.NewReader(rest))
+		}
+	}
+}
+
+func FixHTTPResponseForGolangNativeHTTPClient(ins *http.Response) {
+	if ins == nil {
+		return
+	}
+	if StringArrayContains(ins.TransferEncoding, "chunked") && ins.Body != nil {
+		body, _ := io.ReadAll(ins.Body)
+		result, rest := codec.HTTPChunkedDecodeWithRestBytes(body)
+		if len(result) > 0 {
+			ins.Body = io.NopCloser(bytes.NewReader(result))
+		} else {
+			ins.Body = io.NopCloser(bytes.NewReader(rest))
 		}
 	}
 }

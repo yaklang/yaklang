@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -387,13 +388,13 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 		key, value := result[0], result[1]
 		var replacedValue []string
 		if govalidator.IsIn(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atoi(value)))
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
 		}
 		if govalidator.IsFloat(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atof(value)))
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atof(value)))
 		}
 		if value == `true` || value == `false` {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atob(value)))
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atob(value)))
 		}
 		replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, value))
 
@@ -447,11 +448,8 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 			jsonpath.ReplaceString(rawJson, jsonPath, value),
 		}
 		if govalidator.IsInt(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atoi(value)))
+			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
 		}
-		//if govalidator.IsFloat(value) {
-		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, utils.Atof(value)))
-		//}
 		for _, i := range replacedValue {
 			newReq := lowhttp.CopyRequest(req)
 			if newReq == nil {
@@ -724,7 +722,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		if utils.IsValidInteger(value) {
 			forkedMap, _ := deepCopyMapRaw(newParam)
 			if forkedMap != nil {
-				forkedMap[key] = utils.Atoi(value)
+				forkedMap[key] = codec.Atoi(value)
 				raw, _ := json.Marshal(forkedMap)
 				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
 				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
@@ -737,7 +735,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		if utils.IsValidFloat(value) && strings.Contains(strings.Trim(value, `.`), ".") {
 			forkedMap, _ := deepCopyMapRaw(newParam)
 			if forkedMap != nil {
-				forkedMap[key] = utils.Atof(value)
+				forkedMap[key] = codec.Atof(value)
 				raw, _ := json.Marshal(forkedMap)
 				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
 				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
@@ -750,10 +748,10 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		if value == "true" || value == "false" {
 			forkedMap, _ := deepCopyMapRaw(newParam)
 			if forkedMap != nil {
-				forkedMap[key] = utils.Atob(value)
+				forkedMap[key] = codec.Atob(value)
 				raw, _ := json.Marshal(forkedMap)
 				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
+				_req.Body = io.NopCloser(bytes.NewBuffer(raw))
 				if _req != nil {
 					reqs = append(reqs, _req)
 				}

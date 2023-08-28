@@ -74,7 +74,7 @@ func (h *httpPacketFilterCondition) IsAllowed(req *http.Request, rsp *http.Respo
 		case httpFilter_ResponseHeader:
 			matched, _ = regexp.MatchString(h.Op2, rsp.Header.Get(h.Op1))
 		case httpFilter_ResponseRaw:
-			raw, _ := httputil.DumpResponse(rsp, true)
+			raw, _ := DumpHTTPResponse(rsp, true)
 			matched, _ = regexp.Match(h.Op1, raw)
 		}
 	}

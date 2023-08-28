@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 )
@@ -70,7 +71,7 @@ var (
 			yakit.DeleteRiskByTarget(consts.GetGormProjectDatabase(), addr)
 		},
 		"DeleteRiskByID": func(id any) {
-			var err = yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), int64(utils.Atoi(utils.InterfaceToString(id))))
+			var err = yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), int64(codec.Atoi(utils.InterfaceToString(id))))
 			if err != nil {
 				log.Errorf("delete risk by id error: %v", err)
 			}

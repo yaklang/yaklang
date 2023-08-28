@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -76,12 +75,12 @@ func _dumpWithBody(i interface{}, body bool) (isReq bool, _ []byte, _ error) {
 
 	switch ret := i.(type) {
 	case *http.Request:
-		raw, err := httputil.DumpRequest(ret, body)
+		raw, err := utils.DumpHTTPRequest(ret, body)
 		return true, raw, err
 	case http.Request:
 		return _dumpWithBody(&ret, body)
 	case *http.Response:
-		raw, err := httputil.DumpResponse(ret, body)
+		raw, err := utils.DumpHTTPResponse(ret, body)
 		return false, raw, err
 	case http.Response:
 		return _dumpWithBody(&ret, body)

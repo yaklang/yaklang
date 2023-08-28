@@ -7,6 +7,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
 
@@ -61,7 +62,7 @@ func WithTCP_Flags(in any) TCPOption {
 	return func(config *layers.TCP) error {
 		var flagStr []string
 		if ret := utils.InterfaceToString(in); govalidator.IsInt(ret) {
-			var i = utils.Atoi(ret)
+			var i = codec.Atoi(ret)
 			config.FIN = i&TCP_FLAG_FIN > 0
 			config.SYN = i&TCP_FLAG_SYN > 0
 			config.RST = i&TCP_FLAG_RST > 0

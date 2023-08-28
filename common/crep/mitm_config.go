@@ -571,7 +571,7 @@ func MITM_SetTransparentHijackHTTPResponse(f MITMTransparentHijackHTTPResponseFu
 		}
 
 		rspInstance := f(isHttps, rp)
-		raw, err := httputil.DumpResponse(rspInstance, true)
+		raw, err := utils.DumpHTTPResponse(rspInstance, true)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse *http.Response to []byte failed: %s", err)
 			return nil

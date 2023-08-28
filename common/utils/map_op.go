@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 	"strings"
 )
@@ -243,7 +244,7 @@ func MapGetInt(m map[string]interface{}, key string) int {
 }
 
 func MapGetIntEx(m map[string]interface{}, key ...string) int {
-	return Atoi(InterfaceToString(MapGetFirstRaw(m, key...)))
+	return codec.Atoi(InterfaceToString(MapGetFirstRaw(m, key...)))
 }
 
 func MapGetFloat64Or(m map[string]interface{}, key string, value float64) float64 {

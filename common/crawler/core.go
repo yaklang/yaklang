@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -776,7 +775,7 @@ func (c *Crawler) execReq(r *Req) {
 		return
 	}
 
-	raw, err := httputil.DumpResponse(rsp, false)
+	raw, err := utils.DumpHTTPResponse(rsp, false)
 	if err != nil {
 		return
 	}
