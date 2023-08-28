@@ -4,6 +4,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
 type astbuilder struct {
@@ -47,5 +48,9 @@ func ParseSSA(src string) *ssa.Program {
 		prog: prog,
 	}
 	prog.Build(builder)
+	ssa4analyze.NewAnalyzerGroup(
+		prog,
+		ssa4analyze.WithPass(true),
+	).Run()
 	return prog
 }
