@@ -50,6 +50,14 @@ func newTCPGen(r *rule.Rule) (Generator, error) {
 			log.Warnf("not support modifier %v", mdf)
 		}
 	}
+
+	if g.payload == nil {
+		g.payload = &ContentGen{
+			Len:   32,
+			noise: noiseAll,
+		}
+	}
+
 	return g, nil
 }
 
