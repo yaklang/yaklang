@@ -1,5 +1,132 @@
 package ssa
 
+import "golang.org/x/exp/slices"
+
+func Insert(i Instruction, b *BasicBlock) {
+	b.Instrs = append(b.Instrs, i)
+}
+
+func remove[T comparable](slice []T, s T) []T {
+	if index := slices.Index(slice, s); index > -1 {
+		return append(slice[:index], slice[index+1:]...)
+	}
+	return nil
+}
+
+func DeleteInst(i Instruction) {
+	b := i.GetBlock()
+	if phi, ok := i.(*Phi); ok {
+		b.Phis = remove(b.Phis, phi)
+	} else {
+		b.Instrs = remove(b.Instrs, i)
+	}
+	// if v, ok := i.(Value); ok {
+	// 	f := i.GetParent()
+	// 	f.symbolTable[v.GetVariable()] = remove(f.symbolTable[v.GetVariable()], v)
+	// }
+}
+
+func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
+	j := &Jump{
+		anInstruction: newAnInstuction(block),
+		To:            to,
+	}
+	return j
+}
+
+func newAnInstuction(block *BasicBlock) anInstruction {
+	return anInstruction{
+		Func:  block.Parent,
+		Block: block,
+		typs:  make(Types, 0),
+		pos:   nil,
+	}
+}
+
+func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
+	b := &BinOp{
+		anInstruction: newAnInstuction(block),
+		Op:            op,
+		X:             x,
+		Y:             y,
+		user:          []User{},
+	}
+	fixupUseChain(b)
+	block.Parent.SetReg(b)
+	return b
+}
+func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
+	b := &UnOp{
+		anInstruction: newAnInstuction(block),
+		Op:            op,
+		X:             x,
+		user:          []User{},
+	}
+	fixupUseChain(b)
+	block.Parent.SetReg(b)
+	return b
+}
+
+func NewIf(cond Value, block *BasicBlock) *If {
+	ifssa := &If{
+		anInstruction: newAnInstuction(block),
+		Cond:          cond,
+	}
+	fixupUseChain(ifssa)
+	return ifssa
+}
+
+func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel, block *BasicBlock) *Switch {
+	sw := &Switch{
+		anInstruction: newAnInstuction(block),
+		Cond:          cond,
+		DefaultBlock:  defaultb,
+		Label:         label,
+	}
+	fixupUseChain(sw)
+	return sw
+}
+
+func NewReturn(vs []Value, block *BasicBlock) *Return {
+	r := &Return{
+		anInstruction: newAnInstuction(block),
+		Results:       vs,
+	}
+	fixupUseChain(r)
+	block.Parent.Return = append(block.Parent.Return, r)
+	return r
+}
+
+func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value, block *BasicBlock) *Interface {
+
+	i := &Interface{
+		anInstruction: newAnInstuction(block),
+		parentI:       parentI,
+		low:           low,
+		high:          high,
+		max:           max,
+		field:         make(map[Value]*Field, 0),
+		Len:           Len,
+		Cap:           Cap,
+		users:         make([]User, 0),
+	}
+	if typs != nil {
+		i.anInstruction.typs = typs
+	}
+	fixupUseChain(i)
+	return i
+}
+
+func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
+	s := &Update{
+		anInstruction: newAnInstuction(block),
+		value:         v,
+		address:       address,
+	}
+	fixupUseChain(s)
+	return s
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
@@ -100,7 +227,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 		}
 	}
 	c := &Call{
-		anInstruction: f.newAnInstuction(),
+		anInstruction: newAnInstuction(f.CurrentBlock),
 		Method:        target,
 		Args:          args,
 		user:          []User{},
