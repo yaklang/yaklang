@@ -3,6 +3,8 @@
 package crawlerx
 
 import (
+	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 	"context"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
@@ -35,7 +37,6 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	if err != nil {
 		return nil, utils.Errorf(`Data channel create error: %s`, err)
 	}
-	//urlTree := tools.CreateTree(targetUrl)
 	waitGroup := utils.NewSizedWaitGroup(20)
 	startWaitGroup := utils.NewSizedWaitGroup(20)
 	baseOpts := make([]ConfigOpt, 0)
@@ -45,7 +46,6 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		WithPageVisitFilter(pageVisit),
 		WithResultSentFilter(resultSent),
 		WithUChan(uChan),
-		// WithUrlTree(urlTree),
 		WithPageSizedWaitGroup(waitGroup),
 		WithStartWaitGroup(startWaitGroup),
 	)
@@ -76,14 +76,18 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		waitGroup:      waitGroup,
 		startWaitGroup: startWaitGroup,
 	}
-	core.init()
+	err = core.init()
+	if err != nil {
+		return nil, utils.Error(err)
+	}
 	return &core, nil
 }
 
-func (core *CrawlerCore) init() {
+func (core *CrawlerCore) init() error {
 	manager := NewBrowserManager(core.config)
 	manager.CreateBrowserStarters()
 	core.manager = manager
+	return nil
 }
 
 func (core *CrawlerCore) Start() {
