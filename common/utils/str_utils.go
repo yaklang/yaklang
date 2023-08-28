@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -567,7 +568,7 @@ func InterfaceToInt(i any) int {
 	case uint16:
 		return int(ret)
 	default:
-		return Atoi(InterfaceToString(i))
+		return codec.Atoi(InterfaceToString(i))
 	}
 }
 
@@ -778,21 +779,6 @@ func ParseLines(raw string) chan string {
 		}
 	}()
 	return outC
-}
-
-func Atoi(i string) int {
-	raw, _ := strconv.Atoi(i)
-	return raw
-}
-
-func Atof(i string) float64 {
-	raw, _ := strconv.ParseFloat(i, 64)
-	return raw
-}
-
-func Atob(i string) bool {
-	raw, _ := strconv.ParseBool(i)
-	return raw
 }
 
 func CopyBytes(rsp []byte) []byte {

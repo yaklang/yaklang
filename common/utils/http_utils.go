@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"reflect"
 	"strings"
 
@@ -93,7 +92,7 @@ func HttpDumpWithBody(i interface{}, body bool) ([]byte, error) {
 	case http.Request:
 		return HttpDumpWithBody(&ret, body)
 	case *http.Response:
-		return httputil.DumpResponse(ret, body)
+		return DumpHTTPResponse(ret, body)
 	case http.Response:
 		return HttpDumpWithBody(&ret, body)
 	default:

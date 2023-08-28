@@ -569,7 +569,7 @@ if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("GM HTTPS not pass!")
 }
 `, params)
 				if err != nil {
@@ -595,7 +595,7 @@ if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("TLS HTTPS not pass!")
 }
 `, params)
 				if err != nil {
@@ -621,7 +621,7 @@ if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("Plain HTTP not pass!")
 }
 `, params)
 				if err != nil {
@@ -634,47 +634,47 @@ if rsp.Contains(getParam("token")) {
 
 				// 使用协程进行并发查询
 				done := make(chan struct{})
-				defer close(done)
 
 				go func() {
-					for {
-						_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/GMTLS" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
+					defer close(done)
 
-						if len(flows) > 0 {
-							gmTest = true
-						}
+					time.Sleep(time.Second)
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/GMTLS" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
 
-						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/HTTPS" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
+					if len(flows) > 0 {
+						gmTest = true
+					}
 
-						if len(flows) > 0 {
-							httpsTest = true
-						}
+					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/HTTPS" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
 
-						// 执行查询操作
-						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/HTTP" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
+					if len(flows) > 0 {
+						httpsTest = true
+					}
 
-						if len(flows) > 0 {
-							httpTest = true
-						}
-						if gmTest && httpsTest && httpTest {
-							done <- struct{}{}
-							break
-						}
+					// 执行查询操作
+					_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/HTTP" + token,
+					})
+					if err != nil {
+						panic(err)
+					}
+
+					if len(flows) > 0 {
+						httpTest = true
+					}
+					if gmTest && httpsTest && httpTest {
+						done <- struct{}{}
+						return
 					}
 				}()
 

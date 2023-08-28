@@ -32,15 +32,15 @@ func cloneCookies(i []*http.Cookie) []*http.Cookie {
 
 func valueToJsonValue(i string) []any {
 	if utils.IsValidInteger(i) {
-		return []any{utils.Atoi(i), i}
+		return []any{codec.Atoi(i), i}
 	}
 
 	if utils.IsValidFloat(i) {
-		return []any{utils.Atof(i), i}
+		return []any{codec.Atof(i), i}
 	}
 
 	if i == "true" || i == "false" {
-		return []any{utils.Atob(i), i}
+		return []any{codec.Atob(i), i}
 	}
 
 	if i == "undefined" || i == "null" {

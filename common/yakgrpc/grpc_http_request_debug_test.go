@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -71,7 +72,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 		}
 		spew.Dump(rsp)
 	}
-	count := utils.Atoi(yakit.Get(token))
+	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
 	if count != 2 {
 		panic("count should be 2")
@@ -144,7 +145,7 @@ User-Agent: xxx
 		}
 		spew.Dump(rsp)
 	}
-	count := utils.Atoi(yakit.Get(token))
+	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
 	if count != 2 {
 		panic("count should be 2")
@@ -212,7 +213,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 		}
 		spew.Dump(rsp)
 	}
-	count := utils.Atoi(yakit.Get(token))
+	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
 	if count != 2 {
 		panic("count should be 2")
@@ -284,7 +285,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 		}
 		spew.Dump(rsp)
 	}
-	count := utils.Atoi(yakit.Get(token))
+	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
 	if count != 3 {
 		panic("count should be 3")

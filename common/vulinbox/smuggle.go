@@ -195,7 +195,7 @@ Content-Type: text/html; charset=utf-8
 			}
 			k, v := lowhttp.SplitHTTPHeader(string(line))
 			if strings.ToLower(k) == "content-length" {
-				bodySize = utils.Atoi(v)
+				bodySize = codec.Atoi(v)
 				log.Infof("content-length: %v", bodySize)
 			} else {
 				proxied.WriteString(string(line) + "\r\n")

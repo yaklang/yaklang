@@ -55,5 +55,6 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// do some hack to make sure packet is right
 	utils.FixHTTPRequestForGolangNativeHTTPClient(req)
 	rsp, err := t.Transport.RoundTrip(req)
+	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err
 }

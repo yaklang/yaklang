@@ -230,12 +230,12 @@ func TestNewVars(t *testing.T) {
 	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
 	var a = vars.ToMap()
 
-	actResult := utils.Atoi(fmt.Sprint(a["year"])) - utils.Atoi(fmt.Sprint(a["month"])) - utils.Atoi(fmt.Sprint(a["day"]))
+	actResult := codec.Atoi(fmt.Sprint(a["year"])) - codec.Atoi(fmt.Sprint(a["month"])) - codec.Atoi(fmt.Sprint(a["day"]))
 	if actResult == 0 {
 		panic("empty result vars")
 	}
 
-	if actResult != utils.Atoi(fmt.Sprint(a["result"])) {
+	if actResult != codec.Atoi(fmt.Sprint(a["result"])) {
 		panic("result vars not equal")
 	}
 	spew.Dump(a)

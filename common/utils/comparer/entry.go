@@ -6,9 +6,9 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"sort"
 	"strconv"
 )
@@ -113,12 +113,12 @@ func CompareHTTPResponse(rsp1 *http.Response, rsp2 *http.Response) float64 {
 	scoreFloat64 = scoreFloat64.Add(compareCookies(cookie1, cookie2), 0.02)
 
 	// 整体 Header 相似度
-	header1, _ := httputil.DumpResponse(rsp1, false)
-	header2, _ := httputil.DumpResponse(rsp2, false)
+	header1, _ := utils.DumpHTTPResponse(rsp1, false)
+	header2, _ := utils.DumpHTTPResponse(rsp2, false)
 	scoreFloat64 = scoreFloat64.Add(compareBytes(header1, header2), 0.06)
 
 	// 读取并恢复 Body
-	body1, err := ioutil.ReadAll(rsp1.Body)
+	body1, err := io.ReadAll(rsp1.Body)
 	if err != nil {
 		log.Error(err)
 	}

@@ -556,7 +556,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 		if !haveCL && strings.ToLower(key) == "content-length" {
 			haveCL = true
-			clInt = utils.Atoi(value)
+			clInt = codec.Atoi(value)
 		}
 	})
 	if hostInPacket == "" && host == "" {

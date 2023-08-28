@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // match dns
@@ -20,7 +20,7 @@ func dnsIniter(c *matchContext) error {
 
 	if c.Rule.ContentRuleConfig.DNS != nil {
 		if !c.Must(negIf(c.Rule.ContentRuleConfig.DNS.OpcodeNegative,
-			utils.Atoi(string(dns.(*layers.DNS).OpCode)) == c.Rule.ContentRuleConfig.DNS.Opcode,
+			codec.Atoi(string(dns.(*layers.DNS).OpCode)) == c.Rule.ContentRuleConfig.DNS.Opcode,
 		)) {
 			return nil
 		}

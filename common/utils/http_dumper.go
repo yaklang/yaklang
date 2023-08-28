@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -78,8 +79,127 @@ func shrinkHeader(header http.Header, key string) {
 	}
 }
 
-func DumpHTTPResponse(rsp *http.Response) ([]byte, error) {
-	return nil, Error("not implemented")
+// DumpHTTPResponse dumps http response to bytes
+// if loadBody is true, it will load body to memory
+//
+// transfer-encoding is a special header
+func DumpHTTPResponse(rsp *http.Response, loadBody bool) ([]byte, error) {
+	if rsp == nil {
+		return nil, Error("nil response")
+	}
+
+	var (
+		transferEncodingChunked bool
+		contentLengthExisted    bool
+		contentLengthInt        int64
+	)
+
+	// handle transfer-encoding
+	if len(rsp.TransferEncoding) > 0 {
+		for _, v := range rsp.TransferEncoding {
+			if v == "chunked" {
+				transferEncodingChunked = true
+				break
+			}
+		}
+	}
+	if !transferEncodingChunked {
+		if ret := getHeaderValue(rsp.Header, "transfer-encoding"); ret != "" {
+			if strings.Contains(ret, "chunked") {
+				transferEncodingChunked = true
+			}
+		}
+	}
+
+	// handle content-length
+	if rsp.ContentLength > 0 {
+		contentLengthExisted = true
+		contentLengthInt = rsp.ContentLength
+	} else {
+		if ret := getHeaderValue(rsp.Header, "content-length"); ret != "" {
+			contentLengthExisted = true
+			rsp.ContentLength = int64(codec.Atoi(ret))
+			contentLengthInt = rsp.ContentLength
+		}
+	}
+
+	var buf = new(bytes.Buffer)
+
+	// handle proto
+	protoRaw := rsp.Proto
+	if rsp.ProtoMajor <= 0 && rsp.ProtoMinor <= 0 {
+		rsp.ProtoMajor = 1
+		rsp.ProtoMinor = 1
+	}
+	if protoRaw == "" {
+		protoRaw = fmt.Sprintf("HTTP/%d.%d", rsp.ProtoMajor, rsp.ProtoMinor)
+	}
+	buf.WriteString(protoRaw)
+	buf.WriteString(" ")
+	if rsp.Status == "" {
+		if rsp.StatusCode <= 0 {
+			rsp.StatusCode = 200
+			rsp.Status = "200 OK"
+		} else {
+			rsp.Status = fmt.Sprintf("%d %s", rsp.StatusCode, http.StatusText(rsp.StatusCode))
+		}
+	}
+	buf.WriteString(rsp.Status)
+	buf.WriteString(CRLF)
+
+	// handle server first
+	shrinkHeader(rsp.Header, "server")
+	if ret := rsp.Header.Get("server"); ret != "" {
+		rsp.Header.Set("Server", ret)
+		buf.WriteString("Server: ")
+		buf.WriteString(ret)
+		buf.WriteString(CRLF)
+	}
+
+	for k := range rsp.Header {
+		switch strings.ToLower(k) {
+		case "transfer-encoding", "content-length", "server":
+			continue
+		}
+		buf.WriteString(k)
+		buf.WriteString(": ")
+		buf.WriteString(getHeaderValueAll(rsp.Header, k))
+		buf.WriteString(CRLF)
+	}
+
+	if rsp.Body == nil {
+		rsp.Body = http.NoBody
+	}
+
+	rawBody, _ := io.ReadAll(rsp.Body)
+	haveBody := len(rawBody) > 0
+	if transferEncodingChunked {
+		rsp.ContentLength = -1 // unknown
+		buf.WriteString("Transfer-Encoding: chunked\r\n")
+		if haveBody {
+			decode, fixed, _ := codec.ReadHTTPChunkedDataWithFixed(rawBody)
+			if len(decode) == 0 {
+				rawBody = codec.HTTPChunkedEncode(rawBody)
+			} else {
+				rawBody = fixed
+			}
+		}
+	} else {
+		// handle content-length
+		if haveBody || contentLengthExisted {
+			rsp.ContentLength = int64(len(rawBody))
+			contentLengthInt = rsp.ContentLength
+			buf.WriteString("Content-Length: ")
+			buf.WriteString(strconv.FormatInt(contentLengthInt, 10))
+			buf.WriteString(CRLF)
+		}
+	}
+
+	buf.WriteString(CRLF)
+	if loadBody {
+		buf.Write(rawBody)
+	}
+	return buf.Bytes(), nil
 }
 
 // DumpHTTPRequest dumps http request to bytes
@@ -107,13 +227,11 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 			}
 		}
 	}
-
-	if req.Header.Get("Transfer-Encoding") == "chunked" {
-		transferEncodingChunked = true
-	}
-	if te2, haveTransferEncoding := req.Header["transfer-encoding"]; haveTransferEncoding {
-		if strings.Contains(strings.Join(te2, ", "), "chunked") {
-			transferEncodingChunked = true
+	if !transferEncodingChunked {
+		if ret := getHeaderValue(req.Header, "transfer-encoding"); ret != "" {
+			if strings.Contains(ret, "chunked") {
+				transferEncodingChunked = true
+			}
 		}
 	}
 
@@ -124,7 +242,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	if ret := getHeaderValue(req.Header, "content-length"); ret != "" || req.ContentLength > 0 {
 		contentLengthExisted = true
 		if ret != "" {
-			contentLengthInt = int64(Atoi(ret))
+			contentLengthInt = int64(codec.Atoi(ret))
 		} else {
 			contentLengthInt = req.ContentLength
 		}
