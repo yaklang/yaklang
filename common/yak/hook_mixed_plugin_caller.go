@@ -3,6 +3,12 @@ package yak
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -14,11 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"sort"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -564,39 +565,49 @@ func (m *MixPluginCaller) CallHijackRequest(
 	reject func() interface{},
 	drop func() interface{},
 ) {
-	m.callers.CallByNameExSync(
-		HOOK_HijackHTTPRequest,
-		func() interface{} {
-			return isHttps
-		},
-		func() interface{} {
-			return u
-		},
-		getRequest,
-		reject, drop,
-	)
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_HijackHTTPRequest) {
+		callers.CallByNameExSync(
+			HOOK_HijackHTTPRequest,
+			func() interface{} {
+				return isHttps
+			},
+			func() interface{} {
+				return u
+			},
+			getRequest,
+			reject, drop,
+		)
+	}
 }
 
 func (m *MixPluginCaller) CallHijackResponse(
 	isHttps bool, u string, getResponse,
 	reject, drop func() interface{},
 ) {
-	m.callers.CallByNameExSync(
-		HOOK_HijackHTTPResponse,
-		func() interface{} { return isHttps },
-		func() interface{} { return u }, getResponse, reject, drop,
-	)
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_HijackHTTPResponse) {
+		callers.CallByNameExSync(
+			HOOK_HijackHTTPResponse,
+			func() interface{} { return isHttps },
+			func() interface{} { return u }, getResponse, reject, drop,
+		)
+	}
+
 }
 
 func (m *MixPluginCaller) CallHijackResponseEx(
 	isHttps bool, u string, getRequest, getResponse,
 	reject, drop func() interface{},
 ) {
-	m.callers.CallByNameExSync(
-		HOOK_HijackHTTPResponseEx,
-		func() interface{} { return isHttps },
-		func() interface{} { return u }, getRequest, getResponse, reject, drop,
-	)
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_HijackHTTPResponseEx) {
+		callers.CallByNameExSync(
+			HOOK_HijackHTTPResponseEx,
+			func() interface{} { return isHttps },
+			func() interface{} { return u }, getRequest, getResponse, reject, drop,
+		)
+	}
 }
 
 func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []byte) string {
@@ -666,35 +677,44 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 			log.Errorf("panic from port-scan plugin: %s", err)
 		}
 	}()
+	callers := m.callers
 	wg := new(sync.WaitGroup)
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("HandleServiceScanResult call HOOK_PortScanHandle failed: %v", err)
-			}
+	if callers.ShouldCallByName(HOOK_PortScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_PortScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_PortScanHandle, r)
 		}()
-		m.GetNativeCaller().CallByName(HOOK_PortScanHandle, r)
-	}()
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("HandleServiceScanResult call HOOK_NucleiScanHandle failed: %v", err)
-			}
+	}
+	if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_NucleiScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
 		}()
-		m.GetNativeCaller().CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
-	}()
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
-			}
+	}
+	if callers.ShouldCallByName(HOOK_NaslScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
 		}()
-		m.GetNativeCaller().CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
-	}()
+	}
 	wg.Wait()
 }
 
@@ -713,6 +733,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 			log.Errorf("panic from mirror httpflow ex: %s", err)
 		}
 	}()
+	callers := m.callers
 
 	if !utils.IsHttpOrHttpsUrl(u) {
 		host, port, _ := utils.ParseStringToHostPort(u)
@@ -725,7 +746,10 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 			u = fmt.Sprintf("http://%s", host)
 		}
 	}
-	m.callers.CallByName(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
+	if callers.ShouldCallByName(HOOK_MirrorHTTPFlow) {
+		callers.CallByName(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
+	}
+
 	urlObj, err := url.Parse(u)
 	if err != nil {
 		yaklib.YakitInfo(yaklib.GetYakitClientInstance())("解析 URL 失败：%v 原因: %v", u, err)
@@ -737,9 +761,11 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
 		if !m.websiteFilter.Exist(websiteHash) {
 			m.websiteFilter.Insert(websiteHash)
-			m.callers.CallByName(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
+				callers.CallByName(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
+			}
 
-			if scanPort {
+			if scanPort && callers.ShouldCallByName(HOOK_PortScanHandle) {
 				host, port, _ = utils.ParseStringToHostPort(u)
 				if host != "" && port > 0 {
 					m.swg.Add()
@@ -755,32 +781,40 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 							return
 						}
 						log.Debugf("%v", matchResult.String())
-						m.callers.CallByName(HOOK_PortScanHandle, matchResult)
+						callers.CallByName(HOOK_PortScanHandle, matchResult)
 					}()
 				}
 			}
 
 			// 异步+并发限制执行 Nuclei
-			m.swg.Add()
-			go func() {
-				defer m.swg.Done()
-				m.callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
-			}()
-			m.swg.Add()
-			go func() {
-				defer m.swg.Done()
-				m.callers.CallByName(HOOK_NaslScanHandle, urlObj.String())
-			}()
+			if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
+				m.swg.Add()
+				go func() {
+					defer m.swg.Done()
+					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
+				}()
+			}
+			if callers.ShouldCallByName(HOOK_NaslScanHandle) {
+				m.swg.Add()
+				go func() {
+					defer m.swg.Done()
+					callers.CallByName(HOOK_NaslScanHandle, urlObj.String())
+				}()
+			}
 		}
 
 		if !m.websitePathFilter.Exist(websitePathHash) {
 			m.websitePathFilter.Insert(websitePathHash)
-			m.callers.CallByName(HOOK_MirrorNewWebsitePath, isHttps, u, req, rsp, body)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePath) {
+				callers.CallByName(HOOK_MirrorNewWebsitePath, isHttps, u, req, rsp, body)
+			}
 		}
 
 		if !m.websiteParamsFilter.Exist(websitePathParamsHash) {
 			m.websiteParamsFilter.Insert(websitePathParamsHash)
-			m.callers.CallByName(HOOK_MirrorNewWebsitePathParams, isHttps, u, req, rsp, body)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePathParams) {
+				callers.CallByName(HOOK_MirrorNewWebsitePathParams, isHttps, u, req, rsp, body)
+			}
 		}
 	}
 
@@ -789,11 +823,15 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 			return
 		}
 	}
-	m.callers.CallByName(HOOK_MirrorFilteredHTTPFlow, isHttps, u, req, rsp, body)
+	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
+		callers.CallByName(HOOK_MirrorFilteredHTTPFlow, isHttps, u, req, rsp, body)
+	}
 }
 
 func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *yakit.HTTPFlow, reject func(httpFlow *yakit.HTTPFlow), drop func()) {
-	m.callers.CallByName(HOOK_hijackSaveHTTPFlow, flow, reject, drop)
+	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
+		m.callers.CallByName(HOOK_hijackSaveHTTPFlow, flow, reject, drop)
+	}
 }
 
 func (m *MixPluginCaller) GetNativeCaller() *YakToCallerManager {
