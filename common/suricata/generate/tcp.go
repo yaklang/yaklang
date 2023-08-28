@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -21,22 +22,34 @@ type TCPGen struct {
 	payload ModifierGenerator
 }
 
-func newTCPGen(r *rule.Rule) (*TCPGen, error) {
+func newTCPGen(r *rule.Rule) (Generator, error) {
+	if r.ContentRuleConfig == nil {
+		return nil, errors.New("empty content rule config")
+	}
+
 	g := &TCPGen{
 		r: r,
 	}
 
-	for mdf, r := range contentRuleMap(r.ContentRuleConfig.ContentRules) {
+	for mdf, rr := range contentRuleMap(r.ContentRuleConfig.ContentRules) {
 		switch mdf {
 		case modifier.TCPHDR:
 			// 暂时不太想支持，和其他tcpconfig冲突比较严重,用的也不多
 		case modifier.Default:
-			g.payload = parse2ContentGen(r, WithNoise(noiseAll))
+			g.payload = parse2ContentGen(rr, WithNoise(noiseAll))
 		default:
+			// There are someone using http modifier in tcp...
+			if modifier.IsHTTPModifier(mdf) {
+				gen, err := newHTTPGen(r)
+				if err != nil {
+					return nil, errors.Wrap(err, "new http gen failed")
+				}
+				g.payload = gen
+				return g, nil
+			}
 			log.Warnf("not support modifier %v", mdf)
 		}
 	}
-
 	return g, nil
 }
 
@@ -138,20 +151,17 @@ func (g *TCPGen) Gen() []byte {
 	}
 
 	// IP 层
-	if toServer {
-		ipLayer.SrcIP = net.ParseIP(utils.GetLocalIPAddress())
-		if ipLayer.SrcIP == nil {
-			log.Error("fetch local ip address failed")
-			return nil
-		}
-		ipLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
-	} else if toClient {
-		ipLayer.DstIP = net.ParseIP(utils.GetLocalIPAddress())
-		if ipLayer.DstIP == nil {
-			log.Error("fetch local ip address failed")
-			return nil
-		}
-		ipLayer.SrcIP = net.ParseIP(utils.GetRandomIPAddress())
+	ipLayer.SrcIP = net.ParseIP(utils.GetLocalIPAddress())
+	if ipLayer.SrcIP == nil {
+		log.Error("fetch local ip address failed")
+		return nil
+	}
+	ipLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
+	tcpLayer.SrcPort = layers.TCPPort(uint16(g.r.SourcePort.GetAvailablePort()))
+	tcpLayer.DstPort = layers.TCPPort(uint16(g.r.DestinationPort.GetAvailablePort()))
+	if toClient && !toServer {
+		ipLayer.SrcIP, ipLayer.DstIP = ipLayer.DstIP, ipLayer.SrcIP
+		tcpLayer.SrcPort, tcpLayer.DstPort = tcpLayer.DstPort, tcpLayer.SrcPort
 	}
 
 	dstPort := uint16(g.r.DestinationPort.GetAvailablePort())
