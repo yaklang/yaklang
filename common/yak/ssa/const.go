@@ -81,17 +81,23 @@ func (c *Const) Number() int64 {
 }
 
 func (c *Const) IsFloat() bool {
-	return c.typ[0] == BasicTypesKind[Float]
+	return c.typ[0] == BasicTypesKind[Number]
 }
 
 func (c *Const) Float() float64 {
-	if c.IsFloat() {
-		return c.value.(float64)
-	} else {
-		return float64(c.Number())
+	switch ret := c.value.(type) {
+	case float32:
+		return float64(ret)
+	case float64:
+		return ret
 	}
+	return float64(c.Number())
 }
 
 func (c *Const) IsString() bool {
 	return c.typ[0] == BasicTypesKind[String]
+}
+
+func (c *Const) VarString() string {
+	return c.value.(string)
 }
