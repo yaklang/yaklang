@@ -16,7 +16,7 @@ type WebShell struct {
 	// 加密密钥
 	SecretKey string `json:"secret_key" gorm:"not null"`
 	// 加密模式
-	EncryptedMode string `json:"enc_mode" gorm:"column:enc_mode;not null"`
+	EncryptedMode string `json:"enc_mode" gorm:"column:enc_mode"`
 	// 字符集编码
 	Charset string `json:"charset" gorm:"default:'UTF-8'"`
 	// 冰蝎还是哥斯拉,或者是其他
@@ -36,13 +36,16 @@ func (w *WebShell) CalcHash() string {
 
 func (w *WebShell) BeforeSave() error {
 	if w.Url == "" {
-		return utils.Errorf("webshell url is empty")
+		return utils.Error("webshell url is empty")
 	}
-	if w.EncryptedMode == "" {
-		return utils.Errorf("webshell encrypted mode is empty")
+	if w.ShellType == "" {
+		return utils.Error("webshell shell type is empty")
+	}
+	if w.SecretKey == "" {
+		return utils.Error("webshell secret key is empty")
 	}
 	if w.ShellScript == "" {
-		return utils.Errorf("webshell shell script  is empty")
+		return utils.Error("webshell shell script is empty")
 	}
 	w.Hash = w.CalcHash()
 	return nil
@@ -74,14 +77,14 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 	}
 }
 
-func CreateOrUpdateWebShell(db *gorm.DB, hash string, i interface{}) error {
+func CreateOrUpdateWebShell(db *gorm.DB, hash string, i interface{}) (*WebShell, error) {
 	db = db.Model(&WebShell{})
-
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&WebShell{}); db.Error != nil {
-		return utils.Errorf("create/update WebShell failed: %s", db.Error)
+	shell := &WebShell{}
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(shell); db.Error != nil {
+		return nil, utils.Errorf("create/update WebShell failed: %s", db.Error)
 	}
 
-	return nil
+	return shell, nil
 }
 
 func CreateOrUpdateWebShellById(db *gorm.DB, id int64, i interface{}) error {
