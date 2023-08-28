@@ -551,6 +551,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 	text := origin
 
 	for _, work := range workFlow {
+
 		var params = make(map[string]string)
 		for _, item := range work.GetParams() {
 			params[item.Key] = item.Value
