@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,12 +12,21 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.Empty, error) {
+func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
+	var headers string
+	if req.GetHeaders() != nil {
+		b, err := json.Marshal(req.GetHeaders())
+		if err != nil {
+			return nil, utils.Errorf("headers marshal error: %v", err)
+		}
+		headers = string(b)
+	}
+
 	shell := &yakit.WebShell{
 		Url:           req.GetUrl(),
 		Pass:          req.GetPass(),
@@ -25,14 +35,15 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.Em
 		Charset:       req.GetCharset(),
 		ShellType:     req.GetShellType(),
 		ShellScript:   req.GetShellScript(),
+		Headers:       headers,
 		Tag:           req.GetTag(),
+		Remark:        req.GetRemark(),
 	}
-	err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
+	webShell, err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
 	if err != nil {
-		log.Error(err)
-		return nil, err
+		return nil, utils.Errorf("create webshell error: %v", err)
 	}
-	return &ypb.Empty{}, nil
+	return webShell.ToGRPCModel(), nil
 }
 
 func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequest) (*ypb.Empty, error) {
