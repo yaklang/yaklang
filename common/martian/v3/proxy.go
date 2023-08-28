@@ -652,7 +652,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			if err := res.Write(brw); err != nil {
+			var responseBytes []byte
+			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+			_ = responseBytes
+			if err != nil {
 				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
 			if err := brw.Flush(); err != nil {
@@ -754,7 +757,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			if err := res.Write(brw); err != nil {
+			var responseBytes []byte
+			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+			_ = responseBytes
+			if err != nil {
 				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
 			err := brw.Flush()
@@ -775,7 +781,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return nil
 		}
 		res.ContentLength = -1
-		if err := res.Write(brw); err != nil {
+		var responseBytes []byte
+		responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+		_ = responseBytes
+		if err != nil {
 			log.Errorf("martian: got error while writing response back to client: %v", err)
 		}
 		if err := brw.Flush(); err != nil {
@@ -856,7 +865,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing = errClose
 	}
 
-	err = res.Write(brw)
+	var responseBytes []byte
+	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+	_ = responseBytes
 	if err != nil {
 		log.Errorf("martian: got error while writing response back to client: %v", err)
 	}
