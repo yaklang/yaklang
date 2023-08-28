@@ -34,7 +34,7 @@ func TestMarshalHTTPRequest(t *testing.T) {
 
 	t.Logf("data: %s", string(req))
 
-	_, err = ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewBuffer(req)))
+	_, err = ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewBuffer(req)))
 	if err != nil {
 		t.Errorf("marshal http request for re-building request failed: %s", err)
 		t.FailNow()

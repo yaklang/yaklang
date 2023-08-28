@@ -362,7 +362,7 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 						return
 					default:
 						conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-						req, err := ReadHTTPRequestFromReader(bufio.NewReader(conn))
+						req, err := ReadHTTPRequestFromBufioReader(bufio.NewReader(conn))
 						if err != nil {
 							log.Errorf("read http request failed: %v", err)
 							conn.Close()

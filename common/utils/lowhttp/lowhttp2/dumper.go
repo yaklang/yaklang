@@ -130,7 +130,7 @@ func DumpRequestOut(req *http.Request, body bool) ([]byte, error) {
 	quitReadCh := make(chan struct{})
 	// Wait for the request before replying with a dummy response:
 	go func() {
-		req, err := utils.ReadHTTPRequestFromReader(bufio.NewReader(pr))
+		req, err := utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(pr))
 		if err == nil {
 			// Ensure all the body is read; otherwise
 			// we'll get a partial dump.

@@ -16,7 +16,7 @@ Host: www.example.com
 `)
 	rs := utils.RandStringBytes(100)
 	packet = ReplaceHTTPPacketBody(packet, []byte(rs), true)
-	var a, err = utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewReader(packet)))
+	var a, err = utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(packet)))
 	if err != nil {
 		spew.Dump(err)
 		t.FailNow()
@@ -45,7 +45,7 @@ Host: www.example.com
 `)
 	rs := utils.RandStringBytes(100)
 	packet = ReplaceHTTPPacketBody(packet, []byte(rs), false)
-	var a, err = utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewReader(packet)))
+	var a, err = utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(packet)))
 	if err != nil {
 		spew.Dump(err)
 		t.FailNow()
@@ -76,7 +76,7 @@ content-length: 1
 `)
 	rs := utils.RandStringBytes(100)
 	packet = ReplaceHTTPPacketBody(packet, []byte(rs), false)
-	var a, err = utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewReader(packet)))
+	var a, err = utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(packet)))
 	if err != nil {
 		spew.Dump(err)
 		t.FailNow()
@@ -109,7 +109,7 @@ content-length: 1
 `)
 	rs := utils.RandStringBytes(100)
 	packet = ReplaceHTTPPacketBody(packet, []byte(rs), false)
-	var a, err = utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewReader(packet)))
+	var a, err = utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(packet)))
 	if err != nil {
 		spew.Dump(err)
 		t.FailNow()
@@ -148,7 +148,7 @@ a
 0
 
 `)
-	var a, err = utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewReader(packet)))
+	var a, err = utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(packet)))
 	if err != nil {
 		spew.Dump(err)
 		t.FailNow()

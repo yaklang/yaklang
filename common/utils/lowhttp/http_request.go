@@ -416,7 +416,7 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 }
 
 func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
-	req, err := utils.ReadHTTPRequestFromReader(reader)
+	req, err := utils.ReadHTTPRequestFromBufioReader(reader)
 	if err != nil {
 		return nil, err
 	}
