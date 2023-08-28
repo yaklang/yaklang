@@ -80,7 +80,7 @@ func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, blo
 }
 
 func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock) Value {
-	if block.skip {
+	if block.Skip {
 		return nil
 	}
 	if map2, ok := b.currentDef[variable]; ok {
