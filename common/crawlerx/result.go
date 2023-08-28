@@ -3,7 +3,6 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod"
 	"strings"
 )
 
@@ -89,7 +88,7 @@ type SimpleResult struct {
 	screenshot string
 	resultType string
 	method     string
-	request    *rod.HijackRequest
+	request    HijackRequest
 	from       string
 }
 

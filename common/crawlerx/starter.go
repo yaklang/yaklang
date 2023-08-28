@@ -4,15 +4,13 @@ package crawlerx
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/embed"
-	"net/http"
 	"runtime"
 	"strings"
 	"time"
@@ -60,8 +58,6 @@ type BrowserStarter struct {
 
 	extraWaitLoadTime int
 
-	transport *http.Transport
-
 	// get info
 	getUrls          func(*rod.Page) ([]string, error)
 	getClickElements func(*rod.Page) ([]string, error)
@@ -76,6 +72,10 @@ type BrowserStarter struct {
 	invalidSuffix []string
 
 	storageSave bool
+
+	runtimeID string
+	saveToDB  bool
+	https     bool
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -107,6 +107,10 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
 
 		storageSave: false,
+
+		runtimeID: baseConfig.runtimeId,
+		saveToDB:  baseConfig.saveToDB,
+		https:     false,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -123,22 +127,13 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	starter.requestAfterRepeat = repeatCheckGenerator(baseConfig.scanRepeat, baseConfig.ignoreParams...)
 	starter.urlAfterRepeat = urlRepeatCheckGenerator(baseConfig.scanRepeat, baseConfig.ignoreParams...)
 	starter.counter = tools.NewCounter(starter.concurrent)
-	starter.transport = &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		DialContext:           netx.NewDialContextFunc(30 * time.Second),
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-	if starter.browserConfig.proxyAddress != nil {
-		starter.transport.Proxy = http.ProxyURL(starter.browserConfig.proxyAddress)
-	}
 	if len(starter.baseConfig.invalidSuffix) > 0 {
 		starter.invalidSuffix = append(starter.invalidSuffix, starter.baseConfig.invalidSuffix...)
 	} else {
 		starter.invalidSuffix = defaultInvalidSuffix
+	}
+	if strings.HasPrefix(starter.baseUrl, "https://") || strings.HasPrefix(starter.baseUrl, "wss://") {
+		starter.https = true
 	}
 	return &starter
 }
@@ -274,10 +269,10 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	}
 }
 
-func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
-	pageHijackRouter := page.HijackRequests()
+func (starter *BrowserStarter) createPageHijack(page *rod.Page) error {
+	pageHijackRouter := NewPageHijackRequests(page)
 	var pageUrl string
-	pageHijackRouter.MustAdd("*", func(hijack *rod.Hijack) {
+	err := pageHijackRouter.Add("*", "", func(hijack *CrawlerHijack) {
 		if pageUrl == "" {
 			pageUrl = hijack.Request.URL().String()
 		}
@@ -299,13 +294,18 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
 		}
-		client := http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: starter.transport,
+		opts := []lowhttp.LowhttpOpt{
+			lowhttp.WithTimeout(30 * time.Second),
+			lowhttp.WithHttps(starter.https),
+			lowhttp.WithSaveHTTPFlow(starter.saveToDB),
 		}
-		err := hijack.LoadResponse(&client, true)
+		if starter.browserConfig.proxyAddress != nil {
+			opts = append(opts, lowhttp.WithProxy(starter.browserConfig.proxyAddress.String()))
+		}
+		if starter.runtimeID != "" {
+			opts = append(opts, lowhttp.WithRuntimeId(starter.runtimeID))
+		}
+		err := hijack.LoadResponse(opts, true)
 		if err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				log.Errorf("load response error: %s", err)
@@ -372,9 +372,13 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) {
 			starter.stopSignal = true
 		}
 	})
+	if err != nil {
+		return utils.Errorf(`create hijack error: %v`, err.Error())
+	}
 	go func() {
 		pageHijackRouter.Run()
 	}()
+	return nil
 }
 
 func (starter *BrowserStarter) Start() {
@@ -421,7 +425,11 @@ running:
 					starter.stealth = false
 				}
 			}
-			starter.createPageHijack(p)
+			err = starter.createPageHijack(p)
+			if err != nil {
+				log.Error(err)
+				return
+			}
 			err = p.Navigate(urlStr)
 			if err != nil {
 				log.Errorf("page navigate %s error: %s", urlStr, err)

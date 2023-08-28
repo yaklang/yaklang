@@ -3,6 +3,8 @@
 package crawlerx
 
 import (
+	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
@@ -151,20 +153,27 @@ func TestServer(t *testing.T) {
 }
 
 func TestStartCrawler(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//	_, _ = w.Write([]byte(crawlerTestHtml))
+	//}))
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(crawlerTestHtml))
 	}))
+	server.StartTLS()
 	defer server.Close()
 	opts := make([]ConfigOpt, 0)
 	opts = append(opts,
 		WithFormFill(map[string]string{"username": "admin", "password": "password"}),
 		WithBlackList("logout"),
 		WithMaxDepth(2),
-		WithLeakless("true"),
+		WithLeakless("default"),
 		WithExtraWaitLoadTime(500),
 		WithLocalStorage(map[string]string{"test": "abc"}),
 		WithConcurrent(3),
 		WithStealth(true),
+		//WithBrowserInfo(`{"ws_address":"","exe_path":"","proxy_address":"http://127.0.0.1:8099","proxy_username":"","proxy_password":""}`),
+		//WithRuntimeID("abc123-123-123"),
+		//WithSaveToDB(true),
 	)
 	//ch, err := StartCrawler("http://testphp.vulnweb.com/", opts...)
 	ch, err := StartCrawler(server.URL, opts...)
