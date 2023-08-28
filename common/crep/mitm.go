@@ -304,12 +304,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		/*
 		 use buildin cert domains
 		*/
-		_, ok1 := req.Header["content-type"]
-		_, ok2 := req.Header["Content-Type"]
-		if ok1 && ok2 {
-			log.Errorf("request: %s has both content-type and Content-Type header", req.URL.String())
-		}
-
 		//log.Infof("hostname: %v", req.URL.Hostname())
 		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
 			ctx := martian.NewContext(req, m.GetMartianProxy())
@@ -378,10 +372,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				return nil
 			}
 
-			if ct, ok := req.Header["content-type"]; ok {
-				fmt.Println(ct)
-			}
-
 			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
@@ -421,9 +411,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				}
 				if isHttps {
 					hijackedReq.TLS = req.TLS
-					if hijackedReq.URL != nil {
-						hijackedReq.URL.Scheme = "https"
-					}
 				}
 				if req.ProtoMajor != 2 {
 					hijackedReq.Proto = "HTTP/1.1"
