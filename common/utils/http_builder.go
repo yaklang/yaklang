@@ -70,7 +70,15 @@ func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok boo
 	return line[:s1], line[s1+1 : s2], line[s2+1:], true
 }
 
-func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
+func ReadHTTPRequestFromBufioReader(reader *bufio.Reader) (*http.Request, error) {
+	return readHTTPRequestFromBufioReader(reader, false)
+}
+
+func ReadHTTPRequestFromBytes(raw []byte) (*http.Request, error) {
+	return readHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true)
+}
+
+func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool) (*http.Request, error) {
 	var rawPacket = new(bytes.Buffer)
 
 	var req = &http.Request{
@@ -213,6 +221,7 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 			contentLengthInt = codec.Atoi(valStr)
 			if contentLengthInt != 0 || !ShouldRemoveZeroContentLengthHeader(method) {
 				header.Set(keyStr, valStr)
+				req.ContentLength = int64(contentLengthInt)
 			}
 		case "content-type":
 			isSingletonHeader = true
@@ -250,39 +259,55 @@ func ReadHTTPRequestFromReader(reader *bufio.Reader) (*http.Request, error) {
 	req.Close = defaultClose
 	req.Header = header
 
-	// handle body
 	var bodyRawBuf = new(bytes.Buffer)
-	if useContentLength && useTransferEncodingChunked {
-		log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
-		if contentLengthInt > 0 {
-			// smuggle
-			bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
-			bodyRawBuf.Write(bodyRaw)
-		} else {
-			// chunked
+	if fixContentLength {
+		// by reader
+		raw, _ := io.ReadAll(reader)
+		req.ContentLength = int64(len(raw))
+		shrinkHeader(req.Header, "content-length")
+		req.Header.Set("Content-Length", strconv.Itoa(len(raw)))
+		bodyRawBuf.Write(raw)
+	} else {
+		// by header
+		if useContentLength && useTransferEncodingChunked {
+			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
+			if contentLengthInt > 0 {
+				// smuggle
+				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+				bodyRawBuf.Write(bodyRaw)
+				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
+					bodyRawBuf.WriteString(strings.Repeat("\n", ret))
+				}
+			} else {
+				// chunked
+				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
+				if err != nil {
+					return nil, Errorf("chunked decoder error: %v", err)
+				}
+				bodyRawBuf.Write(fixed)
+			}
+		} else if !useContentLength && useTransferEncodingChunked {
+			// handle chunked
 			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
 			if err != nil {
 				return nil, Errorf("chunked decoder error: %v", err)
 			}
-			bodyRawBuf.Write(fixed)
+			if len(fixed) > 0 {
+				bodyRawBuf.Write(fixed)
+			}
+		} else {
+			// handle content-length as default
+			var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+			if err != nil && err != io.EOF {
+				return nil, Errorf("read body error: %v", err)
+			}
+			bodyLen := len(bodyRaw)
+			bodyRawBuf.Write(bodyRaw)
+			bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 		}
-	} else if !useContentLength && useTransferEncodingChunked {
-		// handle chunked
-		_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
-		if err != nil {
-			return nil, Errorf("chunked decoder error: %v", err)
-		}
-		if len(fixed) > 0 {
-			bodyRawBuf.Write(fixed)
-		}
-	} else {
-		// handle content-length as default
-		bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
-		bodyRawBuf.Write(bodyRaw)
 	}
 
 	rawPacket.Write(bodyRawBuf.Bytes())
-
 	if bodyRawBuf.Len() == 0 {
 		req.Body = http.NoBody
 	} else {
