@@ -658,7 +658,7 @@ if rsp.Contains(getParam("token")) {
 		spew.Dump(rsp)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	if !started {
 		panic("MITM NOT STARTED!")
 	}
