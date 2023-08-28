@@ -3,6 +3,11 @@ package yak
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,10 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/jinzhu/gorm"
 )
@@ -803,6 +804,20 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 		y.table.Store(name, callerList)
 	}
 	return nil
+}
+
+func (y *YakToCallerManager) ShouldCallByName(name string) bool {
+	if y.table == nil {
+		return false
+	}
+
+	caller, ok := y.table.Load(name)
+	if !ok {
+		return false
+	}
+
+	c, ok := caller.([]*Caller)
+	return ok && len(c) > 0
 }
 
 func (y *YakToCallerManager) CallByName(name string, items ...interface{}) {
