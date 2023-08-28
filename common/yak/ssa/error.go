@@ -12,9 +12,7 @@ const (
 type ErrorTag string
 
 const (
-	SSATAG     ErrorTag = "ssa"
-	ASTTAG     ErrorTag = "ast"
-	ANALYZETag ErrorTag = "analyzer"
+	SSATAG ErrorTag = "ssa"
 )
 
 type SSAError struct {
@@ -68,5 +66,5 @@ func (err SSAError) String() string {
 		kind = "error"
 	}
 
-	return fmt.Sprintf("%s-%s:%s", kind, string(err.tag), err.Message)
+	return fmt.Sprintf("[%5s]\t(%s):\t%s", kind, string(err.tag), err.Message)
 }
