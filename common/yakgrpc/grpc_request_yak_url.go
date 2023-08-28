@@ -31,5 +31,4 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
 
-	return nil, utils.Error(`not implemented`)
 }
