@@ -3,7 +3,7 @@ name: Essential Tests
 on:
   pull_request:
     branches: [ main ]
-    types: [opened, synchronize, reopened, closed]
+    types: [ opened, synchronize, reopened, closed ]
     paths:
       - 'common/**'
       - '.github/workflows/essential-tests.yml'
@@ -42,8 +42,8 @@ jobs:
           - name: Test MustPass - full yak scripts
             run: go test -timeout 1m ./common/yak/yaktest/mustpass -v
 
-          - name: Test PeekableConn
-            run: go test -timeout 1m -run TestPeekableConn ./common/utils -v
+          - name: Test Common/Utils
+            run: go test -timeout 1m ./common/utils -v
 
           - name: Test gRPC MUSTPASS
             run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
