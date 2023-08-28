@@ -287,9 +287,10 @@ if rsp.Contains(getParam("token")) {
 				echoTested = true
 
 				var tokenRaw, _ = utils.GzipCompress([]byte(token))
-				params["packet"] = "GET /ca HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
+				params["packet"] = "GET /gziptestted HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
+				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
@@ -304,29 +305,23 @@ if rsp.Contains(getParam("token")) {
 }
 `, params)
 				if err != nil {
-					panic(err)
+					t.FailNow()
 				}
 				gzipAutoDecode = true
 
 				tokenRaw, _ = utils.GzipCompress([]byte(token))
-				params["packet"] = "GET /cab HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
+				params["packet"] = "GET /chunked-and-gziped-test HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, true)
 				originPacket := params["packet"].([]byte)
 				_ = originPacket
 				println(strconv.Quote(string(originPacket)))
 
+				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
-println("-------------------")
-println("-------------------")
-println("-------------------")
-println(string(packet))
-println("-------------------")
-println("-------------------")
-println("-------------------")
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.retryTimes(3))~
 if rsp.Contains(getParam("token")) {
 		println("chunk + gzip auto decode success")	
@@ -338,7 +333,7 @@ println("-----------------------------------")
 }
 `, params)
 				if err != nil {
-					panic(err)
+					t.FailNow()
 				}
 				chunkDecode = true
 

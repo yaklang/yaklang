@@ -49,6 +49,10 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 			}
 		}
 	}
+
+	if utils.StringArrayContains(req.TransferEncoding, "chunked") {
+		req.TransferEncoding = nil
+	}
 	rsp, err := t.Transport.RoundTrip(req)
 	return rsp, err
 }

@@ -1,7 +1,6 @@
 package scannode
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 	"net/http"
-	"net/http/httputil"
 	"path/filepath"
 	"sync"
 	"time"
@@ -258,23 +256,4 @@ func (s *ScanNode) feedback(result *spec.ScanResult) {
 		spec.BackendKey_Scanner,
 		msg,
 	)
-}
-
-func toHttpRequest(method, url string, body []byte, headers *http.Header) ([]byte, error) {
-	r, err := http.NewRequest(
-		method,
-		url,
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	headers.Set("Content-Length", fmt.Sprint(len(body)))
-	for header, values := range *headers {
-		for _, v := range values {
-			r.Header.Set(header, v)
-		}
-	}
-	return httputil.DumpRequest(r, true)
 }
