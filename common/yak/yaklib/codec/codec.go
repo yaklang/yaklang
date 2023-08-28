@@ -344,7 +344,8 @@ func HTTPChunkedDecodeWithRestBytes(raw []byte) ([]byte, []byte) {
 }
 
 func HTTPChunkedDecoderWithRestBytes(raw io.Reader) ([]byte, io.Reader) {
-	return readChunkedDataFromReader(raw)
+	data, _, reader := readChunkedDataFromReader(raw)
+	return data, reader
 }
 
 func HTTPChunkedDecode(raw []byte) ([]byte, error) {

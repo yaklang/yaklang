@@ -39,24 +39,6 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	return []byte(header + string(body))
 }
 
-var _noContentLengthHeader = map[string]bool{
-	"GET":     true,
-	"HEAD":    true,
-	"DELETE":  true,
-	"OPTIONS": true,
-	"CONNECT": true,
-	"get":     true,
-	"head":    true,
-	"delete":  true,
-	"options": true,
-	"connect": true,
-}
-
-func ShouldRemoveZeroContentLengthHeader(s string) bool {
-	_, ok := _noContentLengthHeader[s]
-	return ok
-}
-
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
@@ -73,7 +55,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		raw,
 		func(m, u, proto string) error {
 			isRequest = true
-			contentLengthIsNotRecommanded = ShouldRemoveZeroContentLengthHeader(m)
+			contentLengthIsNotRecommanded = utils.ShouldRemoveZeroContentLengthHeader(m)
 			return nil
 		},
 		func(proto string, code int, codeMsg string) error {
@@ -456,9 +438,6 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 
 	defer func() {
 		if req != nil && req.URL != nil {
-			if req.Host != "" && req.URL.Host == "" {
-				req.URL.Host = req.Host
-			}
 			req.URL.Opaque = ""
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
@@ -470,18 +449,6 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-
-	//defer func() {
-	//	if req != nil {
-	//		if req.Body != nil {
-	//			raw, _ := io.ReadAll(req.Body)
-	//			req.Body = io.NopCloser(bytes.NewBuffer(raw))
-	//			if len(raw) > 0 {
-	//				spew.Dump(raw)
-	//			}
-	//		}
-	//	}
-	//}()
 
 	// parse first line
 	firstLine, err := utils.BufioReadLine(reader)
@@ -554,14 +521,21 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 	}
 	req.URL = urlIns
 
+	/*
+		handle headers
+			1. keep gzip
+			2. keep chunked if have
+		    3. smuggle use max(chunked, contentLength)
+
+		if smuggle { keep cl and te }
+		if not smuggle { if te keep te }
+	*/
 	// close is default in 0.9 or 1.0
 	var defaultClose = (req.ProtoMajor == 1 && req.ProtoMinor == 0) || req.ProtoMajor < 1
-
 	var header = make(http.Header)
 	var useContentLength = false
 	var contentLengthInt = 0
 	var useTransferEncodingChunked = false
-	var contentEncoding string
 	for {
 		lineBytes, err := utils.BufioReadLine(reader)
 		if err != nil {
@@ -579,27 +553,24 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 		if _, isCommonHeader := commonHeader[keyStr]; isCommonHeader {
 			keyStr = http.CanonicalHeaderKey(keyStr)
 		}
+
+		var isSingletonHeader = false
 		switch strings.ToLower(keyStr) {
 		case "content-length":
 			useContentLength = true
 			contentLengthInt = utils.Atoi(valStr)
-			if contentLengthInt != 0 || !ShouldRemoveZeroContentLengthHeader(method) {
+			if contentLengthInt != 0 || !utils.ShouldRemoveZeroContentLengthHeader(method) {
 				header.Set(keyStr, valStr)
 			}
-			continue
 		case "content-type":
-			header.Set(keyStr, valStr)
-			continue
+			isSingletonHeader = true
 		case `transfer-encoding`:
+			req.TransferEncoding = []string{valStr}
 			if strings.EqualFold(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
-			continue
 		case "host":
 			req.Host = valStr
-		case "content-encoding":
-			contentEncoding = valStr
-			continue
 		case "connection":
 			if strings.EqualFold(valStr, "close") {
 				defaultClose = true
@@ -607,15 +578,29 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 				defaultClose = false
 			}
 		}
-		header[keyStr] = append(header[keyStr], valStr)
+
+		// add header
+		if keyStr == "" {
+			continue
+		}
+		if isSingletonHeader {
+			header.Set(keyStr, valStr)
+			continue
+		}
+		if firstCap := keyStr[0]; 'A' <= firstCap && firstCap <= 'Z' {
+			header.Add(keyStr, valStr)
+		} else {
+			header[keyStr] = append(header[keyStr], valStr)
+		}
 	}
 	req.Close = defaultClose
 	req.Header = header
 
 	// handle body
+	var bodyMirror bytes.Buffer
 	if useContentLength && useTransferEncodingChunked && contentLengthInt > 0 {
 		log.Info("content-length and transfer-encoding chunked both exist, try smuggle? use max length!")
-		chunkedReader, newReader := codec.HTTPChunkedDecoderWithRestBytes(reader)
+		chunkedReader, newReader := codec.HTTPChunkedDecoderWithRestBytes(io.TeeReader(reader, &bodyMirror))
 		if len(chunkedReader) > contentLengthInt {
 			// use chunked as body
 			req.ContentLength = int64(len(chunkedReader))
@@ -625,10 +610,11 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 			// use content-length
 			req.ContentLength = int64(len(chunkedReader))
 			reader.Reset(io.MultiReader(bytes.NewReader(chunkedReader), newReader))
-			req.Body = io.NopCloser(io.LimitReader(reader, int64(contentLengthInt)))
+			req.Body = io.NopCloser(io.TeeReader(io.LimitReader(reader, int64(contentLengthInt)), &bodyMirror))
 		}
 	} else if !useContentLength && useTransferEncodingChunked {
-		bodyRaw, newReader := codec.HTTPChunkedDecoderWithRestBytes(reader)
+		// handle chunked
+		bodyRaw, newReader := codec.HTTPChunkedDecoderWithRestBytes(io.TeeReader(reader, &bodyMirror))
 		reader.Reset(newReader)
 		if len(bodyRaw) > 0 {
 			req.ContentLength = int64(len(bodyRaw))
@@ -638,26 +624,17 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 		// use content-length as default
 		req.ContentLength = int64(contentLengthInt)
 		if contentLengthInt > 0 {
-			req.Body = io.NopCloser(io.LimitReader(reader, int64(contentLengthInt)))
+			req.Body = io.NopCloser(io.TeeReader(io.LimitReader(reader, int64(contentLengthInt)), &bodyMirror))
 		}
 	}
-
-	bodyRaw, err := io.ReadAll(req.Body)
+	_, err = io.ReadAll(req.Body)
 	if err != nil && err != io.EOF {
 		return nil, utils.Errorf("read body error: %s", err)
 	}
-	req.Body = io.NopCloser(bytes.NewReader(bodyRaw))
-
-	if contentEncoding != "" {
-		decodeBodyRaw, fixed := ContentEncodingDecode(contentEncoding, bodyRaw)
-		if fixed {
-			req.ContentLength = int64(len(decodeBodyRaw))
-			req.Body = io.NopCloser(bytes.NewReader(decodeBodyRaw))
-			req.Header.Set("Content-Length", strconv.Itoa(len(decodeBodyRaw)))
-		} else {
-			log.Warnf("content-encoding %s decode failed, %s", contentEncoding, req.RequestURI)
-			req.Header.Set("Content-Encoding", contentEncoding)
-		}
+	if bodyMirror.Len() == 0 {
+		req.Body = http.NoBody
+	} else {
+		req.Body = io.NopCloser(&bodyMirror)
 	}
 
 	if req.URL != nil && req.URL.Host != "" {

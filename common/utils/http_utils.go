@@ -83,7 +83,7 @@ func HttpDumpWithBody(i interface{}, body bool) ([]byte, error) {
 	case *http.Request:
 		// fix: single "Connection: close"
 		ret.Close = false
-		return httputil.DumpRequest(ret, body)
+		return DumpHTTPRequest(ret, body)
 	case http.Request:
 		return HttpDumpWithBody(&ret, body)
 	case *http.Response:
