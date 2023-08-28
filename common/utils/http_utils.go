@@ -79,6 +79,12 @@ func MarshalHTTPRequest(req *http.Request) ([]byte, error) {
 }
 
 func HttpDumpWithBody(i interface{}, body bool) ([]byte, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("HttpDumpWithBody panic: %v", err)
+			PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	switch ret := i.(type) {
 	case *http.Request:
 		// fix: single "Connection: close"

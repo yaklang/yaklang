@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
@@ -27,10 +26,6 @@ func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx conte
 
 		if utils.IsIPv4(host) || utils.IsIPv6(host) {
 			return net.DialTimeout(network, utils.HostPort(host, port), timeout)
-		}
-
-		if host == `http` {
-			log.Errorf("http")
 		}
 
 		newHost := LookupFirst(host, opts...)
