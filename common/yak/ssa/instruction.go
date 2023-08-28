@@ -10,7 +10,7 @@ func remove[T comparable](slice []T, s T) []T {
 	if index := slices.Index(slice, s); index > -1 {
 		return append(slice[:index], slice[index+1:]...)
 	}
-	return nil
+	return slice
 }
 
 func DeleteInst(i Instruction) {
