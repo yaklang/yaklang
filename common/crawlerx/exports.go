@@ -28,6 +28,8 @@ var CrawlerXExports = map[string]interface{}{
 	"localStorage":      WithLocalStorage,
 	"invalidSuffix":     WithInvalidSuffix,
 	"stealth":           WithStealth,
+	"saveToDB":          WithSaveToDB,
+	"runtimeID":         WithRuntimeID,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,

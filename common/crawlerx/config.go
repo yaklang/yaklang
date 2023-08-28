@@ -41,6 +41,8 @@ type BaseConfig struct {
 	localStorage      map[string]string
 	invalidSuffix     []string
 	stealth           bool
+	saveToDB          bool
+	runtimeId         string
 
 	targetUrl      string
 	ch             chan ReqInfo
@@ -89,6 +91,7 @@ func NewConfig() *Config {
 			localStorage:      make(map[string]string),
 			invalidSuffix:     make([]string, 0),
 			stealth:           false,
+			saveToDB:          false,
 		},
 	}
 }
@@ -99,6 +102,18 @@ type BrowserInfo struct {
 	ProxyAddress  string `json:"proxy_address,omitempty"`
 	ProxyUsername string `json:"proxy_username,omitempty"`
 	ProxyPassword string `json:"proxy_password,omitempty"`
+}
+
+func WithSaveToDB(b bool) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.saveToDB = b
+	}
+}
+
+func WithRuntimeID(id string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.runtimeId = id
+	}
 }
 
 func WithBrowserInfo(data string) ConfigOpt {
