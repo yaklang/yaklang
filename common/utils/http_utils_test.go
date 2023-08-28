@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/k0kubun/pp"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,7 +34,7 @@ func TestMarshalHTTPRequest(t *testing.T) {
 
 	t.Logf("data: %s", string(req))
 
-	_, err = lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewBuffer(req)))
+	_, err = ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewBuffer(req)))
 	if err != nil {
 		t.Errorf("marshal http request for re-building request failed: %s", err)
 		t.FailNow()
