@@ -17,13 +17,13 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 func (phi *Phi) Name() string { return phi.variable }
 
 func (phi *Phi) Build() Value {
-	phi.Block.skip = true
+	phi.Block.Skip = true
 	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
 		v := phi.Func.builder.readVariableByBlock(phi.variable, predBlock)
 		phi.Edge = append(phi.Edge, v)
 	}
-	phi.Block.skip = false
+	phi.Block.Skip = false
 	v := phi.tryRemoveTrivialPhi()
 	if v == phi {
 		block := phi.Block

@@ -135,7 +135,7 @@ type BasicBlock struct {
 	finish        bool // if emitJump finish!
 	isSealed      bool
 	inCompletePhi []*Phi // variable -> phi
-	skip          bool   // for phi build, avoid recursive
+	Skip          bool   // for phi build, avoid recursive
 
 	// User
 	user []User
