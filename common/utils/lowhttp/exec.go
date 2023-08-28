@@ -955,7 +955,6 @@ STATUSCODERETRY:
 	}
 
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
-	//return utils.StableReader(io.TeeReader(conn, os.Stdout), timeout, 10*1024*1024), nil
 	response.RawPacket = responseRaw.Bytes()
 	return response, nil
 }

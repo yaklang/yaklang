@@ -50,9 +50,10 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 		}
 	}
 
-	if utils.StringArrayContains(req.TransferEncoding, "chunked") {
-		req.TransferEncoding = nil
-	}
+	// Transport is golang native function call request
+	// handling transfer-encoding,
+	// do some hack to make sure packet is right
+	utils.FixHTTPRequestForGolangNativeHTTPClient(req)
 	rsp, err := t.Transport.RoundTrip(req)
 	return rsp, err
 }

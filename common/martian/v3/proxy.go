@@ -733,7 +733,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return p.handle(ctx, nconn, brw)
 			}
 			// -> Client Connection <- is plain HTTP connection
-			// Prepend the previously read data to be read again by http.ReadRequest.
+			// Prepend the previously read data to be read again.
 			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
 			return p.handle(ctx, conn, brw)
 		}

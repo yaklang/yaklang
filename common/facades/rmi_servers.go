@@ -156,8 +156,6 @@ func (f *FacadeServer) rmiServe(peekConn *utils.BufferedPeekableConn) error {
 	//
 	log.Infof("start to handle reader for %v", conn.RemoteAddr())
 
-	//reader := bufio.NewReader(io.TeeReader(conn, &mirror))
-
 	log.Info("start to recv command[byte]")
 	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	//var buf = make([]byte, 1)

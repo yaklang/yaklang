@@ -59,7 +59,7 @@ func NewWebHookServerEx(port int, cb func(data interface{})) *WebHookServer {
 				return
 			}
 
-			requestIns, err := ReadHTTPRequestEx(bufio.NewReader(bytes.NewBuffer(reqBytes)), true)
+			requestIns, err := utils.ReadHTTPRequestFromReader(bufio.NewReader(bytes.NewBuffer(reqBytes)))
 			if err != nil {
 				log.Errorf("re-build webhook request failed: %s", err)
 				return

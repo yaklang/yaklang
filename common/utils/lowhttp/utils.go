@@ -61,22 +61,6 @@ func parseResponseLine(line string) (string, int, string, bool) {
 	return proto, code, status, code != 0
 }
 
-// parseRequestLine parses "GET /foo HTTP/1.1" into its three parts.
-func parseRequestLine(line string) (method, requestURI, proto string, ok bool) {
-	s1 := strings.Index(line, " ")
-	s2 := strings.LastIndex(line[s1+1:], " ")
-	if s1 < 0 {
-		return
-	}
-
-	var httpVersion = "HTTP/1.1"
-	if s2 < 0 {
-		return line[:s1], line[s1+1:], httpVersion, true
-	}
-	s2 += s1 + 1
-	return line[:s1], line[s1+1 : s2], line[s2+1:], true
-}
-
 func validMethod(method string) bool {
 	/*
 	     Method         = "OPTIONS"                ; Section 9.2
@@ -432,7 +416,7 @@ func SplitHTTPPacket(
 	} else {
 		// req
 		if reqFirstLine != nil {
-			method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
+			method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
 			err := reqFirstLine(method, requestURI, proto)
 			if err != nil && err.Error() != "normal abort" {
 				log.Errorf("reqHeader error: %s", err)

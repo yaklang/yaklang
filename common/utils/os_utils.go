@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/net/http2"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -364,21 +362,20 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 						return
 					default:
 						conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-						var buf bytes.Buffer
-						req, _ := http.ReadRequest(bufio.NewReader(io.TeeReader(conn, &buf)))
-						if req != nil && req.Body != nil {
-							_, _ = io.ReadAll(req.Body)
-						}
-						reqBytes := buf.Bytes()
-						if len(reqBytes) == 0 {
+						req, err := ReadHTTPRequestFromReader(bufio.NewReader(conn))
+						if err != nil {
+							log.Errorf("read http request failed: %v", err)
 							conn.Close()
 							return
 						}
-						conn.Write(handle(reqBytes))
-						go func() {
-							time.Sleep(500 * time.Millisecond)
+						raw, err := DumpHTTPRequest(req, true)
+						if err != nil {
 							conn.Close()
-						}()
+							return
+						}
+						conn.Write(handle(raw))
+						time.Sleep(500 * time.Millisecond)
+						conn.Close()
 						return
 					}
 				}

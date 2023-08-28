@@ -993,7 +993,7 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 		return proto, fmt.Sprint(code), codeMsg
 	} else {
 		// request
-		method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
+		method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
 		return method, requestURI, proto
 	}
 }

@@ -406,19 +406,19 @@ if rsp.Contains(getParam("token")) {
 	}
 
 	if !passthroughTested {
-		panic("MITM PASSTHROUGH TEST FAILED")
+		t.Fatal("MITM PASSTHROUGH TEST FAILED")
 	}
 
 	if !echoTested {
-		panic("MITM ECHO TEST FAILED")
+		t.Fatal("MITM ECHO TEST FAILED")
 	}
 
 	if !gzipAutoDecode {
-		panic("GZIP AUTO DECODE FAILED")
+		t.Fatal("GZIP AUTO DECODE FAILED")
 	}
 
 	if !chunkDecode {
-		panic("CHUNK DECODE FAILED")
+		t.Fatal("CHUNK DECODE FAILED")
 	}
 
 	if !h2Test {
