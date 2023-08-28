@@ -2,15 +2,16 @@ package fp
 
 import (
 	"context"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/fp/iotdevfp"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *Config, host string, ip net.IP, port int) (*MatchResult, error) {
@@ -25,7 +26,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	////////////////////////////// IoT 设备优化 ///////////////////////////////
 	//////////////////////////////////////////////////////////////////////////
 	//log.Infof("start to check iotdevfp: %v", utils2.HostPort(ip.String(), port))
-	isOpen, httpBanners, err := FetchBannerFromHostPortEx(iotDetectCtx, nil, ip.String(), port, int64(config.FingerprintDataSize), config.Proxies...)
+	h := host
+	if h == "" {
+		h = ip.String()
+	}
+	isOpen, httpBanners, err := FetchBannerFromHostPortEx(iotDetectCtx, nil, h, port, int64(config.FingerprintDataSize), config.Proxies...)
 	if err != nil {
 		if !isOpen {
 			return &MatchResult{
