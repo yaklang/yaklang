@@ -445,10 +445,11 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 						req.URL.Host = originUrl.Host
 					}
 				}
-				if isHttps {
+				if req.URL.Scheme == "" && isHttps {
 					req.URL.Scheme = "https"
+				} else {
+					req.URL.Scheme = "http"
 				}
-
 			}
 		}
 
