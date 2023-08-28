@@ -173,7 +173,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i Value, key Value, create bool) *F
 
 	if create {
 		field := &Field{
-			anInstruction: b.newAnInstuction(),
+			anInstruction: newAnInstuction(b.CurrentBlock),
 			Key:           key,
 			I:             i,
 			update:        make([]Value, 0),
