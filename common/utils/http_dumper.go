@@ -182,6 +182,10 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 	}
 
 	rawBody, _ := io.ReadAll(rsp.Body)
+	var backupBody = io.NopCloser(bytes.NewReader(rawBody))
+	defer func() {
+		rsp.Body = backupBody
+	}()
 	haveBody := len(rawBody) > 0
 	if transferEncodingChunked {
 		rsp.ContentLength = -1 // unknown
@@ -308,6 +312,11 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		req.Body = http.NoBody
 	}
 	rawBody, _ := io.ReadAll(req.Body)
+	var backupBody = io.NopCloser(bytes.NewReader(rawBody))
+	defer func() {
+		req.Body = backupBody
+	}()
+
 	haveBody := len(rawBody) > 0
 	// handle cl / te
 	if transferEncodingChunked {

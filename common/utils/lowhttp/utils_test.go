@@ -234,15 +234,15 @@ func TestParseResponseLine(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		proto, code, status, _ := parseResponseLine(testcase.line)
+		proto, code, status, _ := utils.ParseHTTPResponseLine(testcase.line)
 		if proto != testcase.proto {
-			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", proto, testcase.proto)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %s(got) != %s(want)", proto, testcase.proto)
 		}
 		if code != testcase.code {
-			t.Fatalf("parseResponseLine error: %d(got) != %d(want)", code, testcase.code)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %d(got) != %d(want)", code, testcase.code)
 		}
 		if status != testcase.status {
-			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", status, testcase.status)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %s(got) != %s(want)", status, testcase.status)
 		}
 
 	}

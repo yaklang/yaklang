@@ -1,7 +1,6 @@
 package crep
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rsa"
@@ -506,7 +505,7 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			} else {
 				responseBytes = result[:]
 				req := rsp.Request
-				resultRsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(result)), req)
+				resultRsp, err := utils.ReadHTTPResponseFromBytes(result, req)
 				if err != nil {
 					log.Errorf("parse fixed response to body failed: %s", err)
 					return utils.Errorf("hijacking modified response parsing failed: %s", err)
