@@ -375,8 +375,10 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 							return
 						}
 						conn.Write(handle(reqBytes))
-						time.Sleep(50 * time.Millisecond)
-						conn.Close()
+						go func() {
+							time.Sleep(500 * time.Millisecond)
+							conn.Close()
+						}()
 						return
 					}
 				}
