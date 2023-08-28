@@ -10,7 +10,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_MITM_H2_RepeatHeaderError(t *testing.T) {
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx := utils.TimeoutContextSeconds(2)
 	targetHost, targetPort := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
 		return []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
@@ -28,9 +28,9 @@ Content-Type: text/html; charset=utf-8
 		panic(err)
 	}
 	stream.Send(&ypb.MITMRequest{
-		Host:            "127.0.0.1",
-		Port:            uint32(mitmPort),
-		DownstreamProxy: "http://" + utils.HostPort("127.0.0.1", targetPort),
+		Host:        "127.0.0.1",
+		Port:        uint32(mitmPort),
+		EnableHttp2: true,
 	})
 	for {
 		data, err := stream.Recv()
@@ -48,8 +48,9 @@ content-type: text/plain
 
 {"a": 1}`
 				_, err := yak.Execute(`
-poc.HTTP(packet, poc.https(true), poc.http2(true))~
-`, map[string]any{"packet": packet})
+rsp, req = poc.HTTP(packet, poc.https(true), poc.http2(true), poc.proxy(f"http://127.0.0.1:${mitmPort}"))~
+dump(rsp)
+`, map[string]any{"packet": packet, "mitmPort": mitmPort})
 				if err != nil {
 					panic(err)
 				}

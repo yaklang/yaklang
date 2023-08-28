@@ -10,7 +10,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
-	"net/textproto"
 	url "net/url"
 	"regexp"
 	"strconv"
@@ -433,126 +432,7 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	if req != nil {
 		return req, nil
 	}
-
-	reader := textproto.NewReader(bufio.NewReader(bytes.NewBuffer(raw)))
-	firstLine, err := reader.ReadLine()
-	if err != nil {
-		return nil, utils.Errorf("textproto readfirstline failed: %s", err)
-	}
-
-	var ok bool
-	// 解析 GET / HTTP/1.1
-	req = new(http.Request)
-	line := string(TrimSpaceHTTPPacket([]byte(firstLine)))
-
-	// 修复这个小问题
-	req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(line)
-	if !ok {
-		return nil, utils.Errorf("malformed HTTP request header:（origin:%v）line:%v", strconv.Quote(firstLine), strconv.Quote(line))
-	}
-	if req.Proto == "HTTP/2" {
-		req.ProtoMajor, req.ProtoMinor = 2, 0
-	} else if req.ProtoMajor, req.ProtoMinor, ok = http.ParseHTTPVersion(req.Proto); !ok && !strings.HasPrefix(req.Proto, "HTTP/2") {
-		log.Debugf("malformed HTTP version: %v", req.Proto)
-	}
-
-	if req.Method != "CONNECT" {
-		if !strings.HasPrefix(req.RequestURI, "/") {
-			req.RequestURI = "/" + req.RequestURI
-		}
-	} else {
-		if utils.IsHttpOrHttpsUrl(req.RequestURI) {
-			targetUri, _ := url.Parse(req.RequestURI)
-			if targetUri != nil {
-				req.URL = targetUri
-			}
-		}
-	}
-
-	req.Header = make(http.Header)
-
-	// 接下来解析各种 Header
-	var hostInHeader string
-	for {
-		line, err := reader.ReadLine()
-		if err != nil && err != io.EOF {
-			return nil, utils.Errorf("readline for parsing http.Request.Headers failed: %s", err.Error())
-		}
-
-		// Header 解析完毕
-		if line == "" {
-			break
-		}
-
-		key, value := SplitHTTPHeader(line)
-		if value == "" {
-			req.Header[key] = []string{" "}
-		} else {
-			req.Header.Add(key, value)
-		}
-
-		if strings.ToLower(key) == "host" && value != "" {
-			hostInHeader = value
-		}
-	}
-
-	// 处理一下 Request.URL 的问题
-	rawUrl := req.RequestURI
-	justAuthority := req.Method == "CONNECT" && !strings.HasPrefix(rawUrl, "/")
-	if justAuthority {
-		rawUrl = "http://" + rawUrl
-	}
-	if req.URL, err = url.ParseRequestURI(rawUrl); err != nil {
-		//log.Errorf("parse request uri[%v] failed: %s", rawUrl, err)
-		req.URL, _ = url.ParseRequestURI(utils.RemoveUnprintableCharsWithReplaceItem(rawUrl))
-		if req.URL == nil {
-			req.URL, _ = url.ParseRequestURI("/")
-			if req.URL != nil {
-				req.URL.RawPath = rawUrl
-			} else {
-				req.URL = &url.URL{
-					Path: rawUrl,
-				}
-			}
-		}
-	}
-
-	if justAuthority {
-		req.URL.Scheme = ""
-	}
-
-	// RFC 7230, section 5.3: Must treat
-	//	GET /index.html HTTP/1.1
-	//	Host: www.google.com
-	// and
-	//	GET http://www.google.com/index.html HTTP/1.1
-	//	Host: doesntmatter
-	// the same. In the second case, any Host line is ignored.
-	req.Host = req.URL.Host
-	if req.Host == "" {
-		req.Host = req.Header.Get("Host")
-	}
-	if req.Host == "" && hostInHeader != "" {
-		req.Host = hostInHeader
-	}
-
-	// 接下来应该处理 Body 的问题了
-	rawBody, err := ioutil.ReadAll(reader.R)
-	if err != nil {
-		return nil, utils.Errorf("read last all body failed: %s", err)
-	}
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(rawBody))
-
-	// 1. Chunked 分块传输
-	chunked := strings.Contains(strings.Join(req.Header.Values("Transfer-Encoding"), "|"), "chunked")
-	if chunked {
-		return req, nil
-	}
-
-	// 普通 Content-Length
-	cl := len(rawBody)
-	req.Header.Set("Content-Length", fmt.Sprint(cl))
-	return req, nil
+	return nil, readErr
 }
 
 func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
@@ -575,6 +455,16 @@ func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, erro
 	}
 
 	defer func() {
+		if req != nil && req.URL != nil {
+			if req.Host != "" && req.URL.Host == "" {
+				req.URL.Host = req.Host
+			}
+			req.URL.Opaque = ""
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+		}
+
 		if err := recover(); err != nil {
 			log.Errorf("ReadHTTPRequestEx panic: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()

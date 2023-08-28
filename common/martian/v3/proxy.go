@@ -613,7 +613,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	if req.Method == "CONNECT" {
 		// req auth enable
 		var connectedTo = req.Host
-		if host, port, err := utils.ParseStringToHostPort(req.URL.String()); err == nil {
+		var urlFromURI = req.URL.String()
+		if host, port, err := utils.ParseStringToHostPort(urlFromURI); err == nil {
 			connectedTo = utils.HostPort(host, port)
 		}
 		if req.URL.Scheme == "https" {
