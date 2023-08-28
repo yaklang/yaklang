@@ -8,8 +8,10 @@ import (
 )
 
 func (f *Function) SetReg(i Instruction) {
-	reg := fmt.Sprintf("t%d", len(f.instReg))
-	f.instReg[i] = reg
+	if _, ok := f.instReg[i]; !ok {
+		reg := fmt.Sprintf("t%d", len(f.instReg))
+		f.instReg[i] = reg
+	}
 }
 
 func GetReg(I Instruction, f *Function) string {
@@ -46,7 +48,9 @@ func getStr(v Node) string {
 				return i.Key.String() + "-capture"
 			}
 		}
-		op += GetReg(v, v.GetParent())
+		if v.GetParent() != nil {
+			op += GetReg(v, v.GetParent())
+		}
 	case *Const:
 		op += v.String()
 	case *Parameter:
