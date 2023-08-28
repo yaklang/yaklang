@@ -115,12 +115,12 @@ func (c *Call) AddValue(v Value)   {}
 
 // ----------- Switch
 func (sw *Switch) ReplaceValue(v Value, to Value) {
-	if sw.cond == v {
-		sw.cond = to
+	if sw.Cond == v {
+		sw.Cond = to
 	}
-	for _, c := range sw.label {
-		if c.value == v {
-			c.value = to
+	for _, c := range sw.Label {
+		if c.Value == v {
+			c.Value = to
 		}
 	}
 }
@@ -129,10 +129,10 @@ func (sw *Switch) GetUsers() []User { return nil }
 
 func (sw *Switch) GetValues() []Value {
 	return append(
-		lo.Map(sw.label,
-			func(label SwitchLabel, _ int) Value { return label.value },
+		lo.Map(sw.Label,
+			func(label SwitchLabel, _ int) Value { return label.Value },
 		),
-		sw.cond,
+		sw.Cond,
 	)
 }
 func (sw *Switch) AddValue(v Value) {}
