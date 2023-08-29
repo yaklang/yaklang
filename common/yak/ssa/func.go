@@ -30,7 +30,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		symbol: &Interface{
 			anInstruction: anInstruction{},
 			// I:     parent.symbol,
-			field: make(map[Value]*Field),
+			Field: make(map[Value]*Field),
 			users: []User{},
 		},
 		err: make(SSAErrors, 0),
@@ -60,6 +60,7 @@ func (f *Function) NewParam(name string) {
 		user:     []User{},
 		typs:     make(Types, 0),
 	}
+	p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.WriteVariable(name, p)
 }

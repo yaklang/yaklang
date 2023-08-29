@@ -105,7 +105,7 @@ func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value
 		low:           low,
 		high:          high,
 		max:           max,
-		field:         make(map[Value]*Field, 0),
+		Field:         make(map[Value]*Field, 0),
 		Len:           Len,
 		Cap:           Cap,
 		users:         make([]User, 0),
@@ -120,7 +120,7 @@ func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value
 func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
 	s := &Update{
 		anInstruction: newAnInstuction(block),
-		value:         v,
+		Value:         v,
 		address:       address,
 	}
 	fixupUseChain(s)
@@ -138,12 +138,12 @@ func (i *If) AddFalse(f *BasicBlock) {
 }
 
 func (f *Field) GetLastValue() Value {
-	if lenght := len(f.update); lenght != 0 {
-		update, ok := f.update[lenght-1].(*Update)
+	if lenght := len(f.Update); lenght != 0 {
+		update, ok := f.Update[lenght-1].(*Update)
 		if !ok {
 			panic("")
 		}
-		return update.value
+		return update.Value
 	}
 	return nil
 }
