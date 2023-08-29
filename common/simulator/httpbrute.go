@@ -34,6 +34,7 @@ type HttpBruteForceCore struct {
 	loginButtonSelector string
 
 	compiler *regexp.Regexp
+	observer bool
 }
 
 func NewHttpBruteForceCore(targetUrl string, opts ...BruteConfigOpt) (*HttpBruteForceCore, error) {
@@ -53,6 +54,8 @@ func NewHttpBruteForceCore(targetUrl string, opts ...BruteConfigOpt) (*HttpBrute
 		captchaSelector:     config.captchaSelector,
 		captchaImgSelector:  config.captchaImgSelector,
 		loginButtonSelector: config.loginButtonSelector,
+
+		observer: true,
 	}
 	if config.proxy != "" {
 		proxyUrl, err := url.Parse(config.proxy)
@@ -99,10 +102,10 @@ func (bruteForce *HttpBruteForceCore) init() (err error) {
 		HtmlChangeMode:    bruteForce.loginDetectByHTML,
 		DefaultChangeMode: bruteForce.loginDetect,
 	}
-	if fn, ok := loginDetectMap[bruteForce.config.loginDetect]; !ok {
-		bruteForce.loginDetectFunc = bruteForce.loginDetect
-	} else {
+	if fn, ok := loginDetectMap[bruteForce.config.loginDetect]; ok {
 		bruteForce.loginDetectFunc = fn
+	} else {
+		bruteForce.loginDetectFunc = bruteForce.loginDetect
 	}
 	return
 }
@@ -306,9 +309,12 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 			return false, utils.Error(err)
 		}
 	}
-	_, err = bruteForce.page.Eval(observer)
-	if err != nil {
-		return false, utils.Error(err)
+	if bruteForce.observer {
+		_, err = bruteForce.page.Eval(observer)
+		if err != nil {
+			log.Errorf(`create observer error: %v`, err)
+			bruteForce.observer = false
+		}
 	}
 	err = ElementClick(bruteForce.page, bruteForce.loginButtonSelector)
 	if err != nil {
@@ -321,13 +327,18 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 	if bruteForce.config.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
 	}
-	obj, err := bruteForce.page.Eval(getObverserResult)
-	if err != nil {
-		return false, utils.Error(err)
-	}
-	objStr := obj.Value.String()
-	if len(objStr) > 500 {
-		objStr = objStr[:500]
+	var objStr string
+	if bruteForce.observer {
+		obj, err := bruteForce.page.Eval(getObverserResult)
+		if err != nil {
+			log.Errorf(`get observer result error: %v`, err)
+			bruteForce.observer = false
+		} else {
+			objStr = obj.Value.String()
+			if len(objStr) > 500 {
+				objStr = objStr[:500]
+			}
+		}
 	}
 	result := BruteResult{
 		username:  username,

@@ -23,13 +23,13 @@ const getImgB64Str = `
 	return base64Str;
 }`
 
-type requestStructor interface {
+type requestStructr interface {
 	InputBase64(string)
 	InputMode(string)
 	Generate() interface{}
 }
 
-type responseStructor interface {
+type responseStructr interface {
 	GetResult() string
 	GetErrorInfo() string
 	GetStatus() bool
@@ -117,8 +117,8 @@ func (dddd *DDDDResult) GetStatus() bool {
 type CaptchaIdentifier struct {
 	identifierUrl  string
 	identifierMode string
-	identifierReq  requestStructor
-	identifierRes  responseStructor
+	identifierReq  requestStructr
+	identifierRes  responseStructr
 	proxy          *url.URL
 }
 
@@ -130,11 +130,11 @@ func (identifier *CaptchaIdentifier) SetMode(mode string) {
 	identifier.identifierMode = mode
 }
 
-func (identifier *CaptchaIdentifier) SetRequest(req requestStructor) {
+func (identifier *CaptchaIdentifier) SetRequest(req requestStructr) {
 	identifier.identifierReq = req
 }
 
-func (identifier *CaptchaIdentifier) SetResponse(res responseStructor) {
+func (identifier *CaptchaIdentifier) SetResponse(res responseStructr) {
 	identifier.identifierRes = res
 }
 

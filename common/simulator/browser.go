@@ -87,6 +87,8 @@ func (starter *BrowserStarter) doLaunch(l *launcher.Launcher) *launcher.Launcher
 		l = l.Leakless(false)
 	} else if starter.config.leakless == LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
 		l = l.Leakless(false)
+	} else if starter.config.leakless == LeaklessOn {
+		l = l.Leakless(true)
 	}
 	return l
 }

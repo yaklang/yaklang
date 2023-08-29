@@ -33,6 +33,9 @@ func customizedCheckTagElements(page *rod.Page, tagName string, tagInfo map[stri
 	}
 	resultElements := make(rod.Elements, 0)
 	for _, element := range elements {
+		if visible, err := element.Visible(); err != nil || !visible {
+			continue
+		}
 		if customizedCheckElementAttribute(element, tagInfo) {
 			resultElements = append(resultElements, element)
 		}

@@ -12,8 +12,8 @@ func TestCaptcha(t *testing.T) {
 	type args struct {
 		url  string
 		mode string
-		req  requestStructor
-		res  responseStructor
+		req  requestStructr
+		res  responseStructr
 		arg  string
 	}
 	tests := []struct {
