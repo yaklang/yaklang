@@ -425,8 +425,8 @@ type Interface struct {
 
 	parentI *Interface // parent interface
 
-	// field
-	field map[Value]*Field // field.key->field
+	// Field
+	Field map[Value]*Field // field.key->field
 
 	// when slice or map
 	Len, Cap Value
@@ -451,7 +451,7 @@ type Field struct {
 	// capture by other function
 	OutCapture bool
 
-	update []Value // value
+	Update []Value // value
 
 	users []User
 
@@ -469,8 +469,10 @@ var _ Instruction = (*Field)(nil)
 // ----------- Update
 type Update struct {
 	anInstruction
-	value   Value
-	address *Field
+
+
+	Value    Value
+	address  *Field
 }
 
 var _ Node = (*Update)(nil)
