@@ -22,6 +22,8 @@ func New(r *rule.Rule) (Generator, error) {
 		return newTCPGen(r)
 	case protocol.UDP:
 		return newUDPGen(r)
+	case protocol.DNS:
+		return newDNSGen(r)
 	}
 	return nil, errors.New("not support protocol")
 }
