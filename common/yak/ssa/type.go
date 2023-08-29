@@ -204,8 +204,8 @@ func (s *InterfaceType) GetField(key Value) Types {
 	return nil
 }
 
-// ===================== transform
-func (s *InterfaceType) Transform() {
+// ===================== Finish simply
+func (s *InterfaceType) Finish() {
 	field := lo.UniqBy(s.Field, func(t Types) string { return t.String() })
 	keytype := lo.UniqBy(s.keyType, func(t Types) string { return t.String() })
 	if len(field) == 1 {
