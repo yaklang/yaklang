@@ -344,7 +344,6 @@ func init() {
 			return nil, nil
 		},
 		"log_message": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			//port := params.getParamByName("port", -1)
 			data := params.getParamByName("data").Value
 			naslLogger.Info(data)
 			return nil, nil
@@ -496,7 +495,6 @@ func init() {
 				}
 			}
 			//log.Infof("recv_line:%v: %s", reflect.ValueOf(iconn).Pointer(), buf.String())
-			spew.Dump(buf.String())
 			return buf.String(), nil
 		},
 		"send": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
@@ -505,9 +503,8 @@ func init() {
 			option := params.getParamByName("option", 0)
 			length := params.getParamByName("length", 0)
 			if engine.debug {
-				//naslLogger.Infof("send data: %s", data)
+				naslLogger.Infof("send data: %s", data)
 			}
-			log.Infof("send data: %s", data)
 			data_length := len(data)
 			_ = option
 			_ = length
@@ -580,18 +577,24 @@ func init() {
 			}
 		},
 		"http_open_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			log.Info("open socket")
 			port := params.getParamByNumber(0, -1).Int()
-			timeout := params.getParamByName("timeout", engine.scriptObj.Timeout).Int()
+			timeout := params.getParamByName("timeout", engine.scriptObj.RecvTimeout).Int()
 			adderss := fmt.Sprintf("%s:%d", engine.host, port)
-			var n int
+			n := -1
 			if timeout == 0 {
 				timeout = 5000
 			}
-			if netx.IsTLSService(adderss) {
-				n = utils2.OPENVAS_ENCAPS_SSLv2
-			} else {
-				n = utils2.OPENVAS_ENCAPS_IP
+			if v, err := engine.CallNativeFunction("get_kb_item", nil, []any{fmt.Sprintf("Transports/TCP/%d", port)}); err != nil {
+				if v1, ok := v.(int); ok {
+					n = v1
+				}
+			}
+			if n == -1 {
+				if netx.IsTLSService(adderss, engine.proxies...) {
+					n = utils2.OPENVAS_ENCAPS_SSLv2
+				} else {
+					n = utils2.OPENVAS_ENCAPS_IP
+				}
 			}
 			conn, err := netx.DialTCPTimeout(time.Duration(timeout)*time.Second, utils.HostPort(engine.host, port), engine.proxies...)
 			if err != nil {
@@ -646,7 +649,6 @@ func init() {
 				return nil, errors.New("http_head fuzz error")
 			}
 			return utils.HttpDumpWithBody(results[0], true)
-			return nil, nil
 		},
 		"http_delete": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
 			getReq := lowhttp.UrlToGetRequestPacket(fmt.Sprintf("http://%s:%d%s", engine.host, params.getParamByName("port", -1).Int(), params.getParamByName("item").String()), nil, false)
@@ -681,7 +683,6 @@ func init() {
 			return nil, nil
 		},
 		"http_close_socket": func(engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			log.Info("close socket")
 			connV := params.getParamByNumber(0, nil)
 			conn := connV.Value
 			if v, ok := conn.(net.Conn); ok {
