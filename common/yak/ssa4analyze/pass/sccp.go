@@ -1,8 +1,6 @@
 package pass
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -15,10 +13,17 @@ func init() {
 // sccp
 // implement simple conditional constant propagation
 type SCCP struct {
+	edge   Edge
+	Finish map[*ssa.BasicBlock]struct{}
 }
 
+// map to -> from -> condition
+type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
+
 func (s *SCCP) RunOnFunction(fun *ssa.Function) {
-	edge = make(Edge)
+	s.edge = make(Edge)
+	s.Finish = make(map[*ssa.BasicBlock]struct{})
+
 	ifstmt := make([]*ssa.If, 0)
 	switchstmt := make([]*ssa.Switch, 0)
 	deleteStmt := make([]ssa.Instruction, 0)
@@ -26,6 +31,7 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	for _, b := range fun.Blocks {
 		for _, inst := range b.Instrs {
 			switch inst := inst.(type) {
+			// calc instruction
 			case *ssa.BinOp:
 				if ret := handlerBinOp(inst); ret != inst {
 					deleteStmt = append(deleteStmt, inst)
@@ -34,6 +40,8 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 				if ret := handlerUnOp(inst); ret != inst {
 					deleteStmt = append(deleteStmt, inst)
 				}
+			// call function
+			case *ssa.Call:
 			// collect if and switch
 			case *ssa.If:
 				ifstmt = append(ifstmt, inst)
@@ -48,47 +56,47 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	}
 
 	// handler edge
-	handlerEdge(ifstmt, switchstmt)
+	s.handlerEdge(ifstmt, switchstmt)
 
 	// handler
 	fun.EnterBlock.Condition = ssa.NewConst(true)
 	fun.EnterBlock.Skip = true
 	// deep first search
-	worklist := make([]*ssa.BasicBlock, 0, len(fun.Blocks))
-	worklist = append(worklist, fun.EnterBlock.Succs...)
-	for i := 0; i < len(worklist); i++ {
-		block := worklist[i]
-		// println(block.Name)
-
-		// handler condition
-		block.Condition = calcCondition(block)
-
-		for _, succ := range block.Succs {
-			// avoid loop
-			if succ.Skip {
-				continue
-			}
-			worklist = append(worklist, succ)
-			succ.Skip = true
+	var handlerBlock func(*ssa.BasicBlock)
+	handlerBlock = func(bb *ssa.BasicBlock) {
+		// skip finish block
+		if _, ok := s.Finish[bb]; ok {
+			return
 		}
+		// get condition
+		cond := s.calcCondition(bb)
+		if cond == nil {
+			return
+		}
+
+		// set finish
+		s.Finish[bb] = struct{}{}
+		bb.Condition = cond
+
+		// dfs
+		for _, succ := range bb.Succs {
+			handlerBlock(succ)
+		}
+	}
+
+	for _, bb := range fun.Blocks {
+		handlerBlock(bb)
 	}
 }
 
-// map to -> from -> condition
-type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
-
-var (
-	edge Edge
-)
-
-func handlerEdge(ifstmt []*ssa.If, switchstmt []*ssa.Switch) {
+func (s *SCCP) handlerEdge(ifstmt []*ssa.If, switchstmt []*ssa.Switch) {
 	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
-		fromtable, ok := edge[to]
+		fromtable, ok := s.edge[to]
 		if !ok {
 			fromtable = make(map[*ssa.BasicBlock]ssa.Value)
 		}
 		fromtable[from] = condition
-		edge[to] = fromtable
+		s.edge[to] = fromtable
 	}
 
 	// mark
@@ -118,10 +126,10 @@ func handlerEdge(ifstmt []*ssa.If, switchstmt []*ssa.Switch) {
 	}
 }
 
-func calcCondition(block *ssa.BasicBlock) ssa.Value {
+func (s *SCCP) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	getCondition := func(to, from *ssa.BasicBlock) ssa.Value {
 		var edgeCond ssa.Value
-		if fromtable, ok := edge[to]; ok {
+		if fromtable, ok := s.edge[to]; ok {
 			if value, ok := fromtable[from]; ok {
 				edgeCond = value
 			}
@@ -130,25 +138,6 @@ func calcCondition(block *ssa.BasicBlock) ssa.Value {
 			return from.Condition
 		} else {
 			return newBinOp(ssa.OpAnd, from.Condition, edgeCond, to)
-		}
-	}
-
-	if block.IsBlock(ssa.LoopExit) {
-		// loop.exit just use loop.header
-		if prev := block.GetBlock(ssa.LoopHeader); prev != nil {
-			return getCondition(block, prev)
-		}
-	}
-
-	if block.IsBlock(ssa.LoopBody) {
-		if prev := block.GetBlock(ssa.LoopHeader); prev != nil {
-			return getCondition(block, prev)
-		}
-	}
-
-	if block.IsBlock(ssa.LoopLatch) {
-		if prev := block.GetBlock(ssa.LoopBody); prev != nil {
-			return prev.Condition
 		}
 	}
 
@@ -169,7 +158,8 @@ func calcCondition(block *ssa.BasicBlock) ssa.Value {
 		}
 		// check
 		if pre.Condition == nil {
-			panic(fmt.Sprintf("this cond is null: %s", pre.Name))
+			// panic(fmt.Sprintf("this cond is null: %s", pre.Name))
+			return nil
 		}
 		// calc
 		if cond == nil {
@@ -293,6 +283,10 @@ func ConstBinary(x, y *ssa.Const, op ssa.BinaryOpcode) *ssa.Const {
 	switch op {
 	case ssa.OpShl:
 		if x.IsNumber() && y.IsNumber() {
+			return ssa.NewConst(x.Number() << y.Number())
+		}
+	case ssa.OpShr:
+		if x.IsNumber() && y.IsNumber() {
 			return ssa.NewConst(x.Number() >> y.Number())
 		}
 	case ssa.OpAnd:
@@ -315,7 +309,10 @@ func ConstBinary(x, y *ssa.Const, op ssa.BinaryOpcode) *ssa.Const {
 		}
 	case ssa.OpAdd:
 		if x.IsNumber() && y.IsNumber() {
-			return ssa.NewConst(x.Number() - y.Number())
+			return ssa.NewConst(x.Number() + y.Number())
+		}
+		if x.IsString() && y.IsString() {
+			return ssa.NewConst(x.VarString() + y.VarString())
 		}
 	case ssa.OpSub:
 		if x.IsNumber() && y.IsNumber() {
