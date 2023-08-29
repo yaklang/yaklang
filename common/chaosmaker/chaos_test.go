@@ -27,6 +27,9 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
+	},
+	{
 		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 	},
 	{
@@ -90,12 +93,6 @@ var rules = []*ruleTest{
 	//	id:           "debug",
 	//	rule:         `alert http any any -> any any (msg:"CobatlStrikt team servers 200 OK Space"; flow:from_server,established; content:"200"; http_stat_code; content:"HTTP/1.1 200 OK|20|"; threshold: type both, track by_src, count 3, seconds 60; reference:url,blog.fox-it.com/2019/02/26/identifying-cobalt-strike-team-servers-in-the-wild/;  sid:3016011; rev:1; metadata:created_at 2019_02_27,by al0ne;)`,
 	//	trafficCount: 3,
-	//},
-	//
-	//{
-	//	rule:         `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
-	//	trafficCount: 1,
-	//	id:           "debug",
 	//},
 }
 
@@ -197,6 +194,27 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 					return
 				}
 				pk = buffer.Bytes()
+			} else if rr.Protocol == protocol.DNS {
+				buffer := gopacket.NewSerializeBuffer()
+				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
+				if err != nil {
+					t.Log(err)
+					linklayer = &layers.Ethernet{
+						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
+						EthernetType: layers.EthernetTypeIPv4,
+					}
+				}
+				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
+					linklayer,
+					gopacket.Payload(result.UDPIPInboundPayload),
+				); err != nil {
+					t.Error(err)
+					return
+				}
+				pk = buffer.Bytes()
+			} else {
+				panic("not implement")
 			}
 			if !match.New(rr).Match(pk) {
 				spew.Dump(rr.Raw)
