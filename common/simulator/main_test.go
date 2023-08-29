@@ -19,9 +19,11 @@ func TestHttpBruteForce(t *testing.T) {
 		t.Error(err)
 	}
 	for item := range ch {
-		t.Logf(`[bruteforce] %s:%s login %v with url: %s`, item.Username(), item.Password(), item.Status(), item.Info())
+		t.Logf(`[bruteforce] %s:%s login %v`, item.Username(), item.Password(), item.Status())
+		t.Logf(`[bruteforce] login generated info: %v`, item.Info())
 		if item.Status() == true {
-			t.Log(item.Base64())
+			t.Logf(`after login url: %v`, item.LoginSuccessUrl())
+			t.Log(item.Base64()[:100])
 		}
 	}
 }
