@@ -253,9 +253,9 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 
 		select {
 		case <-d.continueCh:
-		case <-time.After(d.timeout):
-			// todo: 超时处理
-			return
+			// case <-time.After(d.timeout):
+			// 	// todo: 超时处理
+			// 	return
 		}
 
 	}
