@@ -69,7 +69,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 
 	// if stmt
 	if s, ok := stmt.IfStmt().(*yak.IfStmtContext); ok {
-		b.buildIfStmt(s, nil)
+		b.buildIfStmt(s)
 		return
 	}
 
@@ -340,98 +340,73 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 }
 
 // if stmt
-func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext, done *ssa.BasicBlock) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
+func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
+	var buildIf func(stmt *yak.IfStmtContext) *ssa.IfBuilder
+	buildIf = func(stmt *yak.IfStmtContext) *ssa.IfBuilder {
+		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		defer recoverRange()
 
-	// condition
-	cond := b.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
-	// if instruction
-	ifssa := b.EmitIf(cond)
-	isOutIf := false
-	if done == nil {
-		done = b.NewBasicBlock("if.done")
-		isOutIf = true
-	}
+		i := b.IfBuilder()
 
-	// create true block
-	trueBlock := b.NewBasicBlock("if.true")
-	ifssa.AddTrue(trueBlock)
-
-	// build true block
-	b.CurrentBlock = trueBlock
-	if blockstmt, ok := stmt.Block(0).(*yak.BlockContext); ok {
-		b.buildBlock(blockstmt)
-	}
-	// b.buildBlock(stmt.Block(0).(*yak.BlockContext))
-	b.EmitJump(done)
-
-	// handler "elif"
-	previf := ifssa
-	// add elif block to prev-if false
-	for index := range stmt.AllElif() {
-		// create false block
-		if previf.False == nil {
-			previf.AddFalse(b.NewBasicBlock("if.elif"))
-		}
-		// in false block
-		b.CurrentBlock = previf.False
-		// build condition
-		if condstmt, ok := stmt.Expression(index + 1).(*yak.ExpressionContext); ok {
-			recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
-			cond := b.buildExpression(condstmt)
-			// if instruction
-			currentif := b.EmitIf(cond)
-			// create true block
-			trueBlock := b.NewBasicBlock("if.true")
-			currentif.AddTrue(trueBlock)
-			// build true block
-			b.CurrentBlock = trueBlock
-			if blockstmt, ok := stmt.Block(index + 1).(*yak.BlockContext); ok {
-				b.buildBlock(blockstmt)
+		i.IfBranch(
+			// if instruction condition
+			func() ssa.Value {
+				return b.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
+			},
+			// build true body
+			func() {
+				if blockstmt, ok := stmt.Block(0).(*yak.BlockContext); ok {
+					b.buildBlock(blockstmt)
+				}
+			},
+		)
+		// add elif block to prev-if false
+		for index := range stmt.AllElif() {
+			// build condition
+			condstmt, ok := stmt.Expression(index + 1).(*yak.ExpressionContext)
+			if !ok {
+				continue
 			}
-			// jump to done
-			b.EmitJump(done)
-			// for next elif
-			previf = currentif
-			recoverRange()
+			i.ElifBranch(
+				// condition
+				func() ssa.Value {
+					recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
+					defer recoverRange()
+					return b.buildExpression(condstmt)
+				},
+				// body
+				func() {
+					recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
+					defer recoverRange()
+					if blockstmt, ok := stmt.Block(index + 1).(*yak.BlockContext); ok {
+						b.buildBlock(blockstmt)
+					}
+				},
+			)
 		}
-	}
 
-	// hanlder "else" and "else if "
-	if elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext); ok {
+		// hanlder "else" and "else if "
+		elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext)
+		if !ok {
+			return i
+		}
 		if elseblock, ok := elseStmt.Block().(*yak.BlockContext); ok {
-			// "else"
-			// create false block
-			falseBlock := b.NewBasicBlock("if.false")
-			previf.AddFalse(falseBlock)
-
-			// build false block
-			b.CurrentBlock = falseBlock
-			b.buildBlock(elseblock)
-			b.EmitJump(done)
+			i.ElseBranch(
+				// create false block
+				func() {
+					b.buildBlock(elseblock)
+				},
+			)
 		} else if elifstmt, ok := elseStmt.IfStmt().(*yak.IfStmtContext); ok {
 			// "else if"
 			// create elif block
-			elifBlock := b.NewBasicBlock("if.elif")
-			previf.AddFalse(elifBlock)
-
-			// build elif block
-			b.CurrentBlock = elifBlock
-			b.buildIfStmt(elifstmt, done)
+			i.AddChild(buildIf(elifstmt))
 		}
-	} else {
-		previf.AddFalse(done)
+		return i
 	}
-	b.CurrentBlock = done
-	if isOutIf {
-		// in exit if; set rest block
-		rest := b.NewBasicBlock("")
-		b.EmitJump(rest)
 
-		// continue rest code
-		b.CurrentBlock = rest
-	}
+	i := buildIf(stmt)
+	i.Finish()
 }
 
 // block
@@ -439,11 +414,8 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
-		// b.symbolBlock[]
-		// b.symbolBlock = NewBlockSymbolTable(NewBlockId(), b.symbolBlock)
 		b.PushBlockSymbolTable()
 		b.buildStatementList(s)
-		// b.symbolBlock = b.symbolBlock.next
 		b.PopBlockSymbolTable()
 	} else {
 		b.NewError(ssa.Warn, TAG, "empty block")

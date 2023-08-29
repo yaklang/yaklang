@@ -8,6 +8,12 @@ const (
 	LoopBody   = "loop.body"
 	LoopExit   = "loop.exit"
 	LoopLatch  = "loop.latch"
+
+	// if
+	IfDone  = "if.done"
+	IfTrue  = "if.true"
+	IfFalse = "if.false"
+	IfElif  = "if.elif"
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
@@ -129,3 +135,145 @@ func (lb *LoopBuilder) Finish() {
 	lb.b.CurrentBlock = rest
 }
 
+
+// if builder
+
+// enter:
+//      // if stmt cond in here
+//      If [cond] true -> if.true, false -> if.elif
+// if.true: 					<- enter
+//      // if-true-body block in here
+//      jump if.done
+// if.elif: 					<- enter
+//      // if-elif cond in here    (this build in "elif" and "else if")
+//      If [cond] true -> if.elif_true, false -> if.false
+// if.elif_true:				<- if.elif
+//      // if-elif-true-body block in here
+//      jump if.done
+// if.false: 					<- if.elif
+//      // if-elif-false-body block in here
+//      jump if.done
+// if.done:				        <- if.elif_true,if.true,if.false  (target of all if block)
+//      jump rest
+// rest:
+//      ...rest.code....
+
+type conditionBuilder func() Value
+type IfBuilder struct {
+	b *FunctionBuilder
+	// enter block
+	enter, done *BasicBlock
+	// child ifbuilder
+	child  *IfBuilder
+	parent *IfBuilder
+
+	// if branch
+	ifCondition conditionBuilder
+	ifBody      func()
+
+	// elif branch
+	elifCondition []conditionBuilder
+	elifBody      []func()
+
+	// else branch
+	elseBody func()
+}
+
+func (b *FunctionBuilder) IfBuilder() *IfBuilder {
+	return &IfBuilder{
+		b:             b,
+		enter:         b.CurrentBlock,
+		elifCondition: make([]conditionBuilder, 0),
+		elifBody:      make([]func(), 0),
+	}
+}
+
+func (i *IfBuilder) AddChild(child *IfBuilder) {
+	i.child = child
+	child.parent = i
+}
+
+func (i *IfBuilder) IfBranch(condition conditionBuilder, body func()) {
+	i.ifCondition = condition
+	i.ifBody = body
+}
+
+func (i *IfBuilder) ElifBranch(condition conditionBuilder, body func()) {
+	i.elifCondition = append(i.elifCondition, condition)
+	i.elifBody = append(i.elifBody, body)
+}
+
+func (i *IfBuilder) ElseBranch(body func()) {
+	i.elseBody = body
+}
+
+func (i *IfBuilder) Finish() {
+	// if instruction
+	var doneBlock *BasicBlock
+	if i.parent == nil {
+		doneBlock = i.b.NewBasicBlock(IfDone)
+		i.done = doneBlock
+	} else {
+		i.done = i.parent.done
+		doneBlock = i.parent.done
+	}
+	trueBlock := i.b.NewBasicBlock(IfTrue)
+
+	// build ifssa
+	cond := i.ifCondition()
+	ifssa := i.b.EmitIf(cond)
+	ifssa.AddTrue(trueBlock)
+	// build true block
+	i.b.CurrentBlock = trueBlock
+	i.ifBody()
+	// true -> done
+	i.b.EmitJump(doneBlock)
+
+	prevIf := ifssa
+	for index := range i.elifCondition {
+		buildcondition := i.elifCondition[index]
+		buildbody := i.elifBody[index]
+		// set block
+		if prevIf.False == nil {
+			prevIf.AddFalse(i.b.NewBasicBlock(IfElif))
+		}
+		i.b.CurrentBlock = prevIf.False
+		// build condition
+		cond := buildcondition()
+		if cond == nil {
+			continue
+		}
+		// build if
+		ifssa := i.b.EmitIf(cond)
+		ifssa.AddTrue(i.b.NewBasicBlock(IfTrue))
+		// build if body
+		i.b.CurrentBlock = ifssa.True
+		buildbody()
+		// if -> done
+		i.b.EmitJump(doneBlock)
+		prevIf = ifssa
+	}
+
+	if i.elseBody != nil {
+		// create false
+		prevIf.AddFalse(i.b.NewBasicBlock(IfFalse))
+		// build else body
+		i.b.CurrentBlock = prevIf.False
+		i.elseBody()
+		i.b.EmitJump(doneBlock)
+	} else if i.child != nil {
+		// create elif
+		prevIf.AddFalse(i.b.NewBasicBlock(IfElif))
+		i.b.CurrentBlock = prevIf.False
+		i.child.Finish()
+	} else {
+		prevIf.AddFalse(doneBlock)
+	}
+
+	if i.parent == nil {
+		i.b.CurrentBlock = doneBlock
+		rest := i.b.NewBasicBlock("")
+		i.b.EmitJump(rest)
+		i.b.CurrentBlock = rest
+	}
+}
