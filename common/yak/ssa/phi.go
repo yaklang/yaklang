@@ -8,19 +8,18 @@ func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
 			typs:  make(Types, 0),
 			pos:   &Position{},
 		},
-		Edge:     make([]Value, 0, len(block.Preds)),
-		user:     make([]User, 0),
-		variable: variable,
+		Edge: make([]Value, 0, len(block.Preds)),
+		user: make([]User, 0),
 	}
 }
 
-func (phi *Phi) Name() string { return phi.variable }
+func (phi *Phi) Name() string { return phi.GetVariable() }
 
 func (phi *Phi) Build() Value {
 	phi.Block.Skip = true
 	for _, predBlock := range phi.Block.Preds {
 		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
-		v := phi.Func.builder.readVariableByBlock(phi.variable, predBlock)
+		v := phi.Func.builder.readVariableByBlock(phi.GetVariable(), predBlock)
 		phi.Edge = append(phi.Edge, v)
 	}
 	phi.Block.Skip = false
@@ -29,7 +28,7 @@ func (phi *Phi) Build() Value {
 		block := phi.Block
 		block.Phis = append(block.Phis, phi)
 		phi.Func.SetReg(phi)
-		phi.Func.WriteSymbolTable(phi.variable, phi)
+		phi.Func.WriteSymbolTable(phi.GetVariable(), phi)
 	}
 	fixupUseChain(v)
 	return v
