@@ -44,12 +44,6 @@ func tcpIniter(c *matchContext) error {
 	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
 		c.Attach(newPayloadMatcher(r, r.Modifier))
 	}
-
-	err := c.Next()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
