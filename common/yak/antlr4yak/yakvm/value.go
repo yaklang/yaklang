@@ -1186,7 +1186,7 @@ func GetNamedVariableCount(v interface{}) int {
 	}
 	if _, ok := v.(*Function); rk == reflect.Struct && !ok {
 		return rv.NumField()
-	} else if rk == reflect.Map && rv.Len() > 0 {
+	} else if GetIndexedVariableCount(v) > 0 {
 		// len()
 		return 1
 	} else if IsBytesOrRunes(v) {
