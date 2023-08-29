@@ -45,14 +45,15 @@ func (c *Client) ExpectInitializeResponseAndCapabilities(t *testing.T) *dap.Init
 	t.Helper()
 	initResp := c.ExpectInitializeResponse(t)
 	wantCapabilities := dap.Capabilities{
-		SupportsStepInTargetsRequest:     true,
-		SupportsEvaluateForHovers:        true,
-		SupportsConditionalBreakpoints:   true,
-		SupportsConfigurationDoneRequest: true,
-		SupportsDisassembleRequest:       true,
-		SupportTerminateDebuggee:         true,
-		SupportsSetVariable:              true,
-		SupportsSetExpression:            true,
+		SupportsStepInTargetsRequest:      true,
+		SupportsEvaluateForHovers:         true,
+		SupportsConditionalBreakpoints:    true,
+		SupportsConfigurationDoneRequest:  true,
+		SupportsDisassembleRequest:        true,
+		SupportTerminateDebuggee:          true,
+		SupportsSetVariable:               true,
+		SupportsSetExpression:             true,
+		SupportsHitConditionalBreakpoints: true,
 	}
 	if !reflect.DeepEqual(initResp.Body, wantCapabilities) {
 		t.Errorf("capabilities in initializeResponse: got %+v, want %v", pretty(initResp.Body), pretty(wantCapabilities))
