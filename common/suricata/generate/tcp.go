@@ -35,6 +35,7 @@ func newTCPGen(r *rule.Rule) (Generator, error) {
 		switch mdf {
 		case modifier.TCPHDR:
 			// 暂时不太想支持，和其他tcpconfig冲突比较严重,用的也不多
+			log.Warnf("tcp.hdr modifier won't support in tcp generator")
 		case modifier.Default:
 			g.payload = parse2ContentGen(rr, WithNoise(noiseAll))
 		default:
