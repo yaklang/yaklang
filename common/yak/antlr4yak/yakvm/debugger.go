@@ -884,8 +884,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 
 	// 步入
 	if g.stepInState != nil {
-		// 如果debugger想要步进且frame不同，则回调
-		if g.stepInState.frame != frame {
+		// 在同一个线程下，如果debugger想要步进且frame不同，则回调
+		if g.stepInState.frame.ThreadID == frame.ThreadID && g.stepInState.frame != frame {
 			g.HandleForStepIn()
 		} else if g.stepInState.lineInedx < g.linePointer {
 			// 如果已经超出此行，则回调
