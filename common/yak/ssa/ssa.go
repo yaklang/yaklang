@@ -195,6 +195,7 @@ type anInstruction struct {
 	// type
 	typs Types
 
+	variable string
 	// source code position
 	pos *Position
 }
@@ -217,6 +218,14 @@ func (a *anInstruction) SetType(ts Types) {
 	a.typs = ts
 }
 
+func (a *anInstruction) SetVariable(name string) {
+	a.variable = name
+}
+
+func (a *anInstruction) GetVariable() string {
+	return a.variable
+}
+
 // value
 
 // ----------- Phi
@@ -226,15 +235,6 @@ type Phi struct {
 	user []User
 	// for build
 	wit1, wit2 Value // witness for trivial-phi
-	variable   string
-}
-
-func (phi *Phi) GetVariable() string {
-	return phi.variable
-}
-
-func (phi *Phi) SetVariable(name string) {
-	phi.variable = name
 }
 
 var _ Node = (*Phi)(nil)
@@ -366,14 +366,6 @@ type Call struct {
 	isDropError bool
 }
 
-func (c *Call) GetVariable() string {
-	return c.variable
-}
-
-func (c *Call) SetVariable(name string) {
-	c.variable = name
-}
-
 var _ Node = (*Call)(nil)
 var _ Value = (*Call)(nil)
 var _ User = (*Call)(nil)
@@ -444,14 +436,6 @@ type BinOp struct {
 	user     []User
 }
 
-func (b *BinOp) GetVariable() string {
-	return b.variable
-}
-
-func (b *BinOp) SetVariable(name string) {
-	b.variable = name
-}
-
 var _ Value = (*BinOp)(nil)
 var _ User = (*BinOp)(nil)
 var _ Node = (*BinOp)(nil)
@@ -476,14 +460,6 @@ type UnOp struct {
 	X  Value
 
 	user []User
-}
-
-func (u *UnOp) GetVariable() string {
-	return u.variable
-}
-
-func (u *UnOp) SetVariable(name string) {
-	u.variable = name
 }
 
 var _ Value = (*UnOp)(nil)
@@ -514,14 +490,6 @@ type Interface struct {
 	users []User
 }
 
-func (i *Interface) GetVariable() string {
-	return i.variable
-}
-
-func (i *Interface) SetVariable(name string) {
-	i.variable = name
-}
-
 var _ Node = (*Interface)(nil)
 var _ Value = (*Interface)(nil)
 var _ User = (*Interface)(nil)
@@ -550,13 +518,6 @@ type Field struct {
 
 }
 
-func (f *Field) GetVariable() string {
-	return f.variable
-}
-func (f *Field) SetVariable(name string) {
-	f.variable = name
-}
-
 var _ Node = (*Field)(nil)
 var _ Value = (*Field)(nil)
 var _ User = (*Field)(nil)
@@ -570,14 +531,6 @@ type Update struct {
 	address *Field
 
 	variable string
-}
-
-func (u *Update) GetVariable() string {
-	return u.variable
-}
-
-func (u *Update) SetVariable(name string) {
-	u.variable = name
 }
 
 var _ Node = (*Update)(nil)
