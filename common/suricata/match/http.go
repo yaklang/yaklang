@@ -76,10 +76,6 @@ func httpIniter(c *matchContext) error {
 		} else {
 			c.Attach(newPayloadMatcher(r, r.Modifier))
 		}
-		err := c.Next()
-		if c.IsRejected() {
-			return err
-		}
 	}
 	return nil
 }
