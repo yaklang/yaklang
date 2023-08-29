@@ -37,7 +37,7 @@ func NewBuilder(ast *yak.YaklangParser, prog *ssa.Program) *builder {
 
 var _ (ssa.Builder) = (*builder)(nil)
 
-func ParseSSA(src string) *ssa.Program {
+func ParseSSA(src string, opt ...ssa4analyze.Option) *ssa.Program {
 	inputStream := antlr.NewInputStream(src)
 	lex := yak.NewYaklangLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
@@ -48,9 +48,12 @@ func ParseSSA(src string) *ssa.Program {
 		prog: prog,
 	}
 	prog.Build(builder)
+	if len(opt) == 0 {
+		opt = append(opt, ssa4analyze.WithPass(true))
+	}
 	ssa4analyze.NewAnalyzerGroup(
 		prog,
-		ssa4analyze.WithPass(true),
+		opt...,
 	).Run()
 	return prog
 }
