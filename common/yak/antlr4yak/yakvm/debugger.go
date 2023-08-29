@@ -869,7 +869,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			g.HandleForStepNext()
 		} else if stackTrace.Len() < g.nextState.stackLen {
 			// 当堆栈长度小于stepoutState.stackLen,有可能是一个函数返回了,也应该回调
-			g.HandleForStepOut()
+			g.stepoutState = nil
+			g.HandleForStepNext()
 		}
 		return
 	} else {
