@@ -12,14 +12,8 @@ func ReplaceValue(v Value, to Value) {
 		to.AddUser(user)
 		v.RemoveUser(user)
 	}
-}
-
-func removeUser(users []User, u User) {
-	// if users == nil {
-	// 	return
-	// }
-	if index := slices.Index(users, u); index > -1 {
-		users[index] = nil
+	if inst, ok := v.(Instruction); ok {
+		inst.GetParent().ReplaceSymbolTable(v, to)
 	}
 }
 
@@ -29,7 +23,7 @@ func (f *Function) GetValues() []Value { return nil }
 func (f *Function) GetUsers() []User { return f.user }
 func (f *Function) AddUser(u User)   { f.user = append(f.user, u) }
 
-func (f *Function) RemoveUser(u User) { removeUser(f.user, u) }
+func (f *Function) RemoveUser(u User) { f.user = remove(f.user, u) }
 
 // ----------- BasicBlock
 func (b *BasicBlock) GetValues() []Value { return nil }
@@ -37,7 +31,7 @@ func (b *BasicBlock) GetValues() []Value { return nil }
 func (b *BasicBlock) GetUsers() []User { return b.user }
 func (b *BasicBlock) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *BasicBlock) RemoveUser(u User) { removeUser(b.user, u) }
+func (b *BasicBlock) RemoveUser(u User) { b.user = remove(b.user, u) }
 
 // ----------- Phi
 func (p *Phi) ReplaceValue(v Value, to Value) {
@@ -47,7 +41,7 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 func (p *Phi) GetUsers() []User { return p.user }
 func (p *Phi) AddUser(u User)   { p.user = append(p.user, u) }
 
-func (p *Phi) RemoveUser(u User) { removeUser(p.user, u) }
+func (p *Phi) RemoveUser(u User) { p.user = remove(p.user, u) }
 
 func (p *Phi) GetValues() []Value { return p.Edge }
 func (p *Phi) AddValue(v Value)   {}
@@ -58,7 +52,7 @@ func (c *Const) GetValues() []Value { return nil }
 func (c *Const) GetUsers() []User { return c.user }
 func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
 
-func (c *Const) RemoveUser(u User) { removeUser(c.user, u) }
+func (c *Const) RemoveUser(u User) { c.user = remove(c.user, u) }
 
 // ----------- param
 func (p *Parameter) GetValues() []Value { return nil }
@@ -66,7 +60,7 @@ func (p *Parameter) GetValues() []Value { return nil }
 func (p *Parameter) GetUsers() []User { return p.user }
 
 func (p *Parameter) AddUser(u User)    { p.user = append(p.user, u) }
-func (p *Parameter) RemoveUser(u User) { removeUser(p.user, u) }
+func (p *Parameter) RemoveUser(u User) { p.user = remove(p.user, u) }
 
 // ----------- IF
 func (i *If) ReplaceValue(v Value, to Value) {
@@ -108,7 +102,7 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 func (c *Call) GetUsers() []User { return c.user }
 func (c *Call) AddUser(u User)   { c.user = append(c.user, u) }
 
-func (c *Call) RemoveUser(u User) { removeUser(c.user, u) }
+func (c *Call) RemoveUser(u User) { c.user = remove(c.user, u) }
 
 func (c *Call) GetValues() []Value { return append(c.Args, append(c.binding, c.Method)...) }
 func (c *Call) AddValue(v Value)   {}
@@ -150,7 +144,7 @@ func (b *BinOp) ReplaceValue(v Value, to Value) {
 func (b *BinOp) GetUsers() []User { return b.user }
 func (b *BinOp) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *BinOp) RemoveUser(u User) { removeUser(b.user, u) }
+func (b *BinOp) RemoveUser(u User) { b.user = remove(b.user, u) }
 
 func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
 func (b *BinOp) AddValue(v Value)   {}
@@ -168,7 +162,7 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 func (b *UnOp) GetUsers() []User { return b.user }
 func (b *UnOp) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *UnOp) RemoveUser(u User) { removeUser(b.user, u) }
+func (b *UnOp) RemoveUser(u User) { b.user = remove(b.user, u) }
 
 func (b *UnOp) GetValues() []Value { return []Value{b.X} }
 func (b *UnOp) AddValue(v Value)   {}
@@ -194,7 +188,7 @@ func (i *Interface) AddUser(u User) {
 }
 
 func (i *Interface) RemoveUser(u User) {
-	removeUser(i.users, u)
+	i.users = remove(i.users, u)
 	// removeUser(i.field, u)
 	if f, ok := u.(*Field); ok {
 		delete(i.Field, f.Key)
@@ -206,7 +200,9 @@ func (i *Interface) AddValue(_ Value)   {}
 
 // ----------- Field
 func (f *Field) ReplaceValue(v, to Value) {
-	if index := slices.Index(f.Update, v); index > -1 {
+	if f.Key == v {
+		f.Key = to
+	} else if index := slices.Index(f.Update, v); index > -1 {
 		f.Update[index] = to
 	} else {
 		panic("field not use this value")
@@ -215,9 +211,9 @@ func (f *Field) ReplaceValue(v, to Value) {
 
 func (f *Field) GetUsers() []User  { return f.users }
 func (f *Field) AddUser(u User)    { f.users = append(f.users, u) }
-func (f *Field) RemoveUser(u User) { removeUser(f.users, u) }
+func (f *Field) RemoveUser(u User) { f.users = remove(f.users, u) }
 
-func (f *Field) GetValues() []Value { return append(f.Update, f.I)}
+func (f *Field) GetValues() []Value { return append(append(f.Update, f.I), f.Key) }
 func (f *Field) AddValue(v Value) {
 	if s, ok := v.(*Update); ok {
 		f.Update = append(f.Update, s)
