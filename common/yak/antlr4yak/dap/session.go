@@ -229,13 +229,13 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsStepInTargetsRequest = true     // 支持步入
 	response.Body.SupportTerminateDebuggee = true         // 在调试器终止时是否支持终止调试进程
 
-	response.Body.SupportsSetVariable = true   // 支持调试器设置变量的新值
-	response.Body.SupportsSetExpression = true // 是否支持设置表达式的新值
+	response.Body.SupportsSetVariable = true               // 支持调试器设置变量的新值
+	response.Body.SupportsSetExpression = true             // 是否支持设置表达式的新值
+	response.Body.SupportsHitConditionalBreakpoints = true // 在触发条件断点时到达断点但不满足条件的次数
 
 	response.Body.SupportsDisassembleRequest = false         // 是否支持反汇编请求(输出opcode)
 	response.Body.SupportsDataBreakpoints = false            // 某块内存(变量)被读写时触发的断点
 	response.Body.SupportsFunctionBreakpoints = false        // 函数断点(可以考虑支持)
-	response.Body.SupportsHitConditionalBreakpoints = false  // 在触发条件断点时到达断点但不满足条件的次数(可以考虑支持)
 	response.Body.SupportsBreakpointLocationsRequest = false // 是否支持客户端向调试适配器查询特定源代码文件中可用的断点位置(可以考虑支持)
 	response.Body.SupportsLogPoints = false                  // 是否支持断点不暂停,而是在断点处输出信息(可以考虑支持)
 
