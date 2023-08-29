@@ -20,10 +20,16 @@ type Value interface {
 
 	String() string
 
+	// variable
+	GetVariable() string
+	SetVariable(string)
+
+	// user
 	GetUsers() []User
 	AddUser(User)
 	RemoveUser(User)
 
+	// type
 	SetType(Types)
 }
 
@@ -115,6 +121,14 @@ func (f *Function) GetType() Types {
 func (f *Function) SetType(ts Types) {
 }
 
+func (f *Function) GetVariable() string {
+	return f.Name
+}
+
+func (f *Function) SetVariable(name string) {
+	f.Name = name
+}
+
 var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
 
@@ -151,6 +165,14 @@ func (b *BasicBlock) GetType() Types {
 }
 
 func (b *BasicBlock) SetType(ts Types) {
+}
+
+func (b *BasicBlock) GetVariable() string {
+	return b.Name
+}
+
+func (b *BasicBlock) SetVariable(name string) {
+	b.Name = name
 }
 
 var _ Node = (*BasicBlock)(nil)
@@ -207,6 +229,14 @@ type Phi struct {
 	variable   string
 }
 
+func (phi *Phi) GetVariable() string {
+	return phi.variable
+}
+
+func (phi *Phi) SetVariable(name string) {
+	phi.variable = name
+}
+
 var _ Node = (*Phi)(nil)
 var _ Value = (*Phi)(nil)
 var _ User = (*Phi)(nil)
@@ -214,6 +244,7 @@ var _ Instruction = (*Phi)(nil)
 
 // ----------- Const
 // only Value
+// TODO: const also have block pointer which block set this const to variable
 type Const struct {
 	user  []User
 	value any
@@ -231,6 +262,13 @@ func (c Const) GetType() Types {
 
 func (c *Const) SetType(ts Types) {
 	c.typ = ts
+}
+
+func (c *Const) GetVariable() string {
+	return ""
+}
+
+func (c *Const) SetVariable(name string) {
 }
 
 var _ Node = (*Const)(nil)
@@ -252,6 +290,14 @@ func (p *Parameter) GetType() Types {
 
 func (p *Parameter) SetType(ts Types) {
 	p.typs = ts
+}
+
+func (p *Parameter) GetVariable() string {
+	return p.variable
+}
+
+func (p *Parameter) SetVariable(name string) {
+	p.variable = name
 }
 
 var _ Node = (*Parameter)(nil)
@@ -303,6 +349,7 @@ var _ Instruction = (*Return)(nil)
 // call instruction call method function  with args as argument
 type Call struct {
 	anInstruction
+	variable string
 
 	// for call function
 	Method Value
@@ -317,6 +364,14 @@ type Call struct {
 	caller Value
 	// ~ drop error
 	isDropError bool
+}
+
+func (c *Call) GetVariable() string {
+	return c.variable
+}
+
+func (c *Call) SetVariable(name string) {
+	c.variable = name
 }
 
 var _ Node = (*Call)(nil)
@@ -357,31 +412,44 @@ type BinaryOpcode int
 
 const (
 	// Binary
-	OpShl    BinaryOpcode = iota // <<
-	OpShr                        // >>
-	OpAnd                        // &
-	OpAndNot                     // &^
-	OpOr                         // |
-	OpXor                        // ^
-	OpAdd                        // +
-	OpSub                        // -
-	OpMul                        // *
-	OpDiv                        // /
-	OpMod                        // %
-	OpGt                         // >
-	OpLt                         // <
-	OpGtEq                       // >=
-	OpLtEq                       // <=
-	OpEq                         // ==
-	OpNotEq                      // != <>
+	OpShl BinaryOpcode = iota // <<
+
+	OpShr    // >>
+	OpAnd    // &
+	OpAndNot // &^
+	OpOr     // |
+	OpXor    // ^
+	OpAdd    // +
+	OpSub    // -
+	OpDiv    // /
+	OpMod    // %
+	// mul
+	OpMul // *
+
+	// boolean opcode
+	OpGt    // >
+	OpLt    // <
+	OpGtEq  // >=
+	OpLtEq  // <=
+	OpEq    // ==
+	OpNotEq // != <>
 )
 
 // ----------- BinOp
 type BinOp struct {
 	anInstruction
-	Op   BinaryOpcode
-	X, Y Value
-	user []User
+	variable string
+	Op       BinaryOpcode
+	X, Y     Value
+	user     []User
+}
+
+func (b *BinOp) GetVariable() string {
+	return b.variable
+}
+
+func (b *BinOp) SetVariable(name string) {
+	b.variable = name
 }
 
 var _ Value = (*BinOp)(nil)
@@ -402,10 +470,20 @@ const (
 type UnOp struct {
 	anInstruction
 
+	variable string
+
 	Op UnaryOpcode
 	X  Value
 
 	user []User
+}
+
+func (u *UnOp) GetVariable() string {
+	return u.variable
+}
+
+func (u *UnOp) SetVariable(name string) {
+	u.variable = name
 }
 
 var _ Value = (*UnOp)(nil)
@@ -419,6 +497,8 @@ var _ Instruction = (*UnOp)(nil)
 // instruction + value + user
 type Interface struct {
 	anInstruction
+
+	variable string
 
 	// when slice
 	low, high, max Value
@@ -434,6 +514,14 @@ type Interface struct {
 	users []User
 }
 
+func (i *Interface) GetVariable() string {
+	return i.variable
+}
+
+func (i *Interface) SetVariable(name string) {
+	i.variable = name
+}
+
 var _ Node = (*Interface)(nil)
 var _ Value = (*Interface)(nil)
 var _ User = (*Interface)(nil)
@@ -444,6 +532,7 @@ var _ Instruction = (*Interface)(nil)
 type Field struct {
 	anInstruction
 
+	variable string
 	// field
 	Key Value
 	I   Value
@@ -461,6 +550,13 @@ type Field struct {
 
 }
 
+func (f *Field) GetVariable() string {
+	return f.variable
+}
+func (f *Field) SetVariable(name string) {
+	f.variable = name
+}
+
 var _ Node = (*Field)(nil)
 var _ Value = (*Field)(nil)
 var _ User = (*Field)(nil)
@@ -470,9 +566,18 @@ var _ Instruction = (*Field)(nil)
 type Update struct {
 	anInstruction
 
+	Value   Value
+	address *Field
 
-	Value    Value
-	address  *Field
+	variable string
+}
+
+func (u *Update) GetVariable() string {
+	return u.variable
+}
+
+func (u *Update) SetVariable(name string) {
+	u.variable = name
 }
 
 var _ Node = (*Update)(nil)
