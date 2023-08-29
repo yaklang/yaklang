@@ -44,7 +44,10 @@ func (b *BasicBlock) GetBlock(name string) *BasicBlock {
 
 type LoopBuilder struct {
 	// block
-	enter, header, body, exit, latch *BasicBlock
+	enter *BasicBlock
+
+	buildCondition                    func() Value
+	buildFirst, buildBody, buildThird func()
 
 	// b
 	b *FunctionBuilder
@@ -52,58 +55,75 @@ type LoopBuilder struct {
 
 func (b *FunctionBuilder) BuildLoop() *LoopBuilder {
 	enter := b.CurrentBlock
-	header := b.NewBasicBlockUnSealed(LoopHeader)
-	body := b.NewBasicBlock(LoopBody)
-	exit := b.NewBasicBlock(LoopExit)
-	latch := b.NewBasicBlock(LoopLatch)
 
 	return &LoopBuilder{
-		enter:  enter,
-		header: header,
-		body:   body,
-		exit:   exit,
-		latch:  latch,
-		b:      b,
+		enter: enter,
+		b:     b,
 	}
 }
 
 func (lb *LoopBuilder) BuildFirstExpr(f func()) {
-	lb.b.CurrentBlock = lb.enter
-	f()
+	lb.buildFirst = f
 }
 
 func (lb *LoopBuilder) BuildCondtion(f func() Value) {
-	// enter -> header
-	lb.b.CurrentBlock = lb.enter
-	lb.b.EmitJump(lb.header)
-	// if in header end; to exit or body
-	lb.b.CurrentBlock = lb.header
-	condition := f()
-	ifssa := lb.b.EmitIf(condition)
-	ifssa.AddFalse(lb.exit)
-	ifssa.AddTrue(lb.body)
+	lb.buildCondition = f
 }
 
-func (lb *LoopBuilder) BuildLatch(f func()) {
-	lb.b.CurrentBlock = lb.latch
-	f()
-	// latch -> header
-	lb.b.EmitJump(lb.header)
+func (lb *LoopBuilder) BuildThird(f func()) {
+	lb.buildThird = f
 }
 
 func (lb *LoopBuilder) BuildBody(f func()) {
-	lb.b.CurrentBlock = lb.body
-	lb.b.PushTarget(lb.exit, lb.latch, nil)
-	f()
-	lb.b.PopTarget()
-	// body -> latch
-	lb.b.EmitJump(lb.latch)
+	lb.buildBody = f
 }
 
 func (lb *LoopBuilder) Finish() {
-	lb.header.Sealed()
+	header := lb.b.NewBasicBlockUnSealed(LoopHeader)
+	body := lb.b.NewBasicBlock(LoopBody)
+	exit := lb.b.NewBasicBlock(LoopExit)
+	latch := lb.b.NewBasicBlock(LoopLatch)
+	// build first
+	if lb.buildFirst != nil {
+		lb.b.CurrentBlock = lb.enter
+		lb.buildFirst()
+	}
+
+	// build condition
+	if lb.buildCondition != nil {
+		// enter -> header
+		lb.b.CurrentBlock = lb.enter
+		lb.b.EmitJump(header)
+		// if in header end; to exit or body
+		lb.b.CurrentBlock = header
+		condition := lb.buildCondition()
+		ifssa := lb.b.EmitIf(condition)
+		ifssa.AddFalse(exit)
+		ifssa.AddTrue(body)
+	}
+
+	// build body
+	if lb.buildBody != nil {
+		lb.b.CurrentBlock = body
+		lb.b.PushTarget(exit, latch, nil)
+		lb.buildBody()
+		lb.b.PopTarget()
+		// body -> latch
+		lb.b.EmitJump(latch)
+	}
+
+	// build latch
+	if lb.buildThird != nil {
+		lb.b.CurrentBlock = latch
+		lb.buildThird()
+		// latch -> header
+		lb.b.EmitJump(header)
+	}
+
+	// finish
+	header.Sealed()
 	rest := lb.b.NewBasicBlock("")
-	lb.b.CurrentBlock = lb.exit
+	lb.b.CurrentBlock = exit
 	// exit -> rest
 	lb.b.EmitJump(rest)
 	lb.b.CurrentBlock = rest

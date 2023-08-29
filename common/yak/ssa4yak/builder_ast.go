@@ -195,8 +195,6 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	defer recoverRange()
 	// current := f.currentBlock
 	loop := b.BuildLoop()
-	var endThird *yak.ForThirdExprContext
-	endThird = nil
 
 	// var cond ssa.Value
 	var cond *yak.ExpressionContext
@@ -218,8 +216,14 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		}
 
 		if third, ok := condition.ForThirdExpr().(*yak.ForThirdExprContext); ok {
-			// third exprssion in latch block, when loop.body builded
-			endThird = third
+			// build latch
+			loop.BuildThird(func() {
+				// build third expression in loop.latch
+				recoverRange := b.SetRange(third.BaseParserRuleContext)
+				b.ForExpr(third)
+				recoverRange()
+
+			})
 		}
 	}
 
@@ -231,22 +235,14 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		}
 		return condition
 	})
+
 	//  build body
 	loop.BuildBody(func() {
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			b.buildBlock(block)
 		}
 	})
-	// build latch
-	loop.BuildLatch(func() {
-		if endThird != nil {
-			// build third expression in loop.latch
-			recoverRange := b.SetRange(endThird.BaseParserRuleContext)
-			b.ForExpr(endThird)
-			recoverRange()
 
-		}
-	})
 	loop.Finish()
 }
 
