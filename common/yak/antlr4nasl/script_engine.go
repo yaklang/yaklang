@@ -48,7 +48,7 @@ func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 		dependencyScripts: make(map[string]struct{}),
 	}
 	engine.config = cfg
-	engine.LoadScript(cfg.plugin)
+	engine.LoadScript(cfg.plugins)
 	engine.LoadFamilys(cfg.family)
 	if cfg.conditions != nil {
 		engine.LoadWithConditions(cfg.conditions)

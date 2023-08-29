@@ -113,7 +113,7 @@ naslScanHandle = (hosts,ports)=>{
     }
 }
 
-naslScanHandle("123.56.92.66","80")
+naslScanHandle("uat.sdeweb.hkcsl.com","443")
 `
 	err := yaklang.New().SafeEval(context.Background(), scanCode)
 	if err != nil {

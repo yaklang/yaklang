@@ -309,7 +309,7 @@ func TestPocScanner(t *testing.T) {
 		})
 	})
 	start := time.Now()
-	err := engine.ScanTarget("83.212.108.171:9870")
+	err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
 	if err != nil {
 		log.Error(err)
 	}
