@@ -105,8 +105,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 		hasKey = false
 	}
 	lValueLen := NewConst(len(vs))
-	typ := NewInterfaceType()
-	itf := b.EmitInterfaceBuildWithType(Types{typ}, lValueLen, lValueLen)
+	itf := b.EmitInterfaceBuildWithType(nil, lValueLen, lValueLen)
 	for i, rv := range vs {
 		var key Value
 		if hasKey {
@@ -114,11 +113,9 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 		} else {
 			key = NewConst(i)
 		}
-		typ.AddField(key, rv.GetType())
 		field := b.EmitField(itf, key)
 		b.emitUpdate(field, rv)
 	}
-	typ.Transform()
 	return itf
 }
 

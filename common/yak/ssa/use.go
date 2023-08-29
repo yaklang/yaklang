@@ -189,7 +189,7 @@ func (i *Interface) AddUser(u User) {
 	i.users = append(i.users, u)
 	if f, ok := u.(*Field); ok {
 		// important !
-		i.field[f.Key] = f
+		i.Field[f.Key] = f
 	}
 }
 
@@ -197,7 +197,7 @@ func (i *Interface) RemoveUser(u User) {
 	removeUser(i.users, u)
 	// removeUser(i.field, u)
 	if f, ok := u.(*Field); ok {
-		delete(i.field, f.Key)
+		delete(i.Field, f.Key)
 	}
 }
 
@@ -206,8 +206,8 @@ func (i *Interface) AddValue(_ Value)   {}
 
 // ----------- Field
 func (f *Field) ReplaceValue(v, to Value) {
-	if index := slices.Index(f.update, v); index > -1 {
-		f.update[index] = to
+	if index := slices.Index(f.Update, v); index > -1 {
+		f.Update[index] = to
 	} else {
 		panic("field not use this value")
 	}
@@ -217,17 +217,17 @@ func (f *Field) GetUsers() []User  { return f.users }
 func (f *Field) AddUser(u User)    { f.users = append(f.users, u) }
 func (f *Field) RemoveUser(u User) { removeUser(f.users, u) }
 
-func (f *Field) GetValues() []Value { return append(f.update, f.I) }
+func (f *Field) GetValues() []Value { return append(f.Update, f.I)}
 func (f *Field) AddValue(v Value) {
 	if s, ok := v.(*Update); ok {
-		f.update = append(f.update, s)
+		f.Update = append(f.Update, s)
 	}
 }
 
 // ----------- Update
 func (s *Update) ReplaceValue(v, to Value) {
-	if s.value == v {
-		s.value = to
+	if s.Value == v {
+		s.Value = to
 	} else {
 		panic("update not use this value")
 	}
@@ -243,5 +243,5 @@ func (s *Update) RemoveUser(u User) {
 	}
 }
 
-func (s *Update) GetValues() []Value { return []Value{s.value} }
+func (s *Update) GetValues() []Value { return []Value{s.Value} }
 func (s *Update) AddValue(_ Value)   {}
