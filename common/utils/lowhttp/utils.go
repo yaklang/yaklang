@@ -156,6 +156,7 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	} else {
 		host = r.Header.Get("Host")
 	}
+	host = strings.TrimSpace(host)
 	if host == "" {
 		return nil, utils.Errorf("empty hosts")
 	}

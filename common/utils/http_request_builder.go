@@ -345,11 +345,6 @@ func FixHTTPResponseForGolangNativeHTTPClient(ins *http.Response) {
 	}
 	if StringArrayContains(ins.TransferEncoding, "chunked") && ins.Body != nil {
 		body, _ := io.ReadAll(ins.Body)
-		result, rest := codec.HTTPChunkedDecodeWithRestBytes(body)
-		if len(result) > 0 {
-			ins.Body = io.NopCloser(bytes.NewReader(result))
-		} else {
-			ins.Body = io.NopCloser(bytes.NewReader(rest))
-		}
+		ins.Body = io.NopCloser(bytes.NewReader(body))
 	}
 }
