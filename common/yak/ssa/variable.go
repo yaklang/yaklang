@@ -52,6 +52,13 @@ func (f *Function) WriteVariable(variable string, value Value) {
 	f.WriteSymbolTable(variable, value)
 }
 
+func (f *Function) ReplaceSymbolTable(v, to Value) {
+	variable := v.GetVariable()
+	if t, ok := f.symbolTable[variable]; ok {
+		f.symbolTable[variable] = append(remove(t, v), to)
+	}
+}
+
 func (f *Function) WriteSymbolTable(variable string, value Value) {
 	if _, ok := f.symbolTable[variable]; !ok {
 		f.symbolTable[variable] = make([]Value, 0, 1)
@@ -165,7 +172,7 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 
 func (b *FunctionBuilder) getFieldWithCreate(i Value, key Value, create bool) *Field {
 	if i, ok := i.(*Interface); ok {
-		if field, ok := i.field[key]; ok {
+		if field, ok := i.Field[key]; ok {
 			return field
 		}
 	}
@@ -181,7 +188,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i Value, key Value, create bool) *F
 			anInstruction: newAnInstuction(b.CurrentBlock),
 			Key:           key,
 			I:             i,
-			update:        make([]Value, 0),
+			Update:        make([]Value, 0),
 			users:         make([]User, 0),
 		}
 
