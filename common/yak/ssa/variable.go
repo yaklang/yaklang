@@ -57,6 +57,7 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 		f.symbolTable[variable] = make([]Value, 0, 1)
 	}
 	f.symbolTable[variable] = append(f.symbolTable[variable], value)
+	value.SetVariable(variable)
 }
 
 func (b *FunctionBuilder) ReadVariable(variable string) Value {
