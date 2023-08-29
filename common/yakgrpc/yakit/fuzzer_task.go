@@ -3,16 +3,16 @@ package yakit
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
-
-import "github.com/yaklang/yaklang/common/go-funk"
 
 /*
 这个结构用于保存当前测试的结果
@@ -86,6 +86,10 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"id", "raw_fuzz_task_request", "host",
 		}, keywords, false)
+	}
+
+	if req.GetFuzzerTabIndex() != "" {
+		db = db.Where("fuzzer_tab_index = ?", req.GetFuzzerTabIndex())
 	}
 
 	var task []*WebFuzzerTask
