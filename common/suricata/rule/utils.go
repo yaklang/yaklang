@@ -2,6 +2,7 @@ package rule
 
 import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,4 +50,8 @@ func atoistar(i string) *int {
 	}
 	parsed, _ := strconv.Atoi(i)
 	return &parsed
+}
+
+func getHighPort() uint32 {
+	return uint32(55000 + rand.Intn(65535-55000))
 }

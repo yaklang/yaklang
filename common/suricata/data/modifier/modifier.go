@@ -51,6 +51,10 @@ const (
 
 	// UDP
 	UDPHDR
+
+	// ICMP
+	ICMPV4HDR
+	ICMPV6HDR
 )
 
 var HTTP_REQ_ONLY = []Modifier{
