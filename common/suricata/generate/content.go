@@ -198,7 +198,7 @@ func parse2ContentGen(rules []*rule.ContentRule, opts ...ContentGenOpt) *Content
 				cm.Filter = func(free []int, payload *bytemap.ByteMap, cm *ContentModifier) []int {
 					var res []int
 					for _, v := range free {
-						if neg && mdf.Len <= v+pos || !neg && mdf.Len > v+pos {
+						if neg && mdf.Len <= v+pos+len(cm.Content)-1 || !neg && mdf.Len > v+pos+len(cm.Content)-1 {
 							res = append(res, v)
 						}
 					}
