@@ -47,7 +47,7 @@ func (r *PortRule) GetHighPort() uint32 {
 
 func (r *PortRule) GetAvailablePort() uint32 {
 	if r.Any {
-		return 80
+		return r.GetHighPort()
 	}
 
 	if strings.Contains(strings.ToLower(r.Env), "ssh") {
