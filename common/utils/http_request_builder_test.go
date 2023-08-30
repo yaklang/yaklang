@@ -74,11 +74,41 @@ func TestParseStringToUrl(t *testing.T) {
 	}
 }
 
+func TestReadHTTPRequestFromBytesBadURI1(t *testing.T) {
+	req, err := ReadHTTPRequestFromBytes([]byte("GET baidu/a?b=1 HTTP/1.1\r\nHost: www.example.com"))
+	if err != nil {
+		panic(err)
+	}
+	if req.Host != "www.example.com" {
+		t.Fatal(req.Host)
+	}
+}
+
+func TestReadHTTPRequestFromBytesBadURI2(t *testing.T) {
+	req, err := ReadHTTPRequestFromBytes([]byte("GET http://baidu.com HTTP/1.1\r\nHost: www.example.com"))
+	if err != nil {
+		panic(err)
+	}
+	if req.Host != "baidu.com" {
+		t.Fatal(req.Host)
+	}
+}
+
+func TestReadHTTPRequestFromBytesBadURI3(t *testing.T) {
+	req, err := ReadHTTPRequestFromBytes([]byte("GET //baidu.com HTTP/1.1\r\nHost: www.example.com"))
+	if err != nil {
+		panic(err)
+	}
+	if req.Host != "www.example.com" {
+		t.Fatal(req.Host)
+	}
+}
+
 func TestHTTPRequestBuilderForConnect(t *testing.T) {
 	for _, i := range []string{
-		"CONNECT :80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
-		"CONNECT / HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 		"CONNECT baidu.com:80 HTTP/1.1\r\n\r\n",
+		"CONNECT / HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
+		"CONNECT :80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 		"CONNECT baidu.com:80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 		"CONNECT / HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 	} {
