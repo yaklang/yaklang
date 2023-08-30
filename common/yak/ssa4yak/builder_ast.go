@@ -452,10 +452,12 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 			}
 		} else if len(rvalues) == 1 {
 			// (n) = (1)
-			// (n) = field(1, #index)
-			for i, lv := range lvalues {
-				field := b.EmitField(rvalues[0], ssa.NewConst(i))
-				lv.Assign(field, b.FunctionBuilder)
+			if inter, ok := rvalues[0].(*ssa.Interface); ok {
+				// (n) = field(1, #index)
+				for i, lv := range lvalues {
+					field := b.EmitField(inter, ssa.NewConst(i))
+					lv.Assign(field, b.FunctionBuilder)
+				}
 			}
 		} else if len(lvalues) == 1 {
 			// (1) = (n)

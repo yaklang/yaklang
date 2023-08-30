@@ -465,6 +465,7 @@ var _ InstructionValue = (*UnOp)(nil)
 
 // ----------- Interface
 // instruction + value + user
+// use-chain: *interface(self) -> multiple field(value)
 type Interface struct {
 	anInstruction
 
@@ -490,12 +491,13 @@ var _ InstructionValue = (*Interface)(nil)
 
 // instruction
 // ----------- Field
+// use-chain: interface(user) -> *field(self) -> multiple update(value) -> value
 type Field struct {
 	anInstruction
 
 	// field
 	Key Value
-	I   Value
+	I   *Interface
 
 	// capture by other function
 	OutCapture bool
@@ -517,6 +519,7 @@ var _ Instruction = (*Field)(nil)
 var _ InstructionValue = (*Field)(nil)
 
 // ----------- Update
+// use-chain: field(user) -> *update -> value
 type Update struct {
 	anInstruction
 
