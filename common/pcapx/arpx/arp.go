@@ -35,20 +35,20 @@ var (
 )
 
 func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.HardwareAddr, error) {
-	hw, _ := arptable.SearchHardware(target)
-	if hw != nil && hw.String() != "" {
-		if arpTableTTLCache != nil {
-			arpTableTTLCache.Set(target, hw)
-		}
-		return hw, nil
-	}
-
 	if arpTableTTLCache != nil {
 		if v, ok := arpTableTTLCache.Get(target); ok {
 			if hw, ok := v.(net.HardwareAddr); ok {
 				return hw, nil
 			}
 		}
+	}
+
+	hw, _ := arptable.SearchHardware(target)
+	if hw != nil && hw.String() != "" {
+		if arpTableTTLCache != nil {
+			arpTableTTLCache.Set(target, hw)
+		}
+		return hw, nil
 	}
 
 	r, err := ArpIPAddressesWithContext(ctx, ifaceName, target)
@@ -59,6 +59,9 @@ func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.H
 	if r != nil {
 		res, ok := r[target]
 		if ok {
+			if arpTableTTLCache != nil {
+				arpTableTTLCache.Set(target, res)
+			}
 			return res, nil
 		}
 	}
@@ -125,7 +128,6 @@ func arpDial(ctx context.Context, ifaceName string, addrs string) (map[string]ne
 			if targetIp == nil {
 				log.Debugf("invalid target: %s", targetIp)
 				return
-				//return nil,
 			}
 
 			hw, err := client.Resolve(targetIp)
