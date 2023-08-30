@@ -99,6 +99,7 @@ func ParseStringToUrl(s string) *url.URL {
 		u.Fragment = fragment
 	}
 
+	var haveSchemaSplit = false
 RETRY:
 	if strings.HasPrefix(s, "/") {
 		// /path?query#fragment
@@ -115,11 +116,12 @@ RETRY:
 		return u
 	} else if strings.HasPrefix(s, "://") {
 		s = strings.TrimPrefix(s, "://")
+		haveSchemaSplit = true
 		goto RETRY
 	} else if strings.Contains(s, "://") {
 		origin := s
 		var schema string
-		schema, s, _ = strings.Cut(origin, "://")
+		schema, s, haveSchemaSplit = strings.Cut(origin, "://")
 		u.Scheme = schema
 		if strings.Contains(schema, ".") {
 			log.Warnf("unhealthy schema(%v) found in %v", schema, origin)
@@ -153,7 +155,14 @@ RETRY:
 				u.Host = HostPort(hostname, port)
 			}
 		} else {
-			u.Host, u.RawQuery, _ = strings.Cut(s, "?")
+			var queryOk bool
+			var result string
+			result, u.RawQuery, queryOk = strings.Cut(s, "?")
+			if !queryOk && haveSchemaSplit {
+				u.Host = result
+			} else {
+				u.Path = result
+			}
 		}
 	}
 
