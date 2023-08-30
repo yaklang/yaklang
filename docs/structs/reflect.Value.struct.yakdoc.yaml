@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: dyn
+libname: cve
 struct_name: reflect.Value
 description: ""
 fields: []
@@ -168,6 +168,16 @@ methods:
   relative_struct_name: []
 - description: ""
   structname: reflect.Value
+  name: Comparable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
   name: Complex
   returns:
   - name: r0
@@ -201,6 +211,22 @@ methods:
     type_alias: ""
     description: ""
     type_str: reflect.Value
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Equal
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
   relative_struct_name: []
 - description: ""
   structname: reflect.Value
@@ -296,6 +322,16 @@ methods:
     type_alias: ""
     description: ""
     type_str: float64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: Grow
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
   relative_struct_name: []
 - description: ""
   structname: reflect.Value
@@ -727,6 +763,10 @@ methods:
     type_alias: ""
     description: ""
     type_str: uint64
+  relative_struct_name: []
+- description: ""
+  structname: reflect.Value
+  name: SetZero
   relative_struct_name: []
 - description: ""
   structname: reflect.Value

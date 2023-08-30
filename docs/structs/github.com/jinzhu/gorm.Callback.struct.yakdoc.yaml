@@ -1,0 +1,65 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.Callback
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Callback
+  name: Create
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/jinzhu/gorm.CallbackProcessor
+    type_str: '*gorm.CallbackProcessor'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.CallbackProcessor
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Callback
+  name: Delete
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.CallbackProcessor'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Callback
+  name: Query
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.CallbackProcessor'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Callback
+  name: RowQuery
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.CallbackProcessor'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Callback
+  name: Update
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.CallbackProcessor'
+  relative_struct_name: []
+ptr_methods: []

@@ -8,7 +8,8 @@ fields:
   param_alias: ""
   type_alias: ""
   description: ""
-  type_str: yaklang.YaklangEngine
+  relative_structname: github.com/yaklang/yaklang/common/yak/antlr4yak.Engine
+  type_str: '*antlr4yak.Engine'
 - structname: github.com/yaklang/yaklang/common/yak.yakVariable
   name: FilePath
   param_alias: ""

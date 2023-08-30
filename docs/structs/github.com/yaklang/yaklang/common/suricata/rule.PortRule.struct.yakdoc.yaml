@@ -1,0 +1,77 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Any
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Env
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Negative
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Ports
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]int'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Rules
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  type_str: '[]*rule.PortRule'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: GetAvailablePort
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: GetHighPort
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: uint32
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+  name: Match
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

@@ -87,6 +87,8 @@ methods:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
     isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+    isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false
 - ptr: true
@@ -142,6 +144,28 @@ methods:
   description: ""
   structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch
   name: FuzzCookie
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: mutate.FuzzHTTPRequestIf
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch
+  name: FuzzCookieBase64
   params:
   - name: v2
     param_alias: ""
@@ -269,6 +293,28 @@ methods:
     description: ""
     type_str: string
   - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: mutate.FuzzHTTPRequestIf
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch
+  name: FuzzGetBase64Params
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
     param_alias: ""
     type_alias: ""
     description: ""
@@ -439,6 +485,28 @@ methods:
     description: ""
     type_str: string
   - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: mutate.FuzzHTTPRequestIf
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch
+  name: FuzzPostBase64Params
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
     param_alias: ""
     type_alias: ""
     description: ""

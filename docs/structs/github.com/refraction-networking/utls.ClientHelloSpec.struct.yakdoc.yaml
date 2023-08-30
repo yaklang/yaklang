@@ -1,0 +1,178 @@
+is_build_in_struct: true
+libname: ja3
+struct_name: github.com/refraction-networking/utls.ClientHelloSpec
+description: ""
+fields:
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: CipherSuites
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint16'
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: CompressionMethods
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: Extensions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]tls.TLSExtension'
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: GetSessionID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: []uint8) return([32]uint8) '
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: TLSVersMax
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: TLSVersMin
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: AlwaysAddPadding
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: FromRaw
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]bool'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: ImportTLSClientHello
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: map[string][]uint8
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: ImportTLSClientHelloFromJSON
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: ReadCipherSuites
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: ReadCompressionMethods
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: ReadTLSExtensions
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/refraction-networking/utls.ClientHelloSpec
+  name: UnmarshalJSON
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

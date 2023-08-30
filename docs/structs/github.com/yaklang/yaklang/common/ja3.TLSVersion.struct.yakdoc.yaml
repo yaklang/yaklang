@@ -1,0 +1,19 @@
+is_build_in_struct: false
+libname: ja3
+struct_name: github.com/yaklang/yaklang/common/ja3.TLSVersion
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+  name: VersionName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

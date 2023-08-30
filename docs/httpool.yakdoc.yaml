@@ -90,6 +90,8 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
     isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+    isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false
 - name: httpool.context

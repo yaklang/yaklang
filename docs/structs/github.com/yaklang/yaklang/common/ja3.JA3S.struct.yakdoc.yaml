@@ -1,0 +1,76 @@
+is_build_in_struct: false
+libname: ja3
+struct_name: github.com/yaklang/yaklang/common/ja3.JA3S
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: AcceptedCipher
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  type_str: '*ja3.CipherSuite'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: ExtensionsTypes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.ExtensionsType
+  type_str: '[]*ja3.ExtensionsType'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: JA3SFullStr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: TLSVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+  type_str: '*ja3.TLSVersion'
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: Calc
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: Calc
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3S
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

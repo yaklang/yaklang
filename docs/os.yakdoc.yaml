@@ -537,21 +537,47 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: os.WaitConnect
+  type_str: 'func (v1: string, v2: float64) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 variables:
 - name: os.ARCH
   typestr: string
+  valueverbose: ""
   description: //
 - name: os.Args
   typestr: '[]string'
+  valueverbose: ""
   description: 获取当前命令行参数
 - name: os.IsPrivileged
   typestr: bool
+  valueverbose: ""
   description: //
 - name: os.OS
   typestr: string
+  valueverbose: ""
   description: //
 - name: os.Stderr
   typestr: '*os.File'
+  valueverbose: ""
   description: 标准错误流
   relative_struct:
   - structname: os.File
@@ -562,6 +588,7 @@ variables:
     isbuildinstruct: true
 - name: os.Stdin
   typestr: '*os.File'
+  valueverbose: ""
   description: 标准输入流
   relative_struct:
   - structname: os.File
@@ -572,6 +599,7 @@ variables:
     isbuildinstruct: true
 - name: os.Stdout
   typestr: '*os.File'
+  valueverbose: ""
   description: 标准输出流
   relative_struct:
   - structname: os.File

@@ -1,0 +1,93 @@
+is_build_in_struct: true
+libname: cve
+struct_name: database/sql.ColumnType
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: DatabaseTypeName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: DecimalSize
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: Length
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int64
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: Name
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: Nullable
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: database/sql.ColumnType
+  name: ScanType
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Type
+  relative_struct_name: []
+ptr_methods: []

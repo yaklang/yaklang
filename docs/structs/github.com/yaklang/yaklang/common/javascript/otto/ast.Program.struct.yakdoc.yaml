@@ -1,0 +1,55 @@
+is_build_in_struct: false
+libname: js
+struct_name: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: Body
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ast.Statement'
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: Comments
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  type_str: ast.CommentMap
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: DeclarationList
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]ast.Declaration'
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: File
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  type_str: '*file.File'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: Idx0
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: file.Idx
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+  name: Idx1
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: file.Idx
+  relative_struct_name: []
+ptr_methods: []

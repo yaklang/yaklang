@@ -1,0 +1,77 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: ContentRules
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRule
+  type_str: '[]*rule.ContentRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: DNS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.DNSRule
+  type_str: '*rule.DNSRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: Flow
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+  type_str: '*rule.FlowRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: HTTPConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+  type_str: '*rule.HTTPConfig'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: IPConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.IPLayerRule
+  type_str: '*rule.IPLayerRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: IcmpConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  type_str: '*rule.ICMPLayerRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: PrefilterRule
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  type_str: '*rule.ContentRuleConfig'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: TcpConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  type_str: '*rule.TCPLayerRule'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: Thresholding
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.ThresholdingConfig
+  type_str: '*rule.ThresholdingConfig'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+  name: UdpConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/rule.UDPLayerRule
+  type_str: '*rule.UDPLayerRule'
+methods: []
+ptr_methods: []

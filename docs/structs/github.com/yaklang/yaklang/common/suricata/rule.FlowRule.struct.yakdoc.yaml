@@ -1,0 +1,25 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+  name: Established
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+  name: ToClient
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+  name: ToServer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods: []
+ptr_methods: []

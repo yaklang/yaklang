@@ -1,0 +1,196 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: PCRE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/suricata/pcre.PCRE
+  type_str: '*pcre.PCRE'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Generate
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Generator
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*pcre.Generator'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Generator
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*pcre.Generator'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: IgnoreCase
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: IgnoreCase
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: IgnoreEndNewline
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: IgnoreEndNewline
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Matcher
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*pcre.Matcher'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.Matcher
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/data.Matched
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Matcher
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*pcre.Matcher'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Modifier
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: modifier.Modifier
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Modifier
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: modifier.Modifier
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Relative
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: Relative
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: StartsWith
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+  name: StartsWith
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

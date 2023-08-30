@@ -10,6 +10,12 @@ fields:
   description: ""
   type_str: string
 - structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
+  name: Mode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
   name: Raw
   param_alias: ""
   type_alias: ""
@@ -72,6 +78,17 @@ methods:
   description: ""
   structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
   name: GetDomain
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
+  name: GetMode
   returns:
   - name: r0
     param_alias: ""

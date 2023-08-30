@@ -162,22 +162,29 @@ functions:
 variables:
 - name: math.E
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.Ln10
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.Ln2
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.Pi
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.Sqrt2
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.SqrtE
   typestr: float64
+  valueverbose: ""
   description: //
 - name: math.SqrtPi
   typestr: float64
+  valueverbose: ""
   description: //

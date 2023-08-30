@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.Relationship
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.Relationship
+  name: AssociationForeignDBNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/jinzhu/gorm.Relationship
+  name: AssociationForeignFieldNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/jinzhu/gorm.Relationship
+  name: ForeignDBNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/jinzhu/gorm.Relationship
+  name: ForeignFieldNames
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/jinzhu/gorm.Relationship
+  name: JoinTableHandler
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: gorm.JoinTableHandlerInterface
+- structname: github.com/jinzhu/gorm.Relationship
+  name: Kind
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.Relationship
+  name: PolymorphicDBName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.Relationship
+  name: PolymorphicType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.Relationship
+  name: PolymorphicValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

@@ -1,0 +1,49 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICMPId
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICMPSeq
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICMPv4Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICMPv6Header
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICMPv6MTU
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: ICode
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+  name: IType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

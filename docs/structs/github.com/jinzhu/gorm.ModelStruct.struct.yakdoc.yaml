@@ -1,0 +1,44 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.ModelStruct
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.ModelStruct
+  name: ModelType
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: reflect.Type
+- structname: github.com/jinzhu/gorm.ModelStruct
+  name: PrimaryFields
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.StructField
+  type_str: '[]*gorm.StructField'
+- structname: github.com/jinzhu/gorm.ModelStruct
+  name: StructFields
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.StructField
+  type_str: '[]*gorm.StructField'
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.ModelStruct
+  name: TableName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

@@ -1,0 +1,1506 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.DB
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.DB
+  name: Error
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: error
+- structname: github.com/jinzhu/gorm.DB
+  name: RowsAffected
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: github.com/jinzhu/gorm.DB
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: AddError
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: AddForeignKey
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v5
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: AddIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: AddUniqueIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Assign
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Association
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/jinzhu/gorm.Association
+    type_str: '*gorm.Association'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.Association
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Attrs
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: AutoMigrate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Begin
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: BlockGlobalUpdate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Callback
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Callback'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.Callback
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.CallbackProcessor
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Close
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Commit
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: CommonDB
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.SQLCommon
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Count
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Create
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: CreateTable
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: DB
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*sql.DB'
+  relative_struct_name:
+  - structname: database/sql.DB
+    isbuildinstruct: true
+  - structname: database/sql.Tx
+    isbuildinstruct: true
+  - structname: database/sql.Stmt
+    isbuildinstruct: true
+  - structname: database/sql.Rows
+    isbuildinstruct: true
+  - structname: database/sql.ColumnType
+    isbuildinstruct: true
+  - structname: database/sql.Row
+    isbuildinstruct: true
+  - structname: database/sql.TxOptions
+    isbuildinstruct: true
+  - structname: database/sql.Conn
+    isbuildinstruct: true
+  - structname: database/sql.DBStats
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Debug
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Delete
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Dialect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.Dialect
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: DropColumn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: DropTable
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: DropTableIfExists
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Exec
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Find
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: First
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: FirstOrCreate
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: FirstOrInit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Get
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: GetErrors
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]error'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Group
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: HasBlockGlobalUpdate
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: HasTable
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Having
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: InstantSet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Joins
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Last
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Limit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: LogMode
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Model
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: ModifyColumn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: New
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: NewRecord
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: NewScope
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.Scope
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.search
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.Field
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.StructField
+    isbuildinstruct: true
+  - structname: reflect.StructField
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.Relationship
+    isbuildinstruct: true
+  - structname: reflect.Value
+    isbuildinstruct: true
+  - structname: reflect.MapIter
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.ModelStruct
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Not
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Offset
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Omit
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Or
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Order
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]bool'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Pluck
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Preload
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Preloads
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: QueryExpr
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/jinzhu/gorm.expr
+    type_str: '*gorm.expr'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.expr
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Raw
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: RecordNotFound
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Related
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: RemoveForeignKey
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: RemoveIndex
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Rollback
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Row
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*sql.Row'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Rows
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*sql.Rows'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Save
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Scan
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: ScanRows
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*sql.Rows'
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Scopes
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]func(*gorm.DB) *gorm.DB'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Select
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: SetJoinTableHandler
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.JoinTableHandlerInterface
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: SetLogger
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.logger
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: SingularTable
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: SubQuery
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.expr'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Table
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Take
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Unscoped
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Update
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: UpdateColumn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: UpdateColumns
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Updates
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]bool'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.DB
+  name: Where
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+ptr_methods: []

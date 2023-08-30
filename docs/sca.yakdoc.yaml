@@ -1,0 +1,266 @@
+name: sca
+functions:
+- name: sca.ScanContainerFromContext
+  type_str: 'func (v1: string, v2 ...func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) return([]*dxtypes.Package, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]sca.dockerContextOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    type_str: '[]*dxtypes.Package'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+    isbuildinstruct: false
+- name: sca.ScanImageFromContext
+  type_str: 'func (v1: string, v2 ...func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) return([]*dxtypes.Package, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]sca.dockerContextOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    type_str: '[]*dxtypes.Package'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+    isbuildinstruct: false
+- name: sca.ScanImageFromFile
+  type_str: 'func (v1: string, v2 ...func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) return([]*dxtypes.Package, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]sca.dockerContextOption'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    type_str: '[]*dxtypes.Package'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+    isbuildinstruct: false
+- name: sca.analyzers
+  type_str: 'func (v1 ...analyzer.TypAnalyzer) return(func dockerContextOption(v1:
+    *sca.dockerContextConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]analyzer.TypAnalyzer'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dockerContextOption(v1: *sca.dockerContextConfig) '
+- name: sca.concurrent
+  type_str: 'func (v1: int) return(func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dockerContextOption(v1: *sca.dockerContextConfig) '
+- name: sca.endpoint
+  type_str: 'func (v1: string) return(func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dockerContextOption(v1: *sca.dockerContextConfig) '
+- name: sca.scanMode
+  type_str: 'func (v1: analyzer.ScanMode) return(func dockerContextOption(v1: *sca.dockerContextConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: analyzer.ScanMode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func dockerContextOption(v1: *sca.dockerContextConfig) '
+variables:
+- name: sca.ALL_MODE
+  typestr: analyzer.ScanMode
+  valueverbose: ""
+  description: //
+- name: sca.APK_ALALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.CLANG_CONAN_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.DPKG_ALALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.GO_BINARY_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.GO_MOD_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.JAVA_GRADLE_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.JAVA_JAR_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.JAVA_POM_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.LANGUAGE_MODE
+  typestr: int
+  valueverbose: "0x4"
+  description: //
+- name: sca.NODE_NPM_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.NODE_PNPM_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.NODE_YARN_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.PHP_COMPOSER_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.PKG_MODE
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: sca.PYTHON_PACKAGING_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.PYTHON_PIPENV_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.PYTHON_PIP_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.PYTHON_POETRY_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.RPM_ALALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.RUBY_BUNDLER_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.RUBY_GEMSPEC_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
+- name: sca.RUST_CARGO_ANALYZER
+  typestr: analyzer.TypAnalyzer
+  valueverbose: ""
+  description: //
