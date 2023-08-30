@@ -6,6 +6,8 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"embed"
+	_ "embed"
 	"encoding/pem"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
@@ -464,12 +466,38 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			return the ca certs
 		*/
 		if utils.StringArrayContains(defaultBuildinDomains, rsp.Request.URL.Hostname()) {
-			body := defaultCA
-			rsp.Body = io.NopCloser(bytes.NewReader(body))
-			rsp.ContentLength = int64(len(body))
-			// rsp.Header.Set("Content-Length", strconv.Itoa(len(body)))
-			rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-server.crt"`)
-			rsp.Header.Set("Content-Type", "octet-stream")
+			if strings.HasPrefix(rsp.Request.URL.Path, "/static") {
+				filePath := strings.TrimPrefix(rsp.Request.URL.Path, "/static/")
+				data, err := staticFS.ReadFile("static/" + filePath)
+				if err != nil {
+					log.Errorf("read static file failed: %s", err)
+					return nil
+				}
+
+				if strings.HasSuffix(filePath, ".css") {
+					rsp.Header.Set("Content-Type", "text/css")
+				} else if strings.HasSuffix(filePath, ".ico") {
+					rsp.Header.Set("Content-Type", "image/x-icon")
+				}
+
+				rsp.Body = io.NopCloser(bytes.NewReader(data))
+				rsp.ContentLength = int64(len(data))
+				rsp.StatusCode = http.StatusOK
+				return nil
+			}
+			if rsp.Request.URL.Path == "/download-mitm-crt" {
+				// 返回mitm-server.crt内容
+				body := defaultCA
+				rsp.Body = io.NopCloser(bytes.NewReader(body))
+				rsp.ContentLength = int64(len(body))
+				rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-server.crt"`)
+				rsp.Header.Set("Content-Type", "octet-stream")
+				return nil
+			}
+
+			rsp.Body = io.NopCloser(bytes.NewReader(htmlContent))
+			rsp.ContentLength = int64(len(htmlContent))
+			rsp.Header.Set("Content-Type", "text/html; charset=utf-8")
 			return nil
 		}
 
@@ -563,6 +591,11 @@ var (
 		"download-mitm-cert.yaklang.io",
 		"mitm",
 	}
+	//go:embed static/navtab.html
+	// 返回HTML页面内容
+	htmlContent []byte
+	//go:embed static/*
+	staticFS embed.FS
 )
 
 func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
