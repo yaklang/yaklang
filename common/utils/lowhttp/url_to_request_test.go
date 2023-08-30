@@ -5,15 +5,49 @@ import (
 	"testing"
 )
 
-func CheckResponse(t *testing.T, raw []byte, wantRes string) {
+func CheckResponse(t *testing.T, raw []byte, wantReq string) {
 	t.Helper()
 
-	raw, _, _ = FixHTTPResponse(raw)
-	wantRaw, _, _ := FixHTTPResponse([]byte(wantRes))
-	if bytes.Compare(raw, wantRaw) != 0 {
+	raw = FixHTTPRequestOut(raw)
+	wantRaw := FixHTTPRequestOut([]byte(wantReq))
 
-		t.Errorf("got:\n%s\nwant:\n%s\n", string(raw), string(wantRaw))
+	reqIns, err := ParseBytesToHttpRequest(raw)
+	if err != nil {
+		t.Fatalf("parse request error: %v\n%s", err, string(raw))
 	}
+	wantReqIns, err := ParseBytesToHttpRequest(wantRaw)
+	if err != nil {
+		t.Fatalf("parse want request error: %v\n%s", err, string(wantRaw))
+	}
+
+	// compare method
+	if reqIns.Method != wantReqIns.Method {
+		t.Errorf("method Error: got:\n%s\nwant:\n%s\n", reqIns.Method, wantReqIns.Method)
+	}
+	// compare url
+	if reqIns.URL.String() != wantReqIns.URL.String() {
+		t.Errorf("url Error: got:\n%s\nwant:\n%s\n", reqIns.URL.String(), wantReqIns.URL.String())
+	}
+	// compare header
+	if len(reqIns.Header) != len(wantReqIns.Header) {
+		t.Errorf("header len Error: got:\n%d\nwant:\n%d\n", len(reqIns.Header), len(wantReqIns.Header))
+	}
+	for k, v := range reqIns.Header {
+		if v[0] != wantReqIns.Header[k][0] {
+			t.Errorf("header Error: got:\n%s\nwant:\n%s\n", v[0], wantReqIns.Header[k][0])
+		}
+	}
+
+	// compare body
+	if reqIns.Body != nil && wantReqIns.Body != nil {
+		var buf1, buf2 bytes.Buffer
+		_, _ = buf1.ReadFrom(reqIns.Body)
+		_, _ = buf2.ReadFrom(wantReqIns.Body)
+		if buf1.String() != buf2.String() {
+			t.Errorf("body Error: got:\n%s\nwant:\n%s\n", buf1.String(), buf2.String())
+		}
+	}
+
 }
 
 func TestUrlToGetRequestPacket(t *testing.T) {
