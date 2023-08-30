@@ -605,23 +605,37 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		expr := b.buildExpression(s)
 		if expr == nil {
 			b.NewError(ssa.Error, TAG, "leftexpression expression is nil")
+			return nil
+		}
+		var inter *ssa.Interface
+		if expr, ok := expr.(*ssa.Interface); ok {
+			inter = expr
+		} else {
+			b.NewError(ssa.Error, TAG, "leftexprssion exprssion is not interface")
+			return nil
 		}
 
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
 			index := b.buildLeftSliceCall(s)
-			if expr, ok := expr.(*ssa.Interface); ok {
-				return b.EmitField(expr, index)
-			} else {
-				b.NewError(ssa.Error, TAG, "leftexprssion exprssion is not interface")
-			}
+			return b.EmitField(inter, index)
 		}
 
-		//TODO: leftMemberCall
+		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
+			if id := s.Identifier(); id != nil {
+				idText := id.GetText()
+				return b.EmitField(inter, ssa.NewConst(idText))
+			} else if id := s.IdentifierWithDollar(); id != nil {
+				key := b.ReadVariable(id.GetText()[1:])
+				if key == nil {
+					b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
+					return nil
+				}
+				return b.EmitField(inter, key)
+			}
+		}
 	}
 	return nil
 }
-
-//TODO: left member call
 
 // left slice call
 func (b *astbuilder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) ssa.Value {
@@ -672,13 +686,33 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return nil
 	}
 
-	//TODO: member call
+	// member call
+	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
+		inter, ok := getValue(0).(*ssa.Interface)
+		if !ok {
+			b.NewError(ssa.Error, TAG, "Expression: need a interface")
+			return nil
+		}
+
+		if id := s.Identifier(); id != nil {
+			idText := id.GetText()
+			return b.EmitField(inter, ssa.NewConst(idText))
+		} else if id := s.IdentifierWithDollar(); id != nil {
+			key := b.ReadVariable(id.GetText()[1:])
+			if key == nil {
+				b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
+				return nil
+			}
+			return b.EmitField(inter, key)
+		}
+	}
 
 	// slice call
 	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
 		expr, ok := getValue(0).(*ssa.Interface)
 		if !ok {
-			b.NewError(ssa.Error, TAG, "expression slice need expression")
+			b.NewError(ssa.Error, TAG, "Expression: need a interface")
+			return nil
 		}
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
@@ -1048,8 +1082,6 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 	}
 	return v
 }
-
-// TODO: member call
 
 // slice call
 func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
