@@ -248,27 +248,21 @@ var _ Instruction = (*Phi)(nil)
 type Const struct {
 	user  []User
 	value any
-	typ   Types
-	str   string
+	// only one type
+	typ Type
+	str string
 
 	// other
 	Unary int
 }
 
 // get type
-func (c Const) GetType() Types {
-	return c.typ
+func (c *Const) GetType() Types {
+	return Types{c.typ}
 }
 
 func (c *Const) SetType(ts Types) {
-	c.typ = ts
-}
-
-func (c *Const) GetVariable() string {
-	return ""
-}
-
-func (c *Const) SetVariable(name string) {
+	// const don't need set type
 }
 
 var _ Node = (*Const)(nil)
