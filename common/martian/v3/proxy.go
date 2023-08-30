@@ -565,8 +565,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.URL.Scheme = "https"
 		isHttps = true
 		httpctx.SetRequestHTTPS(req, true)
-	} else {
-		req.URL.Scheme = "http"
+	}
+
+	if session.IsSecure() {
+		log.Debugf("martian: forcing HTTPS inside secure session")
+		req.URL.Scheme = "https"
 	}
 
 	req.RemoteAddr = conn.RemoteAddr().String()
@@ -709,6 +712,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			brw.Read(buf)
 
 			isHttps := b[0] == 0x16
+			ctx.Session().MarkSecure()
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
 			if parsedConnectedToPort == 0 {
 				if isHttps {
