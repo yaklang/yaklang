@@ -85,26 +85,8 @@ func httpReqMatcher(c *matchContext, spliter *httpProvider) error {
 		if cf.Uricontent != "" {
 			log.Errorf("uricontent has been deprecated and not implemented yet")
 		}
-		uri := spliter.Get(modifier.HTTPUri)
-		switch cf.UrilenOp {
-		case 1:
-			if !c.Must(c.Rule.ContentRuleConfig.HTTPConfig.UrilenNum1 == len(uri)) {
-				return nil
-			}
-		case 2:
-			if !c.Must(c.Rule.ContentRuleConfig.HTTPConfig.UrilenNum1 > len(uri)) {
-				return nil
-			}
-		case 3:
-			if !c.Must(c.Rule.ContentRuleConfig.HTTPConfig.UrilenNum1 < len(uri)) {
-				return nil
-			}
-		case 4:
-			if !c.Must(c.Rule.ContentRuleConfig.HTTPConfig.UrilenNum1 < len(uri) && c.Rule.ContentRuleConfig.HTTPConfig.UrilenNum2 > len(uri)) {
-				return nil
-			}
-		default:
-			// not set
+		if !c.Must(cf.UrilenOp.Match(len(spliter.Get(modifier.HTTPUri)))) {
+			return nil
 		}
 	}
 	return nil

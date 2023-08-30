@@ -45,7 +45,7 @@ type ContentRuleConfig struct {
 	TcpConfig *TCPLayerRule
 
 	/* UDP */
-	UdpConfig *UDPLayerRule
+	/* Just No Config */
 
 	/* ICMP */
 	IcmpConfig *ICMPLayerRule

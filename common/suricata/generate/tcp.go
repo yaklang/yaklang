@@ -97,22 +97,12 @@ func (g *TCPGen) Gen() []byte {
 		Ack: uint32(ack),
 	}
 
-	var tcpMss uint32
-	switch tcpConfig.TCPMssOp {
-	case 1:
-		tcpMss = uint32(tcpConfig.TCPMssNum1)
-	case 2:
-		tcpMss = uint32(tcpConfig.TCPMssNum1 + rand.Intn(200))
-	case 3:
-		tcpMss = uint32(rand.Intn(tcpConfig.TCPMssNum1))
-	case 4:
-		tcpMss = uint32(tcpConfig.TCPMssNum1 + rand.Intn(tcpConfig.TCPMssNum2-tcpConfig.TCPMssNum1))
-	default:
-		tcpMss = 0x05b4
-	}
-
-	if tcpMss > 0xffff {
-		tcpMss = 0xffff
+	var tcpMss uint32 = 0x05b4
+	if tcpConfig.TCPMss != nil {
+		tcpMss = uint32(tcpConfig.TCPMss.Generate())
+		if tcpMss > 0xffff {
+			tcpMss = 0xffff
+		}
 	}
 
 	if tcpMss > 0 {

@@ -54,16 +54,17 @@ type tcpGenerator struct {
 }
 
 func (t *tcpGenerator) generator(count int) {
+	defer close(t.out)
+
 	surigen, err := generate.New(t.originRule)
 	if err != nil {
-		log.Warnf("new generator failed: %v", err)
+		log.Errorf("new generator failed: %v", err)
+		return
 	}
 
 	for i := 0; i < count; i++ {
 		t.toChaosTraffic(surigen.Gen())
 	}
-
-	close(t.out)
 }
 
 func (t *tcpGenerator) toChaosTraffic(raw []byte) {

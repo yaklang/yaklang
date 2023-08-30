@@ -97,6 +97,14 @@ func (a *AddressRule) Match(i string) bool {
 	return a._matchWithoutNegative(i)
 }
 
+func (a *AddressRule) Generate() string {
+	// todo: implement it!
+	if a.Env == "HOME_NET" {
+		return utils.GetLocalIPAddress()
+	}
+	return "123.123.123.123"
+}
+
 func (v *RuleSyntaxVisitor) VisitSrcAddress(i *parser.Src_addressContext) *AddressRule {
 	return v.VisitAddress(i.Address().(*parser.AddressContext))
 }

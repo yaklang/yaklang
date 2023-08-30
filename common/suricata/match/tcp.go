@@ -71,7 +71,7 @@ func tcpCfgMatch(c *matchContext) error {
 		return nil
 	}
 
-	if tcpConfig.TCPMssOp != 0 {
+	if tcpConfig.TCPMss != nil {
 		var mss int
 		var set bool
 		for _, opt := range tcp.Options {
@@ -82,25 +82,12 @@ func tcpCfgMatch(c *matchContext) error {
 			}
 		}
 		// if option mss not found, skip
-		if set {
-			switch tcpConfig.TCPMssOp {
-			case 1:
-				if !c.Must(mss == tcpConfig.TCPMssNum1) {
-					return nil
-				}
-			case 2:
-				if !c.Must(mss > tcpConfig.TCPMssNum1) {
-					return nil
-				}
-			case 3:
-				if !c.Must(mss < tcpConfig.TCPMssNum1) {
-					return nil
-				}
-			case 4:
-				if !c.Must(mss >= tcpConfig.TCPMssNum1 && mss <= tcpConfig.TCPMssNum2) {
-					return nil
-				}
-			}
+		if !c.Must(set) {
+			return nil
+		}
+
+		if !c.Must(tcpConfig.TCPMss.Match(mss)) {
+			return nil
 		}
 	}
 
