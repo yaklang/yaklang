@@ -712,7 +712,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			brw.Read(buf)
 
 			isHttps := b[0] == 0x16
-			ctx.Session().MarkSecure()
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
 			if parsedConnectedToPort == 0 {
 				if isHttps {
@@ -726,6 +725,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			// 22 is the TLS handshake.
 			// https://tools.ietf.org/html/rfc5246#section-6.2.1
 			if isHttps {
+				ctx.Session().MarkSecure()
+
 				var serverUseH2 bool
 				if p.http2 {
 					// does remote server use h2?
