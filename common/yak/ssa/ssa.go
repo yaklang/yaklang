@@ -20,10 +20,6 @@ type Value interface {
 
 	String() string
 
-	// variable
-	GetVariable() string
-	SetVariable(string)
-
 	// user
 	GetUsers() []User
 	AddUser(User)
@@ -54,6 +50,16 @@ type Instruction interface {
 
 	// pos
 	Pos() string
+}
+
+// both instruction and value
+type InstructionValue interface {
+	Instruction
+	Value
+
+	// variable
+	GetVariable() string
+	SetVariable(string)
 }
 type Program struct {
 	// package list
@@ -105,7 +111,7 @@ type Function struct {
 
 	// for instruction
 	instReg     map[Instruction]string // instruction -> virtual register
-	symbolTable map[string][]Value
+	symbolTable map[string][]InstructionValue
 
 	// ssa error
 	err SSAErrors
@@ -119,14 +125,6 @@ func (f *Function) GetType() Types {
 }
 
 func (f *Function) SetType(ts Types) {
-}
-
-func (f *Function) GetVariable() string {
-	return f.Name
-}
-
-func (f *Function) SetVariable(name string) {
-	f.Name = name
 }
 
 var _ Node = (*Function)(nil)
@@ -165,14 +163,6 @@ func (b *BasicBlock) GetType() Types {
 }
 
 func (b *BasicBlock) SetType(ts Types) {
-}
-
-func (b *BasicBlock) GetVariable() string {
-	return b.Name
-}
-
-func (b *BasicBlock) SetVariable(name string) {
-	b.Name = name
 }
 
 var _ Node = (*BasicBlock)(nil)
@@ -241,10 +231,29 @@ var _ Node = (*Phi)(nil)
 var _ Value = (*Phi)(nil)
 var _ User = (*Phi)(nil)
 var _ Instruction = (*Phi)(nil)
+var _ InstructionValue = (*Phi)(nil)
 
 // ----------- Const
-// only Value
-// TODO: const also have block pointer which block set this const to variable
+// constinst also have block pointer, which block set this const to variable
+type ConstInst struct {
+	Const
+	anInstruction
+}
+
+func (c *ConstInst) GetType() Types {
+	return c.Const.GetType()
+}
+
+func (c *ConstInst) SetType(ts Types) {
+	// c.typs = ts
+}
+
+var _ Node = (*ConstInst)(nil)
+var _ Value = (*ConstInst)(nil)
+var _ Instruction = (*ConstInst)(nil)
+var _ InstructionValue = (*ConstInst)(nil)
+
+// const only Value
 type Const struct {
 	user  []User
 	value any
@@ -355,6 +364,7 @@ var _ Node = (*Call)(nil)
 var _ Value = (*Call)(nil)
 var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
+var _ InstructionValue = (*Call)(nil)
 
 // ----------- Switch
 type SwitchLabel struct {
@@ -424,6 +434,7 @@ var _ Value = (*BinOp)(nil)
 var _ User = (*BinOp)(nil)
 var _ Node = (*BinOp)(nil)
 var _ Instruction = (*BinOp)(nil)
+var _ InstructionValue = (*BinOp)(nil)
 
 type UnaryOpcode int
 
@@ -448,6 +459,7 @@ var _ Value = (*UnOp)(nil)
 var _ User = (*UnOp)(nil)
 var _ Node = (*UnOp)(nil)
 var _ Instruction = (*UnOp)(nil)
+var _ InstructionValue = (*UnOp)(nil)
 
 // special instruction ------------------------------------------
 
@@ -474,6 +486,7 @@ var _ Node = (*Interface)(nil)
 var _ Value = (*Interface)(nil)
 var _ User = (*Interface)(nil)
 var _ Instruction = (*Interface)(nil)
+var _ InstructionValue = (*Interface)(nil)
 
 // instruction
 // ----------- Field
@@ -501,6 +514,7 @@ var _ Node = (*Field)(nil)
 var _ Value = (*Field)(nil)
 var _ User = (*Field)(nil)
 var _ Instruction = (*Field)(nil)
+var _ InstructionValue = (*Field)(nil)
 
 // ----------- Update
 type Update struct {
@@ -514,3 +528,4 @@ var _ Node = (*Update)(nil)
 var _ Value = (*Update)(nil)
 var _ User = (*Update)(nil)
 var _ Instruction = (*Update)(nil)
+var _ InstructionValue = (*Update)(nil)

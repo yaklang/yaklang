@@ -49,22 +49,37 @@ func (f *Function) WriteVariable(variable string, value Value) {
 	if b := f.builder; b != nil {
 		b.writeVariableByBlock(variable, value, b.CurrentBlock)
 	}
+	// if value is InstructionValue
 	f.WriteSymbolTable(variable, value)
 }
 
-func (f *Function) ReplaceSymbolTable(v, to Value) {
+func (f *Function) ReplaceSymbolTable(v InstructionValue, to Value) {
 	variable := v.GetVariable()
+	// remove
 	if t, ok := f.symbolTable[variable]; ok {
-		f.symbolTable[variable] = append(remove(t, v), to)
+		f.symbolTable[variable] = remove(t, v)
 	}
+	f.WriteSymbolTable(variable, to)
 }
 
 func (f *Function) WriteSymbolTable(variable string, value Value) {
-	if _, ok := f.symbolTable[variable]; !ok {
-		f.symbolTable[variable] = make([]Value, 0, 1)
+	var v InstructionValue
+	switch value := value.(type) {
+	case InstructionValue:
+		v = value
+	case *Const:
+		v = &ConstInst{
+			Const:         *value,
+			anInstruction: newAnInstuction(f.builder.CurrentBlock),
+		}
+	default:
+		return
 	}
-	f.symbolTable[variable] = append(f.symbolTable[variable], value)
-	value.SetVariable(variable)
+	if _, ok := f.symbolTable[variable]; !ok {
+		f.symbolTable[variable] = make([]InstructionValue, 0, 1)
+	}
+	f.symbolTable[variable] = append(f.symbolTable[variable], v)
+	v.SetVariable(variable)
 }
 
 func (b *FunctionBuilder) ReadVariable(variable string) Value {

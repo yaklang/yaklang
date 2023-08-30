@@ -12,8 +12,8 @@ func ReplaceValue(v Value, to Value) {
 		to.AddUser(user)
 		v.RemoveUser(user)
 	}
-	if inst, ok := v.(Instruction); ok {
-		inst.GetParent().ReplaceSymbolTable(v, to)
+	if iv, ok := v.(InstructionValue); ok {
+		iv.GetParent().ReplaceSymbolTable(iv, to)
 	}
 }
 
