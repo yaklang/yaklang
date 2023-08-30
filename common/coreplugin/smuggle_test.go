@@ -43,7 +43,7 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 	var rsps []*http.Response
 	reader := bufio.NewReader(bytes.NewReader(rspBytes))
 	for {
-		rsp, err := http.ReadResponse(reader, nil)
+		rsp, err := utils.ReadHTTPResponseFromBufioReader(reader, nil)
 		if err != nil {
 			break
 		}

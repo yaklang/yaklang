@@ -182,7 +182,7 @@ func _execWithoutRetry(server string, domain string, config *ReliableDNSConfig) 
 
 	if !config.FallbackTCP {
 		if config.count <= 0 {
-			return utils.Errorf("not found ip for %v", domain)
+			return utils.Errorf("not found ip for %#v", domain)
 		}
 		return nil
 	}
@@ -193,7 +193,7 @@ func _execWithoutRetry(server string, domain string, config *ReliableDNSConfig) 
 	}
 
 	if config.count <= 0 {
-		return utils.Errorf("not found ip for %v", domain)
+		return utils.Errorf("not found ip for %#v", domain)
 	}
 	return nil
 }

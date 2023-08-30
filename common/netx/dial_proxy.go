@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -232,9 +231,7 @@ func parseProxyCredential(proxyURL string) (string, string) {
 }
 
 func readHTTP200(c net.Conn) bool {
-	//rspBytes := StableReaderEx(c, 5*time.Second, 4096)
-	//rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rspBytes)), nil)
-	rsp, err := http.ReadResponse(bufio.NewReader(c), nil)
+	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(c), nil)
 	if err != nil {
 		log.Debugf("read response(readHTTP200) failed: %s", err)
 		return false

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/http/httputil"
 	"regexp"
 	textTemp "text/template"
 
@@ -34,7 +33,7 @@ func unsafeTemplateRender(writer http.ResponseWriter, req *http.Request, html st
 		writer.WriteHeader(500)
 		writer.Header().Set("Content-Type", "text/plain; charset=UTF8")
 		writer.Write([]byte(fmt.Sprintf("Request ERROR: %v\n\n", err)))
-		raw, err := httputil.DumpRequest(req, true)
+		raw, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {
 			writer.Write([]byte(fmt.Sprintf("DUMP REQUEST ERROR: %v\n\n", err)))
 			return

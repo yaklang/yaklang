@@ -3,6 +3,7 @@ package pcapx
 import (
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"strings"
 )
@@ -73,7 +74,7 @@ func WithEthernet_NextLayerType(i any) EthernetOption {
 		case "dot1q":
 			config.EthernetType = layers.EthernetTypeDot1Q
 		default:
-			config.EthernetType = layers.EthernetType(utils.Atoi(ret))
+			config.EthernetType = layers.EthernetType(codec.Atoi(ret))
 		}
 		return nil
 	}

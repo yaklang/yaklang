@@ -10,8 +10,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
-	"net/textproto"
-	url "net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,10 +53,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		raw,
 		func(m, u, proto string) error {
 			isRequest = true
-			switch m {
-			case "GET", "HEAD", "DELETE", "OPTIONS", "CONNECT":
-				contentLengthIsNotRecommanded = true
-			}
+			contentLengthIsNotRecommanded = utils.ShouldRemoveZeroContentLengthHeader(m)
 			return nil
 		},
 		func(proto string, code int, codeMsg string) error {
@@ -417,235 +412,14 @@ func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	if req != nil {
 		return req, nil
 	}
-
-	reader := textproto.NewReader(bufio.NewReader(bytes.NewBuffer(raw)))
-	firstLine, err := reader.ReadLine()
-	if err != nil {
-		return nil, utils.Errorf("textproto readfirstline failed: %s", err)
-	}
-
-	var ok bool
-	// 解析 GET / HTTP/1.1
-	req = new(http.Request)
-	line := string(TrimSpaceHTTPPacket([]byte(firstLine)))
-
-	// 修复这个小问题
-	req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(line)
-	if !ok {
-		return nil, utils.Errorf("malformed HTTP request header:（origin:%v）line:%v", strconv.Quote(firstLine), strconv.Quote(line))
-	}
-	if req.Proto == "HTTP/2" {
-		req.ProtoMajor, req.ProtoMinor = 2, 0
-	} else if req.ProtoMajor, req.ProtoMinor, ok = http.ParseHTTPVersion(req.Proto); !ok && !strings.HasPrefix(req.Proto, "HTTP/2") {
-		log.Debugf("malformed HTTP version: %v", req.Proto)
-	}
-
-	if req.Method != "CONNECT" {
-		if !strings.HasPrefix(req.RequestURI, "/") {
-			req.RequestURI = "/" + req.RequestURI
-		}
-	} else {
-		if utils.IsHttpOrHttpsUrl(req.RequestURI) {
-			targetUri, _ := url.Parse(req.RequestURI)
-			if targetUri != nil {
-				req.URL = targetUri
-			}
-		}
-	}
-
-	req.Header = make(http.Header)
-
-	// 接下来解析各种 Header
-	var hostInHeader string
-	for {
-		line, err := reader.ReadLine()
-		if err != nil && err != io.EOF {
-			return nil, utils.Errorf("readline for parsing http.Request.Headers failed: %s", err.Error())
-		}
-
-		// Header 解析完毕
-		if line == "" {
-			break
-		}
-
-		key, value := SplitHTTPHeader(line)
-		if value == "" {
-			req.Header[key] = []string{" "}
-		} else {
-			req.Header.Add(key, value)
-		}
-
-		if strings.ToLower(key) == "host" && value != "" {
-			hostInHeader = value
-		}
-	}
-
-	// 处理一下 Request.URL 的问题
-	rawUrl := req.RequestURI
-	justAuthority := req.Method == "CONNECT" && !strings.HasPrefix(rawUrl, "/")
-	if justAuthority {
-		rawUrl = "http://" + rawUrl
-	}
-	if req.URL, err = url.ParseRequestURI(rawUrl); err != nil {
-		//log.Errorf("parse request uri[%v] failed: %s", rawUrl, err)
-		req.URL, _ = url.ParseRequestURI(utils.RemoveUnprintableCharsWithReplaceItem(rawUrl))
-		if req.URL == nil {
-			req.URL, _ = url.ParseRequestURI("/")
-			if req.URL != nil {
-				req.URL.RawPath = rawUrl
-			} else {
-				req.URL = &url.URL{
-					Path: rawUrl,
-				}
-			}
-		}
-	}
-
-	if justAuthority {
-		req.URL.Scheme = ""
-	}
-
-	// RFC 7230, section 5.3: Must treat
-	//	GET /index.html HTTP/1.1
-	//	Host: www.google.com
-	// and
-	//	GET http://www.google.com/index.html HTTP/1.1
-	//	Host: doesntmatter
-	// the same. In the second case, any Host line is ignored.
-	req.Host = req.URL.Host
-	if req.Host == "" {
-		req.Host = req.Header.Get("Host")
-	}
-	if req.Host == "" && hostInHeader != "" {
-		req.Host = hostInHeader
-	}
-
-	// 接下来应该处理 Body 的问题了
-	rawBody, err := ioutil.ReadAll(reader.R)
-	if err != nil {
-		return nil, utils.Errorf("read last all body failed: %s", err)
-	}
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(rawBody))
-
-	// 1. Chunked 分块传输
-	chunked := strings.Contains(strings.Join(req.Header.Values("Transfer-Encoding"), "|"), "chunked")
-	if chunked {
-		return req, nil
-	}
-
-	// 普通 Content-Length
-	cl := len(rawBody)
-	req.Header.Set("Content-Length", fmt.Sprint(cl))
-	return req, nil
+	return nil, readErr
 }
 
 func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
-	return ReadHTTPRequestEx(reader, false)
-}
-
-func ReadHTTPResponseEx(reader *bufio.Reader, loadbody bool) (*http.Response, []byte, error) {
-	var buf bytes.Buffer
-	rsp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(reader, &buf)), nil)
-	if err != nil {
-		return nil, buf.Bytes(), err
-	}
-
-	if loadbody {
-		var finalBody, _ = ioutil.ReadAll(rsp.Body)
-		rsp.Body = ioutil.NopCloser(bytes.NewBuffer(finalBody))
-	}
-
-	var cache = make(map[string]string)
-	// 这里用来恢复 Req 的大小写
-	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
-		if index := strings.Index(line, ":"); index > 0 {
-			key := line[:index]
-			ckey := textproto.CanonicalMIMEHeaderKey(key)
-			_, ok := commonHeader[ckey]
-			// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
-			if ckey != key && !ok {
-				cache[ckey] = key
-			}
-		}
-	})
-
-	for ckey, key := range cache {
-		values, ok := rsp.Header[ckey]
-		if ok {
-			rsp.Header[key] = values
-			delete(rsp.Header, ckey)
-		}
-	}
-
-	return rsp, buf.Bytes(), nil
-}
-
-func ReadHTTPRequestEx(reader *bufio.Reader, loadbody bool) (*http.Request, error) {
-	var buf bytes.Buffer
-	req, err := http.ReadRequest(bufio.NewReader(io.TeeReader(reader, &buf)))
+	req, err := utils.ReadHTTPRequestFromBufioReader(reader)
 	if err != nil {
 		return nil, err
 	}
-
-	if utils.IsHttpOrHttpsUrl(req.RequestURI) {
-		u, _ := url.Parse(req.RequestURI)
-		if u != nil {
-			req.URL = u
-			req.Host = u.Host
-			if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
-				req.RequestURI = u.RequestURI()
-			} else {
-				req.RequestURI = u.Path
-			}
-		}
-	}
-
-	if loadbody {
-		var finalBody, _ = ioutil.ReadAll(req.Body)
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(finalBody))
-	}
-
-	var cache = make(map[string]string)
-	var host = req.Host
-	var cachedHeader = make(map[string][]string)
-	// 这里用来恢复 Req 的大小写
-	SplitHTTPHeadersAndBodyFromPacket(buf.Bytes(), func(line string) {
-		key, value := SplitHTTPHeader(line)
-		cachedHeader[key] = append(cachedHeader[key], value)
-
-		if strings.ToLower(key) == "host" && value != "" {
-			host = value
-		}
-
-		ckey := textproto.CanonicalMIMEHeaderKey(key)
-		_, ok := commonHeader[ckey]
-		// 大小写发生了变化，并且不是常见公共头，则说明需要恢复一下
-		if ckey != key && !ok {
-			cache[ckey] = key
-		}
-	})
-
-	for ckey, key := range cache {
-		values, ok := req.Header[ckey]
-		if ok {
-			req.Header[key] = values
-			delete(req.Header, ckey)
-		}
-	}
-
-	for key, values := range cachedHeader {
-		req.Header[key] = values
-	}
-	req.Host = host
-
-	//black magic fix when browser use http proxy the RequestURI is not canonical
-	if strings.HasPrefix(req.RequestURI, "http://") || strings.HasPrefix(req.RequestURI, "https://") {
-		if req.Header.Get("Host") == "" {
-			req.Header.Add("Host", req.URL.Host)
-		}
-		req.RequestURI = req.URL.RequestURI()
-	}
-
 	return req, nil
 }
 

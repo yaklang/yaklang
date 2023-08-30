@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"time"
 )
@@ -449,7 +448,6 @@ func MITM_SetHTTPRequestHijack(c func(isHttps bool, req *http.Request) *http.Req
 				return req
 			}
 			raw, err := utils.HttpDumpWithBody(hijackedReq, true)
-			//raw, err := httputil.DumpRequestOut(hijackedReq, true)
 			if err != nil {
 				log.Errorf("dump/marshal hijacked http.Request to bytes failed: %s", err)
 				return req
@@ -546,7 +544,7 @@ func MITM_SetTransparentHijackHTTPRequest(f MITMTransparentHijackHTTPRequestFunc
 		}
 
 		reqInstance := f(isHttps, rp)
-		raw, err := httputil.DumpRequestOut(reqInstance, true)
+		raw, err := utils.HttpDumpWithBody(reqInstance, true)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse *http.Request to []byte failed: %s", err)
 			return nil
@@ -571,7 +569,7 @@ func MITM_SetTransparentHijackHTTPResponse(f MITMTransparentHijackHTTPResponseFu
 		}
 
 		rspInstance := f(isHttps, rp)
-		raw, err := httputil.DumpResponse(rspInstance, true)
+		raw, err := utils.DumpHTTPResponse(rspInstance, true)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse *http.Response to []byte failed: %s", err)
 			return nil

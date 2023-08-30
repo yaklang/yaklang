@@ -989,11 +989,11 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 	headers = append(headers, string(firstLineBytes))
 	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) {
 		// response
-		proto, code, codeMsg, _ := parseResponseLine(string(firstLineBytes))
+		proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
 		return proto, fmt.Sprint(code), codeMsg
 	} else {
 		// request
-		method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
+		method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
 		return method, requestURI, proto
 	}
 }

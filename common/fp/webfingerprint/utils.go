@@ -10,12 +10,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"sort"
-	"strconv"
 	"time"
 )
 
@@ -39,36 +36,6 @@ func HttpGet(url string) ([]byte, error) {
 		return nil, errors.Errorf("read response body error: %s", body)
 	}
 	return body, nil
-}
-
-func HttpGetWithProgress(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, errors.Errorf("HTTP GET %s error: %s", url, err)
-	}
-	defer resp.Body.Close()
-	fileSize, err := strconv.ParseUint(resp.Header.Get("Content-Length"), 10, 64)
-	counter := &WriteCounter{FileSize: fileSize}
-	body, err := ioutil.ReadAll(io.TeeReader(resp.Body, counter))
-	if err != nil {
-		return nil, errors.Errorf("read response body error: %s", body)
-	}
-	return body, nil
-}
-
-// HTTPDownloadToFile download the resource to a specific file
-func HTTPDownloadToFile(url string, filename string) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(f, resp.Body)
-	return err
 }
 
 // WriteCounter counts the number of bytes written to it. It implements to the io.Writer

@@ -68,32 +68,6 @@ type PortFingerprint struct {
 
 func NewHTTPFlowScanResult(isHttps bool, req *http.Request, rsp *http.Response) (*ScanResult, error) {
 	return nil, utils.Error("not implemented")
-	//reqRaw, err := httputil.DumpRequest(req, true)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//rspRaw, err := httputil.DumpResponse(rsp, true)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//flow := &mitmrpc.HTTPFlow{
-	//	IsHttps:   isHttps,
-	//	Timestamp: time.Now().Unix(),
-	//	Request:   reqRaw,
-	//	Response:  rspRaw,
-	//}
-	//
-	//raw, err := json.Marshal(flow)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//return &ScanResult{
-	//	Type:    ScanResult_HTTPFlow,
-	//	Content: raw,
-	//}, nil
 }
 
 func NewScanFingerprintResult(m *fp.MatchResult) (*ScanResult, error) {

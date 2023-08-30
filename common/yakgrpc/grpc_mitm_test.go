@@ -287,14 +287,16 @@ if rsp.Contains(getParam("token")) {
 				echoTested = true
 
 				var tokenRaw, _ = utils.GzipCompress([]byte(token))
-				params["packet"] = "GET /ca HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
+				params["packet"] = "GET /gziptestted HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
+				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
+println(string(req))
 if rsp.Contains(getParam("token")) {
 		println("gzip auto decode success")	
 }else{
@@ -303,29 +305,23 @@ if rsp.Contains(getParam("token")) {
 }
 `, params)
 				if err != nil {
-					panic(err)
+					t.FailNow()
 				}
 				gzipAutoDecode = true
 
 				tokenRaw, _ = utils.GzipCompress([]byte(token))
-				params["packet"] = "GET /cab HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
+				params["packet"] = "GET /chunked-and-gziped-test HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, true)
 				originPacket := params["packet"].([]byte)
 				_ = originPacket
 				println(strconv.Quote(string(originPacket)))
 
+				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
-println("-------------------")
-println("-------------------")
-println("-------------------")
-println(string(packet))
-println("-------------------")
-println("-------------------")
-println("-------------------")
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.retryTimes(3))~
 if rsp.Contains(getParam("token")) {
 		println("chunk + gzip auto decode success")	
@@ -337,7 +333,7 @@ println("-----------------------------------")
 }
 `, params)
 				if err != nil {
-					panic(err)
+					t.FailNow()
 				}
 				chunkDecode = true
 
@@ -410,19 +406,19 @@ if rsp.Contains(getParam("token")) {
 	}
 
 	if !passthroughTested {
-		panic("MITM PASSTHROUGH TEST FAILED")
+		t.Fatal("MITM PASSTHROUGH TEST FAILED")
 	}
 
 	if !echoTested {
-		panic("MITM ECHO TEST FAILED")
+		t.Fatal("MITM ECHO TEST FAILED")
 	}
 
 	if !gzipAutoDecode {
-		panic("GZIP AUTO DECODE FAILED")
+		t.Fatal("GZIP AUTO DECODE FAILED")
 	}
 
 	if !chunkDecode {
-		panic("CHUNK DECODE FAILED")
+		t.Fatal("CHUNK DECODE FAILED")
 	}
 
 	if !h2Test {
@@ -448,7 +444,7 @@ func TestGRPCMUSTPASS_MITM_GM(t *testing.T) {
 
 	var mockGMHost, mockGMPort = utils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
 		gmPassthroughTested = true // 测试标识位 收到了http请求
-		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Length: 3
 
@@ -540,54 +536,44 @@ Content-Length: 3
 			println("----------------------")
 			println("----------------------")
 			started = true
-			go func() {
-				defer func() {
-					wg.Done()
-					cancel()
-					if err := recover(); err != nil {
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-				var token = utils.RandStringBytes(100)
-				var params = map[string]any{
-					"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /GMTLS`+token+` HTTP/1.1
+
+			var token = utils.RandStringBytes(100)
+			var params = map[string]any{
+				"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /GMTLS`+token+` HTTP/1.1
 Host: www.example.com
 
 `+token), "Host", utils.HostPort(mockGMHost, mockGMPort)),
-					"proxy": proxy,
-					"token": token,
-				}
-				spew.Dump(params)
+				"proxy": proxy,
+				"token": token,
+			}
+			spew.Dump(params)
 
-				params["gmHost"] = mockGMHost
-				params["gmPort"] = mockGMPort
-				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+			params["gmHost"] = mockGMHost
+			params["gmPort"] = mockGMPort
+			_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("gmHost"), getParam("gmPort")
-dump(host, port, packet)
 rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.https(true))~
-dump(rsp)
-dump(req)
 if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("GM HTTPS not pass!")
 }
 `, params)
-				if err != nil {
-					panic(err)
-				}
-				gmPassthroughTested = true
+			if err != nil {
+				panic(err)
+			}
+			gmPassthroughTested = true
 
-				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTPS`+token+` HTTP/1.1
+			params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTPS`+token+` HTTP/1.1
 Host: www.example.com
 
 `+token), "Host", utils.HostPort(mockHttpsHost, mockHttpsPort))
-				params["httpsHost"] = mockHttpsHost
-				params["httpsPort"] = mockHttpsPort
-				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+			params["httpsHost"] = mockHttpsHost
+			params["httpsPort"] = mockHttpsPort
+			_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("httpsHost"), getParam("httpsPort")
@@ -599,21 +585,21 @@ if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("TLS HTTPS not pass!")
 }
 `, params)
-				if err != nil {
-					panic(err)
-				}
-				httpsPassthroughTested = true
+			if err != nil {
+				panic(err)
+			}
+			httpsPassthroughTested = true
 
-				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTP`+token+` HTTP/1.1
+			params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /HTTP`+token+` HTTP/1.1
 Host: www.example.com
 
 `+token), "Host", utils.HostPort(mockHost, mockPort))
-				params["host"] = mockHost
-				params["port"] = mockPort
-				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+			params["host"] = mockHost
+			params["port"] = mockPort
+			_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
 host, port = getParam("host"), getParam("port")
@@ -625,79 +611,54 @@ if rsp.Contains(getParam("token")) {
 		println("success")	
 }else{
 	dump(rsp)
-	die("not pass!")
+	die("Plain HTTP not pass!")
 }
 `, params)
-				if err != nil {
-					panic(err)
-				}
-				httpsPassthroughTested = true
+			if err != nil {
+				panic(err)
+			}
+			httpsPassthroughTested = true
 
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
+			time.Sleep(time.Second)
+			_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+				SearchURL: "/GMTLS" + token,
+			})
+			if err != nil {
+				panic(err)
+			}
 
-				// 使用协程进行并发查询
-				done := make(chan struct{})
-				defer close(done)
+			if len(flows) > 0 {
+				gmTest = true
+			}
 
-				go func() {
-					for {
-						_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/GMTLS" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
+			_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+				SearchURL: "/HTTPS" + token,
+			})
+			if err != nil {
+				panic(err)
+			}
 
-						if len(flows) > 0 {
-							gmTest = true
-						}
+			if len(flows) > 0 {
+				httpsTest = true
+			}
 
-						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/HTTPS" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
+			// 执行查询操作
+			_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+				SearchURL: "/HTTP" + token,
+			})
+			if err != nil {
+				panic(err)
+			}
 
-						if len(flows) > 0 {
-							httpsTest = true
-						}
-
-						// 执行查询操作
-						_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-							SearchURL: "/HTTP" + token,
-						})
-						if err != nil {
-							panic(err)
-						}
-
-						if len(flows) > 0 {
-							httpTest = true
-						}
-						if gmTest && httpsTest && httpTest {
-							done <- struct{}{}
-							break
-						}
-					}
-				}()
-
-				select {
-				case <-ctx.Done():
-					log.Warn("flow history not fully found")
-					break
-				case <-done:
-					log.Infof("flow history all found")
-					break
-				}
-
-			}()
-
+			if len(flows) > 0 {
+				httpTest = true
+			}
+			break
 		}
 		spew.Dump(rsp)
 	}
-	wg.Wait()
 
+	time.Sleep(time.Second)
 	if !started {
 		panic("MITM NOT STARTED!")
 	}

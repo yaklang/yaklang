@@ -1036,10 +1036,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		mitmLock.Lock()
 		defer mitmLock.Unlock()
 
-		handled := lowhttp.DeletePacketEncoding(req)
-		if handled != nil {
-			req = handled
-		}
+		//handled := lowhttp.DeletePacketEncoding(req)
+		//if handled != nil {
+		//	req = handled
+		//}
 
 		var matchedRules []*ypb.MITMContentReplacer
 		matchedRulesP := &matchedRules
@@ -1051,7 +1051,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		)
 		httpctx.SetRequestHTTPS(originReqIns, isHttps)
 		httpctx.SetRequestBytes(originReqIns, originReqRaw)
-		httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip, true)
+		//httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip, true)
 
 		// 保证始终只有一个 Goroutine 在处理请求
 		defer func() {
@@ -1150,7 +1150,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-		
+
 		// 开始劫持
 		counter := time.Now().UnixNano()
 		select {

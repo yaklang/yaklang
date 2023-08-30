@@ -85,7 +85,7 @@ func Test_ForExcludeBadCase(t *testing.T) {
 			{"/abc.a", 0},
 		} {
 			// path := utils.InterfaceToString(ct[0])
-			expectCount := utils.Atoi(utils.InterfaceToString(ct[1]))
+			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = "Xsjip0QIZ8tyhnq"
 			packet = []byte(`GET /-L-Xsjip0QIZ8tyhnq/v.gif?logactid=1234567890&showTab=10000&opType=showpv&mod=superman%3Alib&submod=index&superver=supernewplus&glogid=2147883968&type=2011&pid=315&isLogin=0&version=PCHome&terminal=PC&qid=0xc349374900061bc0&sid=36551_38642_38831_39027_39022_38958_38955_39014_39038_38811_39084_38639_26350_39095_39100&super_frm=&from_login=&from_reg=&query=&curcard=2&curcardtab=&_r=0.9024198609355389 HTTP/1.1
 Host: sp1.baidu.com
@@ -171,7 +171,7 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeURI(t *testing.T) {
 			{"/a1bc.aaac?a222bc=1&a=abcc", 0},
 		} {
 			path := utils.InterfaceToString(ct[0])
-			expectCount := utils.Atoi(utils.InterfaceToString(ct[1]))
+			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = ksuid.New().String()
 			packet = []byte("GET " + path + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
 			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
@@ -241,7 +241,7 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeSuffixAndContentType(t *testing.T) {
 			{"/abc.png.zip", 0},
 		} {
 			path := utils.InterfaceToString(ct[0])
-			expectCount := utils.Atoi(utils.InterfaceToString(ct[1]))
+			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = ksuid.New().String()
 			packet = []byte("GET " + path + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
 			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
@@ -288,7 +288,7 @@ sleep(0.3)
 		} {
 			var path = "/"
 			var contentType = utils.InterfaceToString(ct[0])
-			expectCount := utils.Atoi(utils.InterfaceToString(ct[1]))
+			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = ksuid.New().String()
 			packet = []byte("GET " + path + "?ct=" + codec.QueryEscape(contentType) + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
 			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}

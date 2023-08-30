@@ -24,8 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-
-	"golang.org/x/net/http/httpguts"
 )
 
 const (
@@ -38,65 +36,6 @@ var (
 	// Add final block to squelch unexpected EOF error from flate reader
 	TAIL = []byte{0, 0, 0xff, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff}
 )
-
-// parseResponseLine parses `HTTP/1.1 200 OK` into its ports
-func parseResponseLine(line string) (string, int, string, bool) {
-	line = strings.TrimSpace(line)
-
-	var proto string
-	var code int
-	var status string
-
-	blocks := strings.SplitN(line, " ", 3)
-	lenOfBlocks := len(blocks)
-	if lenOfBlocks > 0 {
-		proto = blocks[0]
-	}
-	if lenOfBlocks > 1 {
-		code = utils.Atoi(blocks[1])
-	}
-	if lenOfBlocks > 2 {
-		status = blocks[2]
-	}
-	return proto, code, status, code != 0
-}
-
-// parseRequestLine parses "GET /foo HTTP/1.1" into its three parts.
-func parseRequestLine(line string) (method, requestURI, proto string, ok bool) {
-	s1 := strings.Index(line, " ")
-	s2 := strings.LastIndex(line[s1+1:], " ")
-	if s1 < 0 {
-		return
-	}
-
-	var httpVersion = "HTTP/1.1"
-	if s2 < 0 {
-		return line[:s1], line[s1+1:], httpVersion, true
-	}
-	s2 += s1 + 1
-	return line[:s1], line[s1+1 : s2], line[s2+1:], true
-}
-
-func validMethod(method string) bool {
-	/*
-	     Method         = "OPTIONS"                ; Section 9.2
-	                    | "GET"                    ; Section 9.3
-	                    | "HEAD"                   ; Section 9.4
-	                    | "POST"                   ; Section 9.5
-	                    | "PUT"                    ; Section 9.6
-	                    | "DELETE"                 ; Section 9.7
-	                    | "TRACE"                  ; Section 9.8
-	                    | "CONNECT"                ; Section 9.9
-	                    | extension-method
-	   extension-method = token
-	     token          = 1*<any CHAR except CTLs or separators>
-	*/
-	return len(method) > 0 && strings.IndexFunc(method, isNotToken) == -1
-}
-
-func isNotToken(r rune) bool {
-	return !httpguts.IsTokenRune(r)
-}
 
 func ExtractURLFromHTTPRequestRaw(req []byte, isHttps bool) (*url.URL, error) {
 	r, err := ParseBytesToHttpRequest(req)
@@ -217,6 +156,7 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	} else {
 		host = r.Header.Get("Host")
 	}
+	host = strings.TrimSpace(host)
 	if host == "" {
 		return nil, utils.Errorf("empty hosts")
 	}
@@ -229,6 +169,9 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	}
 	noPath := raw
 	if r.RequestURI != "" {
+		if !strings.HasPrefix(r.RequestURI, "/") {
+			raw += "/"
+		}
 		raw += r.RequestURI
 	} else {
 		u := r.URL
@@ -419,7 +362,7 @@ func SplitHTTPPacket(
 	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) {
 		// rsp
 		if rspFirstLine != nil {
-			proto, code, codeMsg, _ := parseResponseLine(string(firstLineBytes))
+			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
 			err := rspFirstLine(proto, code, codeMsg)
 			if err != nil {
 				log.Errorf("rspHeader error: %s", err)
@@ -429,7 +372,7 @@ func SplitHTTPPacket(
 	} else {
 		// req
 		if reqFirstLine != nil {
-			method, requestURI, proto, _ := parseRequestLine(string(firstLineBytes))
+			method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
 			err := reqFirstLine(method, requestURI, proto)
 			if err != nil && err.Error() != "normal abort" {
 				log.Errorf("reqHeader error: %s", err)
