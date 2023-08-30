@@ -6,7 +6,6 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strconv"
@@ -64,7 +63,7 @@ func GetContextStringInfoFromRequest(r *http.Request, key string) string {
 	if !ok {
 		return ""
 	}
-	return utils.InterfaceToString(v)
+	return codec.AnyToString(v)
 }
 
 func GetRequestBytes(r *http.Request) []byte {
@@ -93,7 +92,7 @@ func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 	case bool:
 		return ret
 	default:
-		result, err := strconv.ParseBool(utils.InterfaceToString(v))
+		result, err := strconv.ParseBool(codec.AnyToString(v))
 		if err != nil {
 			log.Warnf("GetContextBoolInfoFromRequest: %v", err)
 		}
