@@ -9,25 +9,25 @@ import (
 	"strings"
 )
 
-func (r *RuleSyntaxVisitor) Errorf(msg string, items ...interface{}) {
+func (v *RuleSyntaxVisitor) Errorf(msg string, items ...interface{}) {
 	if len(items) == 0 {
-		r.Errors = append(r.Errors, utils.Error(msg))
+		v.Errors = append(v.Errors, utils.Error(msg))
 		return
 	}
-	r.Errors = append(r.Errors, utils.Errorf(msg, items...))
+	v.Errors = append(v.Errors, utils.Errorf(msg, items...))
 }
 
-func (r *RuleSyntaxVisitor) ShowErrors() {
-	if len(r.Errors) > 0 {
-		for _, e := range r.Errors {
+func (v *RuleSyntaxVisitor) ShowErrors() {
+	if len(v.Errors) > 0 {
+		for _, e := range v.Errors {
 			log.Error(e.Error())
 		}
 	}
 }
 
-func (r *RuleSyntaxVisitor) VisitRules(ctx *parser.RulesContext) interface{} {
+func (v *RuleSyntaxVisitor) VisitRules(ctx *parser.RulesContext) interface{} {
 	if ctx == nil {
-		r.Errorf("visit rule met emtpy rules...")
+		v.Errorf("visit rule met emtpy rules...")
 		return nil
 	}
 
@@ -35,16 +35,16 @@ func (r *RuleSyntaxVisitor) VisitRules(ctx *parser.RulesContext) interface{} {
 		if rule == nil {
 			continue
 		}
-		r.VisitRule(rule.(*parser.RuleContext))
+		v.VisitRule(rule.(*parser.RuleContext))
 	}
 	return nil
 }
 
-func (r *RuleSyntaxVisitor) MergeErrors() error {
-	if r.Errors == nil {
+func (v *RuleSyntaxVisitor) MergeErrors() error {
+	if v.Errors == nil {
 		return nil
 	}
-	errors := funk.Map(r.Errors, func(er error) string {
+	errors := funk.Map(v.Errors, func(er error) string {
 		return er.Error()
 	}).([]string)
 	return utils.Error(strings.Join(errors, "\n"))
@@ -54,7 +54,7 @@ func trim(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
+func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	if rule == nil {
 		return nil
 	}
@@ -69,10 +69,10 @@ func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 		Raw: strings.TrimSpace(rule.GetText()),
 	}
 	end := rule.GetStop().GetStop()
-	if len(r.Raw) > end {
+	if len(v.Raw) > end {
 		end += 1
 	}
-	data := r.Raw[rule.GetStart().GetStart():end]
+	data := v.Raw[rule.GetStart().GetStart():end]
 	ruleIns.Raw = utils.EscapeInvalidUTF8Byte(data)
 	ruleIns.ContentRuleConfig = &ContentRuleConfig{}
 
@@ -82,10 +82,10 @@ func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	action := rule.Action_()
 	ruleIns.Action = trim(action.GetText())
 	ruleIns.Protocol = trim(rule.Protocol().GetText())
-	ruleIns.SourceAddress = r.VisitSrcAddress(rule.Src_address().(*parser.Src_addressContext))
-	ruleIns.DestinationAddress = r.VisitDstAddress(rule.Dest_address().(*parser.Dest_addressContext))
-	ruleIns.SourcePort = r.VisitSrcPort(rule.Src_port().(*parser.Src_portContext))
-	ruleIns.DestinationPort = r.VisitDstPort(rule.Dest_port().(*parser.Dest_portContext))
+	ruleIns.SourceAddress = v.VisitSrcAddress(rule.Src_address().(*parser.Src_addressContext))
+	ruleIns.DestinationAddress = v.VisitDstAddress(rule.Dest_address().(*parser.Dest_addressContext))
+	ruleIns.SourcePort = v.VisitSrcPort(rule.Src_port().(*parser.Src_portContext))
+	ruleIns.DestinationPort = v.VisitDstPort(rule.Dest_port().(*parser.Dest_portContext))
 
 	valid := ruleIns.Action != "" && ruleIns.Protocol != "" &&
 		ruleIns.SourcePort != nil && ruleIns.DestinationPort != nil &&
@@ -93,7 +93,7 @@ func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 
 	if !valid {
 		spew.Dump(ruleIns)
-		r.Errorf("met error, parse failed")
+		v.Errorf("met error, parse failed")
 		return nil
 	}
 
@@ -102,11 +102,11 @@ func (r *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	*/
 	params := rule.Params()
 	if params == nil {
-		r.Errorf("params cannot be empty")
+		v.Errorf("params cannot be empty")
 		return nil
 	}
 
-	r.VisitParams(params.(*parser.ParamsContext), ruleIns)
-	r.Rules = append(r.Rules, ruleIns)
+	v.VisitParams(params.(*parser.ParamsContext), ruleIns)
+	v.Rules = append(v.Rules, ruleIns)
 	return nil
 }

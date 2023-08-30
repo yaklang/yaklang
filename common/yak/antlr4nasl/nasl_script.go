@@ -89,9 +89,9 @@ type NaslScriptInfo struct {
 	BugtraqId       []int
 	MandatoryKeys   []string // 前置条件断言
 	Timeout         int      // milliseconds
-
-	Vhosts []*NaslVhost
-	Ip     string
+	RecvTimeout     int      // milliseconds
+	Vhosts          []*NaslVhost
+	Ip              string
 }
 
 func NewNaslScriptObject() *NaslScriptInfo {

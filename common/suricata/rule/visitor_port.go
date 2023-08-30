@@ -3,6 +3,7 @@ package rule
 import (
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
+	"math/rand"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
@@ -102,6 +103,39 @@ func (p *PortRule) Match(i int) bool {
 	} else {
 		return p._matchWithoutNegative(i)
 	}
+}
+
+func (p *PortRule) GetAvailablePort() uint32 {
+	if p.Any {
+		return getHighPort()
+	}
+
+	if strings.Contains(strings.ToLower(p.Env), "ssh") {
+		return 22
+	} else if p.Env != "" {
+		return getHighPort()
+	}
+
+	if len(p.Ports) > 0 && !p.Negative {
+		return uint32(p.Ports[rand.Intn(len(p.Ports))])
+	}
+
+	var count int = 1000
+	for len(p.Ports) > 0 && p.Negative && count <= 30000 {
+		matched := false
+		for _, p := range p.Ports {
+			if p == count {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			return uint32(count)
+		}
+		count++
+	}
+
+	return p.Rules[rand.Intn(len(p.Rules))].GetAvailablePort()
 }
 
 func (v *RuleSyntaxVisitor) VisitSrcPort(i *parser.Src_portContext) *PortRule {

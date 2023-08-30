@@ -102,7 +102,7 @@ func (m *MultipleBufferMatching) transfer(mdf modifier.Modifier) modifier.Modifi
 	return mdf
 }
 
-func (r *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
+func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 	const (
 		HasNone = iota
 		HasContent
