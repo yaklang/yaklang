@@ -103,7 +103,7 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 	var v Value
 	// if block in sealedBlock
 	if !block.isSealed {
-		phi := NewPhi(b.Function, block, variable)
+		phi := NewPhi(block, variable)
 		block.inCompletePhi = append(block.inCompletePhi, phi)
 		v = phi
 	} else if len(block.Preds) == 0 {
@@ -111,7 +111,7 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 	} else if len(block.Preds) == 1 {
 		v = b.readVariableByBlock(variable, block.Preds[0])
 	} else {
-		v = NewPhi(b.Function, block, variable).Build()
+		v = NewPhi(block, variable).Build()
 	}
 	if v != nil {
 		b.writeVariableByBlock(variable, v, block)
