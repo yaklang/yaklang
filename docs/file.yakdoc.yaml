@@ -712,25 +712,33 @@ functions:
 variables:
 - name: file.O_APPEND
   typestr: int
+  valueverbose: "0x8"
   description: //
 - name: file.O_CREATE
   typestr: int
+  valueverbose: "0x200"
   description: //
 - name: file.O_EXCL
   typestr: int
+  valueverbose: "0x800"
   description: //
 - name: file.O_RDONLY
   typestr: int
+  valueverbose: "0x0"
   description: //
 - name: file.O_RDWR
   typestr: int
+  valueverbose: "0x2"
   description: //
 - name: file.O_SYNC
   typestr: int
+  valueverbose: "0x80"
   description: //
 - name: file.O_TRUNC
   typestr: int
+  valueverbose: "0x400"
   description: //
 - name: file.O_WRONLY
   typestr: int
+  valueverbose: "0x1"
   description: //

@@ -119,7 +119,7 @@ functions:
   - structname: github.com/yaklang/yaklang/common/utils.SizedWaitGroup
     isbuildinstruct: false
 - name: sync.NewWaitGroup
-  type_str: 'func () return(*sync.WaitGroup) '
+  type_str: 'func () return(*yaklib.WaitGroupProxy) '
   long_description: ""
   description: ""
   returns:
@@ -127,9 +127,11 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: sync.WaitGroup
-    type_str: '*sync.WaitGroup'
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib.WaitGroupProxy
+    type_str: '*yaklib.WaitGroupProxy'
   relative_structs:
+  - structname: github.com/yaklang/yaklang/common/yak/yaklib.WaitGroupProxy
+    isbuildinstruct: false
   - structname: sync.WaitGroup
     isbuildinstruct: true
 variables: []

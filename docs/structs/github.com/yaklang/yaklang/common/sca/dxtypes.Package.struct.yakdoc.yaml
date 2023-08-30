@@ -1,0 +1,191 @@
+is_build_in_struct: false
+libname: sca
+struct_name: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: AmendedCPE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: AssociatedCVE
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: DependsOn
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+  type_str: dxtypes.PackageRelationShip
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: DownStreamPackages
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  type_str: map[string]*dxtypes.Package
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: FromAnalyzer
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: FromFile
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: IsVersionRange
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: License
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Potential
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: UpStreamPackages
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  type_str: map[string]*dxtypes.Package
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Verification
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Version
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: From
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: HasVersionRange
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Identifier
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: LinkDepend
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*dxtypes.Package'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: Merge
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*dxtypes.Package'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*dxtypes.Package'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: SetFrom
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/sca/dxtypes.Package
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

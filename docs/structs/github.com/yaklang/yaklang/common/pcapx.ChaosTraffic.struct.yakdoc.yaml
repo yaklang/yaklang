@@ -1,0 +1,67 @@
+is_build_in_struct: false
+libname: pcapx
+struct_name: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: HttpRequest
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: HttpResponse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: ICMPIPInboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: ICMPIPOutboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: LinkLayerPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: LocalIP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: RawTCP
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: TCPIPPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: UDPIPInboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+  name: UDPIPOutboundPayload
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

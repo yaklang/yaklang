@@ -102,6 +102,8 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
     isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+    isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
@@ -192,6 +194,8 @@ functions:
   - structname: mime/multipart.Form
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false
@@ -448,6 +452,8 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
     isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+    isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
@@ -537,6 +543,8 @@ functions:
   - structname: mime/multipart.Form
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
     isbuildinstruct: false

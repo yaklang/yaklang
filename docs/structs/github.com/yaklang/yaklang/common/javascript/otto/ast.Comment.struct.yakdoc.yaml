@@ -1,0 +1,46 @@
+is_build_in_struct: false
+libname: js
+struct_name: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  name: Begin
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: file.Idx
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  name: Position
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: ast.CommentPosition
+- structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  name: Text
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

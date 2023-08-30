@@ -76,6 +76,16 @@ functions:
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
     isbuildinstruct: false
+- name: brute.autoDict
+  type_str: 'func () return(func yakBruteOpt(v1: *tools.yakBruter) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func yakBruteOpt(v1: *tools.yakBruter) '
 - name: brute.bruteHandler
   type_str: 'func (v1: func (v1: *bruteutils.BruteItem) return(*bruteutils.BruteItemResult)
     ) return(func yakBruteOpt(v1: *tools.yakBruter) ) '

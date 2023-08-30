@@ -4,6 +4,18 @@ struct_name: github.com/yaklang/yaklang/common/yso.GadgetInfo
 description: ""
 fields:
 - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+  name: Generator
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+- structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+  name: GeneratorName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
   name: Help
   param_alias: ""
   type_alias: ""
@@ -27,6 +39,12 @@ fields:
   type_alias: ""
   description: ""
   type_str: bool
+- structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
+  name: YakFun
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
 methods:
 - ptr: true
   description: ""

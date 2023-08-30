@@ -1,0 +1,177 @@
+name: ja3
+functions:
+- name: ja3.GetTransportByClientHelloSpec
+  type_str: 'func (v1: *tls.ClientHelloSpec) return(*http.Transport) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/refraction-networking/utls.ClientHelloSpec
+    type_str: '*tls.ClientHelloSpec'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: net/http.Transport
+    type_str: '*http.Transport'
+  relative_structs:
+  - structname: github.com/refraction-networking/utls.ClientHelloSpec
+    isbuildinstruct: true
+  - structname: net/http.Transport
+    isbuildinstruct: true
+  - structname: crypto/tls.Config
+    isbuildinstruct: true
+  - structname: crypto/tls.Certificate
+    isbuildinstruct: true
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- name: ja3.ParseJA3
+  type_str: 'func (v1: string) return(*ja3.JA3, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/ja3.JA3
+    type_str: '*ja3.JA3'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/ja3.JA3
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.ExtensionsType
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.EllipticCurve
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.EllipticCurvePointFormat
+    isbuildinstruct: false
+- name: ja3.ParseJA3S
+  type_str: 'func (v1: string) return(*ja3.JA3S, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/ja3.JA3S
+    type_str: '*ja3.JA3S'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/ja3.JA3S
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/ja3.ExtensionsType
+    isbuildinstruct: false
+- name: ja3.ParseJA3ToClientHelloSpec
+  type_str: 'func (v1: string) return(*tls.ClientHelloSpec, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/refraction-networking/utls.ClientHelloSpec
+    type_str: '*tls.ClientHelloSpec'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/refraction-networking/utls.ClientHelloSpec
+    isbuildinstruct: true
+variables: []

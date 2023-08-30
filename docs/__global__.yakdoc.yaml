@@ -398,6 +398,23 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: input
+  type_str: 'func (v1 ...string) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
 - name: isEmpty
   type_str: 'func (v1: interface {}) return(bool) '
   long_description: ""
@@ -1225,67 +1242,89 @@ functions:
 variables:
 - name: bool
   typestr: builtin.tyBool
+  valueverbose: ""
   description: //
 - name: byte
   typestr: builtin.tyUint8
+  valueverbose: ""
   description: //
 - name: "false"
   typestr: bool
+  valueverbose: ""
   description: //
 - name: float
   typestr: builtin.tyFloat64
+  valueverbose: ""
   description: //
 - name: float32
   typestr: builtin.tyFloat32
+  valueverbose: ""
   description: //
 - name: float64
   typestr: builtin.tyFloat64
+  valueverbose: ""
   description: //
 - name: int
   typestr: builtin.tyInt
+  valueverbose: ""
   description: //
 - name: int16
   typestr: builtin.tyInt16
+  valueverbose: ""
   description: //
 - name: int32
   typestr: builtin.tyInt32
+  valueverbose: ""
   description: //
 - name: int64
   typestr: builtin.tyInt64
+  valueverbose: ""
   description: //
 - name: int8
   typestr: builtin.tyInt8
+  valueverbose: ""
   description: //
 - name: sliceFrom
   typestr: builtin.goSliceFrom
+  valueverbose: ""
   description: //
 - name: string
   typestr: builtin.tyString
+  valueverbose: ""
   description: //
 - name: "true"
   typestr: bool
+  valueverbose: ""
   description: //
 - name: type
   typestr: builtin.goTypeOf
+  valueverbose: ""
   description: //
 - name: uint
   typestr: builtin.tyUint
+  valueverbose: ""
   description: //
 - name: uint16
   typestr: builtin.tyUint16
+  valueverbose: ""
   description: //
 - name: uint32
   typestr: builtin.tyUint32
+  valueverbose: ""
   description: //
 - name: uint64
   typestr: builtin.tyUint64
+  valueverbose: ""
   description: //
 - name: uint8
   typestr: builtin.tyUint8
+  valueverbose: ""
   description: //
 - name: undefined
   typestr: '*spec.undefinedType'
+  valueverbose: ""
   description: //
 - name: var
   typestr: builtin.tyVar
+  valueverbose: ""
   description: //

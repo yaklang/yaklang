@@ -1,0 +1,31 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+  name: Uricontent
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+  name: UrilenNum1
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+  name: UrilenNum2
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+  name: UrilenOp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods: []
+ptr_methods: []

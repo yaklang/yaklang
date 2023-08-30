@@ -34,7 +34,7 @@ methods:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func (v1: yaklang.YaklangEngine) return(error) '
+    type_str: 'func (v1: *antlr4yak.Engine) return(error) '
   - name: v7
     param_alias: ""
     type_alias: ""
@@ -350,7 +350,7 @@ methods:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func (v1: yaklang.YaklangEngine) return(error) '
+    type_str: 'func (v1: *antlr4yak.Engine) return(error) '
   - name: v5
     param_alias: ""
     type_alias: ""
@@ -435,6 +435,23 @@ methods:
     type_alias: ""
     description: ""
     type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.YakToCallerManager
+  name: ShouldCallByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
   relative_struct_name: []
 - ptr: true
   description: ""

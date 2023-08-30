@@ -80,6 +80,22 @@ functions:
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
     isbuildinstruct: false
+- name: js.GetSTType
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
 - name: js.NaNValue
   type_str: 'func () return(otto.Value) '
   long_description: 返回 JS 的 NaN 对象
@@ -133,6 +149,39 @@ functions:
   - structname: github.com/yaklang/yaklang/common/javascript/otto.Value
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/javascript/otto.Object
+    isbuildinstruct: false
+- name: js.Parse
+  type_str: 'func (v1: string) return(*ast.Program, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+    type_str: '*ast.Program'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Program
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+    isbuildinstruct: false
+  - structname: gopkg.in/sourcemap.v1.Consumer
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/javascript/otto/ast.Comment
     isbuildinstruct: false
 - name: js.Run
   type_str: 'func (v1: interface {}) return(*otto.Otto, otto.Value, error) '
@@ -239,4 +288,5 @@ functions:
 variables:
 - name: js.PoweredBy
   typestr: string
+  valueverbose: ""
   description: //

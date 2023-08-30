@@ -1,5 +1,5 @@
 is_build_in_struct: true
-libname: dyn
+libname: cve
 struct_name: reflect.MapIter
 description: ""
 fields: []

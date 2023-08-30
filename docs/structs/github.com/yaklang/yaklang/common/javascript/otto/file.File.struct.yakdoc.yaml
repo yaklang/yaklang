@@ -1,0 +1,80 @@
+is_build_in_struct: false
+libname: js
+struct_name: github.com/yaklang/yaklang/common/javascript/otto/file.File
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  name: Base
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  name: Name
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  name: Position
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: file.Idx
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+    type_str: '*file.Position'
+  relative_struct_name:
+  - structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+    isbuildinstruct: false
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  name: Source
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.File
+  name: WithSourceMap
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: gopkg.in/sourcemap.v1.Consumer
+    type_str: '*sourcemap.Consumer'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*file.File'
+  relative_struct_name:
+  - structname: gopkg.in/sourcemap.v1.Consumer
+    isbuildinstruct: true
+ptr_methods: []

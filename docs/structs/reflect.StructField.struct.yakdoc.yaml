@@ -1,0 +1,59 @@
+is_build_in_struct: true
+libname: cve
+struct_name: reflect.StructField
+description: ""
+fields:
+- structname: reflect.StructField
+  name: Anonymous
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: reflect.StructField
+  name: Index
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]int'
+- structname: reflect.StructField
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: reflect.StructField
+  name: Offset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uintptr
+- structname: reflect.StructField
+  name: PkgPath
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: reflect.StructField
+  name: Tag
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: reflect.StructTag
+- structname: reflect.StructField
+  name: Type
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: reflect.Type
+methods:
+- description: ""
+  structname: reflect.StructField
+  name: IsExported
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []

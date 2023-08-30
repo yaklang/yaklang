@@ -1,0 +1,25 @@
+is_build_in_struct: false
+libname: poc
+struct_name: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+  name: IsHttps
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+  name: Request
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+  name: Response
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+methods: []
+ptr_methods: []

@@ -15,7 +15,7 @@ functions:
   - structname: github.com/yaklang/yaklang/common/pcapx.Statistics
     isbuildinstruct: false
 - name: pcapx.InjectChaosTraffic
-  type_str: 'func (v1: *chaosmaker.ChaosTraffic, v2 ...func ConfigOption(v1: *pcapx.Config)
+  type_str: 'func (v1: *pcapx.ChaosTraffic, v2 ...func ConfigOption(v1: *pcapx.Config)
     ) '
   long_description: ""
   description: ""
@@ -24,8 +24,8 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
-    type_str: '*chaosmaker.ChaosTraffic'
+    relative_structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
+    type_str: '*pcapx.ChaosTraffic'
   - name: v2
     param_alias: ""
     type_alias: ""
@@ -33,99 +33,7 @@ functions:
     type_str: '[]pcapx.ConfigOption'
     is_variadic: true
   relative_structs:
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
-    isbuildinstruct: false
-  - structname: github.com/jinzhu/gorm.Model
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.DB
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.Association
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.Callback
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.CallbackProcessor
-    isbuildinstruct: true
-  - structname: database/sql.DB
-    isbuildinstruct: true
-  - structname: database/sql.Tx
-    isbuildinstruct: true
-  - structname: database/sql.Stmt
-    isbuildinstruct: true
-  - structname: database/sql.Rows
-    isbuildinstruct: true
-  - structname: database/sql.ColumnType
-    isbuildinstruct: true
-  - structname: database/sql.Row
-    isbuildinstruct: true
-  - structname: database/sql.TxOptions
-    isbuildinstruct: true
-  - structname: database/sql.Conn
-    isbuildinstruct: true
-  - structname: database/sql.DBStats
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.Scope
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.search
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.Field
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.StructField
-    isbuildinstruct: true
-  - structname: reflect.StructField
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.Relationship
-    isbuildinstruct: true
-  - structname: reflect.Value
-    isbuildinstruct: true
-  - structname: reflect.MapIter
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.ModelStruct
-    isbuildinstruct: true
-  - structname: github.com/jinzhu/gorm.expr
-    isbuildinstruct: true
-  - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ChaosMakerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.Rule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.AddressRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.PortRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRuleConfig
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.FlowRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.DNSRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.UDPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ICMPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseModifierRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseModifierRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  - structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
     isbuildinstruct: false
 - name: pcapx.InjectHTTPRequest
   type_str: 'func (v1: []uint8, v2 ...func ConfigOption(v1: *pcapx.Config) ) '
@@ -191,4 +99,919 @@ functions:
     description: ""
     type_str: '[]pcapx.ConfigOption'
     is_variadic: true
-variables: []
+- name: pcapx.arp_reply
+  type_str: 'func (v1: string, v2: string) return(func ArpConfig(v1: *layers.ARP)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ArpConfig(v1: *layers.ARP) return(error) '
+- name: pcapx.arp_replyEx
+  type_str: 'func (v1: string, v2: string, v3: string, v4: string) return(func ArpConfig(v1:
+    *layers.ARP) return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ArpConfig(v1: *layers.ARP) return(error) '
+- name: pcapx.arp_request
+  type_str: 'func (v1: string) return(func ArpConfig(v1: *layers.ARP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ArpConfig(v1: *layers.ARP) return(error) '
+- name: pcapx.arp_requestEx
+  type_str: 'func (v1: string, v2: string, v3: string) return(func ArpConfig(v1: *layers.ARP)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ArpConfig(v1: *layers.ARP) return(error) '
+- name: pcapx.ethernet_dstMac
+  type_str: 'func (v1: interface {}) return(func EthernetOption(v1: *layers.Ethernet)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func EthernetOption(v1: *layers.Ethernet) return(error) '
+- name: pcapx.ethernet_nextLayerType
+  type_str: 'func (v1: interface {}) return(func EthernetOption(v1: *layers.Ethernet)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func EthernetOption(v1: *layers.Ethernet) return(error) '
+- name: pcapx.ethernet_srcMac
+  type_str: 'func (v1: interface {}) return(func EthernetOption(v1: *layers.Ethernet)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func EthernetOption(v1: *layers.Ethernet) return(error) '
+- name: pcapx.icmp_id
+  type_str: 'func (v1: interface {}) return(func ICMPOption(v1: *layers.ICMPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ICMPOption(v1: *layers.ICMPv4) return(error) '
+- name: pcapx.icmp_payload
+  type_str: 'func (v1: []uint8) return(func ICMPOption(v1: *layers.ICMPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ICMPOption(v1: *layers.ICMPv4) return(error) '
+- name: pcapx.icmp_seq
+  type_str: 'func (v1: interface {}) return(func ICMPOption(v1: *layers.ICMPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ICMPOption(v1: *layers.ICMPv4) return(error) '
+- name: pcapx.icmp_type
+  type_str: 'func (v1: interface {}, v2: interface {}) return(func ICMPOption(v1:
+    *layers.ICMPv4) return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ICMPOption(v1: *layers.ICMPv4) return(error) '
+- name: pcapx.ipv4_dstOp
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_flags
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_fragment
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_id
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_nextLayerProtocol
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_option
+  type_str: 'func (v1: interface {}, v2: []uint8) return(func IPv4Option(v1: *layers.IPv4)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_srcIp
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_tos
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.ipv4_ttl
+  type_str: 'func (v1: interface {}) return(func IPv4Option(v1: *layers.IPv4) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func IPv4Option(v1: *layers.IPv4) return(error) '
+- name: pcapx.tcp_ack
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_dataOffset
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_dstPort
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_flag
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionMSS
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionRaw
+  type_str: 'func (v1: interface {}, v2: []uint8) return(func TCPOption(v1: *layers.TCP)
+    return(error) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionSACK
+  type_str: 'func (v1 ...interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionSACKPermitted
+  type_str: 'func () return(func TCPOption(v1: *layers.TCP) return(error) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionTimestamp
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_optionWindowScale
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_seq
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_srcPort
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_urgent
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.tcp_window
+  type_str: 'func (v1: interface {}) return(func TCPOption(v1: *layers.TCP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func TCPOption(v1: *layers.TCP) return(error) '
+- name: pcapx.udp_dstPort
+  type_str: 'func (v1: interface {}) return(func UDPOption(v1: *layers.UDP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func UDPOption(v1: *layers.UDP) return(error) '
+- name: pcapx.udp_srcPort
+  type_str: 'func (v1: interface {}) return(func UDPOption(v1: *layers.UDP) return(error)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func UDPOption(v1: *layers.UDP) return(error) '
+variables:
+- name: pcapx.ICMP_CODE_PARAM_PROBLEM_BAD_LENGTH
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: pcapx.ICMP_CODE_PARAM_PROBLEM_MISSING_OPTION
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.ICMP_CODE_PARAM_PROBLEM_POINTER_INDICATES_ERROR
+  typestr: int
+  valueverbose: "0x0"
+  description: //
+- name: pcapx.ICMP_CODE_REDIRECT_HOST
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.ICMP_CODE_REDIRECT_NET
+  typestr: int
+  valueverbose: "0x0"
+  description: //
+- name: pcapx.ICMP_CODE_REDIRECT_TOS_HOST
+  typestr: int
+  valueverbose: "0xc"
+  description: //
+- name: pcapx.ICMP_CODE_REDIRECT_TOS_NET
+  typestr: int
+  valueverbose: "0xb"
+  description: //
+- name: pcapx.ICMP_CODE_TIME_EXCEEDED_FRAG_REASS
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.ICMP_CODE_TIME_EXCEEDED_TTL
+  typestr: int
+  valueverbose: "0x0"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_COMM_ADMIN
+  typestr: int
+  valueverbose: "0xd"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_FRAGMENTATION_NEEDED
+  typestr: int
+  valueverbose: "0x4"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_HOST
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_HOST_ADMIN
+  typestr: int
+  valueverbose: "0xa"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_HOST_PRECEDENCE
+  typestr: int
+  valueverbose: "0xe"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_HOST_TOS
+  typestr: int
+  valueverbose: "0xc"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_HOST_UNKNOWN
+  typestr: int
+  valueverbose: "0x7"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_NET
+  typestr: int
+  valueverbose: "0x0"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_NET_ADMIN
+  typestr: int
+  valueverbose: "0x9"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_NET_TOS
+  typestr: int
+  valueverbose: "0xb"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_NET_UNKNOWN
+  typestr: int
+  valueverbose: "0x6"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_PORT
+  typestr: int
+  valueverbose: "0x3"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_PRECEDENCE_CUTOFF
+  typestr: int
+  valueverbose: "0xf"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_PROTOCOL
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_SRC_ISOLATED
+  typestr: int
+  valueverbose: "0x8"
+  description: //
+- name: pcapx.ICMP_CODE_UNREACH_SRC_ROUTE_FAIL
+  typestr: int
+  valueverbose: "0x5"
+  description: //
+- name: pcapx.ICMP_TYPE_ADDRESS_MASK_REPLY
+  typestr: int
+  valueverbose: "0x12"
+  description: //
+- name: pcapx.ICMP_TYPE_ADDRESS_MASK_REQUEST
+  typestr: int
+  valueverbose: "0x11"
+  description: //
+- name: pcapx.ICMP_TYPE_DEST_UNREACH
+  typestr: int
+  valueverbose: "0x3"
+  description: //
+- name: pcapx.ICMP_TYPE_ECHO_REPLY
+  typestr: int
+  valueverbose: "0x0"
+  description: //
+- name: pcapx.ICMP_TYPE_ECHO_REQUEST
+  typestr: int
+  valueverbose: "0x8"
+  description: //
+- name: pcapx.ICMP_TYPE_INFO_REPLY
+  typestr: int
+  valueverbose: "0x10"
+  description: //
+- name: pcapx.ICMP_TYPE_INFO_REQUEST
+  typestr: int
+  valueverbose: "0xf"
+  description: //
+- name: pcapx.ICMP_TYPE_PARAM_PROBLEM
+  typestr: int
+  valueverbose: "0xc"
+  description: //
+- name: pcapx.ICMP_TYPE_REDIRECT
+  typestr: int
+  valueverbose: "0x5"
+  description: //
+- name: pcapx.ICMP_TYPE_ROUTER_ADVERTISEMENT
+  typestr: int
+  valueverbose: "0x9"
+  description: //
+- name: pcapx.ICMP_TYPE_ROUTER_SOLICITATION
+  typestr: int
+  valueverbose: "0xa"
+  description: //
+- name: pcapx.ICMP_TYPE_SRC_QUENCH
+  typestr: int
+  valueverbose: "0x4"
+  description: //
+- name: pcapx.ICMP_TYPE_TIMESTAMP
+  typestr: int
+  valueverbose: "0xd"
+  description: //
+- name: pcapx.ICMP_TYPE_TIMESTAMP_REPLY
+  typestr: int
+  valueverbose: "0xe"
+  description: //
+- name: pcapx.ICMP_TYPE_TIME_EXCEEDED
+  typestr: int
+  valueverbose: "0xb"
+  description: //
+- name: pcapx.IPV4_FLAG_DONT_FRAGMENT
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: pcapx.IPV4_FLAG_EVIL_BIT
+  typestr: int
+  valueverbose: "0x4"
+  description: //
+- name: pcapx.IPV4_FLAG_MORE_FRAGMENT
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_AH
+  typestr: int
+  valueverbose: "0x33"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_ESP
+  typestr: int
+  valueverbose: "0x32"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_ETHERIP
+  typestr: int
+  valueverbose: "0x61"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_GRE
+  typestr: int
+  valueverbose: "0x2f"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_ICMP
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_IGMP
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_IPIP
+  typestr: int
+  valueverbose: "0x5e"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_MPLSINIP
+  typestr: int
+  valueverbose: "0x89"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_OSPF
+  typestr: int
+  valueverbose: "0x59"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_SCTP
+  typestr: int
+  valueverbose: "0x84"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_TCP
+  typestr: int
+  valueverbose: "0x6"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_UDP
+  typestr: int
+  valueverbose: "0x11"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_UDPLITE
+  typestr: int
+  valueverbose: "0x88"
+  description: //
+- name: pcapx.IPV4_PROTOCOL_VRRP
+  typestr: int
+  valueverbose: "0x70"
+  description: //
+- name: pcapx.TCP_FLAG_ACK
+  typestr: int
+  valueverbose: "0x10"
+  description: //
+- name: pcapx.TCP_FLAG_CWR
+  typestr: int
+  valueverbose: "0x80"
+  description: //
+- name: pcapx.TCP_FLAG_ECE
+  typestr: int
+  valueverbose: "0x40"
+  description: //
+- name: pcapx.TCP_FLAG_FIN
+  typestr: int
+  valueverbose: "0x1"
+  description: //
+- name: pcapx.TCP_FLAG_NS
+  typestr: int
+  valueverbose: "0x100"
+  description: //
+- name: pcapx.TCP_FLAG_PSH
+  typestr: int
+  valueverbose: "0x8"
+  description: //
+- name: pcapx.TCP_FLAG_RST
+  typestr: int
+  valueverbose: "0x4"
+  description: //
+- name: pcapx.TCP_FLAG_SYN
+  typestr: int
+  valueverbose: "0x2"
+  description: //
+- name: pcapx.TCP_FLAG_URG
+  typestr: int
+  valueverbose: "0x20"
+  description: //

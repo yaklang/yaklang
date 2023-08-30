@@ -267,12 +267,14 @@ functions:
 variables:
 - name: io.Discard
   typestr: io.discard
+  valueverbose: ""
   description: //
   relative_struct:
   - structname: io.discard
     isbuildinstruct: true
 - name: io.EOF
   typestr: '*errors.errorString'
+  valueverbose: ""
   description: 结束符
   relative_struct:
   - structname: errors.errorString

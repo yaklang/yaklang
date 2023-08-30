@@ -28,6 +28,22 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: csrf.https
+  type_str: 'func (v1: bool) return(func csrfConfig(v1: *yaklib._csrfConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func csrfConfig(v1: *yaklib._csrfConfig) '
 - name: csrf.multipartDefaultValue
   type_str: 'func (v1: bool) return(func csrfConfig(v1: *yaklib._csrfConfig) ) '
   long_description: ""

@@ -1,0 +1,19 @@
+is_build_in_struct: true
+libname: cve
+struct_name: database/sql.TxOptions
+description: ""
+fields:
+- structname: database/sql.TxOptions
+  name: Isolation
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: sql.IsolationLevel
+- structname: database/sql.TxOptions
+  name: ReadOnly
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+methods: []
+ptr_methods: []

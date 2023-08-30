@@ -82,6 +82,12 @@ fields:
   type_alias: ""
   description: ""
   type_str: map[string]int
+- structname: github.com/yaklang/yaklang/common/cve.Statistics
+  name: YearsSeverityCounter
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]map[string]int
 methods:
 - ptr: true
   description: ""

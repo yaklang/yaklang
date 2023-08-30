@@ -1,0 +1,269 @@
+is_build_in_struct: true
+libname: ja3
+struct_name: net/http.Transport
+description: ""
+fields:
+- structname: net/http.Transport
+  name: Dial
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: string, v2: string) return(net.Conn, error) '
+- structname: net/http.Transport
+  name: DialContext
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: context.Context, v2: string, v3: string) return(net.Conn, error) '
+- structname: net/http.Transport
+  name: DialTLS
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: string, v2: string) return(net.Conn, error) '
+- structname: net/http.Transport
+  name: DialTLSContext
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: context.Context, v2: string, v3: string) return(net.Conn, error) '
+- structname: net/http.Transport
+  name: DisableCompression
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Transport
+  name: DisableKeepAlives
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Transport
+  name: ExpectContinueTimeout
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: net/http.Transport
+  name: ForceAttemptHTTP2
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: net/http.Transport
+  name: GetProxyConnectHeader
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: context.Context, v2: *url.URL, v3: string) return(http.Header,
+    error) '
+- structname: net/http.Transport
+  name: IdleConnTimeout
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: net/http.Transport
+  name: MaxConnsPerHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Transport
+  name: MaxIdleConns
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Transport
+  name: MaxIdleConnsPerHost
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Transport
+  name: MaxResponseHeaderBytes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: net/http.Transport
+  name: OnProxyConnectResponse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: context.Context, v2: *url.URL, v3: *http.Request, v4: *http.Response)
+    return(error) '
+- structname: net/http.Transport
+  name: Proxy
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: 'func (v1: *http.Request) return(*url.URL, error) '
+- structname: net/http.Transport
+  name: ProxyConnectHeader
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: http.Header
+- structname: net/http.Transport
+  name: ReadBufferSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: net/http.Transport
+  name: ResponseHeaderTimeout
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: net/http.Transport
+  name: TLSClientConfig
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: crypto/tls.Config
+  type_str: '*tls.Config'
+- structname: net/http.Transport
+  name: TLSHandshakeTimeout
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+- structname: net/http.Transport
+  name: TLSNextProto
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]func(string, *tls.Conn) http.RoundTripper
+- structname: net/http.Transport
+  name: WriteBufferSize
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: net/http.Transport
+  name: CancelRequest
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  relative_struct_name:
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: net/http.Transport
+  name: Clone
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Transport'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Transport
+  name: CloseIdleConnections
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Transport
+  name: RegisterProtocol
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: http.RoundTripper
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: net/http.Transport
+  name: RoundTrip
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Request'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*http.Response'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+ptr_methods: []

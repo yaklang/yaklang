@@ -1,0 +1,55 @@
+is_build_in_struct: false
+libname: suricata
+struct_name: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: Ack
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: Flags
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: NegativeWindow
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: Seq
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: TCPMssNum1
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: TCPMssNum2
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: TCPMssOp
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+  name: Window
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '*int'
+methods: []
+ptr_methods: []
