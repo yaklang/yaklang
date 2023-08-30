@@ -24,6 +24,8 @@ func New(r *rule.Rule) (Generator, error) {
 		return newUDPGen(r)
 	case protocol.DNS:
 		return newDNSGen(r)
+	case protocol.ICMP:
+		return newICMPGen(r)
 	}
 	return nil, errors.New("not support protocol")
 }

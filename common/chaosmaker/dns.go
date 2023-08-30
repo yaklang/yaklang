@@ -54,16 +54,17 @@ type dnsGenerator struct {
 }
 
 func (g *dnsGenerator) generator(count int) {
+	defer close(g.out)
+
 	surigen, err := generate.New(g.originRule)
 	if err != nil {
-		log.Warnf("new generator failed: %v", err)
+		log.Errorf("new generator failed: %v", err)
+		return
 	}
 
 	for i := 0; i < count; i++ {
 		g.toChaosTraffic(surigen.Gen())
 	}
-
-	close(g.out)
 }
 
 func (g *dnsGenerator) toChaosTraffic(raw []byte) {

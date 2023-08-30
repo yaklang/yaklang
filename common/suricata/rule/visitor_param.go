@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/data/numrange"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/utils"
@@ -356,11 +357,6 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 			config.Seconds = atoi(utils.MapGetString(vParams, "seconds"))
 			rule.ContentRuleConfig.Thresholding = config
-		case "udp.hdr":
-			if rule.ContentRuleConfig.UdpConfig != nil {
-				rule.ContentRuleConfig.UdpConfig = &UDPLayerRule{}
-			}
-			rule.ContentRuleConfig.UdpConfig.UDPHeader = true
 		case "icode":
 			/*
 				icode:min<>max;
@@ -369,7 +365,12 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			if rule.ContentRuleConfig.IcmpConfig == nil {
 				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
 			}
-			rule.ContentRuleConfig.IcmpConfig.ICode = vStr
+			numRange, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				log.Errorf("parse icmp icode err:%v", err)
+				continue
+			}
+			rule.ContentRuleConfig.IcmpConfig.ICode = numRange
 		case "itype":
 			/*
 				itype:min<>max;
@@ -378,20 +379,26 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			if rule.ContentRuleConfig.IcmpConfig == nil {
 				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
 			}
-			rule.ContentRuleConfig.IcmpConfig.IType = vStr
+			numRange, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				log.Errorf("parse icmp itype err:%v", err)
+				continue
+			}
+			rule.ContentRuleConfig.IcmpConfig.IType = numRange
 		case "icmp_id":
 			// icmp_id:<number>
 			if rule.ContentRuleConfig.IcmpConfig == nil {
 				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
 			}
-			rule.ContentRuleConfig.IcmpConfig.ICMPId = atoi(vStr)
+			num := atoi(vStr)
+			rule.ContentRuleConfig.IcmpConfig.ICMPId = &num
 		case "icmp_seq":
 			// icmp_seq:<number>;
 			if rule.ContentRuleConfig.IcmpConfig == nil {
 				rule.ContentRuleConfig.IcmpConfig = &ICMPLayerRule{}
 			}
-			rule.ContentRuleConfig.IcmpConfig.ICMPSeq = atoi(vStr)
-
+			num := atoi(vStr)
+			rule.ContentRuleConfig.IcmpConfig.ICMPSeq = &num
 		case "nocase":
 			contentRule.Nocase = true
 		case "depth":
@@ -438,61 +445,12 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			if rule.ContentRuleConfig.TcpConfig == nil {
 				rule.ContentRuleConfig.TcpConfig = &TCPLayerRule{}
 			}
-			switch {
-			case strings.HasPrefix(vStr, "<"):
-				if len(vStr) <= 1 {
-					log.Errorf("tcp.mss parse err:%s", vStr)
-					continue
-				}
-				vStr = vStr[1:]
-				num, err := strconv.Atoi(vStr)
-				if err != nil {
-					log.Errorf("tcp.mss parse err: %s: %v", vStr, err)
-					continue
-				}
-				rule.ContentRuleConfig.TcpConfig.TCPMssOp = 3
-				rule.ContentRuleConfig.TcpConfig.TCPMssNum1 = num
-			case strings.HasPrefix(vStr, ">"):
-				if len(vStr) <= 1 {
-					log.Errorf("tcp.mss parse err:%s", vStr)
-					continue
-				}
-				vStr = vStr[1:]
-				num, err := strconv.Atoi(vStr)
-				if err != nil {
-					log.Errorf("tcp.mss parse err: %s: %v", vStr, err)
-					continue
-				}
-				rule.ContentRuleConfig.TcpConfig.TCPMssOp = 2
-				rule.ContentRuleConfig.TcpConfig.TCPMssNum1 = num
-			case strings.Contains(vStr, "-"):
-				nums := strings.Split(vStr, "-")
-				if len(nums) != 2 {
-					log.Errorf("tcp.mss parse err:%s", vStr)
-					continue
-				}
-				num1, err := strconv.Atoi(nums[0])
-				if err != nil {
-					log.Errorf("tcp.mss parse err: %s: %v", vStr, err)
-					continue
-				}
-				num2, err := strconv.Atoi(nums[1])
-				if err != nil {
-					log.Errorf("tcp.mss parse err: %s: %v", vStr, err)
-					continue
-				}
-				rule.ContentRuleConfig.TcpConfig.TCPMssOp = 4
-				rule.ContentRuleConfig.TcpConfig.TCPMssNum1 = num1
-				rule.ContentRuleConfig.TcpConfig.TCPMssNum2 = num2
-			default:
-				num, err := strconv.Atoi(vStr)
-				if err != nil {
-					log.Errorf("tcp.mss parse err: %s: %v", vStr, err)
-					continue
-				}
-				rule.ContentRuleConfig.TcpConfig.TCPMssOp = 1
-				rule.ContentRuleConfig.TcpConfig.TCPMssNum1 = num
+			numRange, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				log.Errorf("parse tcp.mss err:%v", err)
+				continue
 			}
+			rule.ContentRuleConfig.TcpConfig.TCPMss = numRange
 		case "fast_pattern":
 			contentRule.FastPattern = true
 		case "flowbits":

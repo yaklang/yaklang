@@ -124,6 +124,8 @@ func matchMutex(c *matchContext) error {
 		c.Attach(ipMatcher, portMatcher, tcpIniter)
 	case protocol.UDP:
 		c.Attach(ipMatcher, portMatcher, udpIniter)
+	case protocol.ICMP:
+		c.Attach(ipMatcher, icmpIniter)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
 	}

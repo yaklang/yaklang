@@ -1,17 +1,13 @@
 package rule
 
-type ICMPLayerRule struct {
-	IType        string // itype
-	ICode        string // icode
-	ICMPId       int    //  icmp_id
-	ICMPSeq      int
-	ICMPv4Header bool
-	ICMPv6Header bool
-	ICMPv6MTU    string
-}
+import "github.com/yaklang/yaklang/common/suricata/data/numrange"
 
-type UDPLayerRule struct {
-	UDPHeader bool
+type ICMPLayerRule struct {
+	IType     *numrange.NumRange // itype
+	ICode     *numrange.NumRange // icode
+	ICMPId    *int               // icmp_id
+	ICMPSeq   *int
+	ICMPv6MTU *numrange.NumRange
 }
 
 type IPLayerRule struct {
@@ -47,15 +43,7 @@ type DNSRule struct {
 type HTTPConfig struct {
 	// deprecated and not implemented
 	Uricontent string
-
-	// not set 0
-	// equal 1
-	// bigger than 2
-	// smaller than 3
-	// between 4
-	UrilenOp   int
-	UrilenNum1 int
-	UrilenNum2 int
+	UrilenOp   *numrange.NumRange
 }
 
 type TCPLayerRule struct {
@@ -63,13 +51,6 @@ type TCPLayerRule struct {
 	Ack            *int
 	NegativeWindow bool
 	Window         *int
-	// not set 0
-	// equal 1
-	// bigger than 2
-	// smaller than 3
-	// between 4
-	TCPMssOp   int
-	TCPMssNum1 int
-	TCPMssNum2 int
-	Flags      string
+	TCPMss         *numrange.NumRange
+	Flags          string
 }
