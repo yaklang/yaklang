@@ -27,6 +27,9 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert icmp any any -> any any (msg:"GPL SCAN SolarWinds IP scan attempt"; icode:0; itype:8; content:"SolarWinds.Net"; nocase; classtype:network-scan; sid:2101918; rev:7; metadata:created_at 2010_09_23, updated_at 2010_09_23;)`,
+	},
+	{
 		rule: `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
 	},
 	{
@@ -89,11 +92,6 @@ var rules = []*ruleTest{
 	{
 		rule: `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 	},
-	//{
-	//	id:           "debug",
-	//	rule:         `alert http any any -> any any (msg:"CobatlStrikt team servers 200 OK Space"; flow:from_server,established; content:"200"; http_stat_code; content:"HTTP/1.1 200 OK|20|"; threshold: type both, track by_src, count 3, seconds 60; reference:url,blog.fox-it.com/2019/02/26/identifying-cobalt-strike-team-servers-in-the-wild/;  sid:3016011; rev:1; metadata:created_at 2019_02_27,by al0ne;)`,
-	//	trafficCount: 3,
-	//},
 }
 
 const moreDemo = `
@@ -141,8 +139,6 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 				// pack packet for match
 				pk, err = pcapx.PacketBuilder(
 					pcapx.WithPayload(payload),
-					pcapx.WithEthernet_SrcMac("00:0c:29:4f:8e:8f"),
-					pcapx.WithEthernet_DstMac("00:0c:29:4f:8e:81"),
 					pcapx.WithIPv4_SrcIP("1.1.1.1"),
 					pcapx.WithIPv4_DstIP("2.2.2.2"),
 				)
@@ -213,6 +209,8 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 					return
 				}
 				pk = buffer.Bytes()
+			} else if rr.Protocol == protocol.ICMP {
+				pk = result.ICMPIPInboundPayload
 			} else {
 				panic("not implement")
 			}

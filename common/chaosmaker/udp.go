@@ -46,9 +46,12 @@ type udpGenerator struct {
 }
 
 func (t *udpGenerator) generator(count int) {
+	defer close(t.out)
+
 	surigen, err := generate.New(t.originRule)
 	if err != nil {
-		log.Warnf("new generator failed: %v", err)
+		log.Errorf("new generator failed: %v", err)
+		return
 	}
 	var toServer = true
 	var toClient = true
@@ -73,5 +76,4 @@ func (t *udpGenerator) generator(count int) {
 			}
 		}
 	}
-	close(t.out)
 }

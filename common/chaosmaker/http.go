@@ -48,16 +48,16 @@ type httpGenerator struct {
 }
 
 func (h *httpGenerator) generator(count int) {
+	defer close(h.out)
+
 	surigen, err := generate.New(h.originRule)
 	if err != nil {
-		log.Warnf("new generator failed: %v", err)
+		log.Errorf("new generator failed: %v", err)
 	}
 
 	for i := 0; i < count; i++ {
 		h.toChaosTraffic(surigen.Gen())
 	}
-
-	close(h.out)
 }
 
 func (h *httpGenerator) toChaosTraffic(raw []byte) {
