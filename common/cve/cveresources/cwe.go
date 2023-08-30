@@ -128,3 +128,11 @@ func YieldCWEs(db *gorm.DB, ctx context.Context) chan *CWE {
 	}()
 	return outC
 }
+
+func GetCWEById(db *gorm.DB, id int) (*CWE, error) {
+	var cwe CWE
+	if db = db.Where("id = ?", id).First(&cwe); db.Error != nil {
+		return nil, db.Error
+	}
+	return &cwe, nil
+}

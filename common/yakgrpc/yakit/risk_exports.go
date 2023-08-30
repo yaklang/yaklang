@@ -369,6 +369,9 @@ func _saveRisk(r *Risk) error {
 			r.CveAccessComplexity = cveData.AccessComplexity
 		}
 	}
+	if r.Description == "" && r.Solution == "" {
+		r.Description, r.Solution = SolutionAndDescriptionByCWE(r.FromYakScript, r.RiskTypeVerbose, r.TitleVerbose)
+	}
 	count := 0
 	for {
 		count++
@@ -663,3 +666,46 @@ func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
 //
 //	}
 //)
+
+func SolutionAndDescriptionByCWE(FromYakScript, RiskTypeVerbose, TitleVerbose string) (description, solution string) {
+	riskTypeList := map[string]int{
+		"SQL":    89,
+		"XSS":    79,
+		"命令执行":   77,
+		"命令注入":   77,
+		"代码执行":   94,
+		"代码注入":   94,
+		"CSRF":   352,
+		"文件包含":   41,
+		"文件读取":   41,
+		"文件下载":   41,
+		"文件写入":   434,
+		"文件上传":   434,
+		"XXE":    91,
+		"XML":    91,
+		"反序列化":   502,
+		"未授权访问":  552,
+		"路径遍历":   22,
+		"敏感信息泄漏": 200,
+		"身份验证错误": 1211,
+		"权限提升":   271,
+		"业务逻辑漏洞": 840,
+		"默认配置漏洞": 1188,
+		"弱口令":    1391,
+		"SSRF":   918,
+	}
+	for k, v := range riskTypeList {
+		if strings.Contains(FromYakScript, k) || strings.Contains(RiskTypeVerbose, k) || strings.Contains(TitleVerbose, k) {
+			cweDb := consts.GetGormCVEDatabase()
+			if cweDb != nil {
+				cweData, _ := cveresources.GetCWEById(cweDb, v)
+				if cweData != nil {
+					description = cweData.DescriptionZh
+					solution = cweData.ExtendedDescriptionZh
+					return description, solution
+				}
+			}
+		}
+	}
+	return "", ""
+}
