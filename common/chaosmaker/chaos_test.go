@@ -27,7 +27,13 @@ type ruleTest struct {
 // test table
 var rules = []*ruleTest{
 	{
+		rule: `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
+	},
+	{
 		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	},
+	{
+		rule: `alert udp any any -> any 53 (msg:"Observed DNS Query to public CryptoMining pool Domain (backup-pool.com)"; content:"|01|"; offset:2; depth:1; content:"|00 01 00 00 00 00 00|"; distance:1; within:8; content:"|0b|backup-pool|03|com|00|"; nocase; distance:0; fast_pattern; classtype:coin-mining; sid:3017009; rev:1;)`,
 	},
 	{
 		rule: `alert tcp any any -> any 3306 (msg:"ET SCAN MYSQL 4.0 brute force root login attempt"; flow:to_server,established; content:"|01|"; offset:3; depth:4; content:"root|00|"; nocase; distance:5; within:10; threshold:type both,track by_src,count 5,seconds 60; reference:url,www.redferni.uklinux.net/mysql/MySQL-323.html; reference:url,doc.emergingthreats.net/2001906; classtype:protocol-command-decode; sid:2001906; rev:6; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
@@ -88,17 +94,6 @@ var rules = []*ruleTest{
 	//	rule:         `alert http any any -> any any (msg:"CobatlStrikt team servers 200 OK Space"; flow:from_server,established; content:"200"; http_stat_code; content:"HTTP/1.1 200 OK|20|"; threshold: type both, track by_src, count 3, seconds 60; reference:url,blog.fox-it.com/2019/02/26/identifying-cobalt-strike-team-servers-in-the-wild/;  sid:3016011; rev:1; metadata:created_at 2019_02_27,by al0ne;)`,
 	//	trafficCount: 3,
 	//},
-	//{
-	//	rule:         `alert udp any any -> any 53 (msg:"Observed DNS Query to public CryptoMining pool Domain (backup-pool.com)"; content:"|01|"; offset:2; depth:1; content:"|00 01 00 00 00 00 00|"; distance:1; within:7; content:"|0b|backup-pool|03|com|00|"; nocase; distance:0; fast_pattern; classtype:coin-mining; sid:3017009; rev:1;)`,
-	//	trafficCount: 2,
-	//	id:           "debug",
-	//},
-	//
-	//{
-	//	rule:         `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
-	//	trafficCount: 1,
-	//	id:           "debug",
-	//},
 }
 
 const moreDemo = `
@@ -109,7 +104,7 @@ alert tcp $HOME_NET any -> any 3306 (msg: "mysql general_log write file"; flow: 
 func TestChaosMaker_ApplyAll(t *testing.T) {
 }
 
-func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
+func TestMUSTPASS_CrossVerify(t *testing.T) {
 	for _, r := range rules {
 		rules, err := surirule.Parse(r.rule)
 		// single rule
@@ -174,6 +169,52 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 					return
 				}
 				pk = buffer.Bytes()
+			} else if rr.Protocol == protocol.UDP {
+				buffer := gopacket.NewSerializeBuffer()
+				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
+				if err != nil {
+					t.Log(err)
+					linklayer = &layers.Ethernet{
+						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
+						EthernetType: layers.EthernetTypeIPv4,
+					}
+				}
+				var payload []byte
+				if result.UDPIPOutboundPayload != nil {
+					payload = result.UDPIPOutboundPayload
+				} else {
+					payload = result.UDPIPInboundPayload
+				}
+				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
+					linklayer,
+					gopacket.Payload(payload),
+				); err != nil {
+					t.Error(err)
+					return
+				}
+				pk = buffer.Bytes()
+			} else if rr.Protocol == protocol.DNS {
+				buffer := gopacket.NewSerializeBuffer()
+				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
+				if err != nil {
+					t.Log(err)
+					linklayer = &layers.Ethernet{
+						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
+						EthernetType: layers.EthernetTypeIPv4,
+					}
+				}
+				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
+					linklayer,
+					gopacket.Payload(result.UDPIPInboundPayload),
+				); err != nil {
+					t.Error(err)
+					return
+				}
+				pk = buffer.Bytes()
+			} else {
+				panic("not implement")
 			}
 			if !match.New(rr).Match(pk) {
 				spew.Dump(rr.Raw)
@@ -183,12 +224,7 @@ func TestMUSTPASS_HttpGenerate_CrossVerify(t *testing.T) {
 
 			matchedCount++
 		}
-		var need int
-		if rr.Protocol == protocol.HTTP {
-			need = 5
-		} else if rr.Protocol == protocol.TCP {
-			need = utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
-		}
+		need := utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
 		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
 need: %d
 got: %d

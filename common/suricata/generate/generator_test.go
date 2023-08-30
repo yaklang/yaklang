@@ -31,8 +31,10 @@ func TestNewSurigen(t *testing.T) {
 }
 
 var gen_testcases = []string{
+	`alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"ET SCAN Potential SSH Scan"; flow:to_server; flags:S,12; threshold: type both, track by_src, count 5, seconds 120; reference:url,en.wikipedia.org/wiki/Brute_force_attack; reference:url,doc.emergingthreats.net/2001219; classtype:attempted-recon; sid:2001219; rev:20; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 	"alert tcp $HOME_NET any -> $EXTERNAL_NET $HTTP_PORTS (msg:\"ET TROJAN Win32/Agent.NJX Checkin\"; flow:established,to_server; content:\"/checkin.php?\"; http_uri; content:\"User-Agent|3a| Mozilla/4.0 (compatible|3b| MSIE 6.0|3b| Windows NT 5.1|3b| SV1)\"; http_header; fast_pattern:only; content:\"Host|3a| www.51yund.com|0d 0a|\"; http_header; metadata:ruleset community, service http; reference:url,www.threatexpert.com/report.aspx?md5=3d1b0b6a0b0b0b0b0b0b0b0b0b0b0b0b; classtype:trojan-activity; sid:2014144; rev:3;)",
 	`alert http any any -> any any (msg:"config.pinyin.sogou";http.server;content:nginx;http.server_body;content:"[setting]|0a|";pcre:"/([a-z]+=\\d+\\s?)+/iRQ";)`,
+	`alert udp $EXTERNAL_NET any -> $HOME_NET 69 (msg:"ET SCAN Cisco Torch TFTP Scan"; content:"|52 61 6E 64 30 6D 53 54 52 49 4E 47 00 6E 65 74 61 73 63 69 69|"; offset:2; depth:21; reference:url,www.hackingexposedcisco.com/?link=tools; reference:url,www.securiteam.com/tools/5EP0F1FEUA.html; reference:url,doc.emergingthreats.net/2008414; classtype:attempted-recon; sid:2008414; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 }
 
 func TestGen(t *testing.T) {
