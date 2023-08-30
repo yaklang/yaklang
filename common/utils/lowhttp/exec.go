@@ -409,7 +409,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
-			r = UrlToGetRequestPacket(targetUrl, r, forceHttps, ExtractCookieJarFromHTTPResponse(lastPacket.Response)...)
+			r = UrlToGetRequestPacketWithResponse(targetUrl, r, lastPacket.Response, forceHttps, ExtractCookieJarFromHTTPResponse(lastPacket.Response)...)
 			nextHost, nextPort, _ := utils.ParseStringToHostPort(targetUrl)
 			log.Debugf("[lowhttp] redirect to: %s", targetUrl)
 
