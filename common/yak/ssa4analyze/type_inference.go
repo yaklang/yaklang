@@ -224,14 +224,12 @@ func (t *TypeInference) TypeInferenceInterface(i *ssa.Interface) bool {
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
 	// use interface
-	if i, ok := f.I.(*ssa.Interface); ok {
-		if _, ok := t.Finish[i]; ok {
-			interfaceTyp := i.GetType()[0].(*ssa.InterfaceType)
-			f.SetType(interfaceTyp.GetField(f.Key))
-			// TODO: check all update type
+	if _, ok := t.Finish[f.I]; ok {
+		interfaceTyp := f.I.GetType()[0].(*ssa.InterfaceType)
+		f.SetType(interfaceTyp.GetField(f.Key))
+		// TODO: check all update type
 
-			return true
-		}
+		return true
 	}
 
 	// use update
