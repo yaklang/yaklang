@@ -10,7 +10,7 @@ var (
 	UnDefineConst = &Const{
 		user:  []User{},
 		value: nil,
-		typ:   []Type{BasicTypesKind[UndefineType]},
+		typ:   BasicTypesKind[UndefineType],
 		str:   "Undefine",
 		Unary: 0,
 	}
@@ -33,7 +33,7 @@ func NewConst(i any) *Const {
 	c := &Const{
 		user:  make([]User, 0),
 		value: i,
-		typ:   Types{typ},
+		typ:   typ,
 		str:   fmt.Sprintf("%v", i),
 	}
 	// const should same
@@ -43,7 +43,7 @@ func NewConst(i any) *Const {
 }
 
 func (c *Const) IsBoolean() bool {
-	return c.typ[0] == BasicTypesKind[Boolean]
+	return c.typ == BasicTypesKind[Boolean]
 }
 
 func (c *Const) Boolean() bool {
@@ -51,7 +51,7 @@ func (c *Const) Boolean() bool {
 }
 
 func (c *Const) IsNumber() bool {
-	return c.typ[0] == BasicTypesKind[Number]
+	return c.typ == BasicTypesKind[Number]
 }
 
 func (c *Const) Number() int64 {
@@ -81,7 +81,7 @@ func (c *Const) Number() int64 {
 }
 
 func (c *Const) IsFloat() bool {
-	return c.typ[0] == BasicTypesKind[Number]
+	return c.typ == BasicTypesKind[Number]
 }
 
 func (c *Const) Float() float64 {
@@ -95,7 +95,7 @@ func (c *Const) Float() float64 {
 }
 
 func (c *Const) IsString() bool {
-	return c.typ[0] == BasicTypesKind[String]
+	return c.typ == BasicTypesKind[String]
 }
 
 func (c *Const) VarString() string {
