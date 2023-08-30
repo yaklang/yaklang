@@ -157,7 +157,7 @@ func funcDescriptionAndDeclaration(f interface{}, overideName string, debug ...s
 	if declaration == "" {
 		declaration = fmt.Sprintf("%#v", f)
 		// 去除地址
-		addressIndex := strings.LastIndex(declaration, "(")
+		addressIndex := strings.LastIndexByte(declaration, '(')
 		declaration = declaration[:addressIndex]
 		// 去除左右括号
 		declaration = strings.TrimLeft(declaration, "(")
