@@ -195,6 +195,7 @@ const (
 	Yak_QueryICMPTrigger_FullMethodName                           = "/ypb.Yak/QueryICMPTrigger"
 	Yak_RequireRandomPortToken_FullMethodName                     = "/ypb.Yak/RequireRandomPortToken"
 	Yak_QueryRandomPortTrigger_FullMethodName                     = "/ypb.Yak/QueryRandomPortTrigger"
+	Yak_QuerySupportedDnsLogPlatforms_FullMethodName              = "/ypb.Yak/QuerySupportedDnsLogPlatforms"
 	Yak_GetAvailableYakScriptTags_FullMethodName                  = "/ypb.Yak/GetAvailableYakScriptTags"
 	Yak_ForceUpdateAvailableYakScriptTags_FullMethodName          = "/ypb.Yak/ForceUpdateAvailableYakScriptTags"
 	Yak_ExecYakitPluginsByYakScriptFilter_FullMethodName          = "/ypb.Yak/ExecYakitPluginsByYakScriptFilter"
@@ -504,6 +505,7 @@ type YakClient interface {
 	QueryICMPTrigger(ctx context.Context, in *QueryICMPTriggerRequest, opts ...grpc.CallOption) (*QueryICMPTriggerResponse, error)
 	RequireRandomPortToken(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RandomPortInfo, error)
 	QueryRandomPortTrigger(ctx context.Context, in *QueryRandomPortTriggerRequest, opts ...grpc.CallOption) (*RandomPortTriggerNotification, error)
+	QuerySupportedDnsLogPlatforms(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QuerySupportedDnsLogPlatformsResponse, error)
 	// 获取 Tags
 	GetAvailableYakScriptTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	ForceUpdateAvailableYakScriptTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
@@ -2735,6 +2737,15 @@ func (c *yakClient) QueryRandomPortTrigger(ctx context.Context, in *QueryRandomP
 	return out, nil
 }
 
+func (c *yakClient) QuerySupportedDnsLogPlatforms(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QuerySupportedDnsLogPlatformsResponse, error) {
+	out := new(QuerySupportedDnsLogPlatformsResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySupportedDnsLogPlatforms_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAvailableYakScriptTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error) {
 	out := new(Fields)
 	err := c.cc.Invoke(ctx, Yak_GetAvailableYakScriptTags_FullMethodName, in, out, opts...)
@@ -4260,6 +4271,7 @@ type YakServer interface {
 	QueryICMPTrigger(context.Context, *QueryICMPTriggerRequest) (*QueryICMPTriggerResponse, error)
 	RequireRandomPortToken(context.Context, *Empty) (*RandomPortInfo, error)
 	QueryRandomPortTrigger(context.Context, *QueryRandomPortTriggerRequest) (*RandomPortTriggerNotification, error)
+	QuerySupportedDnsLogPlatforms(context.Context, *Empty) (*QuerySupportedDnsLogPlatformsResponse, error)
 	// 获取 Tags
 	GetAvailableYakScriptTags(context.Context, *Empty) (*Fields, error)
 	ForceUpdateAvailableYakScriptTags(context.Context, *Empty) (*Empty, error)
@@ -4929,6 +4941,9 @@ func (UnimplementedYakServer) RequireRandomPortToken(context.Context, *Empty) (*
 }
 func (UnimplementedYakServer) QueryRandomPortTrigger(context.Context, *QueryRandomPortTriggerRequest) (*RandomPortTriggerNotification, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryRandomPortTrigger not implemented")
+}
+func (UnimplementedYakServer) QuerySupportedDnsLogPlatforms(context.Context, *Empty) (*QuerySupportedDnsLogPlatformsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySupportedDnsLogPlatforms not implemented")
 }
 func (UnimplementedYakServer) GetAvailableYakScriptTags(context.Context, *Empty) (*Fields, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAvailableYakScriptTags not implemented")
@@ -8482,6 +8497,24 @@ func _Yak_QueryRandomPortTrigger_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySupportedDnsLogPlatforms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySupportedDnsLogPlatforms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySupportedDnsLogPlatforms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySupportedDnsLogPlatforms(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAvailableYakScriptTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -10884,6 +10917,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryRandomPortTrigger",
 			Handler:    _Yak_QueryRandomPortTrigger_Handler,
+		},
+		{
+			MethodName: "QuerySupportedDnsLogPlatforms",
+			Handler:    _Yak_QuerySupportedDnsLogPlatforms_Handler,
 		},
 		{
 			MethodName: "GetAvailableYakScriptTags",
