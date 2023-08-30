@@ -1,16 +1,13 @@
 package ssa
 
-func NewPhi(f *Function, block *BasicBlock, variable string) *Phi {
-	return &Phi{
-		anInstruction: anInstruction{
-			Func:  f,
-			Block: block,
-			typs:  make(Types, 0),
-			pos:   &Position{},
-		},
-		Edge: make([]Value, 0, len(block.Preds)),
-		user: make([]User, 0),
+func NewPhi(block *BasicBlock, variable string) *Phi {
+	p := &Phi{
+		anInstruction: newAnInstuction(block),
+		Edge:          make([]Value, 0, len(block.Preds)),
+		user:          make([]User, 0),
 	}
+	p.SetVariable(variable)
+	return p
 }
 
 func (phi *Phi) Name() string { return phi.GetVariable() }
