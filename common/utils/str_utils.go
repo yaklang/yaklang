@@ -549,7 +549,7 @@ func AppendDefaultPort(raw string, port int) string {
 
 func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	if strings.Contains(raw, "://") {
-		urlObject := ParseStringToUrl(raw)
+		urlObject, _ := url.Parse(raw)
 		if urlObject != nil {
 			// 处理 URL
 			portRaw := urlObject.Port()
