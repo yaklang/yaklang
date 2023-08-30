@@ -102,7 +102,7 @@ func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
 	var count = 0
 	for {
 		count++
-		domain, token, err := broke.Require(30*time.Second, "http://192.168.3.113:9999")
+		domain, token, err := broke.Require(15 * time.Second)
 		if err != nil {
 			if count > 3 {
 				return "", "", "", utils.Errorf("require dns domain failed: %s", err)
@@ -344,7 +344,7 @@ func QueryExistedDNSLogEventsByLocalEx(token, mode string, timeout ...float64) (
 	var count = 0
 	for {
 		count++
-		results, err := broker.GetResult(token, 30*time.Second, "http://192.168.3.113:9999")
+		results, err := broker.GetResult(token, 15*time.Second)
 		if err != nil {
 			if count > 3 {
 				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())
