@@ -167,10 +167,11 @@ func TestConnectExtractedUrl(t *testing.T) {
 	}{
 		{url: "http://baidu.com/a?c=1", packet: `POST a?c=1 HTTP/1.1
 Host: baidu.com`},
-		{url: "http://baidu.com:11/./a?c=1", packet: "POST /./a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
-		{url: "http://baidu.com:11//a?c=1", packet: "POST //a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
 		{url: "http://baidu.com:11/a?c=1", packet: `POST a?c=1 HTTP/1.1
 Host: baidu.com:11`},
+		{url: "http://baidu.com:11/./a?c=1", packet: "POST /./a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
+		{url: "http://baidu.com:11//a?c=1", packet: "POST //a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
+
 		{url: "http://baidu.com:11/?c=1", packet: `POST ?c=1 HTTP/1.1
 Host: baidu.com:11`},
 		{url: "http://baidu.com:11/", packet: `POST http://baidu.com:11/ HTTP/1.1`},
@@ -200,6 +201,7 @@ Host: www.example.com`},
 			return
 		}
 		if u.String() != testcase.url {
+			fmt.Println(string(testcase.packet))
 			t.Fatalf("url not match: %s != %s", u.String(), testcase.url)
 		} else {
 			t.Logf("url match: %v == %v", u.String(), testcase.url)
