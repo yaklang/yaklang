@@ -265,14 +265,29 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		}
 	}
 
+	hostInHeader := getHeaderValue(req.Header, "host")
+
 	var buf bytes.Buffer
 	buf.WriteString(req.Method)
 	buf.WriteString(" ")
-	if req.RequestURI == "" {
-		buf.WriteString(req.URL.RequestURI())
+	if req.URL.Host != "" && (req.URL.Host == hostInHeader || req.URL.Host == req.Host) {
+		buf.WriteString(req.URL.Path)
+		if req.URL.RawQuery != "" {
+			buf.WriteString("?")
+			buf.WriteString(req.URL.RawQuery)
+		}
+		if req.URL.Fragment != "" {
+			buf.WriteString("#")
+			buf.WriteString(req.URL.Fragment)
+		}
 	} else {
-		buf.WriteString(req.RequestURI)
+		buf.WriteString(req.URL.RequestURI())
 	}
+	//if req.RequestURI == "" {
+	//
+	//} else {
+	//	buf.WriteString(req.RequestURI)
+	//}
 	buf.WriteString(" ")
 	if h2 {
 		req.Proto = "HTTP/2.0"
