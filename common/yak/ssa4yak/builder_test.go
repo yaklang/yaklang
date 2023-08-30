@@ -422,6 +422,33 @@ entry0:
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
+
+	t.Run("memeber call", func(t *testing.T) {
+		code := `
+a = {"c":1}
+b = "c"
+print(a.c)
+print(a.$b)
+a.c  = 2
+a.$b = 3
+a = 11
+	`
+		ir := `
+yak-main
+entry0: (true)
+		<map[string]number> t0 = Interface map[string]number [<number> 1, <number> 1]
+		<number> t1 = <map[string]number> t0 field[<string> c]
+		update [<number> t1] = <number> 1
+		<> t3 = call <undefine> Undefine (<number> t1) []
+		<> t4 = call <undefine> Undefine (<number> t1) []
+		update [<number> t1] = <number> 2
+		update [<number> t1] = <number> 3
+	`
+		prog := ParseSSA(code)
+		prog.Show()
+		CheckProgram(t, prog)
+		CompareYakMain(t, prog, ir)
+	})
 }
 
 func TestIfStmt(t *testing.T) {
