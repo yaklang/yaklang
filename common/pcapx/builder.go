@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"net"
 )
 
 var (
@@ -124,18 +125,20 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	var linkLayer *layers.Ethernet
 	if baseConfig.Loopback {
 		linkLayer = &layers.Ethernet{EthernetType: layers.EthernetTypeIPv4}
+	} else if ethernetConfig != nil {
+		linkLayer = ethernetConfig
 	} else {
-		if ethernetConfig == nil {
-			var err error
-			linkLayer, err = GetPublicToServerLinkLayerIPv4()
-			if err != nil {
-				return nil, utils.Errorf("PacketBuilder: %v", err)
+		var err error
+		linkLayer, err = GetPublicToServerLinkLayerIPv4()
+		if err != nil {
+			log.Errorf("PacketBuilder: %v", err)
+			linkLayer = &layers.Ethernet{
+				EthernetType: layers.EthernetTypeIPv4,
+				SrcMAC:       net.HardwareAddr{0, 0, 0, 0, 0, 1},
+				DstMAC:       net.HardwareAddr{0, 0, 0, 0, 0, 2},
 			}
-		} else {
-			linkLayer = ethernetConfig
 		}
 	}
-	_ = linkLayer
 
 	/*
 		check network layer?
