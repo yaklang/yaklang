@@ -301,10 +301,53 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 
 	// uri is very complex
 	// utf8 valid or not
-	req.URL = ParseStringToUrl(req.RequestURI)
-	if req.URL == nil {
-		return nil, Errorf("BUG: ParseStringToUrl(%v) return nil", req.RequestURI)
+	before, fragment, haveFragment := strings.Cut(req.RequestURI, "#")
+	urlIns, _ := url.ParseRequestURI(before)
+	if urlIns == nil {
+		// remove : begin
+		// utf8 invalid
+		urlIns = new(url.URL)
+		if method == "CONNECT" {
+			// if connect, the uri should be host:port
+			var host, port, _ = ParseStringToHostPort(before)
+			if port > 0 {
+				urlIns.Host = HostPort(host, port)
+			} else {
+				urlIns.Host = before
+			}
+		} else {
+			var after = req.RequestURI
+			if IsHttpOrHttpsUrl(req.RequestURI) {
+				var schemaRaw, rest, ok = strings.Cut(req.RequestURI, "://")
+				if ok {
+					urlIns.Scheme = schemaRaw
+					after = rest
+				}
+			}
+			if strings.HasPrefix(after, "/") {
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			} else if strings.Contains(after, "/") {
+				var hostraw, after, _ = strings.Cut(after, "/")
+				after = "/" + after
+				if strings.Contains(hostraw, "@") {
+					var userinfo, hostport string
+					userinfo, hostport, _ = strings.Cut(hostraw, "@")
+					urlIns.User = url.UserPassword(userinfo, "")
+					urlIns.Host = hostport
+				} else {
+					urlIns.Host = hostraw
+				}
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			} else {
+				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
+			}
+		}
 	}
+	if urlIns != nil && haveFragment {
+		urlIns.Fragment = fragment
+	}
+
+	// handle host
 	hostInURL = req.URL.Host
 	if ret := strings.LastIndex(hostInURL, ":"); ret >= 0 {
 		hostname, portStr := strings.TrimSpace(hostInURL[:ret]), codec.Atoi(hostInURL[ret+1:])
