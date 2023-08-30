@@ -22,14 +22,14 @@ Host: baidu.com
 Cookie: test=12;`), false)
 	wantResult := `GET /asd HTTP/1.1
 Host: baidu.com
-Cookie: test=12
 User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
+Cookie: test=12
 `
 	CheckResponse(t, result, wantResult)
 }
 
 func TestUrlToGetRequestPacket302(t *testing.T) {
-	resp := []byte(`HTTP/1.1 307
+	resp := []byte(`HTTP/1.1 302
 	Set-Cookie: test2=34;`)
 	respcookies := ExtractCookieJarFromHTTPResponse(resp)
 	result := UrlToGetRequestPacketWithResponse("https://baidu.com/qwe", []byte(`POST /asd HTTP/1.1
@@ -37,8 +37,8 @@ Host: baidu.com
 Cookie: test=12;`), resp, false, respcookies...)
 	wantResult := `GET /qwe HTTP/1.1
 Host: baidu.com
-Cookie: test=12
 User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
+Cookie: test=12
 `
 	CheckResponse(t, result, wantResult)
 }
