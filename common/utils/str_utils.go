@@ -312,7 +312,7 @@ func AsciiBytesToRegexpMatchedString(in []byte) string {
 }
 
 func stripPort(hostport string) string {
-	colon := strings.LastIndexByte(hostport, ':')
+	colon := strings.IndexByte(hostport, ':')
 	if colon == -1 {
 		return hostport
 	}
@@ -323,7 +323,7 @@ func stripPort(hostport string) string {
 }
 
 func portOnly(hostport string) string {
-	colon := strings.LastIndexByte(hostport, ':')
+	colon := strings.IndexByte(hostport, ':')
 	if colon == -1 {
 		return ""
 	}

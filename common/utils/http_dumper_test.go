@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"io"
 	"testing"
@@ -45,6 +46,18 @@ func TestHTTPRequestDumper_Stream_BodyIsLager(t *testing.T) {
 	if req.ContentLength != 3 {
 		t.Fatal("ContentLength should be 3")
 	}
+}
+
+func TestHTTPRequestDumper_C1(t *testing.T) {
+	packet := `GET https://example.com/bac HTTP/1.1` + CRLF +
+		`Host: www.example.com` + CRLF +
+		`Content-Length: 3` + CRLF + CRLF + "abccccddef"
+	req, err := ReadHTTPRequestFromBytes([]byte(packet))
+	if err != nil {
+		panic(err)
+	}
+	raw, _ := DumpHTTPRequest(req, true)
+	fmt.Println(string(raw))
 }
 
 func TestHTTPRequestDumper_Stream_BodyIsSmall(t *testing.T) {
