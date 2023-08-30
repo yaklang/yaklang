@@ -126,7 +126,6 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		linkLayer = &layers.Ethernet{EthernetType: layers.EthernetTypeIPv4}
 	} else {
 		if ethernetConfig == nil {
-			log.Info("PacketBuilder: ethernet layer is empty, use default")
 			var err error
 			linkLayer, err = GetPublicToServerLinkLayerIPv4()
 			if err != nil {
