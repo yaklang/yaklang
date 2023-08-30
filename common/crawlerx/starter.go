@@ -298,6 +298,7 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) error {
 			lowhttp.WithTimeout(30 * time.Second),
 			lowhttp.WithHttps(starter.https),
 			lowhttp.WithSaveHTTPFlow(starter.saveToDB),
+			lowhttp.WithSource("crawlerx"),
 		}
 		if starter.browserConfig.proxyAddress != nil {
 			opts = append(opts, lowhttp.WithProxy(starter.browserConfig.proxyAddress.String()))

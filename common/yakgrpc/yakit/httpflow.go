@@ -53,6 +53,15 @@ func init() {
 					flow.AddTag(reqSource)
 				}
 			}
+			switch ret := strings.ToLower(reqSource); ret {
+			case "mitm":
+				flow.SourceType = "mitm"
+			case "basic-crawler", "crawler", "crawlerx":
+				flow.SourceType = "basic-crawler"
+			case "scan", "port-scan", "plugin":
+				flow.SourceType = "scan"
+
+			}
 			flow.FromPlugin = fromPlugin
 			flow.RuntimeId = runtimeId
 			flow.HiddenIndex = uuid.New().String()
