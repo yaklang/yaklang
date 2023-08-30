@@ -286,14 +286,6 @@ func (p *Parameter) SetType(ts Types) {
 	p.typs = ts
 }
 
-func (p *Parameter) GetVariable() string {
-	return p.variable
-}
-
-func (p *Parameter) SetVariable(name string) {
-	p.variable = name
-}
-
 var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
 
@@ -343,7 +335,6 @@ var _ Instruction = (*Return)(nil)
 // call instruction call method function  with args as argument
 type Call struct {
 	anInstruction
-	variable string
 
 	// for call function
 	Method Value
@@ -424,10 +415,9 @@ const (
 // ----------- BinOp
 type BinOp struct {
 	anInstruction
-	variable string
-	Op       BinaryOpcode
-	X, Y     Value
-	user     []User
+	Op   BinaryOpcode
+	X, Y Value
+	user []User
 }
 
 var _ Value = (*BinOp)(nil)
@@ -448,8 +438,6 @@ const (
 type UnOp struct {
 	anInstruction
 
-	variable string
-
 	Op UnaryOpcode
 	X  Value
 
@@ -467,8 +455,6 @@ var _ Instruction = (*UnOp)(nil)
 // instruction + value + user
 type Interface struct {
 	anInstruction
-
-	variable string
 
 	// when slice
 	low, high, max Value
@@ -494,7 +480,6 @@ var _ Instruction = (*Interface)(nil)
 type Field struct {
 	anInstruction
 
-	variable string
 	// field
 	Key Value
 	I   Value
@@ -523,8 +508,6 @@ type Update struct {
 
 	Value   Value
 	address *Field
-
-	variable string
 }
 
 var _ Node = (*Update)(nil)
