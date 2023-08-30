@@ -40,15 +40,13 @@ func (t *TypeInference) Analyze(config config, prog *ssa.Program) {
 		if !ok {
 			return
 		}
-		// reverse-dfs from user to value
-		// in use-def-chain:  interface->field,
-		// but in type-inference first field then interface
-		for _, value := range value.GetValues() {
-			vInst, ok := value.(ssa.Instruction)
+		// dfs from value to user
+		for _, user := range value.GetUsers() {
+			uInst, ok := user.(ssa.Instruction)
 			if !ok {
 				continue
 			}
-			analyzeInst(vInst)
+			analyzeInst(uInst)
 		}
 	}
 
@@ -77,7 +75,9 @@ func (t *TypeInference) AnalyzeOnInstruction(inst ssa.Instruction) bool {
 	case *ssa.BinOp:
 		return t.TypeInferenceBinOp(inst)
 	case *ssa.Call:
-	// case *ssa.Return:
+		return t.TypeInferenceCall(inst)
+	case *ssa.Return:
+		return t.TypeInferenceReturn(inst)
 	// case *ssa.Switch:
 	// case *ssa.If:
 	case *ssa.Interface:
@@ -255,10 +255,12 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
 	)
 	return true
 }
-func TypeInferenceCall(c *ssa.Call) bool {
+func (t *TypeInference) TypeInferenceCall(c *ssa.Call) bool {
+	// TODO: type inference call
 	return false
 }
 
-func TypeInferenceReturn(r *ssa.Return) bool {
+func (t *TypeInference) TypeInferenceReturn(r *ssa.Return) bool {
+	// TODO: type inference return
 	return false
 }
