@@ -2,8 +2,6 @@ package lowhttp
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	_ "github.com/yaklang/yaklang/common/utils/tlsutils"
 )
@@ -236,4 +237,22 @@ Host: ccc
 	if !bytes.Contains(rsp.RawPacket, []byte("dfa")) {
 		panic(1)
 	}
+}
+
+func TestPoCHTTP(t *testing.T) {
+	HTTP(WithPacketBytes([]byte(`POST /login HTTP/1.1
+Host: oa.fslawyer.org.cn:82
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Cookie: SESSION=MjFmMDI5MDgtZDAyZi00ZDc0LWFlM2YtMzUxY2U2MDJlNmY4
+Origin: http://oa.fslawyer.org.cn:82
+Referer: http://oa.fslawyer.org.cn:82/login.jsp?$=deny
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36
+Content-Length: 474
+
+_csrf=09b1080a-f5f1-4ca1-b9d6-d8c15833db99&username=admin&password=refL8mVwXqFvgDOef%2F%2BSqMqv2aPTg5J%2BSFa2Om1m4QR7Fm86l4WrJnjc4yQEMvYvr97EzQ%2F7CBIqnwsx9NTnvkbPhf%2BdOnVN9A7T9bts2dvjbUb5jkEdEECYKQB7VQRZMxvmVu3qUisim2YaJO8Qc66TtNpvcFqH39bHEZOUn6Cb9f2q%2FgHMwMAUY36xidNj8y4jyFl9NcBL6fvgmraxwp2scbDNNX19utwmn3brGJP3b6HlqZdYIm4FA%2FE7wMg0t02iN7tpXnvxgpVEu7Ze6bCpTH4KIfMtR49%2FcwQ%2BQUtpG%2FgD6l2OrXuJNL1sHDAfBugrK9l6paMb%2F70GlZQEkQ%3D%3D%3A%3A%3AAIiG74Mxr6367FyB0XHOiA%3D%3D`)), WithRedirectTimes(10), WithJsRedirect(true))
 }
