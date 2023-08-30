@@ -91,7 +91,6 @@ func (f *FacadeServer) GetHTTPHandler(isHttps bool) FacadeConnectionHandler {
 		var c net.Conn = peekConn
 		c.SetDeadline(time.Now().Add(3 * time.Second))
 		log.Infof("start to read http request from %s", c.RemoteAddr())
-		//reader := io.TeeReader(c, os.Stdout)
 		req, err := lowhttp.ReadHTTPRequest(bufio.NewReader(c))
 		if err != nil {
 			log.Errorf("read http request from conn[%s] failed", c.RemoteAddr())

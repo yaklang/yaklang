@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
 
@@ -88,7 +89,7 @@ func (p *PortRule) _matchWithoutNegative(i int) bool {
 	if p.Env != "" && p.envTable != nil {
 		result, ok := p.envTable[p.Env]
 		result = strings.TrimSpace(result)
-		if ok && utils.Atoi(result) == i {
+		if ok && codec.Atoi(result) == i {
 			return true
 		}
 	}

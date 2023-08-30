@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
-	"net/http/httputil"
 	"reflect"
 	"strings"
 	"time"
@@ -588,20 +587,20 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 	case http.Request:
 		r := &ret
 		lowhttp.FixRequestHostAndPort(r)
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			return nil, nil, utils.Errorf("dump request out failed: %s", err)
 		}
 		packet = raw
 	case *http.Request:
 		lowhttp.FixRequestHostAndPort(ret)
-		raw, err := httputil.DumpRequest(ret, true)
+		raw, err := utils.DumpHTTPRequest(ret, true)
 		if err != nil {
 			return nil, nil, utils.Errorf("dump request out failed: %s", err)
 		}
 		packet = raw
 	case *yakhttp.YakHttpRequest:
-		raw, err := httputil.DumpRequest(ret.Request, true)
+		raw, err := utils.DumpHTTPRequest(ret.Request, true)
 		if err != nil {
 			return nil, nil, utils.Errorf("dump request out failed: %s", err)
 		}

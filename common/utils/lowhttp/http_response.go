@@ -401,7 +401,7 @@ func ParseBytesToHTTPResponse(res []byte) (*http.Response, error) {
 	if len(res) <= 0 {
 		return nil, utils.Errorf("empty http response")
 	}
-	rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(res)), nil)
+	rsp, err := utils.ReadHTTPResponseFromBytes(res, nil)
 	if err != nil {
 		return nil, err
 	}

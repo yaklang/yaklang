@@ -12,71 +12,52 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
 
-func CopyReader(r io.ReadCloser) (io.ReadCloser, io.ReadCloser, error) {
-	var buf = *bytes.NewBufferString("")
-	if r == nil {
-		return ioutil.NopCloser(bytes.NewBuffer(nil)), ioutil.NopCloser(bytes.NewBuffer(nil)), Errorf("empty input reader")
-	}
+func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback func([]byte) bool, interval time.Duration) {
+	scanner := bufio.NewScanner(rc)
+	scanner.Split(bufio.ScanBytes)
+	ticker := time.Tick(interval)
 
-	if _, err := buf.ReadFrom(r); err != nil {
-		return ioutil.NopCloser(bytes.NewBuffer(nil)), r, err
-	}
-
-	if err := r.Close(); err != nil {
-		return ioutil.NopCloser(bytes.NewBuffer(nil)), r, err
-	}
-
-	return ioutil.NopCloser(&buf), ioutil.NopCloser(bytes.NewReader(buf.Bytes())), nil
-}
-
-func ReaderToReaderCloser(body io.Reader) io.ReadCloser {
-	if body == nil {
-		return nil
-	}
-
-	rc, ok := body.(io.ReadCloser)
-	if !ok {
-		rc = ioutil.NopCloser(body)
-	}
-	return rc
-}
-
-func ReadWithChunkLen(raw []byte, length int) chan []byte {
-	outC := make(chan []byte)
+	// one go routine to read
+	var (
+		mux = new(sync.Mutex)
+		buf []byte
+	)
 	go func() {
-		defer close(outC)
-
-		scanner := bufio.NewScanner(bytes.NewBuffer(raw))
-		scanner.Split(bufio.ScanBytes)
-
-		buffer := []byte{}
-		n := 0
 		for scanner.Scan() {
-			buff := scanner.Bytes()
-			buffSize := len(buff)
-			n += buffSize
-			buffer = append(buffer, buff...)
-
-			if n >= length {
-				outC <- buffer
-				n = 0
-				buffer = []byte{}
+			// 根据上下文退出
+			if ctx.Err() != nil {
+				break
 			}
-		}
 
-		if len(buffer) > 0 {
-			outC <- buffer
+			// 临时读一下现有指纹信息
+			mux.Lock()
+			buf = append(buf, scanner.Bytes()...)
+			mux.Unlock()
 		}
 	}()
-	return outC
-}
 
-func BufReadLen(r io.Reader, length uint64) ([]byte, error) {
-	return nil, nil
+	defer callback(buf)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker:
+			mux.Lock()
+			flag := callback(buf)
+			mux.Unlock()
+			if flag {
+				continue
+			} else {
+				return
+			}
+		}
+	}
 }
 
 func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
@@ -185,37 +166,6 @@ TOKEN:
 	return banner
 }
 
-func ReadWithContext(ctx context.Context, reader io.Reader) []byte {
-	outc := make(chan []byte)
-	go func() {
-		defer close(outc)
-
-		scanner := bufio.NewScanner(reader)
-		scanner.Split(bufio.ScanBytes)
-		for scanner.Scan() {
-
-			if ctx.Err() != nil {
-				return
-			}
-
-			outc <- scanner.Bytes()
-		}
-	}()
-
-	var raw []byte
-	for {
-		select {
-		case data, ok := <-outc:
-			if !ok {
-				return raw
-			}
-			raw = append(raw, data...)
-		case <-ctx.Done():
-			return raw
-		}
-	}
-}
-
 func ReadN(reader io.Reader, n int) ([]byte, error) {
 	var buf = make([]byte, n)
 	if n == 0 {
@@ -240,20 +190,6 @@ func ReadConnWithTimeout(r net.Conn, timeout time.Duration) ([]byte, error) {
 	}
 
 	return nil, errors.Errorf("read empty: %s", err)
-}
-
-func WriteConnWithTimeout(w net.Conn, timeout time.Duration, data []byte) error {
-	err := w.SetWriteDeadline(time.Now().Add(timeout))
-	if err != nil {
-		return errors.Errorf("write failed: %s", err)
-	}
-
-	_, err = w.Write(data)
-	if err != nil {
-		return errors.Errorf("write failed: %s", err)
-	}
-
-	return nil
 }
 
 func ConnExpect(c net.Conn, timeout time.Duration, callback func([]byte) bool) (bool, error) {

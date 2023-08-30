@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
@@ -42,7 +43,7 @@ func FuzzCalcExpr() map[string]interface{} {
 		month = mutate.MutateQuick("{{zp({{ri(10,12)}}|2)}}")[0]
 	}
 	year := mutate.MutateQuick("{{zp({{ri(1970," + fmt.Sprint(time.Now().Year()) + ")}}|4)}}")[0]
-	result := utils.Atoi(strings.TrimLeft(year, "0")) - utils.Atoi(strings.TrimLeft(month, "0")) - utils.Atoi(strings.TrimLeft(day, "0"))
+	result := codec.Atoi(strings.TrimLeft(year, "0")) - codec.Atoi(strings.TrimLeft(month, "0")) - codec.Atoi(strings.TrimLeft(day, "0"))
 	vars.AutoSet("year", year)
 	vars.AutoSet("month", month)
 	vars.AutoSet("day", day)

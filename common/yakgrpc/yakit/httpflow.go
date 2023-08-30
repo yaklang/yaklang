@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -352,7 +351,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		}
 
 		if !flow.NoFixContentLength && f.Response != "" {
-			rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBufferString(unquotedRsp)), nil)
+			rsp, err := utils.ReadHTTPResponseFromBytes([]byte(unquotedRsp), nil)
 			if err != nil {
 				log.Errorf("parse response failed: %s", err)
 				return flow, nil
@@ -855,6 +854,12 @@ func QuickSearchMITMHTTPFlowCount(token string) int {
 }
 
 func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
 	}

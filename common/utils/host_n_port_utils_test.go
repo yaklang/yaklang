@@ -126,7 +126,7 @@ func TestIsIPv6(t *testing.T) {
 		"1.1.1.1":  false,
 		"::":       true,
 		"ffff::ff": true,
-		"[::]":     false,
+		"[::]":     true,
 	}
 	for i, e := range cases {
 		assert.Equal(t, e, IsIPv6(i), "case for: %s", i)

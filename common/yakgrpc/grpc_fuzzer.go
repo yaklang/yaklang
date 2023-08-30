@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"sort"
@@ -799,7 +798,7 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 					log.Errorf("fallback generate url failed: %s", err)
 				}
 			}
-			reqRaw, err := httputil.DumpRequest(r, true)
+			reqRaw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				log.Errorf("dump with transfer encoding failed: %s", err)
 			}

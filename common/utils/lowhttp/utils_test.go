@@ -165,12 +165,12 @@ func TestConnectExtractedUrl(t *testing.T) {
 		url    string
 		packet string
 	}{
+		{url: "http://baidu.com/a?c=1", packet: `POST a?c=1 HTTP/1.1
+Host: baidu.com`},
 		{url: "http://baidu.com:11/./a?c=1", packet: "POST /./a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
 		{url: "http://baidu.com:11//a?c=1", packet: "POST //a?c=1 HTTP/1.1\r\nHost: baidu.com:11\n"},
 		{url: "http://baidu.com:11/a?c=1", packet: `POST a?c=1 HTTP/1.1
 Host: baidu.com:11`},
-		{url: "http://baidu.com/a?c=1", packet: `POST a?c=1 HTTP/1.1
-Host: baidu.com`},
 		{url: "http://baidu.com:11/?c=1", packet: `POST ?c=1 HTTP/1.1
 Host: baidu.com:11`},
 		{url: "http://baidu.com:11/", packet: `POST http://baidu.com:11/ HTTP/1.1`},
@@ -234,15 +234,15 @@ func TestParseResponseLine(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		proto, code, status, _ := parseResponseLine(testcase.line)
+		proto, code, status, _ := utils.ParseHTTPResponseLine(testcase.line)
 		if proto != testcase.proto {
-			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", proto, testcase.proto)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %s(got) != %s(want)", proto, testcase.proto)
 		}
 		if code != testcase.code {
-			t.Fatalf("parseResponseLine error: %d(got) != %d(want)", code, testcase.code)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %d(got) != %d(want)", code, testcase.code)
 		}
 		if status != testcase.status {
-			t.Fatalf("parseResponseLine error: %s(got) != %s(want)", status, testcase.status)
+			t.Fatalf("utils.ParseHTTPResponseLine error: %s(got) != %s(want)", status, testcase.status)
 		}
 
 	}

@@ -1,8 +1,6 @@
 package lowhttp
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -59,7 +57,7 @@ func NewWebHookServerEx(port int, cb func(data interface{})) *WebHookServer {
 				return
 			}
 
-			requestIns, err := ReadHTTPRequestEx(bufio.NewReader(bytes.NewBuffer(reqBytes)), true)
+			requestIns, err := utils.ReadHTTPRequestFromBytes(reqBytes)
 			if err != nil {
 				log.Errorf("re-build webhook request failed: %s", err)
 				return

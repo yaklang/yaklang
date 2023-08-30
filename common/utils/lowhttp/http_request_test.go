@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"strconv"
 	"strings"
 	"testing"
@@ -189,7 +188,7 @@ func TestParseBytesToHttpRequestForHTTP2(t *testing.T) {
 	if req.ProtoMajor != 2 && req.ProtoMinor != 0 {
 		t.Fatalf("prase request proto version failed, got %d.%d", req.ProtoMajor, req.ProtoMinor)
 	}
-	raw, err := httputil.DumpRequest(req, true)
+	raw, err := utils.DumpHTTPRequest(req, true)
 	if err != nil {
 		log.Error(err)
 		t.FailNow()

@@ -228,6 +228,7 @@ c={"abc":{"c":{"d":true}}}
 `,
 			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123)",
 			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`},
+			Debug:                       true,
 		},
 		{
 			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
@@ -351,7 +352,6 @@ d=1234444&&qa=1
 				"eyJkZCI6ImRkZGEifQ%3D%3D",
 				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
 			},
-			Debug: true,
 		},
 	}
 

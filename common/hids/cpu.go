@@ -3,7 +3,7 @@ package hids
 import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -27,7 +27,7 @@ func CPUPercent() float64 {
 }
 
 func CPUAverage() float64 {
-	if ret := utils.Atof(yakit.GetKey(consts.GetGormProfileDatabase(), LASTCPUPERCENT_KEY)); ret > 0 {
+	if ret := codec.Atof(yakit.GetKey(consts.GetGormProfileDatabase(), LASTCPUPERCENT_KEY)); ret > 0 {
 		return (CPUPercent() + ret) / 2.0
 	}
 	return CPUPercent()

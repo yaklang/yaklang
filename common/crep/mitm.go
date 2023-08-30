@@ -1,7 +1,6 @@
 package crep
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rsa"
@@ -306,7 +305,6 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 		/*
 		 use buildin cert domains
 		*/
-
 		//log.Infof("hostname: %v", req.URL.Hostname())
 		if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
 			ctx := martian.NewContext(req, m.GetMartianProxy())
@@ -415,13 +413,10 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 				if isHttps {
 					hijackedReq.TLS = req.TLS
 				}
-
 				if req.ProtoMajor != 2 {
-					hijackedReq, err = utils.FixHTTPRequestForHTTPDoWithHttps(hijackedReq, isHttps)
-					if err != nil {
-						log.Errorf("fix mitm-hijacked http.Request failed: %s", err)
-						return nil
-					}
+					hijackedReq.Proto = "HTTP/1.1"
+					hijackedReq.ProtoMajor = 1
+					hijackedReq.ProtoMinor = 1
 				}
 
 				*req = *hijackedReq.WithContext(req.Context())
@@ -438,10 +433,11 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 						req.URL.Host = originUrl.Host
 					}
 				}
-				if isHttps {
+				if req.URL.Scheme == "" && isHttps {
 					req.URL.Scheme = "https"
+				} else {
+					req.URL.Scheme = "http"
 				}
-
 			}
 		}
 
@@ -537,7 +533,7 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			} else {
 				responseBytes = result[:]
 				req := rsp.Request
-				resultRsp, err := http.ReadResponse(bufio.NewReader(bytes.NewBuffer(result)), req)
+				resultRsp, err := utils.ReadHTTPResponseFromBytes(result, req)
 				if err != nil {
 					log.Errorf("parse fixed response to body failed: %s", err)
 					return utils.Errorf("hijacking modified response parsing failed: %s", err)

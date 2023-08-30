@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"reflect"
 	"strings"
 
@@ -79,15 +78,21 @@ func MarshalHTTPRequest(req *http.Request) ([]byte, error) {
 }
 
 func HttpDumpWithBody(i interface{}, body bool) ([]byte, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("HttpDumpWithBody panic: %v", err)
+			PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	switch ret := i.(type) {
 	case *http.Request:
 		// fix: single "Connection: close"
 		ret.Close = false
-		return httputil.DumpRequest(ret, body)
+		return DumpHTTPRequest(ret, body)
 	case http.Request:
 		return HttpDumpWithBody(&ret, body)
 	case *http.Response:
-		return httputil.DumpResponse(ret, body)
+		return DumpHTTPResponse(ret, body)
 	case http.Response:
 		return HttpDumpWithBody(&ret, body)
 	default:

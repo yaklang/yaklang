@@ -3,7 +3,7 @@ package mutate
 import (
 	"bytes"
 	"fmt"
-	"net/http/httputil"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 
@@ -28,7 +28,7 @@ Host: www.baidu.com
 		test.FailNow("fuzz failed: %v", err)
 	}
 	for _, req := range reqs {
-		raw, err := httputil.DumpRequest(req, true)
+		raw, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {
 			return
 		}
@@ -40,7 +40,7 @@ Host: www.baidu.com
 		test.FailNow("test fuzz path failed")
 	}
 	for _, req := range reqs {
-		raw, err := httputil.DumpRequest(req, true)
+		raw, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -70,7 +70,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -98,7 +98,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -126,7 +126,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -159,7 +159,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -191,7 +191,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -223,7 +223,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -255,7 +255,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -290,7 +290,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -322,7 +322,7 @@ Host: www.baidu.com
 			test.FailNow("Fuzz failed")
 		}
 		for _, r := range res {
-			raw, err := httputil.DumpRequest(r, true)
+			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
@@ -355,7 +355,7 @@ Host: www.baidu.com
 			test.FailNow("Fuzz failed")
 		}
 		for i, r := range res {
-			raw, err := httputil.DumpRequest(r, true)
+			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
@@ -391,7 +391,7 @@ a=cXdl&b=enhjdg%3D%3D
 			test.FailNow("Fuzz failed")
 		}
 		for i, r := range res {
-			raw, err := httputil.DumpRequest(r, true)
+			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
@@ -429,7 +429,7 @@ Host: www.baidu.com
 			test.FailNow("Fuzz failed")
 		}
 		for _, r := range res {
-			raw, err := httputil.DumpRequest(r, true)
+			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
@@ -464,7 +464,7 @@ Cookie: testCookie=13;
 			test.FailNow("Fuzz failed")
 		}
 		for _, r := range res {
-			raw, err := httputil.DumpRequest(r, true)
+			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
@@ -504,7 +504,7 @@ Host: www.baidu.com
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -568,7 +568,7 @@ Content-Type: text/html
 	}
 
 	for _, r := range req {
-		raw, err := httputil.DumpRequest(r, true)
+		raw, err := utils.DumpHTTPRequest(r, true)
 		if err != nil {
 			test.FailNow(err.Error())
 		}
@@ -599,7 +599,7 @@ c=1&d=1
 		return
 	}
 	//rsp, err := freq.ExecFirst()
-	//reqRaw, err := httputil.DumpRequest(rsp.Request, true)
+	//reqRaw, err := utils.DumpHTTPRequest(rsp.Request, true)
 	//println(string(reqRaw))
 	freq.GetCommonParams()[0].Fuzz("aaa").ExecFirst()
 	//freq.fuzzGetParams("a", "1")

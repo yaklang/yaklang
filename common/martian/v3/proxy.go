@@ -613,7 +613,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	if req.Method == "CONNECT" {
 		// req auth enable
 		var connectedTo = req.Host
-		if host, port, err := utils.ParseStringToHostPort(req.URL.String()); err == nil {
+		var urlFromURI = req.URL.String()
+		if host, port, err := utils.ParseStringToHostPort(urlFromURI); err == nil {
 			connectedTo = utils.HostPort(host, port)
 		}
 		if req.URL.Scheme == "https" {
@@ -651,7 +652,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			if err := res.Write(brw); err != nil {
+			var responseBytes []byte
+			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+			_ = responseBytes
+			if err != nil {
 				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
 			if err := brw.Flush(); err != nil {
@@ -730,64 +734,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				brw.Reader.Reset(nconn)
 				// -> Client Connection <- is none HTTP2 HTTPS connection
 				return p.handle(ctx, nconn, brw)
-
-				///* update lib from official martian to add support for intercepting and analysing *h2* request */
-				///* also fix bug from *martian* since they did not respect server side ALPN */
-				//var rawConn net.Conn
-				//var err error
-				//
-				////check if target server support h2 if not we will degrade to use http/1.1
-				//rawConn, err = p.handshakeWithTarget(req)
-				//if err != nil {
-				//	return fmt.Errorf("fail to connect to %v: %w", req.URL, err)
-				//}
-				//_, ok := rawConn.(*tls.Conn)
-				//
-				//if !ok {
-				//	// target server is GM TLS
-				//	// omit HTTP/2 with GM for now
-				//	tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
-				//	if err := tlsconn.Handshake(); err != nil {
-				//		p.mitm.HandshakeErrorCallback(req, err)
-				//		return err
-				//	}
-				//	var nconn net.Conn
-				//	nconn = tlsconn
-				//	brw.Writer.Reset(nconn)
-				//	brw.Reader.Reset(nconn)
-				//	// -> Client Connection <- is none HTTP2 HTTPS connection
-				//	return p.handle(ctx, nconn, brw)
-				//}
-				//
-				//sc := rawConn.(*tls.Conn)
-				//
-				//if sc.ConnectionState().NegotiatedProtocol == "h2" && p.http2 { //server support h2
-				//	cc := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, true))
-				//	if err := cc.Handshake(); err != nil {
-				//		p.mitm.HandshakeErrorCallback(req, err)
-				//		return err
-				//	}
-				//
-				//	if cc.ConnectionState().NegotiatedProtocol == "h2" { //browser also want h2 then proxy with h2
-				//		// -> Client Connection <- is HTTP2 HTTPS connection (P.S no support for h2c all http2 is https)
-				//		return p.proxyH2(p.closing, cc, req.URL)
-				//	}
-				//} else { //server not support h2 so we completely disable h2 support to handle using previous version of martian
-				//	tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host, false))
-				//	if err := tlsconn.Handshake(); err != nil {
-				//		p.mitm.HandshakeErrorCallback(req, err)
-				//		return err
-				//	}
-				//	var nconn net.Conn
-				//	nconn = tlsconn
-				//	brw.Writer.Reset(nconn)
-				//	brw.Reader.Reset(nconn)
-				//	// -> Client Connection <- is none HTTP2 HTTPS connection
-				//	return p.handle(ctx, nconn, brw)
-				//}
 			}
 			// -> Client Connection <- is plain HTTP connection
-			// Prepend the previously read data to be read again by http.ReadRequest.
+			// Prepend the previously read data to be read again.
 			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
 			return p.handle(ctx, conn, brw)
 		}
@@ -808,7 +757,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			if err := res.Write(brw); err != nil {
+			var responseBytes []byte
+			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+			_ = responseBytes
+			if err != nil {
 				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
 			err := brw.Flush()
@@ -829,7 +781,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return nil
 		}
 		res.ContentLength = -1
-		if err := res.Write(brw); err != nil {
+		var responseBytes []byte
+		responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+		_ = responseBytes
+		if err != nil {
 			log.Errorf("martian: got error while writing response back to client: %v", err)
 		}
 		if err := brw.Flush(); err != nil {
@@ -910,7 +865,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing = errClose
 	}
 
-	err = res.Write(brw)
+	var responseBytes []byte
+	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+	_ = responseBytes
 	if err != nil {
 		log.Errorf("martian: got error while writing response back to client: %v", err)
 	}

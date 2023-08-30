@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strconv"
 	"sync"
@@ -110,7 +111,7 @@ func GetContextIntInfoFromRequest(r *http.Request, key string) int {
 	case int:
 		return v.(int)
 	case string:
-		return utils.Atoi(v.(string))
+		return codec.Atoi(v.(string))
 	case int64:
 		return int(v.(int64))
 	case int32:

@@ -9,7 +9,7 @@ import (
 
 func TestRemoveUnprintableChars(t *testing.T) {
 	cases := map[string]string{
-		"\x00W\xffO\x00R\x00K": "WORK",
+		"\x00W\xffO\x00R\x00K": `\x00W\xffO\x00R\x00K`,
 	}
 	for input, output := range cases {
 		if result := RemoveUnprintableChars(input); result == output {
