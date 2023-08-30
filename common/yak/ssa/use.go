@@ -181,22 +181,21 @@ func (i *Interface) ReplaceValue(v, to Value) {
 func (i *Interface) GetUsers() []User { return i.users }
 func (i *Interface) AddUser(u User) {
 	i.users = append(i.users, u)
-	if f, ok := u.(*Field); ok {
-		// important !
-		i.Field[f.Key] = f
-	}
 }
 
 func (i *Interface) RemoveUser(u User) {
 	i.users = remove(i.users, u)
-	// removeUser(i.field, u)
-	if f, ok := u.(*Field); ok {
-		delete(i.Field, f.Key)
-	}
 }
 
-func (i *Interface) GetValues() []Value { return []Value{i.Cap, i.Len} }
-func (i *Interface) AddValue(_ Value)   {}
+func (i *Interface) GetValues() []Value {
+	vs := lo.MapToSlice(i.Field, func(key Value, f *Field) Value { return f })
+	return vs
+}
+func (i *Interface) AddValue(v Value) {
+	if f, ok := v.(*Field); ok {
+		i.Field[f.Key] = f
+	}
+}
 
 // ----------- Field
 func (f *Field) ReplaceValue(v, to Value) {
@@ -209,11 +208,11 @@ func (f *Field) ReplaceValue(v, to Value) {
 	}
 }
 
-func (f *Field) GetUsers() []User  { return f.users }
+func (f *Field) GetUsers() []User  { return append(f.users, f.I) }
 func (f *Field) AddUser(u User)    { f.users = append(f.users, u) }
 func (f *Field) RemoveUser(u User) { f.users = remove(f.users, u) }
 
-func (f *Field) GetValues() []Value { return append(append(f.Update, f.I), f.Key) }
+func (f *Field) GetValues() []Value { return append(f.Update, f.Key) }
 func (f *Field) AddValue(v Value) {
 	if s, ok := v.(*Update); ok {
 		f.Update = append(f.Update, s)

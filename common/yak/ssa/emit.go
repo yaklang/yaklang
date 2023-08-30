@@ -119,12 +119,11 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 	return itf
 }
 
-func (f *FunctionBuilder) EmitField(i Value, key Value) *Field {
+func (f *FunctionBuilder) EmitField(i *Interface, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }
 
 func (f *FunctionBuilder) emitUpdate(address *Field, v Value) *Update {
-	//use-value-chain: address -> update -> value
 	// CheckUpdateType(address.GetType(), v.GetType())
 	s := NewUpdate(address, v, f.CurrentBlock)
 	f.emit(s)
