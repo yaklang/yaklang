@@ -48,6 +48,27 @@ functions:
     isbuildinstruct: true
   - structname: net/netip.Prefix
     isbuildinstruct: true
+- name: udp.MockUDPProtocol
+  type_str: 'func (v1: string) return(string, int) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
 - name: udp.Serve
   type_str: 'func (v1: string, v2: interface {}, v3 ...func udpServerOpt(v1: *yaklib.udpServerConfig)
     ) return(error) '

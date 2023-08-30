@@ -1,290 +1,8 @@
 name: simulator
 functions:
-- name: simulator.Captcha
-  type_str: 'func () return(*extend.CaptchaIdentifier) '
-  long_description: ""
-  description: ""
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    relative_structname: palm/common/simulator/extend.CaptchaIdentifier
-    type_str: '*extend.CaptchaIdentifier'
-  relative_structs:
-  - structname: github.com/yaklang/yaklang/common/simulator/extend.CaptchaIdentifier
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralElement
-    isbuildinstruct: false
-  - structname: github.com/go-rod/rod.Element
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMNode
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.EvalOptions
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
-    isbuildinstruct: true
-  - structname: github.com/ysmood/gson.JSON
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimePropertyPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Page
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Mouse
-    isbuildinstruct: true
-  - structname: sync.Mutex
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Keyboard
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Touch
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Browser
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.Device
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.Screen
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.ScreenSize
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageViewport
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkSetUserAgentOverride
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Message
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkCookie
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.HijackRouter
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.BrowserGetVersionResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkCookieParam
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/js.Function
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.BrowserBounds
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.KeyActions
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.KeyAction
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDF
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.StreamReader
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.RaceContext
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.SearchResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMPerformSearchResult
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.Point
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMGetContentQuadsResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMRect
-    isbuildinstruct: true
-- name: simulator.Page
-  type_str: 'func () return(*core.StartMode) '
-  long_description: ""
-  description: ""
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    relative_structname: github.com/yaklang/yaklang/common/simulator/core.StartMode
-    type_str: '*core.StartMode'
-  relative_structs:
-  - structname: github.com/yaklang/yaklang/common/simulator/core.StartMode
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralPage
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/simulator/core.GeneralElement
-    isbuildinstruct: false
-  - structname: github.com/go-rod/rod.Element
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMNode
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMBackendNode
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.EvalOptions
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeRemoteObject
-    isbuildinstruct: true
-  - structname: github.com/ysmood/gson.JSON
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeWebDriverValue
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeObjectPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimePropertyPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeEntryPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.RuntimeCustomPreview
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Page
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Mouse
-    isbuildinstruct: true
-  - structname: sync.Mutex
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Keyboard
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Touch
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.InputTouchPoint
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Browser
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.Device
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.Screen
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/devices.ScreenSize
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationSetDeviceMetricsOverride
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationScreenOrientation
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageViewport
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationDisplayFeature
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationSetTouchEmulationEnabled
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkSetUserAgentOverride
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentMetadata
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.EmulationUserAgentBrandVersion
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.Message
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkCookie
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.HijackRouter
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.BrowserGetVersionResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTarget
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetCreateTargetResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.NetworkCookieParam
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/js.Function
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.BrowserBounds
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.TargetTargetInfo
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.KeyActions
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.KeyAction
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDF
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PagePrintToPDFResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.StreamReader
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.RaceContext
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshot
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.PageCaptureScreenshotResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod.SearchResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMPerformSearchResult
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.Point
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMGetContentQuadsResult
-    isbuildinstruct: true
-  - structname: github.com/go-rod/rod/lib/proto.DOMRect
-    isbuildinstruct: true
-- name: simulator.captchaMode
-  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
-  long_description: ""
-  description: ""
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: string
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
-- name: simulator.captchaUrl
-  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
-  long_description: ""
-  description: ""
-  params:
-  - name: v1
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: string
-  returns:
-  - name: r0
-    param_alias: ""
-    type_alias: ""
-    description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
-- name: simulator.defaultBrute
-  type_str: 'func (v1: string, v2 ...func ConfigOpt(v1: *examples.Config) ) return(*examples.BruteForceResult,
-    error) '
+- name: simulator.HttpBruteForce
+  type_str: 'func (v1: string, v2 ...func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) return(chan httpbrute.Result, error) '
   long_description: ""
   description: ""
   params:
@@ -297,25 +15,182 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '[]examples.ConfigOpt'
+    type_str: '[]httpbrute.BruteConfigOpt'
     is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: github.com/yaklang/yaklang/common/simulator/examples.BruteForceResult
-    type_str: '*examples.BruteForceResult'
+    type_str: chan httpbrute.Result
   - name: r1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
-  relative_structs:
-  - structname: github.com/yaklang/yaklang/common/simulator/examples.BruteForceResult
-    isbuildinstruct: false
+- name: simulator.captchaImgSelector
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.captchaInputSelector
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.captchaMode
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.captchaUrl
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.exePath
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.extraWaitLoadTime
+  type_str: 'func (v1: int) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.leaklessStatus
+  type_str: 'func (v1: config.LeaklessMode) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: config.LeaklessMode
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.loginDetectMode
+  type_str: 'func (v1: httpbrute.loginDetectMode, v2 ...float64) return(func BruteConfigOpt(v1:
+    *httpbrute.BruteConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: httpbrute.loginDetectMode
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]float64'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.password
+  type_str: 'func (v1 ...string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
 - name: simulator.passwordList
-  type_str: 'func (v1: []string) return(func ConfigOpt(v1: *examples.Config) ) '
+  type_str: 'func (v1: []string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
   long_description: ""
   description: ""
   params:
@@ -329,9 +204,10 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
-- name: simulator.proxy
-  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.passwordSelector
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
   long_description: ""
   description: ""
   params:
@@ -345,9 +221,9 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
-- name: simulator.proxyDetails
-  type_str: 'func (v1: string, v2: string, v3: string) return(func ConfigOpt(v1: *examples.Config)
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.proxy
+  type_str: 'func (v1: string, v2 ...string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
     ) '
   long_description: ""
   description: ""
@@ -361,8 +237,21 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: string
-  - name: v3
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.submitButtonSelector
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
     param_alias: ""
     type_alias: ""
     description: ""
@@ -372,9 +261,28 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.username
+  type_str: 'func (v1 ...string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
 - name: simulator.usernameList
-  type_str: 'func (v1: []string) return(func ConfigOpt(v1: *examples.Config) ) '
+  type_str: 'func (v1: []string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
   long_description: ""
   description: ""
   params:
@@ -388,9 +296,10 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
-- name: simulator.wsAddress
-  type_str: 'func (v1: string) return(func ConfigOpt(v1: *examples.Config) ) '
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.usernameSelector
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
   long_description: ""
   description: ""
   params:
@@ -404,8 +313,54 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: 'func ConfigOpt(v1: *examples.Config) '
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
+- name: simulator.wsAddress
+  type_str: 'func (v1: string) return(func BruteConfigOpt(v1: *httpbrute.BruteConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func BruteConfigOpt(v1: *httpbrute.BruteConfig) '
 variables:
+- name: simulator.defaultChangeMode
+  typestr: httpbrute.loginDetectMode
+  valueverbose: ""
+  description: //
+- name: simulator.htmlChangeMode
+  typestr: httpbrute.loginDetectMode
+  valueverbose: ""
+  description: //
+- name: simulator.leaklessDefault
+  typestr: config.LeaklessMode
+  valueverbose: ""
+  description: //
+- name: simulator.leaklessOff
+  typestr: config.LeaklessMode
+  valueverbose: ""
+  description: //
+- name: simulator.leaklessOn
+  typestr: config.LeaklessMode
+  valueverbose: ""
+  description: //
 - name: simulator.simple
   typestr: map[string]interface {}
+  valueverbose: 0xmap[626f64794d6f64696679546172676574:626f6479 626f64795265706c616365546172676574:626f64795265706c616365
+    63726561746542726f77736572:1021635c0 686561646572734d6f64696679546172676574:68656164657273
+    686561646c657373:102162fd0 686f73744d6f64696679546172676574:686f7374 6e6f53616e64426f78:102162f60
+    70726f7879:102162db0 726571756573744d6f64696679:102163300 726573706f6e73654d6f64696679:102163040
+    777341646472657373:102162cb0]
+  description: //
+- name: simulator.urlChangeMode
+  typestr: httpbrute.loginDetectMode
+  valueverbose: ""
   description: //

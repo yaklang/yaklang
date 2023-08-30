@@ -1,8 +1,14 @@
 is_build_in_struct: false
-libname: httpool
+libname: poc
 struct_name: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
 description: ""
 fields:
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: FromPlugin
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
 - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
   name: Http2
   param_alias: ""
@@ -11,6 +17,12 @@ fields:
   type_str: bool
 - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
   name: Https
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: MultiResponse
   param_alias: ""
   type_alias: ""
   description: ""
@@ -44,9 +56,16 @@ fields:
   param_alias: ""
   type_alias: ""
   description: ""
-  type_str: '[][]uint8'
+  relative_structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+  type_str: '[]*lowhttp.RedirectFlow'
 - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
   name: RemoteAddr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+  name: RuntimeId
   param_alias: ""
   type_alias: ""
   description: ""

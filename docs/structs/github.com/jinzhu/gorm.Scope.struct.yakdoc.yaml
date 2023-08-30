@@ -1,0 +1,562 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.Scope
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.Scope
+  name: SQL
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.Scope
+  name: SQLVars
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]interface {}'
+- structname: github.com/jinzhu/gorm.Scope
+  name: Search
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.search
+  type_str: '*gorm.search'
+- structname: github.com/jinzhu/gorm.Scope
+  name: Value
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: interface {}
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: AddToVars
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Begin
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: CallMethod
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: CombinedConditionSql
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: CommitOrRollback
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: DB
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Dialect
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.Dialect
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Err
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Exec
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: FieldByName
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Field'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.Field
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.StructField
+    isbuildinstruct: true
+  - structname: reflect.StructField
+    isbuildinstruct: true
+  - structname: github.com/jinzhu/gorm.Relationship
+    isbuildinstruct: true
+  - structname: reflect.Value
+    isbuildinstruct: true
+  - structname: reflect.MapIter
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Fields
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*gorm.Field'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Get
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: GetModelStruct
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/jinzhu/gorm.ModelStruct
+    type_str: '*gorm.ModelStruct'
+  relative_struct_name:
+  - structname: github.com/jinzhu/gorm.ModelStruct
+    isbuildinstruct: true
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: GetStructFields
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*gorm.StructField'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: HasColumn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: HasError
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: IndirectValue
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: reflect.Value
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: InstanceGet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: InstanceID
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: InstanceSet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Log
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]interface {}'
+    is_variadic: true
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: New
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: NewDB
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.DB'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: OmitAttrs
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: PrimaryField
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Field'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: PrimaryFields
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]*gorm.Field'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: PrimaryKey
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: PrimaryKeyValue
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: PrimaryKeyZero
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Quote
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: QuotedTableName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Raw
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: SQLDB
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: gorm.SQLCommon
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: SelectAttrs
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: Set
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '*gorm.Scope'
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: SetColumn
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: SkipLeft
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.Scope
+  name: TableName
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

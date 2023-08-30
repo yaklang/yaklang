@@ -1,7 +1,7 @@
 name: risk
 functions:
 - name: risk.CheckDNSLogByToken
-  type_str: 'func (v1: string) return([]*tpb.DNSLogEvent, error) '
+  type_str: 'func (v1: string, v2 ...float64) return([]*tpb.DNSLogEvent, error) '
   long_description: ""
   description: ""
   params:
@@ -10,12 +10,18 @@ functions:
     type_alias: ""
     description: ""
     type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]float64'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: palm/common/cybertunnel/tpb.DNSLogEvent
+    relative_structname: github.com/yaklang/yaklang/common/cybertunnel/tpb.DNSLogEvent
     type_str: '[]*tpb.DNSLogEvent'
   - name: r1
     param_alias: ""
@@ -109,6 +115,26 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
+- name: risk.DeleteRiskByID
+  type_str: 'func (v1: interface {}) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+- name: risk.DeleteRiskByTarget
+  type_str: 'func (v1: string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
 - name: risk.ExtractTokenFromUrl
   type_str: 'func (v1: string) return(string) '
   long_description: ""
@@ -352,6 +378,16 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.Risk
     isbuildinstruct: false
+- name: risk.RegisterBeforeRiskSave
+  type_str: 'func (v1: func (v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func (v1: *yakit.Risk) '
 - name: risk.Save
   type_str: 'func (v1: *yakit.Risk) return(error) '
   long_description: ""
@@ -522,6 +558,22 @@ functions:
     type_alias: ""
     description: ""
     type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func RiskParamsOpt(v1: *yakit.Risk) '
+- name: risk.ignore
+  type_str: 'func (v1: bool) return(func RiskParamsOpt(v1: *yakit.Risk) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
   returns:
   - name: r0
     param_alias: ""

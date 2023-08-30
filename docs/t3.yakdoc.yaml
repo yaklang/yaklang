@@ -9,12 +9,12 @@ functions:
   - name: v1
     param_alias: addr
     type_alias: ""
-    description: "要执行的目标地址"
+    description: 要执行的目标地址
     type_str: string
   - name: v2
     param_alias: command
     type_alias: ""
-    description: "要执行的命令"
+    description: 要执行的命令
     type_str: string
   - name: v3
     param_alias: ""
@@ -36,7 +36,7 @@ functions:
 - name: t3.GenerateJavaObjectStreamBytes
   type_str: 'func (v1: string) return([]uint8) '
   long_description: ""
-  description: "生成T3协议的Java序列化流"
+  description: 生成T3协议的Java序列化流
   params:
   - name: v1
     param_alias: ""
@@ -52,7 +52,7 @@ functions:
 - name: t3.GenerateWeblogicJNDIPayload
   type_str: 'func (v1: string) return([]uint8) '
   long_description: ""
-  description: "生成Weblogic JNDI Payload(Bytes)"
+  description: 生成Weblogic JNDI Payload(Bytes)
   params:
   - name: v1
     param_alias: ""
@@ -69,7 +69,7 @@ functions:
   type_str: 'func (v1: string, v2: interface {}, v3 ...func OptionFun(v1: *t3.T3Paylaod)
     ) return(error) '
   long_description: ""
-  description: "使用T3协议发送Java序列化流"
+  description: 使用T3协议发送Java序列化流
   params:
   - name: v1
     param_alias: ""
@@ -96,7 +96,7 @@ functions:
 - name: t3.clearBackdoor
   type_str: 'func (v1: bool) return(func OptionFun(v1: *t3.T3Paylaod) ) '
   long_description: ""
-  description: "清除控制后门程序"
+  description: 清除控制后门程序
   params:
   - name: v1
     param_alias: ""
@@ -113,7 +113,7 @@ functions:
   type_str: 'func (v1: func (v1: string) ) return(func OptionFun(v1: *t3.T3Paylaod)
     ) '
   long_description: ""
-  description: "设置调试回调接口"
+  description: 设置调试回调接口
   params:
   - name: v1
     param_alias: ""
@@ -129,7 +129,7 @@ functions:
 - name: t3.timeout
   type_str: 'func (v1: float64) return(func OptionFun(v1: *t3.T3Paylaod) ) '
   long_description: ""
-  description: "设置全超时时间"
+  description: 设置全超时时间
   params:
   - name: v1
     param_alias: ""

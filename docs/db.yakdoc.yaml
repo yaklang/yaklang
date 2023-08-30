@@ -1,5 +1,31 @@
 name: db
 functions:
+- name: db.CreateTemporaryYakScript
+  type_str: 'func (v1: string, v2: string) return(string, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: db.DelKey
   type_str: 'func (v1: interface {}) '
   long_description: ""
@@ -69,6 +95,22 @@ functions:
   params:
   - name: v1
     param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+- name: db.GetProjectKey
+  type_str: 'func (v1: interface {}) return(string) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: interface {}
@@ -968,6 +1010,27 @@ functions:
     type_alias: ""
     description: ""
     type_str: error
+- name: db.SetProjectKey
+  type_str: 'func (v1: interface {}, v2: interface {}) return(error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
 - name: db.YieldYakScriptAll
   type_str: 'func () return(chan *yakit.YakScript) '
   long_description: ""
@@ -995,19 +1058,25 @@ functions:
 variables:
 - name: db.YAKIT_PLUGIN_TYPE_CODEC
   typestr: string
+  valueverbose: ""
   description: //
 - name: db.YAKIT_PLUGIN_TYPE_MITM
   typestr: string
+  valueverbose: ""
   description: //
 - name: db.YAKIT_PLUGIN_TYPE_NUCLEI
   typestr: string
+  valueverbose: ""
   description: //
 - name: db.YAKIT_PLUGIN_TYPE_PACKET_HACK
   typestr: string
+  valueverbose: ""
   description: //
 - name: db.YAKIT_PLUGIN_TYPE_PORTSCAN
   typestr: string
+  valueverbose: ""
   description: //
 - name: db.YAKIT_PLUGIN_TYPE_YAK
   typestr: string
+  valueverbose: ""
   description: //

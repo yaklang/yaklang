@@ -163,6 +163,74 @@ methods:
     isbuildinstruct: true
   - structname: github.com/dlclark/regexp2.Capture
     isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate._httpResult
+    isbuildinstruct: false
+  - structname: net/http.Request
+    isbuildinstruct: true
+  - structname: net/url.URL
+    isbuildinstruct: true
+  - structname: net/url.Userinfo
+    isbuildinstruct: true
+  - structname: crypto/tls.ConnectionState
+    isbuildinstruct: true
+  - structname: crypto/x509.Certificate
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Name
+    isbuildinstruct: true
+  - structname: net.IPNet
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.CertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.TBSCertificateList
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AlgorithmIdentifier
+    isbuildinstruct: true
+  - structname: encoding/asn1.RawValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.AttributeTypeAndValue
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.RevokedCertificate
+    isbuildinstruct: true
+  - structname: math/big.Int
+    isbuildinstruct: true
+  - structname: math/rand.Rand
+    isbuildinstruct: true
+  - structname: crypto/x509/pkix.Extension
+    isbuildinstruct: true
+  - structname: encoding/asn1.BitString
+    isbuildinstruct: true
+  - structname: crypto/x509.VerifyOptions
+    isbuildinstruct: true
+  - structname: crypto/x509.CertPool
+    isbuildinstruct: true
+  - structname: .
+    isbuildinstruct: true
+  - structname: net/http.Response
+    isbuildinstruct: true
+  - structname: net/http.Cookie
+    isbuildinstruct: true
+  - structname: time.Time
+    isbuildinstruct: true
+  - structname: time.Location
+    isbuildinstruct: true
+  - structname: mime/multipart.FileHeader
+    isbuildinstruct: true
+  - structname: mime/multipart.Reader
+    isbuildinstruct: true
+  - structname: mime/multipart.Part
+    isbuildinstruct: true
+  - structname: mime/multipart.Form
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpResponse
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.RedirectFlow
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/utils/lowhttp.LowhttpTraceInfo
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestParam
+    isbuildinstruct: false
 - ptr: true
   description: ""
   structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
@@ -187,10 +255,6 @@ methods:
   - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
-    isbuildinstruct: true
-  - structname: time.Time
-    isbuildinstruct: true
-  - structname: time.Location
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.HTTPFlow
     isbuildinstruct: false
@@ -358,18 +422,18 @@ methods:
 - ptr: true
   description: ""
   structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
-  name: ReplaceYakToCallerManager
+  name: ResetFilter
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
+  name: SetCache
   params:
   - name: v2
     param_alias: ""
     type_alias: ""
     description: ""
-    type_str: '*yak.YakToCallerManager'
-  relative_struct_name: []
-- ptr: true
-  description: ""
-  structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
-  name: ResetFilter
+    type_str: bool
   relative_struct_name: []
 - ptr: true
   description: ""
@@ -420,6 +484,28 @@ methods:
     type_alias: ""
     description: ""
     type_str: float64
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
+  name: SetProxy
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/yak.MixPluginCaller
+  name: SetRuntimeId
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
   relative_struct_name: []
 - ptr: true
   description: ""

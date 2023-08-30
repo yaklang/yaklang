@@ -302,6 +302,23 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func ConfigOption(v1: *httptpl.Config) '
+- name: nuclei.fromPlugin
+  type_str: 'func (v1: string) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.fuzzQueryTemplate
   type_str: 'func (v1 ...string) return(func ConfigOption(v1: *httptpl.Config) ) '
   long_description: ""
@@ -387,6 +404,22 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
+- name: nuclei.interactshTimeout
+  type_str: 'func (v1: float64) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: float64
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.logFile
   type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""
@@ -674,6 +707,23 @@ functions:
     type_alias: ""
     description: ""
     type_str: interface {}
+- name: nuclei.runtimeId
+  type_str: 'func (v1: string) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig) '
 - name: nuclei.severity
   type_str: 'func (v1 ...interface {}) return(interface {}) '
   long_description: ""

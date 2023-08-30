@@ -28,6 +28,12 @@ fields:
   description: ""
   type_str: bool
 - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
+  name: ForceInteractive
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
   name: FromGit
   param_alias: ""
   type_alias: ""
@@ -77,6 +83,12 @@ fields:
   type_str: bool
 - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
   name: IsBatchScript
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.YakScript
+  name: IsCorePlugin
   param_alias: ""
   type_alias: ""
   description: ""

@@ -1,0 +1,31 @@
+is_build_in_struct: false
+libname: ja3
+struct_name: github.com/yaklang/yaklang/common/ja3.CipherSuite
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  name: ID
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint16
+- structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  name: Insecure
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  name: SupportedVersions
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint16'
+methods: []
+ptr_methods: []

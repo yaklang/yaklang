@@ -4,7 +4,7 @@ functions:
   type_str: 'func (v1: []uint8, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "从Bytes中加载Class"
+  description: 从Bytes中加载Class
   params:
   - name: v1
     param_alias: ""
@@ -40,7 +40,7 @@ functions:
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个制定域名的DNSLog恶意类"
+  description: 生成一个制定域名的DNSLog恶意类
   params:
   - name: v1
     param_alias: ""
@@ -72,11 +72,42 @@ functions:
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
     isbuildinstruct: false
+- name: yso.GenerateHeaderEchoClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
 - name: yso.GenerateModifyTomcatMaxHeaderSizeEvilClassObject
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
     error) '
   long_description: ""
-  description: "生成一个修改Tomcat最大头长度的恶意类"
+  description: 生成一个修改Tomcat最大头长度的恶意类
   params:
   - name: v1
     param_alias: ""
@@ -107,7 +138,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
     error) '
   long_description: ""
-  description: "生成一个兼容性Echo回显恶意对象"
+  description: 生成一个兼容性Echo回显恶意对象
   params:
   - name: v1
     param_alias: ""
@@ -138,7 +169,7 @@ functions:
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个ProcessBuilderExec方式的恶意类对象"
+  description: 生成一个ProcessBuilderExec方式的恶意类对象
   params:
   - name: v1
     param_alias: ""
@@ -174,7 +205,7 @@ functions:
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个ProcessImpl执行的恶意类对象"
+  description: 生成一个ProcessImpl执行的恶意类对象
   params:
   - name: v1
     param_alias: ""
@@ -210,7 +241,7 @@ functions:
   type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个RuntimeExec的恶意类"
+  description: 生成一个RuntimeExec的恶意类
   params:
   - name: v1
     param_alias: ""
@@ -229,6 +260,37 @@ functions:
     type_alias: ""
     description: ""
     relative_structname: palm/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.GenerateSleepClassObject
+  type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
+    error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
     type_str: '*javaclassparser.ClassObject'
   - name: r1
     param_alias: ""
@@ -277,7 +339,7 @@ functions:
   type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个TCP反连的恶意类对象"
+  description: 生成一个TCP反连的恶意类对象
   params:
   - name: v1
     param_alias: ""
@@ -318,7 +380,7 @@ functions:
   type_str: 'func (v1: string, v2: int, v3 ...func GenClassOptionFun(v1: *yso.ClassConfig)
     ) return(*javaclassparser.ClassObject, error) '
   long_description: ""
-  description: "生成一个TCP反弹Shell的恶意类对象"
+  description: 生成一个TCP反弹Shell的恶意类对象
   params:
   - name: v1
     param_alias: ""
@@ -359,7 +421,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*javaclassparser.ClassObject,
     error) '
   long_description: ""
-  description: "生成一个Tomcat回显恶意类"
+  description: 生成一个Tomcat回显恶意类
   params:
   - name: v1
     param_alias: ""
@@ -389,7 +451,7 @@ functions:
 - name: yso.GetAllGadget
   type_str: 'func () return([]interface {}) '
   long_description: ""
-  description: "获取所有可以生成的工具 Gadget"
+  description: 获取所有可以生成的工具 Gadget
   returns:
   - name: r0
     param_alias: ""
@@ -399,7 +461,7 @@ functions:
 - name: yso.GetAllRuntimeExecGadget
   type_str: 'func () return([]yso.RuntimeExecGadget) '
   long_description: ""
-  description: "获取所有命令执行的 Gadget"
+  description: 获取所有命令执行的 Gadget
   returns:
   - name: r0
     param_alias: ""
@@ -409,7 +471,7 @@ functions:
 - name: yso.GetAllTemplatesGadget
   type_str: 'func () return([]yso.TemplatesGadget) '
   long_description: ""
-  description: "获取所有模版执行的 Gadget"
+  description: 获取所有模版执行的 Gadget
   returns:
   - name: r0
     param_alias: ""
@@ -419,7 +481,7 @@ functions:
 - name: yso.GetBeanShell1JavaObject
   type_str: 'func (v1: string) return(*yso.JavaObject, error) '
   long_description: ""
-  description: "生成 BeanShell1 Java反序列化对象"
+  description: 生成 BeanShell1 Java反序列化对象
   params:
   - name: v1
     param_alias: ""
@@ -447,7 +509,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: "生成 Click1 恶意对象"
+  description: 生成 Click1 恶意对象
   params:
   - name: v1
     param_alias: ""
@@ -476,7 +538,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: "CB183NoCC依赖的Java恶意对象"
+  description: CB183NoCC依赖的Java恶意对象
   params:
   - name: v1
     param_alias: ""
@@ -505,7 +567,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: "CB192NOCC的Java恶意对象"
+  description: CB192NOCC的Java恶意对象
   params:
   - name: v1
     param_alias: ""
@@ -534,7 +596,7 @@ functions:
   type_str: 'func (v1 ...func GenClassOptionFun(v1: *yso.ClassConfig) ) return(*yso.JavaObject,
     error) '
   long_description: ""
-  description: "CB1"
+  description: CB1
   params:
   - name: v1
     param_alias: ""
@@ -1190,6 +1252,114 @@ functions:
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/yso.GadgetInfo
     isbuildinstruct: false
+- name: yso.LoadClassFromBCEL
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.LoadClassFromBase64
+  type_str: 'func (v1: string, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
+- name: yso.LoadClassFromBytes
+  type_str: 'func (v1: []uint8, v2 ...func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) return(*javaclassparser.ClassObject, error) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]yso.GenClassOptionFun'
+    is_variadic: true
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    type_str: '*javaclassparser.ClassObject'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ClassObject
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.ConstantUtf8Info
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/javaclassparser.MemberInfo
+    isbuildinstruct: false
 - name: yso.ToBcel
   type_str: 'func (v1: interface {}) return(string, error) '
   long_description: ""
@@ -1542,6 +1712,48 @@ functions:
     type_alias: ""
     description: ""
     type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useHeaderEchoEvilClass
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useHeaderEchoTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useHeaderParam
+  type_str: 'func (v1: string, v2: string) return(func GenClassOptionFun(v1: *yso.ClassConfig)
+    ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
 - name: yso.useModifyTomcatMaxHeaderSizeTemplate
   type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
   long_description: ""
@@ -1637,6 +1849,42 @@ functions:
   type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
   long_description: ""
   description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useSleepEvilClass
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useSleepTemplate
+  type_str: 'func () return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func GenClassOptionFun(v1: *yso.ClassConfig) '
+- name: yso.useSleepTime
+  type_str: 'func (v1: int) return(func GenClassOptionFun(v1: *yso.ClassConfig) ) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
   returns:
   - name: r0
     param_alias: ""

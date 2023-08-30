@@ -17,7 +17,7 @@ functions:
     description: ""
     type_str: error
 - name: suricata.ParseSuricata
-  type_str: 'func (v1: string) return([]*suricata.Rule, error) '
+  type_str: 'func (v1: string, v2 ...string) return([]*rule.Rule, error) '
   long_description: ""
   description: ""
   params:
@@ -26,54 +26,113 @@ functions:
     type_alias: ""
     description: ""
     type_str: string
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]string'
+    is_variadic: true
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: github.com/yaklang/yaklang/common/suricata.Rule
-    type_str: '[]*suricata.Rule'
+    relative_structname: github.com/yaklang/yaklang/common/suricata/rule.Rule
+    type_str: '[]*rule.Rule'
   - name: r1
     param_alias: ""
     type_alias: ""
     description: ""
     type_str: error
   relative_structs:
-  - structname: github.com/yaklang/yaklang/common/suricata.Rule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.Rule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.AddressRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.AddressRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.PortRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRuleConfig
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.FlowRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ThresholdingConfig
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.DNSRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.DNSRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestStickyRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.IPLayerRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.UDPLayerRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.UDPLayerRule
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ICMPLayerRule
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.PCRE
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRule
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseModifierRule
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.Matcher
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseModifierRule
+  - structname: github.com/yaklang/yaklang/common/suricata/data.Matched
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+- name: suricata.SuricataMatcher
+  type_str: 'func (v1: *rule.Rule) return(*match.Matcher) '
+  long_description: ""
+  description: ""
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/suricata/rule.Rule
+    type_str: '*rule.Rule'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    relative_structname: github.com/yaklang/yaklang/common/suricata/match.Matcher
+    type_str: '*match.Matcher'
+  relative_structs:
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.Rule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.AddressRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.PortRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRuleConfig
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.FlowRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ThresholdingConfig
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.DNSRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.HTTPConfig
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.IPLayerRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.TCPLayerRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.UDPLayerRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ICMPLayerRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/rule.ContentRule
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.PCRE
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.Generator
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/pcre.Matcher
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/data.Matched
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/suricata/match.Matcher
     isbuildinstruct: false
 - name: suricata.TrafficGenerator
   type_str: 'func () return(*chaosmaker.ChaosMaker) '
@@ -89,7 +148,7 @@ functions:
   relative_structs:
   - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMaker
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
+  - structname: github.com/yaklang/yaklang/common/chaosmaker/rule.Storage
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -145,46 +204,10 @@ functions:
     isbuildinstruct: true
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ChaosMakerRule
     isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosTraffic
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.Rule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.AddressRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.PortRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRuleConfig
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.FlowRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ThresholdingConfig
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.DNSRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseStickyRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.IPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.TCPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.UDPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ICMPLayerRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.ContentRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpBaseModifierRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpResponseModifierRule
-    isbuildinstruct: false
-  - structname: github.com/yaklang/yaklang/common/suricata.HttpRequestModifierRule
+  - structname: github.com/yaklang/yaklang/common/pcapx.ChaosTraffic
     isbuildinstruct: false
 - name: suricata.YieldRules
-  type_str: 'func () return(chan *chaosmaker.ChaosMakerRule) '
+  type_str: 'func () return(chan *rule.Storage) '
   long_description: ""
   description: ""
   returns:
@@ -192,10 +215,10 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
-    type_str: chan *chaosmaker.ChaosMakerRule
+    relative_structname: github.com/yaklang/yaklang/common/chaosmaker/rule.Storage
+    type_str: chan *rule.Storage
   relative_structs:
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
+  - structname: github.com/yaklang/yaklang/common/chaosmaker/rule.Storage
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true
@@ -252,7 +275,7 @@ functions:
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.ChaosMakerRule
     isbuildinstruct: false
 - name: suricata.YieldRulesByKeyword
-  type_str: 'func (v1: string, v2 ...string) return(chan *chaosmaker.ChaosMakerRule) '
+  type_str: 'func (v1: string, v2 ...string) return(chan *rule.Storage) '
   long_description: ""
   description: ""
   params:
@@ -272,10 +295,10 @@ functions:
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
-    type_str: chan *chaosmaker.ChaosMakerRule
+    relative_structname: github.com/yaklang/yaklang/common/chaosmaker/rule.Storage
+    type_str: chan *rule.Storage
   relative_structs:
-  - structname: github.com/yaklang/yaklang/common/chaosmaker.ChaosMakerRule
+  - structname: github.com/yaklang/yaklang/common/chaosmaker/rule.Storage
     isbuildinstruct: false
   - structname: github.com/jinzhu/gorm.Model
     isbuildinstruct: true

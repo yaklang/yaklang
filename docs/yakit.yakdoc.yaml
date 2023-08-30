@@ -966,26 +966,26 @@ functions:
     type_str: '[]string'
     is_variadic: true
 - name: yakit.TableData
-  type_str: 'func (v1: string, v2: map[string]interface {}) return(*yaklib.YakitFixedTableData) '
+  type_str: 'func (v1: string, v2: interface {}) return(*yaklib.YakitFixedTableData) '
   long_description: ""
-  description: 为启动的 table 生成数据
+  description: ""
   params:
   - name: v1
-    param_alias: tableName
+    param_alias: ""
     type_alias: ""
     description: ""
     type_str: string
   - name: v2
-    param_alias: data
+    param_alias: ""
     type_alias: ""
     description: ""
-    type_str: map[string]interface {}
+    type_str: interface {}
   returns:
   - name: r0
     param_alias: ""
     type_alias: ""
     description: ""
-    relative_structname: palm/common/yak/yaklib.YakitFixedTableData
+    relative_structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitFixedTableData
     type_str: '*yaklib.YakitFixedTableData'
   relative_structs:
   - structname: github.com/yaklang/yaklang/common/yak/yaklib.YakitFixedTableData

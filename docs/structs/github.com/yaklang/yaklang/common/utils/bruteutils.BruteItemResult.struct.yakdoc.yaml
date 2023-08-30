@@ -4,6 +4,12 @@ struct_name: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
 description: ""
 fields:
 - structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
+  name: ExtraInfo
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]uint8'
+- structname: github.com/yaklang/yaklang/common/utils/bruteutils.BruteItemResult
   name: Finished
   param_alias: ""
   type_alias: ""

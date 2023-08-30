@@ -101,6 +101,36 @@ functions:
   relative_structs:
   - structname: github.com/yaklang/yaklang/common/yak.yakVariable
     isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak.Engine
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.Function
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.Scope
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.SymbolTable
+    isbuildinstruct: false
+  - structname: .
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.Value
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.Frame
+    isbuildinstruct: false
+  - structname: reflect.Value
+    isbuildinstruct: true
+  - structname: reflect.MapIter
+    isbuildinstruct: true
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.Code
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.VirtualMachine
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack.Stack
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.VirtualMachineConfig
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.VMPanic
+    isbuildinstruct: false
+  - structname: github.com/yaklang/yaklang/common/yak/antlr4yak.ScopeValue
+    isbuildinstruct: false
 - name: dyn.params
   type_str: 'func (v1: map[string]interface {}) return(func yakEvalConfigOpt(v1: *yak.yakEvalConfig)
     ) '

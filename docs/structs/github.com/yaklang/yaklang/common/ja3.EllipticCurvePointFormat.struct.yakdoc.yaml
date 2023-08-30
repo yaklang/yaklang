@@ -1,0 +1,19 @@
+is_build_in_struct: false
+libname: ja3
+struct_name: github.com/yaklang/yaklang/common/ja3.EllipticCurvePointFormat
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/ja3.EllipticCurvePointFormat
+  name: CurvePoint
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: uint8
+- structname: github.com/yaklang/yaklang/common/ja3.EllipticCurvePointFormat
+  name: CurvePointFormatName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+methods: []
+ptr_methods: []

@@ -10,6 +10,18 @@ fields:
   description: ""
   type_str: string
 - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
+  name: CveAccessComplexity
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
+  name: CveAccessVector
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
   name: Description
   param_alias: ""
   type_alias: ""
@@ -51,6 +63,12 @@ fields:
   type_alias: ""
   description: ""
   type_str: int64
+- structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
+  name: Ignore
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
 - structname: github.com/yaklang/yaklang/common/yakgrpc/yakit.Risk
   name: IsPotential
   param_alias: ""

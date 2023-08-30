@@ -1,0 +1,90 @@
+is_build_in_struct: false
+libname: ja3
+struct_name: github.com/yaklang/yaklang/common/ja3.JA3
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: CipherSuites
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.CipherSuite
+  type_str: '[]*ja3.CipherSuite'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: EllipticCurvePointFormats
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.EllipticCurvePointFormat
+  type_str: '[]*ja3.EllipticCurvePointFormat'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: EllipticCurves
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.EllipticCurve
+  type_str: '[]*ja3.EllipticCurve'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: ExtensionsTypes
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.ExtensionsType
+  type_str: '[]*ja3.ExtensionsType'
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: JA3FullStr
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: TLSVersion
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/yaklang/yaklang/common/ja3.TLSVersion
+  type_str: '*ja3.TLSVersion'
+methods:
+- description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: Calc
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: Calc
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/ja3.JA3
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

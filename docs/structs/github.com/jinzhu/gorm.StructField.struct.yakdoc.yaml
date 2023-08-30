@@ -1,0 +1,136 @@
+is_build_in_struct: true
+libname: cve
+struct_name: github.com/jinzhu/gorm.StructField
+description: ""
+fields:
+- structname: github.com/jinzhu/gorm.StructField
+  name: DBName
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.StructField
+  name: HasDefaultValue
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: IsForeignKey
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: IsIgnored
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: IsNormal
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: IsPrimaryKey
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: IsScanner
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: bool
+- structname: github.com/jinzhu/gorm.StructField
+  name: Name
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/jinzhu/gorm.StructField
+  name: Names
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]string'
+- structname: github.com/jinzhu/gorm.StructField
+  name: Relationship
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: github.com/jinzhu/gorm.Relationship
+  type_str: '*gorm.Relationship'
+- structname: github.com/jinzhu/gorm.StructField
+  name: Struct
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  relative_structname: reflect.StructField
+  type_str: reflect.StructField
+- structname: github.com/jinzhu/gorm.StructField
+  name: Tag
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: reflect.StructTag
+- structname: github.com/jinzhu/gorm.StructField
+  name: TagSettings
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]string
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.StructField
+  name: TagSettingsDelete
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.StructField
+  name: TagSettingsGet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: github.com/jinzhu/gorm.StructField
+  name: TagSettingsSet
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

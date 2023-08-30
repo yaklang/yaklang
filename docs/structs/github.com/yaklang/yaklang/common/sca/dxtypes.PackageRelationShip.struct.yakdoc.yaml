@@ -1,0 +1,19 @@
+is_build_in_struct: false
+libname: sca
+struct_name: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+  name: And
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: map[string]string
+- structname: github.com/yaklang/yaklang/common/sca/dxtypes.PackageRelationShip
+  name: Or
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: '[]map[string]string'
+methods: []
+ptr_methods: []

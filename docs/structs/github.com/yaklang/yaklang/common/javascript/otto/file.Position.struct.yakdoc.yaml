@@ -1,0 +1,42 @@
+is_build_in_struct: false
+libname: js
+struct_name: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+description: ""
+fields:
+- structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+  name: Column
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+  name: Filename
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: string
+- structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+  name: Line
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+  name: Offset
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+methods:
+- ptr: true
+  description: ""
+  structname: github.com/yaklang/yaklang/common/javascript/otto/file.Position
+  name: String
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+ptr_methods: []

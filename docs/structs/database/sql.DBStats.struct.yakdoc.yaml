@@ -1,0 +1,61 @@
+is_build_in_struct: true
+libname: cve
+struct_name: database/sql.DBStats
+description: ""
+fields:
+- structname: database/sql.DBStats
+  name: Idle
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: database/sql.DBStats
+  name: InUse
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: database/sql.DBStats
+  name: MaxIdleClosed
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: database/sql.DBStats
+  name: MaxIdleTimeClosed
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: database/sql.DBStats
+  name: MaxLifetimeClosed
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: database/sql.DBStats
+  name: MaxOpenConnections
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: database/sql.DBStats
+  name: OpenConnections
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int
+- structname: database/sql.DBStats
+  name: WaitCount
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: int64
+- structname: database/sql.DBStats
+  name: WaitDuration
+  param_alias: ""
+  type_alias: ""
+  description: ""
+  type_str: time.Duration
+methods: []
+ptr_methods: []

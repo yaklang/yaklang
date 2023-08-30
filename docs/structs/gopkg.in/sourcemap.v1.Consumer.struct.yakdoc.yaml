@@ -1,0 +1,60 @@
+is_build_in_struct: true
+libname: js
+struct_name: gopkg.in/sourcemap.v1.Consumer
+description: ""
+fields: []
+methods:
+- ptr: true
+  description: ""
+  structname: gopkg.in/sourcemap.v1.Consumer
+  name: File
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  relative_struct_name: []
+- ptr: true
+  description: ""
+  structname: gopkg.in/sourcemap.v1.Consumer
+  name: Source
+  params:
+  - name: v2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: v3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: string
+  - name: r2
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r3
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: int
+  - name: r4
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: bool
+  relative_struct_name: []
+ptr_methods: []
