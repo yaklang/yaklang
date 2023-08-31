@@ -41,6 +41,34 @@ func (t Types) String() string {
 	)
 }
 
+func (t Types) Equal(typs Types) bool {
+	return reflect.DeepEqual(t, typs)
+}
+
+func (t Types) Contains(typ Types) bool {
+	if len(t) == 0 {
+		return false
+	}
+	targetMap := lo.SliceToMap(typ, func(typ Type) (Type, struct{}) {
+		return typ, struct{}{}
+	})
+	for _, tt := range t {
+		if _, ok := targetMap[tt]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (t Types) IsType(kind TypeKind) bool {
+	for _, typ := range t {
+		if typ == BasicTypesKind[kind] {
+			return true
+		}
+	}
+	return false
+}
+
 // basic type
 type TypeKind int
 
@@ -190,18 +218,19 @@ func (s *InterfaceType) AddField(key Value, field Types) {
 	s.Field = append(s.Field, field)
 }
 
-func (s *InterfaceType) GetField(key Value) Types {
+// return (field-type, key-type)
+func (s *InterfaceType) GetField(key Value) (Types, Types) {
 	switch s.Kind {
 	case Slice:
-		return s.Field[0]
+		return s.Field[0], Types{BasicTypesKind[Number]}
 	case Map:
-		return s.Field[0]
+		return s.Field[0], s.keyType[0]
 	case Struct:
 		if index := slices.Index(s.Key, key); index != -1 {
-			return s.Field[index]
+			return s.Field[index], key.GetType()
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // ===================== Finish simply
