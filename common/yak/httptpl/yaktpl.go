@@ -10,10 +10,31 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/mixer"
-	"gopkg.in/yaml.v2"
 )
 
+type RequestConfig struct {
+	JsEnableRedirect     bool
+	JsMaxRedirects       int
+	EtcHosts             map[string]string
+	DNSServers           []string
+	Variables            *YakVariables
+	RepeatTimes          int64
+	RetryInStatusCode    string
+	RetryNotInStatusCode string
+	Concurrent           int64
+	MaxRetryTimes        int64
+	DelayMinSeconds      float64
+	DelayMaxSeconds      float64
+	ForceFuzz            bool
+	RequestTimeout       float64
+	NoSystemProxy        bool
+	Proxy                string
+	Host                 string
+	IsGmTLS              bool
+	IsHTTPS              bool
+}
 type YakTemplate struct {
+	RequestConfig
 	Id            string   `json:"id"`
 	Name          string   `json:"name"`
 	NameZh        string   `json:"nameZh,omitempty"`
@@ -32,19 +53,20 @@ type YakTemplate struct {
 
 	TCPRequestSequences  []*YakNetworkBulkConfig
 	HTTPRequestSequences []*YakRequestBulkConfig
-	Variables            *YakVariables
 
 	// placeHolderMap
 	PlaceHolderMap map[string]string
 }
 
 type YakRequestBulkConfig struct {
+	RequestConfig
 	Matcher   *YakMatcher
 	Extractor []*YakExtractor
 
 	HTTPRequests []*YakHTTPRequestPacket
 
-	EnableRedirect   bool
+	EnableRedirect bool
+
 	MaxRedirects     int
 	StopAtFirstMatch bool
 
@@ -59,7 +81,9 @@ type YakRequestBulkConfig struct {
 	// batteringram is not valid!
 	// pitchfork means sync
 	// cluster bomb means cartesian product
-	AttackMode string // sync // cartesian
+	AttackMode       string // sync // cartesian
+	InheritVariables bool
+	HotPatchCode     string
 }
 
 func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
@@ -241,20 +265,4 @@ func createVarsFromHTTPRequest(isHttps bool, s []byte) (map[string]interface{}, 
 		"__schema__":              schema,
 	}
 	return vars, nil
-}
-
-func (y *YakTemplate) MarshalToYaml() ([]byte, error) {
-	var data = map[string]interface{}{}
-	data["id"] = y.Id
-	info := make(map[string]interface{})
-	data["info"] = info
-	info["name"] = y.Name
-	info["author"] = y.Author
-	info["severity"] = y.Severity
-	info["description"] = y.Description
-	info["reference"] = y.Reference
-	info["tags"] = strings.Join(y.Tags, ",")
-	info["classification"] = map[string]interface{}{"cve-id": y.CVE}
-	//data["requests"]
-	return yaml.Marshal(data)
 }
