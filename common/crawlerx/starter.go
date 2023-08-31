@@ -4,6 +4,7 @@ package crawlerx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -11,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/embed"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -73,9 +75,11 @@ type BrowserStarter struct {
 
 	storageSave bool
 
-	runtimeID string
-	saveToDB  bool
-	https     bool
+	runtimeID    string
+	saveToDB     bool
+	https        bool
+	evalJs       []*JSEval
+	jsResultSend func(string)
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -111,6 +115,8 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		runtimeID: baseConfig.runtimeId,
 		saveToDB:  baseConfig.saveToDB,
 		https:     false,
+		
+		evalJs: make([]*JSEval, 0),
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -135,6 +141,18 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 	if strings.HasPrefix(starter.baseUrl, "https://") || strings.HasPrefix(starter.baseUrl, "wss://") {
 		starter.https = true
 	}
+	for key, values := range baseConfig.evalJs {
+		e := CreateJsEval()
+		reg, err := regexp.Compile(key)
+		if err != nil {
+			log.Errorf(`evaljs target url %v compiler error: %v`, key, err)
+			continue
+		}
+		e.targetUrl = reg
+		e.js = append(e.js, values...)
+		starter.evalJs = append(starter.evalJs, e)
+	}
+	starter.jsResultSend = starter.baseConfig.jsResultSave
 	return &starter
 }
 
@@ -244,9 +262,9 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		log.Errorf(`TargetID %s get page wait load error: %s`, targetID, err)
 		return
 	}
+	urlStr, _ := getCurrentUrl(page)
 	if !starter.storageSave && len(starter.baseConfig.localStorage) > 0 {
 		starter.storageSave = true
-		urlStr, _ := getCurrentUrl(page)
 		log.Infof(`do local storage on %s`, urlStr)
 		for key, value := range starter.baseConfig.localStorage {
 			setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
@@ -260,6 +278,34 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if starter.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 	}
+	// eval js
+	for _, item := range starter.evalJs {
+		if item.targetUrl.MatchString(urlStr) {
+			for _, js := range item.js {
+				resultObj, err := page.Eval(js)
+				if err != nil {
+					log.Errorf(`page eval custom js error: %v`, err)
+				}
+				jsResult := resultObj.Value.String()
+				result := JsResultSave{
+					TargetUrl: urlStr,
+					Js:        js,
+					Result:    jsResult,
+				}
+				resultBytes, err := json.Marshal(result)
+				if err != nil {
+					log.Errorf(`json marshal result error: %v`, err)
+					continue
+				}
+				if starter.jsResultSend != nil {
+					starter.jsResultSend(string(resultBytes))
+				} else {
+					log.Info(`get eval js result: %v`, string(resultBytes))
+				}
+			}
+		}
+	}
+	//
 	if starter.baseConfig.pageTimeout != 0 {
 		page = page.Timeout(time.Duration(starter.baseConfig.pageTimeout) * time.Second)
 	}
