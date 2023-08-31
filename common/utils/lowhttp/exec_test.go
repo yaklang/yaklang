@@ -237,3 +237,62 @@ Host: ccc
 		panic(1)
 	}
 }
+
+func TestParsePacketTOURLCase1(t *testing.T) {
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(`GET /abc HTTP/1.1
+Host: baidu.com`), false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "http://baidu.com/abc" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
+
+func TestParsePacketTOURLCase2(t *testing.T) {
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(`GET baidu.com/abc HTTP/1.1
+Host: baidu.com`), false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "http://baidu.com/baidu.com/abc" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
+
+func TestParsePacketTOURLCase3(t *testing.T) {
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(`GET http://www.baidu.com/abc HTTP/1.1
+Host: baidu.com`), false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "http://www.baidu.com/abc" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
+
+func TestParsePacketTOURLCase4(t *testing.T) {
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(`GET http://www.baidu.com/abc HTTP/1.1
+Host: www.baidu.com`), false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "http://www.baidu.com/abc" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
+
+func TestParsePacketTOURLCase5(t *testing.T) {
+	req, err := utils.ReadHTTPRequestFromBytes([]byte(`GET http://www.baidu.com/abc HTTP/1.1
+Host: www.baidu.com`))
+	if err != nil {
+		panic(err)
+	}
+	u, err := ExtractURLFromHTTPRequest(req, false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "http://www.baidu.com/abc" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
