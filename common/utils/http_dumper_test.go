@@ -58,6 +58,9 @@ func TestHTTPRequestDumper_C1(t *testing.T) {
 	}
 	raw, _ := DumpHTTPRequest(req, true)
 	fmt.Println(string(raw))
+	if !bytes.HasPrefix(raw, []byte(`GBET /bac HTTP/1.1`)) {
+		t.Fatal("should be GBET /bac HTTP/1.1")
+	}
 }
 
 func TestHTTPRequestDumper_Stream_BodyIsSmall(t *testing.T) {
