@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func TestTypePrediction_Int64(t *testing.T) {
@@ -76,6 +78,21 @@ func TestTypePrediction_Map2(t *testing.T) {
 		t.Fatalf("ProbablyTypes should contain map[string]number, but got %v", typeVerbose)
 	}
 }
+
+func TestTypePrediction_MapTypeError(t *testing.T) {
+	prog := ParseSSA(`a = make([]int, 0); a["aa"] = "1" + "2"`)
+	errs := strings.Join(lo.Map(
+		prog.GetErrors(),
+		func(err *ssa.SSAError, _ int) string {
+			return err.Message
+		},
+	), ",")
+	if !utils.MatchAnyOfSubString(errs, "type check failed, this shoud be number") {
+		t.Fatal("con't get string type error")
+	}
+
+}
+
 
 func TestTypePrediction_Static_PhiAndSccp(t *testing.T) {
 	prog := ParseSSA(`a = 1;b=1; if a>2{b = "arst"};print(b)`)

@@ -228,11 +228,11 @@ func (s *Update) ReplaceValue(v, to Value) {
 	}
 }
 
-func (s *Update) GetUsers() []User { return []User{s.address} }
+func (s *Update) GetUsers() []User { return []User{s.Address} }
 func (s *Update) AddUser(u User)   {}
 func (s *Update) RemoveUser(u User) {
-	if s.address == u {
-		s.address = nil
+	if s.Address == u {
+		s.Address = nil
 	} else {
 		panic("update not have this user")
 	}
