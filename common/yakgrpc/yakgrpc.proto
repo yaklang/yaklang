@@ -196,7 +196,7 @@ service Yak {
   rpc GenerateExtractRule(GenerateExtractRuleRequest) returns (GenerateExtractRuleResponse);
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
   rpc ImportHTTPFuzzerTaskFromYaml(ImportHTTPFuzzerTaskFromYamlRequest) returns (ImportHTTPFuzzerTaskFromYamlResponse);
-  rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (GeneralResponse);
+  rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (ExportHTTPFuzzerTaskToYamlResponse);
 
   rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
   rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
@@ -3792,13 +3792,16 @@ message HTTPFlowBareResponse {
   bytes Data = 2;
 }
 message ImportHTTPFuzzerTaskFromYamlRequest {
-  string YamlPath = 1;
+  string YamlContent = 1;
 }
 message ImportHTTPFuzzerTaskFromYamlResponse{
-  repeated FuzzerRequest FuzzerRequests = 1;
+  GeneralResponse Status = 1;
+  FuzzerRequests Requests = 2;
 }
 message ExportHTTPFuzzerTaskToYamlRequest{
-  repeated FuzzerRequest FuzzerRequests = 1;
-  string Type = 2;
-  string YamlPath = 3;
+  FuzzerRequests Requests = 1;
+}
+message ExportHTTPFuzzerTaskToYamlResponse{
+  GeneralResponse Status = 1;
+  string YamlContent = 2;
 }
