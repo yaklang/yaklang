@@ -296,48 +296,9 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 
 	var (
 		// RequestURI > URL > Host in header
-		hostInURL, hostInHeader string
+		hostInURL    string
+		hostInHeader string
 	)
-
-	// uri is very complex
-	// utf8 valid or not
-	before, fragment, haveFragment := strings.Cut(req.RequestURI, "#")
-	var urlIns *url.URL
-	if method == "CONNECT" {
-		urlIns = new(url.URL)
-		// if connect, the uri should be host:port
-		var host, port, _ = ParseStringToHostPort(before)
-		if port > 0 {
-			urlIns.Host = HostPort(host, port)
-		}
-	} else if urlIns, _ = url.ParseRequestURI(before); urlIns == nil {
-		// remove : begin
-		// utf8 invalid
-		urlIns = new(url.URL)
-		if IsHttpOrHttpsUrl(req.RequestURI) {
-			urlIns, err = url.Parse(req.RequestURI)
-			if err != nil {
-				return nil, Errorf("parse uri-url (%v) failed: %s", req.RequestURI, err)
-			}
-		} else {
-			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(req.RequestURI, "?")
-		}
-	}
-
-	if urlIns != nil && haveFragment {
-		urlIns.Fragment = fragment
-	}
-	req.URL = urlIns
-
-	// handle host
-	hostInURL = req.URL.Host
-	if ret := strings.LastIndex(hostInURL, ":"); ret >= 0 {
-		hostname, portStr := strings.TrimSpace(hostInURL[:ret]), codec.Atoi(hostInURL[ret+1:])
-		if hostname == "" || portStr == 0 {
-			req.URL.Host = ""
-			hostInURL = ""
-		}
-	}
 
 	/*
 		handle headers
@@ -384,6 +345,8 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 				header.Set(keyStr, valStr)
 				req.ContentLength = int64(contentLengthInt)
 			}
+		case "host":
+			hostInHeader = valStr
 		case "content-type":
 			isSingletonHeader = true
 		case `transfer-encoding`:
@@ -391,8 +354,6 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 			if strings.EqualFold(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
-		case "host":
-			hostInHeader = valStr
 		case "connection":
 			if strings.EqualFold(valStr, "close") {
 				defaultClose = true
@@ -411,6 +372,58 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 		}
 		header[keyStr] = append(header[keyStr], valStr)
 	}
+
+	// uri is very complex
+	// utf8 valid or not
+	before, fragment, haveFragment := strings.Cut(req.RequestURI, "#")
+	var urlIns *url.URL
+	if method == "CONNECT" {
+		urlIns = new(url.URL)
+		// if connect, the uri should be host:port
+		var host, port, _ = ParseStringToHostPort(before)
+		if port > 0 {
+			urlIns.Host = HostPort(host, port)
+		} else {
+			if strings.HasPrefix(hostInHeader, ":") {
+				port := codec.Atoi(hostInHeader[1:])
+				if port > 0 && port <= 65535 {
+					urlIns.Host = HostPort(host, port)
+				} else {
+					urlIns.Host = strings.Trim(host, "/")
+				}
+			} else {
+				urlIns.Host = strings.Trim(host, "/")
+			}
+		}
+	} else if urlIns, _ = url.ParseRequestURI(before); urlIns == nil {
+		// remove : begin
+		// utf8 invalid
+		urlIns = new(url.URL)
+		if IsHttpOrHttpsUrl(req.RequestURI) {
+			urlIns, err = url.Parse(req.RequestURI)
+			if err != nil {
+				return nil, Errorf("parse uri-url (%v) failed: %s", req.RequestURI, err)
+			}
+		} else {
+			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(req.RequestURI, "?")
+		}
+	}
+
+	if urlIns != nil && haveFragment {
+		urlIns.Fragment = fragment
+	}
+	req.URL = urlIns
+
+	// handle host
+	hostInURL = req.URL.Host
+	if ret := strings.LastIndex(hostInURL, ":"); ret >= 0 {
+		hostname, portStr := strings.TrimSpace(hostInURL[:ret]), codec.Atoi(hostInURL[ret+1:])
+		if hostname == "" || portStr == 0 {
+			req.URL.Host = ""
+			hostInURL = ""
+		}
+	}
+
 	req.Close = defaultClose
 	req.Header = header
 

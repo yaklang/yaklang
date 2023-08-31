@@ -106,11 +106,15 @@ func TestReadHTTPRequestFromBytesBadURI3(t *testing.T) {
 
 func TestHTTPRequestBuilderForConnect(t *testing.T) {
 	for _, i := range []string{
+		"CONNECT baidu.com HTTP/1.1\r\nHost: :80\r\n\r\n",
 		"CONNECT baidu.com:80 HTTP/1.1\r\n\r\n",
 		"CONNECT / HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 		"CONNECT :80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
+		"CONNECT :80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
 		"CONNECT baidu.com:80 HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
+		"CONNECT baidu.com:80 HTTP/1.1\r\nHost: :80\r\n\r\n",
 		"CONNECT / HTTP/1.1\r\nHost: baidu.com:80\r\n\r\n",
+		"GET http://baidu.com:80/123 HTTP/1.1\r\nHost: 192.168.1.1:8083\r\n\r\n",
 	} {
 		req, err := ReadHTTPRequestFromBytes([]byte(i))
 		if err != nil {
