@@ -13,13 +13,18 @@ import (
 )
 
 type InteractiveDebugger struct {
-	prompt *Prompt
+	prompt   *Prompt
+	filepath string
 }
 
 func NewInteractiveDebugger() *InteractiveDebugger {
 	return &InteractiveDebugger{
 		prompt: NewPrompt(">>>"),
 	}
+}
+
+func (i *InteractiveDebugger) SetAbsFilePath(fp string) {
+	i.filepath = fp
 }
 
 func (i *InteractiveDebugger) Init() func(g *yakvm.Debugger) {
@@ -29,7 +34,6 @@ func (i *InteractiveDebugger) Init() func(g *yakvm.Debugger) {
 		g.Callback()
 	}
 }
-
 func (i *InteractiveDebugger) GetPrettySourceCode(g *yakvm.Debugger, start int, ends ...int) string {
 	var (
 		buf    strings.Builder
@@ -246,10 +250,10 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 
 				if len(commands) > 3 && commands[2] == "if" {
 					condtion := strings.Join(commands[3:], " ")
-					if _, err := g.SetBreakPoint(lineNumber, condtion, ""); err != nil {
+					if _, err := g.SetBreakPointWithSource(i.filepath, lineNumber, condtion, ""); err != nil {
 						fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 					}
-				} else if _, err := g.SetNormalBreakPoint(lineNumber); err != nil {
+				} else if _, err := g.SetBreakPointWithSource(i.filepath, lineNumber, "", ""); err != nil {
 					fmt.Printf("Interactive debugger set breakpoint error: %v\n", err)
 				}
 			case "clear":
