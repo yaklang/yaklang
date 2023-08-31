@@ -297,9 +297,7 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 	for _, bodyRaw := range jsonextractor.ExtractStandardJSON(string(body)) {
 		skipJson = true
 		if govalidator.IsJSON(bodyRaw) {
-			if govalidator.IsJSON(bodyRaw) {
-				processJSON(bodyRaw, 1)
-			}
+			processJSON(bodyRaw, 1)
 		}
 	}
 
