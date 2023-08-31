@@ -351,9 +351,10 @@ func GetSystemHostByName(domain string) (string, bool) {
 }
 
 type RedirectFlow struct {
-	IsHttps  bool
-	Request  []byte
-	Response []byte
+	IsHttps    bool
+	Request    []byte
+	Response   []byte
+	RespRecord *LowhttpResponse
 }
 
 func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
@@ -377,9 +378,10 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		return response, err
 	}
 	raw := &RedirectFlow{
-		IsHttps:  response.Https,
-		Request:  response.RawRequest,
-		Response: response.RawPacket,
+		IsHttps:    response.Https,
+		Request:    response.RawRequest,
+		Response:   response.RawPacket,
+		RespRecord: response,
 	}
 	if raw != nil {
 		redirectRawPackets = append(redirectRawPackets, raw)
@@ -421,9 +423,10 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				return response, nil
 			}
 			responseRaw := &RedirectFlow{
-				IsHttps:  response.Https,
-				Request:  response.RawRequest,
-				Response: response.RawPacket,
+				IsHttps:    response.Https,
+				Request:    response.RawRequest,
+				Response:   response.RawPacket,
+				RespRecord: response,
 			}
 			if responseRaw == nil {
 				response.RawPacket = lastPacket.Response // 保留原始报文
