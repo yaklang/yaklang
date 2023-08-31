@@ -5,11 +5,10 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
-	"net"
 )
 
 var _ Generator = (*DNSGen)(nil)
@@ -94,45 +93,41 @@ func (g *DNSGen) Gen() []byte {
 		}
 	}
 
-	ipLayer := &layers.IPv4{
-		Version:  4,                    // 版本号
-		TTL:      64,                   // 生存时间
-		Protocol: layers.IPProtocolUDP, // 协议类型
-	}
-
-	ipLayer.SrcIP = net.ParseIP(utils.GetLocalIPAddress())
-	if ipLayer.SrcIP == nil {
-		log.Error("fetch local ip address failed")
-		return nil
-	}
-	ipLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
-
-	udpLayer := &layers.UDP{}
-
-	udpLayer.SrcPort = layers.UDPPort(g.srcPort.GetAvailablePort())
-	if g.dstPost.Any {
-		udpLayer.DstPort = layers.UDPPort(53)
-	} else {
-		udpLayer.DstPort = layers.UDPPort(g.dstPost.GetAvailablePort())
-	}
-	_ = udpLayer.SetNetworkLayerForChecksum(ipLayer)
-
-	dnsLayer := &layers.DNS{}
-	dnsLayer.OpCode = layers.DNSOpCode(opcode)
-	dnsLayer.Questions = []layers.DNSQuestion{
-		{
-			Name: g.query.Gen(),
+	dnsLayer := &layers.DNS{
+		ID:     uint16(rand.Intn(65535)),
+		OpCode: layers.DNSOpCode(opcode),
+		Questions: []layers.DNSQuestion{
+			{
+				Name:  g.query.Gen(),
+				Type:  layers.DNSTypeA,
+				Class: layers.DNSClassAny,
+			},
 		},
+		QDCount: 1,
+		RD:      true,
 	}
 
 	buffer := gopacket.NewSerializeBuffer()
 	err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
-	}, ipLayer, udpLayer, dnsLayer)
+	}, dnsLayer)
 	if err != nil {
 		log.Errorf("serialize layers failed: %s", err)
 		return nil
 	}
-	return buffer.Bytes()
+
+	var opts []any
+	opts = append(opts, pcapx.WithIPv4_SrcIP(g.srcIP.Generate()))
+	opts = append(opts, pcapx.WithIPv4_DstIP(g.dstIP.Generate()))
+	opts = append(opts, pcapx.WithUDP_SrcPort(uint16(g.srcPort.GetAvailablePort())))
+	opts = append(opts, pcapx.WithUDP_DstPort(uint16(g.dstPost.GenerateWithDefault(53))))
+	opts = append(opts, pcapx.WithPayload(buffer.Bytes()))
+
+	raw, err := pcapx.PacketBuilder(opts...)
+	if err != nil {
+		log.Errorf("generate dns packet failed: %s", err)
+		return nil
+	}
+	return raw
 }

@@ -99,6 +99,9 @@ func (a *AddressRule) Match(i string) bool {
 
 func (a *AddressRule) Generate() string {
 	// todo: implement it!
+	if a == nil {
+		return "123.123.123.123"
+	}
 	if a.Env == "HOME_NET" {
 		return utils.GetLocalIPAddress()
 	}

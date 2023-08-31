@@ -3,16 +3,23 @@ package generate
 import (
 	"bytes"
 	"errors"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"math/rand"
 )
 
 var _ Generator = (*HTTPGen)(nil)
 
 type HTTPGen struct {
-	rules []*rule.ContentRule
-	gen   map[modifier.Modifier]ModifierGenerator
+	rules   []*rule.ContentRule
+	srcAddr *rule.AddressRule
+	dstAddr *rule.AddressRule
+	srcPort *rule.PortRule
+	dstPort *rule.PortRule
+	gen     map[modifier.Modifier]ModifierGenerator
 }
 
 func newHTTPGen(r *rule.Rule) (Generator, error) {
@@ -57,9 +64,33 @@ func newHTTPGen(r *rule.Rule) (Generator, error) {
 }
 
 func (g *HTTPGen) Gen() []byte {
+	var opts []any
+
 	mp := make(map[modifier.Modifier][]byte)
 	for k, gener := range g.gen {
 		mp[k] = gener.Gen()
 	}
-	return lowhttp.FixHTTPPacketCRLF(HTTPCombination(mp), false)
+
+	payload := lowhttp.FixHTTPPacketCRLF(HTTPCombination(mp), false)
+	opts = append(opts, pcapx.WithPayload(payload))
+
+	opts = append(opts, pcapx.WithIPv4_SrcIP(g.srcAddr.Generate()))
+	opts = append(opts, pcapx.WithIPv4_DstIP(g.dstAddr.Generate()))
+
+	if lowhttp.IsResp(payload) {
+		opts = append(opts, pcapx.WithTCP_SrcPort(uint16(g.srcPort.GenerateWithDefault(80))))
+		opts = append(opts, pcapx.WithTCP_DstPort(uint16(g.dstPort.GetAvailablePort())))
+	} else {
+		opts = append(opts, pcapx.WithTCP_SrcPort(uint16(g.srcPort.GetAvailablePort())))
+		opts = append(opts, pcapx.WithTCP_DstPort(uint16(g.dstPort.GenerateWithDefault(80))))
+	}
+
+	opts = append(opts, pcapx.WithTCP_Window(rand.Intn(2048)))
+
+	raw, err := pcapx.PacketBuilder(opts...)
+	if err != nil {
+		log.Errorf("generate http packet failed: %s", err)
+		return nil
+	}
+	return raw
 }
