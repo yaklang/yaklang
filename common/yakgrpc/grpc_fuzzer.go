@@ -809,8 +809,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						continue
 					}
 				}
-				//修正最后一个req
-				rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
+				//如果重定向了,修正最后一个req
+				if len(redirectPacket) > 0 {
+					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
+				}
 			}
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
 			rsp.TaskId = int64(taskId)
