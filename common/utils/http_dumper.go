@@ -268,10 +268,10 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString(req.Method)
 	buf.WriteString(" ")
-	if req.RequestURI == "" {
-		buf.WriteString(req.URL.RequestURI())
-	} else {
+	if req.Method == "CONNECT" {
 		buf.WriteString(req.RequestURI)
+	} else {
+		buf.WriteString(req.URL.RequestURI())
 	}
 	buf.WriteString(" ")
 	if h2 {

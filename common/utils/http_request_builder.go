@@ -3,8 +3,8 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
@@ -78,6 +78,171 @@ func ReadHTTPRequestFromBytes(raw []byte) (*http.Request, error) {
 	return readHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true)
 }
 
+const minIPInteger uint32 = 1 << 24
+
+func ParseStringToUrl(s string) *url.URL {
+	// schema://user:password@host:port/path?query#fragment
+	// schema://user:password@host:port/path;param?query#fragment
+	// schema://host:port/path;param?query#fragment
+	// ://host:port/path;param?query#fragment
+	// my-app+secure://example.com:80//proxy/https://github.proxy.com
+	// baidu.com:443http://example.com
+	// baidu.com:443
+	// baidu.com
+	// 192.168.1.1:
+	// 0x01000000
+	var u = new(url.URL)
+
+	// handle #
+	s, fragment, fragmentOk := strings.Cut(s, "#")
+	if fragmentOk {
+		u.Fragment = fragment
+	}
+
+	var haveSchemaSplit = false
+RETRY:
+	if strings.HasPrefix(s, "/") {
+		// /path?query#fragment
+		// /path;param?query#fragment params
+		var after string
+		var ok bool
+		u.Path, after, ok = strings.Cut(s, "?")
+		if ok {
+			u.RawQuery, after, ok = strings.Cut(after, "#")
+			if ok {
+				u.Fragment = after
+			}
+		}
+		return u
+	} else if strings.HasPrefix(s, "://") {
+		s = strings.TrimPrefix(s, "://")
+		haveSchemaSplit = true
+		goto RETRY
+	} else if strings.Contains(s, "://") {
+		origin := s
+		var schema string
+		schema, s, haveSchemaSplit = strings.Cut(origin, "://")
+		u.Scheme = schema
+		if strings.Contains(schema, ".") {
+			log.Warnf("unhealthy schema(%v) found in %v", schema, origin)
+		}
+		goto RETRY
+	} else {
+		// checking /
+		if strings.Contains(s, "/") {
+			var after string
+			var ok bool
+			u.Host, after, ok = strings.Cut(s, "/")
+			if ok {
+				after = "/" + after
+			}
+			if after != "" {
+				u.Path, after, ok = strings.Cut(after, "?")
+				if ok {
+					u.RawQuery, after, ok = strings.Cut(after, "#")
+					if ok {
+						u.Fragment = after
+					}
+				}
+			}
+		} else if strings.Contains(s, ":") {
+			hostname, port, ok := strings.Cut(s, ":")
+			if ok && codec.Atoi(port) > 0 && strings.Trim(hostname, ": ") != "" {
+				u.Host = HostPort(hostname, port)
+			} else if !ok || strings.TrimSpace(port) == "" {
+				u.Host = hostname
+			} else {
+				u.Host = HostPort(hostname, port)
+			}
+		} else {
+			var queryOk bool
+			var result string
+			result, u.RawQuery, queryOk = strings.Cut(s, "?")
+			if !queryOk && haveSchemaSplit {
+				u.Host = result
+			} else {
+				u.Path = result
+			}
+		}
+	}
+
+	if u.Host != "" {
+		var userInfo string
+		userInfo, host, ok := strings.Cut(u.Host, "@")
+		if ok {
+			u.Host = host
+			if userInfo != "" && host != "" {
+				if strings.Contains(userInfo, ":") {
+					username, password, _ := strings.Cut(userInfo, ":")
+					u.User = url.UserPassword(username, password)
+				} else {
+					u.User = url.User(userInfo)
+				}
+			}
+		}
+
+		if strings.Contains(u.Host, "?") {
+			u.Host, u.RawQuery, _ = strings.Cut(u.Host, "?")
+		}
+	}
+
+	return u
+}
+
+func GetConnectedToHostPortFromHTTPRequest(t *http.Request) (string, error) {
+	connectedTo := httpctx.GetContextStringInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+	if connectedTo == "" {
+		https, hostport, port, err := generateConnectedToFromHTTPRequest(t)
+		if err != nil {
+			return "", err
+		}
+
+		var result string
+		if https {
+			result = strings.TrimSuffix(hostport, ":443")
+		} else {
+			result = strings.TrimSuffix(hostport, ":80")
+		}
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, result)
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, ExtractHost(result))
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
+		return result, nil
+	}
+	return connectedTo, nil
+}
+
+func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, error) {
+	if t == nil {
+		return false, "", 0, Error("nil http request")
+	}
+
+	var port int
+	var isHttps = (t.TLS != nil) || t.URL.Scheme == "https" || t.URL.Scheme == "wss"
+	if isHttps {
+		port = 443
+	} else {
+		port = 80
+	}
+
+	host := t.Host
+	if host == "" {
+		host = t.URL.Host
+	}
+	if ret := strings.LastIndex(host, ":"); ret > 0 {
+		var hostname string
+		hostname, port = host[:ret], codec.Atoi(host[ret+1:])
+		if port > 0 {
+			return isHttps, HostPort(hostname, port), port, nil
+		}
+		return false, "", 0, Errorf("invalid host: %v, cannot parse to host:port", host)
+	}
+	if ret := HostPort(host, port); strings.HasPrefix(ret, ":") {
+		return false, "", 0, Errorf("invalid host:port(%v) from %v", ret, host)
+	} else {
+		return isHttps, ret, port, nil
+	}
+}
+
 func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool) (*http.Request, error) {
 	var rawPacket = new(bytes.Buffer)
 
@@ -129,54 +294,11 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 		return nil, Errorf(`Parse Request FirstLine(%v) Failed: %s`, strconv.Quote(string(firstLine)), firstLine)
 	}
 
-	// uri is very complex
-	// utf8 valid or not
-	if strings.Contains(uri, "://") && method == "CONNECT" {
-		fmt.Println("DEBUG")
-	}
-	before, fragment, _ := strings.Cut(req.RequestURI, "#")
-	urlIns, _ := url.ParseRequestURI(before)
-	if urlIns == nil {
-		// remove : begin
-		// utf8 invalid
-		urlIns = new(url.URL)
-		if method == "CONNECT" {
-			urlIns.Host = before
-		} else {
-			var after = req.RequestURI
-			if IsHttpOrHttpsUrl(req.RequestURI) {
-				var schemaRaw, rest, ok = strings.Cut(req.RequestURI, "://")
-				if ok {
-					if strings.Contains(schemaRaw, ".") {
-						fmt.Println("DEBUG")
-					}
-					urlIns.Scheme = schemaRaw
-					after = rest
-				}
-			}
-			if strings.HasPrefix(after, "/") {
-				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
-			} else if strings.Contains(after, "/") {
-				var hostraw, after, _ = strings.Cut(after, "/")
-				after = "/" + after
-				if strings.Contains(hostraw, "@") {
-					var userinfo, hostport string
-					userinfo, hostport, _ = strings.Cut(hostraw, "@")
-					urlIns.User = url.UserPassword(userinfo, "")
-					urlIns.Host = hostport
-				} else {
-					urlIns.Host = hostraw
-				}
-				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
-			} else {
-				urlIns.Path, urlIns.RawQuery, _ = strings.Cut(after, "?")
-			}
-		}
-	}
-	if urlIns != nil {
-		urlIns.Fragment = fragment
-	}
-	req.URL = urlIns
+	var (
+		// RequestURI > URL > Host in header
+		hostInURL    string
+		hostInHeader string
+	)
 
 	/*
 		handle headers
@@ -195,7 +317,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 	var useTransferEncodingChunked = false
 	for {
 		lineBytes, err := BufioReadLine(reader)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return nil, Errorf(`Read Request Header Failed: %s`, err)
 		}
 		rawPacket.Write(lineBytes)
@@ -223,6 +345,8 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 				header.Set(keyStr, valStr)
 				req.ContentLength = int64(contentLengthInt)
 			}
+		case "host":
+			hostInHeader = valStr
 		case "content-type":
 			isSingletonHeader = true
 		case `transfer-encoding`:
@@ -230,8 +354,6 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 			if strings.EqualFold(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
-		case "host":
-			req.Host = valStr
 		case "connection":
 			if strings.EqualFold(valStr, "close") {
 				defaultClose = true
@@ -249,15 +371,74 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 			continue
 		}
 		header[keyStr] = append(header[keyStr], valStr)
-
-		//if firstCap := keyStr[0]; 'A' <= firstCap && firstCap <= 'Z' {
-		//	header.Add(keyStr, valStr)
-		//} else {
-		//	header[keyStr] = append(header[keyStr], valStr)
-		//}
 	}
+
+	// uri is very complex
+	// utf8 valid or not
+	before, fragment, haveFragment := strings.Cut(req.RequestURI, "#")
+	var urlIns *url.URL
+	if method == "CONNECT" {
+		urlIns = new(url.URL)
+		// if connect, the uri should be host:port
+		var host, port, _ = ParseStringToHostPort(before)
+		if port > 0 {
+			urlIns.Host = HostPort(host, port)
+		} else {
+			if strings.HasPrefix(hostInHeader, ":") {
+				port := codec.Atoi(hostInHeader[1:])
+				if port > 0 && port <= 65535 {
+					urlIns.Host = HostPort(host, port)
+				} else {
+					urlIns.Host = strings.Trim(host, "/")
+				}
+			} else {
+				urlIns.Host = strings.Trim(host, "/")
+			}
+		}
+	} else if urlIns, _ = url.ParseRequestURI(before); urlIns == nil {
+		// remove : begin
+		// utf8 invalid
+		urlIns = new(url.URL)
+		if IsHttpOrHttpsUrl(req.RequestURI) {
+			urlIns, err = url.Parse(req.RequestURI)
+			if err != nil {
+				return nil, Errorf("parse uri-url (%v) failed: %s", req.RequestURI, err)
+			}
+		} else {
+			urlIns.Path, urlIns.RawQuery, _ = strings.Cut(req.RequestURI, "?")
+		}
+	}
+
+	if urlIns != nil && haveFragment {
+		urlIns.Fragment = fragment
+	}
+	req.URL = urlIns
+
+	// handle host
+	hostInURL = req.URL.Host
+	if ret := strings.LastIndex(hostInURL, ":"); ret >= 0 {
+		hostname, portStr := strings.TrimSpace(hostInURL[:ret]), codec.Atoi(hostInURL[ret+1:])
+		if hostname == "" || portStr == 0 {
+			req.URL.Host = ""
+			hostInURL = ""
+		}
+	}
+
 	req.Close = defaultClose
 	req.Header = header
+
+	// handling host
+	if hostInHeader == "" && hostInURL == "" && method == "CONNECT" {
+		return nil, Error(`Host(inHeader/inURL) is empty in CONNECT method`)
+	}
+
+	var host string
+	if hostInURL != "" {
+		host = hostInURL
+	} else {
+		host = hostInHeader
+	}
+	req.Host = host
 
 	var bodyRawBuf = new(bytes.Buffer)
 	if fixContentLength {
