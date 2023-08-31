@@ -526,6 +526,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	/*
 	   extract url
 	*/
+	var forceOverrideURL string
 	var urlBuf bytes.Buffer
 	if https {
 		urlBuf.WriteString("https://")
@@ -542,6 +543,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		requestURI = uri
 		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
 			enableHttp2 = true
+		}
+		if utils.IsHttpOrHttpsUrl(requestURI) {
+			forceOverrideURL = requestURI
 		}
 		return nil
 	}, func(line string) {
@@ -562,30 +566,37 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if hostInPacket == "" && host == "" {
 		return nil, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
-	if hostInPacket != "" {
-		urlBuf.WriteString(hostInPacket)
-	} else {
-		urlBuf.WriteString(host)
-		if (https && port != 443) || (!https && port != 80) {
-			urlBuf.WriteString(fmt.Sprintf(":%d", port))
+
+	var urlStr = forceOverrideURL
+	var noURI string
+	if urlStr == "" {
+		if hostInPacket != "" {
+			urlBuf.WriteString(hostInPacket)
+		} else {
+			urlBuf.WriteString(host)
+			if (https && port != 443) || (!https && port != 80) {
+				urlBuf.WriteString(fmt.Sprintf(":%d", port))
+			}
 		}
-	}
-	noURI := urlBuf.String()
-	if requestURI == "" {
-		urlBuf.WriteString("/")
-	} else {
-		if !strings.HasPrefix(requestURI, "/") {
+		noURI = urlBuf.String()
+		if requestURI == "" {
 			urlBuf.WriteString("/")
+		} else {
+			if !strings.HasPrefix(requestURI, "/") {
+				urlBuf.WriteString("/")
+			}
+			urlBuf.WriteString(utils.EscapeInvalidUTF8Byte([]byte(requestURI)))
 		}
-		urlBuf.WriteString(utils.EscapeInvalidUTF8Byte([]byte(requestURI)))
+		urlStr = urlBuf.String()
 	}
-	urlStr := urlBuf.String()
+
 	urlIns, err := url.Parse(urlStr)
 	if err != nil {
-		urlIns, err = url.Parse(noURI)
-		if err != nil {
-			return nil, utils.Errorf(`parse url %#v failed: %s`, urlStr, err)
-		}
+		urlIns = utils.ParseStringToUrl(noURI)
+		//urlIns, err = url.Parse(noURI)
+		//if err != nil {
+		//	return nil, utils.Errorf(`parse url %#v failed: %s`, urlStr, err)
+		//}
 	}
 
 	/*
