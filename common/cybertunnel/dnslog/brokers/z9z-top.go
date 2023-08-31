@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-type dnslogCNBroker struct {
+type z9zTopBroker struct {
 }
 
-func (d *dnslogCNBroker) Require(timeout time.Duration, proxy ...string) (domain, token string, err error) {
+func (d *z9zTopBroker) Require(timeout time.Duration, proxy ...string) (domain, token string, err error) {
 	var r string
 	var samples, _ = mutate.FuzzTagExec(`{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(1000, 9999)}}`)
 	if len(samples) > 0 {
@@ -24,12 +24,12 @@ func (d *dnslogCNBroker) Require(timeout time.Duration, proxy ...string) (domain
 	}
 
 	netx.LookupFirst(`dnslog.cn`, netx.WithTimeout(5*time.Second))
-	packet := []byte(`GET /getdomain.php?t=0.06596369931824886 HTTP/1.1
-Host: dnslog.cn
+	packet := []byte(`GET /getdomain/?t=0.06596369931824886 HTTP/1.1
+Host: dnslog.bczs.net
 Accept: */*
 Accept-Encoding: gzip, deflate
 Accept-Language: zh-CN,zh;q=0.9
-Referer: http://dnslog.cn/
+Referer: http://dnslog.bczs.net/
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
 
 `)
@@ -46,35 +46,35 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 	_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
 	subdomain := string(body)
-	token = lowhttp.GetHTTPPacketCookie(rsp.RawPacket, "PHPSESSID")
+	token = lowhttp.GetHTTPPacketCookie(rsp.RawPacket, "sessionid")
 
 	if token == "" || subdomain == "" {
 		return "", "", utils.Errorf("lowhttp.GetHTTPPacketCookie failed: %v", "cookie or subdomain is empty")
 	}
-	log.Infof("dnslog.cn subdomain: %s, token: %s", subdomain, token)
+	log.Debugf("dnslog.bczs.net subdomain: %s, token: %s", subdomain, token)
 	return subdomain, token, nil
 }
 
-func (d *dnslogCNBroker) GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
-	log.Infof("dnslog.cn token: %s", token)
+func (d *z9zTopBroker) GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error) {
+	log.Debugf("dnslog.bczs.net token: %s", token)
 	var r string
 	var samples, _ = mutate.FuzzTagExec(`{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(10000, 99999)}}{{randint(1000, 9999)}}`)
 	if len(samples) > 0 {
 		r = samples[0]
 	}
 
-	packet := []byte(`GET /getrecords.php?t=0.38722448860909564 HTTP/1.1
-Host: dnslog.cn
+	packet := []byte(`GET /getrecords/?t=0.38722448860909564 HTTP/1.1
+Host: dnslog.bczs.net
 Accept: */*
 Accept-Encoding: gzip, deflate
 Accept-Language: zh-CN,zh;q=0.9
 Cookie: PHPSESSID=aaa
-Referer: http://dnslog.cn/
+Referer: http://dnslog.bczs.net/
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
 
 `)
 	packet = lowhttp.ReplaceHTTPPacketQueryParam(packet, "t", `0.`+r)
-	packet = lowhttp.ReplaceHTTPPacketCookie(packet, "PHPSESSID", token)
+	packet = lowhttp.ReplaceHTTPPacketCookie(packet, "sessionid", token)
 	rspIns, err := lowhttp.HTTP(
 		lowhttp.WithRequest(packet),
 		lowhttp.WithTimeout(timeout),
@@ -95,24 +95,22 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	}
 	var events []*tpb.DNSLogEvent
 	funk.ForEach(i, func(sub any) {
-		params := utils.InterfaceToStringSlice(sub)
-		if len(params) < 3 {
+		params := utils.InterfaceToMapInterface(sub)
+		if params == nil {
 			return
 		}
-		var subdomain = params[0]
+		var subdomain = params["0"].(string)
 		if subdomain == "" {
 			return
 		}
-
-		var ip = params[1]
-		var timeStr = params[2]
+		var timeStr = params["2"].(string)
 
 		var event = &tpb.DNSLogEvent{
-			Type:       "A",
+			Type:       params["1"].(string),
 			Token:      token,
 			Domain:     subdomain,
-			RemoteAddr: ip + ":0",
-			RemoteIP:   ip,
+			RemoteAddr: "",
+			RemoteIP:   "",
 			Raw:        []byte(spew.Sdump(sub)),
 			Mode:       d.Name(),
 		}
@@ -128,12 +126,12 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	return events, nil
 }
 
-func (d *dnslogCNBroker) Name() string {
-	return "dnslog.cn"
+func (d *z9zTopBroker) Name() string {
+	return "z9z.top"
 }
 
-var defaultDNSLogCN = &dnslogCNBroker{}
+var defaultZ9zTop = &z9zTopBroker{}
 
 func init() {
-	register(defaultDNSLogCN)
+	register(defaultZ9zTop)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -80,6 +81,40 @@ func GetClient(ctx context.Context, addr, secret string) (context.Context, tpb.T
 	// create tunnel
 	client := tpb.NewTunnelClient(conn)
 	return ctx, client, conn, nil
+}
+
+func GetSupportDNSLogBrokersName() []string {
+	return dnslogbrokers.BrokerNames()
+}
+
+func GetSupportDNSLogBroker(mode string) dnslogbrokers.DNSLogBroker {
+	return dnslogbrokers.GetDNSLogBroker(mode)
+}
+
+func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+	broke, err := dnslogbrokers.Get(mode)
+	if err != nil {
+		return "", "", "", utils.Errorf("get dnslog broker by local failed: %v", err)
+	}
+	var count = 0
+	for {
+		count++
+		domain, token, err := broke.Require(15 * time.Second)
+		if err != nil {
+			if count > 3 {
+				return "", "", "", utils.Errorf("require dns domain failed: %s", err)
+			}
+
+			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
+				continue
+			}
+			return "", "", "", err
+		}
+		return domain, token, mode, nil
+	}
 }
 
 func GetDNSLogClient(addr string) (tpb.DNSLogClient, *grpc.ClientConn, error) {
@@ -217,40 +252,40 @@ func RequirePortByToken(
 	})
 }
 
-func RequireDNSLogDomain(addr string) (domain string, token string, _ error) {
+func RequireDNSLogDomainByRemote(addr, mode string) (string, string, string, error) {
 	if addr == "" {
 		addr = consts.GetDefaultPublicReverseServer()
 	}
 	client, conn, err := GetDNSLogClient(addr)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer conn.Close()
 
 	var count = 0
 	for {
 		count++
-		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{})
+		rsp, err := client.RequireDomain(utils.TimeoutContextSeconds(10), &tpb.RequireDomainParams{Mode: mode})
 		if err != nil {
 			if count > 3 {
-				return "", "", utils.Errorf("require dns domain failed: %s", err)
+				return "", "", "", utils.Errorf("require dns domain failed: %s", err)
 			}
 
 			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
 				continue
 			}
-			return "", "", err
+			return "", "", "", err
 		}
-		return rsp.Domain, rsp.Token, nil
+		return rsp.Domain, rsp.Token, rsp.Mode, nil
 	}
 
 }
 
-func QueryExistedDNSLogEvents(addr string, token string) ([]*tpb.DNSLogEvent, error) {
-	return QueryExistedDNSLogEventsEx(addr, token, 10)
+func QueryExistedDNSLogEvents(addr, token, mode string) ([]*tpb.DNSLogEvent, error) {
+	return QueryExistedDNSLogEventsEx(addr, token, mode, 10)
 }
 
-func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+func QueryExistedDNSLogEventsEx(addr, token, mode string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f = 5.0
 	if len(timeout) > 0 {
 		f = timeout[0]
@@ -271,7 +306,7 @@ func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) (
 	var count = 0
 	for {
 		count++
-		rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token})
+		rsp, err := client.QueryExistedDNSLog(utils.TimeoutContextSeconds(f), &tpb.QueryExistedDNSLogParams{Token: token, Mode: mode})
 		if err != nil {
 			if count > 3 {
 				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())
@@ -284,6 +319,44 @@ func QueryExistedDNSLogEventsEx(addr string, token string, timeout ...float64) (
 			return nil, err
 		}
 		return rsp.Events, nil
+	}
+}
+
+func QueryExistedDNSLogEventsByLocal(token, mode string) ([]*tpb.DNSLogEvent, error) {
+	return QueryExistedDNSLogEventsByLocalEx(token, mode, 10)
+}
+
+func QueryExistedDNSLogEventsByLocalEx(token, mode string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	var f = 5.0
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5
+	}
+
+	if mode == "*" {
+		mode = dnslogbrokers.Random()
+	}
+
+	var broker, _ = dnslogbrokers.Get(mode)
+
+	var count = 0
+	for {
+		count++
+		results, err := broker.GetResult(token, 15*time.Second)
+		if err != nil {
+			if count > 3 {
+				return nil, utils.Errorf("retry query existed dnslog[retry: %v] failed: %s", count, err.Error())
+			}
+
+			reason := strings.ToLower(err.Error())
+			if strings.Contains(reason, "i/o timeout") || strings.Contains(reason, "context deadline exceeded") {
+				continue
+			}
+			return nil, err
+		}
+		return results, nil
 	}
 }
 
