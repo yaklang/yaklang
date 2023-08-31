@@ -527,7 +527,7 @@ type Update struct {
 	anInstruction
 
 	Value   Value
-	address *Field
+	Address *Field
 }
 
 var _ Node = (*Update)(nil)

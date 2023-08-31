@@ -297,6 +297,6 @@ func (f *Field) String() string {
 func (s *Update) String() string {
 	return fmt.Sprintf(
 		"update [%s] = %s",
-		getStr(s.address), getStr(s.Value),
+		getStr(s.Address), getStr(s.Value),
 	)
 }

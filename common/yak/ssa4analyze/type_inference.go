@@ -7,10 +7,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-const TAG ssa.ErrorTag = "typeInference"
+const TypeInferenceTAG ssa.ErrorTag = "typeInference"
 
 type TypeInference struct {
-	Finish map[ssa.Instruction]struct{}
+	Finish    map[ssa.InstructionValue]struct{}
+	CheckList []ssa.InstructionValue
 }
 
 func init() {
@@ -19,55 +20,141 @@ func init() {
 
 // Analyze(config, *ssa.Program)
 func (t *TypeInference) Analyze(config config, prog *ssa.Program) {
-	t.Finish = make(map[ssa.Instruction]struct{})
+	t.Finish = make(map[ssa.InstructionValue]struct{})
 
-	// dfs with finish-flag
-	var analyzeInst func(ssa.Instruction)
-	analyzeInst = func(inst ssa.Instruction) {
-		if _, ok := t.Finish[inst]; ok {
-			// finished, just return
-			return
-		}
-		if !t.AnalyzeOnInstruction(inst) {
+	// dfs: down-up; inference type (from value to user)
+	var inference func(ssa.InstructionValue)
+	inference = func(inst ssa.InstructionValue) {
+		if !t.InferenceOnInstruction(inst) {
 			// not finish, just next
 			return
 		}
 		// finish
 		t.Finish[inst] = struct{}{}
-
-		// if this instruction is value; update all user type
-		value, ok := inst.(ssa.Value)
-		if !ok {
-			return
-		}
 		// dfs from value to user
-		for _, user := range value.GetUsers() {
-			uInst, ok := user.(ssa.Instruction)
+		for _, user := range inst.GetUsers() {
+			uInst, ok := user.(ssa.InstructionValue)
 			if !ok {
 				continue
 			}
-			analyzeInst(uInst)
+			inference(uInst)
+		}
+	}
+
+	// dfs: up-down; check and set type (from user to value)
+	var check func(ssa.InstructionValue)
+	check = func(inst ssa.InstructionValue) {
+		if !t.CheckOnInstruction(inst) {
+			// not finish, just next
+			return
+		}
+		t.Finish[inst] = struct{}{}
+		// dfs from user to value
+		for _, value := range inst.GetValues() {
+			vInst, ok := value.(ssa.InstructionValue)
+			if !ok {
+				continue
+			}
+			check(vInst)
+		}
+	}
+
+	analyzeOnFunction := func(f *ssa.Function) {
+		t.CheckList = make([]ssa.InstructionValue, 0)
+		for _, b := range f.Blocks {
+			for _, phi := range b.Phis {
+				inference(phi)
+			}
+			for _, inst := range b.Instrs {
+				i, ok := inst.(ssa.InstructionValue)
+				if !ok {
+					continue
+				}
+				inference(i)
+			}
+		}
+		for _, i := range t.CheckList {
+			check(i)
 		}
 	}
 
 	for _, pkg := range prog.Packages {
 		for _, f := range pkg.Funcs {
-			for _, b := range f.Blocks {
-				for _, phi := range b.Phis {
-					analyzeInst(phi)
-				}
-				for _, inst := range b.Instrs {
-					analyzeInst(inst)
-				}
-			}
+			analyzeOnFunction(f)
 		}
 	}
 }
 
-func (t *TypeInference) AnalyzeOnInstruction(inst ssa.Instruction) bool {
+func (t *TypeInference) CheckOnInstruction(inst ssa.InstructionValue) bool {
+	// if _, ok := t.Finish[inst]; ok {
+	// 	return true
+	// }
+
+	switch inst := inst.(type) {
+
+	case *ssa.Interface:
+		// pass; this is top instruction
+		return true
+	case *ssa.Field:
+		return t.TypeCheckField(inst)
+	case *ssa.Update:
+		return t.TypeCheckUpdate(inst)
+		// case *ssa.ConstInst:
+		// case *ssa.BinOp:
+	}
+
+	return false
+}
+
+/*
+if v.Type !match typ return true
+if v.Type match  typ return false
+*/
+func checkType(v ssa.Value, typ ssa.Types) bool {
+	if v.GetType().Contains(typ) {
+		return false
+	}
+	v.SetType(typ)
+	if inst, ok := v.(ssa.Instruction); ok {
+		inst.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", typ)
+	}
+	return true
+}
+
+func (t *TypeInference) TypeCheckField(f *ssa.Field) bool {
+	// use interface
+	// if _, ok := t.Finish[f.I]; ok {
+	interfaceTyp := f.I.GetType()[0].(*ssa.InterfaceType)
+	fTyp, kTyp := interfaceTyp.GetField(f.Key)
+	if fTyp == nil || kTyp == nil {
+		f.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this field not in interface")
+		return false
+	}
+	// if one change, will next check
+	fcheck := checkType(f, fTyp)
+	kcheck := checkType(f.Key, kTyp)
+	return fcheck || kcheck
+}
+
+func (t *TypeInference) TypeCheckUpdate(u *ssa.Update) bool {
+	if checkType(u.Value, u.Address.GetType()) {
+		u.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", u.Address.GetType())
+		return true
+	} else {
+		return false
+	}
+}
+
+func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 	if _, ok := t.Finish[inst]; ok {
 		return true
 	}
+	// set type in ast-builder
+	if len(inst.GetType()) != 0 {
+		t.CheckList = append(t.CheckList, inst)
+		return true
+	}
+
 	switch inst := inst.(type) {
 	case *ssa.Phi:
 		return t.TypeInferencePhi(inst)
@@ -76,16 +163,16 @@ func (t *TypeInference) AnalyzeOnInstruction(inst ssa.Instruction) bool {
 		return t.TypeInferenceBinOp(inst)
 	case *ssa.Call:
 		return t.TypeInferenceCall(inst)
-	case *ssa.Return:
-		return t.TypeInferenceReturn(inst)
+	// case *ssa.Return:
+	// 	return t.TypeInferenceReturn(inst)
 	// case *ssa.Switch:
 	// case *ssa.If:
 	case *ssa.Interface:
 		return t.TypeInferenceInterface(inst)
 	case *ssa.Field:
 		return t.TypeInferenceField(inst)
-		// case *ssa.Update:
-		// return TypeInferenceUpdate(inst)
+	case *ssa.Update:
+		return t.TypeInferenceUpdate(inst)
 	}
 	return false
 }
@@ -93,13 +180,13 @@ func (t *TypeInference) AnalyzeOnInstruction(inst ssa.Instruction) bool {
 func collectTypeFromValues(values []ssa.Value, skip func(int, ssa.Value) bool) []ssa.Type {
 	typMap := make(map[ssa.Type]struct{})
 	typs := make([]ssa.Type, 0, len(values))
-	for index, value := range values {
+	for index, v := range values {
 		// skip function
-		if skip(index, value) {
+		if skip(index, v) {
 			continue
 		}
 		// uniq typ
-		for _, typ := range value.GetType() {
+		for _, typ := range v.GetType() {
 			if _, ok := typMap[typ]; !ok {
 				typMap[typ] = struct{}{}
 				typs = append(typs, typ)
@@ -112,8 +199,7 @@ func collectTypeFromValues(values []ssa.Value, skip func(int, ssa.Value) bool) [
 // if all finish, return false
 func (t *TypeInference) checkValuesNotFinish(vs []ssa.Value) bool {
 	for _, v := range vs {
-		inst, ok := v.(ssa.Instruction)
-
+		inst, ok := v.(ssa.InstructionValue)
 		if !ok {
 			continue
 		}
@@ -167,7 +253,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 	}
 	retTyp := handlerBinOpType(XTyps, YTyps)
 	if retTyp == nil {
-		bin.NewError(ssa.Error, TAG, "this expression type error: x[%s] %s y[%s]", XTyps, ssa.BinaryOpcodeName[bin.Op], YTyps)
+		bin.NewError(ssa.Error, TypeInferenceTAG, "this expression type error: x[%s] %s y[%s]", XTyps, ssa.BinaryOpcodeName[bin.Op], YTyps)
 		return false
 	}
 
@@ -182,12 +268,6 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 }
 
 func (t *TypeInference) TypeInferenceInterface(i *ssa.Interface) bool {
-	// set type in yak-code
-	// TODO: just check
-	if len(i.GetType()) != 0 {
-		return true
-	}
-
 	// check field finish
 	if t.checkValuesNotFinish(
 		lo.MapToSlice(i.Field,
@@ -223,14 +303,6 @@ func (t *TypeInference) TypeInferenceInterface(i *ssa.Interface) bool {
 }
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
-	// use interface
-	if _, ok := t.Finish[f.I]; ok {
-		interfaceTyp := f.I.GetType()[0].(*ssa.InterfaceType)
-		f.SetType(interfaceTyp.GetField(f.Key))
-		// TODO: check all update type
-
-		return true
-	}
 
 	// use update
 	vs := lo.Map(f.Update, func(v ssa.Value, i int) ssa.Value {
@@ -262,5 +334,10 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) bool {
 
 func (t *TypeInference) TypeInferenceReturn(r *ssa.Return) bool {
 	// TODO: type inference return
+	return false
+}
+
+func (t *TypeInference) TypeInferenceUpdate(u *ssa.Update) bool {
+	// TODO: type inference update
 	return false
 }
