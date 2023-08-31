@@ -97,7 +97,8 @@ func NewMITMFilterManager(db *gorm.DB) *MITMFilterManager {
 func (m *MITMFilterManager) IsEmpty() bool {
 	return len(m.ExcludeMIME) <= 0 && len(m.ExcludeMethods) <= 0 &&
 		len(m.ExcludeSuffix) <= 0 && len(m.ExcludeHostnames) <= 0 &&
-		len(m.IncludeHostnames) <= 0 && len(m.IncludeSuffix) <= 0
+		len(m.IncludeHostnames) <= 0 && len(m.IncludeSuffix) <= 0 &&
+		len(m.ExcludeUri) <= 0 && len(m.IncludeUri) <= 0
 }
 
 func (m *MITMFilterManager) Save() {
