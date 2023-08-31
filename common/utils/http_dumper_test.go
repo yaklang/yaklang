@@ -63,6 +63,21 @@ func TestHTTPRequestDumper_C1(t *testing.T) {
 	}
 }
 
+func TestHTTPRequestDumper_CONNECT(t *testing.T) {
+	packet := `CONNECT example.com:443 HTTP/1.1` + CRLF +
+		`Host: example.com:443` + CRLF +
+		`Content-Length: 3` + CRLF + CRLF + "abccccddef"
+	req, err := ReadHTTPRequestFromBytes([]byte(packet))
+	if err != nil {
+		panic(err)
+	}
+	raw, _ := DumpHTTPRequest(req, true)
+	fmt.Println(string(raw))
+	if !bytes.HasPrefix(raw, []byte(`CONNECT example.com:443 HTTP/1.1`)) {
+		t.Fatal("should be GET /bac HTTP/1.1")
+	}
+}
+
 func TestHTTPRequestDumper_Stream_BodyIsSmall(t *testing.T) {
 	packet := `GET / HTTP/1.1` + CRLF +
 		`Host: www.example.com` + CRLF +
