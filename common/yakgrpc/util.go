@@ -6,9 +6,11 @@ import (
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 )
 
 // OpenPortServerStreamerHelperRWC
@@ -115,4 +117,66 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 		log.Info("loading plugin empty")
 	}
 	return params, callback, nil
+}
+
+type YamlMapBuilder yaml.MapSlice
+type YamlArrayBuilder struct {
+	slice *[]*yaml.MapSlice
+}
+
+func (a *YamlArrayBuilder) Add(slice *YamlMapBuilder) {
+	*a.slice = append(*a.slice, (*yaml.MapSlice)(slice))
+}
+func NewYamlMapBuilder() *YamlMapBuilder {
+	return &YamlMapBuilder{}
+}
+func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
+	var res yaml.MapSlice
+	for _, item := range *m {
+		switch ret := item.Value.(type) {
+		case *YamlMapBuilder:
+			item.Value = ret.FilterEmptyField()
+		case string:
+			if ret == "" {
+				continue
+			}
+		case *[]*yaml.MapSlice:
+			if len(*ret) == 0 {
+				continue
+			}
+			for i, slice := range *ret {
+				(*ret)[i] = (*YamlMapBuilder)(slice).FilterEmptyField()
+			}
+		}
+		if reflect.TypeOf(item.Value).Kind() == reflect.Array || reflect.TypeOf(item.Value).Kind() == reflect.Slice {
+			if reflect.ValueOf(item.Value).Len() == 0 {
+				continue
+			}
+		}
+		if reflect.TypeOf(item.Value).Kind() == reflect.Ptr && (reflect.ValueOf(item.Value).IsNil() || reflect.ValueOf(item.Value).Elem().IsNil()) {
+			continue
+		}
+		res = append(res, item)
+	}
+	return &res
+}
+func (m *YamlMapBuilder) Set(k string, v any) {
+	*m = append(*m, yaml.MapItem{
+		Key:   k,
+		Value: v,
+	})
+}
+func (m *YamlMapBuilder) NewSubMapBuilder(k string) *YamlMapBuilder {
+	newSliceUtil := NewYamlMapBuilder()
+	m.Set(k, newSliceUtil)
+	return newSliceUtil
+}
+func (m *YamlMapBuilder) NewSubArrayBuilder(k string) *YamlArrayBuilder {
+	var v []*yaml.MapSlice
+	m.Set(k, &v)
+	return &YamlArrayBuilder{slice: &v}
+}
+func (m *YamlMapBuilder) MarshalToString() (string, error) {
+	res, err := yaml.Marshal(m.FilterEmptyField())
+	return string(res), err
 }
