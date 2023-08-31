@@ -75,7 +75,7 @@ func TestCookieRawDataTransfer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			afterTransfer := cookieRawDataTransfer(tt.args.cookieRawData)
+			afterTransfer := cookieRawDataTransfer("", tt.args.cookieRawData)
 			actualResult := result{
 				length:     len(afterTransfer),
 				keyFirst:   afterTransfer[0].Name,

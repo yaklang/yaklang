@@ -182,7 +182,7 @@ func headerRawDataTransfer(headerRawData string) []*headers {
 	return transferred
 }
 
-func cookieRawDataTransfer(cookieRawData string) []*proto.NetworkCookieParam {
+func cookieRawDataTransfer(domain, cookieRawData string) []*proto.NetworkCookieParam {
 	transferred := make([]*proto.NetworkCookieParam, 0)
 	if strings.HasPrefix(cookieRawData, "Cookie: ") {
 		cookieRawData = strings.Replace(cookieRawData, "Cookie: ", "", 1)
@@ -196,7 +196,7 @@ func cookieRawDataTransfer(cookieRawData string) []*proto.NetworkCookieParam {
 			continue
 		}
 		items := strings.Split(rawCookie, "=")
-		transferred = append(transferred, &proto.NetworkCookieParam{Name: items[0], Value: items[1]})
+		transferred = append(transferred, &proto.NetworkCookieParam{Name: items[0], Value: items[1], Domain: domain})
 	}
 	return transferred
 }
