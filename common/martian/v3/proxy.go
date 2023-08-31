@@ -556,22 +556,46 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	link(req, ctx, p)
 	defer unlink(req, p)
 
+	var isHttps bool
 	if tconn, ok := conn.(*tls.Conn); ok {
 		session.MarkSecure()
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
+		req.URL.Scheme = "https"
+		isHttps = true
+		httpctx.SetRequestHTTPS(req, true)
 	}
 
-	req.URL.Scheme = "http"
 	if session.IsSecure() {
 		log.Debugf("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
 
 	req.RemoteAddr = conn.RemoteAddr().String()
+	host := req.Host
+	if host == "" {
+		host = req.URL.Host
+	}
+	if host == "" {
+		host = ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+		port := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+		if (isHttps && port != 443) || (!isHttps && port != 80) {
+			host = utils.HostPort(host, port)
+		}
+
+		if host == "" {
+			conn.Close()
+			reqBytes, _ := utils.DumpHTTPRequest(req, true)
+			return utils.Errorf("martian: no host (and not connect to) in request: \n%v\n\n", string(reqBytes))
+		}
+	}
+
 	if req.URL.Host == "" {
-		req.URL.Host = req.Host
+		req.URL.Host = host
+	}
+	if req.Host == "" {
+		req.Host = host
 	}
 
 	isProxy := req.Method == "CONNECT" || req.Header.Get("Proxy-Connection") != "" || req.Header.Get("Proxy-Authorization") != ""
@@ -612,20 +636,31 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	if req.Method == "CONNECT" {
 		// req auth enable
-		var connectedTo = req.Host
-		var urlFromURI = req.URL.String()
-		if host, port, err := utils.ParseStringToHostPort(urlFromURI); err == nil {
-			connectedTo = utils.HostPort(host, port)
-		}
-		if req.URL.Scheme == "https" {
-			connectedTo = strings.TrimSuffix(connectedTo, ":443")
-		}
+		//var connectedTo = req.Host
+		//var urlFromURI = req.URL.String()
+		//if host, port, err := utils.ParseStringToHostPort(urlFromURI); err == nil {
+		//	connectedTo = utils.HostPort(host, port)
+		//}
+		//if req.URL.Scheme == "https" {
+		//	connectedTo = strings.TrimSuffix(connectedTo, ":443")
+		//}
+		//
+		//var parsedConnectedToHost, parsedConnectedToPort, _ = utils.ParseStringToHostPort(connectedTo)
+		//if parsedConnectedToPort <= 0 {
+		//	parsedConnectedToHost = connectedTo
+		//}
+		//ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
+		//ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
 
-		var parsedConnectedToHost, parsedConnectedToPort, _ = utils.ParseStringToHostPort(connectedTo)
-		if parsedConnectedToPort <= 0 {
-			parsedConnectedToHost = connectedTo
+		connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
+		if err != nil {
+			conn.Close()
+			return utils.Errorf("martian: no host (and not connect to) in connect request: \n%v\n\n", err)
 		}
+		parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+		parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
 
 		if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -684,12 +719,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				} else {
 					parsedConnectedToPort = 80
 				}
+				ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 			}
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 
 			// 22 is the TLS handshake.
 			// https://tools.ietf.org/html/rfc5246#section-6.2.1
 			if isHttps {
+				ctx.Session().MarkSecure()
+
 				var serverUseH2 bool
 				if p.http2 {
 					// does remote server use h2?
