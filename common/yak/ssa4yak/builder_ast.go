@@ -3,6 +3,7 @@ package ssa4yak
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -451,6 +452,12 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 				lvalues[i].Assign(rvalues[i], b.FunctionBuilder)
 			}
 		} else if len(rvalues) == 1 {
+			if len(rvalues) == 0 {
+				// (0) = (1)
+
+				return
+			}
+
 			// (n) = (1)
 			if inter, ok := rvalues[0].(*ssa.Interface); ok {
 				// (n) = field(1, #index)
@@ -460,6 +467,11 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 				}
 			}
 		} else if len(lvalues) == 1 {
+			if len(rvalues) == 0 {
+				// (1) = (0) undefine
+				lvalues[0].Assign(ssa.UnDefineConst, b.FunctionBuilder)
+				return
+			}
 			// (1) = (n)
 			// (1) = interface(n)
 			_interface := b.CreateInterfaceWithVs(nil, rvalues)
@@ -563,10 +575,12 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 	defer recoverRange()
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
-	values := make([]ssa.LeftValue, valueLen)
-	for i, e := range exprs {
+	values := make([]ssa.LeftValue, 0, valueLen)
+	for _, e := range exprs {
 		if e, ok := e.(*yak.LeftExpressionContext); ok {
-			values[i] = b.buildLeftExpression(forceAssign, e)
+			if v := b.buildLeftExpression(forceAssign, e); v != nil && !reflect.ValueOf(v).IsNil() {
+				values = append(values, v)
+			}
 		}
 	}
 	return values
@@ -870,6 +884,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 				b.NewError(ssa.Error, TAG, "make slice expression argument too much!")
 			}
 		case ssa.Map:
+			return b.EmitInterfaceBuildWithType(ssa.Types{typ}, zero, zero)
 		case ssa.Struct:
 		}
 	case *ssa.ChanType:
@@ -1320,10 +1335,14 @@ func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.
 	defer recoverRange()
 	exprs := stmt.AllExpression()
 	valueLen := len(exprs)
-	values := make([]ssa.Value, valueLen)
-	for i, e := range exprs {
+	values := make([]ssa.Value, 0, valueLen)
+	for _, e := range exprs {
 		if e, ok := e.(*yak.ExpressionContext); ok {
-			values[i] = b.buildExpression(e)
+			if v := b.buildExpression(e); v != nil && !reflect.ValueOf(v).IsNil() {
+				b := v == nil
+				_ = b
+				values = append(values, v)
+			}
 		}
 	}
 	return values
