@@ -183,6 +183,7 @@ func initYaklangLib() {
 	yaklang.Import("csrf", yaklib.CSRFExports)
 	yaklang.Import("risk", yaklib.RiskExports)
 	yaklang.Import("report", yakit.ReportExports)
+	yaklang.Import("dnslog", yaklib.DNSLogExports)
 
 	// xpath for html
 	yaklang.Import("xpath", htmlquery.Exports)

@@ -685,7 +685,9 @@ func (s *Server) NewRiskRead(ctx context.Context, req *ypb.NewRiskReadRequest) (
 	if len(req.GetIds()) > 0 {
 		for _, v := range funk.ChunkInt64s(req.Ids, 100) {
 			err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), req, v)
-			log.Error(err)
+			if err != nil {
+				log.Errorf("NewRiskRead error: %v", err)
+			}
 		}
 	} else {
 		err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), req, req.Ids)
@@ -736,7 +738,7 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) QueryPortsGroup(ctx context.Context, req *ypb.Empty) (*ypb.QueryPortsGroupResponse, error)  {
+func (s *Server) QueryPortsGroup(ctx context.Context, req *ypb.Empty) (*ypb.QueryPortsGroupResponse, error) {
 	data, err := yakit.PortsServiceTypeGroup()
 	var tagsCode ypb.QueryPortsGroupResponse
 	if data == nil {
@@ -746,10 +748,9 @@ func (s *Server) QueryPortsGroup(ctx context.Context, req *ypb.Empty) (*ypb.Quer
 	return &tagsCode, nil
 }
 
-
-func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResponse{
+func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResponse {
 	var (
-		portGroup ypb.QueryPortsGroupResponse
+		portGroup                       ypb.QueryPortsGroupResponse
 		databaseGroupList, webGroupList ypb.PortsGroup
 	)
 	serviceTypeKey := map[string]string{
@@ -803,22 +804,22 @@ func PortsServiceTypeGroup(data []*yakit.PortsTypeGroup) ypb.QueryPortsGroupResp
 		"Memcached":               "memcached",
 		"Splunkd":                 "splunkd",
 	}
-	databaseValues := []string{ "sql_server", "mysql", "mongodb", "redis", "elasticsearch", "postgresql", "db2", "hbase", "memcached", "splunkd"}
+	databaseValues := []string{"sql_server", "mysql", "mongodb", "redis", "elasticsearch", "postgresql", "db2", "hbase", "memcached", "splunkd"}
 	for k, v := range serviceTypeKey {
 		if reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32) > 0 {
 			if IsValueInSortedSlice(v, databaseValues) {
 				databaseGroupList.GroupName = "数据库"
 				databaseGroupList.GroupLists = append(databaseGroupList.GroupLists, &ypb.GroupList{
-						ServiceType: v,
-						ShowServiceType: k,
-						Total: reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
+					ServiceType:     v,
+					ShowServiceType: k,
+					Total:           reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
 				})
 			} else {
 				webGroupList.GroupName = "服务器"
 				webGroupList.GroupLists = append(webGroupList.GroupLists, &ypb.GroupList{
-					ServiceType: v,
+					ServiceType:     v,
 					ShowServiceType: k,
-					Total: reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
+					Total:           reflect.ValueOf(data[0]).Elem().FieldByName(k).Interface().(int32),
 				})
 			}
 		}

@@ -41,6 +41,15 @@ func Random() string {
 	return list[rand.Intn(len(list))]
 }
 
+func BrokerNames() []string {
+	var names []string
+	brokers.Range(func(key, value interface{}) bool {
+		names = append(names, key.(string))
+		return true
+	})
+	return names
+}
+
 func AvialableBrokers() []string {
 	var a = []string{"*"}
 	brokers.Range(func(key, value any) bool {
@@ -69,4 +78,17 @@ type DNSLogBroker interface {
 	Require(timeout time.Duration, proxy ...string) (domain, token string, err error)
 	GetResult(token string, timeout time.Duration, proxy ...string) ([]*tpb.DNSLogEvent, error)
 	Name() string
+}
+
+func GetDNSLogBroker(mode string) DNSLogBroker {
+	switch mode {
+	case defaultDNSLogCN.Name():
+		return defaultDNSLogCN
+	case defaultDigPMBYPASS.Name():
+		return defaultDigPMBYPASS
+	case defaultDigPm1433.Name():
+		return defaultDigPm1433
+	default:
+		return nil
+	}
 }
