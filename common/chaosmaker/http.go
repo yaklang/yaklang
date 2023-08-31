@@ -3,10 +3,9 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
+	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func init() {
@@ -21,15 +20,15 @@ type httpHandler struct {
 
 var _ chaosHandler = (*httpHandler)(nil)
 
-func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan *pcapx.ChaosTraffic {
+func (h *httpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan []byte {
 	if originRule == nil {
 		return nil
 	}
-	if originRule.Protocol != "http" {
+	if originRule.Protocol != protocol.HTTP {
 		return nil
 	}
 
-	ch := make(chan *pcapx.ChaosTraffic)
+	ch := make(chan []byte)
 	go (&httpGenerator{
 		chaosRule:  chaosRule,
 		originRule: originRule,
@@ -44,7 +43,7 @@ type httpGenerator struct {
 	chaosRule  *rule.Storage
 	originRule *surirule.Rule
 	maker      *ChaosMaker
-	out        chan *pcapx.ChaosTraffic
+	out        chan []byte
 }
 
 func (h *httpGenerator) generator(count int) {
@@ -56,19 +55,11 @@ func (h *httpGenerator) generator(count int) {
 	}
 
 	for i := 0; i < count; i++ {
-		h.toChaosTraffic(surigen.Gen())
-	}
-}
-
-func (h *httpGenerator) toChaosTraffic(raw []byte) {
-	if lowhttp.IsResp(raw) {
-		h.out <- &pcapx.ChaosTraffic{
-			HttpResponse: raw,
+		raw := surigen.Gen()
+		if raw == nil {
+			return
 		}
-	} else {
-		h.out <- &pcapx.ChaosTraffic{
-			HttpRequest: raw,
-		}
+		h.out <- raw
 	}
 }
 

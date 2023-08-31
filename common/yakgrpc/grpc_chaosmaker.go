@@ -135,10 +135,10 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 					swg.Add()
 					go func() {
 						defer swg.Done()
-						pcapx.InjectChaosTraffic(traffic)
+						pcapx.InjectRaw(traffic)
 						delayer.Wait()
 						for _, r := range req.GetExtraOverrideDestinationAddress() {
-							pcapx.InjectChaosTraffic(traffic, pcapx.WithRemoteAddress(r))
+							pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
 							delayer.Wait()
 						}
 					}()
@@ -157,10 +157,10 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 				addTrafficCounter()
 				go func() {
 					defer swg.Done()
-					pcapx.InjectChaosTraffic(traffic)
+					pcapx.InjectRaw(traffic)
 					delayer.Wait()
 					for _, r := range req.GetExtraOverrideDestinationAddress() {
-						pcapx.InjectChaosTraffic(traffic, pcapx.WithRemoteAddress(r))
+						pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
 						delayer.Wait()
 					}
 				}()

@@ -77,7 +77,8 @@ func (g *ICMPGen) Gen() []byte {
 
 	pk, err := pcapx.PacketBuilder(opts...)
 	if err != nil {
-		log.Errorf("icmp generator error:%v", err)
+		log.Errorf("generate icmp packet failed: %s", err)
+		return nil
 	}
 	return pk
 }

@@ -12,6 +12,7 @@ import (
 )
 
 type ChaosTraffic struct {
+	Raw                   []byte
 	RawTCP                bool
 	LocalIP               string
 	LinkLayerPayload      []byte
