@@ -95,7 +95,12 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 			}
 		}
 	case "kv", "key-value", "kval":
-		kvResult := ExtractKValFromResponse([]byte(material))
+		kvResult := make(map[string]interface{}, 5)
+		if y.Scope == "body" {
+			kvResult = ExtractKValFromBody(material)
+		} else {
+			kvResult = ExtractKValFromResponse([]byte(material))
+		}
 		for _, group := range y.Groups {
 			if v, ok := kvResult[group]; ok {
 				v1 := v.([]interface{})
@@ -217,7 +222,15 @@ var (
 	extractFromEqValue   = regexp.MustCompile(`(?i)([_a-z][^=\s]*)=(([^=\s&,"]+)|("[^"]+"))`)
 )
 
+func ExtractKValFromBody(body string) map[string]interface{} {
+	return extractKVal([]byte(body), false)
+}
+
 func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
+	return extractKVal(rsp, true)
+}
+
+func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 	results := make(map[string]interface{})
 	addResult := func(k, v string) {
 		if _, ok := results[k]; !ok {
@@ -225,48 +238,68 @@ func ExtractKValFromResponse(rsp []byte) map[string]interface{} {
 		}
 		results[k] = append(results[k].([]interface{}), v)
 	}
-	_, body := lowhttp.SplitHTTPPacket(rsp, nil, func(proto string, code int, codeMsg string) error {
-		addResult("proto", proto)
-		addResult("status_code", fmt.Sprintf("%d", code))
-		return nil
-	}, func(line string) string {
-		k, v := lowhttp.SplitHTTPHeader(line)
-		originKey := k
-		k = strings.ReplaceAll(strings.ToLower(k), "-", "_")
-		addResult(k, v)
-		addResult(originKey, v)
-		if k == `content_type` {
-			ct, params, err := mime.ParseMediaType(v)
-			if err != nil {
-				return line
-			}
-			addResult(`content_type`, ct)
-			for k, v := range params {
-				addResult(k, v)
-			}
-		} else {
-			httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, option, attribute, value []byte) httphead.Control {
-				decoded, err := url.QueryUnescape(string(value))
+	var body []byte
+	if shouldSplit {
+		_, body = lowhttp.SplitHTTPPacket(rsp, nil, func(proto string, code int, codeMsg string) error {
+			addResult("proto", proto)
+			addResult("status_code", fmt.Sprintf("%d", code))
+			return nil
+		}, func(line string) string {
+			k, v := lowhttp.SplitHTTPHeader(line)
+			originKey := k
+			k = strings.ReplaceAll(strings.ToLower(k), "-", "_")
+			addResult(k, v)
+			addResult(originKey, v)
+			if k == `content_type` {
+				ct, params, err := mime.ParseMediaType(v)
 				if err != nil {
-					addResult(string(attribute), string(value))
-				} else {
-					addResult(string(attribute), decoded)
+					return line
 				}
-				return httphead.ControlContinue
+				addResult(`content_type`, ct)
+				for k, v := range params {
+					addResult(k, v)
+				}
+			} else {
+				httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, option, attribute, value []byte) httphead.Control {
+					decoded, err := url.QueryUnescape(string(value))
+					if err != nil {
+						addResult(string(attribute), string(value))
+					} else {
+						addResult(string(attribute), decoded)
+					}
+					return httphead.ControlContinue
+				})
+			}
+			return line
+		})
+	} else {
+		body = rsp
+	}
+
+	var processJSON func(jsonString string, depth int)
+	processJSON = func(jsonString string, depth int) {
+		if depth > 3 {
+			return
+		}
+		if govalidator.IsJSON(jsonString) {
+			result := gjson.Parse(jsonString)
+			result.ForEach(func(key, value gjson.Result) bool {
+				addResult(key.String(), value.String())
+				if value.Type == gjson.JSON {
+					processJSON(value.String(), depth+1)
+				}
+				return true
 			})
 		}
-		return line
-	})
+	}
 	// 特殊处理 JSON
 	var skipJson = false
 	for _, bodyRaw := range jsonextractor.ExtractStandardJSON(string(body)) {
 		skipJson = true
 		if govalidator.IsJSON(bodyRaw) {
-			result := gjson.Parse(bodyRaw)
-			result.ForEach(func(key, value gjson.Result) bool {
-				addResult(key.String(), value.String())
-				return true
-			})
+			if govalidator.IsJSON(bodyRaw) {
+				processJSON(bodyRaw, 1)
+			}
 		}
 	}
 
