@@ -388,6 +388,10 @@ func (g *Godzilla) String() string {
 	)
 }
 
+func (g *Godzilla) GenWebShell() string {
+	return ""
+}
+
 func (g *Godzilla) Ping(opts ...behinder.ParamsConfig) (bool, error) {
 	err := g.InjectPayloadIfNoCookie()
 	if err != nil {

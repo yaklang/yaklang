@@ -196,6 +196,18 @@ func (b *Behinder) sendPayload(data []byte) ([]byte, error) {
 //	return nil, nil
 //}
 
+func (b *Behinder) hijackRequestPayload() {
+
+}
+
+func (b *Behinder) hijackPayloadEncode() {
+
+}
+
+func (b *Behinder) hijackPayloadResult() {
+
+}
+
 func (b *Behinder) Encoder(f func(raw []byte) ([]byte, error)) {
 	b.CustomEncoder = f
 }
@@ -226,6 +238,10 @@ func (b *Behinder) String() string {
 		b.Proxy,
 		b.Headers,
 	)
+}
+
+func (b *Behinder) GenWebShell() string {
+	return ""
 }
 
 func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
