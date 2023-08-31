@@ -18,6 +18,7 @@ type BaseShellManager interface {
 	BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error)
 	CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error)
 	String() string
+	GenWebShell() string
 }
 
 type Wsm struct {
