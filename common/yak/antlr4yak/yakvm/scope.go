@@ -88,7 +88,9 @@ func (s *Scope) GetValueByID(id int) (*Value, bool) {
 		return nil, false
 	}
 
+	s.mu.Lock()
 	raw, ok := s.idToValue[id]
+	s.mu.Unlock()
 	if ok {
 		return raw, true
 	}
@@ -106,7 +108,9 @@ func (s *Scope) InCurrentScope(id int) bool {
 	if s == nil {
 		return false
 	}
+	s.mu.Lock()
 	_, ok := s.idToValue[id]
+	s.mu.Unlock()
 	return ok
 }
 
