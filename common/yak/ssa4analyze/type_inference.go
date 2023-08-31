@@ -111,13 +111,15 @@ if v.Type !match typ return true
 if v.Type match  typ return false
 */
 func checkType(v ssa.Value, typ ssa.Types) bool {
-	if v.GetType().Contains(typ) {
+	if v.GetType().Equal(typ) {
 		return false
 	}
-	v.SetType(typ)
-	if inst, ok := v.(ssa.Instruction); ok {
-		inst.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", typ)
+	if !v.GetType().Contains(typ) {
+		if inst, ok := v.(ssa.Instruction); ok {
+			inst.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", typ)
+		}
 	}
+	v.SetType(typ)
 	return true
 }
 
