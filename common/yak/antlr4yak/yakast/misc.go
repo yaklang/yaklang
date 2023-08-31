@@ -155,7 +155,7 @@ func GetEndPosition(t antlr.Token) (int, int) {
 		column = len(str[len(str)-1])
 	} else {
 		line = t.GetLine()
-		column = t.GetColumn()
+		column = t.GetColumn() + len(str[0])
 	}
 	return line, column
 }
