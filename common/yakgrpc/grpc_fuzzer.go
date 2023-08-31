@@ -632,9 +632,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				HitColor:              req.GetHitColor(),
 			}
 
+			redirectPacket := result.LowhttpResponse.RedirectRawPackets
 			if result.LowhttpResponse != nil {
 				// redirect
-				for _, f := range result.LowhttpResponse.RedirectRawPackets {
+				for _, f := range redirectPacket {
 					rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
 						IsHttps:  f.IsHttps,
 						Request:  f.Request,
@@ -726,6 +727,93 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 				}
 			}
+			// 自动重定向
+			if !req.GetNoFollowRedirect() {
+
+				for i := 0; i < len(redirectPacket)-1; i++ {
+					redirectRes := redirectPacket[i].RespRecord
+					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
+					var redirectRsp = &ypb.FuzzerResponse{
+						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
+						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
+						ResponseRaw:           redirectRes.RawPacket,
+						GuessResponseEncoding: Chardet(redirectRes.RawPacket),
+						RequestRaw:            redirectRes.RawRequest,
+						Payloads:              payloads,
+						IsHTTPS:               redirectRes.Https,
+						MatchedByMatcher:      httpTPLmatchersResult,
+						HitColor:              req.GetHitColor(),
+					}
+					if redirectRes != nil && redirectRes.TraceInfo != nil {
+						redirectRsp.TotalDurationMs = redirectRes.TraceInfo.TotalTime.Milliseconds()
+						redirectRsp.DurationMs = redirectRes.TraceInfo.ServerTime.Milliseconds()
+						redirectRsp.FirstByteDurationMs = redirectRes.TraceInfo.ServerTime.Milliseconds()
+						redirectRsp.DNSDurationMs = redirectRes.TraceInfo.DNSTime.Milliseconds()
+						redirectRsp.Proxy = redirectRes.Proxy
+						redirectRsp.RemoteAddr = redirectRes.RemoteAddr
+					}
+					redirectRsp.UUID = uuid.NewV4().String()
+					redirectRsp.Timestamp = result.Timestamp
+					redirectRsp.DurationMs = result.DurationMs
+					redirectRsp.Host = utils.EscapeInvalidUTF8Byte([]byte(lowhttp.GetHTTPPacketHeader(redirectRes.RawRequest, "Host")))
+
+					if redirectRes.RawPacket != nil {
+						redirectRsp.Ok = true
+						redirectRsp.StatusCode = int32(lowhttp.GetStatusCodeFromResponse(redirectRes.RawPacket))
+						redirectRsp.ContentType = utils.ParseStringToVisible(lowhttp.GetHTTPPacketHeader(redirectRes.RawPacket, "Content-Type"))
+						var bodyLen int64 = 0
+						if lowhttp.GetHTTPPacketBody(redirectRes.RawPacket) != nil {
+							bodyLen = int64(len(lowhttp.GetHTTPPacketBody(redirectRes.RawPacket)))
+						}
+						redirectRsp.BodyLength = bodyLen
+
+						// 解析 Headers
+						for k, vs := range lowhttp.GetHTTPPacketHeaders(redirectRes.RawPacket) {
+							for _, v := range vs {
+								redirectRsp.Headers = append(redirectRsp.Headers, &ypb.HTTPHeader{
+									Header: utils.ParseStringToVisible(k),
+									Value:  utils.ParseStringToVisible(v),
+								})
+							}
+						}
+					}
+
+					if redirectRsp.StatusCode > 0 {
+						// 通过长度过滤
+						if minBody <= maxBody && (minBody > 0 || maxBody > 0) {
+							if maxBody >= redirectRsp.BodyLength && minBody <= redirectRsp.BodyLength {
+								redirectRsp.MatchedByFilter = true
+							}
+						}
+
+						// 通过 StatusCode 过滤
+						if !redirectRsp.MatchedByFilter {
+							redirectRsp.MatchedByFilter = includeStatusCodeFilter.Contains(int(redirectRsp.StatusCode))
+						}
+
+						// rule
+						if !redirectRsp.MatchedByFilter && (len(regexps) > 0 || len(keywords) > 0) {
+							if utils.MatchAnyOfRegexp(redirectRsp.ResponseRaw, regexps...) {
+								redirectRsp.MatchedByFilter = true
+							}
+							if redirectRsp.MatchedByFilter || utils.MatchAllOfRegexp(redirectRsp.ResponseRaw, keywords...) {
+								redirectRsp.MatchedByFilter = true
+							}
+						}
+					}
+					yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRsp)
+					rsp.TaskId = int64(taskId)
+					err := feedbackResponse(redirectRsp, false)
+					if err != nil {
+						log.Errorf("send to client failed: %s", err)
+						continue
+					}
+				}
+				//如果重定向了,修正最后一个req
+				if len(redirectPacket) > 0 {
+					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
+				}
+			}
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
 			rsp.TaskId = int64(taskId)
 			err := feedbackResponse(rsp, false)
@@ -733,6 +821,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				log.Errorf("send to client failed: %s", err)
 				continue
 			}
+
 		}
 		return nil
 	}
@@ -746,15 +835,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		mergedParams := _param
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := executeBatchRequestsWithParams(mergedParams)
-			wg.Done()
 			if err != nil {
 				mergedErr <- err
 			}
 		}()
 	}
-	wg.Wait()
-	close(mergedErr)
+	go func() {
+		wg.Wait()
+		close(mergedErr)
+	}()
 
 	errFilter := filter2.NewFilter()
 	var errBuf bytes.Buffer
