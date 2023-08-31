@@ -48,6 +48,9 @@ type Instruction interface {
 	// asm
 	// ParseByString(string) *Function
 
+	// error
+	NewError(ErrorKind, ErrorTag, string, ...any)
+
 	// pos
 	Pos() string
 }
