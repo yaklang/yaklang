@@ -1359,6 +1359,7 @@ func main() {
 				if debug {
 					engine.SetDebug(debug)
 					i := debugger.NewInteractiveDebugger()
+					i.SetAbsFilePath(absFile)
 					engine.SetDebugInit(i.Init())
 					engine.SetDebugCallback(i.CallBack())
 				}
