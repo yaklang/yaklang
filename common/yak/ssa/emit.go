@@ -78,7 +78,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 }
 
 func (f *FunctionBuilder) EmitCall(c *Call) *Call {
-	if f.CurrentBlock.finish {
+	if f.CurrentBlock.finish || c == nil {
 		return nil
 	}
 	fixupUseChain(c)
