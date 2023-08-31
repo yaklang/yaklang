@@ -831,14 +831,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		wg.Add(1)
 		go func() {
 			err := executeBatchRequestsWithParams(mergedParams)
-			wg.Done()
+			defer wg.Done()
 			if err != nil {
 				mergedErr <- err
 			}
 		}()
 	}
-	wg.Wait()
-	close(mergedErr)
+	go func() {
+		wg.Wait()
+		close(mergedErr)
+	}()
 
 	errFilter := filter2.NewFilter()
 	var errBuf bytes.Buffer
