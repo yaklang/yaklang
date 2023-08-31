@@ -31,6 +31,8 @@ var CrawlerXExports = map[string]interface{}{
 	"invalidSuffix":     WithInvalidSuffix,
 	"stealth":           WithStealth,
 	"runtimeID":         WithRuntimeID,
+	"evalJs":            WithEvalJs,
+	"jsResultSend":      WithJsResultSave,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,

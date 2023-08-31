@@ -43,6 +43,8 @@ type BaseConfig struct {
 	stealth           bool
 	saveToDB          bool
 	runtimeId         string
+	evalJs            map[string][]string
+	jsResultSave      func(string)
 
 	targetUrl      string
 	ch             chan ReqInfo
@@ -92,6 +94,7 @@ func NewConfig() *Config {
 			invalidSuffix:     make([]string, 0),
 			stealth:           false,
 			saveToDB:          false,
+			evalJs:            make(map[string][]string),
 		},
 	}
 }
@@ -360,5 +363,21 @@ func WithStartWaitGroup(waitGroup *utils.SizedWaitGroup) ConfigOpt {
 func WithStealth(stealth bool) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.stealth = stealth
+	}
+}
+
+func WithEvalJs(target string, evalJs string) ConfigOpt {
+	return func(config *Config) {
+		if item, ok := config.baseConfig.evalJs[target]; ok {
+			config.baseConfig.evalJs[target] = append(item, evalJs)
+		} else {
+			config.baseConfig.evalJs[target] = []string{evalJs}
+		}
+	}
+}
+
+func WithJsResultSave(storage func(s string)) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.jsResultSave = storage
 	}
 }

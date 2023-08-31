@@ -2,6 +2,8 @@
 // @Author bcy2007  2023/7/12 17:42
 package crawlerx
 
+import "regexp"
+
 const getSelector = `
 ()=>{
     let e = this;
@@ -72,3 +74,21 @@ function getSelector(e){
     }
     clickSelectors
 `
+
+type JSEval struct {
+	targetUrl *regexp.Regexp
+	js        []string
+}
+
+func CreateJsEval() *JSEval {
+	return &JSEval{
+		js: make([]string, 0),
+	}
+}
+
+type JsResultSave struct {
+	TargetUrl string `json:"target_url"`
+	Js        string `json:"js"`
+	Result    string `json:"result"`
+}
+type JsResults []string
