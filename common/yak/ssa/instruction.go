@@ -39,7 +39,7 @@ func newAnInstuction(block *BasicBlock) anInstruction {
 		Func:  block.Parent,
 		Block: block,
 		typs:  make(Types, 0),
-		pos:   nil,
+		pos:   block.Parent.builder.currtenPos,
 	}
 }
 
@@ -121,7 +121,7 @@ func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
 	s := &Update{
 		anInstruction: newAnInstuction(block),
 		Value:         v,
-		address:       address,
+		Address:       address,
 	}
 	fixupUseChain(s)
 	return s
