@@ -27,6 +27,9 @@ type YakVariables struct {
 func (v *YakVariables) Set(key string, value string) {
 	v.raw[key] = &Var{Data: value}
 }
+func (v *YakVariables) SetWithType(key string, value string, typeName string) {
+	v.raw[key] = &Var{Data: value, Type: typeName}
+}
 
 func (v *YakVariables) SetAsNucleiTags(key string, value string) {
 	v.raw[key] = &Var{

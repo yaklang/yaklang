@@ -8,3 +8,7 @@ type YakPayload struct {
 	FromFile string
 	Data     []string
 }
+
+func (y *YakPayloads) GetRawPayloads() map[string]*YakPayload {
+	return y.raw
+}
