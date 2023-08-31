@@ -42,6 +42,9 @@ func (t Types) String() string {
 }
 
 func (t Types) Equal(typs Types) bool {
+	if len(t) != len(typs) {
+		return false
+	}
 	return reflect.DeepEqual(t, typs)
 }
 
