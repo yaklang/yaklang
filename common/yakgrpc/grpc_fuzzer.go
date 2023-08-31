@@ -632,9 +632,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				HitColor:              req.GetHitColor(),
 			}
 
+			redirectPacket := result.LowhttpResponse.RedirectRawPackets
 			if result.LowhttpResponse != nil {
 				// redirect
-				for _, f := range result.LowhttpResponse.RedirectRawPackets {
+				for _, f := range redirectPacket {
 					rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
 						IsHttps:  f.IsHttps,
 						Request:  f.Request,
@@ -729,8 +730,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// 自动重定向
 			if !req.GetNoFollowRedirect() {
 
-				for i := 0; i < len(result.LowhttpResponse.RedirectRawPackets)-1; i++ {
-					redirectRes := result.LowhttpResponse.RedirectRawPackets[i].RespRecord
+				for i := 0; i < len(redirectPacket)-1; i++ {
+					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
 					var redirectRsp = &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
@@ -808,6 +809,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						continue
 					}
 				}
+				//修正最后一个req
+				rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 			}
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
 			rsp.TaskId = int64(taskId)
@@ -830,8 +833,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		mergedParams := _param
 		wg.Add(1)
 		go func() {
-			err := executeBatchRequestsWithParams(mergedParams)
 			defer wg.Done()
+			err := executeBatchRequestsWithParams(mergedParams)
 			if err != nil {
 				mergedErr <- err
 			}
