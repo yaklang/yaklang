@@ -128,15 +128,29 @@ func WithRiskParam_Token(i string) RiskParamsOpt {
 	}
 }
 
+const MaxSize = 2 << 20 // 3MB
+
 func WithRiskParam_Request(i interface{}) RiskParamsOpt {
+	data := utils.InterfaceToString(i)
+	if len(data) > MaxSize {
+		temp := make([]byte, MaxSize)
+		copy(temp, data[:MaxSize])
+		data = string(temp) + "..."
+	}
 	return func(r *Risk) {
-		r.QuotedRequest = utils.InterfaceToQuotedString(i)
+		r.QuotedRequest = utils.InterfaceToQuotedString(data)
 	}
 }
 
 func WithRiskParam_Response(i interface{}) RiskParamsOpt {
+	data := utils.InterfaceToString(i)
+	if len(data) > MaxSize {
+		temp := make([]byte, MaxSize)
+		copy(temp, data[:MaxSize])
+		data = string(temp) + "..."
+	}
 	return func(r *Risk) {
-		r.QuotedResponse = utils.InterfaceToQuotedString(i)
+		r.QuotedResponse = utils.InterfaceToQuotedString(data)
 	}
 }
 
