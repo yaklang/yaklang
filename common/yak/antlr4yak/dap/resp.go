@@ -49,7 +49,6 @@ func (c *Client) ExpectInitializeResponseAndCapabilities(t *testing.T) *dap.Init
 		SupportsEvaluateForHovers:         true,
 		SupportsConditionalBreakpoints:    true,
 		SupportsConfigurationDoneRequest:  true,
-		SupportsDisassembleRequest:        true,
 		SupportTerminateDebuggee:          true,
 		SupportsSetVariable:               true,
 		SupportsSetExpression:             true,
