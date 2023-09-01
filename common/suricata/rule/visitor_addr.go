@@ -107,18 +107,15 @@ func (a *AddressRule) Match(i string) bool {
 // Generate is not uniform distribution
 // also, linklocal addr, multicast addr, loopback addr, etc. are not escaped
 func (a *AddressRule) Generate() string {
+	if a == nil || a.Any {
+		return utils.GetRandomIPAddress()
+	}
+
 	if a.Env != "" && a.envtable != nil {
 		raw, _ := a.envtable[a.Env]
 		if raw != "" {
 			return raw
 		}
-	}
-
-	if a == nil {
-		return "123.123.123.123"
-	}
-	if a.Any {
-		return utils.GetRandomIPAddress()
 	}
 
 	if a.Negative {

@@ -39,9 +39,6 @@ var rules = []string{
 	`alert http any any -> any any (msg:"msfconsole powershell response"; flow:established; content:!"<html>"; content:!"<script>"; content:"|70 6f 77 65 72 73 68 65 6c 6c 2e 65 78 65|"; http_server_body; content:"|46 72 6f 6d 42 61 73 65 36 34 53 74 72 69 6e 67|"; http_server_body; classtype:exploit-kit; sid:3016005; rev:1;)`, `alert tcp any any -> any any (msg:"ET SCAN Amap TCP Service Scan Detected"; flow:to_server; flags:PA; content:"service|3A|thc|3A 2F 2F|"; depth:105; content:"service|3A|thc"; within:40; reference:url,freeworld.thc.org/thc-amap/; reference:url,doc.emergingthreats.net/2010371; classtype:attempted-recon; sid:2010371; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`, `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 }
 
-func TestChaosMaker_ApplyAll(t *testing.T) {
-}
-
 func TestMUSTPASS_CrossVerify(t *testing.T) {
 	for _, r := range rules {
 		rules, err := surirule.Parse(r)
@@ -65,12 +62,9 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 		for pk := range res {
 			pcapx.InjectRaw(pk)
 			count++
-			if !match.New(rr).Match(pk) {
-				spew.Dump(rr.Raw)
-				spew.Dump(pk)
-				continue
+			if match.New(rr).Match(pk) {
+				matchedCount++
 			}
-			matchedCount++
 		}
 		need := utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
 		t.Logf("RULE\n" + r + fmt.Sprintf(`
