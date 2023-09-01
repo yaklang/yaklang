@@ -78,7 +78,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	}
 	err = core.init()
 	if err != nil {
-		return nil, utils.Error(err)
+		return nil, utils.Errorf(`crawlerx core init error: %v`, err)
 	}
 	return &core, nil
 }
