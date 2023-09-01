@@ -2,10 +2,11 @@ package httptpl
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Var struct {
@@ -27,12 +28,21 @@ func (v *YakVariables) Set(key string, value string) {
 	v.raw[key] = &Var{Data: value}
 }
 
+func (v *YakVariables) SetAsNucleiTags(key string, value string) {
+	if !strings.HasPrefix(value, "{{") {
+		value = "{{" + value + "}}"
+	}
+	v.raw[key] = &Var{
+		Type: "nuclei-dsl",
+		Tags: ParseNucleiTag(value),
+	}
+}
+
 func (v *YakVariables) AutoSet(key string, value string) {
 	if strings.Contains(value, "{{") {
-		tags := ParseNucleiTag(value)
 		v.raw[key] = &Var{
 			Type: "nuclei-dsl",
-			Tags: tags,
+			Tags: ParseNucleiTag(value),
 		}
 		return
 	}

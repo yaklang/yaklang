@@ -5,6 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	filter2 "github.com/yaklang/yaklang/common/filter"
@@ -19,16 +30,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"os"
-	"sort"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/saintfish/chardet"
 	uuid "github.com/satori/go.uuid"
@@ -800,7 +801,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	*/
 	wg := new(sync.WaitGroup)
 	var mergedErr = make(chan error)
-	for _param := range s.FuzztagPreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
+	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
 		mergedParams := _param
 		wg.Add(1)
 		go func() {
@@ -1206,7 +1207,21 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 	finalResults = append(finalResults, responseVars...)
 	return &ypb.RenderVariablesResponse{Results: finalResults}, nil
 }
-func (s *Server) FuzztagPreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls bool) chan map[string]any {
+
+func (s *Server) RenderVariablesWithTypedKV(ctx context.Context, kvs []*ypb.FuzzerParamItem) map[string]any {
+	vars := httptpl.NewVars()
+	for _, kv := range kvs {
+		key, value := kv.GetKey(), kv.GetValue()
+		if kv.GetType() == "nuclei-dsl" {
+			vars.SetAsNucleiTags(key, value)
+		} else {
+			vars.Set(key, value)
+		}
+	}
+	return vars.ToMap()
+}
+
+func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls bool) chan map[string]any {
 	var resultsChan = make(chan map[string]any, 100)
 	if len(params) <= 0 {
 		resultsChan <- make(map[string]any)
@@ -1214,22 +1229,26 @@ func (s *Server) FuzztagPreRenderVariables(ctx context.Context, params []*ypb.Fu
 		return resultsChan
 	}
 
-	var l = make([][]string, len(params))
-	var idToKey = make(map[int]string)
-	for index, p := range params {
-		idToKey[index] = p.GetKey()
+	l := make([][]string, len(params))
+	idToParam := make(map[int]*ypb.FuzzerParamItem)
+	hasNucleiTag := false
 
-		if strings.TrimSpace(strings.ToLower(p.GetType())) == "fuzztag" {
-			rets, _ := mutate.FuzzTagExec(p.GetValue(), mutate.FuzzFileOptions()...)
+	for index, p := range params {
+		_, value := p.GetKey(), p.GetValue()
+		typ := strings.TrimSpace(strings.ToLower(p.GetType()))
+		idToParam[index] = p
+
+		if typ == "fuzztag" {
+			rets, _ := mutate.FuzzTagExec(value, mutate.FuzzFileOptions()...)
 			if len(rets) > 0 {
 				l[index] = rets
 				continue
 			}
+		} else if typ == "nuclei-dsl" {
+			hasNucleiTag = true
 		}
 
-		ret := make([]string, 1)
-		ret[0] = p.GetValue()
-		l[index] = ret
+		l[index] = []string{value}
 	}
 
 	var count int64 = 0
@@ -1248,23 +1267,23 @@ func (s *Server) FuzztagPreRenderVariables(ctx context.Context, params []*ypb.Fu
 		}()
 
 		err := cartesian.ProductExContext(ctx, l, func(payloads []string) error {
-			var results = make([]*ypb.KVPair, len(payloads))
-			for index, v := range payloads {
-				results[index] = &ypb.KVPair{Key: idToKey[index], Value: v}
-			}
+			params := make([]*ypb.FuzzerParamItem, 0)
 			resultMap := make(map[string]any)
-			rsp, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
-				Params:  results,
-				IsHTTPS: https,
-				IsGmTLS: gmtls,
-			})
-			if err != nil {
-				log.Errorf("(after fuzztag) render variables failed: %s", err)
-				return nil
+			if hasNucleiTag {
+				for index, v := range payloads {
+					p := idToParam[index]
+					key := p.GetKey()
+					params = append(params, &ypb.FuzzerParamItem{Key: key, Value: v, Type: p.GetType()})
+				}
+				resultMap = s.RenderVariablesWithTypedKV(ctx, params)
+			} else {
+				for index, v := range payloads {
+					p := idToParam[index]
+					key := p.GetKey()
+					resultMap[key] = v
+				}
 			}
-			for _, i := range rsp.Results {
-				resultMap[i.GetKey()] = i.GetValue()
-			}
+
 			atomic.AddInt64(&count, 1)
 			resultsChan <- resultMap
 			return nil
