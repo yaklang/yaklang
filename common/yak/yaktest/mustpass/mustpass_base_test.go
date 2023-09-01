@@ -49,7 +49,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "mitm_connect_assert.yak"
+	var debugName = "git_to_sca.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
