@@ -1,0 +1,16 @@
+targetUrl = f`${VULINBOX}/gitserver/sca-testcase.git/`
+dump(targetUrl)
+localReposDir = `/tmp/sca-testcase.git/`
+os.RemoveAll(localReposDir)
+git.Clone(targetUrl, localReposDir)~
+ret := string(file.ReadFile(`/tmp/sca-testcase.git/testdata/node_npm/positive_file/package.json`)~)
+dump(ret)
+assert `unopinionated, minimalist web framework` in ret
+checked = false
+for result in sca.ScanFilesystem(`/tmp/sca-testcase.git/testdata/`)~ {
+    dump(result)
+    if `53733d3ba4843f2efb79e7c70ef0615f2aa22581` in sdump(result) { checked = true}
+}
+if !checked {
+    die(`SCA FileSystem Is not worked well`)
+}
