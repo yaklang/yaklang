@@ -969,7 +969,7 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					// int8
 					checkVarExact(t, locals, -1, "i8", "i8", "1", "int", noChildren)
 					// uint8
-					checkVarExact(t, locals, -1, "u8", "u8", "0xff", "uint8", noChildren)
+					checkVarExact(t, locals, -1, "u8", "u8", "255", "uint8", noChildren)
 					// uint16
 					checkVarExact(t, locals, -1, "u16", "u16", "65535", "int", noChildren)
 					// uint32
@@ -977,40 +977,40 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					// uint64
 					checkVarExact(t, locals, -1, "u64", "u64", "9223372036854775807", "int", noChildren)
 					// float64
-					checkVarExact(t, locals, -1, "f1", "f1", "1.2", "float64", noChildren)
+					checkVarExact(t, locals, -1, "f1", "f1", "1.200000", "float64", noChildren)
 					// string
 					checkVarExact(t, locals, -1, "a10", "a10", `"ofo"`, "string", noChildren)
 					// slice
 					ref = checkVarRegex(t, locals, -1, "ba", "ba", `\[\]int\{`, `\[\]int`, hasChildren)
 					client.VariablesRequest(ref)
 					ba := client.ExpectVariablesResponse(t)
-					checkChildren(t, ba, "ba", 200)
+					checkChildren(t, ba, "ba", 201)
 
 					ref = checkVarExact(t, locals, -1, "a4", "a4", "[]int{1, 2}", "[]int", hasChildren)
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						a4 := client.ExpectVariablesResponse(t)
-						checkChildren(t, a4, "a4", 2)
-						checkVarExact(t, a4, 0, "[0]", "a4[0]", "1", "int", noChildren)
-						checkVarExact(t, a4, 1, "[1]", "a4[1]", "2", "int", noChildren)
+						checkChildren(t, a4, "a4", 3)
+						checkVarExact(t, a4, 1, "[0]", "a4[0]", "1", "int", noChildren)
+						checkVarExact(t, a4, 2, "[1]", "a4[1]", "2", "int", noChildren)
 					}
 					ref = checkVarExact(t, locals, -1, "a5", "a5", "[]int{1, 2, 3, 4, 5}", "[]int", hasChildren)
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						a5 := client.ExpectVariablesResponse(t)
-						checkChildren(t, a5, "a5", 5)
-						checkVarExact(t, a5, 0, "[0]", "a5[0]", "1", "int", noChildren)
-						checkVarExact(t, a5, 4, "[4]", "a5[4]", "5", "int", noChildren)
-						validateEvaluateName(t, client, frameID, a5, 0)
+						checkChildren(t, a5, "a5", 6)
+						checkVarExact(t, a5, 1, "[0]", "a5[0]", "1", "int", noChildren)
+						checkVarExact(t, a5, 5, "[4]", "a5[4]", "5", "int", noChildren)
 						validateEvaluateName(t, client, frameID, a5, 1)
+						validateEvaluateName(t, client, frameID, a5, 2)
 					}
 					ref = checkVarExact(t, locals, -1, "a12", "a12", `[]dap.FooBar{dap.FooBar{Baz: 4, Bur: "d"}, dap.FooBar{Baz: 5, Bur: "e"}}`, "[]dap.FooBar", hasChildren)
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						a12 := client.ExpectVariablesResponse(t)
-						checkChildren(t, a12, "a12", 2)
-						checkVarExact(t, a12, 0, "[0]", "a12[0]", `dap.FooBar{Baz: 4, Bur: "d"}`, "dap.FooBar", hasChildren)
-						ref = checkVarExact(t, a12, 1, "[1]", "a12[1]", `dap.FooBar{Baz: 5, Bur: "e"}`, "dap.FooBar", hasChildren)
+						checkChildren(t, a12, "a12", 3)
+						checkVarExact(t, a12, 1, "[0]", "a12[0]", `dap.FooBar{Baz: 4, Bur: "d"}`, "dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a12, 2, "[1]", "a12[1]", `dap.FooBar{Baz: 5, Bur: "e"}`, "dap.FooBar", hasChildren)
 						if ref > 0 {
 							client.VariablesRequest(ref)
 							a12_1 := client.ExpectVariablesResponse(t)
@@ -1025,10 +1025,10 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						a13 := client.ExpectVariablesResponse(t)
-						checkChildren(t, a13, "a13", 3)
-						checkVarExact(t, a13, 0, "[0]", "a13[0]", `&dap.FooBar{Baz: 6, Bur: "f"}`, "*dap.FooBar", hasChildren)
-						checkVarExact(t, a13, 1, "[1]", "a13[1]", `&dap.FooBar{Baz: 7, Bur: "g"}`, "*dap.FooBar", hasChildren)
-						ref = checkVarExact(t, a13, 2, "[2]", "a13[2]", `&dap.FooBar{Baz: 8, Bur: "h"}`, "*dap.FooBar", hasChildren)
+						checkChildren(t, a13, "a13", 4)
+						checkVarExact(t, a13, 1, "[0]", "a13[0]", `&dap.FooBar{Baz: 6, Bur: "f"}`, "*dap.FooBar", hasChildren)
+						checkVarExact(t, a13, 2, "[1]", "a13[1]", `&dap.FooBar{Baz: 7, Bur: "g"}`, "*dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a13, 3, "[2]", "a13[2]", `&dap.FooBar{Baz: 8, Bur: "h"}`, "*dap.FooBar", hasChildren)
 						if ref > 0 {
 							client.VariablesRequest(ref)
 							a13_2 := client.ExpectVariablesResponse(t)
@@ -1044,13 +1044,13 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						ni := client.ExpectVariablesResponse(t)
-						checkChildren(t, ni, "ni", 1)
-						ref = checkVarExact(t, ni, 0, "[0]", "ni[0]", `[]interface {}{123}`, `interface {}`, hasChildren)
+						checkChildren(t, ni, "ni", 2)
+						ref = checkVarExact(t, ni, 1, "[0]", "ni[0]", `[]interface {}{123}`, `interface {}`, hasChildren)
 						if ref > 0 {
 							client.VariablesRequest(ref)
 							ni_0 := client.ExpectVariablesResponse(t)
-							checkChildren(t, ni_0, "ni[0]", 1)
-							checkVarExact(t, ni_0, 0, "[0]", "ni[0][0]", `123`, `interface {}`, noChildren)
+							checkChildren(t, ni_0, "ni[0]", 2)
+							checkVarExact(t, ni_0, 1, "[0]", "ni[0][0]", `123`, `interface {}`, noChildren)
 						}
 					}
 
@@ -1095,9 +1095,9 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						a11 := client.ExpectVariablesResponse(t)
-						checkChildren(t, a11, "a11", 3)
-						checkVarExact(t, a11, 0, "[0]", "a11[0]", `dap.FooBar{Baz: 1, Bur: "a"}`, "dap.FooBar", hasChildren)
-						ref = checkVarExact(t, a11, 1, "[1]", "a11[1]", `dap.FooBar{Baz: 2, Bur: "b"}`, "dap.FooBar", hasChildren)
+						checkChildren(t, a11, "a11", 4)
+						checkVarExact(t, a11, 1, "[0]", "a11[0]", `dap.FooBar{Baz: 1, Bur: "a"}`, "dap.FooBar", hasChildren)
+						ref = checkVarExact(t, a11, 2, "[1]", "a11[1]", `dap.FooBar{Baz: 2, Bur: "b"}`, "dap.FooBar", hasChildren)
 						if ref > 0 {
 							client.VariablesRequest(ref)
 							a11_1 := client.ExpectVariablesResponse(t)
@@ -1107,7 +1107,7 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 							validateEvaluateName(t, client, frameID, a11_1, 0)
 							validateEvaluateName(t, client, frameID, a11_1, 1)
 						}
-						checkVarExact(t, a11, 2, "[2]", "a11[2]", `dap.FooBar{Baz: 3, Bur: "c"}`, "dap.FooBar", hasChildren)
+						checkVarExact(t, a11, 3, "[2]", "a11[2]", `dap.FooBar{Baz: 3, Bur: "c"}`, "dap.FooBar", hasChildren)
 					}
 
 					// struct
@@ -1146,11 +1146,11 @@ func TestScopesAndVairablesRequest(t *testing.T) {
 					if ref > 0 {
 						client.VariablesRequest(ref)
 						mp := client.ExpectVariablesResponse(t)
-						checkChildren(t, mp, "mp", 4)
-						checkVarExact(t, mp, 0, "[key 0]", "", "1", "int", noChildren)
-						checkVarExact(t, mp, 1, "[value 0]", "mp[1]", "42", "interface {}", noChildren)
-						checkVarExact(t, mp, 2, "[key 1]", "", "2", "int", noChildren)
-						checkVarExact(t, mp, 3, "[value 1]", "mp[2]", "43", "interface {}", noChildren)
+						checkChildren(t, mp, "mp", 5)
+						checkVarExact(t, mp, 1, "[key 0]", "", "1", "int", noChildren)
+						checkVarExact(t, mp, 2, "[value 0]", "mp[1]", "42", "interface {}", noChildren)
+						checkVarExact(t, mp, 3, "[key 1]", "", "2", "int", noChildren)
+						checkVarExact(t, mp, 4, "[value 1]", "mp[2]", "43", "interface {}", noChildren)
 					}
 
 					// nil

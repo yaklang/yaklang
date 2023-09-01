@@ -160,6 +160,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 					debugger.HandleForNormallyFinished()
 				}
 			}
+			debugger.CurrentStackTracePop()
 		}
 	}()
 
