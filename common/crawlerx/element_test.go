@@ -16,7 +16,7 @@ import (
 func TestElementClick(t *testing.T) {
 	test := assert.New(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(crawlerTestHtml))
+		_, _ = w.Write([]byte(CrawlerTestHtml))
 	}))
 	defer server.Close()
 
