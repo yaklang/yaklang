@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var crawlerTestHtml = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+var CrawlerTestHtml = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html><!-- InstanceBegin template="/Templates/main_dynamic_template.dwt.php" codeOutsideHTMLIsLocked="false" -->
 <head>
@@ -131,7 +131,7 @@ MM_reloadPage(true);
 func TestServer(t *testing.T) {
 	test := assert.New(t)
 	base := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(crawlerTestHtml))
+		_, _ = w.Write([]byte(CrawlerTestHtml))
 	}))
 	defer base.Close()
 	time.Sleep(time.Second)
@@ -157,11 +157,12 @@ func TestStartCrawler(t *testing.T) {
 	//	_, _ = w.Write([]byte(crawlerTestHtml))
 	//}))
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(crawlerTestHtml))
+		_, _ = w.Write([]byte(CrawlerTestHtml))
 	}))
 	server.StartTLS()
 	defer server.Close()
 	opts := make([]ConfigOpt, 0)
+	resultSave := make([]string, 0)
 	opts = append(opts,
 		WithFormFill(map[string]string{"username": "admin", "password": "password"}),
 		WithBlackList("logout"),
@@ -174,6 +175,10 @@ func TestStartCrawler(t *testing.T) {
 		//WithBrowserInfo(`{"ws_address":"","exe_path":"","proxy_address":"http://127.0.0.1:8099","proxy_username":"","proxy_password":""}`),
 		//WithRuntimeID("abc123-123-123"),
 		//WithSaveToDB(true),
+		WithEvalJs(`index.php`, `()=>document.URL`),
+		WithJsResultSave(func(s string) {
+			resultSave = append(resultSave, s)
+		}),
 	)
 	//ch, err := StartCrawler("http://testphp.vulnweb.com/", opts...)
 	ch, err := StartCrawler(server.URL, opts...)
@@ -185,6 +190,7 @@ func TestStartCrawler(t *testing.T) {
 		t.Logf(`%s %s from %s`, item.Method(), item.Url(), item.From())
 	}
 	t.Log(`done!`)
+	t.Log(resultSave)
 	return
 }
 
