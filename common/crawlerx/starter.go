@@ -115,7 +115,7 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		runtimeID: baseConfig.runtimeId,
 		saveToDB:  baseConfig.saveToDB,
 		https:     false,
-		
+
 		evalJs: make([]*JSEval, 0),
 	}
 	var ctx context.Context
@@ -300,7 +300,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 				if starter.jsResultSend != nil {
 					starter.jsResultSend(string(resultBytes))
 				} else {
-					log.Info(`get eval js result: %v`, string(resultBytes))
+					log.Infof(`get eval js result: %v`, string(resultBytes))
 				}
 			}
 		}
