@@ -28,45 +28,45 @@ const (
 	wh  string = ".wh."
 )
 
-type dockerContextConfig struct {
-	endpoint       string
-	numWorkers     int
-	scanMode       analyzer.ScanMode
-	usedAnalayzers []analyzer.TypAnalyzer
+type ScanConfig struct {
+	endpoint      string
+	numWorkers    int
+	scanMode      analyzer.ScanMode
+	usedAnalyzers []analyzer.TypAnalyzer
 }
 
-type dockerContextOption func(*dockerContextConfig)
+type ScanOption func(*ScanConfig)
 
-func NewDockerContextConfig() *dockerContextConfig {
-	return &dockerContextConfig{
-		numWorkers:     5,
-		endpoint:       "",
-		scanMode:       analyzer.AllMode,
-		usedAnalayzers: []analyzer.TypAnalyzer{},
+func NewConfig() *ScanConfig {
+	return &ScanConfig{
+		numWorkers:    5,
+		endpoint:      "",
+		scanMode:      analyzer.AllMode,
+		usedAnalyzers: []analyzer.TypAnalyzer{},
 	}
 }
 
-func _withEndPoint(endpoint string) dockerContextOption {
-	return func(c *dockerContextConfig) {
+func _withEndPoint(endpoint string) ScanOption {
+	return func(c *ScanConfig) {
 		c.endpoint = endpoint
 	}
 }
 
-func _withScanMode(mode analyzer.ScanMode) dockerContextOption {
-	return func(c *dockerContextConfig) {
+func _withScanMode(mode analyzer.ScanMode) ScanOption {
+	return func(c *ScanConfig) {
 		c.scanMode |= mode
 	}
 }
 
-func _withConcurrent(n int) dockerContextOption {
-	return func(c *dockerContextConfig) {
+func _withConcurrent(n int) ScanOption {
+	return func(c *ScanConfig) {
 		c.numWorkers = n
 	}
 }
 
-func _withAnalayzers(a ...analyzer.TypAnalyzer) dockerContextOption {
-	return func(c *dockerContextConfig) {
-		c.usedAnalayzers = append(c.usedAnalayzers, a...)
+func _withAnalayzers(a ...analyzer.TypAnalyzer) ScanOption {
+	return func(c *ScanConfig) {
+		c.usedAnalyzers = append(c.usedAnalyzers, a...)
 	}
 }
 
@@ -216,8 +216,8 @@ func walkLayer(rc io.ReadCloser, handler walkFunc) error {
 	return nil
 }
 
-func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
+func scanDockerImage(imageFile *os.File, config ScanConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -243,8 +243,8 @@ func scanDockerImage(imageFile *os.File, config dockerContextConfig) ([]*dxtypes
 	return ag.Packages(), nil
 }
 
-func scanContainer(rc io.ReadCloser, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
+func scanContainer(rc io.ReadCloser, config ScanConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
 	err := walkLayer(rc, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -270,8 +270,8 @@ func scanContainer(rc io.ReadCloser, config dockerContextConfig) ([]*dxtypes.Pac
 	return ag.Packages(), nil
 }
 
-func scanFS(fsPath string, config dockerContextConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalayzers)
+func scanFS(fsPath string, config ScanConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
 	err := walkFS(fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -297,8 +297,16 @@ func scanFS(fsPath string, config dockerContextConfig) ([]*dxtypes.Package, erro
 	return ag.Packages(), nil
 }
 
-func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOption) (pkgs []*dxtypes.Package, err error) {
-	config := NewDockerContextConfig()
+func ScanFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, error) {
+	config := NewConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	return scanFS(p, *config)
+}
+
+func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkgs []*dxtypes.Package, err error) {
+	config := NewConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -337,8 +345,8 @@ func ScanDockerContainerFromContext(containerID string, opts ...dockerContextOpt
 	return analyzer.MergePackages(pkgs), nil
 }
 
-func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
-	config := NewDockerContextConfig()
+func ScanDockerImageFromContext(imageID string, opts ...ScanOption) ([]*dxtypes.Package, error) {
+	config := NewConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -370,8 +378,8 @@ func ScanDockerImageFromContext(imageID string, opts ...dockerContextOption) ([]
 	return analyzer.MergePackages(pkgs), nil
 }
 
-func ScanDockerImageFromFile(path string, opts ...dockerContextOption) ([]*dxtypes.Package, error) {
-	config := NewDockerContextConfig()
+func ScanDockerImageFromFile(path string, opts ...ScanOption) ([]*dxtypes.Package, error) {
+	config := NewConfig()
 	for _, opt := range opts {
 		opt(config)
 	}

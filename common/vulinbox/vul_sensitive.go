@@ -31,6 +31,9 @@ var _fakeGitWebsite []byte
 //go:embed fakegit/website-repository.git.zip
 var _fakeGitRepository []byte
 
+//go:embed fakegit/sca-testcase.git.zip
+var _fakeGitSCARespos []byte
+
 func GetSensitiveFile(name string) []byte {
 	f, err := _sensitiveFS.Open(path.Join("sensitivefs", name))
 	if err != nil {
@@ -66,6 +69,11 @@ func (s *VulinServer) registerSensitive() {
 	}
 
 	zipGitRepositoryFS, err := zip.NewReader(bytes.NewReader(_fakeGitRepository), int64(len(_fakeGitRepository)))
+	if err != nil {
+		log.Errorf("cannot open zip file: %s", err)
+	}
+
+	zipScaGitResposFS, err := zip.NewReader(bytes.NewReader(_fakeGitSCARespos), int64(len(_fakeGitSCARespos)))
 	if err != nil {
 		log.Errorf("cannot open zip file: %s", err)
 	}
@@ -159,6 +167,49 @@ func (s *VulinServer) registerSensitive() {
 	ziputil.DeCompressFromRaw(_fakeGitRepository, localBareRepos)
 	var localBareReposPath = filepath.Join(localBareRepos, "website-repository.git")
 
+	ziputil.DeCompressFromRaw(_fakeGitSCARespos, localBareRepos)
+	var localSCAReposPath = filepath.Join(localBareRepos, "sca-testcase.git")
+
+	s.router.PathPrefix("/gitserver/sca-testcase.git/").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		request.URL.Path = strings.TrimPrefix(request.URL.Path, "/gitserver/")
+		request.RequestURI = strings.TrimPrefix(request.RequestURI, "/gitserver/")
+
+		rootDir := "sca-testcase.git"
+		fileName := strings.TrimPrefix(request.URL.Path, "/")
+		log.Infof("fetch %v: %s", rootDir, fileName)
+		// website-repository.git
+		serviceParams := request.URL.Query().Get("service")
+		log.Infof("service: %s to %v", serviceParams, fileName)
+		if serviceParams == "git-upload-pack" && strings.HasSuffix(fileName, `/info/refs`) {
+			s.gitInfoRefs(localSCAReposPath, writer, request)
+			return
+		}
+
+		if strings.HasSuffix(request.URL.Path, `/git-upload-pack`) && request.Method == "POST" {
+			s.gitUploadPack(localSCAReposPath, writer, request)
+			return
+		}
+
+		//if strings.HasSuffix(request.URL.Path, `/git-receive-pack`) && request.Method == "POST" {
+		//	s.gitReceivePack(localBareRepos, writer, request)
+		//	return
+		//}
+		filePath := path.Join(rootDir, fileName)
+		var fp, err = zipScaGitResposFS.Open(filePath)
+		if err != nil {
+			writer.WriteHeader(404)
+			return
+		}
+		defer fp.Close()
+		raw, _ := io.ReadAll(fp)
+
+		if strings.Contains(filePath, ".git/") {
+			writer.Header().Set("Content-Type", `text/plain`)
+		} else {
+			writer.Header().Set("Content-Type", `text/html`)
+		}
+		writer.Write(raw)
+	})
 	s.router.PathPrefix("/gitserver/website-repository.git/").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		request.URL.Path = strings.TrimPrefix(request.URL.Path, "/gitserver/")
 		request.RequestURI = strings.TrimPrefix(request.RequestURI, "/gitserver/")
