@@ -17,3 +17,13 @@ die(git.IterateCommit(localReposDir, git.handleCommit(i => {
 dump(count, refCount)
 if count < 3 { die("COMMIT IS TOO LESS") }
 if refCount < 3 { die("REF IS TOO LESS") }
+
+
+targetUrl = f`${VULINBOX}/gitserver/sca-testcase.git/`
+dump(targetUrl)
+localReposDir = `/tmp/sca-testcase.git/`
+os.RemoveAll(localReposDir)
+git.Clone(targetUrl, localReposDir)~
+ret := string(file.ReadFile(`/tmp/sca-testcase.git/testdata/node_npm/positive_file/package.json`)~)
+dump(ret)
+assert `unopinionated, minimalist web framework` in ret
