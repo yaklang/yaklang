@@ -85,7 +85,12 @@ func (g *HTTPGen) Gen() []byte {
 		opts = append(opts, pcapx.WithTCP_DstPort(uint16(g.dstPort.GenerateWithDefault(80))))
 	}
 
-	opts = append(opts, pcapx.WithTCP_Window(rand.Intn(2048)))
+	opts = append(opts,
+		pcapx.WithTCP_Window(rand.Intn(2048)),
+		pcapx.WithTCP_Flags("ack|psh"),
+		pcapx.WithTCP_Ack(rand.Uint32()),
+		pcapx.WithTCP_Seq(rand.Uint32()),
+	)
 
 	raw, err := pcapx.PacketBuilder(opts...)
 	if err != nil {
