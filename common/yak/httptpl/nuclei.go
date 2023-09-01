@@ -224,15 +224,16 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 
 	// parse req seqs
 	var reqSeq []*YakRequestBulkConfig
-	funk.Map(reqs, func(i interface{}) error {
+	hasMatcherOrExtractor := false
+	for _, i := range utils.InterfaceToSliceInterface(reqs) {
 		reqIns := &YakRequestBulkConfig{}
-
 		req := utils.InterfaceToMapInterface(i)
 		matcher, err := generateYakMatcher(req)
 		if err != nil {
 			log.Debugf("extractYakExtractor failed: %v", err)
+		} else if matcher != nil {
+			hasMatcherOrExtractor = true
 		}
-
 		payloads, err := generateYakPayloads(req)
 		if err != nil {
 			log.Debugf("extractYakPayloads failed: %v", err)
@@ -251,9 +252,8 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			log.Errorf("extractYakExtractor failed: %v", err)
 		}
 		reqIns.Extractor = extractors
-		if reqIns.Matcher == nil && len(reqIns.Extractor) <= 0 {
-			log.Error("matcher and extractor are both empty")
-			return utils.Error("matcher and extractor are both empty")
+		if len(reqIns.Extractor) != 0 {
+			hasMatcherOrExtractor = true
 		}
 		reqIns.EnableRedirect, _ = strconv.ParseBool(utils.InterfaceToString(utils.MapGetFirstRaw(req, "host-redirects", "redirects")))
 		reqIns.MaxRedirects = utils.MapGetInt(req, "max-redirects")
@@ -310,12 +310,13 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 
 		if len(reqIns.HTTPRequests) <= 0 {
 			log.Error("http request is empty")
-			return utils.Error("http request is empty")
+			return nil, utils.Error("http request is empty")
 		}
 		reqSeq = append(reqSeq, reqIns)
-		return nil
-	})
-
+	}
+	if !hasMatcherOrExtractor {
+		return nil, utils.Error("matcher and extractor are both empty")
+	}
 	yakTemp.HTTPRequestSequences = reqSeq
 	return yakTemp, nil
 }

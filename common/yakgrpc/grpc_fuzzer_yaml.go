@@ -21,7 +21,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	// 转Template
 	yakTemplate, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(content)
 	if err != nil {
-		return nil, utils.Errorf("cannot create yak template from nuclei template: %v", err)
+		return nil, utils.Errorf("cannot create yak template from yaml: %v", err)
 	}
 	// 转FuzzerRequest
 	for _, sequence := range yakTemplate.HTTPRequestSequences {
@@ -63,8 +63,14 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				}
 			}).([]*ypb.HTTPResponseMatcher)
 		}
-		fuzzerReq.Matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
-		fuzzerReq.MatchersCondition = sequence.Matcher.Condition
+		if len(sequence.Matcher.SubMatchers) > 0 {
+			fuzzerReq.Matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
+			fuzzerReq.MatchersCondition = sequence.Matcher.Condition
+		} else {
+			fuzzerReq.Matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{sequence.Matcher})
+			fuzzerReq.MatchersCondition = "and"
+		}
+
 		if sequence.EnableRedirect {
 			fuzzerReq.RedirectTimes = float64(sequence.MaxRedirects)
 		} else {
@@ -121,6 +127,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	}
 	// 生成请求桶
 	requestBulks := []*httptpl.YakRequestBulkConfig{}
+	hasMetcherOrExtractor := false
 	for _, request := range seq.GetRequests() {
 		vars := httptpl.NewVars()
 		for _, param := range request.Params {
@@ -181,6 +188,17 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		bulk.CookieInherit = request.InheritCookies
 		bulk.InheritVariables = request.InheritVariables
 		bulk.HotPatchCode = request.HotPatchCode
+		if bulk.Matcher != nil || len(bulk.Extractor) > 0 {
+			hasMetcherOrExtractor = true
+		}
+	}
+	if !hasMetcherOrExtractor {
+		res.Ok = false
+		res.Reason = "no matcher or extractor"
+		return &ypb.ExportHTTPFuzzerTaskToYamlResponse{
+			YamlContent: "",
+			Status:      res,
+		}, nil
 	}
 	//
 	template := &httptpl.YakTemplate{}
