@@ -13,6 +13,7 @@ import (
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"os"
 	"testing"
 )
 
@@ -36,7 +37,8 @@ var rules = []string{
 	`alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
 	`alert http any any -> any any (msg: "Weevely PHP Backdoor Response"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; pcre:"/<(\w+)>[a-zA-Z0-9+\/]20,}(?:[a-zA-Z0-9+\/]1}[a-zA-Z0-9+\/=]1}|==)<\/\w+>/Q"; classtype:shellcode-detect; sid: 3016006; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
 	`alert http any any -> any any (msg: "Suspicious netstat command traffic"; flow: established,to_client; content:"Active Internet connections"; http_server_body; depth:28; content:"tcp"; http_server_body; distance:0; classtype:trojan-activity; sid: 3013003; rev: 1; metadata:created_at 2018_09_26,by al0ne;)`,
-	`alert http any any -> any any (msg:"msfconsole powershell response"; flow:established; content:!"<html>"; content:!"<script>"; content:"|70 6f 77 65 72 73 68 65 6c 6c 2e 65 78 65|"; http_server_body; content:"|46 72 6f 6d 42 61 73 65 36 34 53 74 72 69 6e 67|"; http_server_body; classtype:exploit-kit; sid:3016005; rev:1;)`, `alert tcp any any -> any any (msg:"ET SCAN Amap TCP Service Scan Detected"; flow:to_server; flags:PA; content:"service|3A|thc|3A 2F 2F|"; depth:105; content:"service|3A|thc"; within:40; reference:url,freeworld.thc.org/thc-amap/; reference:url,doc.emergingthreats.net/2010371; classtype:attempted-recon; sid:2010371; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`, `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	`alert http any any -> any any (msg:"msfconsole powershell response"; flow:established; content:!"<html>"; content:!"<script>"; content:"|70 6f 77 65 72 73 68 65 6c 6c 2e 65 78 65|"; http_server_body; content:"|46 72 6f 6d 42 61 73 65 36 34 53 74 72 69 6e 67|"; http_server_body; classtype:exploit-kit; sid:3016005; rev:1;)`,
+	`alert tcp any any -> any any (msg:"ET SCAN Amap TCP Service Scan Detected"; flow:to_server; flags:PA; content:"service|3A|thc|3A 2F 2F|"; depth:105; content:"service|3A|thc"; within:40; reference:url,freeworld.thc.org/thc-amap/; reference:url,doc.emergingthreats.net/2010371; classtype:attempted-recon; sid:2010371; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`, `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 }
 
 func TestMUSTPASS_CrossVerify(t *testing.T) {
@@ -60,7 +62,10 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 
 		// check generated chaos
 		for pk := range res {
-			pcapx.InjectRaw(pk)
+			if os.Getenv("GITHUB_ACTIONS") == "" {
+				// view chaos in wireshark
+				pcapx.InjectRaw(pk)
+			}
 			count++
 			if match.New(rr).Match(pk) {
 				matchedCount++
