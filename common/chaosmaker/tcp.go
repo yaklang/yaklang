@@ -3,6 +3,7 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
@@ -67,8 +68,13 @@ func (t *tcpGenerator) generator(count int) {
 		if raw == nil {
 			return
 		}
-		t.out <- raw
-		//todo: generate handshake flow
+		flow, err := pcapx.CompleteTCPFlow(raw)
+		if err != nil {
+			log.Errorf("complete tcp flow failed: %v", err)
+		}
+		for _, f := range flow {
+			t.out <- f
+		}
 	}
 }
 

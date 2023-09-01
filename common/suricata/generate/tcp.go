@@ -66,24 +66,21 @@ func (g *TCPGen) Gen() []byte {
 
 	if tcpConfig.Ack != nil && *tcpConfig.Ack > 0 {
 		opts = append(opts, pcapx.WithTCP_Ack(*tcpConfig.Ack))
+	} else {
+		opts = append(opts, pcapx.WithTCP_Ack(uint32(rand.Uint32())))
 	}
 
 	if tcpConfig.Seq != nil && *tcpConfig.Seq > 0 {
 		opts = append(opts, pcapx.WithTCP_Seq(*tcpConfig.Seq))
+	} else {
+		opts = append(opts, pcapx.WithTCP_Seq(uint32(rand.Uint32())))
 	}
 
-	var tcpMss uint32 = 0x05b4
 	if tcpConfig.TCPMss != nil {
-		tcpMss = uint32(tcpConfig.TCPMss.Generate())
-		if tcpMss > 0xffff {
-			tcpMss = 0xffff
-		}
+		opts = append(opts, pcapx.WithTCP_OptionMSS(uint32(tcpConfig.TCPMss.Generate())))
 	}
 
-	if tcpMss > 0 {
-		opts = append(opts, pcapx.WithTCP_OptionMSS(tcpMss))
-	}
-
+	var Len = len(opts)
 	if tcpConfig.Flags != "" && !strings.HasPrefix(tcpConfig.Flags, "!") {
 		for _, flag := range tcpConfig.Flags {
 			switch flag {
@@ -105,6 +102,10 @@ func (g *TCPGen) Gen() []byte {
 				opts = append(opts, pcapx.WithTCP_Flags("cwr"))
 			}
 		}
+	}
+	// syn by default
+	if len(opts) == Len {
+		opts = append(opts, pcapx.WithTCP_Flags("ack"))
 	}
 
 	if tcpConfig.Window != nil && !tcpConfig.NegativeWindow && *tcpConfig.Window > 0 {
