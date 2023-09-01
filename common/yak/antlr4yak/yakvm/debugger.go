@@ -734,6 +734,13 @@ func (g *Debugger) StepOut() error {
 	}
 }
 
+func (g *Debugger) CurrentStackTracePop() {
+	stackTrace := g.CurrentStackTrace()
+	if stackTrace != nil && stackTrace.Len() > 0 {
+		stackTrace.Pop()
+	}
+}
+
 func (g *Debugger) HitCount(breakpoint *Breakpoint) bool {
 	// 如果命中次数大于0，则命中次数减1,如果还大于0则不断点
 	if breakpoint.HitCount > 0 {
@@ -823,13 +830,8 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 				}
 			}()
 		}
-	} else if code.Opcode == OpReturn {
-		defer func() {
-			if stackTrace != nil {
-				stackTrace.Pop()
-			}
-		}()
 	}
+	// 退栈在frame.Exec的defer处理
 
 	// 更新ThreadStackTrace
 	g.ThreadStackTrace[g.frame.ThreadID] = &DebuggerState{

@@ -929,7 +929,8 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 			fieldName := refT.Field(i).Name
 
 			value := refV.Field(i)
-			iValue := SafeReflectStructFieldInterface(refV, refV.Field(i))
+			value = SafeReflectStructField(refV, value)
+			iValue := value.Interface()
 			ref := -1
 			if iValue != nil {
 				ref = ds.ConvertVariable(iValue)
