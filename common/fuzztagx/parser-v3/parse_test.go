@@ -12,7 +12,7 @@ func TestSearch(t *testing.T) {
 	}
 }
 func TestGenerator(t *testing.T) {
-	nodes := Parse("aaa{{int(a)}}aaa", NewTagDefine("expression", "{{===", "===}}"))
+	nodes := Parse("aaa{{int(a)}}aa", NewTagDefine("fuzztag", "=>", "<="))
 	config := &GeneratorConfig{
 		MethodTable: map[string]func(string) []string{
 			"int": func(s string) []string {
