@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
 	"net"
@@ -111,7 +110,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 	log.Infof("start to handle http request for %s", conn.RemoteAddr().String())
 	var readerBuffer bytes.Buffer
 	var reqReader = io.TeeReader(httpConn, &readerBuffer)
-	firstRequest, err := lowhttp.ReadHTTPRequest(bufio.NewReader(reqReader))
+	firstRequest, err := utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(reqReader))
 	if err != nil {
 		return utils.Errorf("read request failed: %s for %s", err, conn.RemoteAddr().String())
 	}
@@ -340,7 +339,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 			if m.transparentHijackRequest == nil && m.transparentHijackRequestManager == nil {
 				reqReader = io.TeeReader(reqReader, remoteConn)
 			}
-			req, err := lowhttp.ReadHTTPRequest(bufio.NewReader(reqReader))
+			req, err := utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(reqReader))
 			if err != nil {
 				return utils.Errorf("read http request from: %s failed: %s", httpConn.RemoteAddr().String(), err)
 			}

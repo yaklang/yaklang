@@ -476,7 +476,7 @@ func MITM_SetHTTPResponseMirrorRaw(f func(isHttps bool, req, rsp []byte, remoteA
 
 func MITM_SetHTTPRequestMirror(f func(isHttps bool, req *http.Request)) MITMConfig {
 	return MITM_SetHTTPRequestMirrorRaw(func(isHttps bool, raw []byte) {
-		req, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewBuffer(raw)))
+		req, err := utils.ReadHTTPRequestFromBytes(raw)
 		if err != nil {
 			log.Errorf("parse raw to http.Request failed: %s", err)
 			return
@@ -532,7 +532,7 @@ func MITM_SetTransparentHijackRequest(f MITMTransparentHijackFunc) MITMConfig {
 
 func MITM_SetTransparentHijackHTTPRequest(f MITMTransparentHijackHTTPRequestFunc) MITMConfig {
 	return MITM_SetTransparentHijackRequest(func(isHttps bool, req []byte) []byte {
-		rp, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewReader(req)))
+		rp, err := utils.ReadHTTPRequestFromBytes(req)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse request to *http.Request failed: %s", err)
 			return nil
@@ -588,7 +588,7 @@ func MITM_SetTransparentHijackedMirror(f MITMTransparentMirrorFunc) MITMConfig {
 
 func MITM_SetTransparentHijackedMirrorHTTP(f MITMTransparentMirrorHTTPFunc) MITMConfig {
 	return MITM_SetTransparentHijackedMirror(func(isHttps bool, req []byte, rsp []byte) {
-		rq, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewReader(req)))
+		rq, err := utils.ReadHTTPRequestFromBytes(req)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse request to *http.Request failed: %s", err)
 			return
@@ -619,7 +619,7 @@ func MITM_SetTransparentMirror(f MITMTransparentMirrorFunc) MITMConfig {
 
 func MITM_SetTransparentMirrorHTTP(f MITMTransparentMirrorHTTPFunc) MITMConfig {
 	return MITM_SetTransparentMirror(func(isHttps bool, req []byte, rsp []byte) {
-		rq, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewReader(req)))
+		rq, err := utils.ReadHTTPRequestFromBytes(req)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse request to *http.Request failed: %s", err)
 			return

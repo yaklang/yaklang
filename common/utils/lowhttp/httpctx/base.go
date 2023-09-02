@@ -130,6 +130,30 @@ func SetContextValueInfoFromRequest(r *http.Request, key string, value any) {
 	infoMap.Store(key, value)
 }
 
+func SetBareRequestBytes(r *http.Request, bytes []byte) {
+	if len(GetBareRequestBytes(r)) != 0 {
+		log.Debug("SetBareRequestBytes: bare request bytes already set, ignore")
+		return
+	}
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, string(bytes))
+}
+
+func GetBareRequestBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes))
+}
+
+func GetBareResponseBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes))
+}
+
+func SetBareResponseBytes(r *http.Request, bytes []byte) {
+	if len(GetBareResponseBytes(r)) != 0 {
+		log.Debug("SetBareResponseBytes: bare response bytes already set, ignore")
+		return
+	}
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, string(bytes))
+}
+
 const REQUEST_CONTEXT_INFOMAP = "InfoMap"
 
 const (
@@ -147,7 +171,9 @@ const (
 	RESPONSE_CONTEXT_KEY_ResponseIsFiltered          = "responseIsFiltered"
 	REQUEST_CONTEXT_KEY_RequestIsHijacked            = "requestIsHijacked"
 	REQUEST_CONTEXT_KEY_RequestBytes                 = "requestBytes"
+	REQUEST_CONTEXT_KEY_RequestBareBytes             = "requestBareBytes"
 	REQUEST_CONTEXT_KEY_ResponseBytes                = "responseBytes"
+	REQUEST_CONTEXT_KEY_ResponseBareBytes            = "responseBareBytes"
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
