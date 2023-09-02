@@ -1114,7 +1114,6 @@ func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.WriteHeader(rsp.StatusCode)
 		rspBody, _ := io.ReadAll(rsp.Body)
-
 		w.Write(rspBody)
 	}
 

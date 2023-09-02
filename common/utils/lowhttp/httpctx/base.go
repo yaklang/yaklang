@@ -2,8 +2,6 @@ package httpctx
 
 import (
 	"context"
-	"fmt"
-	"github.com/ReneKroon/ttlcache"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -12,40 +10,28 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
-var refCache = ttlcache.NewCache()
-var contextInfoMutex = new(sync.Mutex)
-
-func init() {
-	refCache.SetTTL(200 * time.Second)
-}
-
 func GetContextInfoMap(r *http.Request) *sync.Map {
-	contextInfoMutex.Lock()
-	defer func() {
-		contextInfoMutex.Unlock()
-	}()
-
-	mHash := fmt.Sprintf("%p", r)
-	val, ok := refCache.Get(mHash)
-	if !ok {
-		result := _getContextInfoMap(r)
-		if result != nil {
-			refCache.Set(mHash, result)
-		}
-		return result
+	raw := r.Context().Value(REQUEST_CONTEXT_INFOMAP)
+	if raw == nil {
+		return _getContextInfoMap(r)
 	}
-	return val.(*sync.Map)
+	result, tOk := raw.(*sync.Map)
+	if !tOk {
+		return _getContextInfoMap(r)
+	}
+	return result
 }
 
 func _getContextInfoMap(r *http.Request) *sync.Map {
 	value := r.Context().Value(REQUEST_CONTEXT_INFOMAP)
 	var infoMap *sync.Map
+	var uid string
 	if value == nil {
+		uid = uuid.New().String()
 		var ret = new(sync.Map)
-		ret.Store("uuid", uuid.New().String())
+		ret.Store("uuid", uid)
 		*r = *r.WithContext(context.WithValue(r.Context(), REQUEST_CONTEXT_INFOMAP, ret))
 		value = ret
 		infoMap = ret
@@ -54,6 +40,12 @@ func _getContextInfoMap(r *http.Request) *sync.Map {
 		infoMap, ok = value.(*sync.Map)
 		if !ok {
 			return nil
+		}
+	}
+	if uid == "" {
+		var uidRaw, ok = infoMap.Load("uuid")
+		if ok {
+			uid = uidRaw.(string)
 		}
 	}
 	return infoMap
