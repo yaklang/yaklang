@@ -159,6 +159,10 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 			*req = *hijackedReq.WithContext(req.Context())
 
 			// fix new request: Host n Schema
+			if req.URL.Host == "" {
+				req.URL.Host = req.Host
+			}
+
 			if req.URL.Host == "" && req.Host == "" {
 				req.URL.Host = httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 				req.Host = req.URL.Host
@@ -212,6 +216,17 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		// max content-length
 		if m.largerThanMaxContentLength(rsp) {
 			shouldHandleBody = false
+		}
+
+		responseBytes = httpctx.GetBareResponseBytes(rsp.Request)
+		if len(responseBytes) <= 0 {
+			var err error
+			responseBytes, err = utils.DumpHTTPResponse(rsp, shouldHandleBody)
+			if err != nil {
+				log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
+				return nil
+			}
+			httpctx.SetBareResponseBytes(rsp.Request, responseBytes)
 		}
 
 		var isHttps = httpctx.GetRequestHTTPS(rsp.Request)
