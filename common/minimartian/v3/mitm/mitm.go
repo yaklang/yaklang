@@ -26,7 +26,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"github.com/yaklang/yaklang/common/martian/v3/h2"
+	"github.com/yaklang/yaklang/common/minimartian/v3/h2"
 	"math/big"
 	"net"
 	"net/http"
