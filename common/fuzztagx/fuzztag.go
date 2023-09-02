@@ -239,14 +239,12 @@ func (l *LabelMethods) GenerateOne() bool {
 	return ok
 }
 
-type GeneratorContext struct {
-}
+
 type Generator struct {
 	container []string
 	//index     int
 	data            []Node
 	first           bool
-	ctx             *GeneratorContext
 	backpropagation func(s string)
 }
 
