@@ -4,18 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"net/http/httputil"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	utils "github.com/yaklang/yaklang/common/utils"
@@ -405,58 +402,12 @@ func CopyRequest(r *http.Request) *http.Request {
 func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	raw = FixHTTPPacketCRLF(raw, false)
 
-	req, readErr := ReadHTTPRequest(bufio.NewReader(bytes.NewReader(raw)))
+	req, readErr := utils.ReadHTTPRequestFromBytes(raw)
 	if readErr != nil {
-		log.Debugf("read [standard] httpRequest failed: %s", readErr)
-	}
-	if req != nil {
-		return req, nil
-	}
-	return nil, readErr
-}
-
-func ReadHTTPRequest(reader *bufio.Reader) (*http.Request, error) {
-	req, err := utils.ReadHTTPRequestFromBufioReader(reader)
-	if err != nil {
-		return nil, err
+		log.Errorf("read [standard] httpRequest failed: %s", readErr)
+		return nil, readErr
 	}
 	return req, nil
-}
-
-func ReadHTTPPacketSafe(r *bufio.Reader) ([]byte, error) {
-	var line []string
-	firstLine, err := utils.BufioReadLine(r)
-	if err != nil {
-		return nil, errors.Wrapf(err, "read httppacket first line")
-	}
-	line = append(line, string(firstLine))
-
-	for {
-		lineBytes, err := utils.BufioReadLine(r)
-		if err != nil {
-			break
-		}
-		line = append(line, string(lineBytes))
-		if lineBytes == nil {
-			break
-		}
-	}
-
-	var raw []byte
-	headers := strings.Join(line, CRLF)
-	headerBytes := []byte(headers)
-	cl, chunk := ReadHTTPPacketBodySize([]byte(headers))
-	if chunk {
-		raw, _ = ioutil.ReadAll(httputil.NewChunkedReader(r))
-		return ReplaceHTTPPacketBody(headerBytes, raw, false), nil
-	} else {
-		var body = make([]byte, cl)
-		_, err := io.ReadFull(r, body)
-		if err != nil {
-			return nil, errors.Wrapf(err, "bufio.Reader => io.ReadFull [%v]", cl)
-		}
-		return ReplaceHTTPPacketBody(headerBytes, body, false), nil
-	}
 }
 
 func ExtractBoundaryFromBody(raw interface{}) string {
@@ -476,15 +427,16 @@ func ExtractBoundaryFromBody(raw interface{}) string {
 	return ""
 }
 
-var extractStatusRe = regexp.MustCompile(`^HTTP/[\d](\.\d)?\s(\d{3})`)
+var ReadHTTPRequestFromBytes = utils.ReadHTTPRequestFromBytes
+var ReadHTTPRequestFromBufioReader = utils.ReadHTTPRequestFromBufioReader
+var ReadHTTPResponseFromBytes = utils.ReadHTTPResponseFromBytes
+var ReadHTTPResponseFromBufioReader = utils.ReadHTTPResponseFromBufioReader
 
 func ExtractStatusCodeFromResponse(raw []byte) int {
-	var m = make([]byte, 20)
-	copy(m, raw)
-
-	if ret := extractStatusRe.FindStringSubmatch(strings.Trim(string(m), "\x00")); len(ret) > 2 {
-		code, _ := strconv.Atoi(ret[2])
-		return code
-	}
-	return 0
+	var statusCode int
+	SplitHTTPPacket(raw, nil, func(proto string, code int, codeMsg string) error {
+		statusCode = code
+		return utils.Error("abort")
+	})
+	return statusCode
 }

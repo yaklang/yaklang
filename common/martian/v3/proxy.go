@@ -523,7 +523,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	reqc := make(chan *http.Request, 1)
 	errc := make(chan error, 1)
 	go func() {
-		r, err := lowhttp.ReadHTTPRequest(brw.Reader)
+		r, err := utils.ReadHTTPRequestFromBufioReader(brw.Reader)
 		if err != nil {
 			errc <- err
 			return

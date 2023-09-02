@@ -1,11 +1,8 @@
 package crawler
 
 import (
-	"bufio"
-	"bytes"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 )
@@ -25,7 +22,7 @@ func (r *Req) Url() string {
 }
 
 func (r *Req) Request() *http.Request {
-	reqIns, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewBuffer(r.requestRaw)))
+	reqIns, err := utils.ReadHTTPRequestFromBytes(r.requestRaw)
 	if err != nil {
 		log.Errorf("read request failed: %s", err)
 	}
