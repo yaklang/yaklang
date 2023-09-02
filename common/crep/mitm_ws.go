@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/martian/v3"
+	"github.com/yaklang/yaklang/common/minimartian/v3"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"

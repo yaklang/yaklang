@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/martian/v3/mitm"
+	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"

@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/martian/v3"
-	"github.com/yaklang/yaklang/common/martian/v3/fifo"
-	"github.com/yaklang/yaklang/common/martian/v3/header"
-	"github.com/yaklang/yaklang/common/martian/v3/mitm"
+	"github.com/yaklang/yaklang/common/minimartian/v3"
+	"github.com/yaklang/yaklang/common/minimartian/v3/fifo"
+	"github.com/yaklang/yaklang/common/minimartian/v3/header"
+	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -330,6 +330,7 @@ func (m *MITMServer) preHandle(rootCtx context.Context) {
 			return wsModifier.ModifyRequest(req)
 		}
 
+		// remove proxy-connection like!
 		err := header.NewHopByHopModifier().ModifyRequest(req)
 		if err != nil {
 			log.Errorf("remove hop by hop header failed: %s", err)
