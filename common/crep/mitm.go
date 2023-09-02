@@ -153,7 +153,7 @@ type MITMServer struct {
 	proxyAuth *ProxyAuth
 
 	requestHijackHandler  func(isHttps bool, originReq *http.Request, req []byte) []byte
-	responseHijackHandler func(isHttps bool, r *http.Request, rsp []byte, remoteAddr string) []byte
+	responseHijackHandler func(isHttps bool, r *http.Request, rspIns *http.Response, rsp []byte, remoteAddr string) []byte
 	httpFlowMirror        func(isHttps bool, r *http.Request, rsp *http.Response, startTs int64)
 
 	// websocket

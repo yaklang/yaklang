@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
+	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -229,7 +230,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	// 设置过滤器
 	// 10M - 10 * 1000 * 1000
-	var packetLimit = 8 * 10 * 1000 * 1000
+	var packetLimit = 8 * 10 * 1000 * 1000 // 80M
 
 	/*
 		设置过滤器
@@ -687,7 +688,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return reqInstance.GetResponse()
 		}
 	}
-	handleHijackResponse := func(isHttps bool, req *http.Request, rsp []byte, remoteAddr string) []byte {
+	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("hijack response error: %s", err)
@@ -707,6 +708,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
 			httpctx.SetPlainResponseBytes(req, plainResponse)
 		}
+		rsp = plainResponse
+
 		var urlStr = httpctx.GetRequestURL(req)
 
 		// use handled request
@@ -731,42 +734,45 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		var dropped = utils.NewBool(false)
-		var modifiedResponse []byte
-		// 响应，带请求
 		mitmPluginCaller.CallHijackResponseEx(isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
 			return plainResponse
 		}, constClujore(func(i interface{}) {
 			if ret := codec.AnyToBytes(i); handleResponseModified(ret) {
-				httpctx.SetRequestModified()
+				httpctx.SetResponseModified(req, "yaklang.hook(ex)")
+				httpctx.SetHijackedResponseBytes(req, ret)
 			}
 		}), constClujore(func() {
-			handled.Set()
 			dropped.Set()
 		}))
 
-		// 响应
-		mitmPluginCaller.CallHijackResponse(isHttps, urlStr, func() interface{} {
-			var fixedResponse, _, _ = lowhttp.FixHTTPResponse(originRspRaw[:])
-			if len(fixedResponse) > 0 {
-				return fixedResponse
-			} else {
-				return originRspRaw[:]
-			}
-		}, constClujore(func(i interface{}) {
-			handled.Set()
-			modifiedResponse = utils.InterfaceToBytes(i)
-		}), constClujore(func() {
-			handled.Set()
-			dropped.Set()
-		}))
-		if handled.IsSet() {
+		// dropped.
+		if !dropped.IsSet() {
+			// legacy code
+			mitmPluginCaller.CallHijackResponse(isHttps, urlStr, func() interface{} {
+				if httpctx.GetResponseIsModified(req) {
+					return httpctx.GetHijackedResponseBytes(req)
+				} else {
+					return plainResponse
+				}
+			}, constClujore(func(i interface{}) {
+				if ret := codec.AnyToBytes(i); handleResponseModified(ret) {
+					httpctx.SetResponseModified(req, "yaklang.hook")
+					httpctx.SetHijackedResponseBytes(req, ret)
+				}
+			}), constClujore(func() {
+				dropped.Set()
+			}))
+
 			if dropped.IsSet() {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 				return nil
-			} else {
-				rsp = modifiedResponse[:]
 			}
+		}
+
+		if httpctx.GetResponseIsModified(req) {
+			rsp = httpctx.GetHijackedResponseBytes(req)
 		}
 
 		// 自动转发与否
@@ -778,14 +784,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			*/
 
 			// 这个来过滤一些媒体文件
-			rspIns, _ := lowhttp.ParseBytesToHTTPResponse(rsp)
-			if rspIns != nil {
-				ctStr := rspIns.Header.Get("Content-Type")
-				if ctStr != "" {
-					if !responseShouldBeHijacked(ctStr, isHttps) {
-						httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
-						return rsp
-					}
+			var contentTypeStr string
+			if handleResponseModified(rsp) {
+				contentTypeStr = lowhttp.GetHTTPPacketContentType(rsp)
+			} else {
+				contentTypeStr = rspInstance.Header.Get("Content-Type")
+			}
+			if contentTypeStr != "" {
+				if !responseShouldBeHijacked(contentTypeStr, isHttps) {
+					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
+					return rsp
 				}
 			}
 
@@ -798,6 +806,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return nil
 				}
 				httpctx.AppendMatchedRule(req, rules...)
+				if handleResponseModified(rspHooked) {
+					httpctx.SetResponseModified(req, "yakit.rule.hook")
+					httpctx.SetHijackedResponseBytes(req, rspHooked)
+				}
 				return rspHooked
 			}
 			return rsp
@@ -809,7 +821,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 			return nil
 		}
-		rsp = rsp1
+		if handleResponseModified(rsp1) {
+			rsp = rsp1
+		}
 		httpctx.AppendMatchedRule(req, rules...)
 		responseCounter := time.Now().UnixNano()
 
@@ -826,7 +840,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
-			Request:     requestRaw,
+			Request:     plainRequest,
 			ResponseId:  responseCounter,
 			RemoteAddr:  remoteAddr,
 		}
@@ -1161,7 +1175,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				return req
 			}
 
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsHijacked, true)
+			httpctx.SetRequestViewedByUser(originReqIns)
 			for {
 				feedbackOrigin := &ypb.MITMResponse{
 					Request:             req,
@@ -1283,9 +1297,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if handleRequestModified(current) {
 					httpctx.SetRequestModified(originReqIns, "user")
 					httpctx.SetHijackedRequestBytes(originReqIns, current)
-					// modified
-				} else {
-					// viewed
 				}
 				return current
 			}
@@ -1299,37 +1310,42 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var isFilteredByResponse = httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
 		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
 		var isFilter = isFilteredByResponse || isFilteredByRequest
+		var modified = httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
+		var viewed = httpctx.GetRequestViewedByUser(req)
 
-		var requestRaw = httpctx.GetRequestBytes(req)
-		if len(requestRaw) <= 0 {
-			requestRaw, err = utils.HttpDumpWithBody(req, true)
-			if err != nil {
-				log.Errorf("dump request failed: %s", err)
-				return
+		var plainRequest []byte
+		if httpctx.GetRequestIsModified(req) {
+			plainRequest = httpctx.GetHijackedRequestBytes(req)
+		} else {
+			plainRequest = httpctx.GetPlainRequestBytes(req)
+			if len(plainRequest) <= 0 {
+				plainRequest = lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
 			}
 		}
-		var modified = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsModified)
-		var viewed = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsHijacked)
 
-		// 处理 gzip
-		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsStrippedGzip) {
-			requestRaw = lowhttp.DeletePacketEncoding(requestRaw)
+		var responseOverSize = false
+		var plainResponse []byte
+		if httpctx.GetResponseIsModified(req) {
+			plainResponse = httpctx.GetHijackedResponseBytes(req)
+		} else {
+			plainResponse = httpctx.GetPlainResponseBytes(req)
+			if len(plainResponse) <= 0 {
+				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+			}
+		}
+		if len(plainResponse) > packetLimit {
+			responseOverSize = true
+		}
+		header, body := lowhttp.SplitHTTPPacketFast(plainResponse)
+		if responseOverSize {
+			plainResponse = []byte(header)
 		}
 
-		tooLarge := utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit)
-		if tooLarge {
-			log.Infof(`utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit) -> too large`)
-		}
-		responseRaw, _ := utils.HttpDumpWithBody(rsp, !tooLarge)
-		noGzippedResponse, body, _ := lowhttp.FixHTTPResponse(responseRaw)
-		if noGzippedResponse != nil {
-			responseRaw = noGzippedResponse
-		}
-
-		shouldeBeHijacked := !isFilter
+		shouldBeHijacked := !isFilter
 		go func() {
-			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, requestRaw, responseRaw, body, shouldeBeHijacked)
+			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
+
 		// 劫持过滤
 		if isFilter {
 			return
@@ -1343,8 +1359,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, req, "mitm", reqUrl, remoteAddr, true, true)
 			flow.StatusCode = 200 //先设置成200
 		} else {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !utils.HTTPPacketIsLargerThanMaxContentLength(rsp, packetLimit))
-
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, responseOverSize)
 		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
@@ -1361,7 +1376,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow.Red()
 		}
 		if viewed {
-			flow.AddTagToFirst("[被劫持]")
+			flow.AddTagToFirst("[手动劫持]")
 			flow.Orange()
 		}
 		var hijackedFlowMutex = new(sync.Mutex)
@@ -1395,7 +1410,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						log.Errorf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v panic: %s", truncate(reqUrl), err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					replacer.hookColor(requestRaw, responseRaw, req, flow)
+					replacer.hookColor(plainRequest, plainResponse, req, flow)
 					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 				}()
 				startCreateFlow = time.Now()
@@ -1407,22 +1422,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 				if err != nil {
 					log.Errorf("create / save httpflow from mirror error: %s", err)
+					flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
 					time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
 					continue
 				}
 				break
 			}
-			//
-			//go func() {
-			//	saveHTTPFlowMutex.Lock()
-			//	defer saveHTTPFlowMutex.Unlock()
-			//
-			//	defer func() {
-			//		if err := recover(); err != nil {
-			//			log.Error("panic from save httpflow to database! " + fmt.Sprint(err) + " current url: " + flow.Url)
-			//		}
-			//	}()
-			//}()
 		}
 	}
 	// 核心 MITM 服务器

@@ -170,7 +170,7 @@ func GetHijackedRequestBytes(r *http.Request) []byte {
 	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes))
 }
 
-func SetHijackdResponseBytes(r *http.Request, bytes []byte) {
+func SetHijackedResponseBytes(r *http.Request, bytes []byte) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes, string(bytes))
 }
 
@@ -229,7 +229,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseModifiedBy           = "responseIsModifiedBy"
 	REQUEST_CONTEXT_KEY_RequestIsFiltered            = "requestIsFiltered"
 	RESPONSE_CONTEXT_KEY_ResponseIsFiltered          = "responseIsFiltered"
-	REQUEST_CONTEXT_KEY_RequestIsHijacked            = "requestIsHijacked"
+	REQUEST_CONTEXT_KEY_RequestIsViewedByUser        = "requestIsHijacked"
 	REQUEST_CONTEXT_KEY_RequestBareBytes             = "requestBareBytes"
 	REQUEST_CONTEXT_KEY_RequestHijackedBytes         = "requestHijackedBytes"
 	REQUEST_CONTEXT_KEY_RequestPlainBytes            = "requestPlainBytes"
@@ -307,4 +307,12 @@ func SetRequestURL(req *http.Request, urlStr string) {
 
 func GetRequestURL(req *http.Request) string {
 	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_Url)
+}
+
+func SetRequestViewedByUser(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsViewedByUser)
+}
+
+func GetRequestViewedByUser(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsViewedByUser)
 }

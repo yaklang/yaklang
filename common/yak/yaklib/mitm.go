@@ -294,7 +294,7 @@ func startBridge(
 			}
 			return lowhttp.FixHTTPRequest(after)
 		}),
-		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rsp []byte, remoteAddr string) []byte {
+		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte {
 			if config.hijackResponse == nil && config.hijackResponseEx == nil {
 				return rsp
 			}
