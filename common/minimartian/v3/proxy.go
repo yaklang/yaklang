@@ -42,9 +42,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/martian/v3/mitm"
-	"github.com/yaklang/yaklang/common/martian/v3/nosigpipe"
-	"github.com/yaklang/yaklang/common/martian/v3/proxyutil"
+	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
+	"github.com/yaklang/yaklang/common/minimartian/v3/nosigpipe"
+	"github.com/yaklang/yaklang/common/minimartian/v3/proxyutil"
 )
 
 var errClose = errors.New("closing connection")
@@ -586,8 +586,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 		if host == "" {
 			conn.Close()
-			reqBytes, _ := utils.DumpHTTPRequest(req, true)
-			return utils.Errorf("martian: no host (and not connect to) in request: \n%v\n\n", string(reqBytes))
+			return utils.Errorf("martian: no host (and not connect to) in request: \n%v\n\n", string(httpctx.GetBareRequestBytes(req)))
 		}
 	}
 
@@ -635,23 +634,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if req.Method == "CONNECT" {
-		// req auth enable
-		//var connectedTo = req.Host
-		//var urlFromURI = req.URL.String()
-		//if host, port, err := utils.ParseStringToHostPort(urlFromURI); err == nil {
-		//	connectedTo = utils.HostPort(host, port)
-		//}
-		//if req.URL.Scheme == "https" {
-		//	connectedTo = strings.TrimSuffix(connectedTo, ":443")
-		//}
-		//
-		//var parsedConnectedToHost, parsedConnectedToPort, _ = utils.ParseStringToHostPort(connectedTo)
-		//if parsedConnectedToPort <= 0 {
-		//	parsedConnectedToHost = connectedTo
-		//}
-		//ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
-		//ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
-
 		connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
 		if err != nil {
 			conn.Close()
