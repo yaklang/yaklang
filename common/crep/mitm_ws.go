@@ -132,10 +132,16 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	}
 	remoteConnWriter.Flush()
 
-	rspBytes, err := lowhttp.ReadHTTPPacketSafe(remoteConnReader)
+	rspIns, err := utils.ReadHTTPResponseFromBufioReader(remoteConnReader, req)
 	if err != nil {
-		return errors.Wrap(err, "lowhttp.ReadHTTPPacketSafe")
+		return errors.Wrap(err, "lowhttp.ReadHTTPResponseFromBufioReader")
 	}
+
+	rspBytes, err := utils.DumpHTTPResponse(rspIns, true)
+	if err != nil {
+		return errors.Wrap(err, "lowhttp.DumpHTTPResponse")
+	}
+
 	// 这里不校验，也没关系，反正本来就是为了更好兼容 "劫持部分"
 	//websocketAccept := rsp.Header.Get("Sec-WebSocket-Accept")
 	//checkSum := lowhttp.ComputeWebsocketAcceptKey(webSocketKey)

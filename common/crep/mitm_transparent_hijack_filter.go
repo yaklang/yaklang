@@ -1,10 +1,7 @@
 package crep
 
 import (
-	"bufio"
-	"bytes"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"regexp"
 	"sync"
 )
@@ -51,7 +48,7 @@ func (t *TransparentHijackManager) SetHijackRequestForHost(
 func (t *TransparentHijackManager) Hijacked(isHttps bool, req []byte) []byte {
 	var hijackedReq = req
 
-	reqIns, err := lowhttp.ReadHTTPRequest(bufio.NewReader(bytes.NewReader(req)))
+	reqIns, err := utils.ReadHTTPRequestFromBytes(req)
 	if err != nil {
 		return hijackedReq
 	}
