@@ -22,7 +22,7 @@ Host: asdfasd:123
 		panic(err)
 	}
 	spew.Dump(u.String())
-	var a = FixHTTPRequestOut([]byte(packet))
+	var a = FixHTTPRequest([]byte(packet))
 	if !strings.Contains(string(a), "\r\n Cookie: 123\r\n  d: 1\r\n") {
 		panic(1)
 	}
@@ -258,7 +258,7 @@ Host: www.baidu.com
 Content-Encoding: gzip
 
 `), raw, false)
-	packetResult = FixHTTPRequestOut(packetResult)
+	packetResult = FixHTTPRequest(packetResult)
 	fmt.Println(string(packetResult))
 
 	if strings.Contains(string(packetResult), "abc") {

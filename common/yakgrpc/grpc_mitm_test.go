@@ -48,7 +48,7 @@ Content-Length: 3
 
 111`))
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
-		fixedRequest := lowhttp.FixHTTPRequestOut(req)
+		fixedRequest := lowhttp.FixHTTPRequest(req)
 		spew.Dump(fixedRequest)
 		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
 		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
@@ -157,7 +157,7 @@ Content-Length: 3
 
 111`))
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
-		fixedRequest := lowhttp.FixHTTPRequestOut(req)
+		fixedRequest := lowhttp.FixHTTPRequest(req)
 		spew.Dump(fixedRequest)
 		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
 		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
@@ -260,7 +260,7 @@ Host: ` + h2Addr,
 				}()
 				var token = utils.RandStringBytes(100)
 				var params = map[string]any{
-					"packet": lowhttp.FixHTTPRequestOut(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+					"packet": lowhttp.FixHTTPRequest(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
 Host: www.example.com
 
 `+token), "Host", utils.HostPort(mockHost, mockPort))),

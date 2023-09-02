@@ -11,14 +11,14 @@ import (
 func (s *Server) FixUploadPacket(ctx context.Context, req *ypb.FixUploadPacketRequest) (*ypb.FixUploadPacketResponse, error) {
 	var request []byte = req.GetRequest()
 
-	request = lowhttp.FixHTTPRequestOut(request)
+	request = lowhttp.FixHTTPRequest(request)
 	return &ypb.FixUploadPacketResponse{Request: request}, nil
 }
 
 func (s *Server) IsMultipartFormDataRequest(ctx context.Context, req *ypb.FixUploadPacketRequest) (*ypb.IsMultipartFormDataRequestResult, error) {
 	var request []byte = req.GetRequest()
 
-	request = lowhttp.FixHTTPRequestOut(request)
+	request = lowhttp.FixHTTPRequest(request)
 	reqIns, err := lowhttp.ParseBytesToHttpRequest(request)
 	if err != nil {
 		return nil, utils.Errorf("parse bytes to request failed: %s", err)

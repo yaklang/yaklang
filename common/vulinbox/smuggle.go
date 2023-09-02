@@ -82,7 +82,7 @@ func Pipeline(ctx context.Context, port int) error {
 	}()
 	defer lis.Close()
 
-	ordinaryRequest := lowhttp.FixHTTPRequestOut([]byte(`HTTP/1.1 200 OK
+	ordinaryRequest := lowhttp.FixHTTPRequest([]byte(`HTTP/1.1 200 OK
 Server: ReverseProxy for restriction admin in VULINBOX!
 Content-Type: text/html; charset=utf-8
 `))
@@ -155,7 +155,7 @@ func Smuggle(ctx context.Context, port int) error {
 	}()
 	defer lis.Close()
 
-	ordinaryRequest := lowhttp.FixHTTPRequestOut([]byte(`HTTP/1.1 200 OK
+	ordinaryRequest := lowhttp.FixHTTPRequest([]byte(`HTTP/1.1 200 OK
 Server: ReverseProxy for restriction admin in VULINBOX!
 Content-Type: text/html; charset=utf-8
 `))

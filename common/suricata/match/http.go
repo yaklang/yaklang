@@ -251,7 +251,7 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 		if idx == -1 {
 			return nil
 		}
-		return lowhttp.FixHTTPRequestOut(h.raw[:idx+4])
+		return lowhttp.FixHTTPRequest(h.raw[:idx+4])
 	case modifier.HTTPProtocol:
 		return []byte(h.req.Proto)
 	case modifier.HTTPHeaderNames:
@@ -335,7 +335,7 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 		if idx == -1 {
 			return nil
 		}
-		return lowhttp.FixHTTPRequestOut(h.raw[:idx+4])
+		return lowhttp.FixHTTPRequest(h.raw[:idx+4])
 	case modifier.HTTPProtocol:
 		return []byte(h.res.Proto)
 	case modifier.HTTPHeaderNames:

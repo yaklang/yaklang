@@ -181,7 +181,7 @@ func InjectHTTPRequest(raw []byte, opt ...ConfigOption) {
 		return
 	}
 	host, port, _ := utils.ParseStringToHostPort(urlIns.String())
-	InjectTCPPayload(lowhttp.FixHTTPRequestOut(raw), WithRemoteAddress(utils.HostPort(host, port)))
+	InjectTCPPayload(lowhttp.FixHTTPRequest(raw), WithRemoteAddress(utils.HostPort(host, port)))
 }
 
 func InjectTCPIPInstance(raw *TCPIPFrame, opt ...ConfigOption) {

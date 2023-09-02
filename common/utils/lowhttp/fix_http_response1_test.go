@@ -128,6 +128,6 @@ func TestFixEncoding(t *testing.T) {
 }
 
 func TestFixRequestingDoubleCRLF(t *testing.T) {
-	req := FixHTTPRequestOut([]byte(`POST /abc HTTP/1.1` + "\r\r\nHost: www.baidu.com\r\r\r\n\r\n"))
+	req := FixHTTPRequest([]byte(`POST /abc HTTP/1.1` + "\r\r\nHost: www.baidu.com\r\r\r\n\r\n"))
 	println(string(req))
 }

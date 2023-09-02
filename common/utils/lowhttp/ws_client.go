@@ -276,7 +276,7 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	}
 
 	// 判断websocket扩展
-	requestRaw := FixHTTPRequestOut(packet)
+	requestRaw := FixHTTPRequest(packet)
 	req, err := ParseBytesToHttpRequest(requestRaw)
 	if err != nil {
 		return nil, utils.Errorf("parse request failed: %s", err)
