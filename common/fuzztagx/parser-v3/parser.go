@@ -6,13 +6,15 @@ import (
 )
 
 const (
-	TagLeft     = "{{"
-	TagRight    = "}}"
+	//TagLeft     = "{{"
+	//TagRight    = "}}"
 	MethodLeft  = "("
 	MethodRight = ")"
+	FuzzTagType = "fuzztag"
 )
 
 type fuzztagPos struct {
+	tagType    *TagDefine
 	start, end int
 	subs       []*fuzztagPos
 }
@@ -23,13 +25,26 @@ func isIdentifyString(s string) bool {
 
 func Parse(code string, tagTypes ...*TagDefine) []Node {
 	// 第一层词法: tag
-	tagMarginPostions := IndexAllSubstrings(code, TagLeft, TagRight)
+	tagTypes = append(tagTypes, NewTagDefine(FuzzTagType, "{{", "}}"))
+	utagTypes := []*TagDefine{}
+	var tagMargins []string
+	typeMap := map[string]struct{}{}
+	for _, tagType := range tagTypes {
+		if _, ok := typeMap[tagType.name]; !ok {
+			utagTypes = append(utagTypes, tagType)
+			tagMargins = append(tagMargins, tagType.start, tagType.end)
+		}
+	}
+
+	tagMarginPostions := IndexAllSubstrings(code, tagMargins...)
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
 	for _, pos := range tagMarginPostions {
-		switch pos[0] {
-		case 0: // Left
-			tag := &fuzztagPos{start: pos[1] + 2}
+		tagIndex := pos[0] / 2
+		isleft := pos[0]%2 == 0
+		typ := tagTypes[tagIndex]
+		if isleft {
+			tag := &fuzztagPos{start: pos[1] + 2, tagType: typ}
 			if stack.Size() != 0 {
 				top := stack.Peek()
 				top.subs = append(top.subs, tag)
@@ -37,10 +52,12 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 				rootTags = append(rootTags, tag)
 			}
 			stack.Push(tag)
-		case 1: // Right
+		} else {
 			if stack.Size() != 0 {
-				top := stack.Pop()
-				top.end = pos[1]
+				if stack.Peek().tagType.name == typ.name {
+					top := stack.Pop()
+					top.end = pos[1]
+				}
 			}
 		}
 	}
@@ -60,6 +77,9 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 	newFuzzTagFromPos = func(pos *fuzztagPos) (*FuzzTag, bool) {
 		tag := &FuzzTag{}
 		methodInvokeCode := code[pos.start:pos.end]
+		if pos.tagType.name != FuzzTagType {
+			tag.Data = []Node{methodInvokeCode}
+		}
 		matchedPos := IndexAllSubstrings(methodInvokeCode, MethodLeft, MethodRight)
 		if len(matchedPos) >= 2 {
 			leftPos := matchedPos[0]
@@ -99,12 +119,12 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 			}
 			tag, ok := newFuzzTagFromPos(pos)
 			if ok {
-				s := code[pre : pos.start-len(TagLeft)]
+				s := code[pre : pos.start-len(pos.tagType.start)]
 				if s != "" {
 					res = append(res, s)
 				}
 				res = append(res, tag)
-				pre = pos.end + len(TagRight)
+				pre = pos.end + len(pos.tagType.end)
 			}
 		}
 		if pre < end {
