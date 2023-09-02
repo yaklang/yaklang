@@ -673,10 +673,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 			_ = responseBytes
 			if err != nil {
-				log.Errorf("martian: got error while writing response back to client: %v", err)
+				log.Errorf("CONNECT Request: got error while writing response back to client: %v", err)
 			}
 			if err := brw.Flush(); err != nil {
-				log.Errorf("martian: got error while flushing response back to client: %v", err)
+				log.Errorf("CONNECT Request: got error while flushing response back to client: %v", err)
 			}
 
 			log.Debugf("martian: completed MITM for connection: %s", req.Host)
@@ -780,11 +780,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 			_ = responseBytes
 			if err != nil {
-				log.Errorf("martian: got error while writing response back to client: %v", err)
+				log.Errorf("feedback to client via response: got error while writing response back to client: %v", err)
 			}
 			err := brw.Flush()
 			if err != nil {
-				log.Errorf("martian: got error while flushing response back to client: %v", err)
+				log.Errorf("feedback to client via response: got error while flushing response back to client: %v", err)
+				fmt.Println(string(responseBytes))
 			}
 			return err
 		}
@@ -804,10 +805,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 		_ = responseBytes
 		if err != nil {
-			log.Errorf("martian: got error while writing response back to client: %v", err)
+			log.Errorf("handle response: got error while writing response back to client: %v", err)
 		}
 		if err := brw.Flush(); err != nil {
-			log.Errorf("martian: got error while flushing response back to client: %v", err)
+			log.Errorf("handle response: got error while flushing response back to client: %v", err)
+			fmt.Println(string(responseBytes))
 		}
 
 		cbw := bufio.NewWriter(cconn)
@@ -888,7 +890,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 	_ = responseBytes
 	if err != nil {
-		log.Errorf("martian: got error while writing response back to client: %v", err)
+		log.Errorf("handle ordinary request: got error while writing response back to client: %v", err)
 	}
 	//Handle proxy getting stuck when upstream stops responding midway
 	//see https://github.com/google/martian/pull/349
@@ -898,7 +900,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	err = brw.Flush()
 	if err != nil {
-		log.Errorf("martian: got error while flushing response back to client: %v", err)
+		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
+		fmt.Println(string(responseBytes))
 	}
 	return closing
 }
