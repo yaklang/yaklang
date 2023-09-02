@@ -202,6 +202,8 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	} else {
 		rsp.Body = io.NopCloser(bodyRawBuf)
 	}
-	httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+	if req != nil {
+		httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+	}
 	return rsp, nil
 }

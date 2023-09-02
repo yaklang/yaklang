@@ -699,12 +699,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		proxy = proxy[1:]
 	}
 
-RECONNECT:
 	totalTimeStart := time.Now()
 	defer func() {
 		traceInfo.TotalTime = time.Since(totalTimeStart)
 	}()
 
+RECONNECT:
 	for _, proxyUrl := range proxy {
 		// retry when timeout
 		for retry = 0; retry <= retryTimes; retry++ {

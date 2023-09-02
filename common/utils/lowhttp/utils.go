@@ -365,7 +365,7 @@ func SplitHTTPPacket(
 			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
 			err := rspFirstLine(proto, code, codeMsg)
 			if err != nil {
-				log.Errorf("rspHeader error: %s", err)
+				log.Debugf("rspHeader error: %s", err)
 				return "", nil
 			}
 		}
@@ -375,7 +375,7 @@ func SplitHTTPPacket(
 			method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
 			err := reqFirstLine(method, requestURI, proto)
 			if err != nil && err.Error() != "normal abort" {
-				log.Errorf("reqHeader error: %s", err)
+				log.Debugf("reqHeader error: %s", err)
 				return "", nil
 			}
 		}
