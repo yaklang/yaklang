@@ -109,12 +109,15 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		isDropped = utils.NewBool(false)
 	)
 	if m.requestHijackHandler != nil {
-		hijackedRaw, err := utils.HttpDumpWithBody(req, true)
-		if err != nil {
-			log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
-			return nil
+		hijackedRaw := httpctx.GetBareRequestBytes(req)
+		if hijackedRaw == nil {
+			hijackedRaw, err = utils.DumpHTTPRequest(req, true)
+			if err != nil {
+				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
+				return nil
+			}
+			httpctx.SetBareRequestBytes(req, hijackedRaw)
 		}
-		httpctx.SetRequestBytes(req, hijackedRaw)
 
 		/*
 			ctx control
@@ -138,7 +141,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 			isDropped.Set()
 		} else {
 			hijackedRaw = hijackedRequestRaw
-			httpctx.SetRequestBytes(req, hijackedRequestRaw)
 			hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
 			if err != nil {
 				log.Errorf("mitm-hijacked request to http.Request failed: %s", err)
@@ -213,17 +215,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 
 		var isHttps = httpctx.GetRequestHTTPS(rsp.Request)
-
-		var err error
-		responseBytes, err = utils.HttpDumpWithBody(rsp, shouldHandleBody)
-		if err != nil {
-			log.Errorf("hijack response failed: %s", err)
-			return nil
-		}
-		if responseBytes == nil {
-			return nil
-		}
-		result := m.responseHijackHandler(isHttps, rsp.Request, responseBytes, httpctx.GetRemoteAddr(rsp.Request))
+		result := m.responseHijackHandler(isHttps, rsp.Request, rsp, httpctx.GetBareResponseBytes(rsp.Request), httpctx.GetRemoteAddr(rsp.Request))
 		if result == nil {
 			dropped.Set()
 		} else {
