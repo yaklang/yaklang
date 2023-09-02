@@ -1359,7 +1359,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, req, "mitm", reqUrl, remoteAddr, true, true)
 			flow.StatusCode = 200 //先设置成200
 		} else {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, responseOverSize)
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !responseOverSize)
 		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)

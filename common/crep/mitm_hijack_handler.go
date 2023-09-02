@@ -93,6 +93,10 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		log.Errorf("remove hop by hop header failed: %s", err)
 	}
 
+	if req.Method == "CONNECT" {
+		return nil
+	}
+
 	/*
 		handle hijack
 	*/
@@ -129,6 +133,10 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 			return utils.Error("request hijacker error: MITM Proxy Context Canceled")
 		default:
 		}
+		//urlInstance, _ := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
+		//if urlInstance != nil {
+		//	log.Infof("hijack url [%v]: %v", req.Method, urlInstance.String())
+		//}
 		hijackedRequestRaw := m.requestHijackHandler(isHttps, req, hijackedRaw)
 		select {
 		case <-rootCtx.Done():
@@ -198,10 +206,14 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	var requestOrigin = rsp.Request
 	rsp.TLS = requestOrigin.TLS
 
+	if requestOrigin.Method == "CONNECT" {
+		return nil
+	}
+
 	/*
 		return the ca certs
 	*/
-	if utils.StringArrayContains(defaultBuildinDomains, rsp.Request.URL.Hostname()) {
+	if utils.StringArrayContains(defaultBuildinDomains, requestOrigin.URL.Hostname()) {
 		return handleBuildInMITMDefaultPageResponse(rsp)
 	}
 
@@ -211,14 +223,14 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		shouldHandleBody = true
 	)
 
+	// max content-length
+	if m.largerThanMaxContentLength(rsp) {
+		shouldHandleBody = false
+	}
+
 	// response hijacker
 	if m.responseHijackHandler != nil {
-		// max content-length
-		if m.largerThanMaxContentLength(rsp) {
-			shouldHandleBody = false
-		}
-
-		responseBytes = httpctx.GetBareResponseBytes(rsp.Request)
+		responseBytes = httpctx.GetBareResponseBytes(requestOrigin)
 		if len(responseBytes) <= 0 {
 			var err error
 			responseBytes, err = utils.DumpHTTPResponse(rsp, shouldHandleBody)
@@ -226,17 +238,18 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 				log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
 				return nil
 			}
-			httpctx.SetBareResponseBytes(rsp.Request, responseBytes)
+			httpctx.SetBareResponseBytes(requestOrigin, responseBytes)
 		}
 
 		var isHttps = httpctx.GetRequestHTTPS(rsp.Request)
-		result := m.responseHijackHandler(isHttps, rsp.Request, rsp, httpctx.GetBareResponseBytes(rsp.Request), httpctx.GetRemoteAddr(rsp.Request))
+		result := m.responseHijackHandler(isHttps, requestOrigin, rsp, responseBytes, httpctx.GetRemoteAddr(requestOrigin))
 		if result == nil {
 			dropped.Set()
 		} else {
-			responseBytes = result[:]
-			req := rsp.Request
-			resultRsp, err := utils.ReadHTTPResponseFromBytes(result, req)
+			responseBytes = make([]byte, len(result))
+			copy(responseBytes, result)
+
+			resultRsp, err := utils.ReadHTTPResponseFromBytes(responseBytes, nil)
 			if err != nil {
 				log.Errorf("parse fixed response to body failed: %s", err)
 				return utils.Errorf("hijacking modified response parsing failed: %s", err)
@@ -263,13 +276,13 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 				log.Errorf("dump response mirror failed: %s", err)
 				return nil
 			}
+			httpctx.SetBareResponseBytes(requestOrigin, responseBytes)
 		}
 
-		reqRawBytes := httpctx.GetRequestBytes(rsp.Request)
+		reqRawBytes := httpctx.GetRequestBytes(requestOrigin)
 		if reqRawBytes != nil {
-			https := httpctx.GetRequestHTTPS(rsp.Request)
 			var start = time.Now()
-			m.httpFlowMirror(https, rsp.Request, rsp, start.Unix())
+			m.httpFlowMirror(requestOrigin.TLS != nil, requestOrigin, rsp, start.Unix())
 			var end = time.Now()
 			cost := end.Sub(start)
 			if cost.Milliseconds() > 600 {
