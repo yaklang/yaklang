@@ -391,23 +391,9 @@ func MITM_SetDownstreamProxy(s string) MITMConfig {
 	}
 }
 
-func MITM_SetHTTPRequestMirrorRaw(f func(isHttps bool, raw []byte)) MITMConfig {
-	return func(server *MITMServer) error {
-		server.requestMirror = f
-		return nil
-	}
-}
-
 func MITM_SetHTTPRequestHijackRaw(c func(isHttps bool, reqIns *http.Request, req []byte) []byte) MITMConfig {
 	return func(server *MITMServer) error {
 		server.requestHijackHandler = c
-		return nil
-	}
-}
-
-func MITM_SetLowerHeader(c ...string) MITMConfig {
-	return func(server *MITMServer) error {
-		//server.lowerHeaders = c
 		return nil
 	}
 }
@@ -459,36 +445,11 @@ func MITM_SetHTTPRequestHijack(c func(isHttps bool, req *http.Request) *http.Req
 }
 func MITM_SetHTTPResponseMirrorInstance(f func(isHttps bool, req, rsp []byte, remoteAddr string, response *http.Response)) MITMConfig {
 	return func(server *MITMServer) error {
-		server.responseMirrorWithInstance = f
-		server.responseMirror = func(isHttps bool, req, rsp []byte, remoteAddr string) {
-			f(isHttps, req, rsp, remoteAddr, nil)
+		server.httpFlowMirror = func(isHttps bool, r *http.Request, rsp *http.Response, startTs int64) {
+			f(isHttps, httpctx.GetPlainRequestBytes(r), httpctx.GetPlainResponseBytes(rsp.Request), r.RemoteAddr, rsp)
 		}
 		return nil
 	}
-}
-
-func MITM_SetHTTPResponseMirrorRaw(f func(isHttps bool, req, rsp []byte, remoteAddr string)) MITMConfig {
-	return func(server *MITMServer) error {
-		server.responseMirror = f
-		return nil
-	}
-}
-
-func MITM_SetHTTPRequestMirror(f func(isHttps bool, req *http.Request)) MITMConfig {
-	return MITM_SetHTTPRequestMirrorRaw(func(isHttps bool, raw []byte) {
-		req, err := utils.ReadHTTPRequestFromBytes(raw)
-		if err != nil {
-			log.Errorf("parse raw to http.Request failed: %s", err)
-			return
-		}
-		if isHttps {
-			req.URL.Scheme = "https"
-		} else {
-			req.URL.Scheme = "http"
-		}
-
-		f(isHttps, req)
-	})
 }
 
 func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Response, string)) MITMConfig {

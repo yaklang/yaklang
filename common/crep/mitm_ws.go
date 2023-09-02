@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
 	"net/http"
@@ -123,6 +124,8 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		return err
 	}
 	defer remoteConn.Close()
+	req.RemoteAddr = remoteConn.RemoteAddr().String()
+	httpctx.SetRemoteAddr(req, remoteConn.RemoteAddr().String())
 
 	// client upgrade request to remote
 	remoteConnReader := bufio.NewReader(remoteConn)
@@ -182,10 +185,6 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		go w.copySync(lowhttp.NewFrameWriter(remoteConn, isDeflate), lowhttp.NewFrameReader(brw.Reader, isDeflate), true, req, rsp, cancel, ts)
 		go w.copySync(lowhttp.NewFrameWriter(brw.Writer, isDeflate), lowhttp.NewFrameReader(remoteConn, isDeflate), false, req, rsp, cancel, ts)
 	} else {
-		//go w.copyHijack(lowhttp.NewFrameWriter(remoteConn), lowhttp.NewFrameReader(brw.Reader), true, req, rsp, cancel, ts)
-		//go w.copyHijack(lowhttp.NewFrameWriter(brw.Writer), lowhttp.NewFrameReader(remoteConn), false, req, rsp, cancel, ts)
-		//go io.Copy(remoteConn, io.TeeReader(brw.Reader, os.Stdout))
-		//go io.Copy(brw.Writer, io.TeeReader(remoteConn, os.Stdout))
 		go w.copyHijack(remoteConnWriter, brw.Reader, true, req, rsp, cancel, ts, isDeflate)
 		go w.copyHijack(brw.Writer, remoteConnReader, false, req, rsp, cancel, ts, isDeflate)
 	}

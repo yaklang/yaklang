@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -219,13 +220,9 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		}
 	}()
 
-	if req.Context() != nil {
-		if v := req.Context().Value(REQUEST_CONTEXT_KEY_MatchedRules); v != nil {
-			if v1, ok := v.(*[]*ypb.MITMContentReplacer); ok && len(*v1) > 0 {
-				stringForSettingColor((*v1)[0].Color, (*v1)[0].ExtraTag, flow)
-				return
-			}
-		}
+	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
+		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
+		return
 	}
 	if m == nil {
 		return

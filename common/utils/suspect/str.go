@@ -161,7 +161,7 @@ func IsSHA256Data(s string) bool {
 }
 
 func IsXMLRequest(raw []byte) bool {
-	raw = lowhttp.FixHTTPRequestOut(raw)
+	raw = lowhttp.FixHTTPRequest(raw)
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(raw)
 	req, err := lowhttp.ParseBytesToHttpRequest(raw)
 	if err != nil {

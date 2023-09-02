@@ -104,7 +104,7 @@ var (
 		"ParseBytesToHTTPResponse":       lowhttp.ParseBytesToHTTPResponse,
 		"FixHTTPResponse":                lowhttp.FixHTTPResponse,
 		"ExtractBodyFromHTTPResponseRaw": lowhttp.ExtractBodyFromHTTPResponseRaw,
-		"FixHTTPRequest":                 lowhttp.FixHTTPRequestOut,
+		"FixHTTPRequest":                 lowhttp.FixHTTPRequest,
 		"ExtractURLFromHTTPRequestRaw":   lowhttp.ExtractURLFromHTTPRequestRaw,
 		"ExtractURLFromHTTPRequest":      lowhttp.ExtractURLFromHTTPRequest,
 		"ExtractTitle": func(i interface{}) string {

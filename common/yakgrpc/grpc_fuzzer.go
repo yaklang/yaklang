@@ -894,7 +894,7 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 				log.Errorf("dump with transfer encoding failed: %s", err)
 			}
 			if len(reqRaw) > 0 {
-				raws = append(raws, lowhttp.FixHTTPRequestOut(reqRaw))
+				raws = append(raws, lowhttp.FixHTTPRequest(reqRaw))
 			}
 			continue
 		}

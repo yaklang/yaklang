@@ -199,7 +199,7 @@ func TestParseBytesToHttpRequestForHTTP2(t *testing.T) {
 }
 
 func TestFixHTTPRequestOut(t *testing.T) {
-	raw := FixHTTPRequestOut([]byte(`POST /jmx-console/HtmlAdaptor HTTP/1.1
+	raw := FixHTTPRequest([]byte(`POST /jmx-console/HtmlAdaptor HTTP/1.1
 Host: cybertunnel.run:8080
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
 Accept-Encoding: deflate
@@ -282,7 +282,7 @@ Content-Disposition: form-data; name="stream.body"
 }
 
 func TestFixHTTPPacketCRLF2(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -307,7 +307,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 }
 
 func TestFixHTTPPacketCRLF3(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -332,7 +332,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 }
 
 func TestFixHTTPPacketCRLF4(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: 123123
@@ -354,7 +354,7 @@ Content-Type: 123123
 }
 
 func TestFixHTTPPacketBoundary(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -387,7 +387,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 }
 
 func TestFixHTTPPacketBoundary_2(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -424,7 +424,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 }
 
 func TestFixHTTPPacketBoundary_3(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -456,7 +456,7 @@ abc
 }
 
 func TestFixHTTPPacketBoundary_WithChunk_3(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
@@ -471,7 +471,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 
 abc
 --------------------------123--`))
-	results2 := FixHTTPRequestOut(results)
+	results2 := FixHTTPRequest(results)
 	spew.Dump(results)
 	spew.Dump(results2)
 	if codec.Md5(results) != codec.Md5(results2) {
@@ -505,7 +505,7 @@ Transfer-Encoding: chunked
 G
 */
 func TestFixHTTPPacketBoundary_WithChunk_4(t *testing.T) {
-	results := FixHTTPRequestOut([]byte(`POST / HTTP/1.1
+	results := FixHTTPRequest([]byte(`POST / HTTP/1.1
 Host: 0ac200e70432a698c2a2de6500bb00ff.web-security-academy.net
 Connection: keep-alive
 Content-Type: application/x-www-form-urlencoded

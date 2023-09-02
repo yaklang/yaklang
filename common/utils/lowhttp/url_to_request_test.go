@@ -8,8 +8,8 @@ import (
 func CheckResponse(t *testing.T, raw []byte, wantReq string) {
 	t.Helper()
 
-	raw = FixHTTPRequestOut(raw)
-	wantRaw := FixHTTPRequestOut([]byte(wantReq))
+	raw = FixHTTPRequest(raw)
+	wantRaw := FixHTTPRequest([]byte(wantReq))
 
 	reqIns, err := ParseBytesToHttpRequest(raw)
 	if err != nil {

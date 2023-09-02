@@ -55,7 +55,7 @@ var defaultGopacketSerializeOpt = gopacket.SerializeOptions{
 }
 
 func createIPTCPHTTPRequest(isHttps bool, raw []byte) ([]byte, error) {
-	raw = lowhttp.FixHTTPRequestOut(raw)
+	raw = lowhttp.FixHTTPRequest(raw)
 	_, _, localip, err := getPublicRoute()
 	if err != nil {
 		return nil, utils.Errorf("get default route iface ip failed: %s", err)

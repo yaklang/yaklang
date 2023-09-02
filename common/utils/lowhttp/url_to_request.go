@@ -37,7 +37,7 @@ func NewRequestPacketFromMethod(method string, u string, originRequest []byte, o
 	if err != nil {
 		return nil
 	}
-	return FixHTTPRequestOut(reqRaw)
+	return FixHTTPRequest(reqRaw)
 }
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
