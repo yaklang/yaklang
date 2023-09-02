@@ -280,7 +280,7 @@ func startBridge(
 				return req
 			}
 
-			req = lowhttp.FixHTTPRequestOut(req)
+			req = lowhttp.FixHTTPRequest(req)
 			urlStrIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
 			var after = req
 			var isDropped = utils.NewBool(false)
@@ -292,7 +292,7 @@ func startBridge(
 			if isDropped.IsSet() {
 				return nil
 			}
-			return lowhttp.FixHTTPRequestOut(after)
+			return lowhttp.FixHTTPRequest(after)
 		}),
 		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rsp []byte, remoteAddr string) []byte {
 			if config.hijackResponse == nil && config.hijackResponseEx == nil {

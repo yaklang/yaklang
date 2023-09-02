@@ -312,7 +312,7 @@ func CurlToHTTPRequest(i string) ([]byte, error) {
 	packet := fmt.Sprintf(`%v %v HTTP/1.1
 %v
 %v`, strings.ToUpper(method), urlIns.RequestURI(), headerBuf.String(), body)
-	return FixHTTPRequestOut([]byte(packet)), nil
+	return FixHTTPRequest([]byte(packet)), nil
 }
 
 func splitCookies(s string) []*http.Cookie {

@@ -862,7 +862,7 @@ var PoCExports = map[string]interface{}{
 
 	// split
 	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
-	"FixHTTPRequest": lowhttp.FixHTTPRequestOut,
+	"FixHTTPRequest": lowhttp.FixHTTPRequest,
 	"FixHTTPResponse": func(r []byte) []byte {
 		rsp, _, _ := lowhttp.FixHTTPResponse(r)
 		return rsp

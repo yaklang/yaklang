@@ -317,7 +317,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			break
 		}
-		raw = lowhttp.FixHTTPRequestOut(raw)
+		raw = lowhttp.FixHTTPRequest(raw)
 		result = string(raw)
 	case "pretty-packet":
 		headers, bytes := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(text))
@@ -772,7 +772,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 			if err != nil {
 				break
 			}
-			raw = lowhttp.FixHTTPRequestOut(raw)
+			raw = lowhttp.FixHTTPRequest(raw)
 			result = string(raw)
 		case "pretty-packet":
 			headers, bytes := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(text))

@@ -149,7 +149,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	return buf.Bytes()
 }
 
-func FixHTTPRequestOut(raw []byte) []byte {
+func FixHTTPRequest(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
 }
 
@@ -279,7 +279,7 @@ func ToUnquoteFuzzTag(i []byte) string {
 	return buf.String()
 }
 
-//func FixHTTPRequestOut(raw []byte) []byte {
+//func FixHTTPRequest(raw []byte) []byte {
 //	// 移除左边空白字符
 //	raw = TrimLeftHTTPPacket(raw)
 //

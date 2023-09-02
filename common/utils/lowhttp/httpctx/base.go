@@ -7,8 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -67,7 +69,16 @@ func GetContextStringInfoFromRequest(r *http.Request, key string) string {
 }
 
 func GetRequestBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes))
+	if r == nil {
+		log.Warnf("GetRequestBytes: req is nil")
+		return nil
+	}
+
+	if ret := GetPlainRequestBytes(r); len(ret) > 0 {
+		return ret
+	}
+
+	return GetBareRequestBytes(r)
 }
 
 func GetRequestHTTPS(r *http.Request) bool {
@@ -76,10 +87,6 @@ func GetRequestHTTPS(r *http.Request) bool {
 
 func SetRequestHTTPS(r *http.Request, b bool) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsHttps, b)
-}
-
-func SetRequestBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBytes, string(bytes))
 }
 
 func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
@@ -98,6 +105,15 @@ func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 		}
 		return result
 	}
+}
+
+func GetContextAnyFromRequest(r *http.Request, key string) any {
+	var infoMap = GetContextInfoMap(r)
+	v, ok := infoMap.Load(key)
+	if !ok {
+		return nil
+	}
+	return v
 }
 
 func GetContextIntInfoFromRequest(r *http.Request, key string) int {
@@ -142,8 +158,51 @@ func GetBareRequestBytes(r *http.Request) []byte {
 	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes))
 }
 
+func SetPlainRequestBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, string(bytes))
+}
+
+func SetHijackedRequestBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes, string(bytes))
+}
+
+func GetHijackedRequestBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes))
+}
+
+func SetHijackdResponseBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes, string(bytes))
+}
+
+func GetHijackedResponseBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes))
+}
+
+func SetRemoteAddr(r *http.Request, addr string) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RemoteAddr, addr)
+}
+
+func GetRemoteAddr(r *http.Request) string {
+	if r.RemoteAddr == "" {
+		return GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RemoteAddr)
+	}
+	return r.RemoteAddr
+}
+
+func GetPlainRequestBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes))
+}
+
 func GetBareResponseBytes(r *http.Request) []byte {
 	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes))
+}
+
+func GetPlainResponseBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes))
+}
+
+func SetPlainResponseBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes, string(bytes))
 }
 
 func SetBareResponseBytes(r *http.Request, bytes []byte) {
@@ -164,19 +223,88 @@ const (
 	REQUEST_CONTEXT_KEY_AutoFoward                   = "isRequestAutoForward"
 	RESPONSE_CONTEXT_KEY_AutoFoward                  = "isResponseAutoForward"
 	REQUEST_CONTEXT_KEY_Url                          = "url"
-	REQUEST_CONTEXT_KEY_IsModified                   = "requestIsModified"
-	REQUEST_CONTEXT_KEY_ModifiedBy                   = "requestIsModifiedBy"
-	REQUEST_CONTEXT_KEY_Modified                     = "requestModified"
+	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
+	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
+	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
+	REQUEST_CONTEXT_KEY_ResponseModifiedBy           = "responseIsModifiedBy"
 	REQUEST_CONTEXT_KEY_RequestIsFiltered            = "requestIsFiltered"
 	RESPONSE_CONTEXT_KEY_ResponseIsFiltered          = "responseIsFiltered"
 	REQUEST_CONTEXT_KEY_RequestIsHijacked            = "requestIsHijacked"
-	REQUEST_CONTEXT_KEY_RequestBytes                 = "requestBytes"
 	REQUEST_CONTEXT_KEY_RequestBareBytes             = "requestBareBytes"
-	REQUEST_CONTEXT_KEY_ResponseBytes                = "responseBytes"
+	REQUEST_CONTEXT_KEY_RequestHijackedBytes         = "requestHijackedBytes"
+	REQUEST_CONTEXT_KEY_RequestPlainBytes            = "requestPlainBytes"
 	REQUEST_CONTEXT_KEY_ResponseBareBytes            = "responseBareBytes"
+	REQUEST_CONTEXT_KEY_ResponsePlainBytes           = "responsePlainBytes"
+	REQUEST_CONTEXT_KEY_ResponseHijackedBytes        = "responseHijackedBytes"
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
 	REQUEST_CONTEXT_KEY_ConnectedToPort              = "connectedToPort"
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
+	REQUEST_CONTEXT_KEY_RemoteAddr                   = "remoteAddr"
+
+	// matched mitm rules
+	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
 )
+
+func GetMatchedRule(req *http.Request) []*ypb.MITMContentReplacer {
+	results, ok := GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_MatchedRules).([]*ypb.MITMContentReplacer)
+	if ok {
+		return results
+	}
+	return nil
+}
+
+func AppendMatchedRule(req *http.Request, rule ...*ypb.MITMContentReplacer) {
+	if len(rule) == 0 {
+		return
+	}
+	results := GetMatchedRule(req)
+	if results == nil {
+		results = make([]*ypb.MITMContentReplacer, 0)
+	}
+	results = append(results, rule...)
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MatchedRules, results)
+}
+
+func SetMatchedRule(req *http.Request, rule []*ypb.MITMContentReplacer) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MatchedRules, rule)
+}
+
+func SetRequestModified(req *http.Request, by ...string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsModified, true)
+	modified := GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestModifiedBy)
+	if modified != "" {
+		by = append(by, modified)
+	}
+	if len(by) > 0 {
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestModifiedBy, strings.Join(by, "->"))
+	}
+}
+
+func GetRequestIsModified(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsModified)
+}
+
+func SetResponseModified(req *http.Request, by ...string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseIsModified, true)
+	modified := GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseModifiedBy)
+	if modified != "" {
+		by = append(by, modified)
+	}
+	if len(by) > 0 {
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseModifiedBy, strings.Join(by, "->"))
+	}
+}
+
+func GetResponseIsModified(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseIsModified)
+}
+
+func SetRequestURL(req *http.Request, urlStr string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_Url, urlStr)
+}
+
+func GetRequestURL(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_Url)
+}
