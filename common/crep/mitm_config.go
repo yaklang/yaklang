@@ -398,7 +398,7 @@ func MITM_SetHTTPRequestHijackRaw(c func(isHttps bool, reqIns *http.Request, req
 	}
 }
 
-func MITM_SetHTTPResponseHijackRaw(c func(isHttps bool, req *http.Request, rsp []byte, remoteAddr string) []byte) MITMConfig {
+func MITM_SetHTTPResponseHijackRaw(c func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte) MITMConfig {
 	return func(server *MITMServer) error {
 		server.responseHijackHandler = c
 		return nil
