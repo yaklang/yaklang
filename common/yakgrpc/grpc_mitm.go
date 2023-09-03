@@ -1371,13 +1371,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
 		flow.Hash = flow.CalcHash()
-		if modified {
-			flow.AddTagToFirst("[被修改]")
-			flow.Red()
-		}
+
 		if viewed {
-			flow.AddTagToFirst("[手动劫持]")
-			flow.Orange()
+			if modified {
+				flow.AddTagToFirst("[手动修改]")
+				flow.Red()
+			} else {
+				flow.AddTagToFirst("[手动劫持]")
+				flow.Orange()
+			}
 		}
 		var hijackedFlowMutex = new(sync.Mutex)
 		var dropped = utils.NewBool(false)
