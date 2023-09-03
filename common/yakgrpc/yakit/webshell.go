@@ -22,12 +22,14 @@ type WebShell struct {
 	// 冰蝎还是哥斯拉,或者是其他
 	ShellType string `json:"shell_type"`
 	// 脚本语言
-	ShellScript string `json:"shell_script"`
-	Headers     string `json:"headers" gorm:"type:json"`
-	Status      bool   `json:"status"`
-	Tag         string `json:"tag"`
-	Remark      string `json:"remark"`
-	Hash        string `json:"hash"`
+	ShellScript       string `json:"shell_script"`
+	Headers           string `json:"headers" gorm:"type:json"`
+	Status            bool   `json:"status"`
+	Tag               string `json:"tag"`
+	Remark            string `json:"remark"`
+	Hash              string `json:"hash"`
+	PacketScriptName  string `json:"packet_script_name"`
+	PayloadScriptName string `json:"payload_script_name"`
 }
 
 func (w *WebShell) CalcHash() string {
@@ -60,20 +62,22 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 		}
 	}
 	return &ypb.WebShell{
-		Id:          int64(w.ID),
-		Url:         w.Url,
-		Pass:        w.Pass,
-		SecretKey:   w.SecretKey,
-		EncMode:     w.EncryptedMode,
-		Charset:     w.Charset,
-		ShellType:   w.ShellType,
-		ShellScript: w.ShellScript,
-		Status:      w.Status,
-		Tag:         w.Tag,
-		Remark:      w.Remark,
-		Headers:     headers,
-		CreatedAt:   w.CreatedAt.Unix(),
-		UpdatedAt:   w.UpdatedAt.Unix(),
+		Id:               int64(w.ID),
+		Url:              w.Url,
+		Pass:             w.Pass,
+		SecretKey:        w.SecretKey,
+		EncMode:          w.EncryptedMode,
+		Charset:          w.Charset,
+		ShellType:        w.ShellType,
+		ShellScript:      w.ShellScript,
+		Status:           w.Status,
+		Tag:              w.Tag,
+		Remark:           w.Remark,
+		Headers:          headers,
+		CreatedAt:        w.CreatedAt.Unix(),
+		UpdatedAt:        w.UpdatedAt.Unix(),
+		PayloadCodecName: w.PayloadScriptName,
+		PacketCodecName:  w.PacketScriptName,
 	}
 }
 

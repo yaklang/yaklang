@@ -2513,6 +2513,8 @@ message WebShell {
   string Remark =13;
   int64 CreatedAt = 14;
   int64 UpdatedAt = 15;
+  string PacketCodecName = 16;
+  string PayloadCodecName = 17;
 }
 message WebShellRequest {
   int64 Id = 1;
