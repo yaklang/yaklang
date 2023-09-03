@@ -454,12 +454,13 @@ func MITM_SetHTTPResponseMirrorInstance(f func(isHttps bool, req, rsp []byte, re
 
 func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Response, string)) MITMConfig {
 	return MITM_SetHTTPResponseMirrorInstance(func(isHttps bool, req, rsp []byte, remoteAddr string, response *http.Response) {
-		var urlStr = httpctx.GetContextStringInfoFromRequest(response.Request, httpctx.REQUEST_CONTEXT_KEY_Url)
+		var urlStr = httpctx.GetRequestURL(response.Request)
 		if urlStr == "" {
-			u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
+			u, _ := lowhttp.ExtractURLFromHTTPRequest(response.Request, isHttps)
 			if u != nil {
 				urlStr = u.String()
 			}
+			httpctx.SetRequestURL(response.Request, urlStr)
 		}
 		f(isHttps, urlStr, response.Request, response, remoteAddr)
 	})
