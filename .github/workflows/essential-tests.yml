@@ -15,20 +15,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test Start
-            run: go test -timeout 1m ./common/jsonextractor -v
-
-          - name: Test Codec
-            run: go test -timeout 1m ./common/yak/yaklib/codec -v
-
-          - name: Tesy CartesianProduct
-            run: go test -timeout 1m ./common/yak/cartesian -v
-
-          - name: Test JsonPath
-            run: go test -timeout 1m ./common/jsonpath -v
-
-          - name: Test DomainExtract
-            run: go test -timeout 1m ./common/domainextractor -v
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag
+            run: |
+              go test -timeout 1m ./common/jsonextractor -v
+              go test -timeout 1m ./common/yak/yaklib/codec -v
+              go test -timeout 1m ./common/yak/cartesian -v
+              go test -timeout 1m ./common/jsonpath -v
+              go test -timeout 1m ./common/domainextractor -v
+              go test -timeout 1m ./common/mutate_tests ./common/fuzztag -v
+              go test -timeout 1m ./common/utils -v
 
           - name: Test lowhttp
             run: go test -timeout 1m ./common/utils/lowhttp -v
@@ -36,14 +31,8 @@ jobs:
           - name: Test HttpTpl(YakTemplate)
             run: go test -timeout 1m ./common/yak/httptpl -v
 
-          - name: Test Fuzz/Mutate
-            run: go test -timeout 1m ./common/mutate_tests ./common/fuzztag -v
-
           - name: Test MustPass - full yak scripts
             run: go test -timeout 3m ./common/yak/yaktest/mustpass -v
-
-          - name: Test Common/Utils
-            run: go test -timeout 1m ./common/utils -v
 
           - name: Test gRPC MUSTPASS
             run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
@@ -72,14 +61,10 @@ jobs:
           - name: Test gRPC TestGRPCMUSTPASS_OPEN_REDIRECT
             run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
 
-          - name: Test CVEQuery
-            run: go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
-
-          - name: Test Sca
-            run: go test -timeout 1m ./common/sca/... -v
-
-          - name: Test HostPort  AppendPort
-            run: go test -timeout 1m -run TestMUSTPASS ./common/utils -v
+          - name: Test CVEQuery / SCA
+            run: | 
+              go test -timeout 1m -run TestQueryCVEWithFixName ./common/cve -v
+              go test -timeout 1m ./common/sca/... -v
 
           - name: Test Vulinbox agent client
             run: go test -timeout 1m ./common/vulinboxagentclient -v
