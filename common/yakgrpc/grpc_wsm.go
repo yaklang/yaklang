@@ -67,7 +67,7 @@ func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequ
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) UpdateWebShellById(ctx context.Context, req *ypb.UpdateWebShellRequest) (*ypb.Empty, error) {
+func (s *Server) UpdateWebShellById(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
@@ -83,12 +83,12 @@ func (s *Server) UpdateWebShellById(ctx context.Context, req *ypb.UpdateWebShell
 		ShellScript:   req.GetShellScript(),
 		Tag:           req.GetTag(),
 	}
-	err := yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
+	webShell, err := yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	return &ypb.Empty{}, nil
+	return webShell.ToGRPCModel(), nil
 }
 
 func (s *Server) QueryWebShells(ctx context.Context, req *ypb.QueryWebShellsRequest) (*ypb.QueryWebShellsResponse, error) {
@@ -148,7 +148,7 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 		return nil, err
 	}
 
-	err = yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
+	_, err = yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
 	if err != nil {
 		log.Error(err)
 		return nil, err
