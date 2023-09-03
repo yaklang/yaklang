@@ -23,7 +23,7 @@ func (s *VulinServer) registerPipelineNSmuggle() {
 	pipelineNSmuggleSubroute := s.router.PathPrefix("/http/protocol").Name("HTTP CDN 与 Pipeline 安全").Subrouter()
 	go func() {
 		err := Smuggle(context.Background(), smugglePort)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			log.Error(err)
 		}
 	}()
@@ -43,12 +43,12 @@ func (s *VulinServer) registerPipelineNSmuggle() {
 
 	go func() {
 		err := Pipeline(context.Background(), pipelinePort)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			log.Error(err)
 		}
 	}()
 	err = utils.WaitConnect(utils.HostPort("127.0.0.1", pipelinePort), 3)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		log.Error(err)
 		return
 	}

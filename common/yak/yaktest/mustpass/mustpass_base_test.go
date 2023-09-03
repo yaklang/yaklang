@@ -23,6 +23,7 @@ var testFiles embed.FS
 var vulinboxAddr string
 
 func init() {
+
 	dirs, err := testFiles.ReadDir("files")
 	if err != nil {
 		panic(err)
@@ -49,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "git_to_sca.yak"
+	var debugName = "mitm_lib_hijack.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

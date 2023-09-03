@@ -1,6 +1,9 @@
 package lowhttp
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -10,7 +13,10 @@ import (
 
 func NewRequestPacketFromMethod(method string, u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
 	originReqIns, err := ParseBytesToHttpRequest(originRequest)
-	parseReqOk := err == nil
+	if err != nil && err != io.EOF {
+		log.Warnf("parse origin request error: %s\n%v", err.Error(), fmt.Sprint(string(originRequest)))
+	}
+	parseReqOk := originReqIns != nil
 
 	reqIns, err := http.NewRequest(method, u, http.NoBody)
 	if err != nil {

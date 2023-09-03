@@ -557,3 +557,8 @@ abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`), "Transfer-Encoding", "chun
 		t.FailNow()
 	}
 }
+
+func TestHTTPPacketCRLF_EmptyResult(t *testing.T) {
+	var as = FixHTTPPacketCRLF(nil, true)
+	spew.Dump(as)
+}
