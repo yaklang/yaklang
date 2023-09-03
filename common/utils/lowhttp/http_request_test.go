@@ -1,7 +1,6 @@
 package lowhttp
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"net/http"
@@ -224,7 +223,7 @@ Host: 127.0.0.1:3333
 User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0
 
 `
-	req, err := ReadHTTPRequest(bufio.NewReader(bytes.NewBufferString(packet)))
+	req, err := ReadHTTPRequestFromBytes([]byte(packet))
 	if err != nil {
 		panic(err)
 	}
