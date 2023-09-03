@@ -3,13 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
@@ -28,16 +28,18 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 	}
 
 	shell := &yakit.WebShell{
-		Url:           req.GetUrl(),
-		Pass:          req.GetPass(),
-		SecretKey:     req.GetSecretKey(),
-		EncryptedMode: req.GetEncMode(),
-		Charset:       req.GetCharset(),
-		ShellType:     req.GetShellType(),
-		ShellScript:   req.GetShellScript(),
-		Headers:       headers,
-		Tag:           req.GetTag(),
-		Remark:        req.GetRemark(),
+		Url:               req.GetUrl(),
+		Pass:              req.GetPass(),
+		SecretKey:         req.GetSecretKey(),
+		EncryptedMode:     req.GetEncMode(),
+		Charset:           req.GetCharset(),
+		ShellType:         req.GetShellType(),
+		ShellScript:       req.GetShellScript(),
+		Headers:           headers,
+		Tag:               req.GetTag(),
+		Remark:            req.GetRemark(),
+		PayloadScriptName: req.GetPayloadCodecName(),
+		PacketScriptName:  req.GetPacketCodecName(),
 	}
 	webShell, err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
 	if err != nil {
@@ -115,6 +117,7 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
+	var err error
 	shell, err := yakit.GetWebShell(db, req.GetId())
 	if err != nil {
 		return nil, err
@@ -123,14 +126,20 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 	if err != nil {
 		return nil, err
 	}
-	g, ok := w.(*wsm.Godzilla)
-	if !ok {
-		return nil, fmt.Errorf("expected *wsm.Godzilla, got %T", w)
-	}
+	if shell.GetPacketCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPacketCodecName())
+		if err != nil {
+			return nil, err
+		}
 
-	err = g.InjectPayload()
-	if err != nil {
-		return nil, err
+		w.SetPacketScriptContent(script.Content)
+	}
+	if shell.GetPayloadCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPayloadCodecName())
+		if err != nil {
+			return nil, err
+		}
+		w.SetPayloadScriptContent(script.Content)
 	}
 	ping, err := w.Ping()
 	shell.Status = ping
@@ -174,4 +183,17 @@ func (s *Server) GetBasicInfo(ctx context.Context, req *ypb.WebShellRequest) (*y
 		return nil, err
 	}
 	return &ypb.WebShellResponse{State: true, Data: info}, nil
+}
+
+func getWebShellCodec(name string) (string, string, error) {
+	db := consts.GetGormProfileDatabase()
+	script, err := yakit.GetYakScriptByName(db, name)
+	if err != nil {
+		return "", "", err
+	}
+	contents := strings.Split(script.Content, "##############################################")
+	if len(contents) == 2 {
+		return contents[0], contents[1], nil
+	}
+	return "", "", utils.Errorf("invalid packet codec script")
 }
