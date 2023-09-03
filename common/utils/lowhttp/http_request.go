@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
@@ -37,6 +38,9 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
+	if raw == nil || len(raw) == 0 {
+		return nil
+	}
 	var isMultipart bool
 	var haveChunkedHeader bool
 	var haveContentLength bool
@@ -400,9 +404,11 @@ func CopyRequest(r *http.Request) *http.Request {
 }
 
 func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
-	raw = FixHTTPPacketCRLF(raw, false)
-
-	req, readErr := utils.ReadHTTPRequestFromBytes(raw)
+	fixed := FixHTTPPacketCRLF(raw, false)
+	if fixed == nil {
+		return nil, io.EOF
+	}
+	req, readErr := utils.ReadHTTPRequestFromBytes(fixed)
 	if readErr != nil {
 		log.Errorf("read [standard] httpRequest failed: %s", readErr)
 		return nil, readErr
