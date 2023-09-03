@@ -11,22 +11,13 @@ type ShellConfig func(info *ypb.WebShell)
 type EncoderFunc func(raw []byte) ([]byte, error)
 
 type BaseShellManager interface {
-	//Encoder(EncoderFunc) ([]byte, error)
-	Encoder(func(raw []byte) ([]byte, error))
-	//Encoder([]byte) ([]byte, error)
+	PacketCodecI
+	PayloadCodecI
 	Ping(opts ...behinder.ParamsConfig) (bool, error)
 	BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error)
 	CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error)
 	String() string
 	GenWebShell() string
-}
-
-type Wsm struct {
-}
-
-func (w Wsm) Ping() (bool, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func NewWebShellManager(s *ypb.WebShell) (BaseShellManager, error) {

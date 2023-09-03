@@ -45,6 +45,36 @@ type Godzilla struct {
 	CustomEncoder EncoderFunc
 }
 
+func (g *Godzilla) SetPayloadScriptContent(content string) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *Godzilla) EchoResultEncode(raw []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *Godzilla) EchoResultDecode(raw []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *Godzilla) ClientRequestEncode(raw []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *Godzilla) ServerResponseDecode(raw []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (g *Godzilla) SetPacketScriptContent(content string) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 	client := utils.NewDefaultHTTPClient()
 	gs := &Godzilla{
