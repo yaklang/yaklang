@@ -114,7 +114,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	)
 	if m.requestHijackHandler != nil {
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
-		if hijackedRaw == nil {
+		if hijackedRaw == nil || len(hijackedRaw) == 0 {
 			hijackedRaw, err = utils.DumpHTTPRequest(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
