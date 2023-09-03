@@ -26,6 +26,7 @@ type WebShell struct {
 	Headers           string `json:"headers" gorm:"type:json"`
 	Status            bool   `json:"status"`
 	Tag               string `json:"tag"`
+	Proxy             string `json:"proxy"`
 	Remark            string `json:"remark"`
 	Hash              string `json:"hash"`
 	PacketScriptName  string `json:"packet_script_name"`
@@ -74,6 +75,7 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 		Tag:              w.Tag,
 		Remark:           w.Remark,
 		Headers:          headers,
+		Proxy:            w.Proxy,
 		CreatedAt:        w.CreatedAt.Unix(),
 		UpdatedAt:        w.UpdatedAt.Unix(),
 		PayloadCodecName: w.PayloadScriptName,
@@ -91,14 +93,15 @@ func CreateOrUpdateWebShell(db *gorm.DB, hash string, i interface{}) (*WebShell,
 	return shell, nil
 }
 
-func CreateOrUpdateWebShellById(db *gorm.DB, id int64, i interface{}) error {
+func CreateOrUpdateWebShellById(db *gorm.DB, id int64, i interface{}) (*WebShell, error) {
 	db = db.Model(&WebShell{})
-
+	shell := &WebShell{}
 	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&WebShell{}); db.Error != nil {
-		return utils.Errorf("create/update WebShell failed: %s", db.Error)
+		return nil, utils.Errorf("create/update WebShell failed: %s", db.Error)
 	}
 
-	return nil
+	return shell, nil
+
 }
 
 func DeleteWebShellByID(db *gorm.DB, ids ...int64) error {

@@ -593,7 +593,7 @@ type YakClient interface {
 	// WebShell
 	CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*Empty, error)
 	DeleteWebShell(ctx context.Context, in *DeleteWebShellRequest, opts ...grpc.CallOption) (*Empty, error)
-	UpdateWebShellById(ctx context.Context, in *UpdateWebShellRequest, opts ...grpc.CallOption) (*Empty, error)
+	UpdateWebShellById(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*WebShell, error)
 	QueryWebShells(ctx context.Context, in *QueryWebShellsRequest, opts ...grpc.CallOption) (*QueryWebShellsResponse, error)
 	Ping(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error)
 	GetBasicInfo(ctx context.Context, in *WebShellRequest, opts ...grpc.CallOption) (*WebShellResponse, error)
@@ -3299,8 +3299,8 @@ func (c *yakClient) DeleteWebShell(ctx context.Context, in *DeleteWebShellReques
 	return out, nil
 }
 
-func (c *yakClient) UpdateWebShellById(ctx context.Context, in *UpdateWebShellRequest, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *yakClient) UpdateWebShellById(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*WebShell, error) {
+	out := new(WebShell)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/UpdateWebShellById", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -5303,7 +5303,7 @@ type YakServer interface {
 	// WebShell
 	CreateWebShell(context.Context, *WebShell) (*Empty, error)
 	DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error)
-	UpdateWebShellById(context.Context, *UpdateWebShellRequest) (*Empty, error)
+	UpdateWebShellById(context.Context, *WebShell) (*WebShell, error)
 	QueryWebShells(context.Context, *QueryWebShellsRequest) (*QueryWebShellsResponse, error)
 	Ping(context.Context, *WebShellRequest) (*WebShellResponse, error)
 	GetBasicInfo(context.Context, *WebShellRequest) (*WebShellResponse, error)
@@ -6080,7 +6080,7 @@ func (UnimplementedYakServer) CreateWebShell(context.Context, *WebShell) (*Empty
 func (UnimplementedYakServer) DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteWebShell not implemented")
 }
-func (UnimplementedYakServer) UpdateWebShellById(context.Context, *UpdateWebShellRequest) (*Empty, error) {
+func (UnimplementedYakServer) UpdateWebShellById(context.Context, *WebShell) (*WebShell, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateWebShellById not implemented")
 }
 func (UnimplementedYakServer) QueryWebShells(context.Context, *QueryWebShellsRequest) (*QueryWebShellsResponse, error) {
@@ -10179,7 +10179,7 @@ func _Yak_DeleteWebShell_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Yak_UpdateWebShellById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateWebShellRequest)
+	in := new(WebShell)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -10191,7 +10191,7 @@ func _Yak_UpdateWebShellById_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/ypb.Yak/UpdateWebShellById",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).UpdateWebShellById(ctx, req.(*UpdateWebShellRequest))
+		return srv.(YakServer).UpdateWebShellById(ctx, req.(*WebShell))
 	}
 	return interceptor(ctx, in, info, handler)
 }
