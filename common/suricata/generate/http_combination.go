@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"golang.org/x/exp/slices"
+	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -252,9 +254,16 @@ func (p *partProvider) FillHTTPResponseLine(w *bytes.Buffer) {
 
 	_, _ = w.Write(p.getOrRandom(modifier.HTTPProtocol))
 	_ = w.WriteByte(' ')
-	_, _ = w.Write(p.getOrRandom(modifier.HTTPStatCode))
+	codebytes := p.getOrRandom(modifier.HTTPStatCode)
+	_, _ = w.Write(codebytes)
 	_ = w.WriteByte(' ')
-	_, _ = w.Write(p.getOrRandom(modifier.HTTPStatMsg))
+
+	code, _ := strconv.Atoi(string(codebytes))
+	if p.mp[modifier.HTTPStatMsg] == nil && http.StatusText(code) != "" {
+		_, _ = w.WriteString(http.StatusText(code))
+	} else {
+		_, _ = w.Write(p.getOrRandom(modifier.HTTPStatMsg))
+	}
 
 	_, _ = w.WriteString(lowhttp.CRLF)
 }

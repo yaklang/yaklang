@@ -3,8 +3,8 @@ package rule
 import (
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"math/rand"
 	"strings"
 )
 
@@ -24,6 +24,13 @@ type PortRule struct {
 	Rules         []*PortRule
 
 	Env string
+}
+
+func (p *PortRule) GenerateWithDefault(def uint32) uint32 {
+	if p == nil || p.Any {
+		return def
+	}
+	return p.GetAvailablePort()
 }
 
 func (p *PortRule) postHandle() {
@@ -106,14 +113,14 @@ func (p *PortRule) Match(i int) bool {
 }
 
 func (p *PortRule) GetAvailablePort() uint32 {
-	if p.Any {
-		return getHighPort()
+	if p == nil || p.Any {
+		return uint32(getHighPort())
 	}
 
 	if strings.Contains(strings.ToLower(p.Env), "ssh") {
 		return 22
 	} else if p.Env != "" {
-		return getHighPort()
+		return uint32(getHighPort())
 	}
 
 	if len(p.Ports) > 0 && !p.Negative {

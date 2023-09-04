@@ -4,107 +4,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
-	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/match"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"os"
 	"testing"
 )
 
-type ruleTest struct {
-	rule string
-	id   string
-}
-
-// test table
-var rules = []*ruleTest{
-	{
-		rule: `alert icmp any any -> any any (msg:"GPL SCAN SolarWinds IP scan attempt"; icode:0; itype:8; content:"SolarWinds.Net"; nocase; classtype:network-scan; sid:2101918; rev:7; metadata:created_at 2010_09_23, updated_at 2010_09_23;)`,
-	},
-	{
-		rule: `alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
-	},
-	{
-		rule: `alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
-	{
-		rule: `alert udp any any -> any 53 (msg:"Observed DNS Query to public CryptoMining pool Domain (backup-pool.com)"; content:"|01|"; offset:2; depth:1; content:"|00 01 00 00 00 00 00|"; distance:1; within:8; content:"|0b|backup-pool|03|com|00|"; nocase; distance:0; fast_pattern; classtype:coin-mining; sid:3017009; rev:1;)`,
-	},
-	{
-		rule: `alert tcp any any -> any 3306 (msg:"ET SCAN MYSQL 4.0 brute force root login attempt"; flow:to_server,established; content:"|01|"; offset:3; depth:4; content:"root|00|"; nocase; distance:5; within:10; threshold:type both,track by_src,count 5,seconds 60; reference:url,www.redferni.uklinux.net/mysql/MySQL-323.html; reference:url,doc.emergingthreats.net/2001906; classtype:protocol-command-decode; sid:2001906; rev:6; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "Powershell Empire HTTP Response "; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,empire; content:"Cache-Control: no-cache, no-store, must-revalidate"; http_header; content: "Server: Microsoft-IIS/7.5"; http_header; distance: 0; classtype:shellcode-detect; sid: 3016008; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any  (msg: "Powershell Empire HTTP Request "; flow: established, to_server; content:".php"; http_uri;  pcre:"/session=[a-zA-Z0-9+/]{20,300}([a-zA-Z0-9+/]{1}[a-zA-Z0-9+/=]{1}|==)/ACi"; flowbits:set,empire; classtype:shellcode-detect; sid: 3016007; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"***Linux wget/curl download .sh script***"; flow:established,to_server; content:".sh"; http_uri;  pcre:"/curl|Wget|linux-gnu/Vi"; classtype:trojan-activity; sid:3013002; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "CobaltStrike ARP Scan module"; flow:established; content:"POST"; http_method; content:"(ARP)"; http_client_body; content:"Scanner module is complete"; http_client_body; distance:0; classtype:exploit-kit; sid:3016004; rev:1; metadata:created_at 2018_11_15,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "CobaltStrike download.windowsupdate.com C2 Profile"; flow: established; content:"msdownload"; http_uri; pcre:"/\/c\/msdownload\/update\/others\/[\d]{4}/\d{2}/\d{7,8}_[\d\w-_]{50,}\.cab/UR"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w{2,3}\s+\d{4}-\d{2}-\d{2}\s[\d:]{8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"***Windows Powershell Request UserAgent***"; flow:established; content:"PowerShell"; http_user_agent; pcre:"/PowerShell|WindowsPowerShell/i"; classtype:trojan-activity; sid:3013001; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any  (msg: "Behinder3 PHP HTTP Request"; flow: established, to_server; content:".php"; http_uri;  pcre:"/[a-zA-Z0-9+/]{1000,}=/i"; flowbits:set,behinder3;noalert; classtype:shellcode-detect; sid: 3016017; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "Behinder3  PHP HTTP Response"; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,behinder3; pcre:"/[a-zA-Z0-9+/]{100,}=/i"; classtype:shellcode-detect; sid: 3016018; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w{2,3}\s+\d{4}-\d{2}-\d{2}\s[\d:]{8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "Weevely PHP Backdoor Response"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; pcre:"/<(\w+)>[a-zA-Z0-9+\/]{20,}(?:[a-zA-Z0-9+\/]{1}[a-zA-Z0-9+\/=]{1}|==)<\/\w+>/Q"; classtype:shellcode-detect; sid: 3016006; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg: "Suspicious netstat command traffic"; flow: established,to_client; content:"Active Internet connections"; http_server_body; depth:28; content:"tcp"; http_server_body; distance:0; classtype:trojan-activity; sid: 3013003; rev: 1; metadata:created_at 2018_09_26,by al0ne;)`,
-	},
-	{
-		rule: `alert http any any -> any any (msg:"msfconsole powershell response"; flow:established; content:!"<html>"; content:!"<script>"; content:"|70 6f 77 65 72 73 68 65 6c 6c 2e 65 78 65|"; http_server_body; content:"|46 72 6f 6d 42 61 73 65 36 34 53 74 72 69 6e 67|"; http_server_body; classtype:exploit-kit; sid:3016005; rev:1;)`,
-	},
-	{
-		rule: `alert tcp any any -> any any (msg:"ET SCAN Amap TCP Service Scan Detected"; flow:to_server; flags:PA; content:"service|3A|thc|3A 2F 2F|"; depth:105; content:"service|3A|thc"; within:40; reference:url,freeworld.thc.org/thc-amap/; reference:url,doc.emergingthreats.net/2010371; classtype:attempted-recon; sid:2010371; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
-	{
-		rule: `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
-	},
-}
-
-const moreDemo = `
-alert tcp $HOME_NET any -> any any (msg: "http GET data"; flow: established;  content:"|47 45 54|"; depth: 10; content:"|0d 0a 0d 0a|"; depth:500; pcre:"/\x0d\x0a\x0d\x0a[^GETPOSTPUTHEAD\{\<\-][\x00-\xff]{100,200}/"; classtype:trojan-activity; sid: 3013004; rev: 1; metadata:created_at 2018_10_17,by al0ne;)
-alert tcp $HOME_NET any -> any 3306 (msg: "mysql general_log write file"; flow: established;  content:"|03|"; depth: 5; content:"|67 65 6e 65 72 61 6c 5f 6c 6f 67 5f 66 69 6c 65|"; distance:0; classtype:trojan-activity; sid: 3013005; rev: 1; metadata:created_at 2018_11_20,by al0ne;)
-`
-
-func TestChaosMaker_ApplyAll(t *testing.T) {
+var rules = []string{
+	`alert icmp any any -> any any (msg:"GPL SCAN SolarWinds IP scan attempt"; icode:0; itype:8; content:"SolarWinds.Net"; nocase; classtype:network-scan; sid:2101918; rev:7; metadata:created_at 2010_09_23, updated_at 2010_09_23;)`,
+	`alert dns any any -> any any (msg:"Observed DNS Query to public CryptoMining pool Domain (ppxxmr.com)"; dns_query; content:"ppxxmr.com"; nocase; isdataat:!1,relative; classtype:coin-mining; sid:3017030; rev:1;)`,
+	`alert tcp any 3306 -> any any (msg:"ET SCAN Non-Allowed Host Tried to Connect to MySQL Server"; flow:from_server,established; content:"|6A 04|Host|20 27|"; depth:70; content:"|27 20|is not allowed to connect to this MySQL server"; distance:0; reference:url,www.cyberciti.biz/tips/how-do-i-enable-remote-access-to-mysql-database-server.html; reference:url,doc.emergingthreats.net/2010493; classtype:attempted-recon; sid:2010493; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	`alert udp any any -> any 53 (msg:"Observed DNS Query to public CryptoMining pool Domain (backup-pool.com)"; content:"|01|"; offset:2; depth:1; content:"|00 01 00 00 00 00 00|"; distance:1; within:8; content:"|0b|backup-pool|03|com|00|"; nocase; distance:0; fast_pattern; classtype:coin-mining; sid:3017009; rev:1;)`,
+	`alert tcp any any -> any 3306 (msg:"ET SCAN MYSQL 4.0 brute force root login attempt"; flow:to_server,established; content:"|01|"; offset:3; depth:4; content:"root|00|"; nocase; distance:5; within:10; threshold:type both,track by_src,count 5,seconds 60; reference:url,www.redferni.uklinux.net/mysql/MySQL-323.html; reference:url,doc.emergingthreats.net/2001906; classtype:protocol-command-decode; sid:2001906; rev:6; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
+	`alert http any any -> any any (msg: "Powershell Empire HTTP Response "; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,empire; content:"Cache-Control: no-cache, no-store, must-revalidate"; http_header; content: "Server: Microsoft-IIS/7.5"; http_header; distance: 0; classtype:shellcode-detect; sid: 3016008; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
+	`alert http any any -> any any  (msg: "Powershell Empire HTTP Request "; flow: established, to_server; content:".php"; http_uri;  pcre:"/session=[a-zA-Z0-9+/]20,300}([a-zA-Z0-9+/]1}[a-zA-Z0-9+/=]1}|==)/ACi"; flowbits:set,empire; classtype:shellcode-detect; sid: 3016007; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
+	`alert http any any -> any any (msg:"***Linux wget/curl download .sh script***"; flow:established,to_server; content:".sh"; http_uri;  pcre:"/curl|Wget|linux-gnu/Vi"; classtype:trojan-activity; sid:3013002; rev:1; metadata:by al0ne;)`,
+	`alert http any any -> any any (msg: "CobaltStrike ARP Scan module"; flow:established; content:"POST"; http_method; content:"(ARP)"; http_client_body; content:"Scanner module is complete"; http_client_body; distance:0; classtype:exploit-kit; sid:3016004; rev:1; metadata:created_at 2018_11_15,by al0ne;)`,
+	`alert http any any -> any any (msg: "CobaltStrike download.windowsupdate.com C2 Profile"; flow: established; content:"msdownload"; http_uri; pcre:"/\/c\/msdownload\/update\/others\/[\d]4}/\d2}/\d7,8}_[\d\w-_]50,}\.cab/UR"; reference:url,github.com/bluscreenofjeff/MalleableC2Profiles/blob/master/microsoftupdate_getonly.profile; classtype:exploit-kit; sid: 3016002; rev: 1; metadata:created_at 2018_09_25,by al0ne; )`,
+	`alert http any any -> any any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w2,3}\s+\d4}-\d2}-\d2}\s[\d:]8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
+	`alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
+	`alert http any any -> any any (msg:"***Windows Powershell Request UserAgent***"; flow:established; content:"PowerShell"; http_user_agent; pcre:"/PowerShell|WindowsPowerShell/i"; classtype:trojan-activity; sid:3013001; rev:1; metadata:by al0ne;)`,
+	`alert http any any -> any any  (msg: "Behinder3 PHP HTTP Request"; flow: established, to_server; content:".php"; http_uri;  pcre:"/[a-zA-Z0-9+/]1000,}=/i"; flowbits:set,behinder3;noalert; classtype:shellcode-detect; sid: 3016017; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`,
+	`alert http any any -> any any (msg: "Behinder3  PHP HTTP Response"; flow: established,to_client; content:"200"; http_stat_code; flowbits: isset,behinder3; pcre:"/[a-zA-Z0-9+/]100,}=/i"; classtype:shellcode-detect; sid: 3016018; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`,
+	`alert http any any -> any any (msg: "China hacker tools caidao response - column directory"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; http_server_body; content:"|2d 3e|"; http_server_body; depth:2; pcre:"/[\w\d]+\.\w2,3}\s+\d4}-\d2}-\d2}\s[\d:]8}/RQ"; classtype:shellcode-detect; sid: 3016010; rev: 1; metadata:created_at 2018_09_13,by al0ne; )`,
+	`alert http any any -> any any (msg:"webshell_caidao_php"; flow:established; content:"POST";http_method; content:".php"; http_uri; content:"base64_decode"; http_client_body; classtype:shellcode-detect; sid:3016009; rev:1; metadata:by al0ne;)`,
+	`alert http any any -> any any (msg: "Weevely PHP Backdoor Response"; flow: established,to_client; content:"200"; http_stat_code; content:!"<html>"; pcre:"/<(\w+)>[a-zA-Z0-9+\/]20,}(?:[a-zA-Z0-9+\/]1}[a-zA-Z0-9+\/=]1}|==)<\/\w+>/Q"; classtype:shellcode-detect; sid: 3016006; rev: 1; metadata:created_at 2018_09_03,by al0ne;)`,
+	`alert http any any -> any any (msg: "Suspicious netstat command traffic"; flow: established,to_client; content:"Active Internet connections"; http_server_body; depth:28; content:"tcp"; http_server_body; distance:0; classtype:trojan-activity; sid: 3013003; rev: 1; metadata:created_at 2018_09_26,by al0ne;)`,
+	`alert http any any -> any any (msg:"msfconsole powershell response"; flow:established; content:!"<html>"; content:!"<script>"; content:"|70 6f 77 65 72 73 68 65 6c 6c 2e 65 78 65|"; http_server_body; content:"|46 72 6f 6d 42 61 73 65 36 34 53 74 72 69 6e 67|"; http_server_body; classtype:exploit-kit; sid:3016005; rev:1;)`,
+	`alert tcp any any -> any any (msg:"ET SCAN Amap TCP Service Scan Detected"; flow:to_server; flags:PA; content:"service|3A|thc|3A 2F 2F|"; depth:105; content:"service|3A|thc"; within:40; reference:url,freeworld.thc.org/thc-amap/; reference:url,doc.emergingthreats.net/2010371; classtype:attempted-recon; sid:2010371; rev:2; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`, `alert tcp any any -> any 21 (msg:"ET SCAN Grim's Ping ftp scanning tool"; flow:to_server,established; content:"PASS "; content:"gpuser@home.com"; within:18; reference:url,archives.neohapsis.com/archives/snort/2002-04/0448.html; reference:url,grimsping.cjb.net; reference:url,doc.emergingthreats.net/2007802; classtype:network-scan; sid:2007802; rev:4; metadata:created_at 2010_07_30, updated_at 2010_07_30;)`,
 }
 
 func TestMUSTPASS_CrossVerify(t *testing.T) {
 	for _, r := range rules {
-		rules, err := surirule.Parse(r.rule)
+		rules, err := surirule.Parse(r)
 		// single rule
 		rr := rules[0]
 		if err != nil {
@@ -114,7 +53,7 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 		maker := NewChaosMakerWithRules([]*rule.Storage{fRule})
 		res := maker.Generate()
 		if err != nil {
-			spew.Dump(r.rule)
+			spew.Dump(r)
 			t.Error(err)
 		}
 
@@ -122,108 +61,18 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 		matchedCount := 0
 
 		// check generated chaos
-		for result := range res {
+		for pk := range res {
+			if os.Getenv("GITHUB_ACTIONS") == "" {
+				// view chaos in wireshark
+				pcapx.InjectRaw(pk)
+			}
 			count++
-			var pk []byte
-			if rr.Protocol == protocol.HTTP {
-				var payload []byte
-				if result.HttpRequest == nil && result.HttpResponse == nil {
-					panic("Empty Result")
-				}
-				if result.HttpRequest != nil {
-					payload = result.HttpRequest
-				}
-				if result.HttpResponse != nil {
-					payload = result.HttpResponse
-				}
-				// pack packet for match
-				pk, err = pcapx.PacketBuilder(
-					pcapx.WithPayload(payload),
-					pcapx.WithIPv4_SrcIP("1.1.1.1"),
-					pcapx.WithIPv4_DstIP("2.2.2.2"),
-				)
-				if err != nil {
-					t.Error(err)
-					return
-				}
-			} else if rr.Protocol == protocol.TCP {
-				buffer := gopacket.NewSerializeBuffer()
-				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
-				if err != nil {
-					t.Log(err)
-					linklayer = &layers.Ethernet{
-						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
-						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
-						EthernetType: layers.EthernetTypeIPv4,
-					}
-				}
-				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
-					linklayer,
-					gopacket.Payload(result.TCPIPPayload),
-				); err != nil {
-					t.Error(err)
-					return
-				}
-				pk = buffer.Bytes()
-			} else if rr.Protocol == protocol.UDP {
-				buffer := gopacket.NewSerializeBuffer()
-				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
-				if err != nil {
-					t.Log(err)
-					linklayer = &layers.Ethernet{
-						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
-						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
-						EthernetType: layers.EthernetTypeIPv4,
-					}
-				}
-				var payload []byte
-				if result.UDPIPOutboundPayload != nil {
-					payload = result.UDPIPOutboundPayload
-				} else {
-					payload = result.UDPIPInboundPayload
-				}
-				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
-					linklayer,
-					gopacket.Payload(payload),
-				); err != nil {
-					t.Error(err)
-					return
-				}
-				pk = buffer.Bytes()
-			} else if rr.Protocol == protocol.DNS {
-				buffer := gopacket.NewSerializeBuffer()
-				linklayer, err := pcapx.GetPublicToServerLinkLayerIPv4()
-				if err != nil {
-					t.Log(err)
-					linklayer = &layers.Ethernet{
-						SrcMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
-						DstMAC:       []byte{0x00, 0x01, 0x02, 0x03, 0x03, 0x06},
-						EthernetType: layers.EthernetTypeIPv4,
-					}
-				}
-				if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{},
-					linklayer,
-					gopacket.Payload(result.UDPIPInboundPayload),
-				); err != nil {
-					t.Error(err)
-					return
-				}
-				pk = buffer.Bytes()
-			} else if rr.Protocol == protocol.ICMP {
-				pk = result.ICMPIPInboundPayload
-			} else {
-				panic("not implement")
+			if match.New(rr).Match(pk) {
+				matchedCount++
 			}
-			if !match.New(rr).Match(pk) {
-				spew.Dump(rr.Raw)
-				spew.Dump(pk)
-				continue
-			}
-
-			matchedCount++
 		}
 		need := utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
-		t.Logf("RULE\n" + r.rule + fmt.Sprintf(`
+		t.Logf("RULE\n" + r + fmt.Sprintf(`
 need: %d
 got: %d
 match %d

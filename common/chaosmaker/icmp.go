@@ -3,7 +3,6 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 )
@@ -20,18 +19,18 @@ type icmpHandler struct {
 
 var _ chaosHandler = (*icmpHandler)(nil)
 
-func (h *icmpHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic {
-	if rule == nil {
+func (h *icmpHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan []byte {
+	if originRule == nil {
 		return nil
 	}
-	if rule.Protocol != "icmp" {
+	if originRule.Protocol != "icmp" {
 		return nil
 	}
 
-	ch := make(chan *pcapx.ChaosTraffic)
+	ch := make(chan []byte)
 	go (&icmpGenerator{
-		makerRule: makerRule,
-		rule:      rule,
+		makerRule: chaosRule,
+		rule:      originRule,
 		maker:     maker,
 		out:       ch,
 	}).generator(h.GenCountPerRule)
@@ -43,7 +42,7 @@ type icmpGenerator struct {
 	makerRule *rule.Storage
 	rule      *surirule.Rule
 	maker     *ChaosMaker
-	out       chan *pcapx.ChaosTraffic
+	out       chan []byte
 }
 
 func (h *icmpGenerator) generator(count int) {
@@ -56,13 +55,11 @@ func (h *icmpGenerator) generator(count int) {
 	}
 
 	for i := 0; i < count; i++ {
-		h.toChaosTraffic(surigen.Gen())
-	}
-}
-
-func (h *icmpGenerator) toChaosTraffic(data []byte) {
-	h.out <- &pcapx.ChaosTraffic{
-		ICMPIPInboundPayload: data,
+		raw := surigen.Gen()
+		if raw == nil {
+			return
+		}
+		h.out <- raw
 	}
 }
 

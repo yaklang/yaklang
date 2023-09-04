@@ -1,17 +1,12 @@
 package generate
 
 import (
-	"encoding/hex"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
-	"net"
-	"strconv"
 	"strings"
 )
 
@@ -63,121 +58,72 @@ func newTCPGen(r *rule.Rule) (Generator, error) {
 }
 
 func (g *TCPGen) Gen() []byte {
-	var toServer, toClient bool
-	if g.r.ContentRuleConfig.Flow != nil {
-		toServer = g.r.ContentRuleConfig.Flow.ToServer
-		toClient = g.r.ContentRuleConfig.Flow.ToClient
-	}
-
-	if !toServer && !toClient {
-		toServer = true
-		toClient = true
-	}
-
+	var opts []any
 	tcpConfig := g.r.ContentRuleConfig.TcpConfig
 	if g.r.ContentRuleConfig.TcpConfig == nil {
 		tcpConfig = &rule.TCPLayerRule{}
 	}
 
-	var (
-		seq = 1000 + rand.Intn(5553)
-		ack = 1000 + rand.Intn(5553)
-	)
-
 	if tcpConfig.Ack != nil && *tcpConfig.Ack > 0 {
-		ack = *tcpConfig.Ack
+		opts = append(opts, pcapx.WithTCP_Ack(*tcpConfig.Ack))
+	} else {
+		opts = append(opts, pcapx.WithTCP_Ack(uint32(rand.Uint32())))
 	}
 
 	if tcpConfig.Seq != nil && *tcpConfig.Seq > 0 {
-		seq = *tcpConfig.Seq
+		opts = append(opts, pcapx.WithTCP_Seq(*tcpConfig.Seq))
+	} else {
+		opts = append(opts, pcapx.WithTCP_Seq(uint32(rand.Uint32())))
 	}
 
-	var tcpLayer = &layers.TCP{
-		Seq: uint32(seq),
-		Ack: uint32(ack),
-	}
-
-	var tcpMss uint32 = 0x05b4
 	if tcpConfig.TCPMss != nil {
-		tcpMss = uint32(tcpConfig.TCPMss.Generate())
-		if tcpMss > 0xffff {
-			tcpMss = 0xffff
-		}
+		opts = append(opts, pcapx.WithTCP_OptionMSS(uint32(tcpConfig.TCPMss.Generate())))
 	}
 
-	if tcpMss > 0 {
-		bytes, _ := hex.DecodeString(strconv.FormatInt(int64(tcpMss), 16))
-		if len(bytes) > 0 {
-			tcpLayer.Options = append(tcpLayer.Options, layers.TCPOption{
-				OptionType: layers.TCPOptionKindMSS,
-				OptionData: bytes,
-			})
-		}
-	}
-
+	var Len = len(opts)
 	if tcpConfig.Flags != "" && !strings.HasPrefix(tcpConfig.Flags, "!") {
 		for _, flag := range tcpConfig.Flags {
 			switch flag {
 			case 'S':
-				tcpLayer.SYN = true
+				opts = append(opts, pcapx.WithTCP_Flags("syn"))
 			case 'F':
-				tcpLayer.FIN = true
+				opts = append(opts, pcapx.WithTCP_Flags("fin"))
 			case 'R':
-				tcpLayer.RST = true
+				opts = append(opts, pcapx.WithTCP_Flags("rst"))
 			case 'P':
-				tcpLayer.PSH = true
+				opts = append(opts, pcapx.WithTCP_Flags("psh"))
 			case 'A':
-				tcpLayer.ACK = true
+				opts = append(opts, pcapx.WithTCP_Flags("ack"))
 			case 'U':
-				tcpLayer.URG = true
+				opts = append(opts, pcapx.WithTCP_Flags("urg"))
 			case 'E':
-				tcpLayer.ECE = true
+				opts = append(opts, pcapx.WithTCP_Flags("ece"))
 			case 'C':
-				tcpLayer.CWR = true
+				opts = append(opts, pcapx.WithTCP_Flags("cwr"))
 			}
 		}
 	}
+	// syn by default
+	if len(opts) == Len {
+		opts = append(opts, pcapx.WithTCP_Flags("ack"))
+	}
 
 	if tcpConfig.Window != nil && !tcpConfig.NegativeWindow && *tcpConfig.Window > 0 {
-		tcpLayer.Window = uint16(*tcpConfig.Window)
+		opts = append(opts, pcapx.WithTCP_Window(uint16(*tcpConfig.Window)))
+	} else {
+		opts = append(opts, pcapx.WithTCP_Window(uint16(rand.Intn(2048))))
 	}
 
-	// 定义IPv4报文头部
-	ipLayer := &layers.IPv4{
-		Version:  4,                    // 版本号
-		TTL:      64,                   // 生存时间
-		Protocol: layers.IPProtocolTCP, // 协议类型
-	}
+	opts = append(opts, pcapx.WithIPv4_SrcIP(g.r.SourceAddress.Generate()))
+	opts = append(opts, pcapx.WithIPv4_DstIP(g.r.DestinationAddress.Generate()))
+	opts = append(opts, pcapx.WithTCP_SrcPort(g.r.SourcePort.GetAvailablePort()))
+	opts = append(opts, pcapx.WithTCP_DstPort(g.r.DestinationPort.GetAvailablePort()))
+	opts = append(opts, pcapx.WithPayload(g.payload.Gen()))
 
-	// IP 层
-	ipLayer.SrcIP = net.ParseIP(utils.GetLocalIPAddress())
-	if ipLayer.SrcIP == nil {
-		log.Error("fetch local ip address failed")
-		return nil
-	}
-	ipLayer.DstIP = net.ParseIP(utils.GetRandomIPAddress())
-	tcpLayer.SrcPort = layers.TCPPort(uint16(g.r.SourcePort.GetAvailablePort()))
-	tcpLayer.DstPort = layers.TCPPort(uint16(g.r.DestinationPort.GetAvailablePort()))
-	if toClient && !toServer {
-		ipLayer.SrcIP, ipLayer.DstIP = ipLayer.DstIP, ipLayer.SrcIP
-		tcpLayer.SrcPort, tcpLayer.DstPort = tcpLayer.DstPort, tcpLayer.SrcPort
-	}
-
-	dstPort := uint16(g.r.DestinationPort.GetAvailablePort())
-	srcPort := uint16(g.r.SourcePort.GetAvailablePort())
-	tcpLayer.SrcPort = layers.TCPPort(srcPort)
-	tcpLayer.DstPort = layers.TCPPort(dstPort)
-
-	_ = tcpLayer.SetNetworkLayerForChecksum(ipLayer)
-
-	buffer := gopacket.NewSerializeBuffer()
-	err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, ipLayer, tcpLayer, gopacket.Payload(g.payload.Gen()))
+	raw, err := pcapx.PacketBuilder(opts...)
 	if err != nil {
-		log.Errorf("serialize layers failed: %s", err)
+		log.Errorf("generate tcp packet failed: %s", err)
 		return nil
 	}
-	return buffer.Bytes()
+	return raw
 }

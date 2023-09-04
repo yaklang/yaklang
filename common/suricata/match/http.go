@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/google/gopacket"
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -24,8 +23,8 @@ func httpIniter(c *matchContext) error {
 
 	// buffer provider
 	provider := newHTTPBufferProvider(c.PK)
-	if provider == nil {
-		return errors.New("parse httpraw as http request failed")
+	if !c.Must(provider != nil) {
+		return nil
 	}
 
 	// prefilter
@@ -122,7 +121,6 @@ func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
 	}
 	request, err := lowhttp.ParseBytesToHttpRequest(payload)
 	if err != nil {
-		log.Errorf("parse httpraw as http request failed: %s", err.Error())
 		return nil
 	}
 	return &httpProvider{

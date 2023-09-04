@@ -52,6 +52,6 @@ func atoistar(i string) *int {
 	return &parsed
 }
 
-func getHighPort() uint32 {
-	return uint32(55000 + rand.Intn(65535-55000))
+func getHighPort() uint16 {
+	return uint16(55000 + rand.Intn(65535-55000))
 }

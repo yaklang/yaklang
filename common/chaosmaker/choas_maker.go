@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -40,8 +39,8 @@ func (c *ChaosMaker) ApplyAll() error {
 	return nil
 }
 
-func (c *ChaosMaker) Generate() chan *pcapx.ChaosTraffic {
-	fChan := make(chan *pcapx.ChaosTraffic)
+func (c *ChaosMaker) Generate() chan []byte {
+	fChan := make(chan []byte)
 	go func() {
 		defer close(fChan)
 		for _, r := range c.ChaosRules {
@@ -62,19 +61,18 @@ func (c *ChaosMaker) Generate() chan *pcapx.ChaosTraffic {
 	return fChan
 }
 
-func (c *ChaosMaker) generate(r *rule.Storage) (chan *pcapx.ChaosTraffic, error) {
+func (c *ChaosMaker) generate(r *rule.Storage) (chan []byte, error) {
 	switch strings.ToLower(r.RuleType) {
 	case "suricata":
 		return c._suricataGenerate(r)
 	case "http-request":
+		//todo: implement it
 		raw, err := codec.DecodeBase64(r.RawTrafficBeyondHTTPBase64)
 		if err != nil {
 			return nil, err
 		}
-		ch := make(chan *pcapx.ChaosTraffic, 1)
-		ch <- &pcapx.ChaosTraffic{
-			HttpRequest: raw,
-		}
+		_ = raw
+		ch := make(chan []byte, 1)
 		close(ch)
 		return ch, nil
 	case "tcp":
@@ -84,7 +82,7 @@ func (c *ChaosMaker) generate(r *rule.Storage) (chan *pcapx.ChaosTraffic, error)
 		//	return nil, err
 		//}
 
-		ch := make(chan *pcapx.ChaosTraffic, 1)
+		ch := make(chan []byte, 1)
 		//ch <- &ChaosTraffic{
 		//	ChaosRule:    r,
 		//	TCPIPPayload: raw,
@@ -99,7 +97,7 @@ func (c *ChaosMaker) generate(r *rule.Storage) (chan *pcapx.ChaosTraffic, error)
 	}
 }
 
-func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *pcapx.ChaosTraffic, error) {
+func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan []byte, error) {
 	if originRule == nil {
 		return nil, utils.Error("rule is nil")
 	}
@@ -124,7 +122,7 @@ func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *pcapx.Ch
 		return h.Generator(c, originRule, rules[0]), nil
 	}
 
-	var chans []chan *pcapx.ChaosTraffic
+	var chans []chan []byte
 	for _, r := range rules {
 		ch := h.Generator(c, originRule, r)
 		if ch == nil {
@@ -140,8 +138,8 @@ func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan *pcapx.Ch
 	return nil, utils.Errorf("no traffic generator found for %d rules", len(rules))
 }
 
-func mergeChans(chans ...chan *pcapx.ChaosTraffic) chan *pcapx.ChaosTraffic {
-	merged := make(chan *pcapx.ChaosTraffic)
+func mergeChans[T any](chans ...chan T) chan T {
+	merged := make(chan T)
 	go func() {
 		defer func() {
 			close(merged)
