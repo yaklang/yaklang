@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (f *Function) SetReg(i Instruction) {
@@ -30,6 +31,9 @@ func (p *Position) String() string {
 }
 
 func getStr(v Node) string {
+	if utils.IsNil(v) {
+		return "<nil>"
+	}
 	op := ""
 	op += GetTypeStr(v)
 	switch v := v.(type) {
@@ -152,8 +156,8 @@ func (b *BasicBlock) String() string {
 			ret += pred.Name + " "
 		}
 	}
-	if b.Condition != nil {
-		ret += " (" + b.Condition.String() + ")"
+	if !utils.IsNil(b.Condition) {
+		ret += " (" + getStr(b.Condition) + ")"
 	}
 	return ret
 }
@@ -175,7 +179,7 @@ func (p *Phi) String() string {
 	for i := range p.Edge {
 		v := p.Edge[i]
 		b := p.Block.Preds[i]
-		if v == nil {
+		if utils.IsNil(v) {
 			continue
 		}
 		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.Name)
