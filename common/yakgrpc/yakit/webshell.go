@@ -22,15 +22,15 @@ type WebShell struct {
 	// 冰蝎还是哥斯拉,或者是其他
 	ShellType string `json:"shell_type"`
 	// 脚本语言
-	ShellScript       string `json:"shell_script"`
-	Headers           string `json:"headers" gorm:"type:json"`
-	Status            bool   `json:"status"`
-	Tag               string `json:"tag"`
-	Proxy             string `json:"proxy"`
-	Remark            string `json:"remark"`
-	Hash              string `json:"hash"`
-	PacketScriptName  string `json:"packet_script_name"`
-	PayloadScriptName string `json:"payload_script_name"`
+	ShellScript      string `json:"shell_script"`
+	Headers          string `json:"headers" gorm:"type:json"`
+	Status           bool   `json:"status"`
+	Tag              string `json:"tag"`
+	Proxy            string `json:"proxy"`
+	Remark           string `json:"remark"`
+	Hash             string `json:"hash"`
+	PacketCodecName  string `json:"packet_codec_name"`
+	PayloadCodecName string `json:"payload_codec_name"`
 }
 
 func (w *WebShell) CalcHash() string {
@@ -78,8 +78,8 @@ func (w *WebShell) ToGRPCModel() *ypb.WebShell {
 		Proxy:            w.Proxy,
 		CreatedAt:        w.CreatedAt.Unix(),
 		UpdatedAt:        w.UpdatedAt.Unix(),
-		PayloadCodecName: w.PayloadScriptName,
-		PacketCodecName:  w.PacketScriptName,
+		PayloadCodecName: w.PayloadCodecName,
+		PacketCodecName:  w.PacketCodecName,
 	}
 }
 
