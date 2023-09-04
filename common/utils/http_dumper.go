@@ -208,6 +208,9 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 			buf.WriteString(strconv.FormatInt(contentLengthInt, 10))
 			buf.WriteString(CRLF)
 			buf.Flush()
+		} else {
+			buf.WriteString("Content-Length: 0\r\n")
+			buf.Flush()
 		}
 	}
 
