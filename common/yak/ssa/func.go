@@ -26,7 +26,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		FreeValues:  make([]Value, 0),
 		user:        make([]User, 0),
 		symbolTable: make(map[string][]InstructionValue),
-		instReg:     make(map[Instruction]string),
+		InstReg:     make(map[Instruction]string),
 		symbol: &Interface{
 			anInstruction: anInstruction{},
 			// I:     parent.symbol,

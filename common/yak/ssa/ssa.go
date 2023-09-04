@@ -113,7 +113,7 @@ type Function struct {
 	Pos  *Position // current position
 
 	// for instruction
-	instReg     map[Instruction]string // instruction -> virtual register
+	InstReg     map[Instruction]string // instruction -> virtual register
 	symbolTable map[string][]InstructionValue
 
 	// ssa error
