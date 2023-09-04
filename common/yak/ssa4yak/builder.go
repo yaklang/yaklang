@@ -48,9 +48,6 @@ func ParseSSA(src string, opt ...ssa4analyze.Option) *ssa.Program {
 		prog: prog,
 	}
 	prog.Build(builder)
-	if len(opt) == 0 {
-		opt = append(opt, ssa4analyze.WithPass(true))
-	}
 	ssa4analyze.NewAnalyzerGroup(
 		prog,
 		opt...,

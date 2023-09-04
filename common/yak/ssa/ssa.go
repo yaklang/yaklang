@@ -212,7 +212,9 @@ func (a *anInstruction) SetType(ts Types) {
 }
 
 func (a *anInstruction) SetVariable(name string) {
-	a.variable = name
+	if a.variable == "" {
+		a.variable = name
+	}
 }
 
 func (a *anInstruction) GetVariable() string {
