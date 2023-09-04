@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
 	"strings"
 	"sync"
@@ -494,6 +495,52 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	proxy = pluginContext.Proxy
 
 	// inject meta vars
+	for _, i := range []string{
+		"Get", "Post",
+	} {
+		nIns.GetVM().RegisterMapMemberCallHandler("http", i, func(i interface{}) interface{} {
+			if proxy == "" {
+				return i
+			}
+			originFunc, ok := i.(func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
+			if ok {
+				return func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
+					opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+					return originFunc(u, opts...)
+				}
+			}
+			return i
+		})
+	}
+
+	nIns.GetVM().RegisterMapMemberCallHandler("http", "Request", func(i interface{}) interface{} {
+		if proxy == "" {
+			return i
+		}
+		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
+		if ok {
+			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
+				opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+				return originFunc(method, u, opts...)
+			}
+		}
+		return i
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("http", "NewRequest", func(i interface{}) interface{} {
+		if proxy == "" {
+			return i
+		}
+		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error))
+		if ok {
+			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error) {
+				opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+				return originFunc(method, u, opts...)
+			}
+		}
+		return i
+	})
+
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) ([]byte, []byte, error))
 		if ok {
@@ -572,6 +619,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return i
 	})
+
+	// `
+
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "ScanAuto", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any))
 		if ok {
