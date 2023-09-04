@@ -147,26 +147,14 @@ func InjectTCPPayload(payload []byte, opt ...ConfigOption) {
 		c.TCPRemoteAddress = utils.GetRandomIPAddress() + ":" + fmt.Sprint(20+rand.Intn(1000))
 	}
 
-	syn, synack, ack, pushacks, finack, err := CreateTCPHandshakePackets(c.TCPLocalAddress, c.TCPRemoteAddress, payload)
+	flow, err := CreateTCPFlowFromPayload(c.TCPLocalAddress, c.TCPRemoteAddress, payload)
 	if err != nil {
 		log.Errorf("create iptcp handshake failed: %s", err)
 		return
 	}
-	toOpt := append(opt, WithToServer())
-	fromOpt := append(opt, WithToClient())
-	if !c.ToServer {
-		for _, pushAck := range pushacks {
-			InjectTCPIPInstance(pushAck, fromOpt...)
-		}
-		return
+	for _, f := range flow {
+		InjectRaw(f, opt...)
 	}
-	InjectTCPIPInstance(syn, toOpt...)
-	InjectTCPIPInstance(synack, fromOpt...)
-	InjectTCPIPInstance(ack, toOpt...)
-	for _, pushack := range pushacks {
-		InjectTCPIPInstance(pushack, toOpt...)
-	}
-	InjectTCPIPInstance(finack, toOpt...)
 }
 
 func InjectHTTPRequest(raw []byte, opt ...ConfigOption) {
