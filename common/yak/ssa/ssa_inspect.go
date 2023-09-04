@@ -11,9 +11,9 @@ func (p *Program) show(flag FunctionAsmFlag) {
 }
 
 func (p *Program) Show() {
-	p.show(DisAsmWithoutSource)
+	p.show(DisAsmDefault)
 }
 
 func (p *Program) ShowWithSource() {
-	p.show(DisAsmDefault)
+	p.show(DisAsmWithSource)
 }

@@ -72,7 +72,7 @@ type FunctionAsmFlag int
 
 const (
 	DisAsmDefault FunctionAsmFlag = 1 << iota
-	DisAsmWithoutSource
+	DisAsmWithSource
 )
 
 // implement value
@@ -113,7 +113,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	for _, b := range f.Blocks {
 		ret += b.String() + "\n"
 
-		if flag&DisAsmWithoutSource == 0 {
+		if flag&DisAsmWithSource == 0 {
 			for _, p := range b.Phis {
 				ret += fmt.Sprintf("\t%s\n", p)
 			}
