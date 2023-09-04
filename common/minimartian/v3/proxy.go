@@ -894,7 +894,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 	//Handle proxy getting stuck when upstream stops responding midway
 	//see https://github.com/google/martian/pull/349
-	if err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		closing = errClose
 	}
 
