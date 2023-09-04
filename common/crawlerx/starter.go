@@ -109,14 +109,14 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
 
+		headers: baseConfig.headers,
+		cookies: baseConfig.cookies,
+
 		storageSave: false,
 
 		runtimeID: baseConfig.runtimeId,
 		saveToDB:  baseConfig.saveToDB,
 		https:     false,
-
-		headers: baseConfig.headers,
-		cookies: baseConfig.cookies,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
