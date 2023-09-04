@@ -1,12 +1,15 @@
 package chaosmaker
 
 import (
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"net"
 )
 
 func init() {
@@ -60,7 +63,32 @@ func (h *httpGenerator) generator(count int) {
 		if raw == nil {
 			return
 		}
-		flow, err := pcapx.CompleteTCPFlow(raw)
+
+		var flow [][]byte
+		var err error
+		if len(raw) <= 1500 {
+			flow, err = pcapx.CompleteTCPFlow(raw)
+		} else {
+			// 分片, 如果需要的话
+			pk := gopacket.NewPacket(raw, layers.LayerTypeEthernet, gopacket.Default)
+			if pk == nil {
+				continue
+			}
+			nw := pk.NetworkLayer()
+			if nw == nil {
+				continue
+			}
+			tcp := pk.TransportLayer()
+			if tcp == nil {
+				continue
+			}
+			payload := tcp.LayerPayload()
+			flow, err = pcapx.CreateTCPFlowFromPayload(
+				net.JoinHostPort(nw.NetworkFlow().Src().String(), tcp.TransportFlow().Src().String()),
+				net.JoinHostPort(nw.NetworkFlow().Dst().String(), tcp.TransportFlow().Dst().String()),
+				payload,
+			)
+		}
 		if err != nil {
 			log.Errorf("complete tcp flow failed: %v", err)
 			continue

@@ -6,9 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net"
+	"strconv"
 	"strings"
 )
 
@@ -64,17 +67,9 @@ func (c *ChaosMaker) Generate() chan []byte {
 func (c *ChaosMaker) generate(r *rule.Storage) (chan []byte, error) {
 	switch strings.ToLower(r.RuleType) {
 	case "suricata":
-		return c._suricataGenerate(r)
+		return c.suricataGenerate(r)
 	case "http-request":
-		//todo: implement it
-		raw, err := codec.DecodeBase64(r.RawTrafficBeyondHTTPBase64)
-		if err != nil {
-			return nil, err
-		}
-		_ = raw
-		ch := make(chan []byte, 1)
-		close(ch)
-		return ch, nil
+		return c.httpreqGenerate(r)
 	case "tcp":
 		//TODO: 这里现在还没法处理TCP raw数据
 		//raw, err := codec.DecodeBase64(r.RawTrafficBeyondIPPacketBase64)
@@ -97,7 +92,29 @@ func (c *ChaosMaker) generate(r *rule.Storage) (chan []byte, error) {
 	}
 }
 
-func (c *ChaosMaker) _suricataGenerate(originRule *rule.Storage) (chan []byte, error) {
+func (c *ChaosMaker) httpreqGenerate(r *rule.Storage) (chan []byte, error) {
+	raw, err := codec.DecodeBase64(r.RawTrafficBeyondHTTPBase64)
+	if err != nil {
+		return nil, err
+	}
+	output := make(chan []byte, 128)
+	go func() {
+		defer close(output)
+		for i := 0; i < 5; i++ {
+			flows, err := pcapx.CreateTCPFlowFromPayload(net.JoinHostPort(utils.GetLocalIPAddress(), strconv.Itoa(utils.GetRandomAvailableTCPPort())), net.JoinHostPort(utils.GetRandomIPAddress(), "80"), raw)
+			if err != nil {
+				log.Warnf("build packet failed: %v", err)
+				continue
+			}
+			for _, pk := range flows {
+				output <- pk
+			}
+		}
+	}()
+	return output, nil
+}
+
+func (c *ChaosMaker) suricataGenerate(originRule *rule.Storage) (chan []byte, error) {
 	if originRule == nil {
 		return nil, utils.Error("rule is nil")
 	}
