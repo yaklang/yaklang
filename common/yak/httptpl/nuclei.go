@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -225,8 +224,44 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	// parse req seqs
 	var reqSeq []*YakRequestBulkConfig
 	hasMatcherOrExtractor := false
+	extractConfig := func(config *RequestConfig, data map[string]interface{}) {
+		config.IsHTTPS = utils.MapGetBool(data, "is-https")
+		config.IsGmTLS = utils.MapGetBool(data, "is-gmtls")
+		config.Host = utils.MapGetString(data, "host")
+		config.Proxy = utils.MapGetString(data, "proxy")
+		config.NoSystemProxy = utils.MapGetBool(data, "no-system-proxy")
+		config.ForceFuzz = utils.MapGetBool(data, "force-fuzz")
+		config.RequestTimeout = utils.MapGetFloat64(data, "request-timeout")
+		config.RepeatTimes = utils.MapGetInt64(data, "repeat-times")
+		config.Concurrent = utils.MapGetInt64(data, "concurrent")
+		config.DelayMinSeconds = utils.MapGetFloat64(data, "delay-min-seconds")
+		config.DelayMaxSeconds = utils.MapGetFloat64(data, "delay-max-seconds")
+		config.MaxRetryTimes = utils.MapGetInt64(data, "max-retry-times")
+		config.RetryInStatusCode = utils.MapGetString(data, "retry-in-status-code")
+		config.RetryNotInStatusCode = utils.MapGetString(data, "retry-not-in-status-code")
+		config.MaxRedirects = utils.MapGetInt(data, "max-redirects")
+		config.JsEnableRedirect = utils.MapGetBool(data, "js-enable-redirect")
+		config.JsMaxRedirects = utils.MapGetInt(data, "js-max-redirect")
+		config.EnableRedirect = utils.MapGetBool(data, "enable-redirect")
+		config.MaxRedirects = utils.MapGetInt(data, "max-redirects")
+		config.DNSServers = utils.MapGetStringSlice(data, "dns-servers")
+		ietcHosts := utils.MapGetRaw(data, "etc-hosts")
+		if etcHosts, ok := ietcHosts.(map[string]interface{}); ok {
+			hosts := make(map[string]string)
+			for k, v := range etcHosts {
+				hosts[k] = utils.InterfaceToString(v)
+			}
+			config.EtcHosts = hosts
+		}
+		vars := utils.MapGetRaw(data, "variables")
+		config.Variables = NewVars()
+		for k, v := range utils.InterfaceToMapInterface(vars) {
+			config.Variables.AutoSet(k, utils.InterfaceToString(v))
+		}
+	}
 	for _, i := range utils.InterfaceToSliceInterface(reqs) {
 		reqIns := &YakRequestBulkConfig{}
+		extractConfig(&reqIns.RequestConfig, utils.InterfaceToMapInterface(i))
 		req := utils.InterfaceToMapInterface(i)
 		matcher, err := generateYakMatcher(req)
 		if err != nil {
@@ -255,12 +290,17 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		if len(reqIns.Extractor) != 0 {
 			hasMatcherOrExtractor = true
 		}
-		reqIns.EnableRedirect, _ = strconv.ParseBool(utils.InterfaceToString(utils.MapGetFirstRaw(req, "host-redirects", "redirects")))
-		reqIns.MaxRedirects = utils.MapGetInt(req, "max-redirects")
+		reqIns.StopAtFirstMatch = utils.MapGetBool(req, "stop-at-first-match")
 		reqIns.CookieInherit = utils.MapGetBool(req, "cookie-reuse")
 		reqIns.MaxSize = utils.MapGetInt(req, "max-size")
 		reqIns.NoFixContentLength = utils.MapGetBool(req, "unsafe")
 		reqIns.AfterRequested = utils.MapGetBool(req, "req-condition")
+		reqIns.AttackMode = utils.MapGetString(req, "attack-mode")
+		reqIns.InheritVariables = utils.MapGetBool(req, "inherit-variables")
+		reqIns.HotPatchCode = utils.MapGetString(req, "hot-patch-code")
+
+		//reqIns.EnableRedirect, _ = strconv.ParseBool(utils.InterfaceToString(utils.MapGetFirstRaw(req, "host-redirects", "redirects")))
+		//reqIns.MaxRedirects = utils.MapGetInt(req, "max-redirects")
 
 		if ret := utils.MapGetRaw(req, "raw"); ret != nil {
 			reqIns.HTTPRequests = funk.Map(utils.InterfaceToStringSlice(ret), func(i string) *YakHTTPRequestPacket {
@@ -318,6 +358,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		return nil, utils.Error("matcher and extractor are both empty")
 	}
 	yakTemp.HTTPRequestSequences = reqSeq
+	extractConfig(&yakTemp.RequestConfig, mid)
 	return yakTemp, nil
 }
 

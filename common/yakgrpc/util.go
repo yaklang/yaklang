@@ -1,16 +1,20 @@
 package yakgrpc
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 )
 
 // OpenPortServerStreamerHelperRWC
@@ -166,6 +170,12 @@ func (m *YamlMapBuilder) Set(k string, v any) {
 		Value: v,
 	})
 }
+func (m *YamlMapBuilder) AddEmptyLine() {
+	m.Set("__empty_line__", "__empty_line__")
+}
+func (m *YamlMapBuilder) AddComment(comment string) {
+	m.Set("__comment__", codec.EncodeToHex(comment))
+}
 func (m *YamlMapBuilder) NewSubMapBuilder(k string) *YamlMapBuilder {
 	newSliceUtil := NewYamlMapBuilder()
 	m.Set(k, newSliceUtil)
@@ -177,6 +187,30 @@ func (m *YamlMapBuilder) NewSubArrayBuilder(k string) *YamlArrayBuilder {
 	return &YamlArrayBuilder{slice: &v}
 }
 func (m *YamlMapBuilder) MarshalToString() (string, error) {
-	res, err := yaml.Marshal(m.FilterEmptyField())
-	return string(res), err
+	var res string
+	yamlContent, err := yaml.Marshal(m.FilterEmptyField())
+	scanner := bufio.NewScanner(bytes.NewReader(yamlContent))
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if i := strings.Index(line, "__comment__:"); i != -1 {
+			padding := strings.Repeat(" ", i)
+			hexComment := strings.TrimSpace(line[i+len("__comment__:"):])
+			comment, err := codec.DecodeHex(hexComment)
+			if err != nil {
+				log.Errorf("decode hex comment failed: %s", err)
+				continue
+			}
+			commentLines := strings.Split(string(comment), "\n")
+			for _, commentLine := range commentLines {
+				res += padding + "# " + commentLine + "\n"
+			}
+			continue
+		}
+		if strings.Contains(line, "__empty_line__: ") {
+			line = ""
+		}
+		res += line + "\n"
+	}
+	return res, err
 }

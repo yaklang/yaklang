@@ -15,6 +15,8 @@ import (
 type RequestConfig struct {
 	JsEnableRedirect     bool
 	JsMaxRedirects       int
+	EnableRedirect       bool
+	MaxRedirects         int
 	EtcHosts             map[string]string
 	DNSServers           []string
 	Variables            *YakVariables
@@ -34,6 +36,7 @@ type RequestConfig struct {
 	IsHTTPS              bool
 }
 type YakTemplate struct {
+	Comments []string
 	RequestConfig
 	Id            string   `json:"id"`
 	Name          string   `json:"name"`
@@ -60,14 +63,12 @@ type YakTemplate struct {
 
 type YakRequestBulkConfig struct {
 	RequestConfig
+
 	Matcher   *YakMatcher
 	Extractor []*YakExtractor
 
 	HTTPRequests []*YakHTTPRequestPacket
 
-	EnableRedirect bool
-
-	MaxRedirects     int
 	StopAtFirstMatch bool
 
 	CookieInherit      bool

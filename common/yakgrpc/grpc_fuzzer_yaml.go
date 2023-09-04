@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -86,8 +87,43 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				Type:  "raw",
 			})
 		}
-		fuzzerRequest = append(fuzzerRequest, fuzzerReq)
+		fuzzerReq.IsHTTPS = sequence.IsHTTPS
+		fuzzerReq.IsGmTLS = sequence.IsGmTLS
+		fuzzerReq.ActualAddr = sequence.Host
+		fuzzerReq.Proxy = sequence.Proxy
+		fuzzerReq.NoSystemProxy = sequence.NoSystemProxy
 
+		fuzzerReq.ForceFuzz = sequence.ForceFuzz
+		fuzzerReq.NoFixContentLength = sequence.NoFixContentLength
+		fuzzerReq.PerRequestTimeoutSeconds = sequence.RequestTimeout
+
+		fuzzerReq.RepeatTimes = sequence.RepeatTimes
+		fuzzerReq.Concurrent = sequence.Concurrent
+		fuzzerReq.DelayMinSeconds = sequence.DelayMinSeconds
+		fuzzerReq.DelayMaxSeconds = sequence.DelayMaxSeconds
+
+		fuzzerReq.MaxRetryTimes = sequence.MaxRetryTimes
+		fuzzerReq.RetryInStatusCode = sequence.RetryInStatusCode
+		fuzzerReq.RetryNotInStatusCode = sequence.RetryNotInStatusCode
+
+		fuzzerReq.NoFollowRedirect = sequence.EnableRedirect
+		fuzzerReq.RedirectTimes = float64(sequence.MaxRedirects)
+
+		fuzzerReq.FollowJSRedirect = sequence.JsEnableRedirect
+		fuzzerReq.DNSServers = sequence.DNSServers
+
+		fuzzerReq.InheritCookies = sequence.CookieInherit
+		fuzzerReq.InheritVariables = sequence.InheritVariables
+		fuzzerReq.HotPatchCode = sequence.HotPatchCode
+		hosts := []*ypb.KVPair{}
+		for k, v := range sequence.EtcHosts {
+			hosts = append(hosts, &ypb.KVPair{
+				Key:   k,
+				Value: v,
+			})
+		}
+		fuzzerReq.EtcHosts = hosts
+		fuzzerRequest = append(fuzzerRequest, fuzzerReq)
 	}
 	result := &ypb.ImportHTTPFuzzerTaskFromYamlResponse{
 		Requests: &ypb.FuzzerRequests{
@@ -131,7 +167,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	for _, request := range seq.GetRequests() {
 		vars := httptpl.NewVars()
 		for _, param := range request.Params {
-			vars.SetWithType(param.Key, param.Value, param.Type)
+			if err := vars.SetWithType(param.Key, param.Value, param.Type); err != nil {
+				log.Errorf("set vars error: %v", err)
+			}
 		}
 		etcHosts := map[string]string{}
 		for _, pair := range request.EtcHosts {
@@ -191,6 +229,8 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		if bulk.Matcher != nil || len(bulk.Extractor) > 0 {
 			hasMetcherOrExtractor = true
 		}
+		bulk.StopAtFirstMatch = request.StopAtFirstMatch
+		bulk.AfterRequested = request.AfterRequested
 	}
 	if !hasMetcherOrExtractor {
 		res.Ok = false
@@ -220,6 +260,41 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	rootMap.Set("id", y.Id)
 	infoMap := rootMap.NewSubMapBuilder("info")
 	reqSequencesArray := rootMap.NewSubArrayBuilder("http")
+	writeConfig := func(builder *YamlMapBuilder, config *httptpl.RequestConfig) {
+		builder.AddEmptyLine()
+		builder.AddComment("WebFuzzer请求配置")
+		builder.Set("is-https", config.IsHTTPS)
+		builder.Set("is-gmtls", config.IsGmTLS)
+		builder.Set("host", config.Host)
+		builder.Set("proxy", config.Proxy)
+		builder.Set("no-system-proxy", config.NoSystemProxy)
+		builder.Set("force-fuzz", config.ForceFuzz)
+		builder.Set("request-timeout", config.RequestTimeout)
+		builder.Set("repeat-times", config.RepeatTimes)
+		builder.Set("concurrent", config.Concurrent)
+		builder.Set("delay-min-seconds", config.DelayMinSeconds)
+		builder.Set("delay-max-seconds", config.DelayMaxSeconds)
+		builder.Set("max-retry-times", config.MaxRetryTimes)
+		builder.Set("retry-in-status-code", config.RetryInStatusCode)
+		builder.Set("retry-not-in-status-code", config.RetryNotInStatusCode)
+		builder.Set("js-enable-redirect", config.JsEnableRedirect)
+		builder.Set("js-max-redirect", config.JsMaxRedirects)
+		builder.Set("enable-redirect", config.EnableRedirect)
+		builder.Set("max-redirects", config.MaxRedirects)
+		builder.Set("dns-servers", config.DNSServers)
+		builder.Set("etc-hosts", config.EtcHosts)
+		varBuilder := builder.NewSubMapBuilder("variables")
+		if config.Variables != nil {
+			vars := config.Variables.ToMap()
+			for k, v := range vars {
+				varBuilder.Set(k, v)
+			}
+		}
+	}
+	//requestConfig := rootMap.NewSubMapBuilder("other-config")
+	if len(y.HTTPRequestSequences) == 1 { // 当请求序列长度为1时，优先使用独立配置，无需写入全局配置
+		writeConfig(rootMap, &y.RequestConfig)
+	}
 	// 生成Info
 	infoMap.Set("name", y.Name)
 	infoMap.Set("author", y.Author)
@@ -325,13 +400,19 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			}
 			extratorsArray.Add(extractorItem)
 		}
-		// 其它请求配置
-		sequenceItem.Set("redirects", sequence.EnableRedirect)
-		sequenceItem.Set("max-redirects", sequence.MaxRedirects)
+
+		// 其它配置
+		sequenceItem.Set("stop-at-first-macth", sequence.StopAtFirstMatch)
 		sequenceItem.Set("cookie-reuse", sequence.CookieInherit)
 		sequenceItem.Set("max-size", sequence.MaxSize)
 		sequenceItem.Set("unsafe", sequence.NoFixContentLength)
 		sequenceItem.Set("req-condition", sequence.AfterRequested)
+		sequenceItem.Set("attack-mode", sequence.AttackMode)
+		sequenceItem.Set("inherit-variables", sequence.InheritVariables)
+		sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
+
+		// WebFuzzer请求配置
+		writeConfig(sequenceItem, &sequence.RequestConfig)
 
 		reqSequencesArray.Add(sequenceItem)
 	}
