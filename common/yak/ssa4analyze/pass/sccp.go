@@ -23,9 +23,71 @@ type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
 func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	s.edge = make(Edge)
 	s.Finish = make(map[*ssa.BasicBlock]struct{})
+	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
+		fromtable, ok := s.edge[to]
+		if !ok {
+			fromtable = make(map[*ssa.BasicBlock]ssa.Value)
+		}
+		fromtable[from] = condition
+		s.edge[to] = fromtable
+	}
 
-	ifstmt := make([]*ssa.If, 0)
-	switchstmt := make([]*ssa.Switch, 0)
+	handleIfEdge := func(i *ssa.If) {
+		from := i.Block
+		newEdge(i.True, from, i.Cond)
+		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.Block))
+	}
+	handleLoopEdge := func(l *ssa.Loop) {
+		canReach := func() bool {
+			if l.Key == nil || l.Init == nil || l.Cond == nil {
+				return true
+			}
+			cond, ok := l.Cond.(*ssa.BinOp)
+			if !ok {
+				return true
+			}
+			var x, y ssa.Value
+
+			if l.Key == cond.X {
+				x = l.Init
+				y = cond.Y
+			} else {
+				x = cond.X
+				y = l.Init
+			}
+			canReach := newBinOpOnly(cond.Op, x, y, cond.Block)
+			can, ok := canReach.(*ssa.Const)
+			if ok && can.IsBoolean() {
+				return can.Boolean()
+			}
+			return true
+		}
+		from := l.Block
+		if !canReach() {
+			newEdge(l.Body, from, ssa.NewConst(false))
+			newEdge(l.Exit, from, ssa.NewConst(true))
+		} else {
+			newEdge(l.Body, from, l.Cond)
+			newEdge(l.Exit, from, newUnOp(ssa.OpNot, l.Cond, l.Block))
+		}
+	}
+
+	handleSwitchEdge := func(sw *ssa.Switch) {
+		from := sw.Block
+		var defaultCond ssa.Value
+		for _, lab := range sw.Label {
+			cond := newBinOp(ssa.OpEq, sw.Cond, lab.Value, lab.Dest)
+			newEdge(lab.Dest, from, cond)
+			// lab.Dest.Condition = cond
+			if defaultCond == nil {
+				defaultCond = newUnOp(ssa.OpNot, cond, sw.DefaultBlock)
+			} else {
+				defaultCond = newBinOp(ssa.OpOr, defaultCond, newUnOp(ssa.OpNot, cond, sw.DefaultBlock), sw.DefaultBlock)
+			}
+		}
+		newEdge(sw.DefaultBlock, from, defaultCond)
+	}
+
 	deleteStmt := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
@@ -42,11 +104,23 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 				}
 			// call function
 			case *ssa.Call:
-			// collect if and switch
+				// TODO: config can set funciton return is a const
+				// !! medium: need a good interface for user config this
+
+			case *ssa.Field:
+				if !inst.OutCapture {
+					// TODO: handler field if this field not OutCaptured
+					// ! easy: just replace value
+				}
+
+			// collect control flow
 			case *ssa.If:
-				ifstmt = append(ifstmt, inst)
+				handleIfEdge(inst)
+			case *ssa.Loop:
+				handleLoopEdge(inst)
 			case *ssa.Switch:
-				switchstmt = append(switchstmt, inst)
+				handleSwitchEdge(inst)
+
 			}
 		}
 	}
@@ -54,9 +128,6 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	for _, inst := range deleteStmt {
 		ssa.DeleteInst(inst)
 	}
-
-	// handler edge
-	s.handlerEdge(ifstmt, switchstmt)
 
 	// handler
 	fun.EnterBlock.Condition = ssa.NewConst(true)
@@ -89,43 +160,6 @@ func (s *SCCP) RunOnFunction(fun *ssa.Function) {
 	}
 }
 
-func (s *SCCP) handlerEdge(ifstmt []*ssa.If, switchstmt []*ssa.Switch) {
-	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
-		fromtable, ok := s.edge[to]
-		if !ok {
-			fromtable = make(map[*ssa.BasicBlock]ssa.Value)
-		}
-		fromtable[from] = condition
-		s.edge[to] = fromtable
-	}
-
-	// mark
-	for _, i := range ifstmt {
-		from := i.Block
-		newEdge(i.True, from, i.Cond)
-		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.False))
-	}
-
-	for _, sw := range switchstmt {
-		// defaultConds := make([]ssa.Value, 0)
-		from := sw.Block
-		var defaultCond ssa.Value
-		for _, lab := range sw.Label {
-			cond := newBinOp(ssa.OpEq, sw.Cond, lab.Value, lab.Dest)
-			newEdge(lab.Dest, from, cond)
-			// lab.Dest.Condition = cond
-			if defaultCond == nil {
-				defaultCond = newUnOp(ssa.OpNot, cond, sw.DefaultBlock)
-			} else {
-				defaultCond = newBinOp(ssa.OpOr, defaultCond, newUnOp(ssa.OpNot, cond, sw.DefaultBlock), sw.DefaultBlock)
-			}
-		}
-		// default
-		// sw.DefaultBlock.Condition = defaultCond
-		newEdge(sw.DefaultBlock, from, defaultCond)
-	}
-}
-
 func (s *SCCP) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	getCondition := func(to, from *ssa.BasicBlock) ssa.Value {
 		var edgeCond ssa.Value
@@ -137,7 +171,7 @@ func (s *SCCP) calcCondition(block *ssa.BasicBlock) ssa.Value {
 		if edgeCond == nil {
 			return from.Condition
 		} else {
-			return newBinOp(ssa.OpAnd, from.Condition, edgeCond, to)
+			return newBinOp(ssa.OpAnd, from.Condition, edgeCond, from)
 		}
 	}
 
@@ -165,18 +199,32 @@ func (s *SCCP) calcCondition(block *ssa.BasicBlock) ssa.Value {
 		if cond == nil {
 			cond = getCondition(block, pre)
 		} else {
-			cond = newBinOp(ssa.OpOr, cond, getCondition(block, pre), block)
+			cond = newBinOp(ssa.OpOr, cond, getCondition(block, pre), pre)
 		}
 	}
 	return cond
 }
 
-func newBinOp(op ssa.BinaryOpcode, x, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
+func emit(v ssa.Value, block *ssa.BasicBlock) ssa.Value {
+	if inst, ok := v.(ssa.Instruction); ok {
+		if _, ok := inst.GetParent().InstReg[inst]; !ok {
+			ssa.EmitBefore(block.LastInst(), inst)
+		} else {
+			return v
+		}
+	}
+	return v
+}
+func newBinOpOnly(op ssa.BinaryOpcode, x, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	return handlerBinOpWithOutput(ssa.NewBinOp(op, x, y, block), false)
 }
 
+func newBinOp(op ssa.BinaryOpcode, x, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
+	return emit(newBinOpOnly(op, x, y, block), block)
+}
+
 func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
-	return handlerUnOpWithOutput(ssa.NewUnOp(op, x, block), false)
+	return emit(handlerUnOpWithOutput(ssa.NewUnOp(op, x, block), false), block)
 }
 
 func handlerBinOp(bin *ssa.BinOp) ssa.Value {
@@ -373,7 +421,13 @@ func ConstUnary(x *ssa.Const, op ssa.UnaryOpcode) *ssa.Const {
 			return ssa.NewConst(!x.Boolean())
 		}
 	case ssa.OpPlus:
+		if x.IsNumber() {
+			return ssa.NewConst(+x.Number())
+		}
 	case ssa.OpNeg:
+		if x.IsNumber() {
+			return ssa.NewConst(-x.Number())
+		}
 	case ssa.OpChan:
 	}
 	return nil

@@ -112,7 +112,6 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 }
 
 func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value, block *BasicBlock) *Interface {
-
 	i := &Interface{
 		anInstruction: newAnInstuction(block),
 		parentI:       parentI,
@@ -124,7 +123,7 @@ func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value
 		Cap:           Cap,
 		users:         make([]User, 0),
 	}
-	if typs != nil {
+	if len(typs) != 0 {
 		i.anInstruction.typs = typs
 	}
 	fixupUseChain(i)
@@ -214,9 +213,11 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	switch inst := target.(type) {
 	case *Field:
 		// field
-		fun := inst.GetLastValue().(*Function)
-		freevalue = fun.FreeValues
-		parent = fun.parent
+		fun, ok := inst.GetLastValue().(*Function)
+		if ok {
+			freevalue = fun.FreeValues
+			parent = fun.parent
+		}
 	case *Function:
 		// Function
 		freevalue = inst.FreeValues

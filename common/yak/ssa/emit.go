@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
 func fixupUseChain(node Node) {
@@ -23,6 +24,21 @@ func fixupUseChain(node Node) {
 			}
 		}
 
+	}
+}
+
+func EmitBefore(before, inst Instruction) {
+	block := before.GetBlock()
+	insts := block.Instrs
+	if index := slices.Index(insts, before); index > -1 {
+		// Extend the slice
+		insts = append(insts, nil)
+		// Move elements to create a new space
+		copy(insts[index+1:], insts[index:])
+		// Insert new element
+		insts[index] = inst
+		block.Instrs = insts
+		block.Parent.SetReg(inst)
 	}
 }
 
