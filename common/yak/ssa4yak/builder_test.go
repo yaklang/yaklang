@@ -449,6 +449,38 @@ entry0: (true)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
+
+	t.Run("undefine", func(t *testing.T) {
+		code := `
+a = c
+b = c
+print(a)
+print(b)
+a = undefinePkg.undefineFied
+a = undefinePkg.undefineFunc(a); 
+b = undefineFunc2("bb")
+print(b)
+`
+		ir := `
+yak-main
+entry0: (<boolean> true)
+		<> t0 = undefine-c
+		<> t1 = undefine-print
+		<> t2 = call <> t1 (<> t0) []
+		<> t3 = call <> t1 (<> t0) []
+		<> t4 = undefine-undefinePkg
+		<> t5 = <> t4 field[<string> undefineFied]
+		<> t6 = <> t4 field[<string> undefineFunc]
+		<> t7 = call <> t6 (<> t5) []
+		<> t8 = undefine-undefineFunc2
+		<> t9 = call <> t8 (<string> bb) []
+		<> t10 = call <> t1 (<> t9) []
+		`
+		prog := ParseSSA(code)
+		CheckProgram(t, prog)
+		CompareYakMain(t, prog, ir)
+
+	})
 }
 
 func TestIfStmt(t *testing.T) {

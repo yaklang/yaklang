@@ -184,10 +184,13 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 }
 
 // --------------- `f.symbol` hanlder, read && write
-func (b *FunctionBuilder) getFieldWithCreate(i *Interface, key Value, create bool) *Field {
-	if field, ok := i.Field[key]; ok {
-		return field
+func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) *Field {
+	if I, ok := i.(*Interface); ok {
+		if field, ok := I.Field[key]; ok {
+			return field
+		}
 	}
+
 	if parent := b.parent; parent != nil {
 		// find in parent
 		if field := parent.builder.ReadField(key.String()); field != nil {
