@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
+	"net"
 	"time"
 )
 
@@ -34,55 +36,50 @@ func tsOpt() layers.TCPOption {
 	return tsOption
 }
 
-func CreateTCPHandshakePackets(src, dst string, payload []byte) (
-	*TCPIPFrame,
-	*TCPIPFrame,
-	*TCPIPFrame,
-	[]*TCPIPFrame,
-	*TCPIPFrame,
-	error,
-) {
+func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error) {
 	if src == "" {
 		_, _, srcRaw, err := getPublicRoute()
 		if err != nil {
-			return nil, nil, nil, nil, nil, utils.Error("cannot found src route")
+			return nil, utils.Error("cannot found src route")
 		}
-		src = srcRaw.String() + ":" + fmt.Sprint(40000+rand.Intn(20000))
+		src = net.JoinHostPort(srcRaw.String(), fmt.Sprint(40000+rand.Intn(20000)))
 	}
 	srcIP, dstIP, srcPort, dstPort, err := ParseSrcNDstAddress(src, dst)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
-
-	seqStart := 0x7ffffff + rand.Intn(0x5ffffff)
-	ackStart := rand.Intn(0x7ffffff)
+	seql := rand.Uint32()
+	seqr := rand.Uint32()
 
 	ip := &layers.IPv4{
 		Version:  4,
 		Protocol: layers.IPProtocolTCP,
 		SrcIP:    srcIP,
 		DstIP:    dstIP,
+		TTL:      64,
 	}
+
+	var flow [][]byte
+	link, _ := GetPublicToServerLinkLayerIPv4()
 
 	// SYN ->
 	synTCP := &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
-		Seq:     uint32(seqStart),
-		Ack:     uint32(0),
+		Seq:     seql,
+		Ack:     0,
 		SYN:     true,
 		Options: []layers.TCPOption{
-			layers.TCPOption{
+			{
 				OptionType:   layers.TCPOptionKindMSS,
 				OptionLength: 0x04,
 				OptionData:   []byte{0x05, 0xb4},
-			}, layers.TCPOption{
+			}, {
 				OptionType:   layers.TCPOptionKindWindowScale,
 				OptionData:   []byte{0x06},
 				OptionLength: 0x03,
 			},
-			tsOpt(),
-			layers.TCPOption{
+			{
 				OptionType: layers.TCPOptionKindSACKPermitted,
 			},
 		},
@@ -91,69 +88,88 @@ func CreateTCPHandshakePackets(src, dst string, payload []byte) (
 	ipTo := ip
 	synTCP.SetNetworkLayerForChecksum(ipTo)
 
+	buf, err := seriGopkt(link, ipTo, synTCP)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot serialize gopacket")
+	}
+
+	flow = append(flow, buf)
+
 	ipFrom := &layers.IPv4{
 		Version:  4,
 		Protocol: layers.IPProtocolTCP,
 		SrcIP:    ip.DstIP,
 		DstIP:    ip.SrcIP,
+		TTL:      64,
 	}
 	// SYN ACK <-
 	synAckTCP := &layers.TCP{
 		SrcPort: layers.TCPPort(dstPort),
 		DstPort: layers.TCPPort(srcPort),
-		Seq:     uint32(ackStart),
-		Ack:     uint32(synTCP.Seq + 1),
+		Seq:     seqr,
+		Ack:     seql + 1,
 		SYN:     true,
 		ACK:     true,
 		Window:  65535,
 		Options: []layers.TCPOption{
-			layers.TCPOption{
+			{
 				OptionType:   layers.TCPOptionKindMSS,
 				OptionLength: 0x04,
 				OptionData:   []byte{0x05, 120},
-			}, layers.TCPOption{
+			}, {
 				OptionType:   layers.TCPOptionKindWindowScale,
 				OptionData:   []byte{0x09},
 				OptionLength: 0x03,
 			},
-			tsOpt(),
-			layers.TCPOption{
+			{
 				OptionType: layers.TCPOptionKindSACKPermitted,
 			},
 		},
 	}
 	synAckTCP.SetNetworkLayerForChecksum(ipFrom)
 
+	buf, err = seriGopkt(link, ipFrom, synAckTCP)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot serialize gopacket")
+	}
+	flow = append(flow, buf)
+	seql++
+
 	// ACK ->
 	var nextWindow uint16 = 2060
 	ackTCP := &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
-		Seq:     uint32(synTCP.Seq + 1),
-		Ack:     uint32(synAckTCP.Seq + 1),
+		Seq:     seql,
+		Ack:     seqr + 1,
 		ACK:     true,
-		Window:  uint16(nextWindow),
+		Window:  nextWindow,
 	}
 	ackTCP.SetNetworkLayerForChecksum(ipTo)
 
+	buf, err = seriGopkt(link, ipTo, ackTCP)
+	if err != nil {
+		return nil, err
+	}
+	flow = append(flow, buf)
+
 	var frames []*TCPIPFrame
 	if len(payload) > 0 {
-		var offset uint32 = 0
 		var lastFrame *layers.TCP
 		for _, payloadFrame := range funk.Chunk(payload, 1400).([][]byte) {
 			// push ack
 			ackPush := &layers.TCP{
 				SrcPort: layers.TCPPort(srcPort),
 				DstPort: layers.TCPPort(dstPort),
-				Seq:     uint32(synTCP.Seq + 1 + offset),
-				Ack:     uint32(synAckTCP.Seq + 1),
+				Seq:     seql,
+				Ack:     seqr + 1,
 				ACK:     true,
 				Window:  nextWindow,
 			}
 			ackPush.SetNetworkLayerForChecksum(ipTo)
 			ackPush.Payload = payloadFrame
 			frames = append(frames, &TCPIPFrame{ToServer: true, IP: ipTo, TCP: ackPush})
-			offset += uint32(len(payloadFrame))
+			seql += uint32(len(payloadFrame))
 			lastFrame = ackPush
 		}
 		if lastFrame != nil {
@@ -163,8 +179,8 @@ func CreateTCPHandshakePackets(src, dst string, payload []byte) (
 		ackPush := &layers.TCP{
 			SrcPort: layers.TCPPort(srcPort),
 			DstPort: layers.TCPPort(dstPort),
-			Seq:     uint32(synTCP.Seq + 1),
-			Ack:     uint32(synAckTCP.Seq + 1),
+			Seq:     seql,
+			Ack:     seqr + 1,
 			PSH:     true,
 			ACK:     true,
 			Window:  nextWindow,
@@ -173,33 +189,32 @@ func CreateTCPHandshakePackets(src, dst string, payload []byte) (
 		frames = append(frames, &TCPIPFrame{ToServer: true, IP: ipTo, TCP: ackPush})
 	}
 
+	for _, frame := range frames {
+		buf, err = seriGopkt(link, frame.IP, frame.TCP, gopacket.Payload(frame.TCP.Payload))
+		if err != nil {
+			return nil, err
+		}
+		flow = append(flow, buf)
+	}
+
 	finACK := &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
-		Seq:     uint32(int(synTCP.Seq) + len(payload)),
-		Ack:     uint32(synAckTCP.Seq + 1),
+		Seq:     seql,
+		Ack:     seqr + 1,
 		FIN:     true,
 		ACK:     true,
 		Window:  nextWindow,
 	}
 	finACK.SetNetworkLayerForChecksum(ipTo)
 
-	return &TCPIPFrame{
-			ToServer: true,
-			IP:       ipTo,
-			TCP:      synTCP,
-		}, &TCPIPFrame{
-			IP:  ipFrom,
-			TCP: synAckTCP,
-		}, &TCPIPFrame{
-			ToServer: true,
-			IP:       ipTo,
-			TCP:      ackTCP,
-		}, frames, &TCPIPFrame{
-			ToServer: true,
-			IP:       ipTo,
-			TCP:      finACK,
-		}, nil
+	buf, err = seriGopkt(link, ipTo, finACK)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot serialize gopacket")
+	}
+	flow = append(flow, buf)
+
+	return flow, nil
 }
 
 func CompleteTCPFlow(raw []byte) ([][]byte, error) {
@@ -346,6 +361,24 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 	pkt, err = seriGopkt(linkLy, networkLy, syn2, gopacket.Payload(tcpLy.Payload))
 	if err != nil {
 		return nil, err
+	}
+	flows = append(flows, pkt)
+
+	// 4 fin ack ->
+	finACK := &layers.TCP{
+		SrcPort: tcpLy.SrcPort,
+		DstPort: tcpLy.DstPort,
+		Seq:     tcpLy.Seq + uint32(len(tcpLy.Payload)),
+		Ack:     tcpLy.Ack,
+		FIN:     true,
+		ACK:     true,
+		Window:  tcpLy.Window,
+	}
+	finACK.SetNetworkLayerForChecksum(networkLy)
+
+	pkt, err = seriGopkt(linkLy, networkLy, finACK)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot serialize gopacket")
 	}
 	flows = append(flows, pkt)
 
