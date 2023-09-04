@@ -187,14 +187,16 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			}
 		} else {
 			// handle content-length as default
-			var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
-			rawPacket.Write(bodyRaw)
-			if err != nil && err != io.EOF {
-				return nil, Errorf("read body error: %v", err)
+			if contentLengthInt > 0 {
+				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+				rawPacket.Write(bodyRaw)
+				if err != nil && err != io.EOF {
+					return nil, Errorf("read body error: %v", err)
+				}
+				bodyLen := len(bodyRaw)
+				bodyRawBuf.Write(bodyRaw)
+				bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 			}
-			bodyLen := len(bodyRaw)
-			bodyRawBuf.Write(bodyRaw)
-			bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 		}
 	}
 	if bodyRawBuf.Len() == 0 {
