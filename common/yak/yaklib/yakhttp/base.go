@@ -153,7 +153,7 @@ var rawRequest = func(i interface{}) (*http.Request, error) {
 	return lowhttp.ParseStringToHttpRequest(rawReq)
 }
 
-func yakHttpConfig_Proxy(values ...string) HttpOption {
+func YakHttpConfig_Proxy(values ...string) HttpOption {
 	return func(req *YakHttpRequest) {
 		values = utils.StringArrayFilterEmpty(values)
 		if len(values) <= 0 {
@@ -266,7 +266,7 @@ var HttpExports = map[string]interface{}{
 	"postparams": PostParams,
 
 	// proxy
-	"proxy": yakHttpConfig_Proxy,
+	"proxy": YakHttpConfig_Proxy,
 
 	// timeout
 	"timeout": yakHttpConfig_Timeout,
@@ -295,7 +295,7 @@ func PostParams(i interface{}) HttpOption {
 
 func Do(req *YakHttpRequest) (*http.Response, error) {
 	if req.proxies != nil && netx.GetProxyFromEnv() != "" {
-		yakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
+		YakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
 	}
 
 	var client *http.Client
@@ -423,7 +423,7 @@ func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, e
 		opt(req)
 	}
 	if req.proxies == nil && netx.GetProxyFromEnv() != "" {
-		yakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
+		YakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
 	}
 
 	// client复用，实现会话管理
