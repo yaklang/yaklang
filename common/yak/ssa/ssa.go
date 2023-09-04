@@ -256,6 +256,18 @@ var _ Value = (*ConstInst)(nil)
 var _ Instruction = (*ConstInst)(nil)
 var _ InstructionValue = (*ConstInst)(nil)
 
+type Undefine struct {
+	anInstruction
+	user   []User
+	values []Value
+}
+
+var _ Node = (*Undefine)(nil)
+var _ Value = (*Undefine)(nil)
+var _ User = (*Undefine)(nil)
+var _ Instruction = (*Undefine)(nil)
+var _ InstructionValue = (*Undefine)(nil)
+
 // const only Value
 type Const struct {
 	user  []User
@@ -500,7 +512,7 @@ type Field struct {
 
 	// field
 	Key Value
-	I   *Interface
+	I   User
 
 	// capture by other function
 	OutCapture bool

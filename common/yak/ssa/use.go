@@ -54,6 +54,20 @@ func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
 
 func (c *Const) RemoveUser(u User) { c.user = remove(c.user, u) }
 
+// ----------- undifne
+// node
+func (u *Undefine) GetValues() []Value { return u.values }
+func (c *Undefine) GetUsers() []User   { return c.user }
+
+// value
+func (c *Undefine) AddUser(u User)    { c.user = append(c.user, u) }
+func (c *Undefine) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
+
+// user
+func (c *Undefine) AddValue(v Value)         { c.values = append(c.values, v) }
+func (c *Undefine) RemoveValue(u User)       { c.user = utils.Remove(c.user, u) }
+func (c *Undefine) ReplaceValue(v, to Value) { slices.Replace(c.values, 0, len(c.values), v, to) }
+
 // ----------- param
 func (p *Parameter) GetValues() []Value { return nil }
 

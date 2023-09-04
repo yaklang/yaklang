@@ -27,7 +27,17 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	f.SetReg(i)
 }
 
-func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) Value {
+func (f *FunctionBuilder) EmitUndefine(name string) *Undefine {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	u := NewUndefine(name, f.CurrentBlock)
+	u.NewError(Error, SSATAG, "this variable undefine")
+	f.emit(u)
+	return u
+}
+
+func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) *BinOp {
 	if f.CurrentBlock.finish {
 		return nil
 	}
@@ -119,7 +129,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 	return itf
 }
 
-func (f *FunctionBuilder) EmitField(i *Interface, key Value) *Field {
+func (f *FunctionBuilder) EmitField(i User, key Value) *Field {
 	return f.getFieldWithCreate(i, key, true)
 }
 

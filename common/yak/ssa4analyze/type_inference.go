@@ -215,9 +215,10 @@ func (t *TypeInference) checkValuesNotFinish(vs []ssa.Value) bool {
 func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) bool {
 
 	// check
-	// if t.checkValuesNotFinish(phi.Edge) {
-	// 	return false
-	// }
+	// TODO: handler Acyclic graph
+	if t.checkValuesNotFinish(phi.Edge) {
+		return false
+	}
 
 	// set type
 	typs := collectTypeFromValues(
@@ -317,6 +318,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
 	})
 
 	// check value finish
+	// TODO: handler Acyclic Graph
 	if t.checkValuesNotFinish(vs) {
 		return false
 	}

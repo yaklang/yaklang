@@ -6,14 +6,6 @@ import (
 
 var (
 	ConstMap = make(map[any]*Const)
-
-	UnDefineConst = &Const{
-		user:  []User{},
-		value: nil,
-		typ:   BasicTypesKind[UndefineType],
-		str:   "Undefine",
-		Unary: 0,
-	}
 )
 
 // create const

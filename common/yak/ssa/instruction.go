@@ -42,6 +42,16 @@ func newAnInstuction(block *BasicBlock) anInstruction {
 		pos:   block.Parent.builder.currtenPos,
 	}
 }
+func NewUndefine(name string, block *BasicBlock) *Undefine {
+	u := &Undefine{
+		anInstruction: newAnInstuction(block),
+		user:          []User{},
+		values:        []Value{},
+	}
+	u.SetVariable(name)
+	block.Parent.WriteVariable(name, u)
+	return u
+}
 
 func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 	b := &BinOp{
