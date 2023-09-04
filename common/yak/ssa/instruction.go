@@ -1,29 +1,34 @@
 package ssa
 
-import "golang.org/x/exp/slices"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func Insert(i Instruction, b *BasicBlock) {
 	b.Instrs = append(b.Instrs, i)
 }
 
-func remove[T comparable](slice []T, s T) []T {
-	if index := slices.Index(slice, s); index > -1 {
-		return append(slice[:index], slice[index+1:]...)
-	}
-	return slice
-}
-
 func DeleteInst(i Instruction) {
 	b := i.GetBlock()
 	if phi, ok := i.(*Phi); ok {
-		b.Phis = remove(b.Phis, phi)
+		b.Phis = utils.Remove(b.Phis, phi)
 	} else {
-		b.Instrs = remove(b.Instrs, i)
+		b.Instrs = utils.Remove(b.Instrs, i)
 	}
 	// if v, ok := i.(Value); ok {
 	// 	f := i.GetParent()
 	// 	f.symbolTable[v.GetVariable()] = remove(f.symbolTable[v.GetVariable()], v)
 	// }
+}
+
+func newAnInstuction(block *BasicBlock) anInstruction {
+	return anInstruction{
+		Func:     block.Parent,
+		Block:    block,
+		typs:     make(Types, 0),
+		variable: "",
+		pos:      block.Parent.builder.currtenPos,
+	}
 }
 
 func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
@@ -34,14 +39,6 @@ func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
 	return j
 }
 
-func newAnInstuction(block *BasicBlock) anInstruction {
-	return anInstruction{
-		Func:  block.Parent,
-		Block: block,
-		typs:  make(Types, 0),
-		pos:   block.Parent.builder.currtenPos,
-	}
-}
 func NewUndefine(name string, block *BasicBlock) *Undefine {
 	u := &Undefine{
 		anInstruction: newAnInstuction(block),
@@ -62,7 +59,6 @@ func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 		user:          []User{},
 	}
 	fixupUseChain(b)
-	block.Parent.SetReg(b)
 	return b
 }
 func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
@@ -73,7 +69,6 @@ func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
 		user:          []User{},
 	}
 	fixupUseChain(b)
-	block.Parent.SetReg(b)
 	return b
 }
 
@@ -201,7 +196,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	for index := range freevalue {
 		if para, ok := freevalue[index].(*Parameter); ok { // not modify
 			// find freevalue in parent function
-			if v := parent.builder.ReadVariable(para.variable); v != nil {
+			if v := parent.builder.ReadVariable(para.variable); !utils.IsNil(v) {
 				switch v := v.(type) {
 				case *Parameter:
 					if !v.isFreevalue {
@@ -216,7 +211,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 			}
 			if parent != f.Function {
 				// find freevalue in current function
-				if v := f.ReadVariable(para.variable); v != nil {
+				if v := f.ReadVariable(para.variable); !utils.IsNil(v) {
 					binding = append(binding, v)
 					continue
 				}
