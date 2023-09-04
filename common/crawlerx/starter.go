@@ -69,6 +69,9 @@ type BrowserStarter struct {
 	inputElementsExploit func(*rod.Element) error
 	eventElementsExploit func(*rod.Page, string, string) error
 
+	headers []*headers
+	cookies []*proto.NetworkCookieParam
+
 	invalidSuffix []string
 
 	storageSave bool
@@ -105,6 +108,9 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		stealth:    baseConfig.stealth,
 
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
+
+		headers: baseConfig.headers,
+		cookies: baseConfig.cookies,
 
 		storageSave: false,
 
@@ -168,6 +174,12 @@ func (starter *BrowserStarter) startBrowser() error {
 	}
 	starter.browser = starter.browser.Context(starter.ctx)
 	err := starter.browser.Connect()
+	if len(starter.cookies) > 0 {
+		err = starter.browser.SetCookies(starter.cookies)
+		if err != nil {
+			return utils.Errorf(`browser set cookies error: %v`, err)
+		}
+	}
 	if err != nil {
 		return utils.Errorf(`browser connect error: %s`, err)
 	}
@@ -275,6 +287,9 @@ func (starter *BrowserStarter) createPageHijack(page *rod.Page) error {
 	err := pageHijackRouter.Add("*", "", func(hijack *CrawlerHijack) {
 		if pageUrl == "" {
 			pageUrl = hijack.Request.URL().String()
+		}
+		for _, header := range starter.headers {
+			hijack.Request.Req().Header.Set(header.Key, header.Value)
 		}
 		contentType := hijack.Request.Header("Content-Type")
 		if strings.Contains(contentType, "multipart/form-data") {
@@ -386,18 +401,19 @@ func (starter *BrowserStarter) Start() {
 	err := starter.startBrowser()
 	if err != nil {
 		log.Errorf("browser start error: %s", err)
+		starter.baseConfig.startWaitGroup.Done()
 		return
 	}
 	headlessBrowser := starter.browser
 	defer headlessBrowser.MustClose()
 	defer starter.cancel()
-	starter.baseConfig.startWaitGroup.Done()
 	stealthJs, err := embed.Asset("data/anti-crawler/stealth.min.js")
 	if err != nil {
 		log.Errorf("stealth.min.js read error: %v", err.Error())
 	} else {
 		log.Info("stealth.min.js load done!")
 	}
+	starter.baseConfig.startWaitGroup.Done()
 running:
 	for {
 		select {

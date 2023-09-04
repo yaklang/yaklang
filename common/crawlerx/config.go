@@ -243,16 +243,16 @@ func WithHeaders(headersInfo map[string]string) ConfigOpt {
 	}
 }
 
-func WithCookieInfo(cookieInfo string) ConfigOpt {
+func WithCookieInfo(domain, cookieInfo string) ConfigOpt {
 	return func(config *Config) {
-		config.baseConfig.cookies = append(config.baseConfig.cookies, cookieRawDataTransfer(cookieInfo)...)
+		config.baseConfig.cookies = append(config.baseConfig.cookies, cookieRawDataTransfer(domain, cookieInfo)...)
 	}
 }
 
-func WithCookies(cookiesInfo map[string]string) ConfigOpt {
+func WithCookies(domain string, cookiesInfo map[string]string) ConfigOpt {
 	return func(config *Config) {
 		for k, v := range cookiesInfo {
-			config.baseConfig.cookies = append(config.baseConfig.cookies, &proto.NetworkCookieParam{Name: k, Value: v})
+			config.baseConfig.cookies = append(config.baseConfig.cookies, &proto.NetworkCookieParam{Name: k, Value: v, Domain: domain})
 		}
 	}
 }
