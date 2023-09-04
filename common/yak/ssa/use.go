@@ -36,7 +36,12 @@ func (b *BasicBlock) RemoveUser(u User) { b.user = utils.Remove(b.user, u) }
 
 // ----------- Phi
 func (p *Phi) ReplaceValue(v Value, to Value) {
-	slices.Replace(p.Edge, 0, len(p.Edge), v, to)
+	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
+	if index := slices.Index(p.Edge, v); index != -1 {
+		p.Edge[index] = to
+	} else {
+		panic("phi not use this value")
+	}
 }
 
 func (p *Phi) GetUsers() []User { return p.user }
@@ -125,10 +130,12 @@ func (r *Return) AddValue(v Value)   {}
 
 // ----------- Call
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(c.Args, v); index > -1 {
+	if c.Method == v {
+		c.Method = to
+	} else if index := slices.Index(c.Args, v); index > -1 {
 		c.Args[index] = to
 	} else {
-		panic("return not use this value")
+		panic("call not use this value")
 	}
 }
 
