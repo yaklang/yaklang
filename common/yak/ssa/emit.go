@@ -71,6 +71,20 @@ func (f *FunctionBuilder) EmitJump(to *BasicBlock) *Jump {
 	return j
 }
 
+func (f *FunctionBuilder) EmitLoop(body, exit *BasicBlock, cond Value) *Loop {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	l := NewLoop(f.CurrentBlock, cond)
+	l.Body = body
+	l.Exit = exit
+	f.CurrentBlock.AddSucc(body)
+	f.CurrentBlock.AddSucc(exit)
+	f.emit(l)
+	f.CurrentBlock.finish = true
+	return l
+}
+
 func (f *FunctionBuilder) EmitSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 	if f.CurrentBlock.finish {
 		return nil

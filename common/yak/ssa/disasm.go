@@ -203,6 +203,11 @@ func (i *If) String() string {
 	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
 }
 
+// ----------- Loop
+func (l *Loop) String() string {
+	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.Name, l.Exit.Name)
+}
+
 // ----------- Return
 func (r *Return) String() string {
 	return fmt.Sprintf(

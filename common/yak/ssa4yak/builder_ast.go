@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -205,10 +206,10 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	} else if condition, ok := stmt.ForStmtCond().(*yak.ForStmtCondContext); ok {
 		if first, ok := condition.ForFirstExpr().(*yak.ForFirstExprContext); ok {
 			// first expression is initialization, in enter block
-			loop.BuildFirstExpr(func() {
+			loop.BuildFirstExpr(func() []ssa.Value {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
-				b.ForExpr(first)
-				recoverRange()
+				defer recoverRange()
+				return b.ForExpr(first)
 			})
 		}
 		if expr, ok := condition.Expression().(*yak.ExpressionContext); ok {
@@ -218,12 +219,11 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 
 		if third, ok := condition.ForThirdExpr().(*yak.ForThirdExprContext); ok {
 			// build latch
-			loop.BuildThird(func() {
+			loop.BuildThird(func() []ssa.Value {
 				// build third expression in loop.latch
 				recoverRange := b.SetRange(third.BaseParserRuleContext)
-				b.ForExpr(third)
-				recoverRange()
-
+				defer recoverRange()
+				return b.ForExpr(third)
 			})
 		}
 	}
@@ -252,13 +252,14 @@ type forExpr interface {
 	AssignExpression() yak.IAssignExpressionContext
 }
 
-func (b *astbuilder) ForExpr(stmt forExpr) {
+func (b *astbuilder) ForExpr(stmt forExpr) []ssa.Value {
 	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
-		b.buildAssignExpression(ae)
+		return b.buildAssignExpression(ae)
 	}
 	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		b.buildExpression(e)
+		return []ssa.Value{b.buildExpression(e)}
 	}
+	return nil
 }
 
 //TODO: for range stmt
@@ -430,7 +431,7 @@ type assiglist interface {
 	LeftExpressionList() yak.ILeftExpressionListContext
 }
 
-func (b *astbuilder) AssignList(stmt assiglist) {
+func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
@@ -454,8 +455,8 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 		} else if len(rvalues) == 1 {
 			if len(rvalues) == 0 {
 				// (0) = (1)
-
-				return
+				b.NewError(ssa.Error, TAG, "assign left side is empty")
+				return nil
 			}
 
 			// (n) = (1)
@@ -469,8 +470,8 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 		} else if len(lvalues) == 1 {
 			if len(rvalues) == 0 {
 				// (1) = (0) undefine
-				lvalues[0].Assign(ssa.UnDefineConst, b.FunctionBuilder)
-				return
+				b.NewError(ssa.Error, TAG, "assign right side is empty")
+				return nil
 			}
 			// (1) = (n)
 			// (1) = interface(n)
@@ -480,29 +481,47 @@ func (b *astbuilder) AssignList(stmt assiglist) {
 			// (n) = (m) && n!=m  faltal
 			b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
 		}
+		return lo.Map(lvalues, func(lv ssa.LeftValue, _ int) ssa.Value { return lv.GetValue(b.FunctionBuilder) })
 	}
+	return nil
 }
 
 // assign expression
-func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
+func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	b.AssignList(stmt)
+	if ret := b.AssignList(stmt); ret != nil {
+		return ret
+	}
 
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if lvalue == nil {
+			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			return nil
+		}
 		rvalue := b.EmitArith(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
+		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	} else if stmt.SubSub() != nil { // --
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if lvalue == nil {
+			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			return nil
+		}
 		rvalue := b.EmitArith(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
+		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	}
 
 	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
-		rvalue := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if lvalue == nil {
+			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			return nil
+		}
+		rvalue := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		var opcode ssa.BinaryOpcode
 		switch op.GetText() {
 		case "+=":
@@ -531,7 +550,9 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) {
 		}
 		rvalue = b.EmitArith(opcode, lvalue.GetValue(b.FunctionBuilder), rvalue)
 		lvalue.Assign(rvalue, b.FunctionBuilder)
+		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	}
+	return nil
 }
 
 // declear variable expression
