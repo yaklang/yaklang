@@ -28,18 +28,19 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 	}
 
 	shell := &yakit.WebShell{
-		Url:               req.GetUrl(),
-		Pass:              req.GetPass(),
-		SecretKey:         req.GetSecretKey(),
-		EncryptedMode:     req.GetEncMode(),
-		Charset:           req.GetCharset(),
-		ShellType:         req.GetShellType(),
-		ShellScript:       req.GetShellScript(),
-		Headers:           headers,
-		Tag:               req.GetTag(),
-		Remark:            req.GetRemark(),
-		PayloadScriptName: req.GetPayloadCodecName(),
-		PacketScriptName:  req.GetPacketCodecName(),
+		Url:              req.GetUrl(),
+		Pass:             req.GetPass(),
+		SecretKey:        req.GetSecretKey(),
+		EncryptedMode:    req.GetEncMode(),
+		Charset:          req.GetCharset(),
+		ShellType:        req.GetShellType(),
+		ShellScript:      req.GetShellScript(),
+		Headers:          headers,
+		Tag:              req.GetTag(),
+		Proxy:            req.GetProxy(),
+		Remark:           req.GetRemark(),
+		PayloadCodecName: req.GetPayloadCodecName(),
+		PacketCodecName:  req.GetPacketCodecName(),
 	}
 	webShell, err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
 	if err != nil {
