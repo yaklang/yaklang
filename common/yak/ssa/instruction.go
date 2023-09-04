@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -37,6 +38,14 @@ func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
 		To:            to,
 	}
 	return j
+}
+
+func NewLoop(block *BasicBlock, cond Value) *Loop {
+	l := &Loop{
+		anInstruction: newAnInstuction(block),
+		Cond:          cond,
+	}
+	return l
 }
 
 func NewUndefine(name string, block *BasicBlock) *Undefine {
@@ -140,6 +149,50 @@ func (i *If) AddTrue(t *BasicBlock) {
 func (i *If) AddFalse(f *BasicBlock) {
 	i.False = f
 	i.Block.AddSucc(f)
+}
+
+func (l *Loop) Finish(init, step []Value) {
+
+	// check cond
+	check := func(v Value) bool {
+		if _, ok := v.(*Phi); ok {
+			return true
+		} else {
+			return false
+		}
+	}
+
+	if b, ok := l.Cond.(*BinOp); ok {
+		if b.Op < OpGt || b.Op > OpNotEq {
+			l.NewError(Error, SSATAG, "this condition not compare")
+		}
+		if check(b.X) {
+			l.Key = b.X.(*Phi)
+		} else if check(b.Y) {
+			l.Key = b.Y.(*Phi)
+		} else {
+			l.NewError(Error, SSATAG, "this condition not change")
+		}
+	}
+
+	if l.Key == nil {
+		return
+	}
+	tmp := lo.SliceToMap(l.Key.Edge, func(v Value) (Value, struct{}) { return v, struct{}{} })
+
+	set := func(vs []Value) Value {
+		for _, v := range vs {
+			if _, ok := tmp[v]; ok {
+				return v
+			}
+		}
+		return nil
+	}
+
+	l.Init = set(init)
+	l.Step = set(step)
+
+	fixupUseChain(l)
 }
 
 func (f *Field) GetLastValue() Value {

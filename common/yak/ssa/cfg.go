@@ -52,8 +52,9 @@ type LoopBuilder struct {
 	// block
 	enter *BasicBlock
 
-	buildCondition                    func() Value
-	buildFirst, buildBody, buildThird func()
+	buildCondition         func() Value
+	buildBody              func()
+	buildFirst, buildThird func() []Value
 
 	// b
 	b *FunctionBuilder
@@ -68,7 +69,7 @@ func (b *FunctionBuilder) BuildLoop() *LoopBuilder {
 	}
 }
 
-func (lb *LoopBuilder) BuildFirstExpr(f func()) {
+func (lb *LoopBuilder) BuildFirstExpr(f func() []Value) {
 	lb.buildFirst = f
 }
 
@@ -76,7 +77,7 @@ func (lb *LoopBuilder) BuildCondtion(f func() Value) {
 	lb.buildCondition = f
 }
 
-func (lb *LoopBuilder) BuildThird(f func()) {
+func (lb *LoopBuilder) BuildThird(f func() []Value) {
 	lb.buildThird = f
 }
 
@@ -89,24 +90,29 @@ func (lb *LoopBuilder) Finish() {
 	body := lb.b.NewBasicBlock(LoopBody)
 	exit := lb.b.NewBasicBlock(LoopExit)
 	latch := lb.b.NewBasicBlock(LoopLatch)
+	var loop *Loop
+	var init, step []Value
 	// build first
 	if lb.buildFirst != nil {
 		lb.b.CurrentBlock = lb.enter
-		lb.buildFirst()
+		init = lb.buildFirst()
 	}
 
+	// enter -> header
+	lb.b.CurrentBlock = lb.enter
+	lb.b.EmitJump(header)
+
 	// build condition
+	var condition Value
 	if lb.buildCondition != nil {
-		// enter -> header
-		lb.b.CurrentBlock = lb.enter
-		lb.b.EmitJump(header)
 		// if in header end; to exit or body
 		lb.b.CurrentBlock = header
-		condition := lb.buildCondition()
-		ifssa := lb.b.EmitIf(condition)
-		ifssa.AddFalse(exit)
-		ifssa.AddTrue(body)
+		condition = lb.buildCondition()
+	} else {
+		condition = NewConst(true)
+		lb.b.NewError(Error, SSATAG, "this condition not set!")
 	}
+	loop = lb.b.EmitLoop(body, exit, condition)
 
 	// build body
 	if lb.buildBody != nil {
@@ -114,20 +120,22 @@ func (lb *LoopBuilder) Finish() {
 		lb.b.PushTarget(exit, latch, nil)
 		lb.buildBody()
 		lb.b.PopTarget()
-		// body -> latch
-		lb.b.EmitJump(latch)
 	}
+	// body -> latch
+	lb.b.EmitJump(latch)
 
 	// build latch
 	if lb.buildThird != nil {
 		lb.b.CurrentBlock = latch
-		lb.buildThird()
-		// latch -> header
-		lb.b.EmitJump(header)
+		step = lb.buildThird()
 	}
+	// latch -> header
+	lb.b.EmitJump(header)
 
 	// finish
 	header.Sealed()
+	loop.Finish(init, step)
+
 	rest := lb.b.NewBasicBlock("")
 	lb.b.CurrentBlock = exit
 	// exit -> rest

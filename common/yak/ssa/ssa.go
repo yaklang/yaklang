@@ -343,6 +343,21 @@ var _ Node = (*If)(nil)
 var _ User = (*If)(nil)
 var _ Instruction = (*If)(nil)
 
+// ----------- For
+// for loop
+type Loop struct {
+	anInstruction
+
+	Body, Exit *BasicBlock
+
+	Init, Cond, Step Value
+	Key              *Phi
+}
+
+var _ Node = (*Loop)(nil)
+var _ User = (*Loop)(nil)
+var _ Instruction = (*Loop)(nil)
+
 // ----------- Return
 // The Return instruction returns values and control back to the calling
 // function.
