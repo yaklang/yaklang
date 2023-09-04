@@ -68,21 +68,34 @@ func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequ
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) UpdateWebShellById(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
+func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
+	var headers string
+	if req.GetHeaders() != nil {
+		b, err := json.Marshal(req.GetHeaders())
+		if err != nil {
+			return nil, utils.Errorf("headers marshal error: %v", err)
+		}
+		headers = string(b)
+	}
 	shell := &yakit.WebShell{
-		Url:           req.GetUrl(),
-		Pass:          req.GetPass(),
-		SecretKey:     req.GetSecretKey(),
-		EncryptedMode: req.GetEncMode(),
-		Charset:       req.GetCharset(),
-		ShellType:     req.GetShellType(),
-		ShellScript:   req.GetShellScript(),
-		Tag:           req.GetTag(),
+		Url:              req.GetUrl(),
+		Pass:             req.GetPass(),
+		SecretKey:        req.GetSecretKey(),
+		EncryptedMode:    req.GetEncMode(),
+		Charset:          req.GetCharset(),
+		ShellType:        req.GetShellType(),
+		ShellScript:      req.GetShellScript(),
+		Headers:          headers,
+		Tag:              req.GetTag(),
+		Proxy:            req.GetProxy(),
+		Remark:           req.GetRemark(),
+		PayloadCodecName: req.GetPayloadCodecName(),
+		PacketCodecName:  req.GetPacketCodecName(),
 	}
 	webShell, err := yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
 	if err != nil {
