@@ -160,8 +160,10 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 		if y.passList == nil {
 			y.passList = []string{""}
 		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel() // 在 goroutine 结束时调用 cancel，以确保所有资源都被释放
 
-		err := bruter.StreamBruteContext(context.Background(), y.bruteType, targets, y.userList, y.passList, func(b *bruteutils.BruteItemResult) {
+		err := bruter.StreamBruteContext(ctx, y.bruteType, targets, y.userList, y.passList, func(b *bruteutils.BruteItemResult) {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Error(err)
@@ -169,6 +171,10 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 			}()
 			select {
 			case ch <- b:
+			}
+			// 在爆破成功后调用 cancel，来取消所有其他的 goroutine
+			if b.Ok && y.okToStop {
+				cancel()
 			}
 		})
 		if err != nil {
