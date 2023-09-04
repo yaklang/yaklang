@@ -91,6 +91,24 @@ func (i *If) GetUsers() []User { return nil }
 func (i *If) GetValues() []Value { return []Value{i.Cond} }
 func (i *If) AddValue(v Value)   {}
 
+// ----------- Loop
+func (l *Loop) ReplaceValue(v Value, to Value) {
+	if l.Cond == v {
+		l.Cond = to
+	} else if l.Init == v {
+		l.Init = to
+	} else if l.Step == v {
+		l.Step = to
+	} else {
+		panic("loop not use this value")
+	}
+}
+
+func (l *Loop) GetUsers() []User { return nil }
+
+func (l *Loop) GetValues() []Value { return []Value{l.Cond, l.Step, l.Init} }
+func (l *Loop) AddValue(v Value)   {}
+
 // ----------- Return
 func (r *Return) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(r.Results, v); index > -1 {
