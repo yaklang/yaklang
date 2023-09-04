@@ -164,6 +164,12 @@ func (c Const) String() string {
 	return c.str
 }
 
+// ----------- undefine
+func (u *Undefine) String() string {
+	// return "undefine-" + u.GetVariable()
+	return fmt.Sprintf("%s = undefine-%s", getStr(u), u.GetVariable())
+}
+
 // ----------- Phi
 func (p *Phi) String() string {
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
