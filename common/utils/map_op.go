@@ -97,7 +97,9 @@ func MapGetRawOr(m map[string]interface{}, key string, value interface{}) interf
 func MapGetString(m map[string]interface{}, key string) string {
 	return MapGetStringOr(m, key, "")
 }
-
+func MapGetStringSlice(m map[string]interface{}, key string) []string {
+	return InterfaceToStringSlice(MapGetRaw(m, key))
+}
 func MapGetStringByManyFields(m map[string]interface{}, key ...string) string {
 	if len(key) <= 0 {
 		return ""
