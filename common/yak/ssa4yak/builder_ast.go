@@ -580,7 +580,7 @@ func (b *astbuilder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyConte
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	for _, id := range stmt.AllIdentifier() {
-		b.WriteVariable(id.GetText(), ssa.UnDefineConst)
+		b.WriteVariable(id.GetText(), ssa.NewUndefine("", b.CurrentBlock))
 	}
 }
 
@@ -710,7 +710,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			return b.BuildFreeValue(text)
 		} else {
 			b.NewError(ssa.Error, TAG, "Expression: undefine value %s", s.GetText())
-			return ssa.UnDefineConst
+			return b.EmitUndefine(text)
 		}
 	}
 
@@ -723,10 +723,18 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
-		inter, ok := getValue(0).(*ssa.Interface)
+		value := getValue(0)
+		var inter ssa.User
+		inter, ok := value.(*ssa.Interface)
+		// inter, ok := getValue(0).(*ssa.Interface)
 		if !ok {
 			b.NewError(ssa.Error, TAG, "Expression: need a interface")
-			return nil
+			// return nil
+			if user, ok := value.(ssa.User); ok {
+				inter = user
+			} else {
+				return nil
+			}
 		}
 
 		if id := s.Identifier(); id != nil {
@@ -1159,7 +1167,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		}
 		return ssa.NewConst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
-		return ssa.UnDefineConst
+		return b.EmitUndefine(stmt.GetText())
 	} else if stmt.CharaterLiteral() != nil {
 		lit := stmt.CharaterLiteral().GetText()
 		var s string
@@ -1360,8 +1368,6 @@ func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.
 	for _, e := range exprs {
 		if e, ok := e.(*yak.ExpressionContext); ok {
 			if v := b.buildExpression(e); v != nil && !reflect.ValueOf(v).IsNil() {
-				b := v == nil
-				_ = b
 				values = append(values, v)
 			}
 		}
