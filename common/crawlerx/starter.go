@@ -69,6 +69,9 @@ type BrowserStarter struct {
 	inputElementsExploit func(*rod.Element) error
 	eventElementsExploit func(*rod.Page, string, string) error
 
+	headers []*headers
+	cookies []*proto.NetworkCookieParam
+
 	invalidSuffix []string
 
 	storageSave bool
@@ -76,9 +79,6 @@ type BrowserStarter struct {
 	runtimeID string
 	saveToDB  bool
 	https     bool
-
-	headers []*headers
-	cookies []*proto.NetworkCookieParam
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
