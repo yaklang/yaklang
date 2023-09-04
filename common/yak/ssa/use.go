@@ -13,9 +13,25 @@ func ReplaceValue(v Value, to Value) {
 		to.AddUser(user)
 		v.RemoveUser(user)
 	}
+	// delete user in v.Value
+	if user, ok := v.(User); ok {
+		for _, value := range GetValue(user) {
+			value.RemoveUser(user)
+		}
+	}
 	if iv, ok := v.(InstructionValue); ok {
 		iv.GetParent().ReplaceSymbolTable(iv, to)
 	}
+}
+
+func GetValue(user User) []Value {
+	return lo.Filter(user.GetValues(), func(v Value, _ int) bool {
+		if utils.IsNil(v) {
+			return false
+		} else {
+			return true
+		}
+	})
 }
 
 // ----------- Function
