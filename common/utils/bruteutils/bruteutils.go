@@ -240,6 +240,8 @@ func (b *BruteUtil) run(ctx context.Context) error {
 }
 
 func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	defer func() {
 		go func() {
 			select {
@@ -259,11 +261,11 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 	}()
 
 	var (
-		finishedCount    int32 = 0
-		finished               = utils.NewBool(false)
-		onlyNeedPassword       = utils.NewBool(b.OnlyNeedPassword)
-		eliminatedUsers        = sync.Map{}
-		usedPassword           = sync.Map{}
+		finishedCount int32 = 0
+		//finished               = utils.NewBool(false)
+		onlyNeedPassword = utils.NewBool(b.OnlyNeedPassword)
+		eliminatedUsers  = sync.Map{}
+		usedPassword     = sync.Map{}
 	)
 
 	// 做爆破前的检查，检查目标合理性，如果不合理，马上结束
@@ -281,10 +283,10 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 			return errors.New("context canceled")
 		}
 
-		// 退出爆破
-		if finished.IsSet() {
-			break
-		}
+		//// 退出爆破
+		//if finished.IsSet() {
+		//	break
+		//}
 
 		// 计算子任务要求退出爆破次数
 		if atomic.LoadInt32(&finishedCount) >= int32(b.FinishingThreshold) && b.FinishingThreshold != 0 {
@@ -314,6 +316,11 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 				atomic.AddInt32(&process.count, 1)
 			}()
 
+			// 检查 context 是否已经被取消
+			if err := ctx.Err(); err != nil {
+				return
+			}
+
 			// 废弃的用户名
 			if _, ok := eliminatedUsers.Load(item.Username); ok {
 				// 如果该用户名是被丢弃的，则应该直接不启动该任务的爆破
@@ -332,7 +339,8 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 
 			// 是否遇到了爆破成功的情况？
 			if result.Ok && b.OkToStop {
-				finished.Set()
+				//finished.Set()
+				cancel()
 			}
 
 			// 是否当前结果是完成？
