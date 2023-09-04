@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // --------------- for assign
@@ -21,7 +23,12 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
-	return f.ReadVariable(i.variable)
+	v := f.ReadVariable(i.variable)
+	if utils.IsNil(v) {
+		// v = NewUndefine(i.variable, f.CurrentBlock)
+		v = f.EmitUndefine(i.variable)
+	}
+	return v
 }
 
 func NewIndentifierLV(variable string) *IdentifierLV {
@@ -57,7 +64,7 @@ func (f *Function) ReplaceSymbolTable(v InstructionValue, to Value) {
 	variable := v.GetVariable()
 	// remove
 	if t, ok := f.symbolTable[variable]; ok {
-		f.symbolTable[variable] = remove(t, v)
+		f.symbolTable[variable] = utils.Remove(t, v)
 	}
 	f.WriteSymbolTable(variable, to)
 }

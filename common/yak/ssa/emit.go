@@ -1,12 +1,16 @@
 package ssa
 
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
+
 func fixupUseChain(node Node) {
-	if node == nil {
+	if utils.IsNil(node) {
 		return
 	}
 	if u, ok := node.(User); ok {
 		for _, v := range u.GetValues() {
-			if v != nil {
+			if !utils.IsNil(v) {
 				v.AddUser(u)
 			}
 		}
@@ -14,7 +18,7 @@ func fixupUseChain(node Node) {
 
 	if v, ok := node.(Value); ok {
 		for _, user := range v.GetUsers() {
-			if user != nil {
+			if !utils.IsNil(user) {
 				user.AddValue(v)
 			}
 		}
