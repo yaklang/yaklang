@@ -1,9 +1,13 @@
 package rule
 
 import (
+	"encoding/binary"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
+	"math/big"
+	"math/rand"
+	"net/netip"
 	"strings"
 )
 
@@ -42,25 +46,15 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 		}
 	}
 
-	if len(a.SubRules) > 0 {
-		if len(a.negativeRules) <= 0 && len(a.positiveRules) <= 0 {
-			for _, n := range a.SubRules {
-				if n.Negative {
-					a.negativeRules = append(a.negativeRules, n)
-				} else {
-					a.positiveRules = append(a.positiveRules, n)
-				}
-			}
+	for _, n := range a.negativeRules {
+		if !n.Match(i) {
+			return false
 		}
-		for _, n := range a.negativeRules {
-			if !n.Match(i) {
-				return false
-			}
-		}
-		for _, n := range a.positiveRules {
-			if n.Match(i) {
-				return true
-			}
+	}
+
+	for _, n := range a.positiveRules {
+		if n.Match(i) {
+			return true
 		}
 	}
 
@@ -86,6 +80,19 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 	return false
 }
 
+func (a *AddressRule) parseSubRules() {
+	if len(a.SubRules) <= 0 || len(a.negativeRules) > 0 || len(a.positiveRules) > 0 {
+		return
+	}
+	for _, n := range a.SubRules {
+		if n.Negative {
+			a.negativeRules = append(a.negativeRules, n)
+		} else {
+			a.positiveRules = append(a.positiveRules, n)
+		}
+	}
+}
+
 func (a *AddressRule) Match(i string) bool {
 	if a == nil {
 		return false
@@ -97,12 +104,82 @@ func (a *AddressRule) Match(i string) bool {
 	return a._matchWithoutNegative(i)
 }
 
+// Generate is not uniform distribution
+// also, linklocal addr, multicast addr, loopback addr, etc. are not escaped
 func (a *AddressRule) Generate() string {
-	// todo: implement it!
-	if a.Env == "HOME_NET" {
-		return utils.GetLocalIPAddress()
+	if a == nil || a.Any {
+		return utils.GetRandomIPAddress()
 	}
-	return "123.123.123.123"
+
+	if a.Env != "" && a.envtable != nil {
+		raw, _ := a.envtable[a.Env]
+		if raw != "" {
+			return raw
+		}
+	}
+
+	if a.Negative {
+		rdip := utils.GetRandomIPAddress()
+		for count := 10; a.Match(rdip) && count > 0; count-- {
+			rdip = utils.GetRandomIPAddress()
+		}
+		return rdip
+	}
+
+	if a.IPv4CIDR != "" {
+		cidr, err := netip.ParsePrefix(a.IPv4CIDR)
+		if err != nil {
+			log.Warnf("parse cidr (%s) failed: %v", a.IPv4CIDR, err)
+			return utils.GetRandomLocalAddr()
+		}
+		cidr = cidr.Masked()
+		var genip [4]byte
+		binary.BigEndian.PutUint32(genip[:], binary.BigEndian.Uint32(cidr.Addr().AsSlice())+uint32(rand.Intn(1<<(32-cidr.Bits()))))
+		return netip.AddrFrom4(genip).String()
+	}
+
+	if a.IPv6CIDR != "" {
+		cidr, err := netip.ParsePrefix(a.IPv6CIDR)
+		if err != nil {
+			log.Warnf("parse cidr (%s) failed: %v", a.IPv6CIDR, err)
+			return utils.GetRandomLocalAddr()
+		}
+		cidr = cidr.Masked()
+		var genip [16]byte
+		bn := big.NewInt(0).SetBytes(genip[:])
+		add := big.NewInt(0).Rand(rand.New(rand.NewSource(rand.Int63())), big.NewInt(1).Lsh(big.NewInt(1), 128-uint(cidr.Bits())))
+		bn.Add(bn, add)
+		ip, ok := netip.AddrFromSlice(bn.Bytes())
+		if !ok {
+			log.Warnf("generate ipv6 failed: %v", err)
+			return utils.GetRandomLocalAddr()
+		}
+		return ip.String()
+	}
+
+	if len(a.positiveRules) == 0 && len(a.negativeRules) == 0 {
+		return utils.GetRandomLocalAddr()
+	}
+
+	var genip string
+	retry := 10
+retry:
+	retry--
+	if len(a.positiveRules) != 0 {
+		genip = a.positiveRules[rand.Intn(len(a.positiveRules))].Generate()
+	} else {
+		genip = utils.GetRandomIPAddress()
+	}
+	if retry <= 0 {
+		return genip
+	}
+
+	for _, v := range a.negativeRules {
+		if v.Match(genip) {
+			goto retry
+		}
+	}
+	return genip
 }
 
 func (v *RuleSyntaxVisitor) VisitSrcAddress(i *parser.Src_addressContext) *AddressRule {
@@ -113,11 +190,16 @@ func (v *RuleSyntaxVisitor) VisitDstAddress(i *parser.Dest_addressContext) *Addr
 	return v.VisitAddress(i.Address().(*parser.AddressContext))
 }
 
-func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) *AddressRule {
+func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *AddressRule) {
 	if i == nil {
 		return nil
 	}
-	addr := &AddressRule{envtable: v.Environment}
+	addr = &AddressRule{envtable: v.Environment}
+	defer func() {
+		if addr != nil {
+			addr.parseSubRules()
+		}
+	}()
 	if i.Any() != nil {
 		addr.Any = true
 		return addr

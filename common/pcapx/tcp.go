@@ -3,6 +3,7 @@ package pcapx
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -199,4 +200,154 @@ func CreateTCPHandshakePackets(src, dst string, payload []byte) (
 			IP:       ipTo,
 			TCP:      finACK,
 		}, nil
+}
+
+func CompleteTCPFlow(raw []byte) ([][]byte, error) {
+	flows := make([][]byte, 0, 3)
+
+	pk := gopacket.NewPacket(raw, layers.LayerTypeEthernet, gopacket.Default)
+	if pk == nil {
+		return nil, fmt.Errorf("cannot parse packet")
+	}
+
+	linkLy, ok := pk.LinkLayer().(*layers.Ethernet)
+	if !ok || linkLy == nil {
+		return nil, fmt.Errorf("cannot parse link layer")
+	}
+
+	networkLy, ok := pk.NetworkLayer().(*layers.IPv4)
+	if !ok || networkLy == nil {
+		return nil, fmt.Errorf("cannot parse network layer")
+	}
+
+	tcpLy, ok := pk.TransportLayer().(*layers.TCP)
+	if !ok || tcpLy == nil {
+		return nil, fmt.Errorf("cannot parse tcp layer")
+	}
+
+	if tcpLy.SYN || tcpLy.FIN {
+		return [][]byte{raw}, nil
+	}
+
+	// 1 SYN ->
+	synTCP := &layers.TCP{
+		SrcPort: tcpLy.SrcPort,
+		DstPort: tcpLy.DstPort,
+		Seq:     tcpLy.Seq - 1,
+		SYN:     true,
+		Window:  tcpLy.Window,
+		Options: []layers.TCPOption{
+			{
+				OptionType:   layers.TCPOptionKindMSS,
+				OptionLength: 0x04,
+				OptionData:   []byte{0x05, 120},
+			}, {
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionData:   []byte{0x09},
+				OptionLength: 0x03,
+			},
+			{
+				OptionType: layers.TCPOptionKindSACKPermitted,
+			},
+		},
+	}
+
+	_ = synTCP.SetNetworkLayerForChecksum(networkLy)
+	pkt, err := seriGopkt(linkLy, networkLy, synTCP)
+	if err != nil {
+		return nil, err
+	}
+	flows = append(flows, pkt)
+
+	// 2 SYN ACK <-
+	ipre := &layers.IPv4{
+		Version:  4,
+		Protocol: layers.IPProtocolTCP,
+		SrcIP:    networkLy.DstIP,
+		DstIP:    networkLy.SrcIP,
+		TTL:      networkLy.TTL,
+	}
+	synAckTCP := &layers.TCP{
+		SrcPort: tcpLy.DstPort,
+		DstPort: tcpLy.SrcPort,
+		Seq:     tcpLy.Ack - 1,
+		Ack:     tcpLy.Seq,
+		SYN:     true,
+		ACK:     true,
+		Window:  tcpLy.Window,
+		Options: []layers.TCPOption{
+			{
+				OptionType:   layers.TCPOptionKindMSS,
+				OptionLength: 0x04,
+				OptionData:   []byte{0x05, 120},
+			}, {
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionData:   []byte{0x09},
+				OptionLength: 0x03,
+			},
+			{
+				OptionType: layers.TCPOptionKindSACKPermitted,
+			},
+		},
+	}
+
+	_ = synAckTCP.SetNetworkLayerForChecksum(ipre)
+	pkt, err = seriGopkt(linkLy, ipre, synAckTCP)
+	if err != nil {
+		return nil, err
+	}
+	flows = append(flows, pkt)
+
+	// 3 ACK ->
+	ackTCP := &layers.TCP{
+		SrcPort: tcpLy.SrcPort,
+		DstPort: tcpLy.DstPort,
+		Ack:     tcpLy.Ack,
+		ACK:     true,
+		Seq:     tcpLy.Seq,
+		Window:  tcpLy.Window,
+		Options: []layers.TCPOption{
+			{
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionData:   []byte{0x09},
+				OptionLength: 0x03,
+			},
+		},
+	}
+
+	_ = ackTCP.SetNetworkLayerForChecksum(networkLy)
+	pkt, err = seriGopkt(linkLy, networkLy, ackTCP)
+	if err != nil {
+		return nil, err
+	}
+	flows = append(flows, pkt)
+
+	// 3 sending payload ->
+	_ = tcpLy.SetNetworkLayerForChecksum(networkLy)
+	syn2 := &layers.TCP{
+		SrcPort: tcpLy.SrcPort,
+		DstPort: tcpLy.DstPort,
+		Seq:     tcpLy.Seq,
+		Ack:     tcpLy.Ack,
+		FIN:     tcpLy.FIN,
+		SYN:     false,
+		RST:     tcpLy.RST,
+		PSH:     tcpLy.PSH,
+		ACK:     tcpLy.ACK,
+		URG:     tcpLy.URG,
+		ECE:     tcpLy.ECE,
+		CWR:     tcpLy.CWR,
+		NS:      tcpLy.NS,
+		Window:  tcpLy.Window,
+		Urgent:  tcpLy.Urgent,
+		Options: tcpLy.Options,
+	}
+	_ = syn2.SetNetworkLayerForChecksum(networkLy)
+	pkt, err = seriGopkt(linkLy, networkLy, syn2, gopacket.Payload(tcpLy.Payload))
+	if err != nil {
+		return nil, err
+	}
+	flows = append(flows, pkt)
+
+	return flows, nil
 }

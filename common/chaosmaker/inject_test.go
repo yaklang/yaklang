@@ -24,7 +24,7 @@ func TestChaosRules(t *testing.T) {
 		mk := NewChaosMaker()
 		mk.FeedRule(i)
 		for traffic := range mk.Generate() {
-			pcapx.InjectChaosTraffic(traffic)
+			pcapx.InjectRaw(traffic)
 		}
 	}
 }
@@ -75,7 +75,7 @@ func TestDebugChaosRules(t *testing.T) {
 		mk := NewChaosMaker()
 		mk.FeedRule(fRule...)
 		for traffic := range mk.Generate() {
-			pcapx.InjectChaosTraffic(traffic)
+			pcapx.InjectRaw(traffic)
 		}
 	}
 

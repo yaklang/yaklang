@@ -3,7 +3,6 @@ package chaosmaker
 import (
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/generate"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,24 +20,24 @@ type dnsHandler struct {
 
 var _ chaosHandler = (*dnsHandler)(nil)
 
-func (h *dnsHandler) Generator(maker *ChaosMaker, makerRule *rule.Storage, rule *surirule.Rule) chan *pcapx.ChaosTraffic {
-	if rule == nil {
+func (h *dnsHandler) Generator(maker *ChaosMaker, chaosRule *rule.Storage, originRule *surirule.Rule) chan []byte {
+	if originRule == nil {
 		return nil
 	}
 
-	if rule.Protocol != "dns" {
+	if originRule.Protocol != "dns" {
 		return nil
 	}
 
 	count := h.GenCountPerRule
-	if rule.ContentRuleConfig != nil && rule.ContentRuleConfig.Thresholding != nil {
-		count = utils.Max(h.GenCountPerRule, rule.ContentRuleConfig.Thresholding.Count)
+	if originRule.ContentRuleConfig != nil && originRule.ContentRuleConfig.Thresholding != nil {
+		count = utils.Max(h.GenCountPerRule, originRule.ContentRuleConfig.Thresholding.Count)
 	}
 
-	ch := make(chan *pcapx.ChaosTraffic)
+	ch := make(chan []byte)
 	go (&dnsGenerator{
-		chaosRule:  makerRule,
-		originRule: rule,
+		chaosRule:  chaosRule,
+		originRule: originRule,
 		maker:      maker,
 		out:        ch,
 	}).generator(count)
@@ -50,7 +49,7 @@ type dnsGenerator struct {
 	chaosRule  *rule.Storage
 	originRule *surirule.Rule
 	maker      *ChaosMaker
-	out        chan *pcapx.ChaosTraffic
+	out        chan []byte
 }
 
 func (g *dnsGenerator) generator(count int) {
@@ -63,13 +62,11 @@ func (g *dnsGenerator) generator(count int) {
 	}
 
 	for i := 0; i < count; i++ {
-		g.toChaosTraffic(surigen.Gen())
-	}
-}
-
-func (g *dnsGenerator) toChaosTraffic(raw []byte) {
-	g.out <- &pcapx.ChaosTraffic{
-		UDPIPInboundPayload: raw,
+		raw := surigen.Gen()
+		if raw == nil {
+			return
+		}
+		g.out <- raw
 	}
 }
 
