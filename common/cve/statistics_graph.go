@@ -256,7 +256,7 @@ func (s *Statistics) ToGraphs() []*Graph {
 	graphs = append(graphs, g)
 
 	// 严重程度
-	pairs = []*KVPair{}
+	/*pairs = []*KVPair{}
 	for key, count := range s.SeverityCounter {
 		pairs = append(pairs, &KVPair{
 			Key:        key,
@@ -276,7 +276,7 @@ func (s *Statistics) ToGraphs() []*Graph {
 		Data:            pairs,
 		ComplexityGroup: strings.Join([]string{"严重", "高危", "中危", "低危"}, ","),
 	}
-	graphs = append(graphs, g)
+	graphs = append(graphs, g)*/
 
 	// Years
 	pairs = []*KVPair{}
