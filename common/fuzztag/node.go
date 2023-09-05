@@ -12,6 +12,8 @@ import (
 	"sync"
 )
 
+const YakHotPatchErr = "__YakHotPatchErr@"
+
 type ExecutableNode interface {
 	ToBytes() []byte
 	Execute(map[string]func([]byte) [][]byte) [][]byte
@@ -124,7 +126,11 @@ func (d *DataGenerator) generateBytes(callback func([]byte, [][]byte) bool) [][]
 				for _, i := range ret {
 					if index < len(i.data) {
 						ok = true
-						newPartData[i.pos] = i.data[index]
+						if bytes.HasPrefix(i.data[index], []byte(YakHotPatchErr)) {
+							newPartData[i.pos] = []byte("")
+						} else {
+							newPartData[i.pos] = i.data[index]
+						}
 						newPayloads = append(newPayloads, i.data[index])
 						if payload, ok := d.payloads[string(i.data[index])]; ok {
 							newPayloads = append(newPayloads, payload...)
