@@ -460,22 +460,45 @@ a = undefinePkg.undefineFied
 a = undefinePkg.undefineFunc(a); 
 b = undefineFunc2("bb")
 print(b)
+for i=0; i<10; i++ {
+	print(i)
+	undefineFuncInLoop(i)
+}
+e = 11 + a
 `
 		ir := `
 yak-main
 entry0: (<boolean> true)
-		<> t0 = undefine-c
-		<> t1 = undefine-print
-		<> t2 = call <> t1 (<> t0) []
-		<> t3 = call <> t1 (<> t0) []
-		<> t4 = undefine-undefinePkg
-		<> t5 = <> t4 field[<string> undefineFied]
-		<> t6 = <> t4 field[<string> undefineFunc]
-		<> t7 = call <> t6 (<> t5) []
-		<> t8 = undefine-undefineFunc2
-		<> t9 = call <> t8 (<string> bb) []
-		<> t10 = call <> t1 (<> t9) []
-		`
+	<> t0 = undefine-c
+	<> t1 = undefine-print
+	<> t2 = call <> t1 (<> t0) []
+	<> t3 = call <> t1 (<> t0) []
+	<> t4 = undefine-undefinePkg
+	<> t5 = <> t4 field[<string> undefineFied]
+	<> t6 = <> t4 field[<string> undefineFunc]
+	<> t7 = call <> t6 (<> t5) []
+	<> t8 = undefine-undefineFunc2
+	<> t9 = call <> t8 (<string> bb) []
+	<> t10 = call <> t1 (<> t9) []
+	jump -> loop.header1
+loop.header1: <- entry0 loop.latch4  (<boolean> true)
+	<> t19 = phi [<number> 0, entry0] [<> t17, loop.latch4]
+	<> t12 = <> t19 lt <number> 10
+	<> t20 = undefine-undefineFuncInLoop
+	<> t23 = not <> t12
+	Loop [<number> 0; <> t12; <> t17] body -> loop.body2, exit -> loop.exit3
+loop.body2: <- loop.header1  (<> t12)
+	<> t14 = call <> t1 (<> t19) []
+	<> t15 = call <> t20 (<> t19) []
+	jump -> loop.latch4
+loop.exit3: <- loop.header1  (<> t23)
+	jump -> b5
+loop.latch4: <- loop.body2  (<> t12)
+	<> t17 = <> t19 add <number> 1
+	jump -> loop.header1
+b5: <- loop.exit3  (<> t23)
+	<> t22 = <number> 11 add <> t7
+	`
 		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
