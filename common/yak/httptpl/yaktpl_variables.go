@@ -29,9 +29,6 @@ func (v *YakVariables) Set(key string, value string) {
 }
 
 func (v *YakVariables) SetAsNucleiTags(key string, value string) {
-	if !strings.HasPrefix(value, "{{") {
-		value = "{{" + value + "}}"
-	}
 	v.raw[key] = &Var{
 		Type: "nuclei-dsl",
 		Tags: ParseNucleiTag(value),
