@@ -43,6 +43,7 @@ var ProjectTables = []interface{}{
 	// rss
 	&Briefing{}, &RssFeed{},
 	// &assets.SubscriptionSource{},
+	&AliveHost{},
 }
 
 func UserDataAndPluginDatabaseScope(db *gorm.DB) *gorm.DB {

@@ -185,6 +185,8 @@ func initYaklangLib() {
 	yaklang.Import("report", yakit.ReportExports)
 	yaklang.Import("dnslog", yaklib.DNSLogExports)
 
+	yaklang.Import("aliveHost", yaklib.AliveHostExports)
+
 	// xpath for html
 	yaklang.Import("xpath", htmlquery.Exports)
 

@@ -724,6 +724,7 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 		err := client.UploadRiskToOnlineWithToken(ctx, req.Token, k)
 		if err != nil {
 			log.Errorf("uploadRiskToOnline failed: %s", err)
+			return &ypb.Empty{}, nil
 		} else {
 			hash = append(hash, k.Hash)
 		}
