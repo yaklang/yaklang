@@ -1,4 +1,4 @@
-package main
+package yakcmds
 
 import (
 	"github.com/urfave/cli"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var pcapCommand = cli.Command{
+var PcapCommand = cli.Command{
 	Name:  "pcap",
 	Usage: "抓包并使用规则过滤",
 	Flags: []cli.Flag{
