@@ -143,7 +143,11 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 
 func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
-		p.Build()
+		if v := p.Build(); v == nil {
+			undefine := NewUndefine(p.GetVariable(), p.Block)
+			EmitBefore(p.Block.LastInst(), undefine)
+			p.Replace(undefine)
+		}
 	}
 	b.inCompletePhi = nil
 	b.isSealed = true

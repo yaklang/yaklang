@@ -60,20 +60,24 @@ func (phi *Phi) tryRemoveTrivialPhi() Value {
 	if w1 == nil {
 		if w2 == nil {
 			ret = nil
+		} else {
+			ret = w2
 		}
-		ret = w2
-	}
-	if w2 == nil {
+	} else if w2 == nil {
 		ret = w1
 	}
 	if ret != nil && ret != phi {
-		ReplaceValue(phi, ret)
-		for _, user := range phi.GetUsers() {
-			switch p := user.(type) {
-			case *Phi:
-				p.tryRemoveTrivialPhi()
-			}
-		}
+		phi.Replace(ret)
 	}
 	return ret
+}
+
+func (phi *Phi) Replace(to Value) {
+	ReplaceValue(phi, to)
+	for _, user := range phi.GetUsers() {
+		switch p := user.(type) {
+		case *Phi:
+			p.tryRemoveTrivialPhi()
+		}
+	}
 }
