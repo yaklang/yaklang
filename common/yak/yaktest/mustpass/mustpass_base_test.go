@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "mitm_lib_hijack.yak"
+	var debugName = "plugin_inherit_proxy.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

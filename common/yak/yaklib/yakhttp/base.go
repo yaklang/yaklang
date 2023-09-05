@@ -294,7 +294,7 @@ func PostParams(i interface{}) HttpOption {
 }
 
 func Do(req *YakHttpRequest) (*http.Response, error) {
-	if req.proxies != nil && netx.GetProxyFromEnv() != "" {
+	if req.proxies == nil && netx.GetProxyFromEnv() != "" {
 		YakHttpConfig_Proxy(netx.GetProxyFromEnv())(req)
 	}
 

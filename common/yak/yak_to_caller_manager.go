@@ -495,10 +495,10 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	proxy = pluginContext.Proxy
 
 	// inject meta vars
-	for _, i := range []string{
+	for _, method := range []string{
 		"Get", "Post",
 	} {
-		nIns.GetVM().RegisterMapMemberCallHandler("http", i, func(i interface{}) interface{} {
+		nIns.GetVM().RegisterMapMemberCallHandler("http", method, func(i interface{}) interface{} {
 			if proxy == "" {
 				return i
 			}
