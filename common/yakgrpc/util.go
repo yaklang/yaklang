@@ -123,20 +123,31 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 	return params, callback, nil
 }
 
-type YamlMapBuilder yaml.MapSlice
+type YamlMapBuilder struct {
+	keySet       map[string]struct{} // 去重，如果存在多个相同的key，只保留第一个
+	slice        *yaml.MapSlice
+	defaultField map[string]any // field的默认值，如果新增字段是默认值，则跳过
+}
 type YamlArrayBuilder struct {
 	slice *[]*yaml.MapSlice
 }
 
+func (a *YamlMapBuilder) SetDefaultField(fieldMap map[string]any) {
+	a.defaultField = fieldMap
+}
 func (a *YamlArrayBuilder) Add(slice *YamlMapBuilder) {
-	*a.slice = append(*a.slice, (*yaml.MapSlice)(slice))
+	*a.slice = append(*a.slice, slice.slice)
 }
 func NewYamlMapBuilder() *YamlMapBuilder {
-	return &YamlMapBuilder{}
+	return &YamlMapBuilder{
+		keySet:       make(map[string]struct{}),
+		defaultField: make(map[string]any),
+		slice:        &yaml.MapSlice{},
+	}
 }
 func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	var res yaml.MapSlice
-	for _, item := range *m {
+	for _, item := range *m.slice {
 		switch ret := item.Value.(type) {
 		case *YamlMapBuilder:
 			item.Value = ret.FilterEmptyField()
@@ -149,7 +160,7 @@ func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 				continue
 			}
 			for i, slice := range *ret {
-				(*ret)[i] = (*YamlMapBuilder)(slice).FilterEmptyField()
+				(*ret)[i] = (&YamlMapBuilder{slice: slice}).FilterEmptyField()
 			}
 		}
 		if reflect.TypeOf(item.Value).Kind() == reflect.Array || reflect.TypeOf(item.Value).Kind() == reflect.Slice {
@@ -165,7 +176,18 @@ func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	return &res
 }
 func (m *YamlMapBuilder) Set(k string, v any) {
-	*m = append(*m, yaml.MapItem{
+	if _, ok := m.keySet[k]; ok {
+		return
+	}
+	if m.defaultField != nil {
+		if v2, ok := m.defaultField[k]; ok {
+			if v == v2 {
+				return
+			}
+		}
+	}
+	m.keySet[k] = struct{}{}
+	*m.slice = append(*m.slice, yaml.MapItem{
 		Key:   k,
 		Value: v,
 	})
