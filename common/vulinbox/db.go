@@ -1,15 +1,38 @@
 package vulinbox
 
 import (
+	"database/sql"
+	"fmt"
 	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type dbm struct {
 	db *gorm.DB
+}
+
+func init() {
+	sql.Register("sqlite3ex", &sqlite3.SQLiteDriver{
+		ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+			conn.RegisterUpdateHook(func(op int, db string, table string, rowid int64) {})
+			var err error
+			err = conn.RegisterFunc("md5", func(s any) any {
+				return codec.Md5(s)
+			}, true)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	})
+	dialect, ok := gorm.GetDialect("sqlite3")
+	if ok {
+		gorm.RegisterDialect("sqlite3ex", dialect)
+	}
 }
 
 func newDBM() (*dbm, error) {
@@ -20,10 +43,20 @@ func newDBM() (*dbm, error) {
 	name := fp.Name()
 	log.Infof("db file: %s", name)
 	fp.Close()
-	db, err := gorm.Open("sqlite3", name)
+	db, err := gorm.Open("sqlite3ex", name)
 	if err != nil {
 		return nil, err
 	}
+
+	var i any
+	if err := db.Raw("select md5('a')").Row().Scan(&i); err != nil {
+		return nil, utils.Errorf("sqlite3 md5 function register failed: %v", err)
+	}
+	if fmt.Sprint(i) != codec.Md5("a") {
+		return nil, utils.Errorf("sqlite3 md5 function register failed: %v", i)
+	}
+	log.Infof("verify md5 function is called: %v", i)
+
 	db.AutoMigrate(&VulinUser{})
 	db.AutoMigrate(&Session{})
 	db.Save(&VulinUser{

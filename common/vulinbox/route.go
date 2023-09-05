@@ -298,7 +298,9 @@ func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
-	log.Infof("register: %v to route", info.Title)
+	if info.Title != "" {
+		log.Infof("register: %v to route", info.Title)
+	}
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 }
 

@@ -209,7 +209,7 @@ func DeCompressFromRaw(raw []byte, dest string) error {
 			return err
 		}
 
-		log.Infof("start to unzip: %s", file.Name)
+		log.Debugf("start to unzip: %s", file.Name)
 
 		w, err := os.Create(filename)
 		if err != nil {

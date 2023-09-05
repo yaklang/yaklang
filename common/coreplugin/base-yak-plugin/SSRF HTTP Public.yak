@@ -82,7 +82,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
             yakit_output("请求[%v]失败: %v" % [result.Url, result.Error])
         } else {
             target = str.ParseStringUrlToWebsiteRootPath(result.Url)
-            if risk.CheckDNSLogByToken(token) {
+            if risk.CheckDNSLogByToken(token)[1] == nil {
                 dnslogRiskTitle = "目标路径 %s 的 %s 参数收到 Dnslog 回显，可能存在SSRF漏洞" % [result.Url,paramName]
                 yakit_output(dnslogRiskTitle)
                 haveHttpReverse = false
