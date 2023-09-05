@@ -123,12 +123,13 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch3ErrCheck(t *testing.T) {
 		return
 	})
 	target := utils.HostPort(host, port)
-	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle|1)}}{{yak(errFunc)}}",
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(100), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle|1)}}{{yak(errFunc)}}{{yak(handle1)}}",
 		HotPatchCode: `
 handle = func(i){
     return i
 }
+handle1 = s => {die("expected panic")}
 `,
 		ForceFuzz: true,
 	})
@@ -148,10 +149,13 @@ handle = func(i){
 		if payloads[1] == "["+fuzztag.YakHotPatchErr+"function errFunc not found]" {
 			count++
 		}
+		if payloads[2] == "["+fuzztag.YakHotPatchErr+"expected panic]" {
+			count++
+		}
 		fmt.Println(string(rsp.RequestRaw))
 		fmt.Println(string(rsp.ResponseRaw))
 	}
-	if count != 2 {
-		t.Fatalf("expect 2, got %v", count)
+	if count != 3 {
+		t.Fatalf("expect 3, got %v", count)
 	}
 }
