@@ -152,6 +152,7 @@ func (c *Capturer) packetHandler(ctx context.Context, packet gopacket.Packet) {
 		}
 	}()
 
+	save := true
 	var ts time.Time
 	if packet.Metadata() != nil {
 		ts = packet.Metadata().Timestamp
@@ -160,16 +161,19 @@ func (c *Capturer) packetHandler(ctx context.Context, packet gopacket.Packet) {
 	}
 
 	// todo: suricata group matcher
+	var matched bool
 	for _, filter := range c.SuricataFilters {
 		if filter.Matcher.Match(packet.Data()) {
 			fmt.Printf("[%s] Alert %s\n", ts.String(), filter.Rule.Message)
 			fmt.Println(packet.String())
-			c.Save(packet)
+			matched = true
 			break
 		}
 	}
+	if len(c.SuricataFilters) != 0 && !matched {
+		save = false
+	}
 
-	// clear it?
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk || ret == nil {
 		return
@@ -183,10 +187,13 @@ func (c *Capturer) packetHandler(ctx context.Context, packet gopacket.Packet) {
 		log.Warnf("unknown network layer: %v", packet.NetworkLayer())
 	}
 
-	if c.Debug {
+	if c.Debug && !matched {
 		fmt.Println(packet.String())
 	}
 
+	if save {
+		c.Save(packet)
+	}
 }
 
 func NewDefaultConfig() *Capturer {
@@ -210,6 +217,9 @@ func _open(ctx context.Context, handler *pcap.Handle, bpf string, packetEntry fu
 		case <-ctx.Done():
 			return nil
 		case packet := <-packetSource.Packets():
+			if packet == nil {
+				return nil
+			}
 			if packetEntry != nil {
 				packetEntry(innerCtx, packet)
 			} else {
@@ -227,14 +237,35 @@ func Start(opt ...CaptureOption) error {
 		}
 	}
 
-	var devs []string
-	if len(conf.Device) == 0 {
+	var handlers []*pcap.Handle
+	if conf.Filename != "" {
+		handler, err := OpenFile(conf.Filename)
+		if err != nil {
+			log.Errorf("open file (%v) failed: %s", conf.Filename, err)
+		} else {
+			handlers = append(handlers, handler)
+		}
+	} else if len(conf.Device) == 0 {
 		var ifs, err = pcap.FindAllDevs()
 		if err != nil {
 			return utils.Errorf("(pcap) find all devs failed: %s", err)
 		}
+
+		if len(ifs) > 128 {
+			return utils.Errorf("too many devices: %d", len(ifs))
+		}
+
+		if len(ifs) == 0 {
+			return utils.Errorf("no pcap devices found")
+		}
+
 		for _, iface := range ifs {
-			devs = append(devs, iface.Name)
+			handler, err := OpenIfaceLive(iface.Name)
+			if err != nil {
+				log.Errorf("open device (%v) failed: %s", iface.Name, err)
+				continue
+			}
+			handlers = append(handlers, handler)
 		}
 	} else {
 		for _, i := range conf.Device {
@@ -243,15 +274,13 @@ func Start(opt ...CaptureOption) error {
 				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
 				pcapIface = i
 			}
-			devs = append(devs, pcapIface)
+			handler, err := OpenIfaceLive(pcapIface)
+			if err != nil {
+				log.Errorf("open device (%v) failed: %s", pcapIface, err)
+				continue
+			}
+			handlers = append(handlers, handler)
 		}
-	}
-
-	// TODO: check devs length, 128 is enough...
-	if len(devs) > 128 {
-		return utils.Errorf("too many devices: %d", len(devs))
-	} else if len(devs) == 0 {
-		return utils.Errorf("no pcap devices found")
 	}
 
 	if conf.Context == nil {
@@ -266,25 +295,6 @@ func Start(opt ...CaptureOption) error {
 	//assembler := tcpassembly.NewAssembler(streamPool)
 	// conf.Assembler = assembler
 	conf.trafficPool = NewTrafficPool(ctx)
-
-	var handlers []*pcap.Handle
-	for _, i := range devs {
-		handler, err := OpenIfaceLive(i)
-		if err != nil {
-			log.Errorf("open device (%v) failed: %s", i, err)
-			continue
-		}
-		handlers = append(handlers, handler)
-	}
-
-	if conf.Filename != "" {
-		handler, err := OpenFile(conf.Filename)
-		if err != nil {
-			log.Errorf("open file (%v) failed: %s", conf.Filename, err)
-		} else {
-			handlers = append(handlers, handler)
-		}
-	}
 
 	utils.WaitRoutinesFromSlice(handlers, func(handler *pcap.Handle) {
 		if err := _open(ctx, handler, "", conf.packetHandler); err != nil {

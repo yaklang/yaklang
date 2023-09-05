@@ -1192,6 +1192,8 @@ func main() {
 		cveCommand,
 		translatingCommand,
 
+		pcapCommand,
+
 		// chaosmaker
 		{
 			Name: "import-chaosmaker-json",

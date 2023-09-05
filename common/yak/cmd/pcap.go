@@ -1,6 +1,10 @@
 package main
 
-import "github.com/urfave/cli"
+import (
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"strings"
+)
 
 var pcapCommand = cli.Command{
 	Name:  "pcap",
@@ -8,7 +12,7 @@ var pcapCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "device",
-			Usage: "网卡",
+			Usage: "网卡（可选多个,使用逗号分隔）",
 		},
 		cli.StringFlag{
 			Name:  "input",
@@ -28,6 +32,22 @@ var pcapCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		return nil
+		var opts []pcaputil.CaptureOption
+		if c.Bool("v") {
+			opts = append(opts, pcaputil.WithDebug(true))
+		}
+		if device := c.String("device"); device != "" {
+			opts = append(opts, pcaputil.WithDevice(strings.Split(device, ",")...))
+		}
+		if input := c.String("input"); input != "" {
+			opts = append(opts, pcaputil.WithFile(input))
+		}
+		if output := c.String("output"); output != "" {
+			opts = append(opts, pcaputil.WithOutput(output))
+		}
+		if suricata := c.String("suricata"); suricata != "" {
+			opts = append(opts, pcaputil.WithSuricataFilter(suricata))
+		}
+		return pcaputil.Start(opts...)
 	},
 }
