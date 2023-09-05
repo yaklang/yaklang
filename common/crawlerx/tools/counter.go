@@ -3,7 +3,6 @@
 package tools
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
 )
@@ -34,7 +33,6 @@ func (c *Counter) Add() bool {
 		return false
 	}
 	c.currentNumber += 1
-	log.Infof(`after counter add: %d`, c.currentNumber)
 	return true
 }
 
@@ -45,7 +43,6 @@ func (c *Counter) Minus() bool {
 		return false
 	}
 	c.currentNumber -= 1
-	log.Infof(`after counter minus: %d`, c.currentNumber)
 	return true
 }
 
