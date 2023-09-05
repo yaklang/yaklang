@@ -1,12 +1,11 @@
 package match
 
 import (
-	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"golang.org/x/exp/slices"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/exp/slices"
 )
 
 // match dns
@@ -16,10 +15,9 @@ func dnsIniter(c *matchContext) error {
 	}
 
 	dns := c.PK.Layer(layers.LayerTypeDNS)
-	if dns == nil {
-		return fmt.Errorf("dns layer not found")
+	if !c.Must(dns != nil) {
+		return nil
 	}
-
 	// fast pattern
 	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
 		return rule.FastPattern

@@ -16,8 +16,8 @@ func icmpIniter(c *matchContext) error {
 
 	// icmp6 not supported
 	icmp4 := c.PK.Layer(layers.LayerTypeICMPv4)
-	if icmp4 == nil {
-		return fmt.Errorf("icmp layer not found")
+	if !c.Must(icmp4 != nil) {
+		return nil
 	}
 
 	// register buffer provider
