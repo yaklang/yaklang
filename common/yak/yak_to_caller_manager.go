@@ -59,7 +59,10 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			log.Errorf("call hotPatch code error: %s", err)
 			return result
 		}
-		pushNewResult(utils.InterfaceToBytes(data), []string{""})
+		res := utils.InterfaceToStringSlice(data)
+		for _, item := range res {
+			pushNewResult([]byte(item), []string{""})
+		}
 		return result
 	})
 }
