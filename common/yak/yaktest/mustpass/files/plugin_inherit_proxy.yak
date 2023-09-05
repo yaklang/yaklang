@@ -93,6 +93,18 @@ mirrorNewWebsite = (isHttps, url, req, rsp, body) => {
     host, port, _ = str.ParseStringToHostPort(url)
     for result in fuzz.HTTPRequest("GET / HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.FuzzGetParams("u", token).FuzzGetParams("a", "{{int(1-5)}}").Exec()~ {    }
     for result in fuzz.MustHTTPRequest("GET / HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.FuzzGetParams("u", token).FuzzGetParams("a", "{{int(1-5)}}").Exec()~ {   }
+
+    // http + 4
+    urlSuffix := "?a=" + token
+    http.Get(url + urlSuffix)~
+    http.Post(url + urlSuffix)~
+    http.Request("DELETE", url + urlSuffix)~
+    http.Do(http.NewRequest("PUT", url + urlSuffix)~)
+
+    // fuzz.Params +1
+    for result in fuzz.HTTPRequest("GET /" + token +"?a=1 HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.GetCommonParams() {
+         for in result.Fuzz("c").Exec()~ {}
+    }
 }
 `)~
 
@@ -104,12 +116,13 @@ die(a.LoadPlugin(name))
 _, body = poc.Split(response.RawPacket)
 a.MirrorHTTPFlow(true, targetUrl, response.RawRequest /*type: bytes*/, response.RawPacket, body)
 
-println("TOTAL EXPECT %v, GOT %v" % [20, count])
-if count == 20 {
+sleep(1)
+println("TOTAL EXPECT %v, GOT %v" % [24, count])
+if count == 20 + 4 {
     println("PASSED")
     return
 }
-die("BindYakitPluginContext ERROR!")
+die("BindYakitPluginContext ERROR! count: "+sprint(count))
 
 
 
