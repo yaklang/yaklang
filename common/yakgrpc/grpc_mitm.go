@@ -300,7 +300,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return false
 		}
 
-		passed = _checker(filterManager.IncludeUri, filterManager.ExcludeUri, truncate(urlStr))
+		passed = _checker(filterManager.IncludeUri, filterManager.ExcludeUri, urlStr)
 		if !passed {
 			log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
 			return false
