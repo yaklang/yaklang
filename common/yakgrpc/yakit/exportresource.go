@@ -29,7 +29,7 @@ func init() {
 					log.Infof("start to import resource: %v", path)
 					err := ImportResource(consts.GetGormProfileDatabase(), path)
 					if err != nil {
-						log.Error("import data[%v] failed: %v", path, err)
+						log.Errorf("import data[%v] failed: %v", path, err)
 						continue
 					}
 					os.Rename(path, path+fmt.Sprintf(".%v.done", utils.RandStringBytes(20)))

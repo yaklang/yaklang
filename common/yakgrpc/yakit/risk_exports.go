@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type RiskParamsOpt func(r *Risk)
@@ -128,15 +129,35 @@ func WithRiskParam_Token(i string) RiskParamsOpt {
 	}
 }
 
-const MaxSize = 2 << 20 // 3MB
+const MaxSize = 2 << 20 // 2MB
+
+func limitSize(s string, maxSize int) string {
+	if len(s) <= maxSize {
+		return s
+	}
+
+	i := 0
+	for size := 0; size < maxSize-3; {
+		r, runeSize := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError {
+			break
+		}
+		if size+runeSize > maxSize {
+			break
+		}
+		i += runeSize
+		size += runeSize
+	}
+
+	temp := make([]byte, i)
+	copy(temp, s[:i])
+
+	return string(temp) + "..."
+}
 
 func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
-	if len(data) > MaxSize {
-		temp := make([]byte, MaxSize)
-		copy(temp, data[:MaxSize])
-		data = string(temp) + "..."
-	}
+	data = limitSize(data, MaxSize)
 	return func(r *Risk) {
 		r.QuotedRequest = utils.InterfaceToQuotedString(data)
 	}
@@ -144,11 +165,7 @@ func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 
 func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
-	if len(data) > MaxSize {
-		temp := make([]byte, MaxSize)
-		copy(temp, data[:MaxSize])
-		data = string(temp) + "..."
-	}
+	data = limitSize(data, MaxSize)
 	return func(r *Risk) {
 		r.QuotedResponse = utils.InterfaceToQuotedString(data)
 	}
@@ -177,6 +194,7 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 			} else {
 				requestStr = string(requestBytes)
 			}
+			requestStr = limitSize(requestStr, MaxSize)
 			if requestStr != "" {
 				r.QuotedRequest = strconv.Quote(requestStr)
 			}
@@ -196,11 +214,13 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 			} else {
 				responseStr = string(responseBytes)
 			}
+			responseStr = limitSize(responseStr, MaxSize)
 			if responseStr != "" {
 				r.QuotedResponse = strconv.Quote(responseStr)
 			}
 
 			payloadStr := utils.InterfaceToString(utils.MapGetFirstRaw(details, "payload", "payloads", "payloadStr", "payloadRaw", "Payload", "Payloads", "cmd", "command"))
+			payloadStr = limitSize(payloadStr, MaxSize)
 			if payloadStr != "" {
 				if strings.HasPrefix(payloadStr, `"`) && strings.HasSuffix(payloadStr, `"`) {
 					raw, _ := strconv.Unquote(payloadStr)
