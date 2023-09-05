@@ -1,17 +1,18 @@
 package ssa4yak
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"golang.org/x/exp/slices"
 )
 
 // check block-graph and value-user chain
 func CheckProgram(t *testing.T, prog *ssa.Program) {
-	// showProg(prog)
+	prog.Show()
 
 	checkInst := func(v ssa.Node) {
 		if phi, ok := v.(*ssa.Phi); ok {
@@ -54,6 +55,9 @@ func CheckProgram(t *testing.T, prog *ssa.Program) {
 		}
 
 		for _, value := range user.GetValues() {
+			if utils.IsNil(value) {
+				continue
+			}
 			if !slices.Contains(value.GetUsers(), user) {
 				t.Fatalf("fatal value %s not't have it %s in user", value, user)
 			}
@@ -136,17 +140,6 @@ func CheckProgram(t *testing.T, prog *ssa.Program) {
 
 	}
 
-}
-
-func showProg(prog *ssa.Program) string {
-	ret := ""
-	for _, pkg := range prog.Packages {
-		for _, f := range pkg.Funcs {
-			ret += f.DisAsm(ssa.DisAsmDefault)
-		}
-	}
-	fmt.Println(ret)
-	return ret
 }
 
 type TestProgram struct {
@@ -257,46 +250,39 @@ b = a
 c = a + b + 33
 a = c * 23 
 d = a + 11
-d = a >> 11
+d = a >> 1
 // (1) = (n)
-a = 1, 2, 3 
+a = 1, 2, d 
 // (n) = (1)
 b, c, d = a
 d = b + c + d
-a = 1, "2", true
+d = "arst" + "a"
+a = 1, d + "2", true
 // (n) = (1)
 b, c, d = a
-d = "arst" + "a"
 var e, f, g 
 var e = 1 
 var f = e + 2
 		`
 		ir := `
 yak-main
-entry0:
-	<number> t0 = <number> 42 add <number> 42
-	<number> t1 = <number> t0 add <number> 33
-	<number> t2 = <number> t1 mul <number> 23
-	<number> t3 = <number> t2 add <number> 11
-	<number> t4 = <number> t2 shr <number> 11
-	<[]number> t5 = Interface []number [<number> 3, <number> 3]
-	<number> t6 = <[]number> t5 field[<number> 0]
-	update [<number> t6] = <number> 1
-	<number> t8 = <[]number> t5 field[<number> 1]
-	update [<number> t8] = <number> 2
-	<number> t10 = <[]number> t5 field[<number> 2]
-	update [<number> t10] = <number> 3
-	<number> t12 = <number> t6 add <number> t8
-	<number> t13 = <number> t12 add <number> t10
-	<struct {number,string,boolean}> t14 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
-	<number> t15 = <struct {number,string,boolean}> t14 field[<number> 0]
-	update [<number> t15] = <number> 1
-	<string> t17 = <struct {number,string,boolean}> t14 field[<number> 1]
-	update [<string> t17] = <string> 2
-	<boolean> t19 = <struct {number,string,boolean}> t14 field[<number> 2]
-	update [<boolean> t19] = <boolean> true
-	<string> t21 = <string> arst add <string> a
-	<number> t22 = <number> 1 add <number> 2
+entry0: ( true)
+        <[]number> t5 = Interface []number [<number> 3, <number> 3]
+        <number> t6 = <[]number> t5 field[<number> 0]
+        update [<number> t6] = <number> 1
+        <number> t8 = <[]number> t5 field[<number> 1]
+        update [<number> t8] = <number> 2
+        <number> t10 = <[]number> t5 field[<number> 2]
+        update [<number> t10] = <number> 1345
+        <number> t12 = <number> t6 add <number> t8
+        <number> t13 = <number> t12 add <number> t10
+        <struct {number,string,boolean}> t16 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+        <number> t17 = <struct {number,string,boolean}> t16 field[<number> 0]
+        update [<number> t17] = <number> 1
+        <string> t19 = <struct {number,string,boolean}> t16 field[<number> 1]
+        update [<string> t19] = <string> arsta2
+        <boolean> t21 = <struct {number,string,boolean}> t16 field[<number> 2]
+        update [<boolean> t21] = <boolean> true
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -321,71 +307,77 @@ d = []int {1, 2, 3}
 d = {"11": "11", "23": "23"}
 d = {"a": 1, "b": "23", "c" : true}
 a = 1
-b = a + 1
-c = b + 1
+b = a + 11
+c = b + 11
 d = {a : 1, b : "11", c : true}
 d = map[int]string {1:"11", 2:"23", 3:"23"}
+d = {1:"11", 2:"23", 3:"23"}
 		`
 		ir := `
 yak-main
-entry0:
-	<[]number> t0 = Interface []number [<number> 1, <number> 1]
-	<[]number> t1 = Interface []number [<number> 0, <number> 0]
-	<number> t2 = <[]number> t0 field[<number> 1]
-	update [<number> t2] = <number> 1
-	<number> t4 = <number> t2 add <number> 2
-	<number> t5 = <number> t2 add <number> 2
-	<number> t6 = <number> t2 add <number> 1
-	update [<number> t2] = <number> t6
-	<[]number> t8 = Interface []number [<number> 3, <number> 3]
-	<number> t9 = <[]number> t8 field[<number> 0]
-	update [<number> t9] = <number> 1
-	<number> t11 = <[]number> t8 field[<number> 1]
-	update [<number> t11] = <number> 2
-	<number> t13 = <[]number> t8 field[<number> 2]
-	update [<number> t13] = <number> 3
-	<struct {number,string,boolean}> t15 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
-	<number> t16 = <struct {number,string,boolean}> t15 field[<number> 0]
-	update [<number> t16] = <number> 49
-	<string> t18 = <struct {number,string,boolean}> t15 field[<number> 1]
-	update [<string> t18] = <string> 2
-	<boolean> t20 = <struct {number,string,boolean}> t15 field[<number> 2]
-	update [<boolean> t20] = <boolean> true
-	<[]number> t22 = Interface []number [<number> 3, <number> 3]
-	<number> t23 = <[]number> t22 field[<number> 0]
-	update [<number> t23] = <number> 1
-	<number> t25 = <[]number> t22 field[<number> 1]
-	update [<number> t25] = <number> 2
-	<number> t27 = <[]number> t22 field[<number> 2]
-	update [<number> t27] = <number> 3
-	<map[string]string> t29 = Interface map[string]string [<number> 2, <number> 2]
-	<string> t30 = <map[string]string> t29 field[<string> 11]
-	update [<string> t30] = <string> 11
-	<string> t32 = <map[string]string> t29 field[<string> 23]
-	update [<string> t32] = <string> 23
-	<struct {number,string,boolean}> t34 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
-	<number> t35 = <struct {number,string,boolean}> t34 field[<string> a]
-	update [<number> t35] = <number> 1
-	<string> t37 = <struct {number,string,boolean}> t34 field[<string> b]
-	update [<string> t37] = <string> 23
-	<boolean> t39 = <struct {number,string,boolean}> t34 field[<string> c]
-	update [<boolean> t39] = <boolean> true
-	<number> t41 = <number> 1 add <number> 1
-	<number> t42 = <number> t41 add <number> 1
-	<struct {number,string,boolean}> t43 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
-	<number> t44 = <struct {number,string,boolean}> t43 field[<number> 1]
-	update [<number> t44] = <number> 1
-	<string> t46 = <struct {number,string,boolean}> t43 field[<number> t41]
-	update [<string> t46] = <string> 11
-	<boolean> t48 = <struct {number,string,boolean}> t43 field[<number> t42]
-	update [<boolean> t48] = <boolean> true
-	<map[number]string> t50 = Interface map[number]string [<number> 3, <number> 3]
-	<string> t51 = <map[number]string> t50 field[<number> 1]
-	update [<string> t51] = <string> 11
-	<string> t53 = <map[number]string> t50 field[<number> 2]
-	update [<string> t53] = <string> 23
-	<string> t55 = <map[number]string> t50 field[<number> 3]
-	update [<string> t55] = <string> 23
+entry0: ( true)
+        <[]number> t0 = Interface []number [<number> 1, <number> 1]
+        <[]number> t1 = Interface []number [<number> 0, <number> 0]
+        <number> t2 = <[]number> t0 field[<number> 1]
+        update [<number> t2] = <number> 1
+        <> t4 = <number> t2 add <number> 2
+        <> t5 = <number> t2 add <number> 2
+        <number> t6 = <number> t2 add <number> 1
+        update [<number> t2] = <number> t6
+        <[]number> t8 = Interface []number [<number> 3, <number> 3]
+        <number> t9 = <[]number> t8 field[<number> 0]
+        update [<number> t9] = <number> 1
+        <number> t11 = <[]number> t8 field[<number> 1]
+        update [<number> t11] = <number> 2
+        <number> t13 = <[]number> t8 field[<number> 2]
+        update [<number> t13] = <number> 3
+        <struct {number,string,boolean}> t15 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+        <number> t16 = <struct {number,string,boolean}> t15 field[<number> 0]
+        update [<number> t16] = <number> 49
+        <string> t18 = <struct {number,string,boolean}> t15 field[<number> 1]
+        update [<string> t18] = <string> 2
+        <boolean> t20 = <struct {number,string,boolean}> t15 field[<number> 2]
+        update [<boolean> t20] = <boolean> true
+        <[]number> t22 = Interface []number [<number> 3, <number> 3]
+        <number> t23 = <[]number> t22 field[<number> 0]
+        update [<number> t23] = <number> 1
+        <number> t25 = <[]number> t22 field[<number> 1]
+        update [<number> t25] = <number> 2
+        <number> t27 = <[]number> t22 field[<number> 2]
+        update [<number> t27] = <number> 3
+        <map[string]string> t29 = Interface map[string]string [<number> 2, <number> 2]
+        <string> t30 = <map[string]string> t29 field[<string> 11]
+        update [<string> t30] = <string> 11
+        <string> t32 = <map[string]string> t29 field[<string> 23]
+        update [<string> t32] = <string> 23
+        <struct {number,string,boolean}> t34 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+        <number> t35 = <struct {number,string,boolean}> t34 field[<string> a]
+        update [<number> t35] = <number> 1
+        <string> t37 = <struct {number,string,boolean}> t34 field[<string> b]
+        update [<string> t37] = <string> 23
+        <boolean> t39 = <struct {number,string,boolean}> t34 field[<string> c]
+        update [<boolean> t39] = <boolean> true
+        <struct {number,string,boolean}> t43 = Interface struct {number,string,boolean} [<number> 3, <number> 3]
+        <number> t44 = <struct {number,string,boolean}> t43 field[<number> 1]
+        update [<number> t44] = <number> 1
+        <string> t46 = <struct {number,string,boolean}> t43 field[<number> 12]
+        update [<string> t46] = <string> 11
+        <boolean> t48 = <struct {number,string,boolean}> t43 field[<number> 23]
+        update [<boolean> t48] = <boolean> true
+        <map[number]string> t50 = Interface map[number]string [<number> 3, <number> 3]
+        <string> t51 = <map[number]string> t50 field[<number> 1]
+        update [<string> t51] = <string> 11
+        <string> t53 = <map[number]string> t50 field[<number> 2]
+        update [<string> t53] = <string> 23
+        <string> t55 = <map[number]string> t50 field[<number> 3]
+        update [<string> t55] = <string> 23
+		<[]string> t57 = Interface []string [<number> 3, <number> 3]
+		<string> t58 = <[]string> t57 field[<number> 1]
+		update [<string> t58] = <string> 11
+		<string> t60 = <[]string> t57 field[<number> 2]
+		update [<string> t60] = <string> 23
+		<string> t62 = <[]string> t57 field[<number> 3]
+		update [<string> t62] = <string> 23
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -418,7 +410,7 @@ entry0:
 	<number> t1 = <number> 1 add <number> 1
 	<number> t2 = <number> 2 add <number> 2
 		`
-		prog := ParseSSA(code)
+		prog := ParseSSA(code, ssa4analyze.WithPass(false))
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -435,17 +427,17 @@ a = 11
 	`
 		ir := `
 yak-main
-entry0: (true)
+entry0: ( true)
 		<map[string]number> t0 = Interface map[string]number [<number> 1, <number> 1]
 		<number> t1 = <map[string]number> t0 field[<string> c]
 		update [<number> t1] = <number> 1
-		<> t3 = call <undefine> Undefine (<number> t1) []
-		<> t4 = call <undefine> Undefine (<number> t1) []
+		<> t3 = undefine-print
+		<> t4 = call <> t3 (<number> t1) []
+		<> t5 = call <> t3 (<number> t1) []
 		update [<number> t1] = <number> 2
 		update [<number> t1] = <number> 3
 	`
 		prog := ParseSSA(code)
-		prog.Show()
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
@@ -468,7 +460,7 @@ e = 11 + a
 `
 		ir := `
 yak-main
-entry0: (<boolean> true)
+entry0: ( true)
 	<> t0 = undefine-c
 	<> t1 = undefine-print
 	<> t2 = call <> t1 (<> t0) []
@@ -481,22 +473,22 @@ entry0: (<boolean> true)
 	<> t9 = call <> t8 (<string> bb) []
 	<> t10 = call <> t1 (<> t9) []
 	jump -> loop.header1
-loop.header1: <- entry0 loop.latch4  (<boolean> true)
+loop.header1: <- entry0 loop.latch4  ( true)
 	<> t19 = phi [<number> 0, entry0] [<> t17, loop.latch4]
 	<> t12 = <> t19 lt <number> 10
 	<> t20 = undefine-undefineFuncInLoop
 	<> t23 = not <> t12
 	Loop [<number> 0; <> t12; <> t17] body -> loop.body2, exit -> loop.exit3
-loop.body2: <- loop.header1  (<> t12)
+loop.body2: <- loop.header1  ( t12)
 	<> t14 = call <> t1 (<> t19) []
 	<> t15 = call <> t20 (<> t19) []
 	jump -> loop.latch4
-loop.exit3: <- loop.header1  (<> t23)
+loop.exit3: <- loop.header1  ( t23)
 	jump -> b5
-loop.latch4: <- loop.body2  (<> t12)
+loop.latch4: <- loop.body2  ( t12)
 	<> t17 = <> t19 add <number> 1
 	jump -> loop.header1
-b5: <- loop.exit3  (<> t23)
+b5: <- loop.exit3  (t23)
 	<> t22 = <number> 11 add <> t7
 	`
 		prog := ParseSSA(code)
@@ -518,16 +510,13 @@ d = 1 + 2
 		`
 		ir := `
 yak-main
-entry0:
-	<boolean> t0 = <number> 5 lt <number> 2
-	If [<boolean> t0] true -> if.true2, false -> if.done1
-if.done1: <- if.true2 entry0
+entry0: (true)
+	If [<boolean> false] true -> if.true2, false -> if.done1
+if.done1: <- if.true2 entry0  ( true)
 	jump -> b3
-if.true2: <- entry0
-	<number> t2 = <number> 5 add <number> 6
+if.true2: <- entry0  ( false)
 	jump -> if.done1
-b3: <- if.done1
-	<number> t5 = <number> 1 add <number> 2
+b3: <- if.done1  ( true)
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -556,44 +545,32 @@ d = 1 + 2
 		`
 		ir := `
 yak-main
-entry0:
-	<boolean> t0 = <number> 5 lt <number> 2
-	If [<boolean> t0] true -> if.true2, false -> if.elif3
-if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
-	<number> t24 = phi [<number> 1, if.true2] [<number> 1, if.true4] [<number> t10, if.true6] [<number> t14, if.true8] [<number> t18, if.true10] [<number> t20, if.false11]
+entry0: (true)
+	If [<boolean> false] true -> if.true2, false -> if.elif3
+if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11  (true)
+	<number> t24 = phi [<number> 1, if.true2] [<number> 1, if.true4] [<number> 10, if.true6] [<number> 25, if.true8] [<number> 35, if.true10] [<number> 45, if.false11]
 	jump -> b12
-if.true2: <- entry0
-	<number> t2 = <number> 5 add <number> 6
+if.true2: <- entry0  (false)
 	jump -> if.done1
-if.elif3: <- entry0
-	<boolean> t4 = <number> 5 lt <number> 4
-	If [<boolean> t4] true -> if.true4, false -> if.elif5
-if.true4: <- if.elif3
-	<number> t6 = <number> 5 add <number> 9
+if.elif3: <- entry0  (true)
+	If [<boolean> false] true -> if.true4, false -> if.elif5
+if.true4: <- if.elif3  (false)
 	jump -> if.done1
-if.elif5: <- if.elif3
-	<boolean> t8 = <number> 5 lt <number> 6
-	If [<boolean> t8] true -> if.true6, false -> if.elif7
-if.true6: <- if.elif5
-	<number> t10 = <number> 5 add <number> 5
+if.elif5: <- if.elif3  (true)
+	If [<boolean> true] true -> if.true6, false -> if.elif7
+if.true6: <- if.elif5  (true)
 	jump -> if.done1
-if.elif7: <- if.elif5
-	<boolean> t12 = <number> 5 lt <number> 10
-	If [<boolean> t12] true -> if.true8, false -> if.elif9
-if.true8: <- if.elif7
-	<number> t14 = <number> 5 add <number> 20
+if.elif7: <- if.elif5  (false)
+	If [<boolean> true] true -> if.true8, false -> if.elif9
+if.true8: <- if.elif7  (false)
 	jump -> if.done1
-if.elif9: <- if.elif7
-	<boolean> t16 = <number> 5 lt <number> 20
-	If [<boolean> t16] true -> if.true10, false -> if.false11
-if.true10: <- if.elif9
-	<number> t18 = <number> 5 add <number> 30
+if.elif9: <- if.elif7  (false)
+	If [<boolean> true] true -> if.true10, false -> if.false11
+if.true10: <- if.elif9  (false)
 	jump -> if.done1
-if.false11: <- if.elif9
-	<number> t20 = <number> 5 add <number> 40
+if.false11: <- if.elif9  (false)
 	jump -> if.done1
-b12: <- if.done1
-	<number> t23 = <number> 1 add <number> 2
+b12: <- if.done1  (true)
 		`
 		prog := ParseSSA(src)
 		CheckProgram(t, prog)
@@ -623,43 +600,32 @@ e = e + 2
 		`
 		ir := `
 yak-main
-entry0:
-	<boolean> t0 = <number> 5 lt <number> 2
-	If [<boolean> t0] true -> if.true2, false -> if.elif3
-if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11
-	<number> t23 = phi [<number> 1, if.true2] [<number> t6, if.true4] [<number> t10, if.true6] [<number> t14, if.true8] [<number> t18, if.true10] [<number> 1, if.false11]
+entry0: (true)
+	If [<boolean> false] true -> if.true2, false -> if.elif3
+if.done1: <- if.true2 if.true4 if.true6 if.true8 if.true10 if.false11  (true)
+	<number> t23 = phi [<number> 1, if.true2] [<number> 35, if.true4] [<number> 35, if.true6] [<number> 35, if.true8] [<number> 35, if.true10] [<number> 1, if.false11]
 	jump -> b12
-if.true2: <- entry0
-	<number> t2 = <number> 5 add <number> 6
+if.true2: <- entry0  (false)
 	jump -> if.done1
-if.elif3: <- entry0
-	<boolean> t4 = <number> 5 lt <number> 4
-	If [<boolean> t4] true -> if.true4, false -> if.elif5
-if.true4: <- if.elif3
-	<number> t6 = <number> 5 add <number> 9
+if.elif3: <- entry0  (true)
+	If [<boolean> false] true -> if.true4, false -> if.elif5
+if.true4: <- if.elif3  (false)
 	jump -> if.done1
-if.elif5: <- if.elif3
-	<boolean> t8 = <number> 5 lt <number> 6
-	If [<boolean> t8] true -> if.true6, false -> if.elif7
-if.true6: <- if.elif5
-	<number> t10 = <number> 5 add <number> 10
+if.elif5: <- if.elif3  (true)
+	If [<boolean> true] true -> if.true6, false -> if.elif7
+if.true6: <- if.elif5  (true)
 	jump -> if.done1
-if.elif7: <- if.elif5
-	<boolean> t12 = <number> 5 lt <number> 10
-	If [<boolean> t12] true -> if.true8, false -> if.elif9
-if.true8: <- if.elif7
-	<number> t14 = <number> 5 add <number> 20
+if.elif7: <- if.elif5  (false)
+	If [<boolean> true] true -> if.true8, false -> if.elif9
+if.true8: <- if.elif7  (false)
 	jump -> if.done1
-if.elif9: <- if.elif7
-	<boolean> t16 = <number> 5 lt <number> 20
-	If [<boolean> t16] true -> if.true10, false -> if.false11
-if.true10: <- if.elif9
-	<number> t18 = <number> 5 add <number> 30
+if.elif9: <- if.elif7  (false)
+	If [<boolean> true] true -> if.true10, false -> if.false11
+if.true10: <- if.elif9  (false)
 	jump -> if.done1
-if.false11: <- if.elif9
-	<number> t20 = <number> 5 add <number> 7
+if.false11: <- if.elif9  (false)
 	jump -> if.done1
-b12: <- if.done1
+b12: <- if.done1  (true)
 	<number> t24 = <number> t23 add <number> 2
 		`
 		prog := ParseSSA(src)
@@ -669,18 +635,60 @@ b12: <- if.done1
 }
 
 func TestLoop(t *testing.T) {
-	// 	t.Run("looptest_range", func(*testing.T) {
-	// 		code := `
-	// a = 0
-	// for  range 10 {
-	// 	a += 1
-	// }
-	// b = a + 2
-	// 		`
-	// 		prog := parseSSA(code)
-	// 		CheckProgram(t, prog)
-	// 		showProg(prog)
-	// 	})
+	t.Run("looptest_range", func(*testing.T) {
+		code := `
+for i=0; i<10; i++ {
+	pirnt(i)
+}
+for i=11; i < 10; i++ {
+	print(i)
+}
+
+// !(i<10)
+// if i < 5 {
+// 	// this block will false
+// 	print(i)
+// }
+			`
+		ir := `
+		yak-main
+		entry0: (true)
+			jump -> loop.header1
+		loop.header1: <- entry0 loop.latch4  (true)
+			<> t7 = phi [<number> 0, entry0] [<> t5, loop.latch4]
+			<> t1 = <> t7 lt <number> 10
+			<> t8 = undefine-pirnt
+			<> t20 = not <> t1
+			Loop [<number> 0; <> t1; <> t5] body -> loop.body2, exit -> loop.exit3
+		loop.body2: <- loop.header1  (t1)
+			<> t3 = call <> t8 (<> t7) []
+			jump -> loop.latch4
+		loop.exit3: <- loop.header1  (t20)
+			jump -> b5
+		loop.latch4: <- loop.body2  (t1)
+			<> t5 = <> t7 add <number> 1
+			jump -> loop.header1
+		b5: <- loop.exit3  (t20)
+			jump -> loop.header6
+		loop.header6: <- b5 loop.latch9  (t20)
+			<> t17 = phi [<number> 11, b5] [<> t15, loop.latch9]
+			<> t11 = <> t17 lt <number> 10
+			<> t18 = undefine-print
+			Loop [<number> 11; <> t11; <> t15] body -> loop.body7, exit -> loop.exit8
+		loop.body7: <- loop.header6  (false)
+			<> t13 = call <> t18 (<> t17) []
+			jump -> loop.latch9
+		loop.exit8: <- loop.header6  (t20)
+			jump -> b10
+		loop.latch9: <- loop.body7  (false)
+			<> t15 = <> t17 add <number> 1
+			jump -> loop.header6
+		b10: <- loop.exit8  (t20)
+		`
+		prog := ParseSSA(code)
+		CheckProgram(t, prog)
+		CompareYakMain(t, prog, ir)
+	})
 
 	t.Run("looptest_breakcontinue", func(t *testing.T) {
 		code := `
@@ -698,44 +706,52 @@ b = a + 1
 		`
 		ir := `
 yak-main
-entry0:
-        jump -> loop.header1
-loop.header1: <- entry0 loop.latch4
-        <number> t15 = phi [<number> 0, entry0] [<number> t13, loop.latch4]
-        <number> t17 = phi [<number> 0, entry0] [<number> t16, loop.latch4]
-        <boolean> t0 = <number> t15 lt <number> 10
-        If [<boolean> t0] true -> loop.body2, false -> loop.exit3
-loop.body2: <- loop.header1
-        <boolean> t3 = <number> t17 gt-eq <number> 3
-        If [<boolean> t3] true -> if.true6, false -> if.done5
-loop.exit3: <- loop.header1 if.true8
-        jump -> b11
-loop.latch4: <- b9 b10
-        <number> t16 = phi [<number> t17, b9] [<number> t11, b10]
-        <number> t13 = <number> t15 add <number> 1
-        jump -> loop.header1
-if.done5: <- loop.body2
-        jump -> b10
-if.true6: <- loop.body2
-        <boolean> t5 = <number> t17 eq <number> 3
-        If [<boolean> t5] true -> if.true8, false -> if.done7
-if.done7: <- if.true6
-        jump -> b9
-if.true8: <- if.true6
-        jump -> loop.exit3
-b9: <- if.done7
-        jump -> loop.latch4
-b10: <- if.done5
-        <number> t11 = <number> t17 mul <number> 2
-        jump -> loop.latch4
-b11: <- loop.exit3
-        <number> t19 = <number> t17 add <number> 1
+entry0: ( true)
+	jump -> loop.header1
+loop.header1: <- entry0 loop.latch4  ( true)
+	<> t15 = phi [<number> 0, entry0] [<> t13, loop.latch4]
+	<> t17 = phi [<number> 0, entry0] [<> t16, loop.latch4]
+	<> t1 = <> t15 lt <number> 10
+	<> t20 = not <> t1
+	Loop [<number> 0; <> t1; <> t13] body -> loop.body2, exit -> loop.exit3
+loop.body2: <- loop.header1  ( t1)
+	<> t3 = <> t17 gt-eq <number> 3
+	<> t21 = not <> t3
+	<> t23 = <> t1 and <> t3
+	<> t27 = <> t1 and <> t21
+	If [<> t3] true -> if.true6, false -> if.done5
+loop.exit3: <- loop.header1 if.true8  ( t25)
+	jump -> b11
+loop.latch4: <- b9 b10  ( t28)
+	<> t16 = phi [<> t17, b9] [<> t11, b10]
+	<> t13 = <> t15 add <number> 1
+	jump -> loop.header1
+if.done5: <- loop.body2  ( t27)
+	jump -> b10
+if.true6: <- loop.body2  ( t23)
+	<> t5 = <> t17 eq <number> 3
+	<> t22 = not <> t5
+	<> t24 = <> t23 and <> t5
+	<> t26 = <> t23 and <> t22
+	If [<> t5] true -> if.true8, false -> if.done7
+if.done7: <- if.true6  ( t26)
+	jump -> b9
+if.true8: <- if.true6  ( t24)
+	<> t25 = <> t20 or <> t24
+	jump -> loop.exit3
+b9: <- if.done7  ( t26)
+	jump -> loop.latch4
+b10: <- if.done5  (t27)
+	<> t11 = <> t17 mul <number> 2
+	<> t28 = <> t26 or <> t27
+	jump -> loop.latch4
+b11: <- loop.exit3  ( t25)
+	<> t19 = <> t17 add <number> 1
 		`
 		prog := ParseSSA(code)
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
-
 }
 
 func TestSwitch(t *testing.T) {
@@ -752,20 +768,20 @@ default:
 }
 	`
 		ir := `
-yak-main 
-entry0:
-	switch <number> 2 default:[switch.default2] {<number> 1:switch.handler3, <number> 2:switch.handler3, <number> 3:switch.handler4, <number> 4:switch.handler5}
-switch.done1: <- switch.handler4 switch.default2
-	jump -> b6
-switch.default2: <- entry0 switch.handler5
-	jump -> switch.done1
-switch.handler3: <- entry0
-	jump -> switch.handler4
-switch.handler4: <- entry0 switch.handler3
-	jump -> switch.done1
-switch.handler5: <- entry0
-	jump -> switch.default2
-b6: <- switch.done1
+		yak-main
+		entry0: (true)
+			switch <number> 2 default:[switch.default2] {<number> 1:switch.handler3, <number> 2:switch.handler3, <number> 3:switch.handler4, <number> 4:switch.handler5}
+		switch.done1: <- switch.handler4 switch.default2  (true)
+			jump -> b6
+		switch.default2: <- entry0 switch.handler5  (true)
+			jump -> switch.done1
+		switch.handler3: <- entry0  (true)
+			jump -> switch.handler4
+		switch.handler4: <- entry0 switch.handler3  (true)
+			jump -> switch.done1
+		switch.handler5: <- entry0  (false)
+			jump -> switch.default2
+		b6: <- switch.done1  (true)
 	`
 		prog := ParseSSA(code)
 		CheckProgram(t, prog)
@@ -1222,32 +1238,32 @@ for i=0; i<10; i++ {
 }	
 	`
 	ir := `
-yak-main
-entry0:
-        jump -> loop.header1
-loop.header1: <- entry0 loop.latch4
-        <number> t12 = phi [<number> 0, entry0] [<number> t10, loop.latch4]
-        <boolean> t0 = <number> t12 lt <number> 10
-        If [<boolean> t0] true -> loop.body2, false -> loop.exit3
-loop.body2: <- loop.header1
-        <number> t3 = <number> 2 add <number> 1
-        switch <number> t3 default:[switch.default6] {<number> 1:switch.handler7, <number> 2:switch.handler8}
-loop.exit3: <- loop.header1
-        jump -> b10
-loop.latch4: <- switch.default6 b9
-        <number> t10 = <number> t12 add <number> 1
-        jump -> loop.header1
-switch.done5: <- switch.handler7
-        jump -> b9
-switch.default6: <- loop.body2 switch.handler8
-        jump -> loop.latch4
-switch.handler7: <- loop.body2
-        jump -> switch.done5
-switch.handler8: <- loop.body2
-        jump -> switch.default6
-b9: <- switch.done5
-        jump -> loop.latch4
-b10: <- loop.exit3
+	yak-main
+	entry0: (true)
+		jump -> loop.header1
+	loop.header1: <- entry0 loop.latch4  (true)
+		<> t12 = phi [<number> 0, entry0] [<> t10, loop.latch4]
+		<> t1 = <> t12 lt <number> 10
+		<> t14 = not <> t1
+		Loop [<number> 0; <> t1; <> t10] body -> loop.body2, exit -> loop.exit3
+	loop.body2: <- loop.header1  (t1)
+		switch <number> 3 default:[switch.default6] {<number> 1:switch.handler7, <number> 2:switch.handler8}
+	loop.exit3: <- loop.header1  (t14)
+		jump -> b10
+	loop.latch4: <- switch.default6 b9  (t1)
+		<> t10 = <> t12 add <number> 1
+		jump -> loop.header1
+	switch.done5: <- switch.handler7  (false)
+		jump -> b9
+	switch.default6: <- loop.body2 switch.handler8  (t1)
+		jump -> loop.latch4
+	switch.handler7: <- loop.body2  (false)
+		jump -> switch.done5
+	switch.handler8: <- loop.body2  (false)
+		jump -> switch.default6
+	b9: <- switch.done5  (false)
+		jump -> loop.latch4
+	b10: <- loop.exit3  (t14)
 `
 	prog := ParseSSA(code)
 	CheckProgram(t, prog)

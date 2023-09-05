@@ -31,11 +31,16 @@ func (p *Position) String() string {
 }
 
 func getStr(v Node) string {
+	return getStrFlag(v, true)
+}
+func getStrFlag(v Node, hasType bool) string {
 	if utils.IsNil(v) {
 		return "<nil>"
 	}
 	op := ""
-	op += GetTypeStr(v)
+	if hasType {
+		op += GetTypeStr(v)
+	}
 	switch v := v.(type) {
 	case Instruction:
 		if i, ok := v.(*Interface); ok {
@@ -157,7 +162,7 @@ func (b *BasicBlock) String() string {
 		}
 	}
 	if !utils.IsNil(b.Condition) {
-		ret += " (" + getStr(b.Condition) + ")"
+		ret += " (" + getStrFlag(b.Condition, false) + ")"
 	}
 	return ret
 }
