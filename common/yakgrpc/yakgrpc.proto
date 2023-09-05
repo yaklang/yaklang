@@ -3802,6 +3802,7 @@ message ImportHTTPFuzzerTaskFromYamlResponse{
 }
 message ExportHTTPFuzzerTaskToYamlRequest{
   FuzzerRequests Requests = 1;
+  string TemplateType = 2;
 }
 message ExportHTTPFuzzerTaskToYamlResponse{
   GeneralResponse Status = 1;
