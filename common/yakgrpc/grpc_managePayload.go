@@ -241,7 +241,7 @@ func (s *Server) SavePayload(ctx context.Context, req *ypb.SavePayloadRequest) (
 						}
 						payload := &yakit.Payload{
 							Group:   group,
-							Content: strconv.Quote(strings.TrimRightFunc(scanner.Text(), TrimWhitespaceExceptSpace)),
+							Content: strconv.Quote(strings.TrimRightFunc(p, TrimWhitespaceExceptSpace)),
 						}
 						payload.Hash = payload.CalcHash()
 						err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
