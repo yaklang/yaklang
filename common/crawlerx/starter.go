@@ -57,6 +57,7 @@ type BrowserStarter struct {
 	stopSignal bool
 	running    bool
 	stealth    bool
+	vue        bool
 
 	extraWaitLoadTime int
 
@@ -110,6 +111,7 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		stopSignal: false,
 		running:    false,
 		stealth:    baseConfig.stealth,
+		vue:        baseConfig.vue,
 
 		extraWaitLoadTime: baseConfig.extraWaitLoadTime,
 
@@ -237,7 +239,8 @@ func (starter *BrowserStarter) pageActionGenerator() {
 	starter.urlsExploit = starter.generateUrlsExploit()
 	starter.inputElementsExploit = starter.generateInputElementsExploit()
 	starter.clickElementsExploit = starter.generateClickElementsExploit()
-	starter.eventElementsExploit = starter.generateEventElementsExploit()
+	//starter.eventElementsExploit = starter.generateEventElementsExploit()
+	starter.eventElementsExploit = starter.newEventElementsExploit()
 
 	starter.elementCheck = starter.elementCheckGenerate()
 }
@@ -321,7 +324,8 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if starter.baseConfig.pageTimeout != 0 {
 		page = page.Timeout(time.Duration(starter.baseConfig.pageTimeout) * time.Second)
 	}
-	err = starter.actionOnPage(page)
+	//err = starter.actionOnPage(page)
+	err = starter.ActionOnPage(page)
 	if err != nil {
 		log.Errorf(`TargetID %s get page do action error: %s`, targetID, err)
 	}
@@ -475,9 +479,9 @@ running:
 				starter.running = true
 			}
 			if starter.counter.OverLoad() {
-				log.Infof(`overload, waiting for concurrent: %d`, starter.counter.Number())
+				//log.Infof(`overload, waiting for concurrent: %d`, starter.counter.Number())
 				starter.counter.Wait(starter.concurrent)
-				log.Infof(`overload done: %d`, starter.counter.Number())
+				//log.Infof(`overload done: %d`, starter.counter.Number())
 			}
 			urlStr, _ := v.(string)
 			p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
