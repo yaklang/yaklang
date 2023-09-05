@@ -3,6 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,10 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -442,6 +443,70 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 	}
 
 	if ret := time.Since(start); ret.Seconds() > 5 && ret.Seconds() < 6 {
+		t.Log("time cost [" + ret.String() + "] is expected")
+	} else {
+		t.Fatalf("time cost is not expected: %v", ret)
+	}
+}
+
+// nuclei-dsl type tags and raw type tags
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
+
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	token := utils.RandStringBytes(100)
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		time.Sleep(time.Second)
+		writer.Write([]byte(token))
+	})
+
+	start := time.Now()
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Params: []*ypb.FuzzerParamItem{
+			{
+				Key:   "a",
+				Value: "{{int(1-2)}}",
+				Type:  "nuclei-dsl",
+			},
+			{
+				Key:   "b",
+				Value: "{{int(1-2)}}",
+				Type:  "raw",
+			},
+		},
+		Concurrent: 1,
+		Request: `GET /?v=1&d={{rs(10,10)}}&a={{params(a)}}&b={{params(b)}} HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+`})
+	if err != nil {
+		panic(err)
+	}
+
+	// only 1 request
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if len(rsp.Payloads) != 3 {
+			panic("expect payload count == 3, got " + fmt.Sprint(len(rsp.Payloads)))
+		}
+		log.Infof("url: %v payloads: %v", rsp.Url, rsp.Payloads)
+
+		a, b := rsp.Payloads[1], rsp.Payloads[2]
+		if a != "-1" {
+			panic("expect params(a) == -1, got " + a)
+		}
+		if b != "{{int(1-2)}}" {
+			panic("expect params(b) == {{int(1-2)}}, got " + b)
+		}
+	}
+
+	if ret := time.Since(start); ret.Seconds() < 2 {
 		t.Log("time cost [" + ret.String() + "] is expected")
 	} else {
 		t.Fatalf("time cost is not expected: %v", ret)
