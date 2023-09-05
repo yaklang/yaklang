@@ -16,6 +16,17 @@ import (
 	"time"
 )
 
+func TrimWhitespaceExceptSpace(r rune) bool {
+	if uint32(r) <= '\u00FF' {
+		switch r {
+		case '\t', '\n', '\v', '\f', '\r', 0x85, 0xA0:
+			return true
+		}
+		return false
+	}
+	return false
+}
+
 func (s *Server) QueryPayload(ctx context.Context, req *ypb.QueryPayloadRequest) (*ypb.QueryPayloadResponse, error) {
 	p, d, err := yakit.QueryPayload(s.GetProfileDatabase(), req)
 	if err != nil {
@@ -149,7 +160,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 					}
 					payload := &yakit.Payload{
 						Group:   group,
-						Content: strconv.Quote(p),
+						Content: strconv.Quote(strings.TrimRightFunc(p, TrimWhitespaceExceptSpace)),
 					}
 					payload.Hash = payload.CalcHash()
 					err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
@@ -164,7 +175,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 				size += int64(len(scanner.Bytes()))
 				payload := &yakit.Payload{
 					Group:   group,
-					Content: strconv.Quote(scanner.Text()),
+					Content: strconv.Quote(strings.TrimRightFunc(scanner.Text(), TrimWhitespaceExceptSpace)),
 				}
 				payload.Hash = payload.CalcHash()
 				err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
@@ -195,7 +206,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		size += int64(len(lineScanner.Bytes()))
 		payload := &yakit.Payload{
 			Group:   group,
-			Content: strconv.Quote(lineScanner.Text()),
+			Content: strconv.Quote(strings.TrimRightFunc(lineScanner.Text(), TrimWhitespaceExceptSpace)),
 		}
 		payload.Hash = payload.CalcHash()
 		err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
@@ -230,7 +241,7 @@ func (s *Server) SavePayload(ctx context.Context, req *ypb.SavePayloadRequest) (
 						}
 						payload := &yakit.Payload{
 							Group:   group,
-							Content: strconv.Quote(p),
+							Content: strconv.Quote(strings.TrimRightFunc(scanner.Text(), TrimWhitespaceExceptSpace)),
 						}
 						payload.Hash = payload.CalcHash()
 						err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
@@ -242,7 +253,7 @@ func (s *Server) SavePayload(ctx context.Context, req *ypb.SavePayloadRequest) (
 				} else {
 					payload := &yakit.Payload{
 						Group:   group,
-						Content: strconv.Quote(scanner.Text()),
+						Content: strconv.Quote(strings.TrimRightFunc(scanner.Text(), TrimWhitespaceExceptSpace)),
 					}
 					payload.Hash = payload.CalcHash()
 					err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
@@ -263,7 +274,7 @@ func (s *Server) SavePayload(ctx context.Context, req *ypb.SavePayloadRequest) (
 	for lineScanner.Scan() {
 		payload := &yakit.Payload{
 			Group:   group,
-			Content: strconv.Quote(lineScanner.Text()),
+			Content: strconv.Quote(strings.TrimRightFunc(lineScanner.Text(), TrimWhitespaceExceptSpace)),
 		}
 		payload.Hash = payload.CalcHash()
 		err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload.Hash, payload)
