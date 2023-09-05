@@ -117,8 +117,8 @@ _, body = poc.Split(response.RawPacket)
 a.MirrorHTTPFlow(true, targetUrl, response.RawRequest /*type: bytes*/, response.RawPacket, body)
 
 sleep(1)
-println("TOTAL EXPECT %v, GOT %v" % [24, count])
-if count == 20 + 4 {
+println("TOTAL EXPECT %v, GOT %v" % [25, count])
+if count == 20 + 4 + 1 {
     println("PASSED")
     return
 }
