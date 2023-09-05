@@ -120,6 +120,11 @@ func ExecuteWithStringHandlerWithCallbackEx(
 		for index, d := range i {
 			if payloadVerbose != nil {
 				if v, ok := payloadVerbose[string(d)]; ok {
+					//如果在payloadVerbose 去到空，则把实际的输出值展示给用户
+					if info := strings.Join(v, ","); info == "" {
+						results[index] = string(d)
+						continue
+					}
 					results[index] = fmt.Sprintf("[%s]", strings.Join(v, ","))
 					continue
 				}

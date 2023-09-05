@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
 	"strings"
@@ -40,19 +41,26 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 	engine := NewScriptEngine(1)
 	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
 	if err != nil {
-		log.Errorf("load hotpatch code error: %s", err)
+		log.Errorf("load hotPatch code error: %s", err)
 		return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
 			return []string{s}
 		})
 	}
-	return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+	return mutate.Fuzz_WithExtraFuzzTagHandlerEx("yak", func(s string) []*fuzztag.FuzzExecResult {
+		var result []*fuzztag.FuzzExecResult
 		var handle, params, _ = strings.Cut(s, "|")
-		results, err := codeEnv.CallYakFunction(ctx, handle, []any{params})
-		if err != nil {
-			log.Errorf("call hotpatch code error: %s", err)
-			return []string{}
+		pushNewResult := func(d []byte, verbose []string) {
+			result = append(result, fuzztag.NewFuzzExecResult(d, verbose))
 		}
-		return utils.InterfaceToStringSlice(results)
+		data, err := codeEnv.CallYakFunction(ctx, handle, []any{params})
+		if err != nil {
+			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
+			pushNewResult([]byte(errInfo), []string{errInfo})
+			log.Errorf("call hotPatch code error: %s", err)
+			return result
+		}
+		pushNewResult(utils.InterfaceToBytes(data), []string{""})
+		return result
 	})
 }
 

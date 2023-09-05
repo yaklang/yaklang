@@ -23,6 +23,10 @@ func (f *FuzzTagConfig) AddFuzzTagHandler(tag string, handler func(string) []str
 	f.tagHandlers[tag] = handler
 }
 
+func (f *FuzzTagConfig) AddFuzzTagHandlerEx(tag string, handler func(string) []*fuzztag.FuzzExecResult) {
+	f.tagHandlersEx[tag] = handler
+}
+
 func (f *FuzzTagConfig) GetFuzzTagHandler(tag string) func(string) []string {
 	return f.tagHandlers[tag]
 }
@@ -87,11 +91,9 @@ func Fuzz_WithExtraFuzzTagHandler(tag string, handler func(string) []string) Fuz
 	}
 }
 
-func Fuzz_WithExtraFuzzTagHandlerEx(tag string, handler func(string) interface{}) FuzzConfigOpt {
+func Fuzz_WithExtraFuzzTagHandlerEx(tag string, handler func(string) []*fuzztag.FuzzExecResult) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
-		config.AddFuzzTagHandler(tag, func(s string) []string {
-			return utils2.InterfaceToStringSlice(s)
-		})
+		config.AddFuzzTagHandlerEx(tag, handler)
 	}
 }
 
