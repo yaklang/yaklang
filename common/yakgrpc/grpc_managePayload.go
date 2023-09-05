@@ -17,12 +17,9 @@ import (
 )
 
 func TrimWhitespaceExceptSpace(r rune) bool {
-	if uint32(r) <= '\u00FF' {
-		switch r {
-		case '\t', '\n', '\v', '\f', '\r', 0x85, 0xA0:
-			return true
-		}
-		return false
+	switch r {
+	case '\t', '\n', '\v', '\f', '\r', 0x85, 0xA0:
+		return true
 	}
 	return false
 }
