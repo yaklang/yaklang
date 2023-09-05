@@ -81,6 +81,7 @@ var defaultInvalidSuffix = []string{
 	".doc", ".docx", ".pptx",
 	".ppt", ".pdf",
 	".swf",
+	".json", "./",
 }
 
 var jsContentTypes = []string{

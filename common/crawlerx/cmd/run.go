@@ -134,6 +134,10 @@ func loadFromFile(filePath string) []crawlerx.ConfigOpt {
 		crawlerx.WithSensitiveWords(getSliceFromString(sensitiveWord)),
 		crawlerx.WithLeakless(leakless),
 		crawlerx.WithLocalStorage(map[string]string{"abc": "123"}),
+		crawlerx.WithConcurrent(1),
+		crawlerx.WithLocalStorage(map[string]string{"test": "abc"}),
+		crawlerx.WithStealth(true),
+		crawlerx.WithVue(true),
 	)
 	maxDepthInt, err := strconv.Atoi(maxDepth)
 	if err == nil {

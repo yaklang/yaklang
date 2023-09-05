@@ -11,7 +11,20 @@ import (
 	"time"
 )
 
-var invalidUrl = []string{"", "#", "javascript:;"}
+var invalidUrl = []string{"", "#", "javascript:;", "#/"}
+
+const findHref = `() => {
+    let nodes = document.createNodeIterator(document.getRootNode())
+    let hrefs = [];
+    let node;
+    while ((node = nodes.nextNode())) {
+        let {href} = node;
+        if (href) {
+            hrefs.push(href)
+        }
+    }
+    return hrefs
+}`
 
 func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 	originUrl, _ := getCurrentUrl(page)
@@ -82,6 +95,134 @@ func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 	return nil
 }
 
+func (starter *BrowserStarter) normalActionOnPage(page *rod.Page) error {
+	var err error
+	originUrl, _ := getCurrentUrl(page)
+	urls, err := starter.getUrls(page)
+	if err != nil {
+		return utils.Errorf(`Page %s get urls error: %s`, originUrl, err)
+	}
+	err = starter.doInput(originUrl, page)
+	if err != nil {
+		return utils.Errorf(`do input error: %v`, err)
+	}
+	for _, url := range urls {
+		if starter.banList.Exist(url) {
+			continue
+		}
+		err = starter.urlsExploit(originUrl, url)
+		if err != nil {
+			return utils.Errorf(`Url %v from %v exploit error: %v`, url, originUrl, err.Error())
+		}
+	}
+	clickSelectors, err := starter.getClickElements(page)
+	if err != nil {
+		return utils.Errorf(`Page %s get click elements error: %s`, originUrl, err)
+	}
+	for _, clickSelector := range clickSelectors {
+		err = starter.clickElementsExploit(page, originUrl, clickSelector)
+		if err != nil {
+			return utils.Errorf(`Page %v click selector %v error: %v`, originUrl, clickSelector, err.Error())
+		}
+	}
+	return nil
+}
+
+func (starter *BrowserStarter) eventActionOnPage(page *rod.Page) error {
+	originUrl, _ := getCurrentUrl(page)
+	err := starter.doInput(originUrl, page)
+	if err != nil {
+		return utils.Errorf(`do input error: %v`, err)
+	}
+	eventSelectors, err := starter.getEventElements(page)
+	if err != nil {
+		return utils.Errorf(`Page %s get event elements error: %s`, originUrl, err)
+	}
+	for _, eventSelector := range eventSelectors {
+		err = starter.eventElementsExploit(page, originUrl, eventSelector)
+		if err != nil {
+			return utils.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+		}
+	}
+	return nil
+}
+
+func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
+	if starter.vue {
+		log.Info("determined vue.")
+		return starter.eventActionOnPage(page)
+	}
+	status, err := starter.vueCheck(page)
+	if err != nil {
+		return utils.Errorf(`check vue error: %v`, err)
+	}
+	if status {
+		log.Info("presume vue")
+		return starter.eventActionOnPage(page)
+	} else {
+		return starter.normalActionOnPage(page)
+	}
+}
+
+func (starter *BrowserStarter) vueCheck(page *rod.Page) (bool, error) {
+	urlObj, err := page.Eval(findHref)
+	if err != nil {
+		return false, utils.Errorf(`page find href error: %v`, err)
+	}
+	urlArr := urlObj.Value.Arr()
+	for _, url := range urlArr {
+		if StringArrayContains(invalidUrl, url.String()) {
+			continue
+		}
+		if StringSuffixList(url.String(), starter.invalidSuffix) {
+			continue
+		} else {
+			return false, nil
+		}
+	}
+	submitInfo := map[string]map[string][]string{
+		"input": {
+			"type": {
+				"submit",
+			},
+		},
+		"button": {
+			"type": {
+				"submit",
+			},
+		},
+	}
+	submitElements, err := customizedGetElement(page, submitInfo)
+	if err != nil {
+		return false, utils.Errorf(`get submit elements error: %s`, err)
+	}
+	if len(submitElements) == 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (starter *BrowserStarter) doInput(originUrl string, page *rod.Page) error {
+	inputElements, err := starter.getInputElements(page)
+	if err != nil {
+		return utils.Errorf(`Page %s get input elements error: %s`, originUrl, err)
+	}
+	for _, inputElement := range inputElements {
+		visible, err := inputElement.Visible()
+		if err != nil {
+			return utils.Errorf(`get element visible error: %v`, err)
+		}
+		if !visible {
+			continue
+		}
+		err = starter.inputElementsExploit(inputElement)
+		if err != nil {
+			return utils.Errorf(`Page %v input element %v error: %v`, originUrl, inputElement, err.Error())
+		}
+	}
+	return nil
+}
+
 func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, error) {
 	return func(page *rod.Page) ([]string, error) {
 		urls := make([]string, 0)
@@ -100,9 +241,9 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 			if currentNode == nil {
 				log.Infof(`Origin url %s current node not found.`, originUrl)
 			} else {
-				log.Infof(`Current node %s depth: %d`, originUrl, currentNode.Level())
+				//log.Infof(`Current node %s depth: %d`, originUrl, currentNode.Level())
 				if currentNode.Level() > starter.maxDepth {
-					log.Infof(`Origin url %s reach max depth %d`, originUrl, starter.maxDepth)
+					//log.Infof(`Origin url %s reach max depth %d`, originUrl, starter.maxDepth)
 					return urls, nil
 				}
 			}
@@ -286,6 +427,51 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 				return nil
 			}
 			err = starter.urlsExploit(originUrl, currentUrl)
+			if err != nil {
+				return utils.Errorf(`Url %v from %v exploit error: %v`, currentUrl, originUrl, err.Error())
+			}
+		}
+		return nil
+	}
+}
+
+func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string, string) error {
+	return func(page *rod.Page, originUrl string, eventSelector string) error {
+		status := starter.clickElementOnPageBySelector(page, eventSelector)
+		if !status {
+			return nil
+		}
+		currentUrl, _ := getCurrentUrl(page)
+		if currentUrl != "" && currentUrl != originUrl {
+			defer func() {
+				err := page.Navigate(originUrl)
+				if err != nil {
+					log.Errorf("page navigate %s error: %s", originUrl, err)
+					return
+				}
+				page.MustWaitLoad()
+				if starter.extraWaitLoadTime != 0 {
+					time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
+				}
+			}()
+			checkUrl := currentUrl
+			if starter.urlAfterRepeat != nil {
+				checkUrl = starter.urlAfterRepeat(checkUrl)
+			}
+			if !starter.resultSent(checkUrl) {
+				return nil
+			}
+			result := SimpleResult{
+				url:        currentUrl,
+				resultType: "event url",
+				method:     "EVENT GET",
+				from:       originUrl,
+			}
+			starter.ch <- &result
+			if starter.banList.Exist(currentUrl) {
+				return nil
+			}
+			err := starter.urlsExploit(originUrl, currentUrl)
 			if err != nil {
 				return utils.Errorf(`Url %v from %v exploit error: %v`, currentUrl, originUrl, err.Error())
 			}
