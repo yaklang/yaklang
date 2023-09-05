@@ -311,6 +311,9 @@ if !skippedHostAliveScan {
 			aliveHostCount ++
 			yakit.Info("ping onResult: %v", res)
 			aliveHostStr += res.IP + "\n"
+			aliveHost.NewAliveHost(
+                res.IP,
+            )
 		}
 		ScanHostCount++
 		showAliveHostCount()
