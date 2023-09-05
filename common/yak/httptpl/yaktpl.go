@@ -36,8 +36,7 @@ type RequestConfig struct {
 	IsHTTPS              bool
 }
 type YakTemplate struct {
-	Comments []string
-	RequestConfig
+	//RequestConfig
 	Id            string   `json:"id"`
 	Name          string   `json:"name"`
 	NameZh        string   `json:"nameZh,omitempty"`
@@ -59,10 +58,11 @@ type YakTemplate struct {
 
 	// placeHolderMap
 	PlaceHolderMap map[string]string
+	Variables      *YakVariables
 }
 
 type YakRequestBulkConfig struct {
-	RequestConfig
+	//RequestConfig
 
 	Matcher   *YakMatcher
 	Extractor []*YakExtractor
@@ -78,13 +78,17 @@ type YakRequestBulkConfig struct {
 
 	// req-condition - 为 true 的时候，要等所有的请求发送完在执行 Matcher
 	AfterRequested bool
-
+	Method         string
+	Paths          []string
+	Headers        map[string]string
+	Body           string
+	MaxRedirects   int
+	EnableRedirect bool
 	// batteringram is not valid!
 	// pitchfork means sync
 	// cluster bomb means cartesian product
 	AttackMode       string // sync // cartesian
 	InheritVariables bool
-	HotPatchCode     string
 }
 
 func (c *YakRequestBulkConfig) GenerateRaw() []*RequestBulk {
