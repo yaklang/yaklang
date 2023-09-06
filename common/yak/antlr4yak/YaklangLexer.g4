@@ -180,7 +180,7 @@ mode TEMPLATE_DOUBLE_QUOTE_MODE;
 mode TEMPLATE_BACKTICK_MODE;
     TemplateBackTickStringCharacterStringEnd:                 '`' {this.DecreaseTemplateDepth();} -> popMode;
     TemplateBackTickStringCharacter
-        : ~[`"\\$]
+        : ~[`\\$]
         | '\\' EscapeSequence
         | '\\$'
         | '\\`'
