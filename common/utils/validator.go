@@ -9,10 +9,25 @@ import (
 )
 
 var (
-	domainRe = regexp2.MustCompile(`(?=^.{3,255}$)[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z][a-zA-Z]{2,62})+$`, regexp2.Singleline|regexp2.IgnoreCase)
+	domainRe = regexp2.MustCompile(`^(((?!-))(xn--|_)?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$`, regexp2.Singleline|regexp2.IgnoreCase)
 )
 
 func IsValidDomain(raw string) bool {
+	var isIDN bool
+	for _, b := range raw {
+		if b > 127 {
+			isIDN = true
+			continue
+		}
+		if !(b >= 'a' && b <= 'z') && !(b >= 'A' && b <= 'Z') && !(b >= '0' && b <= '9') && b != '-' && b != '.' && b != '_' {
+			return false
+		}
+	}
+
+	if isIDN {
+		return strings.Trim(raw, ".-") == raw
+	}
+
 	result, err := domainRe.MatchString(raw)
 	if err != nil {
 		log.Errorf("domain match failed; %s", err)
