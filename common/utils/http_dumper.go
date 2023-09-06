@@ -32,7 +32,7 @@ func ShouldRemoveZeroContentLengthHeader(s string) bool {
 const CRLF = "\r\n"
 
 func getHeaderValueAll(header http.Header, key string) string {
-	return strings.Join(getHeaderValueList(header, key), ", ")
+	return strings.Join(getHeaderValueList(header, key), "; ")
 }
 
 func getHeaderValue(header http.Header, key string) string {
@@ -49,7 +49,10 @@ func getHeaderValueList(header http.Header, key string) []string {
 	}
 	cKey := http.CanonicalHeaderKey(key)
 	if key == cKey {
-		return []string{header.Get(key)}
+		if raw, ok := header[key]; ok {
+			return raw
+		}
+		return []string{}
 	}
 
 	v1, _ := header[key]
@@ -95,6 +98,11 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		contentLengthInt        int64
 	)
 
+	header := make(http.Header)
+	for k, v := range rsp.Header {
+		header[k] = v
+	}
+
 	// handle transfer-encoding
 	if len(rsp.TransferEncoding) > 0 {
 		for _, v := range rsp.TransferEncoding {
@@ -105,7 +113,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		}
 	}
 	if !transferEncodingChunked {
-		if ret := getHeaderValue(rsp.Header, "transfer-encoding"); ret != "" {
+		if ret := getHeaderValue(header, "transfer-encoding"); ret != "" {
 			if strings.Contains(ret, "chunked") {
 				transferEncodingChunked = true
 			}
@@ -117,7 +125,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		contentLengthExisted = true
 		contentLengthInt = rsp.ContentLength
 	} else {
-		if ret := getHeaderValue(rsp.Header, "content-length"); ret != "" {
+		if ret := getHeaderValue(header, "content-length"); ret != "" {
 			contentLengthExisted = true
 			rsp.ContentLength = int64(codec.Atoi(ret))
 			contentLengthInt = rsp.ContentLength
@@ -155,24 +163,24 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 	buf.Flush()
 
 	// handle server first
-	shrinkHeader(rsp.Header, "server")
-	if ret := rsp.Header.Get("server"); ret != "" {
-		rsp.Header.Set("Server", ret)
+	shrinkHeader(header, "server")
+	if ret := header.Get("server"); ret != "" {
+		header.Set("Server", ret)
 		buf.WriteString("Server: ")
 		buf.WriteString(ret)
 		buf.WriteString(CRLF)
 		buf.Flush()
 	}
 
-	shrinkHeader(rsp.Header, "content-length")
-	for k := range rsp.Header {
+	shrinkHeader(header, "content-length")
+	for k := range header {
 		switch strings.ToLower(k) {
 		case "transfer-encoding", "content-length", "server":
 			continue
 		}
 		buf.WriteString(k)
 		buf.WriteString(": ")
-		buf.WriteString(getHeaderValueAll(rsp.Header, k))
+		buf.WriteString(getHeaderValueAll(header, k))
 		buf.WriteString(CRLF)
 	}
 
@@ -238,6 +246,12 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		contentLengthExisted    bool
 		contentLengthInt        int64
 	)
+
+	header := make(http.Header)
+	for k, v := range req.Header {
+		header[k] = v
+	}
+
 	_ = contentLengthInt
 	if len(req.TransferEncoding) > 0 {
 		for _, v := range req.TransferEncoding {
@@ -248,7 +262,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		}
 	}
 	if !transferEncodingChunked {
-		if ret := getHeaderValue(req.Header, "transfer-encoding"); ret != "" {
+		if ret := getHeaderValue(header, "transfer-encoding"); ret != "" {
 			if strings.Contains(ret, "chunked") {
 				transferEncodingChunked = true
 			}
@@ -259,7 +273,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		h2 = true
 	}
 
-	if ret := getHeaderValue(req.Header, "content-length"); ret != "" || req.ContentLength > 0 {
+	if ret := getHeaderValue(header, "content-length"); ret != "" || req.ContentLength > 0 {
 		contentLengthExisted = true
 		if ret != "" {
 			contentLengthInt = int64(codec.Atoi(ret))
@@ -287,7 +301,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 
 	// handle host
 	buf.WriteString("Host: ")
-	if ret := getHeaderValue(req.Header, "host"); ret == "" {
+	if ret := getHeaderValue(header, "host"); ret == "" {
 		if req.Host != "" {
 			buf.WriteString(req.Host)
 		} else if req.URL.Host != "" {
@@ -297,14 +311,14 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		buf.WriteString(ret)
 	}
 	buf.WriteString(CRLF)
-	shrinkHeader(req.Header, "content-type")
+	shrinkHeader(header, "content-type")
 
-	for k := range req.Header {
+	for k := range header {
 		switch strings.ToLower(k) {
 		case "host", "content-length", "transfer-encoding":
 			continue
 		}
-		val := getHeaderValueAll(req.Header, k)
+		val := getHeaderValueAll(header, k)
 		buf.WriteString(k)
 		buf.WriteString(": ")
 		buf.WriteString(val)
