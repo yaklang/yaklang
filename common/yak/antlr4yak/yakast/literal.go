@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -351,39 +352,25 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 		Expression() yak.IExpressionContext
 	}
 	var tempString string
-	var needUnquote = false
-	//yakDoubleQuoteEscapeChar := func(s string) string {
-	//	return s
-	//}
-	//yakBackTickQuoteEscapeChar := func(s string) string {
-	//	return s
-	//}
-	yakTemplateDoubleQuoteEscapeChar := func(s string) string {
-		escapeString, err := yakunquote.UnquoteInner(s, '"')
+	var quote byte
+	yakTemplateQuoteEscapeChar := func(s string) string {
+		s = strings.Replace(s, "\\$", "$", -1)
+		if quote == '`' {
+			s = strings.Replace(s, "\\n", "\\\\n", -1)
+			s = strings.Replace(s, "\\r", "\\\\r", -1)
+		}
+		escapeString, err := yakunquote.UnquoteInner(s, quote)
 		if err != nil {
 			y.panicCompilerError(compileError, err)
 		}
 		return escapeString
 	}
-	yakTemplateBackTickQuoteEscapeChar := func(s string) string {
-		s = strings.Replace(s, "\\n", "\\\\n", -1)
-		s = strings.Replace(s, "\\r", "\\\\r", -1)
-		escapeString, err := yakunquote.UnquoteInner(s, '`')
-		if err != nil {
-			y.panicCompilerError(compileError, err)
-		}
-		return escapeString
-	}
+
 	pushStringAtom := func(atom StringAtom) {
 		exp := atom.Expression()
 		if exp != nil {
-			if needUnquote {
-				tempString = yakTemplateDoubleQuoteEscapeChar(tempString)
-				y.pushString(tempString, tempString)
-			} else {
-				tempString = yakTemplateBackTickQuoteEscapeChar(tempString)
-				y.pushString(tempString, tempString)
-			}
+			tempString = yakTemplateQuoteEscapeChar(tempString)
+			y.pushString(tempString, tempString)
 
 			tempString = ""
 			y.pushOperator(yakvm.OpAdd)
@@ -395,53 +382,56 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 			tempString += atom.GetText()
 		}
 	}
+
+	handleTemplate := func(prefix byte, getAtoms func() []StringAtom) {
+		quote = prefix
+		y.pushString("", "")
+		atoms := getAtoms()
+		for _, item := range atoms {
+			pushStringAtom(item)
+		}
+		if tempString != "" {
+			tempString = yakTemplateQuoteEscapeChar(tempString)
+			y.pushString(tempString, tempString)
+			tempString = ""
+			y.pushOperator(yakvm.OpAdd)
+		}
+	}
+
 	i, _ := raw.(*yak.TemplateStringLiteralContext)
 	if i == nil {
 		return nil
 	}
 	if ilit := i.TemplateDoubleQuoteStringLiteral(); ilit != nil {
-		lit, _ := ilit.(*yak.TemplateDoubleQuoteStringLiteralContext)
-		needUnquote = true
-		if lit != nil {
-			y.pushString("", "")
-			stringAtoms := lit.AllTemplateDoubleQupteStringAtom()
-			for _, iatom := range stringAtoms {
-				atom, ok := iatom.(*yak.TemplateDoubleQupteStringAtomContext)
-				if !ok {
-					continue
-				}
-				pushStringAtom(atom)
-			}
-			if tempString != "" {
-				tempString = yakTemplateDoubleQuoteEscapeChar(tempString)
-				y.pushString(tempString, tempString)
-				tempString = ""
-				y.pushOperator(yakvm.OpAdd)
-			}
-			return nil
+		if lit, _ := ilit.(*yak.TemplateDoubleQuoteStringLiteralContext); lit != nil {
+			handleTemplate('"', func() []StringAtom {
+				return lo.FilterMap(lit.AllTemplateDoubleQupteStringAtom(), func(atom yak.ITemplateDoubleQupteStringAtomContext, _ int) (StringAtom, bool) {
+					item, ok := atom.(*yak.TemplateDoubleQupteStringAtomContext)
+					return item, ok
+				})
+			})
 		}
 	} else if ilit := i.TemplateBackTickStringLiteral(); ilit != nil {
-		lit, _ := ilit.(*yak.TemplateBackTickStringLiteralContext)
-		if lit != nil {
-			y.pushString("", "")
-			stringAtoms := lit.AllTemplateBackTickStringAtom()
-			for _, iatom := range stringAtoms {
-				atom, ok := iatom.(*yak.TemplateBackTickStringAtomContext)
-				if !ok {
-					continue
-				}
-				pushStringAtom(atom)
-			}
-			if tempString != "" {
-				tempString = yakTemplateBackTickQuoteEscapeChar(tempString)
-				y.pushString(tempString, tempString)
-				tempString = ""
-				y.pushOperator(yakvm.OpAdd)
-			}
-			return nil
+		if lit, _ := ilit.(*yak.TemplateBackTickStringLiteralContext); lit != nil {
+			handleTemplate('`', func() []StringAtom {
+				return lo.FilterMap(lit.AllTemplateBackTickStringAtom(), func(atom yak.ITemplateBackTickStringAtomContext, _ int) (StringAtom, bool) {
+					item, ok := atom.(*yak.TemplateBackTickStringAtomContext)
+					return item, ok
+				})
+			})
 		}
+	} else if ilit := i.TemplateSingleQuoteStringLiteral(); ilit != nil {
+		if lit, _ := ilit.(*yak.TemplateSingleQuoteStringLiteralContext); lit != nil {
+			handleTemplate('\'', func() []StringAtom {
+				return lo.FilterMap(lit.AllTemplateSingleQupteStringAtom(), func(atom yak.ITemplateSingleQupteStringAtomContext, _ int) (StringAtom, bool) {
+					item, ok := atom.(*yak.TemplateSingleQupteStringAtomContext)
+					return item, ok
+				})
+			})
+		}
+	} else {
+		y.panicCompilerError(compileError, "parse template string literal error")
 	}
-	y.panicCompilerError(compileError, "parse template string literal error")
 
 	//y.pushString(i.GetText())
 	return nil

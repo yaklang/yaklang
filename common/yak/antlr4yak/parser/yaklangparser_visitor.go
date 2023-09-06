@@ -179,6 +179,9 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
+	// Visit a parse tree produced by YaklangParser#templateSingleQuoteStringLiteral.
+	VisitTemplateSingleQuoteStringLiteral(ctx *TemplateSingleQuoteStringLiteralContext) interface{}
+
 	// Visit a parse tree produced by YaklangParser#templateDoubleQuoteStringLiteral.
 	VisitTemplateDoubleQuoteStringLiteral(ctx *TemplateDoubleQuoteStringLiteralContext) interface{}
 
@@ -187,6 +190,9 @@ type YaklangParserVisitor interface {
 
 	// Visit a parse tree produced by YaklangParser#templateStringLiteral.
 	VisitTemplateStringLiteral(ctx *TemplateStringLiteralContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#templateSingleQupteStringAtom.
+	VisitTemplateSingleQupteStringAtom(ctx *TemplateSingleQupteStringAtomContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#templateDoubleQupteStringAtom.
 	VisitTemplateDoubleQupteStringAtom(ctx *TemplateDoubleQupteStringAtomContext) interface{}
