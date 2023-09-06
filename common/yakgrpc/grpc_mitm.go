@@ -279,35 +279,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		})
 	}
 
-	var shouldDediver = func(method string, hostport, urlStr string, ext string, isHttps bool) bool {
-		var passed bool
-
-		passed = _exactChecker(nil, filterManager.ExcludeMethods, method)
-		if !passed {
-			log.Debugf("[%v] url: %s is filtered via method", method, truncate(urlStr))
-			return false
-		}
-
-		passed = _exactChecker(filterManager.IncludeSuffix, filterManager.ExcludeSuffix, strings.ToLower(ext))
-		if !passed {
-			log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
-			return false
-		}
-
-		passed = _checker(filterManager.IncludeHostnames, filterManager.ExcludeHostnames, hostport)
-		if !passed {
-			log.Debugf("url: %s is filtered via hostnames(%v)", truncate(urlStr), hostport)
-			return false
-		}
-
-		passed = _checker(filterManager.IncludeUri, filterManager.ExcludeUri, urlStr)
-		if !passed {
-			log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
-			return false
-		}
-		return true
-	}
-
 	var responseShouldBeHijacked = func(contentType string, isHttps bool) bool {
 		return _checker(nil, filterManager.ExcludeMIME, contentType)
 	}
@@ -1146,8 +1117,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		var shouldBeDeliveredToUser = shouldDediver(method, hostname, urlStr, extName, isHttps)
-		if !shouldBeDeliveredToUser {
+		if !filterManager.Filter(method, hostname, urlStr, extName, isHttps) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
