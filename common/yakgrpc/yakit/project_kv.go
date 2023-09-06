@@ -1,12 +1,19 @@
 package yakit
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"time"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+)
+
+const (
+	BARE_REQUEST_GROUP  = "FLOW_ID_TO_BARE_REQUEST"
+	BARE_RESPONSE_GROUP = "FLOW_ID_TO_BARE_RESPONSE"
 )
 
 type ProjectGeneralStorage struct {
@@ -59,6 +66,33 @@ func GetProjectKey(db *gorm.DB, key interface{}) string {
 		return kv.Value
 	}
 	return v
+}
+
+func setKVBare(db *gorm.DB, keyStr string, buf []byte, group string) error {
+	if db == nil {
+		return utils.Error("no set database")
+	}
+	var valueStr string
+
+	if len(buf) > 0 {
+		valueStr = codec.EncodeBase64(buf)
+	}
+	if db := db.Model(&ProjectGeneralStorage{}).Debug().Where(`"group" = ? and key = ?`, group, keyStr).Assign(map[string]interface{}{
+		"key": keyStr, "value": valueStr, "group": group,
+	}).FirstOrCreate(&ProjectGeneralStorage{}); db.Error != nil {
+		return utils.Errorf("create project storage kv failed: %s", db.Error)
+	}
+	return nil
+}
+
+func SetKVBareRequest(db *gorm.DB, key uint, reqBytes []byte) error {
+	keyStr := strconv.FormatUint(uint64(key), 10) + "_request"
+	return setKVBare(db, keyStr, reqBytes, BARE_REQUEST_GROUP)
+}
+
+func SetKVBareResponse(db *gorm.DB, key uint, rspBytes []byte) error {
+	keyStr := strconv.FormatUint(uint64(key), 10) + "_response"
+	return setKVBare(db, keyStr, rspBytes, BARE_RESPONSE_GROUP)
 }
 
 func SetProjectKey(db *gorm.DB, key interface{}, value interface{}) error {
