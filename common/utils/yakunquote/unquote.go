@@ -72,10 +72,6 @@ func UnquoteChar(s string, quote byte) (value rune, multibyte bool, tail string,
 		value = '\t'
 	case 'v':
 		value = '\v'
-	case '$':
-		value = '$'
-	case '`':
-		value = '`'
 	case 'x', 'u', 'U':
 		n := 0
 		switch c {
@@ -133,11 +129,7 @@ func UnquoteChar(s string, quote byte) (value rune, multibyte bool, tail string,
 		value = v
 	case '\\':
 		value = '\\'
-	case '\'', '"':
-		// if c != quote {
-		// 	err = strconv.ErrSyntax
-		// 	return
-		// }
+	case '\'', '"', '`':
 		value = rune(c)
 	default:
 		err = strconv.ErrSyntax

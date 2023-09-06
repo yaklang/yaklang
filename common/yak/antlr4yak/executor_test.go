@@ -3213,9 +3213,9 @@ assert len(a) == 30
 func TestNewExecutor_TemplateStringFix2(t *testing.T) {
 	code := `
 assert f"\'" == "'"
-assert f` + "`" + `"` + "`" + ` == "\""
+assert f` + "`" + `"a` + "`" + ` == '"a'
 assert f` + "`" + `\n` + "`" + ` == "\\n"
-assert "\$" == "$"
+assert f"\$" == "$"
 assert '\'a' == "'a"
 `
 	_marshallerTest(code)
@@ -3254,6 +3254,8 @@ func TestNewExecutor_TemplateString(t *testing.T) {
 	_formattest(code)
 
 	code = `
+	assert f'\"a' == '"a'
+	assert f'\'a' == "'a"
 	
 	name = f"小明"
 	age = 18
@@ -3265,6 +3267,23 @@ func TestNewExecutor_TemplateString(t *testing.T) {
 	_marshallerTest(code)
 	_formattest(code)
 }
+
+func TestNewExecutor_TemplateStringSingleQuote(t *testing.T) {
+	code := `
+	abc = f'abc${1+1}'; 
+	assert abc == 'abc2'
+
+	name = f'小明'
+	age = 18
+	assert f'${name} + 1' == '小明 + 1'
+	a = f'username: ${name} password: ${age+1}'
+	assert a == 'username: 小明 password: 19'
+	`
+
+	_marshallerTest(code)
+	_formattest(code)
+}
+
 func TestNewExecutor_HexString(t *testing.T) {
 	code := `
 a = 0h1234
