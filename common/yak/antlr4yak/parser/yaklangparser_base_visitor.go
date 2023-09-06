@@ -236,6 +236,10 @@ func (v *BaseYaklangParserVisitor) VisitStringLiteral(ctx *StringLiteralContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseYaklangParserVisitor) VisitTemplateSingleQuoteStringLiteral(ctx *TemplateSingleQuoteStringLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseYaklangParserVisitor) VisitTemplateDoubleQuoteStringLiteral(ctx *TemplateDoubleQuoteStringLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -245,6 +249,10 @@ func (v *BaseYaklangParserVisitor) VisitTemplateBackTickStringLiteral(ctx *Templ
 }
 
 func (v *BaseYaklangParserVisitor) VisitTemplateStringLiteral(ctx *TemplateStringLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitTemplateSingleQupteStringAtom(ctx *TemplateSingleQupteStringAtomContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

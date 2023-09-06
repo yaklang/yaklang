@@ -257,6 +257,9 @@ numericLiteral
 stringLiteral
     : StringLiteral
     ;
+templateSingleQuoteStringLiteral
+    : TemplateSingleQuoteStringStart (templateSingleQupteStringAtom)* TemplateSingleQuoteStringCharacterStringEnd
+    ;
 templateDoubleQuoteStringLiteral
     : TemplateDoubleQuoteStringStart (templateDoubleQupteStringAtom)* TemplateDoubleQuoteStringCharacterStringEnd
     ;
@@ -264,7 +267,11 @@ templateBackTickStringLiteral
     : TemplateBackTickStringStart (templateBackTickStringAtom)* TemplateBackTickStringCharacterStringEnd
     ;
 templateStringLiteral
-    : templateDoubleQuoteStringLiteral | templateBackTickStringLiteral
+    : templateSingleQuoteStringLiteral | templateDoubleQuoteStringLiteral | templateBackTickStringLiteral 
+    ;
+templateSingleQupteStringAtom
+    :TemplateSingleQuoteStringCharacter+
+    | TemplateSingleQuoteStringStartExpression expression TemplateCloseBrace
     ;
 templateDoubleQupteStringAtom
     :TemplateDoubleQuoteStringCharacter+

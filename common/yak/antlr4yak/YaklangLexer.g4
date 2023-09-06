@@ -147,6 +147,9 @@ FloatLiteral
     : DecimalIntegerLiteral '.' [0-9]+
     | '.' [0-9]+
     ;
+TemplateSingleQuoteStringStart
+    : 'f\''  {this.IncreaseTemplateDepth();} -> pushMode(TEMPLATE_SINGLE_QUOTE_MODE)
+    ;
 TemplateDoubleQuoteStringStart
     : 'f"'  {this.IncreaseTemplateDepth();} -> pushMode(TEMPLATE_DOUBLE_QUOTE_MODE)
     ;
@@ -167,6 +170,16 @@ StringLiteral
 CharacterLiteral
     : '\'' SingleStringCharacter '\''
     ;
+
+mode TEMPLATE_SINGLE_QUOTE_MODE;
+    TemplateSingleQuoteStringCharacterStringEnd:                 '\'' {this.DecreaseTemplateDepth();} -> popMode;
+    TemplateSingleQuoteStringCharacter
+        : ~['\\\r\n$]
+        | '\\' EscapeSequence
+        | '\\$'
+        ;
+    TemplateSingleQuoteStringStartExpression:  '${' -> pushMode(DEFAULT_MODE);
+
 
 mode TEMPLATE_DOUBLE_QUOTE_MODE;
     TemplateDoubleQuoteStringCharacterStringEnd:                 '"' {this.DecreaseTemplateDepth();} -> popMode;
