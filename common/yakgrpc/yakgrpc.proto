@@ -3778,11 +3778,7 @@ message DefaultDnsServerResponse{
 
 message HTTPFlowBareRequest {
   int64 Id = 1;
-  enum Type {
-    Request = 0;
-    Response = 1;
-  }
-  Type BareType = 2;
+  string BareType = 2;
 }
 
 message HTTPFlowBareResponse {

@@ -448,7 +448,7 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 	db := s.GetProjectDatabase()
 	id, typ := req.GetId(), req.GetBareType()
 	suffix := "_request"
-	if typ == ypb.HTTPFlowBareRequest_Response {
+	if typ == "response" {
 		suffix = "_response"
 	}
 	var (
