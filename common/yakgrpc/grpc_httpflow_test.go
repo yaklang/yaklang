@@ -95,4 +95,7 @@ Host: www.example.com
 		t.Fatal("should be cached")
 	}
 	_ = response
+	if len(response.GetResponse()) < 1000*800 {
+		t.Fatal("response is missed")
+	}
 }
