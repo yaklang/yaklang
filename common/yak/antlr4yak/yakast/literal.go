@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -358,19 +359,16 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 	//	return s
 	//}
 	yakTemplateDoubleQuoteEscapeChar := func(s string) string {
-		s = strings.Replace(s, "\\$", "$", -1)
-		escapeString, err := strconv.Unquote("\"" + s + "\"")
+		escapeString, err := yakunquote.UnquoteInner(s, '"')
 		if err != nil {
 			y.panicCompilerError(compileError, err)
 		}
 		return escapeString
 	}
 	yakTemplateBackTickQuoteEscapeChar := func(s string) string {
-		s = strings.Replace(s, "\\$", "$", -1)
-		s = strings.Replace(s, "\n", "\\n", -1)
-		s = strings.Replace(s, "\r", "\\r", -1)
-		s = strings.Replace(s, "\\`", "`", -1)
-		escapeString, err := strconv.Unquote("\"" + s + "\"")
+		s = strings.Replace(s, "\\n", "\\\\n", -1)
+		s = strings.Replace(s, "\\r", "\\\\r", -1)
+		escapeString, err := yakunquote.UnquoteInner(s, '`')
 		if err != nil {
 			y.panicCompilerError(compileError, err)
 		}
@@ -484,7 +482,7 @@ ParseStrLit:
 			prefix = 0
 			y.pushPrefixString(prefix, val, i.GetText())
 		} else {
-			val, err := strconv.Unquote(text)
+			val, err := yakunquote.Unquote(text)
 			if err != nil {
 				y.panicCompilerError(compileError, utils.Errorf("parse %v to string literal failed: %s", i.GetText(), err.Error()))
 			}
@@ -501,14 +499,7 @@ ParseStrLit:
 			prefix = 0
 			y.pushPrefixString(prefix, val, i.GetText())
 		} else {
-			if lit := i.GetText(); len(lit) >= 2 {
-				text = lit[1 : len(lit)-1]
-			} else {
-				text = lit
-			}
-			text = strings.Replace(text, "\\'", "'", -1)
-			text = strings.Replace(text, `"`, `\"`, -1)
-			val, err := strconv.Unquote(`"` + text + `"`)
+			val, err := yakunquote.Unquote(text)
 			if err != nil {
 				y.panicCompilerError(compileError, utils.Errorf("parse %v to string literal failed: %s", i.GetText(), err.Error()))
 			}

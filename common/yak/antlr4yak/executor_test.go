@@ -3210,21 +3210,36 @@ assert len(a) == 30
 	_marshallerTest(code)
 	_formattest(code)
 }
+func TestNewExecutor_TemplateStringFix2(t *testing.T) {
+	code := `
+assert f"\'" == "'"
+assert f` + "`" + `"` + "`" + ` == "\""
+assert f` + "`" + `\n` + "`" + ` == "\\n"
+assert "\$" == "$"
+assert '\'a' == "'a"
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
 func TestNewExecutor_TemplateStringFix(t *testing.T) {
 	code := `
 name = "张三"
+
 //测试double quote template
 assert f"姓名1: \$${name}\\1\n姓名2: \$${name}\\2" == ` + "`" + `姓名1: $张三\1
 姓名2: $张三\2` + "`" + `
+
 //测试double quote
 assert "姓名1: ${name}\\1\n姓名2: ${name}\\2" == ` + "`" + `姓名1: ${name}\1
 姓名2: ${name}\2` + "`" + `
-//print(f` + "`" + `姓名1: \$${name}\\1
-//姓名2: \$` + "\\`" + `${name}` + "\\`" + `\\2` + "`" + `)
-//print("姓名1: $张三\\1\n姓名2: $张三\\2")
+
 //测试back tick template
 assert f` + "`" + `姓名1: \$${name}\\1
 姓名2: \$` + "\\`" + `${name}` + "\\`" + `\\2` + "`" + ` == "姓名1: $张三\\1\n姓名2: $` + "`" + `张三` + "`" + `\\2"
+
+//测试back tick template with "\n"
+assert f` + "`" + `姓名1: \$${name}\\1\n姓名2: \$` + "\\`" + `${name}` + "\\`" + `\\2` + "`" + ` == "姓名1: $张三\\1\\n姓名2: $` + "`" + `张三` + "`" + `\\2"
+
 //测试back tick
 assert ` + "`" + `姓名1: \$${name}\\1
 姓名2: \$${name}\\2` + "`" + ` == ` + "`" + `姓名1: \$${name}\\1
@@ -3239,12 +3254,14 @@ func TestNewExecutor_TemplateString(t *testing.T) {
 	_formattest(code)
 
 	code = `
-name = f"小明"
-age = 18
-assert f"${name} + 1" == "小明 + 1"
-a = f"username: ${name} password: ${age+1}"
-//assert a == "username: 小明 password: 19"
-`
+	
+	name = f"小明"
+	age = 18
+	assert f"${name} + 1" == "小明 + 1"
+	a = f"username: ${name} password: ${age+1}"
+	assert a == "username: 小明 password: 19"
+	`
+
 	_marshallerTest(code)
 	_formattest(code)
 }
