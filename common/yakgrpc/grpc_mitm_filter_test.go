@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -314,4 +315,36 @@ sleep(0.5)
 		}
 		cancel()
 	})
+}
+
+func TestMITMFilterManager_Filter(t *testing.T) {
+	type Case struct {
+		Filter *MITMFilterManager
+		Send   [][]any
+		Count  int
+	}
+	var cases = []Case{
+		{
+			Filter: &MITMFilterManager{
+				IncludeUri: []string{"abc"},
+			},
+			Send: [][]any{
+				{
+					"GET", "localhost:80", "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabc", "", false,
+				},
+			},
+			Count: 1,
+		},
+	}
+
+	for _, c := range cases {
+		var count int
+		for _, send := range c.Send {
+			if c.Filter.Filter(send[0].(string), send[1].(string), send[2].(string), send[3].(string), send[4].(bool)) {
+				count++
+			}
+		}
+		assert.Equal(t, c.Count, 1)
+	}
+
 }
