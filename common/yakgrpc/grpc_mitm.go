@@ -822,6 +822,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
+		httpctx.SetResponseViewedByUser(req)
 		for {
 			reqInstance, ok := <-messageChan
 			if !ok {
@@ -1282,7 +1283,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
 		var isFilter = isFilteredByResponse || isFilteredByRequest
 		var modified = httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
-		var viewed = httpctx.GetRequestViewedByUser(req)
+		var viewed = httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
