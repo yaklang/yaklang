@@ -892,7 +892,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			websocketHashCache.Store(wshash, true)
 
 			flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
-				s.GetProjectDatabase(), isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req), true, true,
+				isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
 			)
 			if err != nil {
 				log.Errorf("httpflow failed: %s", err)
@@ -1204,7 +1204,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					// 保存到数据库
 					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
 					var startCreateFlow = time.Now()
-					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, true, true)
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr)
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
 						return nil
@@ -1326,10 +1326,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var startCreateFlow = time.Now()
 		var flow *yakit.HTTPFlow
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(s.GetProjectDatabase(), isHttps, req, "mitm", reqUrl, remoteAddr, true, true)
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, req, "mitm", reqUrl, remoteAddr)
 			flow.StatusCode = 200 //先设置成200
 		} else {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(s.GetProjectDatabase(), isHttps, req, rsp, "mitm", reqUrl, remoteAddr, true, !responseOverSize)
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, "mitm", reqUrl, remoteAddr) // , !responseOverSize)
 		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
