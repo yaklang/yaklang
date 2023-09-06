@@ -2,6 +2,7 @@ target = getParam("target")
 var nucleiPluginNames = getParam("templates")
 var nonNucleiPluginNames = getParam("ordinary")
 var ctx = getParam("ctx")
+var proxy = getParam("proxy")
 
 wg = sync.NewWaitGroup()
 wg.Add(2)
@@ -37,6 +38,7 @@ go func {
 
     try {
         caller = hook.NewMixPluginCaller()~
+        caller.SetProxy(proxy)
         try {caller.SetFeedback(getParam("feedbacker"))} catch err {}
         caller.SetConcurrent(20)
         caller.SetDividedContext(true)

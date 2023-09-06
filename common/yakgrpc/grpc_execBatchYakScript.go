@@ -358,6 +358,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 				coreEngine, err := engine.ExecuteExWithContext(subCtx, string(batchExecScripts), map[string]interface{}{
 					"target":      target,
 					"templates":   templates,
+					"proxy":       proxyCurrent,
 					"ordinary":    ordinaries,
 					"ctx":         subCtx,
 					"yakitclient": feedbackClient,
