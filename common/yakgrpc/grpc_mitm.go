@@ -5,6 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"path"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
@@ -21,13 +29,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"path"
-	"strings"
-	"sync"
-	"time"
 )
 
 func _exactChecker(includes, excludes []string, target string) bool {
@@ -1341,7 +1342,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
 		flow.Hash = flow.CalcHash()
-
 		if viewed {
 			if modified {
 				flow.AddTagToFirst("[手动修改]")
@@ -1351,6 +1351,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.Orange()
 			}
 		}
+
 		var hijackedFlowMutex = new(sync.Mutex)
 		var dropped = utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
@@ -1401,6 +1402,30 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				break
 			}
 		}
+
+		// 存储KV，将flow ID作为key，bare request和bare response作为value
+		if modified {
+			bareReq := httpctx.GetPlainRequestBytes(req)
+			if len(bareReq) == 0 {
+				bareReq = httpctx.GetBareRequestBytes(req)
+			}
+			log.Infof("[KV] bare Req(%d): %s", len(bareReq), bareReq)
+
+			if len(bareReq) > 0 && flow.ID > 0 {
+				yakit.SetKVBareRequest(s.GetProjectDatabase(), flow.ID, bareReq)
+			}
+
+			bareRsp := httpctx.GetPlainResponseBytes(req)
+			if len(bareRsp) == 0 {
+				bareRsp = httpctx.GetBareResponseBytes(req)
+			}
+			log.Infof("[KV] bare Rsp(%d): %s", len(bareRsp), bareRsp)
+
+			if len(bareRsp) > 0 && flow.ID > 0 {
+				yakit.SetKVBareResponse(s.GetProjectDatabase(), flow.ID, bareRsp)
+			}
+		}
+
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig

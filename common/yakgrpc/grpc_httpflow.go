@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,11 +14,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
@@ -440,4 +442,30 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	sw.Commit()
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareRequest) (*ypb.HTTPFlowBareResponse, error) {
+	db := s.GetProjectDatabase()
+	id, typ := req.GetId(), req.GetBareType()
+	suffix := "_request"
+	if typ == ypb.HTTPFlowBareRequest_Response {
+		suffix = "_response"
+	}
+	var (
+		bare yakit.ProjectGeneralStorage
+		data []byte
+		err  error
+	)
+
+	if db.Where("key = ?", strconv.FormatInt(id, 10)+suffix).First(&bare); db.Error != nil {
+		return nil, utils.Errorf("get bare from kv failed: %s", db.Error)
+	}
+
+	if data, err = codec.DecodeBase64(bare.Value); err != nil {
+		return nil, utils.Errorf("decode bare from kv failed: %s", db.Error)
+	}
+	return &ypb.HTTPFlowBareResponse{
+		Id:   id,
+		Data: data,
+	}, nil
 }
