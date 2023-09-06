@@ -3,7 +3,6 @@ package domainextractor
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -214,7 +213,7 @@ func _scan(code string) ([]string, []string) {
 	var lastCh byte
 	var ch byte
 	var blockSeries []string
-	var currentBlock string
+	var currentBlock = bytes.NewBufferString("")
 
 	var isDomainChar = func(c byte) bool {
 		return (c >= '0' && c <= '9') ||
@@ -252,24 +251,26 @@ func _scan(code string) ([]string, []string) {
 
 		var validDomainChar = isDomainChar(ch)
 
-		if ch == '.' && currentBlock != "" {
+		if ch == '.' && currentBlock.Len() > 0 {
 			// block end
-			blockSeries = append(blockSeries, currentBlock)
-			currentBlock = ""
+			if currentBlock.Len() < 4096 {
+				blockSeries = append(blockSeries, currentBlock.String())
+			}
+			currentBlock.Reset()
 			continue
 		}
 
 		if validDomainChar {
-			currentBlock += fmt.Sprintf("%c", ch)
+			//currentBlock += fmt.Sprintf("%c", ch)
+			currentBlock.WriteByte(ch)
 			continue
 		}
 
-		if currentBlock != "" {
-			blockSeries = append(blockSeries, currentBlock)
-			currentBlock = ""
-		} else {
-			currentBlock = ""
+		// block end
+		if ret := currentBlock.Len(); ret < 4096 && ret > 0 {
+			blockSeries = append(blockSeries, currentBlock.String())
 		}
+		currentBlock.Reset()
 
 		_, ret := haveDomainSuffix(blockSeries)
 		if len(blockSeries) > 1 && ret {
@@ -277,8 +278,8 @@ func _scan(code string) ([]string, []string) {
 		}
 		blockSeries = nil
 	}
-	if currentBlock != "" {
-		blockSeries = append(blockSeries, currentBlock)
+	if ret := currentBlock.Len(); ret > 0 && ret < 4096 {
+		blockSeries = append(blockSeries, currentBlock.String())
 	}
 	_, result := haveDomainSuffix(blockSeries)
 	if len(blockSeries) > 1 && result {
