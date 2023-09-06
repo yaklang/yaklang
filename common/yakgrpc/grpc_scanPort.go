@@ -31,6 +31,14 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	targetsLineFromFile := utils.PrettifyListFromStringSplited(string(raw), "\n")
 	targetsLine := utils.PrettifyListFromStringSplited(req.GetTargets(), "\n")
 	targets := append(targetsLine, targetsLineFromFile...)
+
+	// validation
+	for _, target := range targets {
+		if !utils.IsValidDomain(target) && !utils.IsValidCIDR(target) && !utils.IsIPv4(target) && !utils.IsIPv6(target) {
+			return utils.Errorf("invalid target: %s\ninput must be ip, domain or cidr.", strconv.Quote(target))
+		}
+	}
+
 	var allTargets = strings.Join(targets, ",")
 	if req.GetEnableCClassScan() {
 		allTargets = network.ParseStringToCClassHosts(allTargets)
