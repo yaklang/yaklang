@@ -57,6 +57,11 @@ sec-ch-ua-platform: "macOS"
 	}
 }
 
+func TestHaveDomainDOS(t *testing.T) {
+	var result, rootDomain = scan(string(strings.Repeat("a", 1000*1000) + " baidu.com "))
+	spew.Dump(result, rootDomain)
+}
+
 func testExtractDomain(code string, i ...string) {
 	if len(i) <= 0 {
 		panic("no expected")
