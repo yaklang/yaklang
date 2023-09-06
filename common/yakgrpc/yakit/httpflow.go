@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -41,7 +42,7 @@ func init() {
 				return
 			}
 			db := consts.GetGormProjectDatabase()
-			flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, https, req, rsp, "scan", url, remoteAddr, true, true)
+			flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr)
 			if err != nil {
 				log.Errorf("create httpflow from lowhttp failed: %s", err)
 				return
@@ -434,11 +435,11 @@ func (f *HTTPFlow) BeforeSave() error {
 }
 
 func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
-	return SaveFromHTTPWithBodySaved(db, isHttps, req, rsp, source, url, remoteAddr, true, true)
+	return SaveFromHTTPWithBodySaved(db, isHttps, req, rsp, source, url, remoteAddr)
 }
 
 func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, source string, url string, remoteAddr string) (*HTTPFlow, error) {
-	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, req, rsp, source, url, remoteAddr, true, true)
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, req, rsp, source, url, remoteAddr)
 	if err != nil {
 		return nil, utils.Errorf("create httpflow failed: %s", err)
 	}
@@ -449,8 +450,8 @@ func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, sour
 	return GetHTTPFlowByHash(db, flow.CalcHash())
 }
 
-func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
-	flow, err := CreateHTTPFlowFromHTTPWithBodySaved(db, isHttps, req, rsp, source, url, remoteAddr, allowReqBody, allowRspBody)
+func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+	flow, err := CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, source, url, remoteAddr)
 	if err != nil {
 		return nil, utils.Errorf("create httpflow failed: %s", err)
 	}
@@ -463,7 +464,7 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 
 const maxBodyLength = 4 * 1024 * 1024
 
-func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string) (*HTTPFlow, error) {
 	var method string
 	var requestUri string
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(reqRaw, func(m string, r string, proto string) error {
@@ -515,6 +516,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 		Request:     requestRaw,
 		Response:    responseRaw,
 		RemoteAddr:  remoteAddr,
+		HiddenIndex: ksuid.New().String(),
 	}
 	ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
 	if ip != "" {
@@ -539,7 +541,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db *gorm.DB, isHttps bool, reqRa
 	return flow, nil
 }
 
-func CreateHTTPFlowFromHTTPWithNoRspSaved(db *gorm.DB, isHttps bool, req *http.Request, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string) (*HTTPFlow, error) {
 	var urlRaw = url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -560,7 +562,7 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(db *gorm.DB, isHttps bool, req *http.R
 	reqRaw := httpctx.GetRequestBytes(req)
 	if reqRaw == nil {
 		var err error
-		reqRaw, err = utils.HttpDumpWithBody(req, allowReqBody)
+		reqRaw, err = utils.HttpDumpWithBody(req, true)
 		if err != nil {
 			reqRaw, err = utils.HttpDumpWithBody(req, false)
 			if err != nil {
@@ -569,10 +571,10 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(db *gorm.DB, isHttps bool, req *http.R
 		}
 	}
 
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr)
 }
 
-func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, allowReqBody bool, allowRspBody bool) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
 	var urlRaw = url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -593,7 +595,7 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 	reqRaw := httpctx.GetRequestBytes(req)
 	if reqRaw == nil {
 		var err error
-		reqRaw, err = utils.HttpDumpWithBody(req, allowReqBody)
+		reqRaw, err = utils.HttpDumpWithBody(req, true)
 		if err != nil {
 			reqRaw, err = utils.HttpDumpWithBody(req, false)
 			if err != nil {
@@ -602,11 +604,11 @@ func CreateHTTPFlowFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Re
 		}
 	}
 
-	rspRaw, err := utils.HttpDumpWithBody(rsp, allowRspBody)
+	rspRaw, err := utils.HttpDumpWithBody(rsp, true)
 	if err != nil {
 		log.Errorf("dump response failed: %s", err)
 	}
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(db, isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, allowReqBody, allowRspBody)
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr)
 }
 
 func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {

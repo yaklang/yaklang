@@ -3,8 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize(t *testing.T) {
@@ -13,6 +19,35 @@ func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Server: test
+`))
+
+	var flow *yakit.HTTPFlow
+	flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, lowhttp.FixHTTPRequest([]byte(
+		`GET / HTTP/1.1
+Host: www.example.com
+`)), lowhttp.ReplaceHTTPPacketBodyFast(rsp, []byte(strings.Repeat(strings.Repeat("a", 1000), 1000))), "abc",
+		"https://www.example.com", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
+	flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, lowhttp.FixHTTPRequest([]byte(
+		`GET / HTTP/1.1
+Host: www.example.com
+`)), lowhttp.ReplaceHTTPPacketBodyFast(rsp, []byte(strings.Repeat(strings.Repeat("a", 11), 11))), "abc",
+		"https://www.example.com", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
 	resp, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 		Pagination: &ypb.Paging{
 			Page:    1,
@@ -20,13 +55,20 @@ func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize(t *testing.T) {
 			OrderBy: "body_length",
 			Order:   "desc",
 		},
-		Full: false,
+		Full:       false,
+		SourceType: "abc",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(resp.GetData()) <= 0 {
+		t.Fatal("resp should not be empty")
+	}
+
+	var checkLargeBodyId int64
 	for _, r := range resp.GetData() {
-		if r.BodyLength > 1000*1000 {
+		if r.BodyLength > 800*1000 {
+			checkLargeBodyId = int64(r.GetId())
 			if len(r.Response) != 0 {
 				t.Fatal("response should be empty")
 			}
@@ -38,4 +80,19 @@ func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize(t *testing.T) {
 			}
 		}
 	}
+
+	if checkLargeBodyId <= 0 {
+		t.Fatal("no large body found")
+	}
+
+	start := time.Now()
+	response, err := client.GetHTTPFlowById(utils.TimeoutContext(1*time.Second), &ypb.GetHTTPFlowByIdRequest{Id: checkLargeBodyId})
+	if err != nil {
+		spew.Dump(err)
+		t.Fatal("cannot found large response")
+	}
+	if time.Now().Sub(start).Seconds() > 500 {
+		t.Fatal("should be cached")
+	}
+	_ = response
 }
