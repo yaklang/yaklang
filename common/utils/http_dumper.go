@@ -32,7 +32,7 @@ func ShouldRemoveZeroContentLengthHeader(s string) bool {
 const CRLF = "\r\n"
 
 func getHeaderValueAll(header http.Header, key string) string {
-	return strings.Join(getHeaderValueList(header, key), ", ")
+	return strings.Join(getHeaderValueList(header, key), "; ")
 }
 
 func getHeaderValue(header http.Header, key string) string {
@@ -49,7 +49,10 @@ func getHeaderValueList(header http.Header, key string) []string {
 	}
 	cKey := http.CanonicalHeaderKey(key)
 	if key == cKey {
-		return []string{header.Get(key)}
+		if raw, ok := header[key]; ok {
+			return raw
+		}
+		return []string{}
 	}
 
 	v1, _ := header[key]
@@ -315,7 +318,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		case "host", "content-length", "transfer-encoding":
 			continue
 		}
-		val := getHeaderValueAll(req.Header, k)
+		val := getHeaderValueAll(header, k)
 		buf.WriteString(k)
 		buf.WriteString(": ")
 		buf.WriteString(val)
