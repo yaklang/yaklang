@@ -3,9 +3,11 @@ package yakgrpc
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"net/http"
 	"testing"
 )
@@ -101,5 +103,59 @@ return "aaa" + sprintf("_origin(%v)", param)
 	}
 	if count != 1 {
 		t.Fatalf("expect 1, got %v", count)
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch3ErrCheck(t *testing.T) {
+
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err2 := io.ReadAll(r.Body)
+		if err2 != nil {
+			w.Write([]byte("err"))
+			return
+		}
+		w.Write(body)
+		return
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(100), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle|1)}}{{yak(errFunc)}}{{yak(handle1)}}",
+		HotPatchCode: `
+handle = func(i){
+    return i
+}
+handle1 = s => {die("expected panic")}
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	count := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		payloads := rsp.Payloads
+		if payloads[0] == "1" {
+			count++
+		}
+		if payloads[1] == "["+fuzztag.YakHotPatchErr+"function errFunc not found]" {
+			count++
+		}
+		if payloads[2] == "["+fuzztag.YakHotPatchErr+"expected panic]" {
+			count++
+		}
+		fmt.Println(string(rsp.RequestRaw))
+		fmt.Println(string(rsp.ResponseRaw))
+	}
+	if count != 3 {
+		t.Fatalf("expect 3, got %v", count)
 	}
 }
