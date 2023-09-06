@@ -105,6 +105,12 @@ type HTTPFlow struct {
 
 	RuntimeId  string
 	FromPlugin string
+
+	// friendly for gorm build instance, not for store
+	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
+	// 主要用来标记用户的 Request 和 Response 是否超大
+	IsRequestOversize  bool `gorm:"-"`
+	IsResponseOversize bool `gorm:"-"`
 }
 
 type TagAndStatusCode struct {
@@ -283,120 +289,113 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 
 	flow.BodySizeVerbose = utils.ByteSize(uint64(flow.BodyLength))
 
-	unquotedReq, err := strconv.Unquote(f.Request)
+	unquotedRequest, err := strconv.Unquote(f.Request)
 	if err != nil {
 		return nil, utils.Errorf("unquoted failed: %s", err)
 	}
-	flow.RequestLength = int64(len(unquotedReq))
-	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedReq)))
+	flow.RequestLength = int64(len(unquotedRequest))
+	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
 
-	if full || len(unquotedReq) <= (maxBodyLength/2) {
-		flow.Request = []byte(unquotedReq)
-	}
+	var requireRequest = full || !f.IsRequestOversize
+	var requireResponse = full || !f.IsResponseOversize
+	var isStandardRequest = !flow.NoFixContentLength
 
-	if full && !flow.NoFixContentLength {
-		req, err := lowhttp.ParseStringToHttpRequest(unquotedReq)
-		if err != nil {
-			return nil, utils.Errorf("[lowhttp.ParseStringToHttpRequest] parse request failed: %s", err)
-		}
-		for k, vs := range req.Header {
-			for _, v := range vs {
+	var haveRequest bool = funk.NotEmpty(f.Request)
+	var requestBody []byte
+	if requireRequest {
+		// return request:
+		// 1. request is not required (!full)
+		// 2. not a large request
+		// 3. request is not oversize
+		flow.Request = []byte(unquotedRequest)
+		if isStandardRequest && haveRequest {
+			// unfix request:
+			var requestURI string
+			_, requestBody = lowhttp.SplitHTTPPacket(flow.Request, func(method string, requestUri string, proto string) error {
+				requestURI = requestUri
+				return nil
+			}, nil, func(line string) string {
+				k, v := lowhttp.SplitHTTPHeader(line)
 				flow.RequestHeader = append(flow.RequestHeader, &ypb.HTTPHeader{
 					Header: utf8safe(utils.ParseStringToVisible(k)),
 					Value:  utf8safe(utils.ParseStringToVisible(v)),
 				})
+				return line
+			})
+			if flow.Path == "" {
+				flow.Path = utf8safe(requestURI)
 			}
-		}
 
-		if flow.Path == "" {
-			flow.Path = utils.EscapeInvalidUTF8Byte([]byte(req.RequestURI))
+			fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
+			if fReq != nil {
+				for _, r := range fReq.GetCommonParams() {
+					var fReq = &ypb.FuzzableParam{
+						Position:  r.PositionVerbose(),
+						ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
+						IsHTTPS:   flow.IsHTTPS,
+					}
+
+					if full {
+						// 详情模式，这个很耗时。
+						fReq = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
+					}
+					fReq.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fReq.ParamName))
+					if r.IsGetParams() {
+						flow.GetParams = append(flow.GetParams, fReq)
+					}
+					if r.IsPostParams() {
+						flow.PostParams = append(flow.PostParams, fReq)
+					}
+					if r.IsCookieParams() {
+						flow.CookieParams = append(flow.CookieParams, fReq)
+					}
+				}
+
+				flow.GetParamsTotal = int64(len(flow.GetParams))
+				flow.PostParamsTotal = int64(len(flow.PostParams))
+				flow.CookieParamsTotal = int64(len(flow.CookieParams))
+			}
 		}
 	}
 
-	// 处理带参数的 Request
-	if !flow.NoFixContentLength {
-		fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
-		if fReq != nil {
-			for _, r := range fReq.GetCommonParams() {
-				var fReq = &ypb.FuzzableParam{
-					Position:  r.PositionVerbose(),
-					ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
-					IsHTTPS:   flow.IsHTTPS,
-				}
-
-				if full {
-					// 详情模式，这个很耗时。
-					fReq = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
-				}
-				fReq.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fReq.ParamName))
-				if r.IsGetParams() {
-					flow.GetParams = append(flow.GetParams, fReq)
-				}
-				if r.IsPostParams() {
-					flow.PostParams = append(flow.PostParams, fReq)
-				}
-				if r.IsCookieParams() {
-					flow.CookieParams = append(flow.CookieParams, fReq)
-				}
-			}
-
-			flow.GetParamsTotal = int64(len(flow.GetParams))
-			flow.PostParamsTotal = int64(len(flow.PostParams))
-			flow.CookieParamsTotal = int64(len(flow.CookieParams))
-		}
-	}
-
-	if full {
-		unquotedRsp := unquotedResponse
-		// fixed
-		//unquotedRspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(unquotedRsp))
-		//if unquotedRspRaw != nil {
-		//	unquotedRsp = string(unquotedRspRaw)
-		//}
-		flow.Response = []byte(unquotedRsp)
+	var haveResponse = funk.NotEmpty(unquotedResponse)
+	var responseBody []byte
+	if requireResponse {
+		flow.Response = []byte(unquotedResponse)
 		// 显示最多 1M
 		if len(flow.Response) > 1000*1000 {
 			flow.Response = append(flow.Response[:1000*1000], []byte("...")...)
 		}
-
-		if !flow.NoFixContentLength && f.Response != "" {
-			rsp, err := utils.ReadHTTPResponseFromBytes([]byte(unquotedRsp), nil)
-			if err != nil {
-				log.Errorf("parse response failed: %s", err)
-				return flow, nil
-			}
-			for k, vs := range rsp.Header {
-				for _, v := range vs {
-					flow.ResponseHeader = append(flow.ResponseHeader, &ypb.HTTPHeader{
-						Header: utf8safe(utils.ParseStringToVisible(k)),
-						Value:  utf8safe(utils.ParseStringToVisible(v)),
-					})
-				}
-			}
+		if isStandardRequest && haveResponse {
+			_, responseBody = lowhttp.SplitHTTPPacket(flow.Response, nil, nil, func(line string) string {
+				k, v := lowhttp.SplitHTTPHeader(line)
+				flow.ResponseHeader = append(flow.ResponseHeader, &ypb.HTTPHeader{
+					Header: utf8safe(utils.ParseStringToVisible(k)),
+					Value:  utf8safe(utils.ParseStringToVisible(v)),
+				})
+				return line
+			})
 		}
 	}
 
 	// 这里用来标记一下，UTF8 支持情况，要根据情况提供给用户合理 body 建议处理方案
-	if full {
-		flow.InvalidForUTF8Request = !utf8.ValidString(unquotedReq)
-		flow.InvalidForUTF8Response = !utf8.ValidString(unquotedResponse)
+	if requireRequest {
+		flow.InvalidForUTF8Request = !utf8.ValidString(unquotedRequest)
 		if flow.InvalidForUTF8Request {
-			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(flow.Request)
-			flow.RawRequestBodyBase64 = codec.EncodeBase64(body)
-		}
-
-		if flow.InvalidForUTF8Response {
-			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(flow.Response)
-			flow.RawResponseBodyBase64 = codec.EncodeBase64(body)
-		}
-
-		if flow.InvalidForUTF8Request {
+			flow.RawRequestBodyBase64 = codec.EncodeBase64(requestBody)
 			flow.SafeHTTPRequest = codec.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(flow.Request))
 		}
 	}
 
+	if requireResponse {
+		flow.InvalidForUTF8Response = !utf8.ValidString(unquotedResponse)
+		if flow.InvalidForUTF8Response {
+			flow.RawResponseBodyBase64 = codec.EncodeBase64(responseBody)
+		}
+	}
+
 	// 提取数据
-	if full {
+	if requireResponse {
 		domains, rootDomains := domainextractor.ExtractDomainsEx(string(flow.Response))
 		jsonObjects := jsonextractor.ExtractStandardJSON(string(flow.Response))
 		flow.Domains = make([]string, len(domains))
@@ -874,6 +873,30 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 	}
 
 	db = db.Model(&HTTPFlow{}) //.Debug()
+	if !params.GetFull() {
+		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
+		// max request size is 200K -> 200 * 1024 -> 204800
+		// max response size is 500K -> 500 * 1024 -> 512000
+		db = db.Select(`id,created_at,updated_at, -- basic gorm fields
+body_length, -- handle body length should be careful, if it's big, no return response
+
+-- metainfo
+is_http_s, -- legacy
+no_fix_content_length, hash,url, path, method,
+content_type, status_code, source_type,
+get_params_total, post_params_total, cookie_params_total,
+ip_address, remote_addr, ip_integer,
+tags, is_websocket, websocket_hash, runtime_id, from_plugin,
+
+-- request is larger than 200K, return empty string
+LENGTH(request) > 204800 as is_request_oversize,
+CASE WHEN LENGTH(request) > 204800 THEN '' ELSE request END as request,
+-- response is larger than 500K, return empty string
+LENGTH(response) > 512000 as is_response_oversize,
+CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response
+
+`)
+	}
 
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
