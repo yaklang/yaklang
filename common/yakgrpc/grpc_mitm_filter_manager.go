@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strings"
 )
 
 type MITMFilterManager struct {
@@ -121,4 +122,34 @@ func (m *MITMFilterManager) Save() {
 	if err != nil {
 		log.Errorf("set filter db key failed: %s", err)
 	}
+}
+
+// Filter return true if passed, false if filtered out
+func (m *MITMFilterManager) Filter(method string, hostport, urlStr string, ext string, isHttps bool) bool {
+	var passed bool
+
+	passed = _exactChecker(nil, m.ExcludeMethods, method)
+	if !passed {
+		log.Debugf("[%v] url: %s is filtered via method", method, truncate(urlStr))
+		return false
+	}
+
+	passed = _exactChecker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
+	if !passed {
+		log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
+		return false
+	}
+
+	passed = _checker(m.IncludeHostnames, m.ExcludeHostnames, hostport)
+	if !passed {
+		log.Debugf("url: %s is filtered via hostnames(%v)", truncate(urlStr), hostport)
+		return false
+	}
+
+	passed = _checker(m.IncludeUri, m.ExcludeUri, urlStr)
+	if !passed {
+		log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
+		return false
+	}
+	return true
 }
