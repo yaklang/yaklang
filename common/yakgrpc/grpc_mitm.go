@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1415,10 +1416,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(bareReq) == 0 {
 				bareReq = httpctx.GetBareRequestBytes(req)
 			}
-			log.Infof("[KV] save bare Response(%d)", flow.ID)
+			log.Debugf("[KV] save bare Response(%d)", flow.ID)
 
 			if len(bareReq) > 0 && flow.ID > 0 {
-				yakit.SetKVBareRequest(s.GetProjectDatabase(), flow.ID, bareReq)
+				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
+				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
 			}
 		}
 
@@ -1427,10 +1429,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(bareRsp) == 0 {
 				bareRsp = httpctx.GetBareResponseBytes(req)
 			}
-			log.Infof("[KV] save bare Response(%d)", flow.ID)
+			log.Debugf("[KV] save bare Response(%d)", flow.ID)
 
 			if len(bareRsp) > 0 && flow.ID > 0 {
-				yakit.SetKVBareResponse(s.GetProjectDatabase(), flow.ID, bareRsp)
+				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
+				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
 			}
 		}
 
