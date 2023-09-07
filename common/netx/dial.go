@@ -67,6 +67,10 @@ func DialForceGMTLSContextWithoutProxy(ctx context.Context, network, addr string
 }
 
 func UpgradeToTLSConnection(conn net.Conn, sni string, i any) (net.Conn, error) {
+	return UpgradeToTLSConnectionWithTimeout(conn, sni, i, 10*time.Second)
+}
+
+func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration) (net.Conn, error) {
 	if i == nil {
 		i = &tls.Config{
 			ServerName:         sni,
@@ -83,20 +87,28 @@ func UpgradeToTLSConnection(conn net.Conn, sni string, i any) (net.Conn, error) 
 		tlsConfig = ret
 	case *gmtls.Config:
 		gmtlsConfig = ret
+	case *gmtls.GMSupport:
+		gmtlsConfig = &gmtls.Config{
+			GMSupport:          ret,
+			ServerName:         sni,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
+			InsecureSkipVerify: true,
+		}
 	default:
 		return nil, utils.Errorf("invalid tlsConfig type %T", i)
 	}
 
 	if tlsConfig != nil {
 		var sConn = tls.Client(conn, tlsConfig)
-		err := sConn.HandshakeContext(utils.TimeoutContext(15 * time.Second))
+		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
 			return nil, err
 		}
 		return sConn, nil
 	} else if gmtlsConfig != nil {
 		var sConn = gmtls.Client(conn, gmtlsConfig)
-		err := sConn.HandshakeContext(utils.TimeoutContext(15 * time.Second))
+		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
 			return nil, err
 		}
