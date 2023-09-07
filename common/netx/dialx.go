@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sync/atomic"
@@ -166,6 +167,7 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (net.Conn, er
 	}
 
 	var lastError error
+	var proxyHaveTimeoutError = false
 RETRY:
 	if ret := addRetry(); ret > timeoutRetryMax {
 		if timeoutRetryMax > 0 {
@@ -179,21 +181,46 @@ RETRY:
 
 	// handle plain
 	// not need to upgrade
-	conn, err := NewDialContextFunc(config.Timeout, config.DNSOpts...)(utils.TimeoutContext(config.Timeout), "tcp", target)
-	//conn, err := DialTCPTimeout(config.Timeout, target, config.Proxy...)
-	if err != nil {
-		lastError = err
-		var opError *net.OpError
-		switch {
-		case errors.As(err, &opError):
-			if opError.Timeout() {
-				jitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
-				goto RETRY
+	var conn net.Conn
+	var err error
+	dialerFunc := NewDialContextFunc(config.Timeout, config.DNSOpts...)
+	if len(config.Proxy) <= 0 {
+		conn, err = dialerFunc(utils.TimeoutContext(config.Timeout), "tcp", target)
+		//conn, err := DialTCPTimeout(config.Timeout, target, config.Proxy...)
+		if err != nil {
+			lastError = err
+			var opError *net.OpError
+			switch {
+			case errors.As(err, &opError):
+				if opError.Timeout() {
+					jitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
+					goto RETRY
+				}
 			}
+			return nil, err
 		}
-		return nil, err
+		return conn, nil
 	}
-	return conn, nil
+
+	for _, proxy := range config.Proxy {
+		conn, err := getConnForceProxy(target, proxy, config.Timeout)
+		if err != nil {
+			log.Errorf("proxy conn failed: %s", err)
+			if !proxyHaveTimeoutError {
+				var opError *net.OpError
+				if errors.As(err, &opError) {
+					proxyHaveTimeoutError = true
+				}
+			}
+			continue
+		}
+		return conn, nil
+	}
+	if proxyHaveTimeoutError {
+		proxyHaveTimeoutError = false
+		goto RETRY
+	}
+	return nil, utils.Errorf("connect: %v failed: no proxy available (in %v)", target, config.Proxy)
 }
 
 /*
