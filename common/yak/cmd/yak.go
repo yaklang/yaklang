@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1191,6 +1192,8 @@ func main() {
 		// CVE 相关命令
 		cveCommand,
 		translatingCommand,
+
+		yakcmds.PcapCommand,
 
 		// chaosmaker
 		{
