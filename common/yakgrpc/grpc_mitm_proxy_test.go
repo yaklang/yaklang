@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
@@ -161,7 +162,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_ApplyToPlugin(t *testing.T) {
 	var mockUrl = "http://" + utils.HostPort(mockHost, mockPort)
 	_ = mockUrl
 
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
@@ -216,6 +217,7 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 						"token":     token,
 					}); err != nil {
 					t.Errorf("execute script failed: %v", err)
+					cancel()
 					t.FailNow()
 				}
 			}
