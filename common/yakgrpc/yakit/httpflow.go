@@ -273,11 +273,18 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		WebsocketHash:      f.WebsocketHash,
 	}
 	// 设置 title
-	unquotedResponse, err := strconv.Unquote(f.Response)
-	if err != nil {
-		log.Errorf("unquoted response failed: %s", err)
-		fmt.Println(f.Response)
-		unquotedResponse = f.Response
+	var (
+		unquotedResponse string
+		unquotedRequest  string
+		err              error
+	)
+	if f.Response != "" {
+		unquotedResponse, err = strconv.Unquote(f.Response)
+		if err != nil {
+			log.Errorf("unquoted response failed: %s", err)
+			fmt.Println(f.Response)
+			unquotedResponse = f.Response
+		}
 	}
 	flow.HtmlTitle = utf8safe(strings.TrimSpace(utils.ExtractTitleFromHTMLTitle(unquotedResponse, "")))
 
@@ -295,12 +302,15 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 
 	flow.BodySizeVerbose = utils.ByteSize(uint64(flow.BodyLength))
 
-	unquotedRequest, err := strconv.Unquote(f.Request)
-	if err != nil {
-		unquotedRequest = f.Request
-		log.Errorf("unquoted request failed: %s", err)
-		fmt.Println(f.Request)
+	if f.Request != "" {
+		unquotedRequest, err = strconv.Unquote(f.Request)
+		if err != nil {
+			unquotedRequest = f.Request
+			log.Errorf("unquoted request failed: %s", err)
+			fmt.Println(f.Request)
+		}
 	}
+
 	flow.RequestLength = int64(len(unquotedRequest))
 	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
 
