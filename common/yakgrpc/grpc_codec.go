@@ -185,7 +185,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		}
 		result = string(raw)
 	case "fuzz":
-		res, err := mutate.QuickMutate(text, s.GetProfileDatabase())
+		res, err := mutate.FuzzTagExec(text, mutate.Fuzz_WithEnableFiletag())
 		if err != nil {
 			result = text
 		} else {
@@ -640,7 +640,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 			}
 			result = string(raw)
 		case "fuzz":
-			res, err := mutate.QuickMutate(text, s.GetProfileDatabase())
+			res, err := mutate.FuzzTagExec(text, mutate.Fuzz_WithEnableFiletag())
 			if err != nil {
 				result = text
 			} else {
