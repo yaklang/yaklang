@@ -107,10 +107,13 @@ type httpProvider struct {
 // if success, return value not nil
 func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
 	payload := pk.TransportLayer().LayerPayload()
-	if lowhttp.IsResp(payload) {
+	a, b, c := lowhttp.GetHTTPPacketFirstLine(payload)
+	if a == "" || b == "" || c == "" {
+		return nil
+	}
+	if strings.HasPrefix(a, "HTTP/") {
 		res, err := lowhttp.ParseBytesToHTTPResponse(payload)
 		if err != nil {
-			log.Errorf("parse httpraw as http response failed: %s", err.Error())
 			return nil
 		}
 		return &httpProvider{
