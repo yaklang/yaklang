@@ -87,6 +87,8 @@ type ReliableDNSConfig struct {
 
 	mutex *sync.Mutex
 	count int64
+
+	OnFinished func()
 }
 
 type DNSOption func(*ReliableDNSConfig)
@@ -239,5 +241,11 @@ func WithTimeout(timeout time.Duration) DNSOption {
 func WithTemporaryHosts(i map[string]string) DNSOption {
 	return func(config *ReliableDNSConfig) {
 		config.Hosts = i
+	}
+}
+
+func WithDNSOnFinished(cb func()) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		config.OnFinished = cb
 	}
 }
