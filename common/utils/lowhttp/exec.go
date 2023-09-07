@@ -690,8 +690,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	//https://github.com/mattn/go-ieproxy
 	var (
 		conn                 net.Conn
-		proxyConn            net.Conn
-		proxyConnIns         net.Conn
 		retry                int
 		statusCodeRetryTimes int = 0
 	)
@@ -704,123 +702,72 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		traceInfo.TotalTime = time.Since(totalTimeStart)
 	}()
 
+	// h2
+	var nextProto []string
+	if enableHttp2 {
+		nextProto = []string{http2.NextProtoTLS}
+	} else {
+		nextProto = []string{"http/1.1"}
+	}
+
+	// configTLS
+	var dialopts []netx.DialXOption
+	if https {
+		if gmTLS {
+			dialopts = append(dialopts, netx.DialX_WithGMTLSConfig(&gmtls.Config{
+				GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
+				NextProtos:         nextProto,
+				ServerName:         host,
+				InsecureSkipVerify: !option.VerifyCertificate,
+				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+				MaxVersion:         tls.VersionTLS13,
+			}))
+		} else {
+			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&tls.Config{
+				NextProtos:         nextProto,
+				ServerName:         host,
+				InsecureSkipVerify: !option.VerifyCertificate,
+				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+				MaxVersion:         tls.VersionTLS13,
+			}))
+		}
+		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https))
+	}
+
+	if len(proxy) > 0 {
+		dialopts = append(dialopts, netx.DialX_WithProxy(proxy...))
+	}
+
+	// retry use DialX
+	var dnsStart = time.Now()
+	var dnsEnd = time.Now()
+	dialopts = append(
+		dialopts,
+		netx.DialX_WithTimeoutRetry(retryTimes),
+		netx.DialX_WithTimeoutRetryWaitRange(
+			retryWaitTime,
+			retryMaxWaitTime,
+		),
+		netx.DialX_WithDNSOptions(
+			netx.WithDNSOnFinished(func() {
+				dnsEnd = time.Now()
+			}),
+			netx.WithDNSServers(dnsServers...),
+			netx.WithTemporaryHosts(dnsHosts),
+		),
+		netx.DialX_WithSNI(host),
+	)
+
 RECONNECT:
-	for _, proxyUrl := range proxy {
-		// retry when timeout
-		for retry = 0; retry <= retryTimes; retry++ {
-			start := time.Now()
-			proxyConnIns, err = netx.DialTCPTimeoutForceProxy(timeout, originAddr, proxyUrl)
-			traceInfo.ConnTime = time.Since(start)
-
-			if err == nil || !isErrorTimeout(err) {
-				break
-			}
-			log.Debugf("[lowhttp] [%d / %d] retry dial with proxy: %s", retry, retryTimes, proxy)
-			time.Sleep(jitterBackoff(retryWaitTime, retryMaxWaitTime, retry))
-		}
-
-		if err != nil {
-			log.Errorf("use proxy failed: %s, reason: %v", proxy, err)
-			continue
-		}
-		conn = proxyConnIns
-		proxyConn = proxyConnIns
-		response.Proxy = proxyUrl
-		break
-	}
-
-	if conn == nil && len(proxy) > 0 {
-		return response, utils.Errorf("cannot create proxy[%v] connection", proxy)
-	}
-
-	if proxyConn != nil {
-		defer proxyConn.Close()
-	}
-
+	conn, err = netx.DialX(originAddr, dialopts...)
+	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 
-	if conn == nil {
-		// no proxy
-
-		var extraDNS []netx.DNSOption
-		if len(dnsServers) > 0 {
-			extraDNS = append(extraDNS, netx.WithDNSServers(dnsServers...), netx.WithDNSDisableSystemResolver(true))
-		}
-		if dnsHosts != nil && len(dnsHosts) > 0 {
-			extraDNS = append(extraDNS, netx.WithTemporaryHosts(dnsHosts))
-		}
-
-		// DNS Resolve
-		// ATTENTION: DO DNS AFTER PROXY CONN!
-		var ip = host
-		var addr string
-		startDNS := time.Now()
-		if !(utils.IsIPv4(host) || utils.IsIPv6(host)) {
-			var ips = netx.LookupFirst(host, extraDNS...)
-			traceInfo.DNSTime = time.Since(startDNS)
-			if ips == "" {
-				return response, utils.Errorf("[%vms] dns failed for querying: %s", traceInfo.DNSTime.Milliseconds(), host)
-			}
-			ip = ips
-			addr = utils.HostPort(ip, port)
-		} else {
-			addr = utils.HostPort(host, port)
-		}
-		response.RemoteAddr = addr
-
-		switch https {
-		case false:
-			// retry when timeout
-			for retry = 0; retry <= retryTimes; retry++ {
-				start := time.Now()
-				conn, err = netx.DialContextWithoutProxy(ctx, "tcp", utils.HostPort(ip, port))
-				traceInfo.ConnTime = time.Since(start)
-
-				if err == nil || !isErrorTimeout(err) {
-					break
-				}
-				log.Debugf("[lowhttp] [%d / %d] retry dial with remote: %s:%d", retry, retryTimes, ip, port)
-				time.Sleep(jitterBackoff(retryWaitTime, retryMaxWaitTime, retry))
-			}
-			if err != nil {
-				return response, utils.Errorf("dial %v failed: %s", utils.HostPort(ip, port), err)
-			}
-			response.PortIsOpen = true
-		default:
-			var rawConn net.Conn
-			// retry when timeout
-			for retry = 0; retry <= retryTimes; retry++ {
-				start := time.Now()
-				rawConn, err = netx.DialContextWithoutProxy(ctx, "tcp", utils.HostPort(ip, port))
-				traceInfo.ConnTime = time.Since(start)
-
-				if err == nil || !isErrorTimeout(err) {
-					break
-				}
-				log.Debugf("[lowhttp] [%d / %d] retry dial with remote: %s:%d", retry, retryTimes, ip, port)
-				time.Sleep(jitterBackoff(retryWaitTime, retryMaxWaitTime, retry))
-			}
-
-			if err != nil {
-				return response, utils.Errorf("dial %v failed: %s", utils.HostPort(ip, port), err)
-			}
-			response.PortIsOpen = true
-
-			conn, err = GetTLSConn(gmTLS, option.VerifyCertificate, enableHttp2, host, rawConn, timeout)
-			if err != nil {
-				return response, err
-			}
-		}
-	} else {
-		response.RemoteAddr = conn.RemoteAddr().String()
-		if https {
-			conn, err = GetTLSConn(gmTLS, option.VerifyCertificate, enableHttp2, host, conn, timeout)
-			if err != nil {
-				return response, err
-			}
-		}
+	if err != nil {
+		return response, err
 	}
-
+	response.RemoteAddr = conn.RemoteAddr().String()
+	response.PortIsOpen = true
 	if conn != nil {
 		defer func() {
 			conn.Close()
@@ -971,56 +918,4 @@ STATUSCODERETRY:
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
 	response.RawPacket = responseRaw.Bytes()
 	return response, nil
-}
-
-func GetTLSConn(isGM bool, verify, enableHttp2 bool, host string, rawConn net.Conn, timeout time.Duration) (net.Conn, error) {
-	var nextProtos []string
-	if enableHttp2 {
-		nextProtos = []string{http2.NextProtoTLS}
-	} else {
-		nextProtos = []string{"http/1.1"}
-	}
-
-	insecureSkipVerify := true
-	if verify {
-		insecureSkipVerify = false
-	}
-
-	if isGM {
-		gmSupport := gmtls.NewGMSupport()
-		gmSupport.EnableMixMode()
-
-		config := &gmtls.Config{
-			InsecureSkipVerify: insecureSkipVerify,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			ServerName:         host,
-			GMSupport:          gmSupport,
-			NextProtos:         nextProtos,
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		var tlsConn = gmtls.Client(rawConn, config)
-		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			rawConn.Close()
-			return nil, err
-		}
-		return tlsConn, nil
-	}
-	config := &tls.Config{
-		InsecureSkipVerify: insecureSkipVerify,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
-		ServerName:         host,
-		NextProtos:         nextProtos,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	var tlsConn = tls.Client(rawConn, config)
-	if err := tlsConn.HandshakeContext(ctx); err != nil {
-		rawConn.Close()
-		return nil, err
-	}
-	return tlsConn, nil
 }

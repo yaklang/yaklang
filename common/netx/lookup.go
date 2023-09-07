@@ -17,6 +17,12 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 		o(config)
 	}
 
+	defer func() {
+		if config != nil && config.OnFinished != nil {
+			config.OnFinished()
+		}
+	}()
+
 	if config.Hosts != nil && len(config.Hosts) > 0 {
 		result, ok := config.Hosts[host]
 		if ok && result != "" {
