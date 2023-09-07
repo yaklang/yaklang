@@ -1,6 +1,8 @@
 package yakgrpc
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -24,6 +26,32 @@ func TestGRPCMUSTPASS_CODEC_AUTODECODE(t *testing.T) {
 	}
 	if !check {
 		t.Fatal("AUTO DECODE BASE64 SMOKING TEST FAILED")
+	}
+}
+
+func TestGRPCMUSTPASS_CODEC_Filetag(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fp, err := consts.TempFile("test-*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(10)
+	fp.WriteString("asdfasdfas\r\nabc\r\n" + token)
+	fp.Close()
+
+	rsp, err := client.Codec(context.Background(), &ypb.CodecRequest{
+		Text: "{{file:line(" + fp.Name() + ")}}",
+		Type: "fuzz",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rsp.GetResult(), token) {
+		t.Fatal("filetag codec fail")
 	}
 }
 

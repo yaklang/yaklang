@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"os"
@@ -172,6 +173,20 @@ func GetDefaultYakitBaseDir() string {
 
 func TempFile(pattern string) (*os.File, error) {
 	return ioutil.TempFile(GetDefaultYakitBaseTempDir(), pattern)
+}
+
+func TempFileFast(data ...any) string {
+	f, err := TempFile("yakit-*.tmp")
+	if err != nil {
+		log.Errorf("create temp file error: %v", err)
+		return ""
+	}
+	defer f.Close()
+	for _, d := range data {
+		_, _ = f.Write(codec.AnyToBytes(d))
+		f.WriteString("\r\n")
+	}
+	return f.Name()
 }
 
 func GetDefaultYakitBaseTempDir() string {
