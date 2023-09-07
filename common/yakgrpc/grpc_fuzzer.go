@@ -62,57 +62,24 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 
 	var res [][]byte
 	var counter int64
-	_, _ = mutate.QuickMutateWithCallbackEx2(
-		req.GetTemplate(), s.GetProfileDatabase(), []func(*mutate.MutateResult) bool{
-			func(mutateResult *mutate.MutateResult) bool {
-				select {
-				case <-ctx.Done():
+	mutate.FuzzTagExec(
+		req.GetTemplate(),
+		mutate.Fuzz_WithResultHandler(func(origin string, payloads []string) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			default:
+				if max > 0 && counter >= max {
 					return false
-				default:
-					if max > 0 && counter >= max {
-						return false
-					}
 				}
-				counter++
-
-				res = append(res, []byte(mutateResult.Result))
-				return true
-			},
-		},
-		yak.MutateWithYaklang(req.GetHotPatchCode()),
-		yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())(),
+			}
+			counter++
+			res = append(res, []byte(origin))
+			return true
+		}),
+		yak.Fuzz_WithHotPatch(rootCtx, req.GetHotPatchCode()),
+		mutate.Fuzz_WithEnableFiletag(),
 	)
-	//mutate.MutateWithConditions(req.GetTemplate(), func(finalResult *mutate.MutateResult) bool {
-	//	select {
-	//	case <-ctx.Done():
-	//		return false
-	//	default:
-	//		if max > 0 && counter >= max {
-	//			return false
-	//		}
-	//	}
-	//	_, _ = mutate.QuickMutateWithCallbackEx2(
-	//		finalResult.Result, s.db, []func(*mutate.MutateResult) bool{
-	//			func(mutateResult *mutate.MutateResult) bool {
-	//				select {
-	//				case <-ctx.Done():
-	//					return false
-	//				default:
-	//					if max > 0 && counter >= max {
-	//						return false
-	//					}
-	//				}
-	//				counter++
-	//
-	//				res = append(res, []byte(mutateResult.Result))
-	//				return true
-	//			},
-	//		},
-	//		yak.MutateWithYaklang(req.GetHotPatchCode()),
-	//	)
-	//	return true
-	//}, yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())())
-
 	return &ypb.StringFuzzerResponse{Results: res}, nil
 }
 

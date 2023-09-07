@@ -242,6 +242,14 @@ func FuzzFileOptions() []FuzzConfigOpt {
 	return opt
 }
 
+func Fuzz_WithEnableFiletag() FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		for _, opt := range FuzzFileOptions() {
+			opt(config)
+		}
+	}
+}
+
 func Filetag() []*FuzzTagDescription {
 	return []*FuzzTagDescription{
 		{
