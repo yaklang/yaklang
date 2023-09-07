@@ -99,6 +99,8 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 				panic(msg)
 			}
 			args[i] = argVal
+			v := argVal.Interface()
+			_ = v
 		}
 	}
 	// debug io
@@ -114,6 +116,13 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	returns := rets.Call(args)
 	var vals = make([]interface{}, len(returns))
 	for i, ret := range returns {
+		// 证明是别名，例如time.Duration 是 int64 类型别名，但是有自己实现的方法，所以不应该转换
+		pkgPath := ret.Type().PkgPath()
+		if pkgPath != "" {
+			vals[i] = ret.Interface()
+			continue
+		}
+
 		switch {
 		case ret.Kind() >= reflect.Int && ret.Kind() <= reflect.Int64:
 			if ret.Int() > math.MaxInt {

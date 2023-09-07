@@ -37,14 +37,19 @@ func init() {
 			return true
 		},
 	})
-	Import("timeNow", time.Now()) // timeNow.Unix()
-	Import("time", time.Now())
+	Import("timeNow", time.Now) // timeNow.Unix()
 	Import("testIns", &testStructed{A: []int{1, 2, 3}})
 	Import("dump", func(v ...interface{}) {
 		spew.Dump(v...)
 	})
 	Import("print", func(v interface{}) {
 		fmt.Println(v)
+	})
+	Import("println", func(v interface{}) {
+		fmt.Println(v)
+	})
+	Import("printf", func(f string, items ...interface{}) {
+		fmt.Printf(f, items...)
 	})
 	Import("handlerTest", func(h func(b bool) string) {
 		fmt.Println(h(true))
@@ -3732,6 +3737,22 @@ test()
 func TestFixIssues304(t *testing.T) {
 	code := `
 ni = []var([]var{[]var{123}})
+`
+	_marshallerTest(code)
+}
+
+func TestFixCallReturnForceConvert(t *testing.T) {
+	code := `
+t = timeNow()
+sleep(1)
+t2 = timeNow()
+try {
+	sub = t2.Sub(t)
+	printf("duration: %s\n",sub)
+	assert typeof(sub) != int
+} catch e {
+	panic("time.Duration force convert to int")
+}
 `
 	_marshallerTest(code)
 }
