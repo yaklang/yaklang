@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -153,5 +154,48 @@ func TestNewServer(t *testing.T) {
 			panic(err)
 		}
 		spew.Dump(rsp)
+	}
+}
+
+func TestGRPCMUSTPASS_NesureProxyValidInExecBatchYakScript(t *testing.T) {
+
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	name, err := yakit.CreateTemporaryYakScript("mitm", `
+mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
+    	poc.HTTP(req,poc.https(isHttps),poc.replaceQueryParam("key", "1"))
+}
+`)
+	count := 0
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "CONNECT" {
+			w.Write([]byte("HTTP/1.0 200 Connection established\r\n\r\n"))
+		} else if keys, ok := r.URL.Query()["key"]; ok && keys[0] == "1" {
+			count++
+		}
+		w.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+	})
+
+	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
+		Target:              "http://www.baidu.com?key=0",
+		ScriptNames:         []string{name},
+		Limit:               10,
+		TotalTimeoutSeconds: 1000,
+		Concurrent:          4,
+		Proxy:               fmt.Sprintf("http://%s:%d", host, port),
+	})
+	if err != nil {
+		panic(err)
+	}
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			break
+		}
+	}
+	if count <= 0 {
+		t.Fatalf("want more than 1 ,but got %d", count)
 	}
 }

@@ -49,7 +49,7 @@ go func {
         })
         for result in str.ParseStringToUrls(target) {
             https, bytes := poc.ParseUrlToHTTPRequestRaw("GET", result)~
-            rsp, req, err = poc.HTTP(bytes, poc.https(https))
+            rsp, req, err = poc.HTTP(bytes, poc.https(https), poc.proxy(proxy))
             if err != nil {
                 continue
             }
