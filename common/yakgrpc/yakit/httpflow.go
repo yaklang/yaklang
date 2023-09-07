@@ -273,7 +273,12 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		WebsocketHash:      f.WebsocketHash,
 	}
 	// 设置 title
-	unquotedResponse, _ := strconv.Unquote(f.Response)
+	unquotedResponse, err := strconv.Unquote(f.Response)
+	if err != nil {
+		log.Errorf("unquoted response failed: %s", err)
+		fmt.Println(f.Response)
+		unquotedResponse = f.Response
+	}
 	flow.HtmlTitle = utf8safe(strings.TrimSpace(utils.ExtractTitleFromHTMLTitle(unquotedResponse, "")))
 
 	if f.UpdatedAt.IsZero() {
@@ -292,7 +297,9 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 
 	unquotedRequest, err := strconv.Unquote(f.Request)
 	if err != nil {
-		return nil, utils.Errorf("unquoted failed: %s", err)
+		unquotedRequest = f.Request
+		log.Errorf("unquoted request failed: %s", err)
+		fmt.Println(f.Request)
 	}
 	flow.RequestLength = int64(len(unquotedRequest))
 	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
@@ -301,7 +308,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	var requireResponse = full || !f.IsResponseOversize
 	var isStandardRequest = !flow.NoFixContentLength
 
-	var haveRequest bool = funk.NotEmpty(f.Request)
+	var haveRequest = funk.NotEmpty(unquotedRequest)
 	var requestBody []byte
 	if requireRequest {
 		// return request:
