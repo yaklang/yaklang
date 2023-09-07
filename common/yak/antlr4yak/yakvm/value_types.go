@@ -236,6 +236,11 @@ func (v *Frame) AutoConvertReflectValueByType(
 
 	targetKind := reflectType.Kind()
 	if targetKind == reflect.Interface {
+		// 证明是别名，例如time.Duration 是 int64 类型别名，但是有自己实现的方法，所以不应该转换
+		pkgPath := reflectValue.Type().PkgPath()
+		if pkgPath != "" {
+			return nil
+		}
 		//if targetReflectType != nil && yaklangspec.DontTyNormalize[targetReflectType] { // don't normalize input type
 		//	return nil
 		//}
