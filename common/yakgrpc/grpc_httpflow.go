@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -451,23 +450,13 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 	if typ == "response" {
 		suffix = "_response"
 	}
-	var (
-		bare yakit.ProjectGeneralStorage
-		data []byte
-		err  error
-	)
 
-	if db := db.Where("key = ?", strconv.FormatInt(id, 10)+suffix).First(&bare); db.Error != nil {
+	if data, err := yakit.GetProjectKeyWithError(db, strconv.FormatInt(id, 10)+suffix); err != nil {
 		return nil, utils.Errorf("get bare from kv failed: %s", db.Error)
-	} else if db.RowsAffected == 0 {
-		return nil, utils.Errorf("bare not found")
+	} else {
+		return &ypb.HTTPFlowBareResponse{
+			Id:   id,
+			Data: utils.UnsafeStringToBytes(data),
+		}, nil
 	}
-
-	if data, err = codec.DecodeBase64(bare.Value); err != nil {
-		return nil, utils.Errorf("decode bare from kv failed: %s", db.Error)
-	}
-	return &ypb.HTTPFlowBareResponse{
-		Id:   id,
-		Data: data,
-	}, nil
 }
