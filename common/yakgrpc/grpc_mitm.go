@@ -787,6 +787,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
+		// 非自动转发的情况下处理替换器
 		rules, rsp1, shouldBeDropped := replacer.hook(false, true, rsp)
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
@@ -862,6 +863,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			response := reqInstance.GetResponse()
+			if handleResponseModified(response) {
+				httpctx.SetResponseModified(req, "manual")
+			}
+
 			rspModified, _, err := lowhttp.FixHTTPResponse(response)
 			if err != nil {
 				log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
@@ -1405,22 +1410,24 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 存储KV，将flow ID作为key，bare request和bare response作为value
-		if modified {
+		if httpctx.GetRequestIsModified(req) {
 			bareReq := httpctx.GetPlainRequestBytes(req)
 			if len(bareReq) == 0 {
 				bareReq = httpctx.GetBareRequestBytes(req)
 			}
-			log.Infof("[KV] bare Req(%d): %s", len(bareReq), bareReq)
+			log.Infof("[KV] save bare Response(%d)", flow.ID)
 
 			if len(bareReq) > 0 && flow.ID > 0 {
 				yakit.SetKVBareRequest(s.GetProjectDatabase(), flow.ID, bareReq)
 			}
+		}
 
+		if httpctx.GetResponseIsModified(req) {
 			bareRsp := httpctx.GetPlainResponseBytes(req)
 			if len(bareRsp) == 0 {
 				bareRsp = httpctx.GetBareResponseBytes(req)
 			}
-			log.Infof("[KV] bare Rsp(%d): %s", len(bareRsp), bareRsp)
+			log.Infof("[KV] save bare Response(%d)", flow.ID)
 
 			if len(bareRsp) > 0 && flow.ID > 0 {
 				yakit.SetKVBareResponse(s.GetProjectDatabase(), flow.ID, bareRsp)
