@@ -172,6 +172,7 @@ service Yak {
   rpc HTTPFlowsFieldGroup(HTTPFlowsFieldGroupRequest) returns (HTTPFlowsFieldGroupResponse);
   rpc HTTPFlowsShare(HTTPFlowsShareRequest) returns (HTTPFlowsShareResponse);
   rpc HTTPFlowsExtract(HTTPFlowsExtractRequest) returns (Empty);
+  rpc GetHTTPFlowBare(HTTPFlowBareRequest) returns (HTTPFlowBareResponse);
 
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
@@ -3772,4 +3773,15 @@ message CheckLicenseRequest {
 }
 message DefaultDnsServerResponse{
   repeated string DefaultDnsServer = 1;
+}
+
+
+message HTTPFlowBareRequest {
+  int64 Id = 1;
+  string BareType = 2;
+}
+
+message HTTPFlowBareResponse {
+    int64 Id = 1;
+    bytes Data = 2;
 }

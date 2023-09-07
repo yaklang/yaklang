@@ -5,6 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
@@ -21,13 +30,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"path"
-	"strings"
-	"sync"
-	"time"
 )
 
 func _exactChecker(includes, excludes []string, target string) bool {
@@ -786,6 +788,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
+		// 非自动转发的情况下处理替换器
 		rules, rsp1, shouldBeDropped := replacer.hook(false, true, rsp)
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
@@ -821,6 +824,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
+		httpctx.SetResponseViewedByUser(req)
 		for {
 			reqInstance, ok := <-messageChan
 			if !ok {
@@ -860,6 +864,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			response := reqInstance.GetResponse()
+			if handleResponseModified(response) {
+				httpctx.SetResponseModified(req, "manual")
+			}
+
 			rspModified, _, err := lowhttp.FixHTTPResponse(response)
 			if err != nil {
 				log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
@@ -1281,7 +1289,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
 		var isFilter = isFilteredByResponse || isFilteredByRequest
 		var modified = httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
-		var viewed = httpctx.GetRequestViewedByUser(req)
+		var viewed = httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
@@ -1341,7 +1349,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
 		flow.Hash = flow.CalcHash()
-
 		if viewed {
 			if modified {
 				flow.AddTagToFirst("[手动修改]")
@@ -1351,6 +1358,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.Orange()
 			}
 		}
+
 		var hijackedFlowMutex = new(sync.Mutex)
 		var dropped = utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
@@ -1401,6 +1409,34 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				break
 			}
 		}
+
+		// 存储KV，将flow ID作为key，bare request和bare response作为value
+		if httpctx.GetRequestIsModified(req) {
+			bareReq := httpctx.GetPlainRequestBytes(req)
+			if len(bareReq) == 0 {
+				bareReq = httpctx.GetBareRequestBytes(req)
+			}
+			log.Debugf("[KV] save bare Response(%d)", flow.ID)
+
+			if len(bareReq) > 0 && flow.ID > 0 {
+				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
+				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+			}
+		}
+
+		if httpctx.GetResponseIsModified(req) {
+			bareRsp := httpctx.GetPlainResponseBytes(req)
+			if len(bareRsp) == 0 {
+				bareRsp = httpctx.GetBareResponseBytes(req)
+			}
+			log.Debugf("[KV] save bare Response(%d)", flow.ID)
+
+			if len(bareRsp) > 0 && flow.ID > 0 {
+				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
+				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
+			}
+		}
+
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig
