@@ -121,77 +121,83 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 func NewDialGMTLSContextFunc(enableGM bool, preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
 	origin := NewDialContextFunc(timeout, opts...)
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
-		plainConn, err := origin(ctx, network, addr)
-		if err != nil {
-			return nil, utils.Errorf("gmtls dialer with TCP dial: %v", err)
-		}
 		targetHost, _, err := utils.ParseStringToHostPort(addr)
 		if err != nil {
 			targetHost = addr
 		}
 
-		gmtlsConfig := &gmtls.GMSupport{
-			WorkMode: "GMSSLOnly",
-		}
-		tlsConfig := &tls.Config{
-			ServerName:         targetHost,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			InsecureSkipVerify: true,
-		}
-
-		if !enableGM {
-			sconn, err := UpgradeToTLSConnection(plainConn, targetHost, tlsConfig)
-			if err != nil {
-				plainConn.Close()
-				return nil, err
+		var strategies = []TLSStrategy{TLS_Strategy_Ordinary}
+		if enableGM {
+			if onlyGMTLS {
+				strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_GMDial_Without_GMSupport}
+			} else if preferGMTLS {
+				strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_Ordinary, TLS_Strategy_GMDial_Without_GMSupport}
+			} else {
+				strategies = []TLSStrategy{TLS_Strategy_Ordinary, TLS_Strategy_GMDail, TLS_Strategy_GMDial_Without_GMSupport}
 			}
-			return sconn, nil
 		}
 
-		if onlyGMTLS {
-			conn, err := UpgradeToTLSConnection(plainConn, targetHost, gmtlsConfig)
+		var errs = make([]error, 0, len(strategies))
+		for _, strategy := range strategies {
+			plainConn, err := origin(ctx, network, addr)
 			if err != nil {
-				plainConn.Close()
-				return nil, utils.Errorf("gmtls dialer with gmtls dial: %v", err)
+				return nil, utils.Errorf("dialer with TCP dial: %v", err)
 			}
-			return conn, nil
-		}
 
-		if preferGMTLS {
-			conn, err := UpgradeToTLSConnection(plainConn, targetHost, gmtlsConfig)
-			if err != nil {
-				plainConn.Close()
-
-				plainConn, err := origin(ctx, network, addr)
-				if err != nil {
-					return nil, err
+			switch strategy {
+			case TLS_Strategy_Ordinary:
+				tlsConfig := &tls.Config{
+					ServerName:         targetHost,
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+					InsecureSkipVerify: true,
 				}
 				conn, err := UpgradeToTLSConnection(plainConn, targetHost, tlsConfig)
 				if err != nil {
 					plainConn.Close()
-					return nil, utils.Errorf("dialer with tls dial: %v", err)
+					errs = append(errs, err)
+					continue
 				}
 				return conn, nil
-			}
-			return conn, nil
-		} else {
-			conn, err := UpgradeToTLSConnection(plainConn, targetHost, tlsConfig)
-			if err != nil {
-				plainConn.Close()
-
-				plainConn, err := origin(ctx, network, addr)
-				if err != nil {
-					return nil, err
+			case TLS_Strategy_GMDail:
+				gmtlsConfig := &gmtls.Config{
+					GMSupport: &gmtls.GMSupport{
+						WorkMode: gmtls.ModeGMSSLOnly,
+					},
+					ServerName:         targetHost,
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+					InsecureSkipVerify: true,
 				}
 				conn, err := UpgradeToTLSConnection(plainConn, targetHost, gmtlsConfig)
 				if err != nil {
 					plainConn.Close()
-					return nil, utils.Errorf("dialer with gmtls dial: %v", err)
+					errs = append(errs, err)
+					continue
 				}
 				return conn, nil
+			case TLS_Strategy_GMDial_Without_GMSupport:
+				gmtlsConfig := &gmtls.Config{
+					ServerName:         targetHost,
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+					InsecureSkipVerify: true,
+				}
+				conn, err := UpgradeToTLSConnection(plainConn, targetHost, gmtlsConfig)
+				if err != nil {
+					plainConn.Close()
+					errs = append(errs, err)
+					continue
+				}
+				return conn, nil
+			default:
+				return nil, utils.Errorf("unknown tls strategy %v", strategy)
 			}
-			return conn, nil
 		}
+
+		if len(errs) > 0 {
+			return nil, utils.Errorf("all tls strategy failed: %v", errs)
+		}
+		return nil, utils.Error("unknown tls strategy error, BUG here!")
 	}
 }
