@@ -458,7 +458,7 @@ assert a == 3
 func TestNewExecutor_FixMemberCall(t *testing.T) {
 	code := `
 dump(
-	time.String(), 1111111
+	timeNow().String(), 1111111
 )
 
 `
