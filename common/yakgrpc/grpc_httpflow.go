@@ -457,8 +457,10 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 		err  error
 	)
 
-	if db.Where("key = ?", strconv.FormatInt(id, 10)+suffix).First(&bare); db.Error != nil {
+	if db := db.Where("key = ?", strconv.FormatInt(id, 10)+suffix).First(&bare); db.Error != nil {
 		return nil, utils.Errorf("get bare from kv failed: %s", db.Error)
+	} else if db.RowsAffected == 0 {
+		return nil, utils.Errorf("bare not found")
 	}
 
 	if data, err = codec.DecodeBase64(bare.Value); err != nil {
