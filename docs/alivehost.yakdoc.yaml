@@ -17,7 +17,7 @@ functions:
         type_str: '[]yakit.AliveHostParamsOpt'
         is_variadic: true
   - name: aliveHost.QueryAliveHost
-    type_str: 'func (v1: string) return(chan *yakit.AliveHost, error)'
+    type_str: 'func (v1: string) return(chan *yakit.AliveHost)'
     long_description: ""
     description: ""
     params:

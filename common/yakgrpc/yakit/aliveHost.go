@@ -29,8 +29,10 @@ func CreateOrUpdateAliveHost(db *gorm.DB, hash string, i interface{}) error {
 	return nil
 }
 
-func YieldAliveHost(db *gorm.DB, ctx context.Context) chan *AliveHost {
+func YieldAliveHostRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *AliveHost {
 	outC := make(chan *AliveHost)
+	db = db.Model(&AliveHost{})
+	db = db.Where("runtime_id = ?", runtimeId)
 	go func() {
 		defer close(outC)
 
