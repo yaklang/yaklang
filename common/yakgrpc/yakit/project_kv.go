@@ -77,7 +77,7 @@ func setKVBare(db *gorm.DB, keyStr string, buf []byte, group string) error {
 	if len(buf) > 0 {
 		valueStr = codec.EncodeBase64(buf)
 	}
-	if db := db.Model(&ProjectGeneralStorage{}).Debug().Where(`"group" = ? and key = ?`, group, keyStr).Assign(map[string]interface{}{
+	if db := db.Model(&ProjectGeneralStorage{}).Where(`"group" = ? and key = ?`, group, keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "group": group,
 	}).FirstOrCreate(&ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("create project storage kv failed: %s", db.Error)
