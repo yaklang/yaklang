@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -99,6 +100,80 @@ abc`), "Host", utils.HostPort(host, port))),
 
 	if !verified {
 		t.Fatal("verified extractor ")
+	}
+}
+
+func TestGRPCMUSTPASS_FuzzerSequence_InheritKey(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	var (
+		token = utils.RandStringBytes(32)
+	)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("GREAT"))
+		return
+	})
+
+	client, err := c.HTTPFuzzerSequence(
+		utils.TimeoutContextSeconds(10),
+		&ypb.FuzzerRequests{Requests: []*ypb.FuzzerRequest{
+			{
+				Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+Host: www.example.com
+
+{{p(a)}}`), "Host", utils.HostPort(host, port))),
+				IsHTTPS:                  false,
+				PerRequestTimeoutSeconds: 5,
+				RedirectTimes:            3,
+				ForceFuzz:                true,
+				Params: []*ypb.FuzzerParamItem{
+					{
+						Key:   "a",
+						Value: "{{int(1-10)}}",
+						Type:  "fuzztag",
+					},
+				},
+			},
+			{
+				Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /verify HTTP/1.1
+Host: www.example.com
+Authorization: Bearer {{params(test)}}
+
+`+token+`_`+"{{p(a)}}"), "Host", utils.HostPort(host, port))),
+				IsHTTPS:                  false,
+				PerRequestTimeoutSeconds: 5,
+				RedirectTimes:            3,
+				InheritVariables:         true,
+				ForceFuzz:                true,
+			},
+		}},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	count := 0
+	for {
+		resp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if resp == nil {
+			break
+		}
+		count++
+		if strings.Contains(string(resp.Response.RequestRaw), token+`_-9`) {
+			fmt.Println(string(resp.Response.RequestRaw))
+			t.Fatal("fuzztag variables passed failed!")
+		}
+	}
+	t.Logf("FETCH COUNT: %v", count)
+	if count != 20 {
+		t.Fatal("not 20 request")
 	}
 }
 
