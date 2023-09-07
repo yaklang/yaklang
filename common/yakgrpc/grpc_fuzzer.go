@@ -543,8 +543,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 			extractorResultsOrigin := extractorResults
-			for _, p := range req.GetParams() {
-				extractorResults = append(extractorResults, &ypb.KVPair{Key: p.GetKey(), Value: p.GetValue()})
+			for k, v := range mergedParams {
+				extractorResults = append(extractorResults, &ypb.KVPair{
+					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v))},
+				)
 			}
 
 			var httpTPLmatchersResult bool
