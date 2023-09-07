@@ -16,7 +16,7 @@ func (v *Frame) call(caller *Value, wavy bool, args []*Value) {
 		})
 		return
 	}
-	panic(fmt.Sprintf("runtime error: %v cannot be called", reflect.TypeOf(caller)))
+	panic(fmt.Sprintf("runtime error: %v cannot be called", reflect.TypeOf(caller.Value)))
 }
 
 func (v *Frame) asyncCall(caller *Value, wavy bool, args []*Value) {
