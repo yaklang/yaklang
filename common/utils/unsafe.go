@@ -14,3 +14,11 @@ func SetUnexportedField(field reflect.Value, value interface{}) {
 		Elem().
 		Set(reflect.ValueOf(value))
 }
+
+func UnsafeStringToBytes(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&s))
+}
+
+func UnsafeBytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}

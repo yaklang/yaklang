@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,9 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
@@ -440,4 +441,22 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	sw.Commit()
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareRequest) (*ypb.HTTPFlowBareResponse, error) {
+	db := s.GetProjectDatabase()
+	id, typ := req.GetId(), req.GetBareType()
+	suffix := "_request"
+	if typ == "response" {
+		suffix = "_response"
+	}
+
+	if data, err := yakit.GetProjectKeyWithError(db, strconv.FormatInt(id, 10)+suffix); err != nil {
+		return nil, utils.Errorf("get bare from kv failed: %s", db.Error)
+	} else {
+		return &ypb.HTTPFlowBareResponse{
+			Id:   id,
+			Data: utils.UnsafeStringToBytes(data),
+		}, nil
+	}
 }
