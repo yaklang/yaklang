@@ -18,8 +18,9 @@ import (
 type VulinServer struct {
 	database *dbm
 	router   *mux.Router
-	wsAgent  wsAgent
-	matcher  matcher
+
+	wsAgent wsAgent
+	matcher matcher
 
 	safeMode           bool
 	groupedRoutesCache []*GroupedRoutes

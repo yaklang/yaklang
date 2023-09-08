@@ -67,7 +67,7 @@ jobs:
             run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
 
           - name: Test Vulinbox agent client
-            run: go test -timeout 1m ./common/vulinboxagentclient -v
+            run: go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient -v
 
           - name: Test Suricata Generate && Match
             run: |

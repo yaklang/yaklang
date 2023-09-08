@@ -91,8 +91,24 @@ type SubscribeAction struct {
 	Rules []string `json:"rules"`
 }
 
+func NewSubscribeAction(tp string, rules []string) *SubscribeAction {
+	return &SubscribeAction{
+		AgentProtocol: newAgentProtocol(ActionSubscribe),
+		Type:          tp,
+		Rules:         rules,
+	}
+}
+
 type UnsubscribeAction struct {
 	AgentProtocol
 	Type  string   `json:"type"`
 	Rules []string `json:"rules"`
+}
+
+func NewUnsubscribeAction(tp string, rules []string) *UnsubscribeAction {
+	return &UnsubscribeAction{
+		AgentProtocol: newAgentProtocol(ActionUnsubscribe),
+		Type:          tp,
+		Rules:         rules,
+	}
 }

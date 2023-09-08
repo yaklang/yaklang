@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,9 @@ type Client struct {
 
 	ackWaitMap *ttlcache.Cache
 	sendBuf    chan []byte
+
+	databackHandler     map[string]func(any)
+	databackHandlerLock sync.RWMutex
 
 	ctx     context.Context
 	onClose func()
@@ -42,8 +46,9 @@ type Option func(c *Client)
 func Connect(addr string, options ...Option) (*Client, error) {
 	// new client
 	var c = &Client{
-		sendBuf:    make(chan []byte, 1024),
-		ackWaitMap: ttlcache.NewCache(),
+		sendBuf:         make(chan []byte, 1024),
+		ackWaitMap:      ttlcache.NewCache(),
+		databackHandler: map[string]func(any){},
 	}
 	c.ackWaitMap.SetTTL(Expire)
 	c.ackWaitMap.SkipTtlExtensionOnHit(true)
@@ -159,12 +164,19 @@ func (c *Client) MessageMux(bytes []byte) {
 			log.Errorf("cannot unmarshal databack action: %v", string(bytes))
 			return
 		}
-		if databack.Type == "suricata" {
-			if databack.Data != nil {
-				log.Debugf("vulinbox ws agent fetch suricata databack: %v", databack.Data)
-			}
-		} else {
-			log.Debugf("vulinbox ws agent fetch databack: %v", string(bytes))
+		log.Debugf("vulinbox ws agent fetch %s databack: %v", databack.Type, databack.Data)
+		c.databackHandlerLock.RLock()
+		defer c.databackHandlerLock.RUnlock()
+		if f, ok := c.databackHandler[databack.Type]; ok {
+			f(databack.Data)
 		}
 	}
+}
+
+// RegisterDataback register databack handler
+// attention that no racing protect here, so you should register databack handler before connect
+func (c *Client) RegisterDataback(kind string, f func(any)) {
+	c.databackHandlerLock.Lock()
+	defer c.databackHandlerLock.Unlock()
+	c.databackHandler[kind] = f
 }
