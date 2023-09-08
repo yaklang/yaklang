@@ -209,7 +209,12 @@ func StringGlobArrayContains(array []string, element string, seps ...rune) bool 
 			}
 			continue
 		}
-
+		if !strings.HasSuffix(r, "*") {
+			r += "*"
+		}
+		if !strings.HasPrefix(r, "*") {
+			r = "*" + r
+		}
 		rule, err := glob.Compile(r, seps...)
 		if err != nil {
 			continue

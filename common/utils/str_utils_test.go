@@ -157,3 +157,8 @@ func TestMUSTPASS_HostPort(t *testing.T) {
 	assert.Equal(t, "127.0.0.1:8787", AppendDefaultPort("127.0.0.1", 8787))
 	assert.Equal(t, "yaklang.io:8787", AppendDefaultPort("yaklang.io", 8787))
 }
+
+func TestMUSSPASS_StringGlobArrayContains(t *testing.T) {
+	assert.Equal(t, true, StringGlobArrayContains([]string{"/api/push?pass=*"}, "localhost/api/push?pass=123"))
+	assert.Equal(t, true, StringGlobArrayContains([]string{"/api/push?pass=*&abc=123"}, "localhost/api/push?pass=123&abc=123"))
+}
