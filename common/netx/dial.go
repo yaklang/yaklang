@@ -36,6 +36,37 @@ func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx conte
 	}
 }
 
+// NewDialContextFuncEx 扩展方法支持更多的Dial配置
+func NewDialContextFuncEx(config *dialXConfig) func(ctx context.Context, network string, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
+		d := net.Dialer{
+			Timeout:   config.Timeout,
+			KeepAlive: config.KeepAlive,
+		}
+		host, port, err := utils.ParseStringToHostPort(addr)
+		if err != nil {
+			return nil, utils.Errorf("cannot parse %v as host:port, reason: %v", addr, err)
+		}
+
+		ddl, ok := ctx.Deadline()
+		if ok {
+			if du := ddl.Sub(time.Now()); du.Seconds() > 0 {
+				d.Timeout = du
+			}
+		}
+
+		if utils.IsIPv4(host) || utils.IsIPv6(host) {
+			return d.Dial(network, utils.HostPort(host, port))
+		}
+
+		newHost := LookupFirst(host, config.DNSOpts...)
+		if newHost == "" {
+			return nil, utils.Errorf("cannot resolve %v", addr)
+		}
+		return d.Dial(network, utils.HostPort(newHost, port))
+	}
+}
+
 var defaultDialContextFunc = NewDialContextFunc(30 * time.Second)
 var defaultDialGMTLSContextFunc = NewDialGMTLSContextFunc(true, false, false, 30*time.Second)
 var defaultDialForceGMTLSContextFunc = NewDialGMTLSContextFunc(true, false, true, 30*time.Second)

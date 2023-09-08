@@ -58,6 +58,8 @@ type LowhttpExecConfig struct {
 	DNSServers           []string
 	RuntimeId            string
 	FromPlugin           string
+	WithoutConnPool      bool
+	ConnPool             *lowHttpConnPool
 }
 
 type LowhttpResponse struct {
@@ -335,6 +337,18 @@ func WithSession(session interface{}) LowhttpOpt {
 	}
 }
 
+func WithConnPool(p *lowHttpConnPool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ConnPool = p
+	}
+}
+
+func WithoutConnPool() LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.WithoutConnPool = true
+	}
+}
+
 var (
 	_systemEtcHosts = make(map[string]string)
 	systemEtcOnce   = sync.Once{}
@@ -360,6 +374,10 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
+	if !option.WithoutConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
+		opts = append(opts, WithConnPool(DefaultLowHttpConnPool))
+	}
 
 	var (
 		forceHttps         = option.Https
@@ -371,6 +389,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		response           *LowhttpResponse
 		err                error
 	)
+
 	response, err = HTTPWithoutRedirect(opts...)
 	if err != nil {
 		return response, err
@@ -483,7 +502,14 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		source               = option.RequestSource
 		dnsServers           = option.DNSServers
 		dnsHosts             = option.EtcHosts
+		connPool             = option.ConnPool
+		withoutConnPool      = option.WithoutConnPool
 	)
+	reqSchema := "HTTP"
+	if forceHttp2 {
+		reqSchema = "HTTP2"
+	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -719,6 +745,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		nextProto = []string{"http/1.1"}
 	}
 
+	// 需要用于标识连接 https gmTLS
 	// configTLS
 	var dialopts []netx.DialXOption
 	if https {
@@ -747,6 +774,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dialopts = append(dialopts, netx.DialX_WithProxy(proxy...))
 	}
 
+	// 初次连接需要的
 	// retry use DialX
 	var dnsStart = time.Now()
 	var dnsEnd = time.Now()
@@ -766,9 +794,23 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		),
 		netx.DialX_WithSNI(host),
 	)
-
+	cacheKey := connectKey{
+		proxy:  option.Proxy,
+		scheme: reqSchema,
+		addr:   originAddr,
+		https:  option.Https,
+		gmTls:  option.GmTLS,
+	}
 RECONNECT:
-	conn, err = netx.DialX(originAddr, dialopts...)
+	if withoutConnPool {
+		//if true {
+		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		conn, err = netx.DialX(originAddr, dialopts...)
+	} else {
+		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		//conn, err = netx.DialX(originAddr, dialopts...)
+
+	}
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 

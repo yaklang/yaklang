@@ -13,8 +13,9 @@ import (
 )
 
 type dialXConfig struct {
-	Timeout time.Duration
-	Proxy   []string
+	Timeout   time.Duration
+	Proxy     []string
+	KeepAlive time.Duration
 
 	// EnableTLS is true, force to use TLS, auto upgrade
 	EnableTLS                 bool
@@ -60,6 +61,12 @@ func DialX_WithTimeoutRetryWait(timeout time.Duration) DialXOption {
 		c.EnableTimeoutRetry = true
 		c.TimeoutRetryMinWait = timeout
 		c.TimeoutRetryMaxWait = timeout
+	}
+}
+
+func DialX_WithKeepAlive(aliveTime time.Duration) DialXOption {
+	return func(c *dialXConfig) {
+		c.KeepAlive = aliveTime
 	}
 }
 
