@@ -3,8 +3,6 @@ package yakast
 import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-
-	"github.com/google/uuid"
 )
 
 func (y *YakCompiler) PreviewStatementList(raw yak.IStatementListContext) (int, *yak.StatementContext) {
@@ -185,9 +183,7 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 	}
 
 	if s := i.Block(); s != nil {
-		tableRecover := y.SwitchSymbolTableInNewScope("block", uuid.New().String())
 		y.VisitBlock(s)
-		tableRecover()
 		y.writeEOS(i.Eos())
 		return false
 	}
