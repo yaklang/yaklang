@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"sync"
 )
@@ -169,6 +170,10 @@ func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
 		appendRules = append(appendRules, rules...)
 	}
 	r.matcher.AddRule(appendRules...)
+	r.matcher.SetCallback(func(data []byte) {
+		r.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("suricata", codec.EncodeBase64(data)))
+	})
+	go r.matcher.RunSingle()
 	return nil, nil
 }
 
