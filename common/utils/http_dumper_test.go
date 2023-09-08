@@ -7,6 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"testing"
 )
@@ -52,6 +53,27 @@ func TestHTTPRequestDumper_Cookie(t *testing.T) {
 	}
 	if len(req.Cookies()) != 3 {
 		t.Fatal("should be 3 cookies")
+	}
+
+	req.URL.Scheme = "http"
+	req.URL.Host = "www.example.com"
+	req.Host = "www.example.com"
+	raw, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !MatchAllOfSubString(string(raw), `jsession=abc`, "name=value") {
+		t.Fatal("should contains jsession=abc")
+	}
+	fmt.Println(string(raw))
+
+	raw, err = DumpHTTPRequest(req, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(raw))
+	if !MatchAllOfSubString(string(raw), `jsession=abc`, "name=value") {
+		t.Fatal("should contains jsession=abc")
 	}
 }
 
