@@ -143,10 +143,10 @@ func SetContextValueInfoFromRequest(r *http.Request, key string, value any) {
 }
 
 func SetBareRequestBytes(r *http.Request, bytes []byte) {
-	if len(GetBareRequestBytes(r)) != 0 {
-		log.Debug("SetBareRequestBytes: bare request bytes already set, ignore")
-		return
-	}
+	//if len(GetBareRequestBytes(r)) != 0 {
+	//	log.Debug("SetBareRequestBytes: bare request bytes already set, ignore")
+	//	return
+	//}
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, string(bytes))
 }
 
