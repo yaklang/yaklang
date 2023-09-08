@@ -2,9 +2,10 @@ package yakast
 
 import (
 	"fmt"
+	"strings"
+
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -45,7 +46,7 @@ func (y *YakCompiler) exitSwitchContext(end int) {
 	y.switchDepthStack.Pop()
 }
 
-func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
+func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -123,7 +124,6 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 					y.pushOperator(yakvm.OpEq)
 				}
 			} else { // 如果多个表达式,要短路处理
-
 				for i, e := range exprs.AllExpression() {
 					y.VisitExpression(e)
 					if !switchExprIsEmpty {
@@ -275,8 +275,10 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	for _, jmp := range jmpToEnd {
 		jmp.Unary = endCodewithScopeEnd
 	}
-	// 设置break跳转到switch结尾的位置,没有scopeEnd,因为break自带了scopeEnd
-	y.exitSwitchContext(endCode + 1)
+	// 设置break跳转到switch结尾的位置,不需要处理内部的scopeEnd,因为break自带了scopeEnd
+	// 因为switch创建时，breakScope的层数从0开始，因此break只会退出switch-scope内部的scope， 最后仍然需要一个switch-scope的scopeEnd。
+	// endCode一定是最后的ScopeEnd
+	y.exitSwitchContext(endCode)
 
 	y.writeString("}")
 
