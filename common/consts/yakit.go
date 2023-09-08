@@ -2,6 +2,8 @@ package consts
 
 import (
 	"compress/gzip"
+	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,9 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
-
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	"time"
 )
 
 var (
@@ -509,10 +509,13 @@ func GetGormProjectDatabase() *gorm.DB {
 		if utils.IsDir(profileDatabaseName) {
 			os.RemoveAll(profileDatabaseName)
 		}
+		//gormPluginDatabase, err = gorm.Open("sqlite3", fmt.Sprintf("file:%s?cache=shared", profileDatabaseName))
 		gormPluginDatabase, err = gorm.Open("sqlite3", profileDatabaseName)
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
 		} else {
+			//gormPluginDatabase = gormPluginDatabase.Debug()
+			configureAndOptimizeDB(gormPluginDatabase)
 			err := os.Chmod(profileDatabaseName, 0666)
 			if err != nil {
 				log.Errorf("chmod +rw failed: %s", err)
@@ -523,10 +526,13 @@ func GetGormProjectDatabase() *gorm.DB {
 		if utils.IsDir(projectDatabaseName) {
 			os.RemoveAll(projectDatabaseName)
 		}
+		//gormDatabase, err = gorm.Open("sqlite3", fmt.Sprintf("file:%s?cache=shared", projectDatabaseName))
 		gormDatabase, err = gorm.Open("sqlite3", projectDatabaseName)
 		if err != nil {
 			log.Errorf("init db[%v] failed: %s", projectDatabaseName, err)
 		} else {
+			//gormDatabase = gormDatabase.Debug()
+			configureAndOptimizeDB(gormDatabase)
 			err := os.Chmod(projectDatabaseName, 0666)
 			if err != nil {
 				log.Errorf("chmod +rw failed: %s", err)
@@ -537,4 +543,18 @@ func GetGormProjectDatabase() *gorm.DB {
 
 	})
 	return gormDatabase
+}
+
+func configureAndOptimizeDB(db *gorm.DB) {
+	db.DB().SetConnMaxLifetime(time.Hour)
+	db.DB().SetMaxIdleConns(10)
+	db.DB().SetMaxOpenConns(100)
+
+	// sqlite 性能调优
+	db.Exec("PRAGMA synchronous = OFF;")
+	//db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
+	db.Exec("PRAGMA journal_mode = OFF;")
+	db.Exec("PRAGMA temp_store = MEMORY;")
+	db.Exec("PRAGMA cache_size = 8000;")
+	db.Exec("PRAGMA busy_timeout = 10000;")
 }
