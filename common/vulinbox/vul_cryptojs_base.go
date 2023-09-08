@@ -145,6 +145,53 @@ func (s *VulinServer) registerCryptoJS() {
 			},
 		},
 		{
+			Path: "/sign/hmac/sha256/verify",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				raw, err := utils.HttpDumpWithBody(request, true)
+				if err != nil {
+					Failed(writer, request, "dump request failed: %v", err)
+					return
+				}
+				params := utils.ParseStringToGeneralMap(lowhttp.GetHTTPPacketBody(raw))
+				keyEncoded := utils.MapGetString(params, "key")
+				keyPlain, err := codec.DecodeHex(keyEncoded)
+				if err != nil {
+					Failed(writer, request, "key decode hex failed: %v", err)
+					return
+				}
+				_ = keyPlain
+				originSign := utils.MapGetString(params, "signature")
+				siginatureHmacHex := originSign
+				//siginatureHmacHex, err := tlsutils.PemPkcs1v15Decrypt(pri, []byte(originSignDecoded))
+				//if err != nil {
+				//	Failed(writer, request, "signature decrypt failed: %v", err)
+				//	return
+				//}
+				username := utils.MapGetString(params, "username")
+				password := utils.MapGetString(params, "password")
+				backendCalcOrigin := fmt.Sprintf("username=%v&password=%v", username, password)
+				dataRaw := codec.HmacSha256(keyPlain, backendCalcOrigin)
+				var blocks []string
+				var signFinished = string(siginatureHmacHex) == codec.EncodeToHex(dataRaw)
+				msg := "ORIGIN -> " + originSign + "\n DECODED HMAC: " + string(siginatureHmacHex) + "\n" +
+					"\n Expect: " + codec.EncodeToHex(dataRaw) +
+					"\n Key: " + string(keyPlain) +
+					"\n OriginData: " + backendCalcOrigin
+				if signFinished {
+					blocks = append(blocks, block("签名验证成功", msg))
+				} else {
+					blocks = append(blocks, block("签名验证失败", msg))
+				}
+				if isLoginedFromRaw(params) && signFinished {
+					blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+				} else {
+					blocks = append(blocks, block("用户名密码验证失败", "origin data: "+backendCalcOrigin))
+				}
+
+				DefaultRender(BlockContent(blocks...), writer, request)
+			},
+		},
+		{
 			Path:  "/sign/rsa/hmacsha256",
 			Title: "前端验证签名（验签）表单：先 HMAC-SHA256 再 RSA",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
