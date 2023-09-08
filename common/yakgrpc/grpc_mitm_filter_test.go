@@ -335,6 +335,20 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 			},
 			Count: 1,
 		},
+		{
+			Filter: &MITMFilterManager{
+				IncludeUri: []string{"/ab*c"},
+			},
+			Send: [][]any{
+				{
+					"GET", "localhost:80", "/abbbbbbc", "", false,
+				},
+				{
+					"GET", "localhost:80", "/abaaaac", "", false,
+				},
+			},
+			Count: 2,
+		},
 	}
 
 	for _, c := range cases {
@@ -344,7 +358,7 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 				count++
 			}
 		}
-		assert.Equal(t, c.Count, 1)
+		assert.Equal(t, c.Count, count)
 	}
 
 }

@@ -134,7 +134,7 @@ func (m *MITMFilterManager) Filter(method string, hostport, urlStr string, ext s
 		return false
 	}
 
-	passed = _exactChecker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
+	passed = _checker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
 	if !passed {
 		log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
 		return false
