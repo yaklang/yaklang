@@ -82,6 +82,7 @@ conn.Close()
 	}
 	request := string(data.GetData()[0].Request)
 	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
+		fmt.Println(request)
 		t.Fatal("request should not contains proxy connection")
 	}
 }
