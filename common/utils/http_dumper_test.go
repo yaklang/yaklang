@@ -237,3 +237,24 @@ func TestHTTPResponseDumper_Stream_BodyIsSmall(t *testing.T) {
 		t.Fatal("body should be abcccddef[SP][SP][SP]")
 	}
 }
+
+func TestDumpHTTPResponse(t *testing.T) {
+	rsp, err := ReadHTTPResponseFromBytes([]byte(`HTTP/1.1 302 Found
+Server: nginx/1.21.6
+Date: Fri, 08 Sep 2023 04:17:28 GMT
+Content-Type: text/html; charset=utf-8
+X-XSS-Protection: 1; mode=block
+X-Content-Type-Options: nosniff
+Content-Security-Policy: media-src 'self'
+Set-Cookie: name=value; HttpOnly
+Location: http://59.255.61.116/mh/login.jsp
+Set-Cookie: JSESSIONID=ChIBvh-RZPqgoK9M0mDr10MliU9w_SPinloA; path=/mh; HttpOnly
+
+123`), nil)
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(rsp.Header)
+	raw, _ := DumpHTTPResponse(rsp, true)
+	fmt.Println(string(raw))
+}

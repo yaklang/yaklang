@@ -178,10 +178,31 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		case "transfer-encoding", "content-length", "server":
 			continue
 		}
-		buf.WriteString(k)
-		buf.WriteString(": ")
-		buf.WriteString(getHeaderValueAll(header, k))
-		buf.WriteString(CRLF)
+
+		vals, ok := header[k]
+		if !ok {
+			continue
+		}
+		for _, v := range vals {
+			buf.WriteString(k)
+			buf.WriteString(": ")
+			buf.WriteString(v)
+			buf.WriteString(CRLF)
+		}
+
+		cKey := http.CanonicalHeaderKey(k)
+		if cKey != k {
+			vals, ok = header[cKey]
+			if !ok {
+				continue
+			}
+			for _, v := range vals {
+				buf.WriteString(k)
+				buf.WriteString(": ")
+				buf.WriteString(v)
+				buf.WriteString(CRLF)
+			}
+		}
 	}
 
 	buf.Flush()
@@ -318,11 +339,30 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		case "host", "content-length", "transfer-encoding":
 			continue
 		}
-		val := getHeaderValueAll(header, k)
-		buf.WriteString(k)
-		buf.WriteString(": ")
-		buf.WriteString(val)
-		buf.WriteString(CRLF)
+		vals, ok := header[k]
+		if !ok {
+			continue
+		}
+		for _, v := range vals {
+			buf.WriteString(k)
+			buf.WriteString(": ")
+			buf.WriteString(v)
+			buf.WriteString(CRLF)
+		}
+
+		cKey := http.CanonicalHeaderKey(k)
+		if cKey != k {
+			vals, ok = header[cKey]
+			if !ok {
+				continue
+			}
+			for _, v := range vals {
+				buf.WriteString(k)
+				buf.WriteString(": ")
+				buf.WriteString(v)
+				buf.WriteString(CRLF)
+			}
+		}
 	}
 
 	if req.Body == nil {
