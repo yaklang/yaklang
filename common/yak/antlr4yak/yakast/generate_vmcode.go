@@ -127,11 +127,13 @@ func (s *YakCompiler) pushEnterFR() *yakvm.Code {
 	return code
 }
 
-func (s *YakCompiler) pushBreak() {
-	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
+func (s *YakCompiler) pushBreak() *yakvm.Code {
+	b := &yakvm.Code{
 		Opcode: yakvm.OpBreak,
 		Op1:    yakvm.NewIntValue(s.getNearliestBreakScopeCounter()),
-	})
+	}
+	s._pushOpcodeWithCurrentCodeContext(b)
+	return b
 }
 
 func (s *YakCompiler) pushEllipsis(n int) {
