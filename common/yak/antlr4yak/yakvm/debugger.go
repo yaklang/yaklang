@@ -165,11 +165,8 @@ func NewCodeState(codeIndex int, state string) *CodeState {
 		state:     state,
 	}
 }
-func (g *Debugger) Init(codes []*Code) {
-	g.StartWGAdd()
 
-	g.codes[""] = codes
-
+func (g *Debugger) InitCode(codes []*Code) {
 	// 找出所有的函数及其opcode
 	for _, code := range codes {
 		if code.Opcode == OpPush {
@@ -181,8 +178,16 @@ func (g *Debugger) Init(codes []*Code) {
 			funcUUID := f.GetUUID()
 
 			g.codes[funcUUID] = f.codes
+			g.InitCode(f.codes)
 		}
 	}
+}
+
+func (g *Debugger) Init(codes []*Code) {
+	g.StartWGAdd()
+
+	g.codes[""] = codes
+	g.InitCode(codes)
 
 	hasSet := false
 	sourceCodeFilePath := ""
