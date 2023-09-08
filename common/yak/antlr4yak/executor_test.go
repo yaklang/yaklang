@@ -831,6 +831,9 @@ func _marshallerTest(i string) {
 	vm.ImportLibs(buildinLib)
 	err = vm.Exec(context.Background(), func(frame *yakvm.Frame) {
 		frame.NormalExec(codes)
+		if err := frame.CheckExit(); err != nil {
+			panic(err)
+		}
 	})
 	if err != nil {
 		panic(err)

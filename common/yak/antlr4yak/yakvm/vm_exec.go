@@ -63,6 +63,35 @@ func (v *Frame) continueExec() {
 func (v *Frame) execEx() {
 	v.execExWithContinueOption(false)
 }
+func (v *Frame) CheckExit() error {
+	if v.parent != nil {
+		return nil
+	}
+	if v.stack.Len() > 0 {
+		for v.stack.Len() > 0 {
+			value := v.stack.Pop().(*Value).Value
+			switch vv := value.(type) {
+			case []*Value:
+				for _, val := range vv {
+					fmt.Printf("stack - : %#v", val)
+				}
+			default:
+				fmt.Printf("stack : %#v\n", value)
+			}
+		}
+		return utils.Errorf("Runtime Stack Unbalanced: %v ", v.stack.Len())
+	}
+
+	if v.iteratorStack.Len() > 0 {
+		return utils.Errorf("Runtime For Iterator Stack Unbalanced: %v", v.iteratorStack.Len())
+	}
+
+	if !v.CurrentScope().IsRoot() {
+		return utils.Errorf("Scope is unbalanced %#v", v.CurrentScope())
+	}
+	return nil
+}
+
 func (v *Frame) execExWithContinueOption(isContinue bool) {
 	if !isContinue {
 		v.codePointer = 0
@@ -80,30 +109,8 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 		}
 
 		if v.debug && v.exitCode == NormallyExit {
-			if v.stack.Len() > 0 {
-				log.Warnf("Runtime Stack Unbalanced: %v", v.stack.Len())
-				for v.stack.Len() > 0 {
-					value := v.stack.Pop().(*Value).Value
-					switch vv := value.(type) {
-					case []*Value:
-						for _, val := range vv {
-							fmt.Printf("stack - : %#v", val)
-						}
-					default:
-						fmt.Printf("stack : %#v\n", value)
-					}
-				}
-
-				panic("Runtime Stack Unbalanced!")
-			}
-
-			if v.iteratorStack.Len() > 0 {
-				log.Warnf("Iterator Stack Unbalanced: %v", v.iteratorStack.Len())
-				panic("Runtime For-Iterator-Stack Unbalanced!")
-			}
-
-			if !v.CurrentScope().IsRoot() {
-				log.Warnf("Scope is unbalanced")
+			if err := v.CheckExit(); err != nil {
+				panic(err)
 			}
 		}
 
@@ -165,10 +172,10 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	}()
 
 	if v.debug {
-		ShowOpcodes(v.codes)
-		println()
-		println(strings.Repeat("-", 32))
-		println()
+		// ShowOpcodes(v.codes)
+		// println()
+		// println(strings.Repeat("-", 32))
+		// println()
 	}
 	for {
 		if v.codePointer >= len(v.codes) {
@@ -206,8 +213,15 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 }
 
 func ShowOpcodes(c []*Code) {
+	index := 0
 	for i, code := range c {
-		fmt.Printf("%-13s %4d:%v\n", code.RangeVerbose(), i, code.String())
+		if code.Opcode == OpScopeEnd {
+			index -= 1
+		}
+		fmt.Printf("%s%-13s %4d:%v\n", strings.Repeat("\t", index), code.RangeVerbose(), i, code.String())
+		if code.Opcode == OpScope {
+			index += 1
+		}
 	}
 }
 
