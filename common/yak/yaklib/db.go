@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -124,6 +125,11 @@ var DatabaseExports = map[string]interface{}{
 
 	// CreateTemporaryYakScript
 	"CreateTemporaryYakScript": yakit.CreateTemporaryYakScript,
+
+	"NewAliveHost": YakitNewAliveHost,
+	"QueryAliveHost": func(runtimeId string) chan *yakit.AliveHost {
+		return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
+	},
 }
 
 func _deleteYakScriptByName(i string) error {
@@ -165,6 +171,14 @@ func queryYakitPluginByName(name string) (*yakit.YakScript, error) {
 		return scripts[0], nil
 	}
 	return nil, utils.Errorf("yakit plugin(YakScript) cannot found by name: %v", name)
+}
+
+func YakitNewAliveHost(target string, opts ...yakit.AliveHostParamsOpt) {
+	risk, _ := yakit.NewAliveHost(target, opts...)
+	if risk != nil {
+		yakitStatusCard("存活主机", fmt.Sprint(addCounter()))
+		yakitOutputHelper(risk)
+	}
 }
 
 func init() {
