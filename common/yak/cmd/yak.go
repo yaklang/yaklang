@@ -349,6 +349,35 @@ var mirrorGRPCServerCommand = cli.Command{
 	},
 }
 
+func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	start := time.Now()
+	// 继续处理请求
+	resp, err := handler(ctx, req)
+
+	// 计算请求处理的时间
+	elapsed := time.Since(start)
+	log.Infof("exec RPC: %s, took %v \n", info.FullMethod, elapsed)
+
+	if elapsed > 250*time.Millisecond {
+		logMsg := fmt.Sprintf("slow RPC: %s, took %v\n", info.FullMethod, elapsed)
+
+		log.Warnf(logMsg)
+		// 打开文件，如果文件不存在则创建，如果文件存在则在文件末尾追加
+		f, err := os.OpenFile("debug-slow.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Println(err)
+		}
+		defer f.Close()
+
+		// 将日志写入文件
+		if _, err := f.WriteString(logMsg); err != nil {
+			log.Println(err)
+		}
+	}
+
+	return resp, err
+}
+
 var startGRPCServerCommand = cli.Command{
 	Name:   "grpc",
 	Usage:  "启动 GRPC 服务器",
@@ -380,6 +409,9 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name: "pprof",
+		},
+		cli.BoolFlag{
+			Name: "debug",
 		},
 		cli.StringFlag{
 			Name:  "project-db",
@@ -457,7 +489,10 @@ var startGRPCServerCommand = cli.Command{
 			streamInterceptors = append(streamInterceptors, grpc_auth.StreamServerInterceptor(auth))
 			unaryInterceptors = append(unaryInterceptors, grpc_auth.UnaryServerInterceptor(auth))
 		}
-
+		debug := c.Bool("debug")
+		if debug {
+			unaryInterceptors = append(unaryInterceptors, slowLogUnaryInterceptor)
+		}
 		log.Infof("start to create grpc schema...")
 		grpcTrans := grpc.NewServer(
 			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(streamInterceptors...)),
@@ -754,7 +789,7 @@ var translatingCommand = cli.Command{
 }
 
 func main() {
-	//log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.WarnLevel)
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
 	app.Version = yakVersion
