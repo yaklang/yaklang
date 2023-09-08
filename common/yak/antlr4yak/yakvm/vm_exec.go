@@ -172,10 +172,10 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	}()
 
 	if v.debug {
-		// ShowOpcodes(v.codes)
-		// println()
-		// println(strings.Repeat("-", 32))
-		// println()
+		ShowOpcodes(v.codes)
+		println()
+		println(strings.Repeat("-", 32))
+		println()
 	}
 	for {
 		if v.codePointer >= len(v.codes) {
@@ -215,13 +215,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 func ShowOpcodes(c []*Code) {
 	index := 0
 	for i, code := range c {
-		if code.Opcode == OpScopeEnd {
-			index -= 1
-		}
 		fmt.Printf("%s%-13s %4d:%v\n", strings.Repeat("\t", index), code.RangeVerbose(), i, code.String())
-		if code.Opcode == OpScope {
-			index += 1
-		}
 	}
 }
 
