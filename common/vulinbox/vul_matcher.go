@@ -95,4 +95,7 @@ func (m *matcher) RemoveRule(rules ...*rule.Rule) {
 			}
 		}
 	}
+	if len(m.surirule) == 0 {
+		m.cancel()
+	}
 }
