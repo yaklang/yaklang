@@ -3,6 +3,8 @@ package crep
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	martian "github.com/yaklang/yaklang/common/minimartian/v3"
 	"github.com/yaklang/yaklang/common/minimartian/v3/fifo"
@@ -88,9 +90,30 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	}
 
 	// remove proxy-connection like!
+	var haveProxyHeader = false
+	for _, p := range []string{
+		"Proxy-Authenticate",
+		"Proxy-Authorization",
+		"Proxy-Connection", // Non-standard, but required for HTTP/2.
+	} {
+		if req.Header.Get(p) != "" {
+			haveProxyHeader = true
+			break
+		}
+	}
 	err := header.NewHopByHopModifier().ModifyRequest(req)
 	if err != nil {
 		log.Errorf("remove hop by hop header failed: %s", err)
+	}
+	fmt.Println(string(httpctx.GetBareRequestBytes(req)))
+	if haveProxyHeader {
+		raw, err := utils.DumpHTTPRequest(req, true)
+		if err != nil {
+			log.Errorf("dump request failed: %s", err)
+		}
+		if funk.NotEmpty(raw) {
+			httpctx.SetBareRequestBytes(req, raw)
+		}
 	}
 
 	if req.Method == "CONNECT" {
