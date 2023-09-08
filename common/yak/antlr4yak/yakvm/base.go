@@ -354,15 +354,23 @@ func (c *Code) String() string {
 	case OpCall, OpVariadicCall, OpDefer, OpAsyncCall:
 		buf.WriteString(fmt.Sprintf("vlen:%d", c.Unary))
 	case OpRangeNext, OpInNext, OpFastAssign:
-	case OpJMP, OpJMPT, OpJMPF, OpJMPTOP, OpJMPFOP, OpEnterFR, OpExitFR, OpContinue:
+	case OpJMP, OpJMPT, OpJMPF, OpJMPTOP, OpJMPFOP, OpEnterFR, OpExitFR:
 		buf.WriteString(fmt.Sprintf("-> %d", c.Unary))
 	case OpAssign:
 		switch c.Op1.String() {
 		case "nasl_global_declare", "nasl_declare":
 			buf.WriteString("-> with pop")
 		}
+	case OpContinue:
+		buf.WriteString(fmt.Sprintf("-> %d (-%d scope)", c.Unary, c.Op1.Int()))
 	case OpBreak:
-		buf.WriteString(fmt.Sprintf("-> %d (-%d scope) mode: %v", c.Unary, c.Op1.Int(), c.Op2.String()))
+		if c.Op2.Int() != 2 {
+			buf.WriteString(fmt.Sprintf("-> %d (-%d scope) mode: %v", c.Unary, c.Op1.Int(), c.Op2.String()))
+		} else {
+			buf.Reset()
+			buf.WriteString(fmt.Sprintf("OP:%-20s", "fallthrough") + " ")
+			buf.WriteString(fmt.Sprintf("-> %d (-%d scope)", c.Unary, c.Op1.Int()))
+		}
 	case OpList, OpPushRef, OpNewMap, OpNewMapWithType, OpNewSlice, OpNewSliceWithType, OpPushLeftRef:
 		buf.WriteString(fmt.Sprint(c.Unary))
 	case OpCatchError:
