@@ -33,6 +33,7 @@ func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
 	})
+	token := utils.RandStringBytes(19)
 	for {
 		data, err := stream.Recv()
 		if err != nil {
@@ -42,7 +43,7 @@ func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 			var msg = string(data.GetMessage().GetMessage())
 			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
-				var packet = `GET http://` + utils.HostPort(mockHost, mockPort) + `/mh/zwww/hlwjjg/index.jsp HTTP/1.1
+				var packet = `GET http://` + utils.HostPort(mockHost, mockPort) + `/mh/zwww/hlwjjg/index.jsp?a=` + token + ` HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `
 Proxy-Connection: keep-alive
 Upgrade-Insecure-Requests: 1
@@ -73,6 +74,15 @@ conn.Close()
 				cancel()
 			}
 		}
+	}
+
+	data, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := string(data.GetData()[0].Request)
+	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
+		t.Fatal("request should not contains proxy connection")
 	}
 }
 
