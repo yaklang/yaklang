@@ -3,7 +3,6 @@ package crep
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	martian "github.com/yaklang/yaklang/common/minimartian/v3"
@@ -105,7 +104,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	if err != nil {
 		log.Errorf("remove hop by hop header failed: %s", err)
 	}
-	fmt.Println(string(httpctx.GetBareRequestBytes(req)))
 	if haveProxyHeader {
 		raw, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {

@@ -221,7 +221,7 @@ func TestGRPCMUSTPASS_HijackedFlow_Response(t *testing.T) {
 	})
 	target := utils.HostPort(host, port)
 
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
 	defer cancel()
 	stream, err := client.MITM(ctx)
 	if err != nil {

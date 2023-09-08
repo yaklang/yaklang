@@ -57,7 +57,6 @@ Connection: close
 
 `
 				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
-				fmt.Println(string(packetBytes))
 				_, err := yak.Execute(`
 host, port = str.ParseStringToHostPort(target)~
 conn = tcp.Connect(host, port)~
@@ -80,7 +79,9 @@ conn.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	request := string(data.GetData()[0].Request)
+	fmt.Println(request)
 	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
 		fmt.Println(request)
 		t.Fatal("request should not contains proxy connection")
