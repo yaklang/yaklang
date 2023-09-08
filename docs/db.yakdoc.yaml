@@ -1055,6 +1055,39 @@ functions:
     isbuildinstruct: false
   - structname: github.com/yaklang/yaklang/common/yakgrpc/ypb.YakScriptParam
     isbuildinstruct: false
+- name: db.NewAliveHost
+  type_str: 'func (v1: string, v2 ...func AliveHostParamsOpt(v1: *yakit.AliveHost) ) '
+  long_description: ""
+  description: ""
+  params:
+    - name: v1
+      param_alias: ""
+      type_alias: ""
+      description: ""
+      type_str: string
+    - name: v2
+      param_alias: ""
+      type_alias: ""
+      description: ""
+      type_str: '[]yakit.AliveHostParamsOpt'
+      is_variadic: true
+- name: db.QueryAliveHost
+  type_str: 'func (v1: string) return(chan *yakit.AliveHost)'
+  long_description: ""
+  description: ""
+  params:
+    - name: v1
+      param_alias: ""
+      type_alias: ""
+      description: ""
+      type_str: string
+  returns:
+    - name: r0
+      param_alias: ""
+      type_alias: ""
+      description: ""
+      relative_structname: palm/common/yakgrpc/yakit.AliveHost
+      type_str: chan *yakit.AliveHost
 variables:
 - name: db.YAKIT_PLUGIN_TYPE_CODEC
   typestr: string
