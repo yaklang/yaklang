@@ -3759,3 +3759,14 @@ try {
 `
 	_marshallerTest(code)
 }
+
+func TestFixForSingleConditionJump(t *testing.T) {
+	code := `
+a = 1 
+for a < 10000 {
+	a ++ 
+}
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
