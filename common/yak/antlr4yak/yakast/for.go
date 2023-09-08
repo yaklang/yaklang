@@ -77,6 +77,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 
 	// _ 记录一下开始的索引，一般是 continue 的时候
 	startIndex := y.GetNextCodeIndex()
+	startIndex += 1 // skip new-scope instruction
 	y.enterForContext(startIndex)
 
 	var endThirdExpr yak.IForThirdExprContext
