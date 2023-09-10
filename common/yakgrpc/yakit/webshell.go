@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -93,15 +94,26 @@ func CreateOrUpdateWebShell(db *gorm.DB, hash string, i interface{}) (*WebShell,
 	return shell, nil
 }
 
-func CreateOrUpdateWebShellById(db *gorm.DB, id int64, i interface{}) (*WebShell, error) {
-	db = db.Model(&WebShell{})
+func UpdateWebShellById(db *gorm.DB, id int64, i interface{}) (*WebShell, error) {
+	db = db.Model(&WebShell{}).Debug()
 	shell := &WebShell{}
-	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&WebShell{}); db.Error != nil {
-		return nil, utils.Errorf("create/update WebShell failed: %s", db.Error)
+
+	// First, try to find the record
+	if err := db.Where("id = ?", id).First(shell).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// If the record is not found, return an error
+			return nil, utils.Errorf("WebShell not found: %s", err)
+		} else {
+			// Some other error occurred
+			return nil, utils.Errorf("retrieve WebShell failed: %s", err)
+		}
+	}
+	// If the record is found, update it
+	if err := db.Model(shell).Update(i).Error; err != nil {
+		return nil, utils.Errorf("update WebShell failed: %s", err)
 	}
 
 	return shell, nil
-
 }
 
 func DeleteWebShellByID(db *gorm.DB, ids ...int64) error {
@@ -121,11 +133,11 @@ func DeleteWebShellByID(db *gorm.DB, ids ...int64) error {
 }
 
 func GetWebShell(db *gorm.DB, id int64) (*ypb.WebShell, error) {
-	var req WebShell
-	if db := db.Model(&WebShell{}).Where("id = ?", id).First(&req); db.Error != nil {
+	shell := &WebShell{}
+	if db := db.Model(&WebShell{}).Where("id = ?", id).First(shell); db.Error != nil {
 		return nil, utils.Errorf("get WebShell failed: %s", db.Error)
 	}
-	return req.ToGRPCModel(), nil
+	return shell.ToGRPCModel(), nil
 }
 
 func QueryWebShells(db *gorm.DB, params *ypb.QueryWebShellsRequest) (*bizhelper.Paginator, []*WebShell, error) {

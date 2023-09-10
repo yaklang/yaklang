@@ -38,11 +38,19 @@ type Behinder struct {
 	Client               *http.Client
 	PacketScriptContent  string
 	PayloadScriptContent string
-	//CustomEncoder EncoderFunc
-	//CustomDecoder EncoderFunc
+	customEchoEncoder    codecFunc
+	customEchoDecoder    codecFunc
+	customPacketEncoder  codecFunc
 }
 
-func (b *Behinder) EchoResultEncode(raw []byte) ([]byte, error) {
+func (b *Behinder) echoResultEncode(raw []byte) ([]byte, error) {
+	if b.customEchoEncoder != nil {
+		return b.customEchoEncoder(raw)
+	}
+	return b.EchoResultEncodeFormYak(raw)
+}
+
+func (b *Behinder) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
 	if len(b.PayloadScriptContent) == 0 {
 		return []byte(""), nil
 	}
@@ -62,7 +70,14 @@ func (b *Behinder) EchoResultEncode(raw []byte) ([]byte, error) {
 	return rspBytes, nil
 }
 
-func (b *Behinder) EchoResultDecode(raw []byte) ([]byte, error) {
+func (b *Behinder) echoResultDecode(raw []byte) ([]byte, error) {
+	if b.customEchoDecoder != nil {
+		return b.customEchoDecoder(raw)
+	}
+	return b.EchoResultDecodeFormYak(raw)
+}
+
+func (b *Behinder) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
 	if len(b.PayloadScriptContent) == 0 {
 		return b.deCryption(raw)
 	}
@@ -81,6 +96,12 @@ func (b *Behinder) EchoResultDecode(raw []byte) ([]byte, error) {
 	return rspBytes, nil
 }
 
+func (b *Behinder) clientRequestEncode(raw []byte) ([]byte, error) {
+	if b.customPacketEncoder != nil {
+		return b.customPacketEncoder(raw)
+	}
+	return b.ClientRequestEncode(raw)
+}
 func (b *Behinder) ClientRequestEncode(raw []byte) ([]byte, error) {
 	if len(b.PacketScriptContent) == 0 {
 		return b.enCryption(raw)
@@ -99,7 +120,18 @@ func (b *Behinder) ClientRequestEncode(raw []byte) ([]byte, error) {
 	rspBytes := utils.InterfaceToBytes(result)
 
 	return rspBytes, nil
+}
 
+func (b *Behinder) EchoResultEncodeFormGo(en codecFunc) {
+	b.customEchoEncoder = en
+}
+
+func (b *Behinder) EchoResultDecodeFormGo(de codecFunc) {
+	b.customEchoDecoder = de
+}
+
+func (b *Behinder) ClientRequestEncodeFormGo(en codecFunc) {
+	b.customPacketEncoder = en
 }
 
 func (b *Behinder) ServerResponseDecode(raw []byte) ([]byte, error) {
@@ -221,8 +253,10 @@ func (b *Behinder) deCryption(raw []byte) ([]byte, error) {
 
 func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
 	// request body 编码操作
-	data, _ = b.ClientRequestEncode(data)
-
+	data, err := b.clientRequestEncode(data)
+	if err != nil {
+		return nil, utils.Errorf("clientRequestEncode error: %v", err)
+	}
 	request, err := http.NewRequest(http.MethodPost, b.Url, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -242,7 +276,7 @@ func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
 		return nil, utils.Errorf("empty response")
 	}
 	// payload 回显结果解码操作
-	result, err := b.EchoResultDecode(raw)
+	result, err := b.echoResultDecode(raw)
 
 	if err != nil {
 		return nil, utils.Errorf("echo decode error: %v", err)
@@ -291,19 +325,54 @@ func (b *Behinder) String() string {
 	)
 }
 
-func (b *Behinder) cloneParams() map[string]string {
-	encoderParams := make(map[string]string)
-	value, _ := b.EchoResultEncode([]byte(""))
-	encoderParams["CustomEncoder"] = string(value)
-	return encoderParams
+//func (b *Behinder) cloneParams() map[string]string {
+//	encoderParams := make(map[string]string)
+//	value, _ := b.EchoResultEncodeFormYak([]byte(""))
+//	encoderParams["CustomEncoder"] = string(value)
+//	return encoderParams
+//}
+
+func (b *Behinder) processParams(params map[string]string) {
+
+	value, _ := b.echoResultEncode([]byte(""))
+	if len(value) != 0 {
+		params["customEncoderFromClass"] = string(value)
+	}
+	if b.ShellScript == ypb.ShellScript_JSP.String() || b.ShellScript == ypb.ShellScript_JSPX.String() {
+		for key, value := range params {
+			newKey := fmt.Sprintf("{{%s}}", key)
+			delete(params, key)
+			params[newKey] = value
+		}
+	}
 }
 
 func (b *Behinder) GenWebShell() string {
 	return ""
 }
 
-func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
-	params := b.cloneParams()
+func (b *Behinder) processBase64JSON(input []byte) ([]byte, error) {
+	var raw interface{}
+	err := json.Unmarshal(input, &raw)
+	if err != nil {
+		return nil, err
+	}
+
+	decoded, err := decodeBase64Values(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedJSON, err := json.Marshal(decoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to re-encode decoded data as JSON: %w", err)
+	}
+
+	return decodedJSON, nil
+}
+
+func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
+	params := make(map[string]string)
 	params["content"] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 	params = behinder.ProcessParams(params, opts...)
 
@@ -321,8 +390,8 @@ func (b *Behinder) Ping(opts ...behinder.ParamsConfig) (bool, error) {
 	return true, nil
 }
 
-func (b *Behinder) BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error) {
-	params := b.cloneParams()
+func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) {
+	params := make(map[string]string)
 	params["whatever"] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 	params = behinder.ProcessParams(params, opts...)
 	payload, err := b.getPayload(behinder.BasicInfoGo, params)
@@ -333,23 +402,16 @@ func (b *Behinder) BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("%q", bs64res)
-	resJson := make(map[string]string)
-	err = b.Unmarshal(bs64res, resJson)
+	jsonByte, err := b.processBase64JSON(bs64res)
 	if err != nil {
 		return nil, err
 	}
-	jsonByte, err := json.Marshal(resJson)
-	if err != nil {
-		return nil, err
-	}
-	//log.Infof("%q", jsonByte)
 
 	return jsonByte, nil
 }
 
-func (b *Behinder) CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error) {
-	params := b.cloneParams()
+func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
+	params := make(map[string]string)
 	params["cmd"] = cmd
 	params["path"] = "/"
 	params = behinder.ProcessParams(params, opts...)
@@ -361,25 +423,59 @@ func (b *Behinder) CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("%q", bs64res)
-	resJson := make(map[string]string)
-	err = b.Unmarshal(bs64res, resJson)
+	jsonByte, err := b.processBase64JSON(bs64res)
 	if err != nil {
 		return nil, err
 	}
-	jsonByte, err := json.Marshal(resJson)
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("%q", jsonByte)
 
 	return jsonByte, nil
 }
 
-func (b *Behinder) FileManagement() {
+func (b *Behinder) showFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "show",
+		"path": path,
+	}
+	b.processParams(params)
+	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	if err != nil {
+		return nil, err
+	}
+	bs64res, err := b.SendHttpRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	jsonByte, err := b.processBase64JSON(bs64res)
+	if err != nil {
+		return nil, err
+	}
 
+	return jsonByte, nil
 }
 
-func (b *Behinder) ShowFile() {
+func (b *Behinder) listFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "list",
+		"path": path,
+	}
+	b.processParams(params)
+	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	if err != nil {
+		return nil, err
+	}
+	bs64res, err := b.SendHttpRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	jsonByte, err := b.processBase64JSON(bs64res)
+	if err != nil {
+		return nil, err
+	}
 
+	//echo,err := b.processBase64JSON(jsonByte)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//fmt.Println(string(echo))
+	return jsonByte, nil
 }

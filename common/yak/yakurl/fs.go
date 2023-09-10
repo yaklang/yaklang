@@ -12,10 +12,6 @@ import (
 type fileSystemAction struct {
 }
 
-func GetLocalFileSystemAction() Action {
-	return defaultFileSystemAction
-}
-
 func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, inDir bool) *ypb.YakURLResource {
 	var newParam = &ypb.YakURL{
 		Schema:   originParam.Schema,
@@ -23,6 +19,7 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, inDir bool) *
 		Pass:     originParam.GetPass(),
 		Location: originParam.GetLocation(),
 		Path:     filepath.Join(originParam.GetPath(), info.Name()),
+		Query:    originParam.GetQuery(),
 	}
 	if !inDir {
 		newParam.Path = originParam.GetPath()
@@ -139,7 +136,3 @@ func (f fileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	//TODO implement me
 	return nil, utils.Error("not implemented")
 }
-
-var (
-	defaultFileSystemAction Action = &fileSystemAction{}
-)
