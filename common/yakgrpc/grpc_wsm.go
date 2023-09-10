@@ -82,22 +82,24 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		}
 		headers = string(b)
 	}
-	shell := &yakit.WebShell{
-		Url:              req.GetUrl(),
-		Pass:             req.GetPass(),
-		SecretKey:        req.GetSecretKey(),
-		EncryptedMode:    req.GetEncMode(),
-		Charset:          req.GetCharset(),
-		ShellType:        req.GetShellType(),
-		ShellScript:      req.GetShellScript(),
-		Headers:          headers,
-		Tag:              req.GetTag(),
-		Proxy:            req.GetProxy(),
-		Remark:           req.GetRemark(),
-		PayloadCodecName: req.GetPayloadCodecName(),
-		PacketCodecName:  req.GetPacketCodecName(),
+
+	shellMap := map[string]interface{}{
+		"url":                req.GetUrl(),
+		"pass":               req.GetPass(),
+		"secret_key":         req.GetSecretKey(),
+		"enc_mode":           req.GetEncMode(),
+		"charset":            req.GetCharset(),
+		"shell_type":         req.GetShellType(),
+		"shell_script":       req.GetShellScript(),
+		"headers":            headers,
+		"status":             req.GetStatus(),
+		"tag":                req.GetTag(),
+		"proxy":              req.GetProxy(),
+		"remark":             req.GetRemark(),
+		"payload_codec_name": req.GetPayloadCodecName(),
+		"packet_codec_name":  req.GetPacketCodecName(),
 	}
-	webShell, err := yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
+	webShell, err := yakit.UpdateWebShellById(db, req.GetId(), shellMap)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -156,13 +158,12 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 		w.SetPayloadScriptContent(script.Content)
 	}
 	ping, err := w.Ping()
-	shell.Status = ping
 	if err != nil {
-		yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
 		return nil, err
 	}
+	shell.Status = ping
 
-	_, err = yakit.CreateOrUpdateWebShellById(db, req.GetId(), shell)
+	_, err = yakit.UpdateWebShellById(db, req.GetId(), shell)
 	if err != nil {
 		log.Error(err)
 		return nil, err

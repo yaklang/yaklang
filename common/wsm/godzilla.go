@@ -42,7 +42,7 @@ type Godzilla struct {
 
 	dynamicFuncName map[string]string
 
-	CustomEncoder EncoderFunc
+	CustomEncoder codecFunc
 }
 
 func (g *Godzilla) SetPayloadScriptContent(content string) {
@@ -50,12 +50,12 @@ func (g *Godzilla) SetPayloadScriptContent(content string) {
 	panic("implement me")
 }
 
-func (g *Godzilla) EchoResultEncode(raw []byte) ([]byte, error) {
+func (g *Godzilla) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *Godzilla) EchoResultDecode(raw []byte) ([]byte, error) {
+func (g *Godzilla) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -205,7 +205,7 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 //	return enPayload, nil
 //}
 
-//func gNativeCryption(raw []byte) EncoderFunc {
+//func gNativeCryption(raw []byte) codecFunc {
 //	return func(info interface{}) ([]byte, error) {
 //		g := info.(*Godzilla)
 //		enPayload, err := godzilla.Encryption(raw, g.SecretKey, g.Pass, g.EncMode, g.ShellScript, true)
@@ -422,7 +422,7 @@ func (g *Godzilla) GenWebShell() string {
 	return ""
 }
 
-func (g *Godzilla) Ping(opts ...behinder.ParamsConfig) (bool, error) {
+func (g *Godzilla) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 	err := g.InjectPayloadIfNoCookie()
 	if err != nil {
 		return false, nil
@@ -439,7 +439,7 @@ func (g *Godzilla) Ping(opts ...behinder.ParamsConfig) (bool, error) {
 	}
 }
 
-func (g *Godzilla) BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error) {
+func (g *Godzilla) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) {
 	err := g.InjectPayloadIfNoCookie()
 	if err != nil {
 		return nil, err
@@ -453,7 +453,7 @@ func (g *Godzilla) BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error) {
 	return basicsInfo, nil
 }
 
-func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error) {
+func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
 	err := g.InjectPayloadIfNoCookie()
 	if err != nil {
 		return nil, err
