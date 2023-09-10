@@ -8,16 +8,20 @@ import (
 )
 
 type ShellConfig func(info *ypb.WebShell)
-type EncoderFunc func(raw []byte) ([]byte, error)
+type codecFunc func(raw []byte) ([]byte, error)
 
 type BaseShellManager interface {
 	PacketCodecI
 	PayloadCodecI
-	Ping(opts ...behinder.ParamsConfig) (bool, error)
-	BasicInfo(opts ...behinder.ParamsConfig) ([]byte, error)
-	CommandExec(cmd string, opts ...behinder.ParamsConfig) ([]byte, error)
+	Ping(opts ...behinder.ExecParamsConfig) (bool, error)
+	BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error)
+	CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error)
 	String() string
 	GenWebShell() string
+}
+
+type FileOperation interface {
+	Execute(base BaseShellManager) ([]byte, error)
 }
 
 func NewWebShellManager(s *ypb.WebShell) (BaseShellManager, error) {
