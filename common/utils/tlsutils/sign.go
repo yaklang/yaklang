@@ -162,3 +162,7 @@ func SelfSignCACertificateAndPrivateKey(common string, opts ...SelfSignConfigOpt
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
+
+func newPEMBlock(title string, bytes []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{Type: title, Bytes: bytes})
+}
