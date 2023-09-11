@@ -803,13 +803,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 RECONNECT:
 	if withoutConnPool {
-		//if true {
-		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 		conn, err = netx.DialX(originAddr, dialopts...)
 	} else {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
-		//conn, err = netx.DialX(originAddr, dialopts...)
-
 	}
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
