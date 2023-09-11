@@ -4,8 +4,13 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
+
+var presetEnv = map[string]string{
+	"HOME_NET": utils.GetLocalIPAddress(),
+}
 
 func Parse(data string, envs ...string) ([]*Rule, error) {
 	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(data))
@@ -17,6 +22,9 @@ func Parse(data string, envs ...string) ([]*Rule, error) {
 	//}
 	v := &RuleSyntaxVisitor{Raw: []byte(data)}
 	v.Environment = make(map[string]string)
+	for k, val := range presetEnv {
+		v.Environment[k] = val
+	}
 	for _, e := range envs {
 		before, after, cut := strings.Cut(e, "=")
 		if !cut {
