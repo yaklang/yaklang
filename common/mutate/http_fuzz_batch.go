@@ -500,37 +500,22 @@ func (f *FuzzHTTPRequestBatch) Results() ([]*http.Request, error) {
 }
 
 func (f *FuzzHTTPRequestBatch) ExecFirst(opts ...HttpPoolConfigOption) (*_httpResult, error) {
-	return executeOne(f, opts...)
-}
-
-func executeOne(f FuzzHTTPRequestIf, opts ...HttpPoolConfigOption) (*_httpResult, error) {
-	reqs, err := f.Results()
-	if err != nil {
-		return nil, err
-	}
-	if len(reqs) <= 0 {
-		return nil, utils.Error("no request is rendered")
-	}
-
-	fixedOpts := append(opts, _httpPool_SetForceFuzz(false))
-
-	switch v := f.(type) {
-	case *FuzzHTTPRequestBatch:
-		fixedOpts = append(opts, _httpPool_IsHttps(v.originRequest.isHttps))
-	case *FuzzHTTPRequest:
-		fixedOpts = append(opts, _httpPool_IsHttps(v.isHttps))
-	}
-
-	res, err := _httpPool(reqs[0], fixedOpts...)
+	opts = append(opts, WithPoolOpt_RequestCountLimiter(1))
+	resultCh, err := f.Exec(opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	for result := range res {
-		if result.Error != nil {
-			return result, result.Error
-		}
-		return result, nil
+	var result *_httpResult
+	for i := range resultCh {
+		result = i
 	}
-	return nil, utils.Error("empty result for FuzzHTTPRequest")
+	if result == nil {
+		return nil, utils.Error("empty result for FuzzHTTPRequest")
+	}
+	if result.Error != nil {
+		return result, result.Error
+	}
+
+	return result, nil
 }
