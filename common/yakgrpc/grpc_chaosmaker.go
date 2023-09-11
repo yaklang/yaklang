@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinboxagentclient"
+	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -78,14 +81,25 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 	var addTrafficCounter = func() {
 		atomic.AddInt64(&trafficCounter, 1)
 	}
+	var matchCounter int64 = 0
+	var addMatchCounter = func() {
+		atomic.AddInt64(&matchCounter, 1)
+	}
+
 	var start = time.Now()
 	sendLogger := yaklib.NewVirtualYakitClient(stream.Send)
 	go func() {
+		t := time.NewTicker(500 * time.Millisecond)
 		for {
 			select {
 			case <-stream.Context().Done():
+				t.Stop()
 				return
-			default:
+			case <-t.C:
+				sendLogger.Output(&yaklib.YakitStatusCard{
+					Id:   "Agent命中流量",
+					Data: fmt.Sprintf("%d", matchCounter),
+				})
 				sendLogger.Output(&yaklib.YakitStatusCard{
 					Id:   "已运行",
 					Data: fmt.Sprintf("%ds", int64(time.Now().Sub(start).Seconds())),
@@ -94,61 +108,81 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 					Id:   "模拟攻击事件",
 					Data: fmt.Sprintf("%d", trafficCounter),
 				})
-				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}()
 
-	var handle = func() {
+	getRules := func() []*rule.Storage {
+		var rules []*rule.Storage
+		if len(req.GetGroups()) > 0 {
+			for _, group := range req.GetGroups() {
+				sendLog("info", "开始加载模拟场景，关键字: %v, 协议: %v", group.Keywords, group.Protocols)
+				for r := range chaosmaker.YieldRulesByKeywords(group.Keywords, group.Protocols...) {
+					rules = append(rules, r)
+				}
+			}
+		} else {
+			sendLog("info", "开始加载全部模拟攻击剧本")
+			for r := range rule.YieldRules(consts.GetGormProfileDatabase(), stream.Context()) {
+				rules = append(rules, r)
+			}
+		}
+		return rules
+	}
+
+	var attackOnce = func() {
 		concurrent := req.GetConcurrent()
 		if concurrent <= 0 {
 			concurrent = 30
 		}
+
+		sendLog("info", "正在初始化Agent")
+		var clients []*vulinboxagentclient.Client
+		vulinboxAgentMap.Range(func(key, value any) bool {
+			agent, ok := value.(*VulinboxAgentFacade)
+			if !ok {
+				return true
+			}
+			clients = append(clients, agent.client)
+			return true
+		})
+
+		// 暂时只支持 suricata
+		rules := getRules()
+		var suriraw []string
+		for _, r := range rules {
+			suriraw = append(suriraw, r.SuricataRaw)
+		}
+		for _, client := range clients {
+			client.Msg().Send(vulinboxagentproto.NewSubscribeAction("suricata", suriraw))
+			client.RegisterDataback("suricata", func(data any) {
+				spew.Dump(data)
+				addMatchCounter()
+			})
+		}
+		defer func() {
+			for _, client := range clients {
+				client.Msg().Send(vulinboxagentproto.NewUnsubscribeAction("suricata", suriraw))
+			}
+		}()
+
+		sendLog("info", "开始执行本地模拟攻击剧本")
+		var generator = chaosmaker.NewChaosMaker()
+		generator.FeedRule(rules...)
 		swg := utils.NewSizedWaitGroup(int(concurrent))
-		if len(req.GetGroups()) > 0 {
-			for _, group := range req.GetGroups() {
-				generator := chaosmaker.NewChaosMaker()
-				sendLog("info", "开始加载模拟场景，关键字: %v, 协议: %v", group.Keywords, group.Protocols)
-				for rule := range chaosmaker.YieldRulesByKeywords(group.Keywords, group.Protocols...) {
-					generator.FeedRule(rule)
-				}
-				sendLog("info", "模拟场景加载完成，共加载规则: %v", len(generator.ChaosRules))
-				for traffic := range generator.Generate() {
-					addTrafficCounter()
-					traffic := traffic
-					swg.Add()
-					go func() {
-						defer swg.Done()
-						pcapx.InjectRaw(traffic)
-						delayer.Wait()
-						for _, r := range req.GetExtraOverrideDestinationAddress() {
-							pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
-							delayer.Wait()
-						}
-					}()
-				}
-			}
-		} else {
-			generator := chaosmaker.NewChaosMaker()
-			sendLog("info", "开始加载全部模拟攻击剧本")
-			for rule := range rule.YieldRules(consts.GetGormProfileDatabase(), stream.Context()) {
-				generator.FeedRule(rule)
-			}
-			sendLog("info", "模拟场景加载完成，共加载规则: %v", len(generator.ChaosRules))
-			for traffic := range generator.Generate() {
-				traffic := traffic
-				swg.Add()
-				addTrafficCounter()
-				go func() {
-					defer swg.Done()
-					pcapx.InjectRaw(traffic)
+		for traffic := range generator.Generate() {
+			addTrafficCounter()
+			traffic := traffic
+			swg.Add()
+			go func() {
+				defer swg.Done()
+				pcapx.InjectRaw(traffic)
+				delayer.Wait()
+				for _, r := range req.GetExtraOverrideDestinationAddress() {
+					pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
 					delayer.Wait()
-					for _, r := range req.GetExtraOverrideDestinationAddress() {
-						pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
-						delayer.Wait()
-					}
-				}()
-			}
+				}
+			}()
 		}
 		swg.Wait()
 		sendLog("info", "本地模拟攻击剧本执行完成")
@@ -157,7 +191,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 	if req.GetExtraRepeat() >= 0 {
 		for _index := 0; _index < int(req.GetExtraRepeat())+1; _index++ {
 			sendLog("info", "开始进行第%v次攻击模拟", _index)
-			handle()
+			attackOnce()
 		}
 	} else {
 		count := 0
@@ -169,7 +203,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			}
 			count++
 			sendLog("info", "开始进行第%v次攻击模拟", count)
-			handle()
+			attackOnce()
 		}
 	}
 	return nil
