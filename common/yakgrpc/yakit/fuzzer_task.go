@@ -94,15 +94,15 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	pagination := req.GetPagination()
 	order, orderby := pagination.Order, pagination.OrderBy
 	if order == "" {
-		order = "id"
+		order = "asc"
 	}
 	if orderby == "" {
-		orderby = "asc"
+		orderby = "id"
 	}
 
 	var task []*WebFuzzerTask
 
-	db = bizhelper.QueryOrder(db, order, orderby)
+	db = bizhelper.QueryOrder(db, orderby, order)
 	paging, db := bizhelper.Paging(db, int(pagination.GetPage()), int(pagination.GetLimit()), &task)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("pagination failed: %s", db.Error)
