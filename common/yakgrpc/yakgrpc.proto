@@ -1909,7 +1909,7 @@ message HistoryHTTPFuzzerTasksResponse {
 message QueryHistoryHTTPFuzzerTaskExParams {
   Paging Pagination = 1;
   string Keyword = 2;
-  string FuzzerTabIndex =3;
+  string FuzzerTabIndex = 3;
 }
 
 message ExecutePacketYakScriptParams {
@@ -3583,7 +3583,8 @@ message Certificate {
   repeated bytes CaCertificates = 3;
 
   // pkcs12path need a .p12 or .pfx file
-  bytes Pkcs12Path = 4;
+  bytes Pkcs12Bytes = 4;
+  bytes Pkcs12Password = 5;
 }
 
 message MITMContentReplacer {
@@ -3785,6 +3786,6 @@ message HTTPFlowBareRequest {
 }
 
 message HTTPFlowBareResponse {
-    int64 Id = 1;
-    bytes Data = 2;
+  int64 Id = 1;
+  bytes Data = 2;
 }
