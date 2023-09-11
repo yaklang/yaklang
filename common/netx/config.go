@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -54,16 +53,6 @@ var defaultDoHHTTPClient = &http.Client{
 		Proxy: nil,
 	},
 	Timeout: 5 * time.Second,
-}
-
-type DialConfig struct {
-	Timeout       time.Duration
-	Deadline      time.Time
-	LocalAddr     net.Addr
-	DualStack     bool
-	FallbackDelay time.Duration
-	KeepAlive     time.Duration
-	Resolver      *net.Resolver
 }
 
 type ReliableDNSConfig struct {
