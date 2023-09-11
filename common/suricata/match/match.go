@@ -1,7 +1,6 @@
 package match
 
 import (
-	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -127,7 +126,8 @@ func matchMutex(c *matchContext) error {
 	case protocol.ICMP:
 		c.Attach(ipMatcher, icmpIniter)
 	default:
-		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
+		log.Errorf("unsupported protocol: %s", c.Rule.Protocol)
+		c.Reject()
 	}
 	return nil
 }
