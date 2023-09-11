@@ -39,9 +39,6 @@ func newFileDataMatcher(r *rule.ContentRule, data any) func(c *matchContext) err
 				return nil
 			}
 			files = append(files, data.Body)
-		case nil:
-			c.Reject()
-			return nil
 		default:
 			c.Reject()
 			return errors.New("unknown type for filedata matcher")
