@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
 	"strings"
 )
 
@@ -22,10 +23,16 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
 	switch ret := strings.ToUpper(req.GetMethod()); ret {
-	case "GET":
+	case http.MethodGet:
 		return action.Get(req)
-	case "POST":
+	case http.MethodPost:
 		return action.Post(req)
+	case http.MethodPut:
+		return action.Put(req)
+	case http.MethodDelete:
+		return action.Delete(req)
+	case http.MethodHead:
+		return action.Head(req)
 	default:
 		return nil, utils.Errorf("not implemented method: %v", ret)
 	}
