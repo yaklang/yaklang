@@ -167,6 +167,14 @@ func NewCodeState(codeIndex int, state string) *CodeState {
 }
 
 func (g *Debugger) InitCode(codes []*Code) {
+	g.initCode(codes, 1)
+}
+
+func (g *Debugger) initCode(codes []*Code, depth int) {
+	// 防止爆栈
+	if depth >= 100000 {
+		return
+	}
 	// 找出所有的函数及其opcode
 	for _, code := range codes {
 		if code.Opcode == OpPush {
@@ -176,9 +184,12 @@ func (g *Debugger) InitCode(codes []*Code) {
 			}
 			f, _ := v.Value.(*Function)
 			funcUUID := f.GetUUID()
+			if _, ok := g.codes[funcUUID]; ok {
+				continue
+			}
 
 			g.codes[funcUUID] = f.codes
-			g.InitCode(f.codes)
+			g.initCode(f.codes, depth+1)
 		}
 	}
 }
