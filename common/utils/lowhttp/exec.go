@@ -475,6 +475,10 @@ var commonHTTPMethod = map[string]struct{}{
 // SendHttpRequestWithRawPacketWithOpt
 func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
+	if !option.WithoutConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
+		opts = append(opts, WithConnPool(DefaultLowHttpConnPool))
+	}
 	for _, opt := range opts {
 		opt(option)
 	}
