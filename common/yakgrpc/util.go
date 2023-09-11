@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -124,9 +125,11 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 }
 
 type YamlMapBuilder struct {
-	keySet       map[string]struct{} // 去重，如果存在多个相同的key，只保留第一个
-	slice        *yaml.MapSlice
-	defaultField map[string]any // field的默认值，如果新增字段是默认值，则跳过
+	keySet         map[string]struct{} // 去重，如果存在多个相同的key，只保留第一个
+	forceKeySet    map[string]struct{}
+	slice          *yaml.MapSlice
+	defaultField   map[string]any // field的默认值，如果新增字段是默认值，则跳过
+	emptyLineIndex int
 }
 type YamlArrayBuilder struct {
 	slice *[]*yaml.MapSlice
@@ -143,11 +146,16 @@ func NewYamlMapBuilder() *YamlMapBuilder {
 		keySet:       make(map[string]struct{}),
 		defaultField: make(map[string]any),
 		slice:        &yaml.MapSlice{},
+		forceKeySet:  make(map[string]struct{}),
 	}
 }
 func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	var res yaml.MapSlice
 	for _, item := range *m.slice {
+		if _, ok := m.forceKeySet[utils.InterfaceToString(item.Key)]; ok {
+			res = append(res, item)
+			continue
+		}
 		switch ret := item.Value.(type) {
 		case *YamlMapBuilder:
 			item.Value = ret.FilterEmptyField()
@@ -175,6 +183,17 @@ func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	}
 	return &res
 }
+func (m *YamlMapBuilder) ForceSet(k string, v any) {
+	if _, ok := m.keySet[k]; ok {
+		return
+	}
+	m.keySet[k] = struct{}{}
+	m.forceKeySet[k] = struct{}{}
+	*m.slice = append(*m.slice, yaml.MapItem{
+		Key:   k,
+		Value: v,
+	})
+}
 func (m *YamlMapBuilder) Set(k string, v any) {
 	if _, ok := m.keySet[k]; ok {
 		return
@@ -193,7 +212,8 @@ func (m *YamlMapBuilder) Set(k string, v any) {
 	})
 }
 func (m *YamlMapBuilder) AddEmptyLine() {
-	m.Set("__empty_line__", "__empty_line__")
+	m.emptyLineIndex++
+	m.Set("__empty_line__"+strconv.Itoa(m.emptyLineIndex), "__empty_line__")
 }
 func (m *YamlMapBuilder) AddComment(comment string) {
 	m.Set("__comment__", codec.EncodeToHex(comment))
@@ -229,7 +249,7 @@ func (m *YamlMapBuilder) MarshalToString() (string, error) {
 			}
 			continue
 		}
-		if strings.Contains(line, "__empty_line__: ") {
+		if strings.Contains(line, "__empty_line__") {
 			line = ""
 		}
 		res += line + "\n"
