@@ -14,7 +14,9 @@ jobs:
         os:
           - windows-latest
           - macos-latest
+          - macos-arm64
           - ubuntu-20.04
+          - ubuntu-20.04-arm
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -57,12 +59,22 @@ jobs:
       - name: Build For Linux
         run: |
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && runner.arch == 'X64'
 
-      - name: Build For MacOS
+      - name: Build For Linux Arm
+        run: |
+          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+
+      - name: Build For MacOS Intel
         run: |
           go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+
+      - name: Build For MacOS Apple Scilicon
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
 
       - name: Build For Windows
         run: |
@@ -77,20 +89,33 @@ jobs:
           path: ./vulinbox_windows_amd64.exe
 
 
-      - name: Upload Artifacts MacOS
+      - name: Upload Artifacts MacOS Intel
         uses: actions/upload-artifact@v2
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && runner.arch == 'X64'
         with:
           name: vulinbox_darwin_amd64
           path: ./vulinbox_darwin_amd64
 
+      - name: Upload Artifacts MacOS Apple Scilicon
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        with:
+          name: vulinbox_darwin_arm64
+          path: ./vulinbox_darwin_arm64
 
       - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v2
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && runner.arch == 'X64'
         with:
           name: vulinbox_linux_amd64
           path: ./vulinbox_linux_amd64
+
+      - name: Upload Artifacts Linux Arm
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        with:
+          name: vulinbox_linux_arm64
+          path: ./vulinbox_linux_arm64
 
   download_artifacts_and_release:
     needs:
@@ -115,14 +140,22 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: vulinbox_windows_amd64.exe
-      - name: Download macOS VULINBOX
+      - name: Download macOS Intel VULINBOX
         uses: actions/download-artifact@v2
         with:
           name: vulinbox_darwin_amd64
+      - name: Download macOS Apple Scilicon VULINBOXS
+        uses: actions/download-artifact@v2
+        with:
+          name: vulinbox_darwin_arm64
       - name: Download Linux VULINBOX
         uses: actions/download-artifact@v2
         with:
           name: vulinbox_linux_amd64
+      - name: Download Linux Arm VULINBOX
+        uses: actions/download-artifact@v2
+        with:
+          name: vulinbox_linux_arm64
       - name: Run
         run: ls
       - name: Update OSS latest file
@@ -143,5 +176,9 @@ jobs:
             vulinbox_windows_amd64.exe:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_windows_amd64.exe
             vulinbox_linux_amd64:/vulinbox/latest/vulinbox_linux_amd64
             vulinbox_linux_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_linux_amd64
+            vulinbox_linux_arm64:/vulinbox/latest/vulinbox_linux_arm64
+            vulinbox_linux_arm64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_linux_arm64
             vulinbox_darwin_amd64:/vulinbox/latest/vulinbox_darwin_amd64
             vulinbox_darwin_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_darwin_amd64
+            vulinbox_darwin_arm64:/vulinbox/latest/vulinbox_darwin_arm64
+            vulinbox_darwin_arm64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_darwin_arm64
