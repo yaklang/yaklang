@@ -58,22 +58,22 @@ jobs:
       - name: Build For Linux (AMD64)
         run: |
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
-        if: runner.os == 'Linux' && env.GOARCH == 'amd64'
+        if: runner.os == 'Linux' && runner.arch == 'x64'
 
       - name: Build For Linux (ARM64)
         run: |
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
-        if: runner.os == 'Linux' && env.GOARCH == 'amd64'
+        if: runner.os == 'Linux' && runner.arch == 'arm64'
 
       - name: Build For MacOS (Intel)
         run: |
           go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
-        if: runner.os == 'macOS' && env.GOARCH == 'amd64'
+        if: runner.os == 'macOS' && runner.arch == 'x64'
 
       - name: Build For MacOS (Apple Silicon)
         run: |
           go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
-        if: runner.os == 'macOS' && env.GOARCH == 'arm64'
+        if: runner.os == 'macOS' && runner.arch == 'arm64'
 
       - name: Build For Windows
         run: |
