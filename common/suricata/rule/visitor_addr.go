@@ -40,10 +40,12 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 	}
 
 	if a.Env != "" && a.envtable != nil {
-		raw, _ := a.envtable[a.Env]
-		if raw != "" && raw == i {
+		raw, existed := a.envtable[a.Env]
+		if !existed {
+			log.Warnf("suricata env %s not found, fallback to any", a.Env)
 			return true
 		}
+		return raw == i
 	}
 
 	for _, n := range a.negativeRules {
@@ -112,10 +114,12 @@ func (a *AddressRule) Generate() string {
 	}
 
 	if a.Env != "" && a.envtable != nil {
-		raw, _ := a.envtable[a.Env]
-		if raw != "" {
-			return raw
+		raw, existed := a.envtable[a.Env]
+		if !existed {
+			log.Warnf("suricata env %s not found, fallback to any", a.Env)
+			return utils.GetRandomLocalAddr()
 		}
+		return raw
 	}
 
 	if a.Negative {
@@ -218,6 +222,9 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *Addres
 		return addr
 	case i.Environment_var() != nil:
 		addr.Env = strings.Trim(trim(i.Environment_var().GetText()), "${}")
+		if addr.Env == "EXTERNAL_NET" {
+			addr.Any = true
+		}
 		return addr
 	case len(i.AllAddress()) > 0:
 		var subs []*AddressRule
