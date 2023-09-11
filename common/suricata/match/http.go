@@ -71,7 +71,11 @@ func httpIniter(c *matchContext) error {
 	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
 		if r.Modifier == modifier.FileData {
 			// filedata has its individual matcher
-			c.Attach(newFileDataMatcher(r, provider.GetResponse()))
+			resp := provider.GetResponse()
+			if !c.Must(resp != nil) {
+				return nil
+			}
+			c.Attach(newFileDataMatcher(r, resp))
 		} else {
 			c.Attach(newPayloadMatcher(r, r.Modifier))
 		}
@@ -141,14 +145,23 @@ func (h *httpProvider) Parsed() any {
 	if h.req != nil {
 		return h.req
 	}
-	return h.res
+	if h.res != nil {
+		return h.res
+	}
+	return nil
 }
 
 func (h *httpProvider) GetRequest() *http.Request {
+	if h.req == nil {
+		return nil
+	}
 	return h.req
 }
 
 func (h *httpProvider) GetResponse() *http.Response {
+	if h.res == nil {
+		return nil
+	}
 	return h.res
 }
 
