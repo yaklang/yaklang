@@ -158,6 +158,7 @@ func (s *Server) IsRemoteAddrAvailable(ctx context.Context, req *ypb.IsRemoteAdd
 		return nil, utils.Errorf("connect to remove agent failed: %s", err)
 	}
 	info.disconnect = client.Disconnect
+	info.client = client
 	RegisterVulinboxAgent(addr, info)
 
 	return &ypb.IsRemoteAddrAvailableResponse{
