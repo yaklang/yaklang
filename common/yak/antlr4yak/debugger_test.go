@@ -917,3 +917,66 @@ func TestDebugger_Try(t *testing.T) {
 	})
 
 }
+
+func TestDebugger_NestedFunction(t *testing.T) {
+	code := `func a() {
+	b = func() {
+		c = func() {
+			println(1)
+		}
+		c()
+	}
+	b()
+}
+a()`
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetBreakPoint(4, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
+
+func TestDebugger_Recursion(t *testing.T) {
+	code := `func fib(a) {
+	if a <= 1 {
+		return a
+	}
+	return fib(a-1) + fib(a-2)
+}
+
+fib(10)
+println(1)`
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetBreakPoint(9, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := false
+
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		in = true
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !in {
+		t.Fatal("callback not called")
+	}
+}
