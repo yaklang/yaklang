@@ -11,7 +11,7 @@ import (
 )
 
 func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler {
-	if r.PCRE != "" {
+	if r.PCREParsed != nil {
 		// pcre match
 		return newPCREMatch(r)
 	}
