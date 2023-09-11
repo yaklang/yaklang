@@ -23,7 +23,6 @@ func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 	}
 
 	resErr := &ResourceError{}
-	var err error
 	gjson.GetBytes(result, "msg").ForEach(func(_, v gjson.Result) bool {
 		var extra []*ypb.KVPair
 		newParam := &ypb.YakURL{
@@ -58,6 +57,9 @@ func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 
 		if v.Type == gjson.JSON {
 			name := v.Get("name").String()
+			if name == "." || name == ".." {
+				return true
+			}
 			size := v.Get("size").Int()
 			typ := v.Get("type").String()
 			lastModified := v.Get("lastModified").String()
@@ -101,20 +103,13 @@ func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 		}
 		return true
 	})
-	if err != nil {
-		return nil, err
+	if resErr.err != nil {
+		return nil, resErr.err
 	}
 	return resErr.resources, nil
 }
-func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	u := params.GetUrl()
-	path := u.GetPath()
 
-	var query = make(url.Values)
-	for _, v := range u.GetQuery() {
-		query.Add(v.GetKey(), v.GetValue())
-	}
-	id := query.Get("id")
+func (b BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, error) {
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, utils.Errorf("cannot parse id[%s] as int: %s", id, err)
@@ -143,6 +138,22 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 		}
 		manager.SetPayloadScriptContent(script.Content)
 	}
+	return manager, nil
+}
+
+func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	u := params.GetUrl()
+	path := u.GetPath()
+
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	id := query.Get("id")
+	manager, err := b.newBehinderFormId(id)
+	if err != nil {
+		return nil, err
+	}
 	var res []*ypb.YakURLResource
 	switch query.Get("mode") {
 	case "list":
@@ -161,6 +172,11 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 			return nil, er
 		}
 		res, err = webShellResultToYakURLResource(u, show)
+	case "check":
+	case "checkExist":
+
+	case "getTimeStamp":
+
 	}
 
 	return &ypb.RequestYakURLResponse{
@@ -172,13 +188,77 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 }
 
 func (b BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+	path := u.GetPath()
+	_ = path
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	id := query.Get("id")
+	manager, err := b.newBehinderFormId(id)
+	_ = manager
+	if err != nil {
+		return nil, err
+	}
+	var res []*ypb.YakURLResource
+	switch query.Get("mode") {
+
+	case "updateTimeStamp":
+
+		//updateTimeStamp,err := manager.updateTimeStamp(path)
+
+	}
+
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  100,
+		Total:     int64(len(res)),
+		Resources: res,
+	}, nil
 }
 
 func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+	path := u.GetPath()
+
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	id := query.Get("id")
+	manager, err := b.newBehinderFormId(id)
+	if err != nil {
+		return nil, err
+	}
+	var res []*ypb.YakURLResource
+	switch query.Get("mode") {
+	case "create":
+		list, err := manager.uploadFile(path, params.GetBody())
+		if err != nil {
+			return nil, err
+		}
+		res, err = webShellResultToYakURLResource(u, list)
+		if err != nil {
+			return nil, err
+		}
+	case "append":
+		show, er := manager.appendFile(path, []byte("params.GetBody()"))
+		if er != nil {
+			return nil, er
+		}
+		res, err = webShellResultToYakURLResource(u, show)
+	case "createFile":
+	case "createDirectory":
+
+	}
+
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  100,
+		Total:     int64(len(res)),
+		Resources: res,
+	}, nil
 }
 
 func (b BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
