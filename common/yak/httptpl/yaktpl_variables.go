@@ -32,12 +32,16 @@ type Var struct {
 
 func NewVar(v string) *Var {
 	val := &Var{Data: v, Type: NucleiDslType}
-	if strings.HasPrefix(v, string(FuzztagPrefix)) {
+	if strings.HasPrefix(v, string(FuzztagPrefix)) { // 指定为fuzztag类型
 		val.Data = v[len(string(FuzztagPrefix)):]
 		val.Type = FuzztagType
-	}
-	if strings.HasPrefix(v, string(RawPrefix)) {
+	} else if strings.HasPrefix(v, string(RawPrefix)) { // 指定为raw类型
 		val.Data = v[len(string(RawPrefix)):]
+		val.Type = RawType
+	} else if strings.Contains(v, "{{") { // 自动类型解析
+		tags := ParseNucleiTag(v)
+		val.Tags = tags
+	} else {
 		val.Type = RawType
 	}
 	return val
@@ -90,10 +94,6 @@ func (v *YakVariables) SetAsNucleiTags(key string, value string) {
 
 func (v *YakVariables) AutoSet(key string, value string) {
 	v.raw[key] = NewVar(value)
-	if v.raw[key].Type == NucleiDslType && strings.Contains(value, "{{") {
-		tags := ParseNucleiTag(value)
-		v.raw[key].Tags = tags
-	}
 }
 
 func (v *YakVariables) SetNucleiDSL(key string, items []*NucleiTagData) {
