@@ -3,11 +3,8 @@ package tlsutils
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/tls"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
 )
@@ -253,12 +250,4 @@ func TestGenerateSelfSignedCertKey(t *testing.T) {
 
 	clientRun()
 
-}
-
-func TestDebugMockGMHTTP(t *testing.T) {
-	host, port := utils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
-		return req
-	})
-	spew.Dump(host, port)
-	time.Sleep(10 * time.Minute)
 }

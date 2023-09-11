@@ -3581,6 +3581,9 @@ message Certificate {
   bytes CrtPem = 1;
   bytes KeyPem = 2;
   repeated bytes CaCertificates = 3;
+
+  // pkcs12path need a .p12 or .pfx file
+  bytes Pkcs12Path = 4;
 }
 
 message MITMContentReplacer {
