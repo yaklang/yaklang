@@ -7,9 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type TemplateVarTypePrefix string
