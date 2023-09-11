@@ -92,7 +92,25 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 
 		c, err := tls.X509KeyPair(ca, key)
 		if err != nil {
-			return utils.Errorf("parse ca and privKey failed: %s", err)
+			// try parse burp der raw bytes
+			certDER, err := x509.ParseCertificate(ca)
+			if err != nil {
+				return utils.Errorf("parse ca failed: %s", err)
+			}
+			keyDER, err := x509.ParsePKCS8PrivateKey(key)
+			if err != nil {
+				return utils.Errorf("parse key failed: %s", err)
+			}
+			keyDecode, err := x509.MarshalPKCS8PrivateKey(keyDER)
+			if err != nil {
+				return utils.Errorf("parse key Decode failed: %s", err)
+			}
+			cer := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER.Raw})
+			prikey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDecode})
+			c, err = tls.X509KeyPair(cer, prikey)
+			if err != nil {
+				return utils.Errorf("parse ca and privKey failed: %s", err)
+			}
 		}
 
 		cert, err := x509.ParseCertificate(c.Certificate[0])
@@ -680,3 +698,4 @@ func MITM_SetWebsocketResponseMirrorRaw(f func(req []byte)) MITMConfig {
 		return nil
 	}
 }
+
