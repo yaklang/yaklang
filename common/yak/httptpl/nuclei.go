@@ -310,51 +310,44 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			}).([]*YakHTTPRequestPacket)
 		} else {
 			method := utils.MapGetString(req, "method")
-			reqIns.Method = method
-			reqIns.Paths = utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
-			reqIns.Headers = make(map[string]string)
-			headers := utils.InterfaceToMapInterface(utils.MapGetRaw(req, "headers"))
-			for k, v := range headers {
-				reqIns.Headers[k] = utils.InterfaceToString(v)
+			paths := utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
+			for _, path := range paths {
+				var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", method, path)
+				baseURLph := tagsToPlaceHolderMap["{{BaseURL}}"]
+				if strings.HasPrefix(path, baseURLph) {
+					if strings.HasPrefix(path, fmt.Sprintf("%s/", baseURLph)) {
+						ph = registerNucleiTags("{{EndSlashBaseURL}}", "__path_trim_end_slash__")
+						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{BaseURL}}"], ph))
+					} else {
+						ph = tagsToPlaceHolderMap["{{BaseURL}}"]
+						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", ph))
+					}
+				} else if strings.HasPrefix(path, tagsToPlaceHolderMap["{{RootURL}}"]) {
+					firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{RootURL}}"], ""))
+				}
+				firstLine = nucleiFormatToFuzzTagMode(firstLine)
+
+				// 处理
+				var lines []string
+				lines = append(lines, firstLine)
+				headersRaw := utils.MapGetRaw(req, "headers")
+				headers := utils.InterfaceToMapInterface(headersRaw)
+				_, hostOk1 := headers["Host"]
+				_, hostOk2 := headers["host"]
+				if !hostOk1 && !hostOk2 {
+					lines = append(lines, "Host: "+tagsToPlaceHolderMap["{{Hostname}}"])
+				}
+				for k, v := range headers {
+					lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatToFuzzTagMode(utils.InterfaceToString(v))))
+				}
+				if len(headers) <= 0 {
+					lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
+				}
+				var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
+				rawPacket += utils.MapGetString(req, "body")
+				rawPacket = nucleiFormatToFuzzTagMode(rawPacket)
+				reqIns.HTTPRequests = append(reqIns.HTTPRequests, &YakHTTPRequestPacket{Request: rawPacket})
 			}
-			reqIns.Body = utils.MapGetString(req, "body")
-			//for _, path := range paths {
-			//	var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", method, path)
-			//	baseURLph := tagsToPlaceHolderMap["{{BaseURL}}"]
-			//	if strings.HasPrefix(path, baseURLph) {
-			//		if strings.HasPrefix(path, fmt.Sprintf("%s/", baseURLph)) {
-			//			ph = registerNucleiTags("{{EndSlashBaseURL}}", "__path_trim_end_slash__")
-			//			firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{BaseURL}}"], ph))
-			//		} else {
-			//			ph = tagsToPlaceHolderMap["{{BaseURL}}"]
-			//			firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", ph))
-			//		}
-			//	} else if strings.HasPrefix(path, tagsToPlaceHolderMap["{{RootURL}}"]) {
-			//		firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{RootURL}}"], ""))
-			//	}
-			//	firstLine = nucleiFormatToFuzzTagMode(firstLine)
-			//
-			//	// 处理
-			//	var lines []string
-			//	lines = append(lines, firstLine)
-			//	headersRaw := utils.MapGetRaw(req, "headers")
-			//	headers := utils.InterfaceToMapInterface(headersRaw)
-			//	_, hostOk1 := headers["Host"]
-			//	_, hostOk2 := headers["host"]
-			//	if !hostOk1 && !hostOk2 {
-			//		lines = append(lines, "Host: "+tagsToPlaceHolderMap["{{Hostname}}"])
-			//	}
-			//	for k, v := range headers {
-			//		lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatToFuzzTagMode(utils.InterfaceToString(v))))
-			//	}
-			//	if len(headers) <= 0 {
-			//		lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
-			//	}
-			//	var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
-			//	rawPacket += utils.MapGetString(req, "body")
-			//	rawPacket = nucleiFormatToFuzzTagMode(rawPacket)
-			//	reqIns.HTTPRequests = append(reqIns.HTTPRequests, &YakHTTPRequestPacket{Request: rawPacket})
-			//}
 		}
 
 		if len(reqIns.HTTPRequests) <= 0 {
