@@ -91,10 +91,19 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	if req.GetFuzzerTabIndex() != "" {
 		db = db.Where("fuzzer_tab_index = ?", req.GetFuzzerTabIndex())
 	}
+	pagination := req.GetPagination()
+	order, orderby := pagination.Order, pagination.OrderBy
+	if order == "" {
+		order = "id"
+	}
+	if orderby == "" {
+		orderby = "asc"
+	}
 
 	var task []*WebFuzzerTask
-	db = bizhelper.QueryOrder(db, "id", "desc")
-	paging, db := bizhelper.Paging(db, int(req.GetPagination().GetPage()), int(req.GetPagination().GetLimit()), &task)
+
+	db = bizhelper.QueryOrder(db, order, orderby)
+	paging, db := bizhelper.Paging(db, int(pagination.GetPage()), int(pagination.GetLimit()), &task)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("pagination failed: %s", db.Error)
 	}
