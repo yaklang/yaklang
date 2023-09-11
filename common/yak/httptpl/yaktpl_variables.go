@@ -67,7 +67,7 @@ type YakVariables struct {
 }
 
 func (v *YakVariables) Set(key string, value string) {
-	v.raw[key] = NewVar(value)
+	v.SetWithType(key, value, string(RawType))
 }
 func (v *YakVariables) SetWithType(key string, value string, typeName string) error {
 	var tempType TemplateVarType
