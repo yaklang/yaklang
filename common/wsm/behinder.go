@@ -363,6 +363,19 @@ func (b *Behinder) processBase64JSON(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// {"msg":"xxx","status":"success"}
+	if decodedMap, ok := decoded.(map[string]interface{}); ok {
+		if status, exists := decodedMap["status"]; exists {
+			if status != "success" {
+				return nil, utils.Errorf("status is not success: %v", decodedMap["msg"])
+			}
+		} else {
+			return nil, utils.Error("status field not found in the JSON data")
+		}
+	} else {
+		return nil, utils.Error("unexpected data format")
+	}
+
 	decodedJSON, err := json.Marshal(decoded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to re-encode decoded data as JSON: %w", err)

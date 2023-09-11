@@ -1,6 +1,7 @@
 package wsm
 
 import (
+	"encoding/base64"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,58 +17,94 @@ type BehidnerFileSystemAction struct {
 }
 
 func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
-	var resources []*ypb.YakURLResource
+	type ResourceError struct {
+		resources []*ypb.YakURLResource
+		err       error
+	}
 
+	resErr := &ResourceError{}
+	var err error
 	gjson.GetBytes(result, "msg").ForEach(func(_, v gjson.Result) bool {
-		name := v.Get("name").String()
-		size := v.Get("size").Int()
-		typ := v.Get("type").String()
-		lastModified := v.Get("lastModified").String()
-		perm := v.Get("perm").String()
-
+		var extra []*ypb.KVPair
 		newParam := &ypb.YakURL{
 			Schema:   originParam.Schema,
 			User:     originParam.GetUser(),
 			Pass:     originParam.GetPass(),
 			Location: originParam.GetLocation(),
-			Path:     filepath.Join(originParam.GetPath(), name),
-			Query:    originParam.GetQuery(), // 增加这一行来复制查询参数
+			Query:    originParam.GetQuery(),
+		}
+		if v.Type == gjson.String {
+			name := filepath.Base(originParam.GetPath())
+			newParam.Path = originParam.GetPath()
+
+			content, err := base64.StdEncoding.DecodeString(v.String())
+			if err != nil {
+				resErr.err = err
+				return true
+			}
+			extra = []*ypb.KVPair{
+				{Key: "content", Value: string(content)},
+			}
+			var resource = &ypb.YakURLResource{
+				Path:         newParam.Path,
+				Url:          newParam,
+				ResourceName: name,
+				VerboseName:  name,
+				Extra:        extra,
+			}
+			resErr.resources = append(resErr.resources, resource)
+			return true
 		}
 
-		var resource = &ypb.YakURLResource{
-			Size:         size,
-			SizeVerbose:  utils.ByteSize(uint64(size)),
-			Path:         newParam.Path,
-			Url:          newParam,
-			ResourceName: name,
-			VerboseName:  name,
-			Extra: []*ypb.KVPair{
-				{Key: "perm", Value: perm},
-			},
-		}
+		if v.Type == gjson.JSON {
+			name := v.Get("name").String()
+			size := v.Get("size").Int()
+			typ := v.Get("type").String()
+			lastModified := v.Get("lastModified").String()
+			perm := v.Get("perm").String()
 
-		if typ == "directory" {
-			resource.ResourceType = "dir"
-			resource.VerboseType = "behinder-directory"
-			resource.HaveChildrenNodes = true
-		} else {
-			resource.ResourceType = "file"
-			resource.VerboseType = "behinder-file"
-			resource.HaveChildrenNodes = false
-		}
-		loc, _ := time.LoadLocation("Asia/Shanghai")
+			if len(perm) > 0 {
+				extra = []*ypb.KVPair{
+					{Key: "perm", Value: perm},
+				}
+			}
+			newParam.Path = filepath.Join(originParam.GetPath(), name)
 
-		// Parse the "lastModified" string to a Unix timestamp
-		t, err := time.ParseInLocation("2006/01/02 15:04:05", lastModified, loc)
-		if err == nil {
-			resource.ModifiedTimestamp = t.Unix()
-		}
+			var resource = &ypb.YakURLResource{
+				Size:         size,
+				SizeVerbose:  utils.ByteSize(uint64(size)),
+				Path:         newParam.Path,
+				Url:          newParam,
+				ResourceName: name,
+				VerboseName:  name,
+				Extra:        extra,
+			}
 
-		resources = append(resources, resource)
-		return true // keep iterating
+			if typ == "directory" {
+				resource.ResourceType = "dir"
+				resource.VerboseType = "behinder-directory"
+				resource.HaveChildrenNodes = true
+			} else {
+				resource.ResourceType = "file"
+				resource.VerboseType = "behinder-file"
+				resource.HaveChildrenNodes = false
+			}
+			loc, _ := time.LoadLocation("Asia/Shanghai")
+
+			// Parse the "lastModified" string to a Unix timestamp
+			t, err := time.ParseInLocation("2006/01/02 15:04:05", lastModified, loc)
+			if err == nil {
+				resource.ModifiedTimestamp = t.Unix()
+			}
+
+			resErr.resources = append(resErr.resources, resource)
+		}
+		return true
 	})
-
-	return resources, nil
+	if err != nil {
+		return nil, err
+	}
+	return resErr.resources, nil
 }
 func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
@@ -118,7 +155,14 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 		if err != nil {
 			return nil, err
 		}
+	case "show":
+		show, er := manager.showFile(path)
+		if er != nil {
+			return nil, er
+		}
+		res, err = webShellResultToYakURLResource(u, show)
 	}
+
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,

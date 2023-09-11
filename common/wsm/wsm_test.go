@@ -18,7 +18,7 @@ func TestNewWebShell(t *testing.T) {
 	url = "http://127.0.0.1:8080/S2-032/bs4-json.jsp"
 	url = "http://127.0.0.1:8085/S2-032/bx4-json.jsp"
 	url = "http://127.0.0.1:8085/S2-032/go0p-json.jsp"
-	url = "http://127.0.0.1:8080/S2-032/go0p-json.jsp"
+	//url = "http://127.0.0.1:8080/S2-032/go0p-json.jsp"
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
 		SetShellScript("jsp"),
@@ -44,7 +44,8 @@ func TestNewWebShell(t *testing.T) {
 		}
 		return decodedData, nil
 	})
-	ping, err := bx.listFile("C:\\Tools\\Vuln\\SYC")
+	ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032\\go0p-json.jsp")
+	//ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
 	if err != nil {
 		t.Error(err)
 		return
