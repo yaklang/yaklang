@@ -2,12 +2,15 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"time"
@@ -28,7 +31,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	// 转FuzzerRequest
 	for _, sequence := range yakTemplate.HTTPRequestSequences {
 		var fuzzerReqs []*ypb.FuzzerRequest
-		if len(sequence.HTTPRequests) == 0 {
+		if len(sequence.HTTPRequests) != 0 {
 			fuzzerReqs = make([]*ypb.FuzzerRequest, len(sequence.HTTPRequests)) // 每个package对应一个fuzzerRequest,使用相同配置
 			for i, request := range sequence.HTTPRequests {
 				req := request.Request
@@ -307,6 +310,14 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	//
 	template := &httptpl.YakTemplate{}
 	template.HTTPRequestSequences = requestBulks
+	// 补充info字段
+	randstr := utils.RandStringBytes(8)
+	template.Id = fmt.Sprintf("WebFuzzer-Template-%s", randstr)
+	template.Name = fmt.Sprintf("WebFuzzer Template %s", randstr)
+	template.Author = "god"
+	template.Severity = "low"
+	template.Description = "write your description here"
+	template.Reference = []string{"https://github.com/", "https://cve.mitre.org/"}
 	// 转换为Yaml
 	yamlContent, err := MarshalYakTemplateToYaml(template)
 	if err != nil {
@@ -321,8 +332,10 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 
 func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	rootMap := NewYamlMapBuilder()
-	rootMap.Set("id", y.Id)
+	rootMap.ForceSet("id", y.Id)
+	rootMap.AddEmptyLine()
 	infoMap := rootMap.NewSubMapBuilder("info")
+	rootMap.AddEmptyLine()
 	reqSequencesArray := rootMap.NewSubArrayBuilder("http")
 	writeConfig := func(builder *YamlMapBuilder, config *httptpl.RequestConfig) {
 		builder.AddEmptyLine()
@@ -365,31 +378,50 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	infoMap.Set("severity", y.Severity)
 	infoMap.Set("description", y.Description)
 	infoMap.Set("reference", y.Reference)
-	infoMap.Set("tags", strings.Join(y.Tags, ","))
+	metadata := infoMap.NewSubMapBuilder("metadata")
 	classification := infoMap.NewSubMapBuilder("classification")
 	classification.Set("cve-id", y.CVE)
+	infoMap.Set("tags", strings.Join(y.Tags, ","))
+	yakitInfo := infoMap.NewSubMapBuilder("yakit-info")
 	//生成req sequences
+	maxRequest := 0
+	signElements := make([]string, 0)
+	addSignElements := func(i ...any) {
+		for _, a := range i {
+			res, err := json.Marshal(a)
+			if err != nil {
+				return
+			}
+
+			signElements = append(signElements, string(res))
+		}
+	}
 	for _, sequence := range y.HTTPRequestSequences {
 		sequenceItem := NewYamlMapBuilder()
 		sequenceItem.SetDefaultField(map[string]any{
-			"stop-at-first-macth": true,
+			"stop-at-first-macth": false,
 			"max-size":            0,
 			"unsafe":              false,
 			"req-condition":       false,
 			"redirects":           false,
+			"cookie-reuse":        false,
 			"max-redirects":       0,
-			"matchers-condition":  "and",
+			"matchers-condition":  "or",
 		})
 		// 请求配置
 		isPaths := len(sequence.Paths) > 0
 		var payloadsMap *YamlMapBuilder
 		if isPaths {
+			addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
+			maxRequest += len(sequence.Paths)
 			sequenceItem.Set("method", sequence.Method)
 			sequenceItem.Set("path", sequence.Paths)
 			payloadsMap = sequenceItem.NewSubMapBuilder("payloads")
 			sequenceItem.Set("headers", sequence.Headers)
 			sequenceItem.Set("body", sequence.Body)
 		} else {
+			addSignElements(sequence.HTTPRequests)
+			maxRequest += len(sequence.HTTPRequests)
 			reqArray := []string{}
 			for _, request := range sequence.HTTPRequests {
 				prefix := ""
@@ -418,8 +450,21 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 				}
 			}
 		}
+		// 其它配置
+		sequenceItem.Set("redirects", sequence.EnableRedirect)
+		sequenceItem.Set("max-redirects", sequence.MaxRedirects)
+
+		sequenceItem.Set("stop-at-first-macth", sequence.StopAtFirstMatch)
+		sequenceItem.Set("cookie-reuse", sequence.CookieInherit)
+		sequenceItem.Set("max-size", sequence.MaxSize)
+		sequenceItem.Set("unsafe", sequence.NoFixContentLength)
+		sequenceItem.Set("req-condition", sequence.AfterRequested)
+		//sequenceItem.Set("attack-mode", sequence.AttackMode)
+		//sequenceItem.Set("inherit-variables", sequence.InheritVariables)
+		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
 		// matcher生成
 		matcher := sequence.Matcher
+		addSignElements(matcher)
 		matcherCondition := matcher.Condition
 		if matcherCondition == "" {
 			matcherCondition = "and"
@@ -460,6 +505,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 
 		sequenceItem.Set("attack", sequence.AttackMode)
 
+		addSignElements(sequence.Extractor)
 		// extractor生成
 		extratorsArray := sequenceItem.NewSubArrayBuilder("extractors")
 		for _, extractor := range sequence.Extractor {
@@ -488,23 +534,16 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			extratorsArray.Add(extractorItem)
 		}
 
-		// 其它配置
-		sequenceItem.Set("redirects", sequence.EnableRedirect)
-		sequenceItem.Set("max-redirects", sequence.MaxRedirects)
-
-		//sequenceItem.Set("stop-at-first-macth", sequence.StopAtFirstMatch)
-		//sequenceItem.Set("cookie-reuse", sequence.CookieInherit)
-		//sequenceItem.Set("max-size", sequence.MaxSize)
-		//sequenceItem.Set("unsafe", sequence.NoFixContentLength)
-		//sequenceItem.Set("req-condition", sequence.AfterRequested)
-		//sequenceItem.Set("attack-mode", sequence.AttackMode)
-		//sequenceItem.Set("inherit-variables", sequence.InheritVariables)
-		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
-
 		// WebFuzzer请求配置
 		//writeConfig(sequenceItem, &sequence.RequestConfig)
 
 		reqSequencesArray.Add(sequenceItem)
 	}
+	metadata.Set("max-request", maxRequest)
+	metadata.ForceSet("shodan-query", "")
+	metadata.Set("verified", true)
+	yakitInfo.Set("sign", codec.Md5(strings.Join(signElements, "\n")))
+	rootMap.AddEmptyLine()
+	rootMap.AddComment("Generated From WebFuzzer on " + time.Now().Format("2006-01-02 15:04:05"))
 	return rootMap.MarshalToString()
 }
