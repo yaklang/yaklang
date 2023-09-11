@@ -493,7 +493,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					// 处理异常
 					defer func() {
 						if err := recover(); err != nil {
-							utils.PrintCurrentGoroutineRuntimeStack()
 							log.Errorf("submit fuzzer task failed: %s", err)
 						}
 					}()
