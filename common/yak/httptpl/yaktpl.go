@@ -26,6 +26,9 @@ type YakTemplate struct {
 	ShodanQuery   string
 	Verified      string
 
+	// SelfContained
+	SelfContained bool
+
 	// interactsh
 	ReverseConnectionNeed bool `json:"reverseConnectionNeed"`
 

@@ -62,12 +62,6 @@ func ScanPacket(req []byte, opts ...interface{}) {
 		lowhttpConfig.Ctx = baseContext
 	}
 
-	//config.AppendHTTPResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-	//	if result {
-	//		log.Infof("httptpl.YakTemplate matched response: %v", y.Name)
-	//	}
-	//})
-
 	var urlStr string
 	u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, lowhttpConfig.Https)
 	if u != nil {
@@ -92,7 +86,10 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				log.Infof("skip template %s because of reverse connection feature is disabled", tpl.Name)
 				continue
 			}
-
+			if config.OnTemplateLoaded != nil && !config.OnTemplateLoaded(tpl) {
+				log.Infof("skipped template %s because of OnTemplateLoaded", tpl.Name)
+				continue
+			}
 			log.Infof("start to using template %v", tpl.Name)
 
 			tpl := tpl
@@ -440,6 +437,7 @@ var Exports = map[string]interface{}{
 	"targetConcurrent":        WithConcurrentTarget,
 	"rawTemplate":             WithTemplateRaw,
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
+	"all":                     WithAllTemplate,
 	"mode":                    WithMode,
 	"resultCallback":          _callback,
 	"tcpResultCallback":       _tcpCallback,

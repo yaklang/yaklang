@@ -73,6 +73,7 @@ type Config struct {
 	FuzzQueryTemplate []string
 	ExcludeTemplates  []string
 	Tags              []string
+	QueryAll          bool
 
 	// DebugMode
 	Debug         bool
@@ -84,6 +85,9 @@ type Config struct {
 	OOBTimeout                float64
 	OOBRequireCallback        func(...float64) (string, string, error)
 	OOBRequireCheckingTrigger func(string, ...float64) bool
+
+	// onTempalteLoaded
+	OnTemplateLoaded func(*YakTemplate) bool
 }
 
 func WithOOBRequireCallback(f func(...float64) (string, string, error)) ConfigOption {
@@ -165,6 +169,18 @@ func WithTemplateName(s ...string) ConfigOption {
 func WithFuzzQueryTemplate(s ...string) ConfigOption {
 	return func(config *Config) {
 		config.FuzzQueryTemplate = s
+	}
+}
+
+func WithAllTemplate(b bool) ConfigOption {
+	return func(config *Config) {
+		config.QueryAll = b
+	}
+}
+
+func WithOnTemplateLoaded(f func(template *YakTemplate) bool) ConfigOption {
+	return func(config *Config) {
+		config.OnTemplateLoaded = f
 	}
 }
 
@@ -349,6 +365,20 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 				}
 				scriptFilter.Insert(t.Name)
 				ch <- t
+			}
+
+			if c.QueryAll {
+				for y := range yakit.YieldYakScripts(
+					consts.GetGormProfileDatabase().Where("type = 'nuclei'"),
+					context.Background()) {
+					tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+					if err != nil {
+						log.Errorf("create yak template failed (fuzz query mode): %s", err)
+						continue
+					}
+					feedback(tpl)
+				}
+				return
 			}
 
 			if c.SingleTemplateRaw != "" {
