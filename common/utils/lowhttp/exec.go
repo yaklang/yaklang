@@ -443,6 +443,18 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	return response, nil
 }
 
+var commonHTTPMethod = map[string]string{
+	http.MethodGet:     http.MethodGet,
+	http.MethodPost:    http.MethodPost,
+	http.MethodPut:     http.MethodPut,
+	http.MethodDelete:  http.MethodDelete,
+	http.MethodPatch:   http.MethodPatch,
+	http.MethodHead:    http.MethodHead,
+	http.MethodOptions: http.MethodOptions,
+	http.MethodConnect: http.MethodConnect,
+	http.MethodTrace:   http.MethodTrace,
+}
+
 // SendHttpRequestWithRawPacketWithOpt
 func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
@@ -610,8 +622,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		noFixContentLength = true
 	} else if haveCL && !haveTE && len(originBody) > clInt {
 		SplitHTTPPacket(originBody[clInt:], func(method string, requestUri string, proto string) error {
-			if len(proto) > 5 {
-				if strings.HasPrefix(proto, "HTTP/") {
+			if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
+				if _, ok := commonHTTPMethod[method]; ok {
 					noFixContentLength = true
 				}
 			}
