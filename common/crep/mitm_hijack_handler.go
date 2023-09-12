@@ -89,22 +89,13 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	}
 
 	// remove proxy-connection like!
-	var haveProxyHeader = false
-	for _, p := range []string{
-		"Proxy-Authenticate",
-		"Proxy-Authorization",
-		"Proxy-Connection", // Non-standard, but required for HTTP/2.
-	} {
-		if req.Header.Get(p) != "" {
-			haveProxyHeader = true
-			break
-		}
-	}
 	err := header.NewHopByHopModifier().ModifyRequest(req)
 	if err != nil {
 		log.Errorf("remove hop by hop header failed: %s", err)
 	}
-	if haveProxyHeader {
+	if !httpctx.GetRequestViaCONNECT(req) {
+		// 不是通过 CONNECT 方法的代理，一般常见非 HTTPS 代理，这种情况下
+		// Dump 出来的数据包 URI 不包含 http://
 		raw, err := utils.DumpHTTPRequest(req, true)
 		if err != nil {
 			log.Errorf("dump request failed: %s", err)

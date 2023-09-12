@@ -597,6 +597,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.Host = host
 	}
 
+	if ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_ViaConnect) {
+		httpctx.SetRequestViaCONNECT(req, true)
+	}
+
 	isProxy := req.Method == "CONNECT" || req.Header.Get("Proxy-Connection") != "" || req.Header.Get("Proxy-Authorization") != ""
 	if isProxy {
 		if p.proxyUsername != "" || p.proxyPassword != "" {
@@ -634,6 +638,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if req.Method == "CONNECT" {
+		httpctx.SetRequestViaCONNECT(req, true)
 		connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
 		if err != nil {
 			conn.Close()
@@ -644,6 +649,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
 
 		if err := p.reqmod.ModifyRequest(req); err != nil {
 			if !strings.Contains(err.Error(), "ignore connect") {
