@@ -1,0 +1,40 @@
+name: Push docs to repo B
+
+on:
+  push:
+    branches:
+      - "feat/doc/fun_sign_upgrade"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+
+    - name: Generate docs
+      run: |
+        echo "Generating docs..."
+        go run common/yak/yakdoc/generate_web_doc/generate_web_doc.go web_doc/
+        echo "Generating docs finished"
+        
+    - name: Checkout yaklang.github.io repo
+      uses: actions/checkout@v2
+      with:
+        repository: yaklang/yaklang.github.io
+        token: ${{ secrets.GH_TOKEN }}
+        path: websize
+
+    - name: Copy docs
+      run: |
+        cp -rf web_doc/* websize/docs/api
+
+    - name: Push
+      run: |
+        cd websize
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add .
+        git commit -m "Update api docs"
+        git push
