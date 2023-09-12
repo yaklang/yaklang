@@ -101,6 +101,10 @@ Content-Length: 1
 	fmt.Println(string(rsp.RawPacket))
 	fmt.Println("------------------------------")
 	fmt.Println(string(rsp.RawRequest))
+
+	if count != 1 {
+		t.Fatal("BUG: Pipeline failed")
+	}
 }
 
 func TestLowhttpResponse2(t *testing.T) {
