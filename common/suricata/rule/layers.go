@@ -43,7 +43,7 @@ type DNSRule struct {
 type HTTPConfig struct {
 	// deprecated and not implemented
 	Uricontent string
-	UrilenOp   *numrange.NumRange
+	Urilen     *numrange.NumRange
 }
 
 type TCPLayerRule struct {

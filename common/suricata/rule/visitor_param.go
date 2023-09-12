@@ -62,7 +62,7 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.HTTPStatMsg
 	case "http_stat_code", "http.stat_code":
 		return modifier.HTTPStatCode
-	case "http_client_body", "http.client_body":
+	case "http_client_body", "http.client_body", "http_request_body", "http.request_body":
 		return modifier.HTTPRequestBody
 	case "http_server_body", "http.server_body":
 		return modifier.HTTPResponseBody
@@ -399,6 +399,16 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 			num := atoi(vStr)
 			rule.ContentRuleConfig.IcmpConfig.ICMPSeq = &num
+		case "urilen":
+			if rule.ContentRuleConfig.HTTPConfig == nil {
+				rule.ContentRuleConfig.HTTPConfig = &HTTPConfig{}
+			}
+			numRange, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				log.Errorf("parse urilen err:%v", err)
+				continue
+			}
+			rule.ContentRuleConfig.HTTPConfig.Urilen = numRange
 		case "nocase":
 			contentRule.Nocase = true
 		case "depth":
