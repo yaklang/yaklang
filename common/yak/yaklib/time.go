@@ -1,8 +1,9 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var TimeExports = map[string]interface{}{
@@ -27,15 +28,4 @@ var TimeExports = map[string]interface{}{
 	},
 	"Until": time.Until,
 	"Since": time.Since,
-}
-
-var TimeZoneExports = map[string]interface{}{
-	"Get": time.LoadLocation,
-	"Now": func(i string) time.Time {
-		loc, err := time.LoadLocation(i)
-		if err != nil {
-			return time.Now()
-		}
-		return time.Now().In(loc)
-	},
 }
