@@ -10,6 +10,52 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
+func TestCreateYakTemplateFromSelfContained(t *testing.T) {
+	var demo = `
+id: self-contained-file-input
+
+info:
+  name: Test Self Contained Template With File Input
+  author: pdteam
+  severity: info
+
+self-contained: true
+requests:
+  - method: GET
+    path:
+      - "http://127.0.0.1:5431/{{test}}"
+    matchers:
+      - type: word
+        words:
+          - This is self-contained response
+      
+  - raw:
+      - |
+        GET http://127.0.0.1:5431/{{test}} HTTP/1.1
+        Host: {{Hostname}}
+    matchers:
+      - type: word
+        words:
+          - This is self-contained response
+`
+	data, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !data.SelfContained {
+		t.Fatal("self-contained failed")
+	}
+	config := NewConfig()
+
+	n, err := data.Exec(config, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatal("self-contained failed")
+	}
+}
+
 func TestCreateYakTemplateFromNucleiTemplateRaw(t *testing.T) {
 	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 111\r\n" +
