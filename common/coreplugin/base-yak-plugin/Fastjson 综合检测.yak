@@ -3,7 +3,7 @@ dnslogTimeout = 3
 timeoutTolerance = 2 // 2 秒的超时容错
 fuzzTimeout = 10
 networkFluctuation = 5 // 网络波动，fuzztimeout = networkFluctuation * getCommonWastTime()
-log.setLevel("debug")
+log.setLevel("info")
 
 encodePayload = payload=>{
     res = re.FindAll(payload, `"(.*?)"`)

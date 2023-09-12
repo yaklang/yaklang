@@ -41,7 +41,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	}
 	var dnslog string
 	// 查找dnslog
-	re, err := regexp.Compile(`\w+\.((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dnstunnel\.run))`)
+	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn))`)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		}
 	}
 	if dnslog != "" {
-		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second))
+		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second),netx.WithDNSNoCache(true))
 		if ip != "" {
 			DnsRecord = append(DnsRecord, dnslog)
 		}
