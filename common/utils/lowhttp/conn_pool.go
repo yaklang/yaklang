@@ -13,7 +13,7 @@ import (
 
 var DefaultLowHttpConnPool = &lowHttpConnPool{
 	maxIdleConn:        100,
-	maxIdleConnPerHost: 2,
+	maxIdleConnPerHost: 20,
 	connCount:          0,
 	idleConnTimeout:    90 * time.Second,
 	gcPool: sync.Pool{
@@ -40,20 +40,29 @@ type lowHttpConnPool struct {
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
 func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
-	l.idleConnMux.RLock()
+	start := time.Now()
+	l.idleConnMux.Lock()
+	waitTime := time.Since(start)
+	log.Infof("wait time [%v]", waitTime)
 	// 检索是否有符合要求的连接
 	if len(l.idleConn[key.hash()]) > 0 {
 		for _, pConn := range l.idleConn[key.hash()] {
 			if pConn.isAlive && pConn.isIdle {
-				l.idleConnMux.RUnlock()
-				l.idleConnMux.Lock()
 				pConn.isIdle = false
 				l.idleConnMux.Unlock()
-				return pConn, nil
+				//取出连接时验活
+				if pConn.checkAlive() {
+					log.Infof("old conn")
+					return pConn, nil
+				}
+				pConn.removeConn()
+				return l.getIdleConn(key, opts...)
 			}
 		}
 	}
-	l.idleConnMux.RUnlock()
+	//如果没有符合要求连接则新建
+	l.idleConnMux.Unlock()
+	log.Infof("new conn")
 	pConn, err := newPersistConn(key, l, opts...)
 	if err != nil {
 		return nil, err
@@ -63,19 +72,25 @@ func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 
 func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 	cacheKeyHash := conn.cacheKey.hash()
-	l.idleConnMux.RLock()
-	//如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
-	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost {
-		l.idleConnMux.RUnlock()
-		return nil
-	}
-	l.idleConnMux.RUnlock()
-
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
+	//如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
+	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost && !conn.inPool {
+		return nil
+	}
 
+	//添加一个连接到连接池,转化连接状态,刷新空闲时间
+	conn.idleAt = time.Now()
+	if l.idleConnTimeout > 0 { //判断空闲时间,若为0则不设限
+		if conn.closeTimer != nil {
+			conn.closeTimer.Reset(l.idleConnTimeout)
+		} else {
+			conn.closeTimer = time.AfterFunc(l.idleConnTimeout, conn.removeConn)
+		}
+	}
+
+	conn.isIdle = true
 	if conn.inPool {
-		conn.isIdle = true
 		return nil
 	}
 
@@ -86,24 +101,9 @@ func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 			return err
 		}
 	}
-	//添加一个连接到连接池,转化连接状态,刷新空闲时间
-	conn.idleAt = time.Now()
-	if l.idleConnTimeout > 0 {
-		if conn.closeTimer != nil {
-			conn.closeTimer.Reset(l.idleConnTimeout)
-		} else {
-			conn.closeTimer = time.AfterFunc(l.idleConnTimeout, conn.closeConnIfStillIdle)
-		}
-	}
 	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], conn)
 	conn.inPool = true
-	conn.isIdle = true
 	return nil
-}
-
-// todo keepalive
-func (l *lowHttpConnPool) keepAliveCheck() {
-
 }
 
 // 在有写锁的环境中从池子里删除一个连接
@@ -165,11 +165,20 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	return conn, nil
 }
 
+func (pc *persistConn) checkAlive() bool {
+	_, err := pc.Write([]byte("alive"))
+	if err != nil {
+		log.Infof("this [%v] persistConn is close [%v]", pc.cacheKey, err)
+		return false
+	}
+	return true
+}
+
 func (pc *persistConn) Close() error {
 	return pc.p.putIdleConn(pc)
 }
 
-func (pc *persistConn) closeConnIfStillIdle() {
+func (pc *persistConn) removeConn() {
 	l := pc.p
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
@@ -177,10 +186,6 @@ func (pc *persistConn) closeConnIfStillIdle() {
 	if err != nil {
 		log.Error(err)
 	}
-}
-
-func (pc *persistConn) idle() {
-
 }
 
 type connectKey struct {
