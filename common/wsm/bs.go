@@ -42,7 +42,7 @@ func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 				return true
 			}
 			extra = []*ypb.KVPair{
-				{Key: "content", Value: string(content)},
+				{Key: "content", ValueBytes: content},
 			}
 			var resource = &ypb.YakURLResource{
 				Path:         newParam.Path,
@@ -172,6 +172,9 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 			return nil, er
 		}
 		res, err = webShellResultToYakURLResource(u, show)
+		if err != nil {
+			return nil, err
+		}
 	case "check":
 	case "checkExist":
 
@@ -243,7 +246,7 @@ func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Req
 			return nil, err
 		}
 	case "append":
-		show, er := manager.appendFile(path, []byte("params.GetBody()"))
+		show, er := manager.appendFile(path, params.GetBody())
 		if er != nil {
 			return nil, er
 		}

@@ -271,6 +271,11 @@ func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
 		lowhttp.WithTimeoutFloat(15),
 		lowhttp.WithProxy(b.Proxy),
 	)
+
+	if err != nil {
+		return nil, utils.Errorf("http request error: %v", err)
+	}
+
 	raw := lowhttp.GetHTTPPacketBody(lresp.RawPacket)
 
 	if len(raw) == 0 {
