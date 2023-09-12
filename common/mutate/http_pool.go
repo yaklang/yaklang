@@ -364,6 +364,9 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		ForceFuzzfile:     false,
 	}
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
 		opt(base)
 	}
 	return base
@@ -411,24 +414,18 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			results = append(results, res)
 		}
 		return _httpPool(results, opts...)
-	case FuzzHTTPRequestIf:
-		reqs, err := ret.Results()
+	case *FuzzHTTPRequest:
+		results, err := ret.Results()
 		if err != nil {
-			return nil, utils.Errorf("call FuzzHTTPRequest.Results() failed: %s", err)
+			return nil, err
 		}
-		return _httpPool(reqs, opts...)
-	case FuzzHTTPRequestBatch:
-		reqs, err := ret.Results()
+		return _httpPool(results, opts...)
+	case *FuzzHTTPRequestBatch:
+		results, err := ret.Results()
 		if err != nil {
-			return nil, utils.Errorf("call FuzzHTTPRequestBatch.Results() failed: %s", err)
+			return nil, err
 		}
-		return _httpPool(reqs, opts...)
-	case FuzzHTTPRequest:
-		reqs, err := ret.Results()
-		if err != nil {
-			return nil, utils.Errorf("call FuzzHTTPRequestBatch.Results() failed: %s", err)
-		}
-		return _httpPool(reqs, opts...)
+		return _httpPool(results, opts...)
 	case *http.Request:
 		raw, err := utils.HttpDumpWithBody(ret, true)
 		if err != nil {
