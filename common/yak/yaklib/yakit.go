@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -61,8 +62,46 @@ var YakitExports = map[string]interface{}{
 	"SetProgressEx": yakitSetProgressEx(emptyVirtualClient),
 }
 
+func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
+	var exports = map[string]interface{}{}
+	exports["EnableWebsiteTrees"] = func(targets string) {
+		Output(&YakitFeature{
+			Feature: "website-trees",
+			Params: map[string]interface{}{
+				"targets":          targets,
+				"refresh_interval": 3,
+			},
+		})
+	}
+	exports["EnableTable"] = func(tableName string, columns []string) {
+		Output(&YakitFeature{
+			Feature: "fixed-table",
+			Params: map[string]interface{}{
+				"table_name": tableName,
+				"columns":    columns,
+			},
+		})
+	}
+	exports["TableData"] = func(tableName string, data any) *YakitFixedTableData {
+		tableData := &YakitFixedTableData{
+			TableName: tableName,
+			Data:      utils.InterfaceToGeneralMap(data),
+		}
+		if tableData.Data == nil {
+			tableData.Data = map[string]interface{}{}
+		}
+		tableData.Data["uuid"] = uuid.NewV4().String()
+		Output(tableData)
+		return nil
+	}
+	exports["StatusCard"] = func(id string, data interface{}, tags ...string) {
+		Output(&YakitStatusCard{
+			Id: id, Data: fmt.Sprint(data), Tags: tags,
+		})
+	}
+	return exports
+}
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
-
 	var YakitExports = map[string]interface{}{
 		"Info":          yakitInfo(client),
 		"Warn":          yakitWarn(client),
@@ -74,6 +113,10 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"Output":        yakitOutput(client),
 		"SetProgress":   yakitSetProgress(client),
 		"SetProgressEx": yakitSetProgressEx(client),
+	}
+	exports := GetExtYakitLibByOutput(client.Output)
+	for k, v := range exports {
+		YakitExports[k] = v
 	}
 	return YakitExports
 }

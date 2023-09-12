@@ -263,6 +263,24 @@ func (y *YakToCallerManager) SetForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
+		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByOutput(func(d any) error {
+			level, data := yaklib.MarshalYakitOutput(d)
+			yakitLog := &yaklib.YakitLog{
+				Level:     level,
+				Data:      data,
+				Timestamp: time.Now().Unix(),
+			}
+			raw, err := yaklib.YakitMessageGenerator(yakitLog)
+			if err != nil {
+				return err
+			}
+
+			result := &ypb.ExecResult{
+				IsMessage: true,
+				Message:   raw,
+			}
+			return caller(result)
+		}))
 		return nil
 	}, hooks...)
 }
@@ -727,6 +745,24 @@ func (y *YakToCallerManager) AddForYakit(
 				Data: fmt.Sprint(i),
 			})
 		})
+		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByOutput(func(d any) error {
+			level, data := yaklib.MarshalYakitOutput(d)
+			yakitLog := &yaklib.YakitLog{
+				Level:     level,
+				Data:      data,
+				Timestamp: time.Now().Unix(),
+			}
+			raw, err := yaklib.YakitMessageGenerator(yakitLog)
+			if err != nil {
+				return err
+			}
+
+			result := &ypb.ExecResult{
+				IsMessage: true,
+				Message:   raw,
+			}
+			return caller(result)
+		}))
 		BindYakitPluginContextToEngine(engine, &YakitPluginContext{
 			PluginName: id,
 			RuntimeId:  y.runtimeId,
