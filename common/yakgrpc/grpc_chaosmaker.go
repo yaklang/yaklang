@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/workpool"
 	"github.com/yaklang/yaklang/common/vulinboxagentclient"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -167,31 +168,41 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		}()
 
 		sendLog("info", "开始执行本地模拟攻击剧本")
-		var generator = chaosmaker.NewChaosMaker()
-		generator.FeedRule(rules...)
 		swg := utils.NewSizedWaitGroup(int(concurrent))
-		for traffic := range generator.Generate() {
-			addTrafficCounter()
-			traffic := traffic
-			swg.Add()
-			go func() {
-				defer swg.Done()
+		var generator = chaosmaker.NewChaosMaker()
+
+		wp := workpool.New(int(concurrent), func(rec chan []byte) {
+			for traffic := range rec {
 				pcapx.InjectRaw(traffic)
-				delayer.Wait()
 				for _, r := range req.GetExtraOverrideDestinationAddress() {
 					pcapx.InjectRaw(traffic, pcapx.WithRemoteAddress(r))
-					delayer.Wait()
 				}
-			}()
+				swg.Done()
+			}
+		})
+		wp.Start()
+		defer wp.Stop()
+
+		generator.FeedRule(rules...)
+		for traffic := range generator.Generate() {
+			addTrafficCounter()
+			swg.Add()
+			wp.AddJob(traffic)
 		}
 		swg.Wait()
 		sendLog("info", "本地模拟攻击剧本执行完成")
 	}
 
 	if req.GetExtraRepeat() >= 0 {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		default:
+		}
 		for _index := 0; _index < int(req.GetExtraRepeat())+1; _index++ {
 			sendLog("info", "开始进行第%v次攻击模拟", _index)
 			attackOnce()
+			delayer.Wait()
 		}
 	} else {
 		count := 0
