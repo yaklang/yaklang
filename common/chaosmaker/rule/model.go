@@ -51,6 +51,10 @@ type Storage struct {
 	CVE           string
 }
 
+func (Storage) TableName() string {
+	return "chaos_maker_rules"
+}
+
 func QueryRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*bizhelper.Paginator, []*Storage, error) {
 	db = db.Model(&Storage{})
 
