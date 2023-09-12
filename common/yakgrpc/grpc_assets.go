@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"sync"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -14,12 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"sync"
 )
 
 var saveYakitLogLock = new(sync.Mutex)
@@ -582,11 +583,21 @@ func (s *Server) ResetRiskTableStats(ctx context.Context, e *ypb.Empty) (*ypb.Em
 }
 
 func (s *Server) DeleteHistoryHTTPFuzzerTask(ctx context.Context, d *ypb.DeleteHistoryHTTPFuzzerTaskRequest) (*ypb.Empty, error) {
+	// 优先 id -> webfuzzerIndex -> 全部
+
 	if d.GetId() > 0 {
 		err := yakit.DeleteWebFuzzerTask(s.GetProjectDatabase(), int64(d.GetId()))
 		if err != nil {
 			return nil, err
 		}
+		return &ypb.Empty{}, nil
+	}
+	if d.GetWebFuzzerIndex() != "" {
+		err := yakit.DeleteWebFuzzerTaskByWebFuzzerIndex(s.GetProjectDatabase(), d.GetWebFuzzerIndex())
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.Empty{}, nil
 	}
 	err := yakit.DeleteWebFuzzerTaskAll(s.GetProjectDatabase())
 	if err != nil {

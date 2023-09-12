@@ -1761,6 +1761,7 @@ message RandomPortInfo {
 
 message DeleteHistoryHTTPFuzzerTaskRequest {
   int32 Id = 1;
+  string WebFuzzerIndex = 2;
 }
 
 message RiskTableStats {
