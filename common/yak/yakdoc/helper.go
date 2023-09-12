@@ -224,7 +224,7 @@ func (f *FuncDecl) String() string {
 }
 
 func FuncToFuncDecl(libName, methodName string, f interface{}) *FuncDecl {
-	funcDecl, err := funcDescriptionAndDeclaration(f, methodName)
+	funcDecl, err := funcDescriptionAndDeclaration(f, libName, methodName)
 	if err != nil {
 		log.Warnf("funcToFuncDecl error: %v", err)
 		return &FuncDecl{}
@@ -232,8 +232,6 @@ func FuncToFuncDecl(libName, methodName string, f interface{}) *FuncDecl {
 	if funcDecl == nil {
 		return &FuncDecl{}
 	}
-	// 设置库名
-	funcDecl.LibName = libName
 
 	return funcDecl
 }

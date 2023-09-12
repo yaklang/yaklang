@@ -113,8 +113,16 @@ func handleResults(buf []byte, typ *ast.FuncType) (results []*Field) {
 	return results
 }
 
+func customHandleParamsAndResults(libName string, overideName string, params []*Field, results []*Field) ([]*Field, []*Field) {
+	// eval时丢掉第一个参数，因为第一个参数是context，是在执行时自动注入的
+	if libName == "__GLOBAL__" && overideName == "eval" {
+		params = params[1:]
+	}
+	return params, results
+}
+
 // Get description and declaration of a func
-func funcDescriptionAndDeclaration(f interface{}, overideName string, debug ...string) (*FuncDecl, error) {
+func funcDescriptionAndDeclaration(f interface{}, libName string, overideName string) (*FuncDecl, error) {
 	fv := reflect.ValueOf(f)
 	if fv.Kind() != reflect.Func {
 		return nil, fmt.Errorf("not a function")
@@ -439,7 +447,10 @@ func funcDescriptionAndDeclaration(f interface{}, overideName string, debug ...s
 		finalName = funcName
 	}
 
-	// 处理params和results
+	// 特殊处理params和results
+	params, results = customHandleParamsAndResults(libName, overideName, params, results)
+
+	// 通用处理params和results
 	completeStrs = make([]string, 0, len(params))
 	for i, p := range params {
 		variadic := strings.HasPrefix(p.Type, "...")
@@ -499,6 +510,7 @@ func funcDescriptionAndDeclaration(f interface{}, overideName string, debug ...s
 	paramAutoCompletionStr = fmt.Sprintf("%v(%v)", finalName, paramAutoCompletionStr)
 
 	return &FuncDecl{
+		LibName:        libName,
 		MethodName:     finalName,
 		Document:       document,
 		Decl:           declaration,
