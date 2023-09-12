@@ -239,6 +239,7 @@ const (
 	REQUEST_CONTEXT_KEY_ConnectedToPort              = "connectedToPort"
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
 	REQUEST_CONTEXT_KEY_RemoteAddr                   = "remoteAddr"
+	REQUEST_CONTEXT_KEY_ViaConnect                   = "viaConnect"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
@@ -320,4 +321,12 @@ func SetResponseViewedByUser(req *http.Request) {
 
 func GetResponseViewedByUser(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseIsViewedByUser)
+}
+
+func GetRequestViaCONNECT(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ViaConnect)
+}
+
+func SetRequestViaCONNECT(req *http.Request, b bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ViaConnect, b)
 }
