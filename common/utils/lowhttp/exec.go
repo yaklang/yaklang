@@ -441,16 +441,16 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	return response, nil
 }
 
-var commonHTTPMethod = map[string]string{
-	http.MethodGet:     http.MethodGet,
-	http.MethodPost:    http.MethodPost,
-	http.MethodPut:     http.MethodPut,
-	http.MethodDelete:  http.MethodDelete,
-	http.MethodPatch:   http.MethodPatch,
-	http.MethodHead:    http.MethodHead,
-	http.MethodOptions: http.MethodOptions,
-	http.MethodConnect: http.MethodConnect,
-	http.MethodTrace:   http.MethodTrace,
+var commonHTTPMethod = map[string]struct{}{
+	http.MethodGet:     {},
+	http.MethodPost:    {},
+	http.MethodPut:     {},
+	http.MethodDelete:  {},
+	http.MethodPatch:   {},
+	http.MethodHead:    {},
+	http.MethodOptions: {},
+	http.MethodConnect: {},
+	http.MethodTrace:   {},
 }
 
 // SendHttpRequestWithRawPacketWithOpt
