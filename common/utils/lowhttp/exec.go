@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -21,9 +22,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-
-	"golang.org/x/net/http2"
 )
 
 const (
@@ -619,7 +617,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	*/
 	if haveTE && haveCL {
 		log.Infof("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, auto enable noFixContentLength", spew.Sdump(requestPacket))
-		noFixContentLength = true
+		//noFixContentLength = true
 	} else if haveCL && !haveTE && len(originBody) > clInt {
 		SplitHTTPPacket(originBody[clInt:], func(method string, requestUri string, proto string) error {
 			if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
@@ -633,12 +631,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		// have transfer-encoding and no cl!
 		var body, nextPacket = codec.HTTPChunkedDecodeWithRestBytes(originBody)
 		_ = body
-		nextPacket = bytes.TrimLeftFunc(nextPacket, unicode.IsSpace)
 		if len(nextPacket) > 0 {
 			SplitHTTPPacket(nextPacket, func(method string, requestUri string, proto string) error {
-				if len(proto) > 5 {
-					if strings.HasPrefix(proto, "HTTP/") {
-						noFixContentLength = true
+				if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
+					if _, ok := commonHTTPMethod[method]; ok {
+						//noFixContentLength = true
 					}
 				}
 				return utils.Error("pipeline or smuggle detected, auto enable noFixContentLength")
