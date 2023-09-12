@@ -3,10 +3,11 @@ package yakdoc
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"
@@ -194,11 +195,20 @@ func (l *ScriptLib) String() string {
 	return buff.String()
 }
 
+type Field struct {
+	Name string
+	Type string
+}
+
 type FuncDecl struct {
-	LibName        string
-	MethodName     string
-	Document       string
-	Decl           string
+	LibName    string
+	MethodName string
+	Document   string
+	Decl       string
+
+	Params  []*Field
+	Results []*Field
+
 	VSCodeSnippets string
 }
 
@@ -214,18 +224,17 @@ func (f *FuncDecl) String() string {
 }
 
 func FuncToFuncDecl(libName, methodName string, f interface{}) *FuncDecl {
-	doc, decl, completion := funcDescriptionAndDeclaration(f, methodName)
-	if decl == "" {
-		log.Warnf("anonymous function: %s.%s", libName, methodName)
+	funcDecl, err := funcDescriptionAndDeclaration(f, methodName)
+	if err != nil {
+		log.Warnf("funcToFuncDecl error: %v", err)
+		return &FuncDecl{}
 	}
+	if funcDecl == nil {
+		return &FuncDecl{}
+	}
+	// 设置库名
+	funcDecl.LibName = libName
 
-	funcDecl := &FuncDecl{
-		LibName:        libName,
-		MethodName:     methodName,
-		Document:       doc,
-		Decl:           methodName + decl,
-		VSCodeSnippets: completion,
-	}
 	return funcDecl
 }
 
