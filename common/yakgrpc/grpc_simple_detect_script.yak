@@ -390,47 +390,46 @@ bruteScan = func(result){
 
         if bruteType == "ftp" {
             defaultusers = ["ftp", "www", "anonymous", "admin"]
-            defaultpass = ["admin","admin123","root@123","123456"]
-        }else if bruteType == "memcached" {
+            defaultpass = ["admin","admin123","123456"] }
+        else if bruteType == "memcached" {
             defaultusers = ["root","admin"]
-            defaultpass = ["root","admin123","root@123"]
-        }else if bruteType=="mongodb" {
+            defaultpass = ["root","123456"] }
+        else if bruteType == "mongodb" {
             defaultusers = ["root","admin", "mongodb"]
-            defaultpass = ["root","admin123","root@123"]
-        }else if bruteType=="mssql" {
-            defaultusers = ["administrator", "admin", "mssql", "manager"]
-            defaultpass = ["root", "admin123", "root@123","admin"]
-        }else if bruteType=="mysql" {
+            defaultpass = ["root","admin123","root@123","123456"] }
+        else if bruteType == "mssql" {
+            defaultusers = ["root", "admin", "mssql"]
+            defaultpass = ["root", "admin123", "root@123","admin","123456"] }
+        else if bruteType == "mysql" {
             defaultusers = ["mysql", "root", "admin"]
-            defaultpass = ["root", "123456", "admin123", "admin", "root@123"]
-        }else if bruteType=="postgres" {
+            defaultpass = ["root", "123456", "admin123", "admin", "root@123"] }
+        else if bruteType == "postgres" {
             defaultusers = ["postgres", "root", "admin"]
-            defaultpass = ["root", "admin123", "root@123"]
-        }else if bruteType=="rdp" {
-            defaultusers = ["123456", "admin", "administrator", "root", "admin123", "123456"]
-            defaultpass = ["administrator", "guest", "admin","root@123"]
-        }else if bruteType=="redis" {
+            defaultpass = ["root", "admin", "123456"] }
+        else if bruteType == "rdp" {
+            defaultusers = ["admin", "administrator", "root","guest"]
+            defaultpass = ["administrator", "guest", "admin","123456"] }
+        else if bruteType == "redis" {
             defaultusers = ["redis"]
-            defaultpass = ["root", "admin123", "root@123","admin"]
-        }else if bruteType=="smb" {
+            defaultpass = ["redis", "123456"] }
+        else if bruteType == "smb" {
             defaultusers = ["administrator", "admin", "test", "guest", "system", "root", "sa"]
-            defaultpass = ["admin123!@#","admin","admin123","admin@123","admin#123","123456","root@123"]
-        }else if bruteType=="snmp" {
+            defaultpass = ["admin123!@#","admin","admin123","admin@123","admin#123","123456","root@123"] }
+        else if bruteType == "snmp" {
             defaultusers = ["snmp"]
-            defaultpass = ["public","private","0","0392a0","1234","2read","4changes"]
-        }else if bruteType == "ssh" {
-            defaultusers = ["root","admin","ruijie"]
-            defaultpass = ["root","admin123","root@123","123456","admin","admin@123","Admin@huawei.com","Changeme_@123","huawei@123","h3c@123","admin@123456","ruijie","ruijie@123"]
-        } else if bruteType == "telnet" {
-            defaultusers = ["admin", "cisco", "test", "root"]
-            defaultpass = ["123456", "123", "admin","cisco", "cisco123", "cisco123$", "Cisco", "Cisco123"]
-        }else if bruteType == "tomcat" {
+            defaultpass = ["public","private","0","0392a0","1234","2read","4changes"] }
+        else if bruteType == "ssh" {
+            defaultusers = ["root","admin"]
+            defaultpass = ["root","admin123","root@123","123456","admin","admin@123"] }
+        else if bruteType == "telnet" {
+            defaultusers = ["root", "admin"]
+            defaultpass = ["root","admin123","root@123","123456","admin","admin@123"] }
+        else if bruteType == "tomcat" {
             defaultusers = ["manager", "tomcat"]
-            defaultpass = ["tomcat", "manager", "apache","administrator"]
-        }else if bruteType == "vnc" {
+            defaultpass = ["tomcat", "manager"] }
+        else if bruteType == "vnc" {
             defaultusers = ["vnc"]
-            defaultpass = ["123456", "admin", "root"]
-        }
+            defaultpass = ["123456", "admin", "root"] }
 
 
 		uL = make([]string)
