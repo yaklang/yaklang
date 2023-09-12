@@ -25,7 +25,7 @@
         </div>
         <div class="text-center" style="padding-top: 50px;">
             <strong>注意：</strong>后端是通过正则提取payload中的dnslog模拟fastjson解析过程，使用不在范围内的dnslog不会触发<br>
-            <strong>提取正则：\w+\.((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dnstunnel\.run))</strong><br>
+            <strong>提取正则：(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn))</strong><br>
             后台并不会真正执行exp，触发exp特征即可，不需要登录后台（Jackson后端案例不存在漏洞）
         </div>
         <div id="response" class="text-center" style="padding-top: 50px;"></div>
