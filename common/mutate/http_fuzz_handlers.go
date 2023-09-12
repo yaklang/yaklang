@@ -926,5 +926,22 @@ func (f *FuzzHTTPRequest) Show() FuzzHTTPRequestIf {
 }
 
 func (f *FuzzHTTPRequest) ExecFirst(opts ...HttpPoolConfigOption) (*_httpResult, error) {
-	return executeOne(f, opts...)
+	opts = append(opts, WithPoolOpt_RequestCountLimiter(1))
+	resultCh, err := f.Exec(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	var result *_httpResult
+	for i := range resultCh {
+		result = i
+	}
+	if result == nil {
+		return nil, utils.Error("empty result for FuzzHTTPRequest")
+	}
+	if result.Error != nil {
+		return result, result.Error
+	}
+
+	return result, nil
 }

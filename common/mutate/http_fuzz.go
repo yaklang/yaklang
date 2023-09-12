@@ -763,7 +763,13 @@ func (f *FuzzHTTPRequest) ParamsHash() (string, error) {
 }
 
 func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
-	return _httpPool(f, opts...)
+	var originOpts = make([]HttpPoolConfigOption, 4, len(opts)+4)
+	originOpts[0] = WithPoolOpt_Https(f.isHttps)
+	originOpts[1] = WithPoolOpt_Source(f.source)
+	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
+	originOpts[3] = WithPoolOpt_Proxy(f.proxy)
+	originOpts = append(originOpts, opts...)
+	return _httpPool(f, originOpts...)
 }
 
 func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *_httpResult, error) {

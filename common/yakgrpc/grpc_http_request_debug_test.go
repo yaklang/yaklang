@@ -14,6 +14,63 @@ import (
 	"time"
 )
 
+func TestServer_DebugPlugin_TestFlow(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
+	defer cancel()
+
+	var count = 0
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		var raw, _ = utils.HttpDumpWithBody(request, true)
+		spew.Dump(raw)
+		writer.Write(raw)
+		count++
+	})
+
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `mirrorHTTPFlow = (tls, url, req, rsp, body) => {
+	// 3
+	fuzz.HTTPRequest(req)~.ExecFirst()
+	fuzz.HTTPRequest(req)~.ExecFirst()
+	fuzz.HTTPRequest(req)~.ExecFirst()
+	for result in fuzz.HTTPRequest(req)~.Repeat(5).Exec()~ {}
+}`,
+		PluginType:          "mitm",
+		Input:               "http://" + utils.HostPort(host, port) + "/",
+		HTTPRequestTemplate: nil,
+	})
+	if err != nil {
+		t.Errorf("DebugPlugin error: %v", err)
+		t.FailNow()
+	}
+
+	var runtimeId string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if runtimeId == "" {
+			runtimeId = rsp.GetRuntimeID()
+		}
+		spew.Dump(rsp)
+	}
+
+	rsp, err := client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{RuntimeId: runtimeId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	total := rsp.GetTotal()
+	t.Log("total: ", total)
+	if total != int64(count) && total >= 8 {
+		t.Errorf("total: %d != count: %d", total, count)
+	}
+}
+
 func TestServer_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
