@@ -187,6 +187,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	yakTemp.Id = utils.MapGetString(mid, "id")
 	info := utils.InterfaceToMapInterface(utils.MapGetRaw(mid, "info"))
 
+	yakTemp.SelfContained = utils.MapGetBool(mid, "self-contained")
 	cveInfo := utils.InterfaceToMapInterface(utils.MapGetRaw(info, "classification"))
 	yakTemp.Name = utils.MapGetString(info, "name")
 	yakTemp.Author = utils.MapGetString(info, "author")

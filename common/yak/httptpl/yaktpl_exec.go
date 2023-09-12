@@ -49,6 +49,11 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 		}
 	}()
 
+	if y.SelfContained {
+		log.Debugf("skip self-contained template: %v", y.Name)
+		return 0, nil
+	}
+
 	if config == nil {
 		config = NewConfig()
 	}
