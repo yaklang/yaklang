@@ -156,7 +156,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     risk.payload(payload),
                     risk.description(description),
                     risk.solution(solution),
-                    risk.details({"durationS":rsp.DurationMs/1000.0})
+                    risk.details({"currentDuration":rsp.DurationMs/1000.0,"normalDurationS":getCommonWastTime(),"timeoutTolerance":timeoutTolerance})
                 )
             }})
         }
@@ -440,18 +440,26 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         // fastjson特征检测（dos延时、读文件等操作）
         if !hasCriticalRisk() && globalInfo.Load("isFastjson")[0] != 1{
             log.debug("开始fastjson特征检测")
-            for param in needToFuzzParams{
-                // redos 检测 适用于 1.2.36 - 1.2.62
-                scope,ok = globalInfo.Load("versionScope")
-                if ok && versionInScope(scope,["1.2.36","1.2.6"]) {
-                    log.debug("redos 特征检测")
-                    rsp,err = param.delayFuzz(poc_redos)
-                    if rsp.DurationMs/1000.0 > getCommonWastTime() {
+            // redos 检测 适用于 1.2.36 - 1.2.62
+            scope,ok = globalInfo.Load("versionScope")
+            if ok && versionInScope(scope,["1.2.36","1.2.6"]) {
+                log.debug("redos 特征检测")
+                for param in needToFuzzParams{
+                    fuzzOk = true
+                    for in 3{
+                        rsp,err = param.delayFuzz(poc_redos)
+                        if rsp.DurationMs/1000.0 - getCommonWastTime() <= timeoutTolerance {
+                            fuzzOk = false
+                            break
+                        }else{
+                            log.info("发现redos漏洞")
+                        }
+                    }
+                    if fuzzOk {
                         newRisk("目标存在 fastjson 框架 (Redos Check)","",param,0)
                         break
                     }
                 }
-
             }
         }
 

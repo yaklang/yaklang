@@ -48,7 +48,9 @@ Host: www.baidu.com
 		println(string(raw))
 	}
 }
+func TestNewFuzzHTTPRequestFuzzCookies(t *testing.T) {
 
+}
 func TestNewFuzzHTTPRequestFuzzHeader(t *testing.T) {
 	test := assert.New(t)
 	fuzzReq, err := NewFuzzHTTPRequest(`
