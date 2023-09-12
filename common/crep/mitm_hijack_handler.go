@@ -282,7 +282,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		reqRawBytes := httpctx.GetRequestBytes(requestOrigin)
 		if reqRawBytes != nil {
 			var start = time.Now()
-			m.httpFlowMirror(requestOrigin.TLS != nil, requestOrigin, rsp, start.Unix())
+			m.httpFlowMirror(httpctx.GetRequestHTTPS(requestOrigin), requestOrigin, rsp, start.Unix())
 			var end = time.Now()
 			cost := end.Sub(start)
 			if cost.Milliseconds() > 600 {
