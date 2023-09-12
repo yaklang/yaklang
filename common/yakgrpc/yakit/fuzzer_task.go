@@ -147,6 +147,13 @@ func DeleteWebFuzzerTask(db *gorm.DB, id int64) error {
 	return nil
 }
 
+func DeleteWebFuzzerTaskByWebFuzzerIndex(db *gorm.DB, index string) error {
+	if db := db.Debug().Model(&WebFuzzerTask{}).Where("fuzzer_tab_index = ?", index).Unscoped().Delete(&WebFuzzerTask{}); db.Error != nil {
+		return utils.Errorf("delete web fuzzer by fuzzer_tab_index failed: %s", db.Error)
+	}
+	return nil
+}
+
 func GetWebFuzzerTaskById(db *gorm.DB, id int) (*WebFuzzerTask, error) {
 	var t WebFuzzerTask
 	if db := db.Model(&WebFuzzerTask{}).Where("id = ?", id).First(&t); db.Error != nil {
