@@ -1,4 +1,4 @@
-name: Push docs to repo B
+name: Push web docs
 
 on:
   push:
@@ -12,6 +12,11 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
+
+    - name: Install libpcap (Linux)
+      run: |
+        sudo apt-get update
+        sudo apt-get install libpcap-dev=1.9.1-3
 
     - name: Generate docs
       run: |
