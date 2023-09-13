@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 )
 
 const (
