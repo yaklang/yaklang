@@ -1186,6 +1186,8 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		return ssa.NewConst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
 		return b.EmitUndefine(stmt.GetText())
+	} else if stmt.NilLiteral() != nil {
+		return ssa.NewConst(nil)
 	} else if stmt.CharaterLiteral() != nil {
 		lit := stmt.CharaterLiteral().GetText()
 		var s string
