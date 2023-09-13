@@ -9,7 +9,7 @@ import (
 type Node interface {
 	String() string
 
-	GetType() Types
+	GetType() Type
 
 	GetUsers() []User
 	GetValues() []Value
@@ -26,7 +26,7 @@ type Value interface {
 	RemoveUser(User)
 
 	// type
-	SetType(Types)
+	SetType(Type)
 }
 
 type User interface {
@@ -84,15 +84,14 @@ type Package struct {
 type Function struct {
 	Name string
 
+	Type *FunctionType
+
 	// package
 	Package *Package
 
 	Param  []*Parameter
 	Return []*Return
 
-	// type
-	ParamTyp    []Types
-	ReturnTyp   []Types
 	hasEllipsis bool
 
 	// BasicBlock list
@@ -123,11 +122,14 @@ type Function struct {
 	builder *FunctionBuilder
 }
 
-func (f *Function) GetType() Types {
-	return nil
+func (f *Function) GetType() Type {
+	return f.Type
 }
 
-func (f *Function) SetType(ts Types) {
+func (f *Function) SetType(t Type) {
+	if ft, ok := t.(*FunctionType); ok {
+		f.Type = ft
+	}
 }
 
 var _ Node = (*Function)(nil)
@@ -161,11 +163,11 @@ type BasicBlock struct {
 	user []User
 }
 
-func (b *BasicBlock) GetType() Types {
+func (b *BasicBlock) GetType() Type {
 	return nil
 }
 
-func (b *BasicBlock) SetType(ts Types) {
+func (b *BasicBlock) SetType(ts Type) {
 }
 
 var _ Node = (*BasicBlock)(nil)
@@ -186,7 +188,7 @@ type anInstruction struct {
 	// basicblock
 	Block *BasicBlock
 	// type
-	typs Types
+	typs Type
 
 	variable string
 	// source code position
@@ -203,11 +205,11 @@ func (a *anInstruction) Pos() string {
 		return ""
 	}
 }
-func (a *anInstruction) GetType() Types {
+func (a *anInstruction) GetType() Type {
 	return a.typs
 }
 
-func (a *anInstruction) SetType(ts Types) {
+func (a *anInstruction) SetType(ts Type) {
 	a.typs = ts
 }
 
@@ -245,11 +247,11 @@ type ConstInst struct {
 	anInstruction
 }
 
-func (c *ConstInst) GetType() Types {
+func (c *ConstInst) GetType() Type {
 	return c.Const.GetType()
 }
 
-func (c *ConstInst) SetType(ts Types) {
+func (c *ConstInst) SetType(ts Type) {
 	// c.typs = ts
 }
 
@@ -283,11 +285,11 @@ type Const struct {
 }
 
 // get type
-func (c *Const) GetType() Types {
-	return Types{c.typ}
+func (c *Const) GetType() Type {
+	return c.typ
 }
 
-func (c *Const) SetType(ts Types) {
+func (c *Const) SetType(ts Type) {
 	// const don't need set type
 }
 
@@ -299,21 +301,24 @@ type Parameter struct {
 	variable    string
 	Func        *Function
 	isFreevalue bool
-	typs        Types
+	typs        Type
 
-	user []User
+	values []Value
+
+	users []User
 }
 
-func (p *Parameter) GetType() Types {
+func (p *Parameter) GetType() Type {
 	return p.typs
 }
 
-func (p *Parameter) SetType(ts Types) {
+func (p *Parameter) SetType(ts Type) {
 	p.typs = ts
 }
 
 var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
+var _ User = (*Parameter)(nil)
 
 // control-flow instructions  ----------------------------------------
 // jump / if / return / call / switch

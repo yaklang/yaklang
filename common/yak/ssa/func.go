@@ -1,6 +1,10 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/samber/lo"
+)
 
 func (p *Package) NewFunction(name string) *Function {
 	return p.NewFunctionWithParent(name, nil)
@@ -30,7 +34,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		symbol: &Interface{
 			anInstruction: anInstruction{},
 			// I:     parent.symbol,
-			Field: make(map[Value]*Field),
 			users: []User{},
 		},
 		err: make(SSAErrors, 0),
@@ -57,10 +60,10 @@ func (f *Function) NewParam(name string) {
 	p := &Parameter{
 		variable: name,
 		Func:     f,
-		user:     []User{},
-		typs:     make(Types, 0),
+		users:    []User{},
+		typs:     BasicTypes[Any],
 	}
-	p.typs = append(p.typs, BasicTypesKind[Any])
+	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.WriteVariable(name, p)
 }
@@ -79,17 +82,22 @@ func (f *Function) GetParent() *Function {
 }
 
 // just create a function define, only function parameter type \ return type \ ellipsis
-func NewFunctionDefine(name string, ParamTyp, ReturnTyp []Types, hasEllipsis bool) *Function {
-	return &Function{
-		Name:        name,
-		ParamTyp:    ParamTyp,
-		ReturnTyp:   ReturnTyp,
-		hasEllipsis: hasEllipsis,
+func NewFunctionWithType(name string, typ *FunctionType) *Function {
+	f := &Function{
+		Name: name,
+		Type: typ,
 	}
+	return f
 }
 
 // current function finish
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+
+	f.SetType(NewFunctionType("",
+		lo.Map(f.Param, func(p *Parameter, _ int) Type { return p.GetType() }),
+		lo.Map(f.Return, func(r *Return, _ int) Type { return r.GetType() }),
+		f.hasEllipsis,
+	))
 }
