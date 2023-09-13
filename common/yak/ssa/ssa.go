@@ -393,6 +393,8 @@ type Call struct {
 	// call is a value
 	user []User
 
+	value []Value
+
 	binding []Value
 
 	// caller
@@ -513,15 +515,21 @@ type Interface struct {
 	// when slice
 	low, high, max Value
 
-	parentI *Interface // parent interface
+	parentI User // parent interface
+
+	IsNew bool
 
 	// Field
-	Field map[Value]*Field // field.key->field
+	// Field map[Value]*Field // field.key->field
+	value []Value
 
 	// when slice or map
 	Len, Cap Value
 
 	users []User
+
+	// for extern lib
+	buildField func(key string) Value
 }
 
 var _ Node = (*Interface)(nil)
@@ -538,7 +546,7 @@ type Field struct {
 
 	// field
 	Key Value
-	I   User
+	I   User // this I type must be InterfaceType
 
 	// capture by other function
 	OutCapture bool

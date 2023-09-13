@@ -3,12 +3,12 @@ package ssa4yak
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -79,8 +79,6 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		b.buildSwitchStmt(s)
 		return
 	}
-
-	//TODO: for range stmt
 
 	// for stmt
 	if s, ok := stmt.ForStmt().(*yak.ForStmtContext); ok {
@@ -173,9 +171,7 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 				b.AddDefer(c)
 			}
 		}
-
 	}
-
 }
 
 // TODO: go stmt
@@ -261,8 +257,6 @@ func (b *astbuilder) ForExpr(stmt forExpr) []ssa.Value {
 	}
 	return nil
 }
-
-//TODO: for range stmt
 
 // switch stmt
 func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
@@ -453,19 +447,43 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 				lvalues[i].Assign(rvalues[i], b.FunctionBuilder)
 			}
 		} else if len(rvalues) == 1 {
-			if len(rvalues) == 0 {
+			if len(lvalues) == 0 {
 				// (0) = (1)
 				b.NewError(ssa.Error, TAG, "assign left side is empty")
 				return nil
 			}
 
 			// (n) = (1)
-			if inter, ok := rvalues[0].(*ssa.Interface); ok {
-				// (n) = field(1, #index)
-				for i, lv := range lvalues {
-					field := b.EmitField(inter, ssa.NewConst(i))
-					lv.Assign(field, b.FunctionBuilder)
+			inter, ok := rvalues[0].(ssa.User)
+			if !ok {
+				return nil
+			}
+			if c, ok := rvalues[0].(*ssa.Call); ok {
+				if c.GetType().GetTypeKind() != ssa.InterfaceTypeKind {
+					b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
+					return nil
 				}
+				vs := make([]ssa.Value, 0)
+				it := c.GetType().(*ssa.InterfaceType)
+				for i := 0; i < it.Len; i++ {
+					field := b.EmitField(c, ssa.NewConst(i))
+					vs = append(vs, field)
+				}
+				if len(vs) == len(lvalues) {
+					for i := range vs {
+						lvalues[i].Assign(vs[i], b.FunctionBuilder)
+					}
+				} else {
+					b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
+					return nil
+				}
+
+			}
+
+			// (n) = field(1, #index)
+			for i, lv := range lvalues {
+				field := b.EmitField(inter, ssa.NewConst(i))
+				lv.Assign(field, b.FunctionBuilder)
 			}
 		} else if len(lvalues) == 1 {
 			if len(rvalues) == 0 {
@@ -480,6 +498,7 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 		} else {
 			// (n) = (m) && n!=m  faltal
 			b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
+			return nil
 		}
 		return lo.Map(lvalues, func(lv ssa.LeftValue, _ int) ssa.Value { return lv.GetValue(b.FunctionBuilder) })
 	}
@@ -546,7 +565,6 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 			opcode = ssa.OpOr
 		case "^=":
 			opcode = ssa.OpXor
-
 		}
 		rvalue = b.EmitArith(opcode, lvalue.GetValue(b.FunctionBuilder), rvalue)
 		lvalue.Assign(rvalue, b.FunctionBuilder)
@@ -600,7 +618,7 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 	values := make([]ssa.LeftValue, 0, valueLen)
 	for _, e := range exprs {
 		if e, ok := e.(*yak.LeftExpressionContext); ok {
-			if v := b.buildLeftExpression(forceAssign, e); v != nil && !reflect.ValueOf(v).IsNil() {
+			if v := b.buildLeftExpression(forceAssign, e); !utils.IsNil(v) {
 				values = append(values, v)
 			}
 		}
@@ -643,8 +661,9 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			b.NewError(ssa.Error, TAG, "leftexpression expression is nil")
 			return nil
 		}
-		var inter *ssa.Interface
-		if expr, ok := expr.(*ssa.Interface); ok {
+		//TODO: check interface type
+		var inter ssa.User
+		if expr, ok := expr.(ssa.User); ok {
 			inter = expr
 		} else {
 			b.NewError(ssa.Error, TAG, "leftexprssion exprssion is not interface")
@@ -653,20 +672,20 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
 			index := b.buildLeftSliceCall(s)
-			return b.EmitField(inter, index)
+			return b.EmitFieldMust(inter, index)
 		}
 
 		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
 			if id := s.Identifier(); id != nil {
 				idText := id.GetText()
-				return b.EmitField(inter, ssa.NewConst(idText))
+				return b.EmitFieldMust(inter, ssa.NewConst(idText))
 			} else if id := s.IdentifierWithDollar(); id != nil {
 				key := b.ReadVariable(id.GetText()[1:])
 				if key == nil {
 					b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
 					return nil
 				}
-				return b.EmitField(inter, key)
+				return b.EmitFieldMust(inter, key)
 			}
 		}
 	}
@@ -710,7 +729,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		} else if b.CanBuildFreeValue(text) {
 			return b.BuildFreeValue(text)
 		} else {
-			b.NewError(ssa.Error, TAG, "Expression: undefine value %s", s.GetText())
 			return b.EmitUndefine(text)
 		}
 	}
@@ -726,16 +744,16 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
 		value := getValue(0)
 		var inter ssa.User
-		inter, ok := value.(*ssa.Interface)
+		// inter, ok := value.(*ssa.Interface)
 		// inter, ok := getValue(0).(*ssa.Interface)
-		if !ok {
-			b.NewError(ssa.Error, TAG, "Expression: need a interface")
-			// return nil
-			if user, ok := value.(ssa.User); ok {
-				inter = user
-			} else {
-				return nil
-			}
+		// if !ok {
+		// 	b.NewError(ssa.Error, TAG, "Expression: need a interface")
+		// 	// return nil
+		if user, ok := value.(ssa.User); ok {
+			inter = user
+		} else {
+			return nil
+			// 	}
 		}
 
 		if id := s.Identifier(); id != nil {
@@ -753,7 +771,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// slice call
 	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
-		expr, ok := getValue(0).(*ssa.Interface)
+		expr, ok := getValue(0).(ssa.User)
 		if !ok {
 			b.NewError(ssa.Error, TAG, "Expression: need a interface")
 			return nil

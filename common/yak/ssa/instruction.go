@@ -111,35 +111,6 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 	return r
 }
 
-func NewInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value, block *BasicBlock) *Interface {
-	i := &Interface{
-		anInstruction: newAnInstuction(block),
-		parentI:       parentI,
-		low:           low,
-		high:          high,
-		max:           max,
-		Field:         make(map[Value]*Field, 0),
-		Len:           Len,
-		Cap:           Cap,
-		users:         make([]User, 0),
-	}
-	if len(typs) != 0 {
-		i.anInstruction.typs = typs
-	}
-	fixupUseChain(i)
-	return i
-}
-
-func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
-	s := &Update{
-		anInstruction: newAnInstuction(block),
-		Value:         v,
-		Address:       address,
-	}
-	fixupUseChain(s)
-	return s
-}
-
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
@@ -151,7 +122,6 @@ func (i *If) AddFalse(f *BasicBlock) {
 }
 
 func (l *Loop) Finish(init, step []Value) {
-
 	// check cond
 	check := func(v Value) bool {
 		if _, ok := v.(*Phi); ok {

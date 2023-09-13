@@ -146,34 +146,23 @@ func (f *FunctionBuilder) emitInterface(parentI User, typ Type, low, high, max, 
 	return i
 }
 
+func (f *FunctionBuilder) EmitInterfaceBuildWithType(typ Type, Len, Cap Value) *Interface {
+	i := f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
+	i.IsNew = true
 	return i
 }
-func (f *FunctionBuilder) EmitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
-	return f.emitInterface(i, i.typs, low, high, max, nil, nil)
+func (f *FunctionBuilder) EmitInterfaceBuildNewType(Len, Cap Value) *Interface {
+	return f.emitInterface(nil, nil, nil, nil, nil, Len, Cap)
+}
+func (f *FunctionBuilder) EmitInterfaceSlice(i User, low, high, max Value) *Interface {
+	return f.emitInterface(i, i.GetType(), low, high, max, nil, nil)
 }
 
-func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Interface {
-	hasKey := true
-	if len(keys) == 0 {
-		hasKey = false
-	}
-	lValueLen := NewConst(len(vs))
-	itf := b.EmitInterfaceBuildWithType(nil, lValueLen, lValueLen)
-	for i, rv := range vs {
-		var key Value
-		if hasKey {
-			key = keys[i]
-		} else {
-			key = NewConst(i)
-		}
-		field := b.EmitField(itf, key)
-		b.emitUpdate(field, rv)
-	}
-	return itf
-}
-
-func (f *FunctionBuilder) EmitField(i User, key Value) *Field {
+func (f *FunctionBuilder) EmitField(i User, key Value) Value {
 	return f.getFieldWithCreate(i, key, true)
+}
+func (f *FunctionBuilder) EmitFieldMust(i User, key Value) *Field {
+	return f.GetField(i, key, true)
 }
 
 func (f *FunctionBuilder) emitUpdate(address *Field, v Value) *Update {
