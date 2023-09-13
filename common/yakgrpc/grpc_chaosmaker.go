@@ -152,7 +152,9 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		rules := getRules()
 		var suriraw []string
 		for _, r := range rules {
-			suriraw = append(suriraw, r.SuricataRaw)
+			if r.SuricataRaw != "" {
+				suriraw = append(suriraw, r.SuricataRaw)
+			}
 		}
 		for _, client := range clients {
 			client.Msg().Send(vulinboxagentproto.NewSubscribeAction("suricata", suriraw))
