@@ -456,6 +456,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}()
 		res, err := mutate.ExecPool(
 			rawRequest,
+			//mutate.WithoutConnPool(),
 			mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
 			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
@@ -497,10 +498,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		// 可以用于计算相似度
 		var firstHeader, firstBody []byte
-		start := time.Now()
 		for result := range res {
-			useTime := time.Since(start)
-			log.Infof("http fuzzer res use [%v]", useTime)
 			task.HTTPFlowTotal++
 			var payloads = make([]string, len(result.Payloads))
 			for i, payload := range result.Payloads {
@@ -799,10 +797,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			err := feedbackResponse(rsp, false)
 			if err != nil {
 				log.Errorf("send to client failed: %s", err)
-				start = time.Now()
 				continue
 			}
-			start = time.Now()
 		}
 		return nil
 	}

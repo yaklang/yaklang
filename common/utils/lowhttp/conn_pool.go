@@ -48,14 +48,12 @@ func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 				pConn.isIdle = false
 				l.idleConnMux.Unlock()
 				//取出连接时验活
-				log.Infof("old conn")
 				return pConn, nil
 			}
 		}
 	}
 	//如果没有符合要求连接则新建
 	l.idleConnMux.Unlock()
-	log.Infof("new conn")
 	pConn, err := newPersistConn(key, l, opts...)
 	if err != nil {
 		return nil, err
