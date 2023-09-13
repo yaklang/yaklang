@@ -815,3 +815,4 @@ var WithPoolOpt_DNSServers = _httpPool_DNSServers
 var WithPoolOpt_EtcHosts = _httpPool_EtcHosts
 var WithPoolOpt_NoSystemProxy = _httpPool_NoSystemProxy
 var WithPoolOpt_RequestCountLimiter = _httpPool_RequestCountLimiter
+var WithoutConnPool = _httpPool_withoutConnPool
