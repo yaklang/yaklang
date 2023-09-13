@@ -70,51 +70,6 @@ func (r *router) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc 
 	return r.RouteWithSrc(nil, nil, dst)
 }
 
-func calcMaskSize(mask net.IPMask) (int, int) {
-	ones, bits := mask.Size()
-	if bits <= 0 {
-		if len(mask) == 4 {
-			bits = 32
-			maskInt := uint32(mask[0])<<24 | uint32(mask[1])<<16 | uint32(mask[2])<<8 | uint32(mask[3])
-			for i := 0; i < 32; i++ {
-				if maskInt&1 == 1 {
-					ones++
-				} else {
-					break
-				}
-				maskInt >>= 1
-			}
-			return ones, bits
-		} else if len(mask) == 16 {
-			bits = 128
-			highMaskInt := uint64(mask[0])<<56 | uint64(mask[1])<<48 | uint64(mask[2])<<40 | uint64(mask[3])<<32 |
-				uint64(mask[4])<<24 | uint64(mask[5])<<16 | uint64(mask[6])<<8 | uint64(mask[7])
-			lowMaskInt := uint64(mask[8])<<56 | uint64(mask[9])<<48 | uint64(mask[10])<<40 | uint64(mask[11])<<32 |
-				uint64(mask[12])<<24 | uint64(mask[13])<<16 | uint64(mask[14])<<8 | uint64(mask[15])
-			for i := 0; i < 64; i++ {
-				if highMaskInt&1 == 1 {
-					ones++
-				} else {
-					break
-				}
-				highMaskInt >>= 1
-			}
-			if ones == 64 {
-				for i := 0; i < 64; i++ {
-					if lowMaskInt&1 == 1 {
-						ones++
-					} else {
-						break
-					}
-					lowMaskInt >>= 1
-				}
-			}
-			return ones, bits
-		}
-	}
-	return ones, bits
-}
-
 func (r *router) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
 	var ifaceIndex int
 	switch {
