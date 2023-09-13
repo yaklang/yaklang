@@ -127,7 +127,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 
 	if tlsConfig != nil {
-		var sConn = tls.UClient(conn, tlsConfig, tls.HelloRandomized)
+		var sConn = tls.Client(conn, tlsConfig)
 		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
 			return nil, err
