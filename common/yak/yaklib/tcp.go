@@ -3,11 +3,14 @@ package yaklib
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"reflect"
 	"time"
@@ -148,8 +151,10 @@ func _tcpClientProxy(proxy string) dialerOpt {
 }
 
 var TcpExports = map[string]interface{}{
-	"MockServe": utils.DebugMockHTTP,
-	"Connect":   _tcpConnect,
+	"MockServe":       utils.DebugMockHTTP,
+	"MockTCPProtocol": DebugMockTCPProtocol,
+
+	"Connect": _tcpConnect,
 
 	// 设置超时和 local
 	"clientTimeout": _tcpTimeout,
@@ -165,4 +170,77 @@ var TcpExports = map[string]interface{}{
 
 	// tcp 端口转发
 	"Forward": _tcpPortForward,
+}
+
+func DebugMockTCPProtocol(name string) (string, int) {
+	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"tcp"}...)...))
+	blocks := fp.GetRuleBlockByServiceName(name, cfg)
+	var generates []string
+	var err error
+	responses := make(map[string][][]byte)
+	for _, block := range blocks {
+		payload := block.Probe.Payload
+		log.Infof("payload: %#v", payload)
+		for _, match := range block.Matched {
+			r := match.MatchRule.String()
+			log.Infof("ServiceName: [%s] , ProductVerbose: [%s]", match.ServiceName, match.ProductVerbose)
+			generates, err = regen.GenerateOne(r)
+			if err != nil {
+				continue
+			}
+			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
+		}
+	}
+	return DebugMockTCPFromScan(30*time.Minute, responses)
+}
+
+func DebugMockTCPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
+	addr := utils.GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := utils.ParseStringToHostPort(addr)
+
+	go func() {
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			panic(err)
+		}
+		defer listener.Close()
+
+		go func() {
+			time.Sleep(du)
+			listener.Close()
+		}()
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			go func(conn net.Conn) {
+				defer conn.Close()
+
+				buffer := make([]byte, 1024)
+				n, err := conn.Read(buffer)
+				if err != nil {
+					return
+				}
+
+				requestPayload := string(buffer[:n])
+
+				log.Infof("requestPayload: %#v from: %v", requestPayload, conn.RemoteAddr().String())
+
+				if responses, ok := responses[requestPayload]; ok {
+					rand.NewSource(time.Now().UnixNano())
+					response := responses[rand.Intn(len(responses))]
+					log.Infof("send: %#v to: %v", string(response), conn.RemoteAddr().String())
+					conn.Write(response)
+					time.Sleep(50 * time.Millisecond)
+				}
+			}(conn)
+		}
+	}()
+
+	time.Sleep(time.Millisecond * 100)
+	return host, port
 }
