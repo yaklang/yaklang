@@ -131,7 +131,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		return rules
 	}
 
-	var attackOnce = func() {
+	var attackOnce = func(ctx context.Context) {
 		concurrent := req.GetConcurrent()
 		if concurrent <= 0 {
 			concurrent = 30
@@ -184,11 +184,14 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		defer wp.Stop()
 
 		generator.FeedRule(rules...)
-		for traffic := range generator.Generate() {
+		generator.SetContext(ctx)
+
+		for pk := range generator.Generate() {
 			addTrafficCounter()
 			swg.Add()
-			wp.AddJob(traffic)
+			wp.AddJob(pk)
 		}
+
 		swg.Wait()
 		sendLog("info", "本地模拟攻击剧本执行完成")
 	}
@@ -199,9 +202,9 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			return nil
 		default:
 		}
-		for _index := 0; _index < int(req.GetExtraRepeat())+1; _index++ {
+		for _index := 1; _index <= int(req.GetExtraRepeat()); _index++ {
 			sendLog("info", "开始进行第%v次攻击模拟", _index)
-			attackOnce()
+			attackOnce(stream.Context())
 			delayer.Wait()
 		}
 	} else {
@@ -214,7 +217,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			}
 			count++
 			sendLog("info", "开始进行第%v次攻击模拟", count)
-			attackOnce()
+			attackOnce(stream.Context())
 		}
 	}
 	return nil
