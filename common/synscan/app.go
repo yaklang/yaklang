@@ -88,7 +88,13 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 		return nil
 	}
 
-	if gateway != "" && s.iface != nil {
+	if s.iface != nil && s.iface.HardwareAddr == nil {
+		// vpn 模式下，不需要获取网关的 mac 地址
+		// vo
+		return nil
+	}
+
+	if gateway != "" && s.iface != nil && s.iface.HardwareAddr != nil {
 		// 传入的网关不为空
 		srcHw := s.iface.HardwareAddr
 		dstHw, err := arpx.ArpWithTimeout(5*time.Second, s.iface.Name, gateway)
@@ -202,7 +208,7 @@ FLAGS: %v
 		for _, addr := range d.Addresses {
 			if addr.IP.IsLoopback() {
 				localIfaceName = d.Name
-				log.Infof("fetch loopback by addr: %v", d.Name)
+				log.Debugf("fetch loopback by addr: %v", d.Name)
 				break
 			}
 		}
@@ -284,7 +290,7 @@ FLAGS: %v
 
 func (s *Scanner) daemon() {
 	// handler
-	err := s.handler.SetBPFFilter("(arpx) or (tcp[tcpflags] & (tcp-syn) != 0)")
+	err := s.handler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
 	if err != nil {
 		log.Errorf("set bpf filter failed: %s", err)
 	}
@@ -292,7 +298,7 @@ func (s *Scanner) daemon() {
 	packets := source.Packets()
 
 	// local handler
-	err = s.localHandler.SetBPFFilter("(arpx) or (tcp[tcpflags] & (tcp-syn) != 0)")
+	err = s.localHandler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
 	if err != nil {
 		log.Errorf("set bpf filter failed for loopback: %s", err)
 	}

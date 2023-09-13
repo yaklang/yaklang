@@ -169,7 +169,7 @@ FLAGS: %v
 		for _, addr := range d.Addresses {
 			if addr.IP.IsLoopback() {
 				localIfaceName = d.Name
-				log.Infof("fetch loopback by addr: %v", d.Name)
+				log.Debugf("fetch loopback by addr: %v", d.Name)
 				break
 			}
 		}

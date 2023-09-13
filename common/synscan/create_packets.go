@@ -26,9 +26,8 @@ func (s *Scanner) createTCPWithDstMac(dstIp net.IP, dstPort int, syn bool, rst b
 	if dstMac == nil {
 		if !utils.IsLoopback(dstIp.String()) {
 			baseLayer, err = s.getDefaultCacheEthernet(dstIp.String(), dstPort, gateway)
-			loopback = false
-			if baseLayer == nil {
-				return nil, loopback, errors.Errorf("can't get default ethernet: %v", err)
+			if err != nil {
+				return nil, false, err
 			}
 		} else {
 			baseLayer = s.getLoopbackLinkLayer()
@@ -75,6 +74,11 @@ func (s *Scanner) createTCPWithDstMac(dstIp net.IP, dstPort int, syn bool, rst b
 		return nil, loopback, errors.Errorf("ip4 set network layer checksum failed: %s", err)
 	}
 
+	if baseLayer == nil {
+		baseLayer = &layers.Loopback{
+			Family: layers.ProtocolFamilyIPv4,
+		}
+	}
 	return []gopacket.SerializableLayer{
 		baseLayer, &ip4, &tcp,
 	}, loopback, nil
