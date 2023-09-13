@@ -7,12 +7,22 @@ import (
 )
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"sort"
+	"time"
 )
+
+func HttpInsecureGet(url string) (*http.Response, error) {
+	client := http.Client{
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		Timeout:   10 * time.Second,
+	}
+	return client.Get(url)
+}
 
 func HttpGet(url string) ([]byte, error) {
 

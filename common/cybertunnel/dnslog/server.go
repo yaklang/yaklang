@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
-	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"net"
 	"strings"
@@ -20,7 +19,7 @@ import (
 )
 
 func fetchExternalIP() (net.IP, error) {
-	dailer := netx.NewDefaultHTTPClient()
+	dailer := utils.NewDefaultHTTPClient()
 	for _, domain := range []string{
 		"ifconfig.me",
 		"ipinfo.io/ip",

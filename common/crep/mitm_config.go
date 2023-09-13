@@ -3,8 +3,8 @@ package crep
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"crypto/x509"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/v3"
@@ -229,13 +229,9 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 	var dialContext = netx.NewDialContextFunc(
 		time.Duration(opts.DialTimeout)*time.Second,
 		extraDNSOpt...)
-	var tlsDialContext = netx.NewDialGMTLSContextFunc(
-		opts.EnableGMTLS, opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
-		extraDNSOpt...)
 	t := &http.Transport{
 		Proxy:                 proxyFunc,
 		DialContext:           dialContext,
-		DialTLSContext:        tlsDialContext,
 		DisableCompression:    true,
 		DisableKeepAlives:     false,
 		MaxIdleConns:          opts.MaxIdleConns,
@@ -243,6 +239,12 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		IdleConnTimeout:       time.Duration(opts.IdleConnTimeout) * time.Second,
 		TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
 		ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
+			Certificates:       certificates,
+		},
 	}
 
 	if opts.EnableHTTP2 {
@@ -269,9 +271,7 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		if err != nil {
 			return nil, utils.Errorf("initial tls with client cert error (mTLS error): %s", err)
 		}
-		// TODO
-		_ = pair
-		// t.TLSClientConfig.Certificates = append(t.TLSClientConfig.Certificates, pair)
+		t.TLSClientConfig.Certificates = append(t.TLSClientConfig.Certificates, pair)
 		if opts.EnableGMTLS {
 			pairGM, _, err := tlsutils.ParseCertAndPriKeyAndPoolForGM(certs.CrtPem, certs.KeyPem)
 			if err != nil {
@@ -279,6 +279,15 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 			}
 			gmCerts = append(gmCerts, pairGM)
 		}
+	}
+
+	if opts.EnableGMTLS {
+		var gmDialCtx = netx.NewDialGMTLSContextFunc(
+			true,
+			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
+			extraDNSOpt...)
+		t.DialContext = dialContext
+		t.DialTLSContext = gmDialCtx
 	}
 	return t, nil
 }

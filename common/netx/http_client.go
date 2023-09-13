@@ -1,6 +1,8 @@
 package netx
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"time"
 )
@@ -8,7 +10,11 @@ import (
 func NewDefaultHTTPClient(
 	proxy ...string,
 ) *http.Client {
-	tr := NewDefaultHTTPTransport(proxy...)
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return DialContext(ctx, addr, proxy...)
+		},
+	}
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   10 * time.Second,

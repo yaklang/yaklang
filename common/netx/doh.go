@@ -62,7 +62,7 @@ func dohRequest(domain string, dohUrl string, config *ReliableDNSConfig) error {
 	}
 	reqInstance.URL.RawQuery = val.Encode()
 	reqInstance.Header.Set("Accept", "application/dns-json")
-	rspInstance, err := NewDefaultHTTPClient().Do(reqInstance)
+	rspInstance, err := defaultDoHHTTPClient.Do(reqInstance)
 	if err != nil {
 		return utils.Errorf("doh request failed: %s", err)
 	}

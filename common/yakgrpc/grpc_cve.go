@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -150,7 +149,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 	}
 
 	if req.GetJustUpdateLatestCVE() {
-		client := netx.NewDefaultHTTPClient(req.GetProxy())
+		client := utils.NewDefaultHTTPClientWithProxy(req.GetProxy())
 		client.Timeout = 30 * time.Second
 
 		info(5, "差量更新最新数据：modified/recent nvd db")
@@ -247,7 +246,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 	consts.SetGormCVEDatabase(nil)
 
 	info(0, "开始下载 CVE 数据库: Start to download CVE Database")
-	client := netx.NewDefaultHTTPClient(req.GetProxy())
+	client := utils.NewDefaultHTTPClientWithProxy(req.GetProxy())
 	client.Timeout = 30 * time.Minute
 
 	info(0, "获取下载材料大小: Fetching Download Material Basic Info")

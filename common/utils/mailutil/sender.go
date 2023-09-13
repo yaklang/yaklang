@@ -2,9 +2,9 @@ package mailutil
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/netx"
 	"gopkg.in/gomail.v2"
 	"net"

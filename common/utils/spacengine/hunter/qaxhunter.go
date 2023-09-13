@@ -4,12 +4,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+var defaultHttpClient = utils.NewDefaultHTTPClient()
 
 func HunterQuery(username, key, query string, page, pageSize int) (*gjson.Result, error) {
 	values := make(url.Values)
@@ -18,7 +19,7 @@ func HunterQuery(username, key, query string, page, pageSize int) (*gjson.Result
 	values.Set("search", base64.URLEncoding.EncodeToString([]byte(query)))
 	values.Set("page", fmt.Sprint(page))
 	values.Set("page_size", fmt.Sprint(pageSize))
-	var res, err = http.DefaultClient.Get(fmt.Sprintf("https://hunter.qianxin.com/openApi/search?%s", values.Encode()))
+	var res, err = defaultHttpClient.Get(fmt.Sprintf("https://hunter.qianxin.com/openApi/search?%s", values.Encode()))
 	if err != nil {
 		return nil, utils.Errorf("query hunter search api failed: %s", err)
 	}

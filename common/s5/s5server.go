@@ -2,8 +2,8 @@ package s5
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/binary"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"

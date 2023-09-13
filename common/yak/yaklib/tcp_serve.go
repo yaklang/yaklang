@@ -3,8 +3,8 @@ package yaklib
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"fmt"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"

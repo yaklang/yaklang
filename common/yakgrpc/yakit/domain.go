@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -47,7 +46,7 @@ func (d *Domain) FillDomainHTTPInfo() {
 		return
 	}
 
-	httpClient := netx.NewDefaultHTTPClient()
+	httpClient := utils.NewDefaultHTTPClient()
 	updateStatus := func(urlStr string) error {
 		rsp, err := httpClient.Get(urlStr)
 		if err != nil {

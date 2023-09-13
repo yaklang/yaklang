@@ -3,11 +3,13 @@ package crep
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"fmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -58,8 +60,17 @@ func TestMITM_SetTransparentHijackResponse(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
-	client := netx.NewDefaultHTTPClient()
-	client.Transport = netx.NewDefaultHTTPTransport()
+	client := utils.NewDefaultHTTPClient()
+	client.Transport = &http.Transport{
+		Proxy: func(r *http.Request) (*url.URL, error) {
+			return url.Parse(fmt.Sprintf("http://%v", addr))
+		},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		DisableCompression: false,
+		DisableKeepAlives:  true,
+	}
 	req, err := http.NewRequest("GET", "https://www.example.com", nil)
 	if err != nil {
 		test.FailNow(err.Error())

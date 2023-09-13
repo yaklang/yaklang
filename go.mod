@@ -5,7 +5,6 @@ go 1.20
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
 require (
-	github.com/CycloneDX/cyclonedx-go v0.7.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/ReneKroon/ttlcache v1.6.0
@@ -133,6 +132,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
+	github.com/CycloneDX/cyclonedx-go v0.7.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect

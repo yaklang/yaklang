@@ -3,10 +3,10 @@ package antlr4nasl
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -384,10 +384,7 @@ func init() {
 				return nil, err
 			}
 			if transport >= 0 {
-				conn, err = netx.UpgradeToTLSConnection(conn, "", nil)
-				if err != nil {
-					return nil, err
-				}
+				conn = utils.NewDefaultTLSClient(conn)
 			}
 			return conn, nil
 		},

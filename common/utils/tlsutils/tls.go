@@ -3,16 +3,15 @@ package tlsutils
 import (
 	"bytes"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"github.com/pkg/errors"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	x509gm "github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
 	"net"
@@ -47,7 +46,7 @@ func NewDefaultTLSServer(conn net.Conn) *tls.Conn {
 	if defaultTLSServerConfig != nil {
 		return tls.Server(conn, defaultTLSServerConfig)
 	} else {
-		return tls.Server(conn, netx.NewDefaultTLSConfig())
+		return tls.Server(conn, utils.NewDefaultTLSConfig())
 	}
 }
 
