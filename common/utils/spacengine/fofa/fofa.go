@@ -1,14 +1,15 @@
 package fofa
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -41,9 +42,9 @@ var (
 )
 
 func NewFofaClient(email, key string) *Fofa {
-
 	transCfg := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext:    netx.NewDialContextFunc(10 * time.Second),
+		DialTLSContext: netx.NewDialGMTLSContextFunc(false, false, false, 10*time.Second),
 	}
 
 	return &Fofa{

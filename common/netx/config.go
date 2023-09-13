@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -46,13 +45,6 @@ func GetDefaultOptions() []DNSOption {
 	var result = make([]DNSOption, len(defaultYakDNSOptions))
 	copy(result, defaultYakDNSOptions)
 	return result
-}
-
-var defaultDoHHTTPClient = &http.Client{
-	Transport: &http.Transport{
-		Proxy: nil,
-	},
-	Timeout: 5 * time.Second,
 }
 
 type ReliableDNSConfig struct {

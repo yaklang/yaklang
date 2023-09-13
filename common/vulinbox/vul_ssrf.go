@@ -59,7 +59,7 @@ func (s *VulinServer) registerSSRF() {
 				}
 
 				var u = fmt.Sprint(ref)
-				c := utils.NewDefaultHTTPClient()
+				c := netx.NewDefaultHTTPClient()
 				c.Timeout = 5 * time.Second
 				rsp, err := c.Get(u)
 				if err != nil {
@@ -82,7 +82,7 @@ func (s *VulinServer) registerSSRF() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				ref := request.URL.Query().Get("url")
 				var u = fmt.Sprint(ref)
-				c := utils.NewDefaultHTTPClient()
+				c := netx.NewDefaultHTTPClient()
 				c.Timeout = 5 * time.Second
 				rsp, err := c.Get(u)
 				if err != nil {
@@ -147,7 +147,7 @@ func (s *VulinServer) registerSSRF() {
 					return
 				}
 				var u = fmt.Sprint(values.Get("url"))
-				c := utils.NewDefaultHTTPClient()
+				c := netx.NewDefaultHTTPClient()
 				c.Timeout = 10 * time.Second
 				rsp, err := c.Get(u)
 				if err != nil {
@@ -223,7 +223,7 @@ func (s *VulinServer) registerSSRF() {
 					return
 				}
 
-				c := utils.NewDefaultHTTPClient()
+				c := netx.NewDefaultHTTPClient()
 				timeoutSec, err := strconv.Atoi(values.Get("timeout"))
 				if err != nil {
 					writer.Write([]byte("Invalid timeout value"))
