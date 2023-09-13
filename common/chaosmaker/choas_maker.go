@@ -18,10 +18,15 @@ import (
 type ChaosMaker struct {
 	LocalIPAddress string
 	ChaosRules     []*rule.Storage
+	ctx            context.Context
 }
 
 func NewChaosMakerWithRules(rules []*rule.Storage) *ChaosMaker {
 	return &ChaosMaker{ChaosRules: rules, LocalIPAddress: utils.GetLocalIPAddress()}
+}
+
+func (c *ChaosMaker) SetContext(ctx context.Context) {
+	c.ctx = ctx
 }
 
 func NewChaosMaker() *ChaosMaker {
@@ -47,6 +52,13 @@ func (c *ChaosMaker) Generate() chan []byte {
 	go func() {
 		defer close(fChan)
 		for _, r := range c.ChaosRules {
+			if c.ctx != nil {
+				select {
+				case <-c.ctx.Done():
+					return
+				default:
+				}
+			}
 			ch, err := c.generate(r)
 			if err != nil {
 				log.Errorf("generate traffic failed: %v", err)
@@ -55,7 +67,6 @@ func (c *ChaosMaker) Generate() chan []byte {
 			if ch == nil {
 				continue
 			}
-
 			for t := range ch {
 				fChan <- t
 			}
