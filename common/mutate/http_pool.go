@@ -75,6 +75,9 @@ type httpPoolConfig struct {
 
 	// batch
 	BatchTarget string
+
+	//without conn_pool
+	WithoutConnPool bool
 }
 
 func WithPoolOpt_ExtraFuzzOptions(opts ...FuzzConfigOpt) HttpPoolConfigOption {
@@ -330,6 +333,12 @@ func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_withoutConnPool() HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.WithoutConnPool = true
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type _httpResult struct {
@@ -554,6 +563,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					}
 
 					rspInstance, err := lowhttp.HTTP(
+						lowhttp.WithoutConnPool(config.WithoutConnPool),
 						lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
