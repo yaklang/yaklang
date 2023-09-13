@@ -93,10 +93,17 @@ func (c *Undefine) ReplaceValue(v, to Value) { slices.Replace(c.values, 0, len(c
 // ----------- param
 func (p *Parameter) GetValues() []Value { return nil }
 
-func (p *Parameter) GetUsers() []User { return p.user }
+func (p *Parameter) GetUsers() []User { return p.users }
 
-func (p *Parameter) AddUser(u User)    { p.user = append(p.user, u) }
-func (p *Parameter) RemoveUser(u User) { p.user = utils.Remove(p.user, u) }
+func (p *Parameter) AddUser(u User)    { p.users = append(p.users, u) }
+func (p *Parameter) RemoveUser(u User) { p.users = utils.Remove(p.users, u) }
+func (p *Parameter) AddValue(v Value)  { p.values = append(p.values, v) }
+
+func (p *Parameter) ReplaceValue(v, to Value) {
+	if index := slices.Index(p.values, v); index != -1 {
+		p.values[index] = to
+	}
+}
 
 // ----------- IF
 func (i *If) ReplaceValue(v Value, to Value) {
@@ -160,8 +167,10 @@ func (c *Call) AddUser(u User)   { c.user = append(c.user, u) }
 
 func (c *Call) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
 
-func (c *Call) GetValues() []Value { return append(c.Args, append(c.binding, c.Method)...) }
-func (c *Call) AddValue(v Value)   {}
+func (c *Call) GetValues() []Value {
+	return append(c.value, append(c.Args, append(c.binding, c.Method)...)...)
+}
+func (c *Call) AddValue(v Value) { c.value = append(c.value, v) }
 
 // ----------- Switch
 func (sw *Switch) ReplaceValue(v Value, to Value) {
@@ -244,13 +253,10 @@ func (i *Interface) RemoveUser(u User) {
 }
 
 func (i *Interface) GetValues() []Value {
-	vs := lo.MapToSlice(i.Field, func(key Value, f *Field) Value { return f })
-	return vs
+	return i.value
 }
 func (i *Interface) AddValue(v Value) {
-	if f, ok := v.(*Field); ok {
-		i.Field[f.Key] = f
-	}
+	i.value = append(i.value, v)
 }
 
 // ----------- Field
