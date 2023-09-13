@@ -579,8 +579,9 @@ func (b *astbuilder) buildDeclearVariableExpression(stmt *yak.DeclearVariableExp
 func (b *astbuilder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	for _, id := range stmt.AllIdentifier() {
-		b.WriteVariable(id.GetText(), ssa.NewUndefine("", b.CurrentBlock))
+	for _, idstmt := range stmt.AllIdentifier() {
+		id := idstmt.GetText()
+		b.WriteVariable(id, b.EmitUndefine(id))
 	}
 }
 

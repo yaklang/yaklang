@@ -16,9 +16,13 @@ func (f *Function) SetReg(i Instruction) {
 }
 
 func GetTypeStr(n Node) string {
-	return fmt.Sprintf(
-		"<%s> ", n.GetType(),
-	)
+	if t := n.GetType(); t != nil {
+		return fmt.Sprintf(
+			"<%s> ", t,
+		)
+	} else {
+		return "<>"
+	}
 }
 
 func (p *Position) String() string {
@@ -107,12 +111,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
-	if len(f.Return) > 0 {
-		ret += "return: " + strings.Join(
-			lo.Map(f.Return, func(ret *Return, _ int) string {
-				return getStr(ret)
-			}),
-			", ") + "\n"
+	if f.Type != nil {
+		ret += "type: " + f.Type.String() + "\n"
 	}
 
 	for _, b := range f.Blocks {
