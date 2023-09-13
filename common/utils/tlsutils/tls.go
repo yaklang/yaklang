@@ -3,6 +3,7 @@ package tlsutils
 import (
 	"bytes"
 	"crypto/rsa"
+	cryptoTLS "crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -433,6 +434,28 @@ func GetX509ServerTlsConfigWithAuth(caPemRaw, serverCrt, keyPriv []byte, auth bo
 	}
 	if auth {
 		config.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	return &config, nil
+}
+
+func GetX509ServerNativeTlsConfigWithAuth(caPemRaw, serverCrt, keyPriv []byte, auth bool) (*cryptoTLS.Config, error) {
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPemRaw) {
+		return nil, errors.New("append ca pem error")
+	}
+
+	serverPair, err := cryptoTLS.X509KeyPair(serverCrt, keyPriv)
+	if err != nil {
+		return nil, errors.Errorf("cannot build server crt/key pair: %s", err)
+	}
+
+	config := cryptoTLS.Config{
+		Certificates: []cryptoTLS.Certificate{serverPair},
+		ClientCAs:    pool,
+	}
+	if auth {
+		config.ClientAuth = cryptoTLS.RequireAndVerifyClientCert
 	}
 
 	return &config, nil

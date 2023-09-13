@@ -96,7 +96,7 @@ func NewVulinServerEx(ctx context.Context, noHttps, safeMode bool, host string, 
 			dealTls <- true
 			log.Info("start to load tls config")
 			crt, serverKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(time.Hour*24*180), false)
-			config, err := tlsutils.GetX509ServerTlsConfig(ca, crt, serverKey)
+			config, err := tlsutils.GetX509ServerNativeTlsConfigWithAuth(ca, crt, serverKey, false)
 			if err != nil {
 				log.Error(err)
 				return
