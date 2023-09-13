@@ -1,9 +1,9 @@
 package netx
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

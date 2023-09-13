@@ -2,8 +2,8 @@ package netx
 
 import (
 	"context"
-	"crypto/tls"
 	"github.com/ReneKroon/ttlcache"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/utils"
 	"time"
 )

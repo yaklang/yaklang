@@ -3,8 +3,8 @@ package netx
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -14,6 +14,14 @@ import (
 	"strings"
 	"time"
 )
+
+func NewDefaultTLSConfig() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+		MaxVersion:         tls.VersionTLS13,
+	}
+}
 
 func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string) (net.Conn, error) {
 	return connectForceProxy(nil, target, proxy, timeout)
@@ -46,7 +54,7 @@ func DialTLSTimeout(timeout time.Duration, target string, tlsConfig any, proxy .
 		return nil, err
 	}
 	if tlsConfig == nil {
-		tlsConfig = utils.NewDefaultTLSConfig()
+		tlsConfig = NewDefaultTLSConfig()
 	}
 	conn, err := UpgradeToTLSConnection(plainConn, utils.ExtractHost(target), tlsConfig)
 	if err != nil {
@@ -151,11 +159,11 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		if err != nil {
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
-		conn, err := DialTLSContextWithoutProxy(ctx, "tcp", proxyAddr, utils.NewDefaultTLSConfig())
+		conn, err := DialTLSContextWithoutProxy(ctx, "tcp", proxyAddr, NewDefaultTLSConfig())
 		if err != nil {
 			return nil, err
 		}
-		conn = tls.Client(conn, utils.NewDefaultTLSConfig())
+		conn = tls.Client(conn, NewDefaultTLSConfig())
 		if urlIns.User != nil && urlIns.User.String() != "" {
 			// 有密码
 			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))

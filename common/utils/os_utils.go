@@ -3,10 +3,10 @@ package utils
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/net/http2"

@@ -1,9 +1,6 @@
 package yaktest
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"testing"
 )
 
@@ -104,21 +101,4 @@ println(count)
 `},
 	}
 	Run("Yak SYNSCAN 测试", t, cases...)
-}
-
-func TestServiceScan4_RDP1(t *testing.T) {
-	var a, err = tlsutils.TLSInspect(`64.19.180.94:8443`)
-	if err != nil {
-		panic(err)
-	}
-	for _, a1 := range a {
-		a1.Show()
-	}
-
-	rsp, err := utils.NewDefaultHTTPClient().Get("https://64.19.180.94:8443/webmanagement/WebManagement.html")
-	if err != nil {
-		panic(err)
-		return
-	}
-	spew.Dump(rsp)
 }

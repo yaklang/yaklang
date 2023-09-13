@@ -2,9 +2,9 @@ package crawler
 
 import (
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"github.com/gobwas/glob"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -235,21 +235,7 @@ func RoundRobinProxySwitcher(ProxyURLs ...string) (func(r *http.Request) (*url.U
 
 func (c *Config) CreateHTTPClient() *http.Client {
 	// 设置 Transport
-	httpTr := &http.Transport{
-		// 关闭 http keep-alive
-		DisableKeepAlives: true,
-		// 设置最大平行连接数
-		MaxConnsPerHost: c.concurrent,
-		// 设置超时
-		DialContext: netx.NewDialContextFunc(c.connectTimeout),
-		// 设置 HTTP 响应获取超时
-		ResponseHeaderTimeout: c.responseTimeout,
-		// 使用自定义的 tlsConfig 进行 TCP 连接
-		TLSClientConfig: c.tlsConfig,
-
-		// 不要用 gzip
-		DisableCompression: true,
-	}
+	httpTr := netx.NewDefaultHTTPTransport()
 
 	// 设置代理
 	if len(c.proxies) > 0 {

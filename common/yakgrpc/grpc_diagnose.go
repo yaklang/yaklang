@@ -205,11 +205,11 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 			}
 			lines = append(lines, fmt.Sprintf("TCP [%v:%v] connection success.", host, port))
 
-			tlsConn := utils.NewDefaultTLSClient(conn)
-			err = tlsConn.HandshakeContext(utils.TimeoutContext(timeout))
-			if err == nil {
+			tlsConn, err := netx.UpgradeToTLSConnection(conn, "", nil)
+			if err != nil {
 				lines = append(lines, fmt.Sprintf("TLS [%v:%v] connection success.", host, port))
 			}
+			_ = tlsConn
 			conn.Close()
 		}
 	}()

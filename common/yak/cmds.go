@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -549,7 +550,7 @@ var upgradeCommand = cli.Command{
 
 		versionUrl := `https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/version.txt`
 
-		client := utils.NewDefaultHTTPClient()
+		client := netx.NewDefaultHTTPClient()
 		client.Timeout = time.Duration(c.Int("timeout")) * time.Second
 
 		rsp, _ := client.Get(versionUrl)

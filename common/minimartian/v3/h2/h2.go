@@ -17,10 +17,10 @@ package h2
 
 import (
 	"bytes"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/net/http2"
 	"io"

@@ -167,27 +167,6 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 			results = append(results, f.matchByRule(i, ruleToUse, config)...)
 		}
 		return results
-
-		//client := http.Client{
-		//	Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
-		//	Timeout:   config.ProbeTimeout,
-		//}
-		//urlObj, err := url.Parse(r.URL.String())
-		//if err != nil {
-		//	log.Errorf("url parse failed: %s", err)
-		//	return []*CPE{}
-		//}
-		////urlObj.Path = path.Join(r.URL.Path, ruleToUse.Path)
-		//urlObj.Path = ruleToUse.Path
-		//
-		//log.Infof("web-fingerprint active query %s to fetch fingerprint", urlObj.String())
-		//httpResponse, err := client.Get(urlObj.String())
-		//if err != nil {
-		//	return []*CPE{}
-		//}
-		//responseInfo := ExtractHTTPResponseInfoFromHTTPResponseWithBodySize(httpResponse, config.FingerprintDataSize)
-		//responseInfo.URL = urlObj
-		//return f.matchByRule(responseInfo, ruleToUse, config)
 	}
 
 	for _, m := range ruleToUse.Methods {
