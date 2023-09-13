@@ -71,7 +71,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		}),
 		lowhttp.WithProxy(proxy...),
 	)
-	var isOpen bool
+	isOpen := rspDetail.PortIsOpen
 	if err != nil {
 		return isOpen, nil, utils.Errorf("lowhttp.HTTP failed: %s", err)
 	}
