@@ -32,6 +32,7 @@ func ArpWithTimeout(timeoutContext time.Duration, ifaceName string, target strin
 
 var (
 	TargetIsLoopback = utils.Error("loopback")
+	LinkTypeIsNull   = utils.Error("link type is null")
 )
 
 func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.HardwareAddr, error) {
@@ -286,21 +287,24 @@ func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		return nil, utils.Errorf("find pcap name failed: %v", err)
 	}
 
-	hanldler, err := pcap.OpenLive(pcapName, 65535, false, pcap.BlockForever)
+	handler, err := pcap.OpenLive(pcapName, 65535, true, pcap.BlockForever)
 	if err != nil {
 		return nil, utils.Errorf("pcap open live %v failed: %s", pcapName, err)
 	}
 
-	err = hanldler.SetBPFFilter("arp")
+	log.Infof(`Arp With Pcap in %v, LinkType: %v`, ifaceName, handler.LinkType())
+
+	expr := "arp"
+	err = handler.SetBPFFilter(expr)
 	if err != nil {
-		return nil, utils.Errorf("bind bpf filter failed: %s", err)
+		return nil, utils.Errorf("bind bpf(%v) filter failed: %s with name: %v", expr, err, "- "+ifaceName)
 	}
 
 	results := make(map[string]net.HardwareAddr)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	srcs := gopacket.NewPacketSource(hanldler, hanldler.LinkType())
+	srcs := gopacket.NewPacketSource(handler, handler.LinkType())
 	packets := srcs.Packets()
 
 	targetsList := utils.ParseStringToHosts(targets)
@@ -350,7 +354,7 @@ func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 				log.Errorf("create arpx packet [%v for %v] failed: %s", ifaceName, p, err)
 				continue
 			}
-			err = hanldler.WritePacketData(buf.Bytes())
+			err = handler.WritePacketData(buf.Bytes())
 			if err != nil {
 				log.Errorf("write arpx[%v] request packet to %v failed", p, ifaceName)
 				continue
