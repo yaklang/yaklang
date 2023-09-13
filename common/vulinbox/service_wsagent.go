@@ -75,14 +75,22 @@ func (a *wsAgent) run() {
 	go a.listenLoop()
 	go a.sendLoop()
 	<-a.ctx.Done()
-	close(a.wChan)
 }
 
 func (a *wsAgent) TrySend(v any) {
+	if a == nil || a.ctx == nil || a.wChan == nil {
+		return
+	}
+	select {
+	case <-a.ctx.Done():
+		close(a.wChan)
+		return
+	default:
+	}
 	select {
 	case a.wChan <- v:
 	default:
-		// channel closed or full, drop it
+		// full, drop it
 	}
 }
 

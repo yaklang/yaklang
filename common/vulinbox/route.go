@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
-	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"net/url"
@@ -70,15 +68,6 @@ func (s *VulinServer) init() {
 	// FE AND FEEDBACK
 	fe := http.FileServer(http.FS(staticFS))
 	router.NotFoundHandler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		/* load to agent feedback */
-		reqRaw, err := utils.HttpDumpWithBody(request, true)
-		if err != nil {
-			log.Errorf("dump request failed: %v", err)
-		}
-		if len(reqRaw) > 0 {
-			s.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("http-request", string(reqRaw)))
-		}
-
 		if strings.HasPrefix(request.URL.Path, "/static") {
 			var u, _ = lowhttp.ExtractURLFromHTTPRequest(request, true)
 			if u != nil {
@@ -93,18 +82,6 @@ func (s *VulinServer) init() {
 			writer.WriteHeader(404)
 			writer.Write([]byte("404 not found"))
 		}).ServeHTTP(writer, request)
-	})
-	router.Use(func(handler http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			reqRaw, err := utils.HttpDumpWithBody(request, false)
-			if err != nil {
-				log.Errorf("dump request failed: %v", err)
-			}
-			if len(reqRaw) > 0 {
-				s.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("http-request", string(reqRaw)))
-			}
-			handler.ServeHTTP(writer, request)
-		})
 	})
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		var renderedData string
@@ -132,7 +109,6 @@ func (s *VulinServer) init() {
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
-
 	})
 
 	// agent ws connector
