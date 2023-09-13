@@ -115,6 +115,10 @@ type Function struct {
 	InstReg     map[Instruction]string // instruction -> virtual register
 	symbolTable map[string][]InstructionValue
 
+	// extern lib
+	externInstance map[string]Value // lib and value
+	externType     map[string]Type
+
 	// ssa error
 	err SSAErrors
 

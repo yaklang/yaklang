@@ -12,12 +12,15 @@ func NewProgram() *Program {
 	return prog
 }
 
-func (prog *Program) NewPackage(name string) *Package {
+func NewPackage(name string) *Package {
 	pkg := &Package{
 		Name:  name,
-		Prog:  prog,
 		Funcs: make([]*Function, 0),
 	}
-	prog.Packages = append(prog.Packages, pkg)
 	return pkg
+}
+
+func (prog *Program) AddPackage(pkg *Package) {
+	pkg.Prog = prog
+	prog.Packages = append(prog.Packages, pkg)
 }

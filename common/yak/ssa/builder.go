@@ -28,6 +28,8 @@ type FunctionBuilder struct {
 	currtenPos   *Position                        // current position in source code
 	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
 
+	undefineHijack func(string) Value
+
 	prev *FunctionBuilder
 }
 
@@ -42,6 +44,10 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 		symbolBlock:  nil,
 		prev:         next,
 	}
+	if next != nil {
+		b.undefineHijack = next.undefineHijack
+	}
+
 	b.PushBlockSymbolTable()
 	b.CurrentBlock = f.EnterBlock
 	f.builder = b

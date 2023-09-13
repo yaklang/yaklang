@@ -53,12 +53,15 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	f.SetReg(i)
 }
 
-func (f *FunctionBuilder) EmitUndefine(name string) *Undefine {
+func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
+	if v := f.UndefineHijack(name); v != nil {
+		return v
+	}
 	u := NewUndefine(name, f.CurrentBlock)
-	u.NewError(Error, SSATAG, "this variable undefine")
+	u.NewError(Error, SSATAG, "variable [%s] undefine", name)
 	f.emit(u)
 	return u
 }
