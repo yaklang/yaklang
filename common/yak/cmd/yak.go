@@ -3,10 +3,10 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 	"io"
 	"io/ioutil"

@@ -3,7 +3,7 @@ package tlsutils
 import (
 	"bufio"
 	"bytes"
-	tls "github.com/refraction-networking/utls"
+	"crypto/tls"
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"

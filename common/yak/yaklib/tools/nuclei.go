@@ -2,11 +2,11 @@ package tools
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -135,7 +135,7 @@ func PullTemplatesFromGithub(giturl string, proxy ...string) (string, error) {
 		}
 	}
 
-	tr := netx.NewDefaultHTTPTransport()
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, Proxy: http.ProxyFromEnvironment}
 	if len(proxy) > 0 {
 		u, err := url.Parse(proxy[0])
 		if err != nil {

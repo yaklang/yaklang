@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"context"
-	tls "github.com/refraction-networking/utls"
+	"crypto/tls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"

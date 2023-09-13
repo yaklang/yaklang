@@ -10,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+var defaultHttpClient = utils.NewDefaultHTTPClient()
+
 func ZoomeyeQuery(key string, query string, page int) (*gjson.Result, error) {
 	values := make(url.Values)
 	values.Set("query", query)
@@ -20,7 +22,7 @@ func ZoomeyeQuery(key string, query string, page int) (*gjson.Result, error) {
 	}
 	req.Header.Set("API-KEY", key)
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := defaultHttpClient.Do(req)
 	if err != nil {
 		return nil, utils.Errorf("query zoomeye search api failed: %s", err)
 	}

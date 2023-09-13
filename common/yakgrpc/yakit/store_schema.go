@@ -2,11 +2,11 @@ package yakit
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"gopkg.in/yaml.v2"
 	"runtime"
@@ -418,7 +418,12 @@ func LoadYakitThirdpartySourceScripts(
 		log.Infof("proxy: %v", proxy)
 	}
 	// 设置 client
-	tr := netx.NewDefaultHTTPTransport()
+	//client := utils.NewDefaultHTTPClient()
+	// Create a custom http(s) client with your config
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Proxy:           http.ProxyFromEnvironment,
+	}
 	if len(proxy) > 0 {
 		u, err := url.Parse(proxy[0])
 		if err != nil {

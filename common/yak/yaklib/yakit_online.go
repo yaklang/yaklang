@@ -51,12 +51,12 @@ func NewOnlineClient(baseUrl string) *OnlineClient {
 	if proxy := strings.TrimSpace(consts.GetOnlineBaseUrlProxy()); proxy != "" {
 		return &OnlineClient{
 			BaseUrl: baseUrl,
-			client:  netx.NewDefaultHTTPClient(proxy),
+			client:  utils.NewDefaultHTTPClientWithProxy(proxy),
 		}
 	}
 	return &OnlineClient{
 		BaseUrl: baseUrl,
-		client:  netx.NewDefaultHTTPClient(),
+		client:  utils.NewDefaultHTTPClient(),
 	}
 }
 

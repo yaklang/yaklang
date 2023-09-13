@@ -2,11 +2,11 @@ package yaklib
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -63,8 +63,25 @@ type YakitClient struct {
 
 func NewYakitClient(addr string) *YakitClient {
 	client := &YakitClient{
-		addr:   addr,
-		client: netx.NewDefaultHTTPClient(),
+		addr: addr,
+		client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+					MaxVersion:         tls.VersionTLS13,
+				},
+				TLSHandshakeTimeout:   10 * time.Second,
+				DisableCompression:    true,
+				MaxIdleConns:          1,
+				MaxIdleConnsPerHost:   1,
+				MaxConnsPerHost:       1,
+				IdleConnTimeout:       5 * time.Minute,
+				ResponseHeaderTimeout: 30 * time.Second,
+				ExpectContinueTimeout: 30 * time.Second,
+			},
+			Timeout: 15 * time.Second,
+		},
 	}
 	client.send = func(i interface{}) error {
 		if client == nil {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -41,7 +40,7 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 	}
 
 	info(0, "获取下载材料大小: Fetching Download Material Basic Info")
-	client := netx.NewDefaultHTTPClient(proxy)
+	client := utils.NewDefaultHTTPClientWithProxy(proxy)
 	client.Timeout = time.Hour
 	rsp, err := client.Head(targetUrl)
 	if err != nil {
