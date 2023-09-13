@@ -66,13 +66,16 @@ func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	return u
 }
 
-func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) *BinOp {
+func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	b := NewBinOp(op, x, y, f.CurrentBlock)
-	f.emit(b)
-	return b
+	v := NewBinOp(op, x, y, f.CurrentBlock)
+	if b, ok := v.(*BinOp); ok {
+		fixupUseChain(b)
+		f.emit(b)
+	}
+	return v
 }
 
 func (f *FunctionBuilder) EmitIf(cond Value) *If {

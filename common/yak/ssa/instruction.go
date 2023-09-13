@@ -59,7 +59,7 @@ func NewUndefine(name string, block *BasicBlock) *Undefine {
 	return u
 }
 
-func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
+func NewBinOpOnly(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 	b := &BinOp{
 		anInstruction: newAnInstuction(block),
 		Op:            op,
@@ -67,9 +67,18 @@ func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 		Y:             y,
 		user:          []User{},
 	}
-	fixupUseChain(b)
+	if op >= OpGt && op <= OpNotEq {
+		b.SetType(BasicTypes[Boolean])
+	}
+	// fixupUseChain(b)
 	return b
 }
+
+func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) Value {
+	v := HandlerBinOp(NewBinOpOnly(op, x, y, block))
+	return v
+}
+
 func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
 	b := &UnOp{
 		anInstruction: newAnInstuction(block),
