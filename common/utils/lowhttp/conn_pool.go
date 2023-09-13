@@ -161,7 +161,6 @@ func (pc *persistConn) Write(packet []byte) (n int, err error) {
 	if err != nil {
 		//pc.removeConn()
 		//如果连接写入失败则删除本连接并尝试重新构建一个连接
-		log.Infof("refresh conn")
 		pc.Conn, err = netx.DialX(pc.cacheKey.addr, pc.dialOption...)
 		if err != nil {
 			return n, err
