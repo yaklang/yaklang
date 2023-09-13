@@ -4,6 +4,16 @@ import (
 	"fmt"
 )
 
+func init() {
+	ConstMap[nil] = &Const{
+		user:  []User{},
+		value: nil,
+		typ:   BasicTypes[Null],
+		str:   "nil",
+		Unary: 0,
+	}
+}
+
 var (
 	ConstMap = make(map[any]*Const)
 )
@@ -16,12 +26,12 @@ func NewConstWithUnary(i any, un int) *Const {
 }
 
 func NewConst(i any) *Const {
-	// build new const
-	typ := GetType(i)
 	// after update i
 	if c, ok := ConstMap[i]; ok {
 		return c
 	}
+	// build new const
+	typ := GetType(i)
 	c := &Const{
 		user:  make([]User, 0),
 		value: i,
