@@ -5,6 +5,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -16,7 +17,7 @@ import (
 type BehidnerFileSystemAction struct {
 }
 
-func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
+func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
 	type ResourceError struct {
 		resources []*ypb.YakURLResource
 		err       error
@@ -42,7 +43,8 @@ func webShellResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 				return true
 			}
 			extra = []*ypb.KVPair{
-				{Key: "content", ValueBytes: content},
+				// TODO
+				{Key: "content", Value: utils.EscapeInvalidUTF8Byte(content)},
 			}
 			var resource = &ypb.YakURLResource{
 				Path:         newParam.Path,
@@ -162,7 +164,7 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 		if err != nil {
 			return nil, err
 		}
-		res, err = webShellResultToYakURLResource(u, list)
+		res, err = behidnerResultToYakURLResource(u, list)
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +173,7 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 		if er != nil {
 			return nil, er
 		}
-		res, err = webShellResultToYakURLResource(u, show)
+		res, err = behidnerResultToYakURLResource(u, show)
 		if err != nil {
 			return nil, err
 		}
@@ -241,7 +243,7 @@ func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Req
 		if err != nil {
 			return nil, err
 		}
-		res, err = webShellResultToYakURLResource(u, list)
+		res, err = behidnerResultToYakURLResource(u, list)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +252,7 @@ func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Req
 		if er != nil {
 			return nil, er
 		}
-		res, err = webShellResultToYakURLResource(u, show)
+		res, err = behidnerResultToYakURLResource(u, show)
 	case "createFile":
 	case "createDirectory":
 
@@ -285,4 +287,180 @@ func (l *ListFiles) Execute(base BaseShellManager) ([]byte, error) {
 	// code to list files
 	//base.
 	return nil, nil
+}
+
+func (b *Behinder) showFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "show",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) listFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "list",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) checkFileHash(path, hash string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "list",
+		"path": path,
+		"hash": hash,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) getTimeStamp(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "getTimeStamp",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) updateTimeStamp(path, createTimeStamp, accessTimeStamp, modifyTimeStamp string) ([]byte, error) {
+	params := map[string]string{
+		"mode":            "getTimeStamp",
+		"path":            path,
+		"createTimeStamp": createTimeStamp,
+		"accessTimeStamp": accessTimeStamp,
+		"modifyTimeStamp": modifyTimeStamp,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) deleteFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "delete",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) compress(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "compress",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) checkFileExist(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "checkExist",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) renameFile(old, new string) ([]byte, error) {
+	params := map[string]string{
+		"mode":    "rename",
+		"path":    old,
+		"newPath": new,
+	}
+	if b.ShellScript == ypb.ShellScript_PHP.String() {
+		params["content"] = ""
+		params["charset"] = ""
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) createFile(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "createFile",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) createDirectory(path string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "createDirectory",
+		"path": path,
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) downloadFile(remote, local string) ([]byte, error) {
+	params := map[string]string{
+		"mode": "download",
+		"path": remote,
+	}
+	b.processParams(params)
+	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	if err != nil {
+		return nil, err
+	}
+	fileContent, err := b.SendHttpRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	return fileContent, nil
+}
+
+func (b *Behinder) uploadFile(remote string, fileContent []byte) ([]byte, error) {
+	params := map[string]string{
+		"mode":    "create",
+		"path":    remote,
+		"content": base64.StdEncoding.EncodeToString(fileContent),
+	}
+	b.processParams(params)
+	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	if err != nil {
+		return nil, err
+	}
+	bres, err := b.SendHttpRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	return bres, nil
+}
+
+func (b *Behinder) appendFile(remote string, fileContent []byte) ([]byte, error) {
+	params := map[string]string{
+		"mode":    "append",
+		"path":    remote,
+		"content": base64.StdEncoding.EncodeToString(fileContent),
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) uploadFilePart(remote string, fileContent []byte, blockIndex, blockSize uint64) ([]byte, error) {
+	params := map[string]string{
+		"mode":       "update",
+		"path":       remote,
+		"blockIndex": strconv.FormatUint(blockIndex, 10),
+		"blockSize":  strconv.FormatUint(blockSize, 10),
+		"content":    base64.StdEncoding.EncodeToString(fileContent),
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+}
+
+func (b *Behinder) downFilePart(remote string, fileContent []byte, blockIndex, blockSize uint64) ([]byte, error) {
+	params := map[string]string{
+		"mode":       "downloadPart",
+		"path":       remote,
+		"blockIndex": strconv.FormatUint(blockIndex, 10),
+		"blockSize":  strconv.FormatUint(blockSize, 10),
+	}
+	b.processParams(params)
+	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
 }

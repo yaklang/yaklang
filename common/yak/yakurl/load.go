@@ -33,5 +33,8 @@ func LoadFromRaw(raw string) (*ypb.YakURL, error) {
 	}
 
 	yu.Path = utils.EscapeInvalidUTF8Byte([]byte(u.EscapedPath()))
+	if yu.Path[2] == ':' {
+		yu.Path = strings.TrimPrefix(yu.Path, "/")
+	}
 	return yu, nil
 }

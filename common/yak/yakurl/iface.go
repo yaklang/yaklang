@@ -22,6 +22,8 @@ func (f DefaultActionFactory) CreateAction(schema string) Action {
 		return &fileSystemAction{}
 	case "behinder":
 		return &wsm.BehidnerFileSystemAction{}
+	case "godzilla":
+		return &wsm.GodzillaFileSystemAction{}
 	default:
 		return nil
 	}

