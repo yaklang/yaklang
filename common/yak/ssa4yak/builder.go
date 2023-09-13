@@ -1,6 +1,9 @@
 package ssa4yak
 
 import (
+	"fmt"
+	"runtime/debug"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -12,15 +15,18 @@ type astbuilder struct {
 }
 
 type builder struct {
-	ast  *yak.YaklangParser
-	prog *ssa.Program
+	ast         *yak.YaklangParser
+	prog        *ssa.Program
+	symboltable map[string]any
 }
 
 // build implements ssa.builder.
 func (b *builder) Build() {
-	pkg := b.prog.NewPackage("main")
+	pkg := ssa.NewPackage("main")
+	b.prog.AddPackage(pkg)
 	main := pkg.NewFunction("yak-main")
 	funcbuilder := ssa.NewBuilder(main, nil)
+	funcbuilder.WithUndefineHijack(b.symboltable)
 	astbuilder := astbuilder{
 		FunctionBuilder: funcbuilder,
 	}
@@ -28,29 +34,63 @@ func (b *builder) Build() {
 	astbuilder.Finish()
 }
 
-func NewBuilder(ast *yak.YaklangParser, prog *ssa.Program) *builder {
-	return &builder{
-		ast:  ast,
-		prog: prog,
+var _ (ssa.Builder) = (*builder)(nil)
+
+type config struct {
+	analyzeOpt  []ssa4analyze.Option
+	symboltable map[string]any
+}
+
+func defaultConfig() *config {
+	return &config{
+		analyzeOpt:  make([]ssa4analyze.Option, 0),
+		symboltable: nil,
+	}
+
+}
+
+type Option func(*config)
+
+func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
+	return func(c *config) {
+		c.analyzeOpt = append(c.analyzeOpt, opt...)
 	}
 }
 
-var _ (ssa.Builder) = (*builder)(nil)
+func WithSymbolTable(table map[string]interface{}) Option {
+	return func(c *config) {
+		c.symboltable = table
+	}
+}
 
-func ParseSSA(src string, opt ...ssa4analyze.Option) *ssa.Program {
+func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in parseSSA", r)
+			debug.PrintStack()
+			prog = nil
+		}
+	}()
+
+	c := defaultConfig()
+	for _, f := range opt {
+		f(c)
+	}
+
 	inputStream := antlr.NewInputStream(src)
 	lex := yak.NewYaklangLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
 	ast := yak.NewYaklangParser(tokenStream)
-	prog := ssa.NewProgram()
+	prog = ssa.NewProgram()
 	builder := &builder{
-		ast:  ast,
-		prog: prog,
+		ast:         ast,
+		prog:        prog,
+		symboltable: c.symboltable,
 	}
 	prog.Build(builder)
 	ssa4analyze.NewAnalyzerGroup(
 		prog,
-		opt...,
+		c.analyzeOpt...,
 	).Run()
 	return prog
 }

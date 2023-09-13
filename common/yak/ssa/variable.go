@@ -144,9 +144,15 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
 		if v := p.Build(); v == nil {
-			undefine := NewUndefine(p.GetVariable(), p.Block)
-			EmitBefore(p.Block.LastInst(), undefine)
-			p.Replace(undefine)
+			var res Value
+			res = b.Parent.builder.UndefineHijack(p.GetVariable())
+			if res == nil {
+				res = NewUndefine(p.GetVariable(), p.Block)
+			}
+			if inst, ok := res.(Instruction); ok {
+				EmitBefore(p.Block.LastInst(), inst)
+			}
+			p.Replace(res)
 		}
 	}
 	b.inCompletePhi = nil
@@ -170,7 +176,7 @@ func (f *FunctionBuilder) BuildFreeValue(variable string) Value {
 				freevalue := &Parameter{
 					variable:    variable,
 					Func:        b.Function,
-					user:        []User{},
+					users:       []User{},
 					isFreevalue: true,
 				}
 				b.FreeValues = append(b.FreeValues, freevalue)
@@ -181,7 +187,6 @@ func (f *FunctionBuilder) BuildFreeValue(variable string) Value {
 			}
 		}
 	}
-
 	return build(f)
 }
 
@@ -192,52 +197,4 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 		}
 	}
 	return false
-}
-
-// --------------- `f.symbol` hanlder, read && write
-func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) *Field {
-	if I, ok := i.(*Interface); ok {
-		if field, ok := I.Field[key]; ok {
-			return field
-		}
-	}
-
-	if parent := b.parent; parent != nil {
-		// find in parent
-		if field := parent.builder.ReadField(key.String()); field != nil {
-			return field
-		}
-	}
-
-	if create {
-		field := &Field{
-			anInstruction: newAnInstuction(b.CurrentBlock),
-			Key:           key,
-			I:             i,
-			Update:        make([]Value, 0),
-			users:         make([]User, 0),
-		}
-
-		b.emit(field)
-		fixupUseChain(field)
-		return field
-	} else {
-		return nil
-	}
-}
-func (b *FunctionBuilder) ReadField(key string) *Field {
-	return b.getFieldWithCreate(b.symbol, NewConst(key), false)
-}
-func (b *FunctionBuilder) NewField(key string) *Field {
-	return b.getFieldWithCreate(b.symbol, NewConst(key), true)
-}
-
-func (b *FunctionBuilder) writeField(key string, v Value) {
-	field := b.getFieldWithCreate(b.symbol, NewConst(key), true)
-	if field == nil {
-		panic(fmt.Sprintf("writeField: %s not found", key))
-	}
-	if field.GetLastValue() != v {
-		b.emitUpdate(field, v)
-	}
 }

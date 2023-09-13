@@ -410,7 +410,9 @@ entry0:
 	<number> t1 = <number> 1 add <number> 1
 	<number> t2 = <number> 2 add <number> 2
 		`
-		prog := ParseSSA(code, ssa4analyze.WithPass(false))
+		prog := ParseSSA(code, WithAnalyzeOpt(
+			ssa4analyze.WithPass(false),
+		))
 		CheckProgram(t, prog)
 		CompareYakMain(t, prog, ir)
 	})
