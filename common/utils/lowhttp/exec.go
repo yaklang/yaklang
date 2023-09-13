@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const (
@@ -343,9 +344,9 @@ func WithConnPool(p *lowHttpConnPool) LowhttpOpt {
 	}
 }
 
-func WithoutConnPool() LowhttpOpt {
+func WithoutConnPool(without bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.WithoutConnPool = true
+		o.WithoutConnPool = without
 	}
 }
 

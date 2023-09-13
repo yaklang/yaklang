@@ -40,23 +40,16 @@ type lowHttpConnPool struct {
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
 func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
-	start := time.Now()
 	l.idleConnMux.Lock()
-	waitTime := time.Since(start)
-	log.Infof("wait time [%v]", waitTime)
 	// 检索是否有符合要求的连接
 	if len(l.idleConn[key.hash()]) > 0 {
 		for _, pConn := range l.idleConn[key.hash()] {
-			if pConn.isAlive && pConn.isIdle {
+			if pConn.isIdle {
 				pConn.isIdle = false
 				l.idleConnMux.Unlock()
 				//取出连接时验活
-				if pConn.checkAlive() {
-					log.Infof("old conn")
-					return pConn, nil
-				}
-				pConn.removeConn()
-				return l.getIdleConn(key, opts...)
+				log.Infof("old conn")
+				return pConn, nil
 			}
 		}
 	}
@@ -138,14 +131,14 @@ func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 type persistConn struct {
 	net.Conn   //conn本体
 	mu         sync.Mutex
-	p          *lowHttpConnPool //连接对应的连接池
-	cacheKey   connectKey       //连接池缓存key
-	isProxy    bool             //是否使用代理
-	idleAt     time.Time        //进入空闲的时间
-	closeTimer *time.Timer      //关闭定时器
-	isIdle     bool             //是否空闲
-	isAlive    bool             //是否存活
-	inPool     bool             //是否入池
+	p          *lowHttpConnPool   //连接对应的连接池
+	cacheKey   connectKey         //连接池缓存key
+	isProxy    bool               //是否使用代理
+	idleAt     time.Time          //进入空闲的时间
+	closeTimer *time.Timer        //关闭定时器
+	isIdle     bool               //是否空闲
+	inPool     bool               //是否入池
+	dialOption []netx.DialXOption //dial 选项
 }
 
 func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
@@ -161,17 +154,23 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	conn.p = pool
 	conn.cacheKey = key
 	conn.isProxy = needProxy
-	conn.isAlive = true
+	conn.dialOption = opt
 	return conn, nil
 }
 
-func (pc *persistConn) checkAlive() bool {
-	_, err := pc.Write([]byte("alive"))
+func (pc *persistConn) Write(packet []byte) (n int, err error) {
+	n, err = pc.Conn.Write(packet)
 	if err != nil {
-		log.Infof("this [%v] persistConn is close [%v]", pc.cacheKey, err)
-		return false
+		//pc.removeConn()
+		//如果连接写入失败则删除本连接并尝试重新构建一个连接
+		log.Infof("refresh conn")
+		pc.Conn, err = netx.DialX(pc.cacheKey.addr, pc.dialOption...)
+		if err != nil {
+			return n, err
+		}
+		n, err = pc.Conn.Write(packet)
 	}
-	return true
+	return n, err
 }
 
 func (pc *persistConn) Close() error {
