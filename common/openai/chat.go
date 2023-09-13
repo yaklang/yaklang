@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"net/http"
@@ -34,7 +35,7 @@ func NewOpenAIClient(opt ...ConfigOption) *Client {
 		o(c)
 	}
 	if c.httpClient == nil {
-		c.httpClient = utils.NewDefaultHTTPClientWithProxy(c.Proxy)
+		c.httpClient = netx.NewDefaultHTTPClient(c.Proxy)
 		c.httpClient.Timeout = time.Minute
 	}
 	return c

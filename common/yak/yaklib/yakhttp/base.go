@@ -23,7 +23,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-var getDefaultHTTPClient = utils.NewDefaultHTTPClient
+var getDefaultHTTPClient = netx.NewDefaultHTTPClient
 
 var ClientPool sync.Map
 

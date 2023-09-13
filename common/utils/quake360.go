@@ -2,33 +2,13 @@ package utils
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
-
-	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/common/log"
 )
-
-func newDefaultClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			MaxConnsPerHost:    50,
-			Proxy:              nil,
-		},
-		Timeout: 15 * time.Second,
-	}
-}
 
 type Quake360Client struct {
 	key                 string
@@ -38,7 +18,7 @@ type Quake360Client struct {
 }
 
 func NewQuake360Client(apiKey string) *Quake360Client {
-	return &Quake360Client{key: apiKey, client: newDefaultClient()}
+	return &Quake360Client{key: apiKey, client: http.DefaultClient}
 }
 
 const quakeAPI = "https://quake.360.cn/api/v3/scroll/quake_service"

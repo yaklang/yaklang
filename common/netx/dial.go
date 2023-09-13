@@ -2,12 +2,39 @@ package netx
 
 import (
 	"context"
-	"crypto/tls"
+	"net/http"
+	"net/url"
+
+	// tls "github.com/refraction-networking/utls"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
 )
+
+func NewDefaultHTTPTransport(proxy ...string) *http.Transport {
+	return &http.Transport{
+		DialContext:    NewDialContextFunc(10 * time.Second),
+		DialTLSContext: NewDialGMTLSContextFunc(false, false, false, 10*time.Second),
+		Proxy: func(u *http.Request) (*url.URL, error) {
+			proxy := utils.StringArrayFilterEmpty(proxy)
+			if len(proxy) == 0 {
+				return nil, nil
+			}
+			for _, p := range proxy {
+				if p != "" {
+					pu, err := url.Parse(p)
+					if err != nil {
+						return nil, err
+					}
+					return pu, nil
+				}
+			}
+			return nil, utils.Errorf("no valid proxy found in %v", proxy)
+		},
+	}
+}
 
 // NewDialContextFunc is a function that can be used to dial a connection.
 func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
@@ -100,7 +127,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 
 	if tlsConfig != nil {
-		var sConn = tls.Client(conn, tlsConfig)
+		var sConn = tls.UClient(conn, tlsConfig, tls.HelloRandomized)
 		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
 			return nil, err

@@ -3,22 +3,16 @@ package utils
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -189,21 +183,7 @@ func GetSystemMachineCode() (_ string, err error) {
 	if id == "" {
 		return "", Errorf("fetch machine code failed")
 	}
-	//if err != nil {
-	//	m := fmt.Sprintf("get machine id failed: %s", err)
-	//	return "", errors.New(m)
-	//}
-	//
-	//if id == "" {
-	//	return "", Errorf("empty machine-id...")
-	//}
 	return id, nil
-}
-
-func FixJsonRawBytes(rawBytes []byte) []byte {
-	rawBytes = []byte(EscapeInvalidUTF8Byte(rawBytes))
-	rawBytes = bytes.ReplaceAll(rawBytes, []byte("\\u0000"), []byte(" "))
-	return rawBytes
 }
 
 func Jsonify(i interface{}) []byte {
@@ -220,18 +200,6 @@ func MustUnmarshalJson[T any](raw []byte) *T {
 		return nil
 	}
 	return &ret
-}
-
-func NewDefaultHTTPClientWithProxy(proxy string) *http.Client {
-	client := NewDefaultHTTPClient()
-	if proxy == "" {
-		return client
-	}
-	ht := client.Transport.(*http.Transport)
-	ht.Proxy = func(request *http.Request) (*url.URL, error) {
-		return url.Parse(proxy)
-	}
-	return client
 }
 
 func DownloadFile(client *http.Client, u string, localFile string, every1s ...func(float64)) error {
@@ -281,50 +249,6 @@ func DownloadFile(client *http.Client, u string, localFile string, every1s ...fu
 		return nil
 	}
 	return Error("body is nil")
-}
-
-func NewDefaultHTTPClient() *http.Client {
-	jar, _ := cookiejar.New(nil)
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-					return nil
-				},
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			MaxConnsPerHost:    50,
-		},
-		Timeout: 15 * time.Second,
-		Jar:     jar,
-	}
-}
-
-func NewDefaultTLSClient(conn net.Conn) *tls.Conn {
-	return tls.Client(conn, NewDefaultTLSConfig())
-}
-
-func NewDefaultTLSConfig() *tls.Config {
-	return &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
-	}
-}
-
-func NewDefaultGMTLSConfig() *gmtls.Config {
-	return &gmtls.Config{
-		InsecureSkipVerify: true,
-		GMSupport:          &gmtls.GMSupport{},
-	}
-}
-
-func FixHTTPRequestForHTTPDo(r *http.Request) (*http.Request, error) {
-	return FixHTTPRequestForHTTPDoWithHttps(r, false)
 }
 
 func FixHTTPRequestForHTTPDoWithHttps(r *http.Request, isHttps bool) (*http.Request, error) {

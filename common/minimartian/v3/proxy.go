@@ -18,12 +18,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
+	cryltoTLS "crypto/tls"
 	_ "embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
+	tls "github.com/refraction-networking/utls"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -138,14 +139,7 @@ func (p *Proxy) deleteCache(req *http.Request) {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	proxy := &Proxy{
-		roundTripper: &http.Transport{
-			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
-			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
-			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
-			Proxy:                 http.ProxyFromEnvironment,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: time.Second,
-		},
+		roundTripper:     netx.NewDefaultHTTPTransport(),
 		timeout:          5 * time.Minute,
 		closing:          make(chan bool),
 		reqmod:           noop,
@@ -164,7 +158,7 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	p.roundTripper = rt
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		tr.TLSNextProto = make(map[string]func(string, *cryltoTLS.Conn) http.RoundTripper)
 		tr.Proxy = http.ProxyURL(p.proxyURL)
 		tr.DialContext = p.dial
 	}
@@ -559,9 +553,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	var isHttps bool
 	if tconn, ok := conn.(*tls.Conn); ok {
 		session.MarkSecure()
-
-		cs := tconn.ConnectionState()
-		req.TLS = &cs
+		_ = tconn
+		//cs := tconn.ConnectionState()
+		//req.TLS = &cs
 		req.URL.Scheme = "https"
 		isHttps = true
 		httpctx.SetRequestHTTPS(req, true)
@@ -718,7 +712,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				var serverUseH2 bool
 				if p.http2 {
 					// does remote server use h2?
-					defaultTLSConfig := utils.NewDefaultTLSConfig()
+					defaultTLSConfig := &cryltoTLS.Config{}
 					defaultTLSConfig.NextProtos = []string{"h2"}
 					var proxyStr string
 					if p.proxyURL != nil {

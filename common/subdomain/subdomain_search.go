@@ -2,9 +2,9 @@ package subdomain
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -34,14 +34,7 @@ func virustotalVisit(ctx context.Context, url string) (result []string, err erro
 			Next string `json:"next"`
 		} `json:"links"`
 	}
-	client := http.Client{
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-		}},
-		Timeout: timeoutFromContext(ctx, 15*time.Second),
-	}
+	client := netx.NewDefaultHTTPClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -157,14 +150,7 @@ var (
 	}
 
 	GeneralAction SearchAction = func(ctx context.Context, target string) (result []*SubdomainResult, e error) {
-		client := http.Client{
-			Transport: &http.Transport{TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-			}},
-			Timeout: timeoutFromContext(ctx, 15*time.Second),
-		}
+		client := netx.NewDefaultHTTPClient()
 		wg := sync.WaitGroup{}
 		wg.Add(len(SearchSource))
 

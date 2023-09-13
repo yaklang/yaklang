@@ -1,11 +1,11 @@
 package simple
 
 import (
-	"crypto/tls"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"net/url"
@@ -115,9 +115,7 @@ func (browser *VBrowser) createHijack() error {
 				return http.ErrUseLastResponse
 			},
 		}
-		transport := http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
+		transport := netx.NewDefaultHTTPTransport()
 		if browser.proxyAddress != "" {
 			proxyUrl, err := url.Parse(browser.proxyAddress)
 			if err != nil {
@@ -125,7 +123,7 @@ func (browser *VBrowser) createHijack() error {
 			}
 			transport.Proxy = http.ProxyURL(proxyUrl)
 		}
-		client.Transport = &transport
+		client.Transport = transport
 
 		err := hijack.LoadResponse(&client, true)
 		if err != nil {

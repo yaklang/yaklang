@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"net"
 )
 
 func FetchExternalIP() (net.IP, error) {
-	dailer := utils.NewDefaultHTTPClient()
+	dailer := netx.NewDefaultHTTPClient()
 	for _, domain := range []string{
 		"ifconfig.me",
 		"ipinfo.io/ip",

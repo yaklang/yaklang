@@ -1,8 +1,8 @@
 package websvr
 
 import (
-	"crypto/tls"
 	x "crypto/x509"
+	tls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/gmsm/x509"
 	"io/ioutil"
