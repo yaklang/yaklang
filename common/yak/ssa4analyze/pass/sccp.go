@@ -216,7 +216,7 @@ func emit(v ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	return v
 }
 func newBinOpOnly(op ssa.BinaryOpcode, x, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
-	return handlerBinOpWithOutput(ssa.NewBinOp(op, x, y, block), false)
+	return handlerBinOpWithOutput(ssa.NewBinOpOnly(op, x, y, block), false)
 }
 
 func newBinOp(op ssa.BinaryOpcode, x, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
@@ -230,6 +230,7 @@ func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
 func handlerBinOp(bin *ssa.BinOp) ssa.Value {
 	return handlerBinOpWithOutput(bin, true)
 }
+
 func handlerBinOpWithOutput(bin *ssa.BinOp, output bool) ssa.Value {
 	replace := func(ret ssa.Value) {
 		if output {
@@ -259,6 +260,23 @@ func handlerBinOpWithOutput(bin *ssa.BinOp, output bool) ssa.Value {
 			return ret
 		}
 	}
+
+	f := func(x, y ssa.Value) bool {
+		if un, ok := x.(*ssa.UnOp); ok {
+			if un.X == y && un.Op == ssa.OpNot {
+				return true
+			}
+		}
+		return false
+	}
+
+	if bin.Op == ssa.OpOr {
+		// ~x | x
+		if f(bin.X, bin.Y) || f(bin.Y, bin.X) {
+			return ssa.NewConst(true)
+		}
+	}
+
 	return bin
 }
 
@@ -403,7 +421,6 @@ func ConstBinary(x, y *ssa.Const, op ssa.BinaryOpcode) *ssa.Const {
 			return ssa.NewConst(x.Number() != y.Number())
 		}
 	}
-
 	return nil
 }
 
