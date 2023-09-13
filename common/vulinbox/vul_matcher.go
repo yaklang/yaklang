@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"golang.org/x/exp/slices"
 	"sync"
 )
 
@@ -22,10 +23,11 @@ func (m *matcher) RunSingle() {
 	if m.ctx != nil {
 		select {
 		case <-m.ctx.Done():
-			return
 		default:
+			return
 		}
 	}
+
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	m.run()
 }
@@ -68,33 +70,28 @@ func (m *matcher) Match(data []byte) bool {
 func (m *matcher) AddRule(rules ...*rule.Rule) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-RULELOOP:
 	for _, r := range rules {
+		var found bool
 		for _, r2 := range m.surirule {
 			if r.Raw == r2.Raw {
-				continue RULELOOP
+				found = true
+				break
 			}
 		}
-		m.surirule = append(m.surirule, r)
+		if !found {
+			m.surirule = append(m.surirule, r)
+		}
 	}
 }
 
 func (m *matcher) RemoveRule(rules ...*rule.Rule) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	for i := 0; i < len(m.surirule); i++ {
-		for _, r := range rules {
-			if r.Raw == m.surirule[i].Raw {
-				if i == len(m.surirule)-1 {
-					m.surirule = m.surirule[:len(m.surirule)-1]
-				} else {
-					m.surirule[i] = m.surirule[len(m.surirule)-1]
-					m.surirule = m.surirule[:len(m.surirule)-1]
-				}
-				break
-			}
-		}
-	}
+	m.surirule = slices.DeleteFunc(m.surirule, func(rr *rule.Rule) bool {
+		return slices.IndexFunc(rules, func(r *rule.Rule) bool {
+			return r.Raw == rr.Raw
+		}) != -1
+	})
 	if len(m.surirule) == 0 {
 		m.cancel()
 	}
