@@ -43,6 +43,12 @@ func EmitBefore(before, inst Instruction) {
 }
 
 func (f *FunctionBuilder) emit(i Instruction) {
+	if c, ok := i.(Value); ok {
+		if utils.IsNil(c.GetType()) {
+			c.SetType(BasicTypes[Any])
+		}
+	}
+
 	f.CurrentBlock.Instrs = append(f.CurrentBlock.Instrs, i)
 	f.SetReg(i)
 }
@@ -118,6 +124,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	r := NewReturn(vs, f.CurrentBlock)
 	f.emit(r)
 	f.CurrentBlock.finish = true
+	f.Return = append(f.Return, r)
 	return r
 }
 
@@ -130,14 +137,13 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	return c
 }
 
-func (f *FunctionBuilder) emitInterface(parentI *Interface, typs Types, low, high, max, Len, Cap Value) *Interface {
-	i := NewInterface(parentI, typs, low, high, max, Len, Cap, f.CurrentBlock)
+func (f *FunctionBuilder) emitInterface(parentI User, typ Type, low, high, max, Len, Cap Value) *Interface {
+	i := NewInterface(parentI, typ, low, high, max, Len, Cap, f.CurrentBlock)
 	f.emit(i)
 	return i
 }
 
-func (f *FunctionBuilder) EmitInterfaceBuildWithType(typ Types, Len, Cap Value) *Interface {
-	return f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
+	return i
 }
 func (f *FunctionBuilder) EmitInterfaceSlice(i *Interface, low, high, max Value) *Interface {
 	return f.emitInterface(i, i.typs, low, high, max, nil, nil)

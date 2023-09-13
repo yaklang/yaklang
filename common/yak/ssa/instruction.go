@@ -26,7 +26,7 @@ func newAnInstuction(block *BasicBlock) anInstruction {
 	return anInstruction{
 		Func:     block.Parent,
 		Block:    block,
-		typs:     make(Types, 0),
+		typs:     nil,
 		variable: "",
 		pos:      block.Parent.builder.currtenPos,
 	}
@@ -107,7 +107,7 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 		Results:       vs,
 	}
 	fixupUseChain(r)
-	block.Parent.Return = append(block.Parent.Return, r)
+	r.SetType(CalculateType(lo.Map(vs, func(v Value, _ int) Type { return v.GetType() })))
 	return r
 }
 

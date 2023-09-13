@@ -11,6 +11,8 @@ import (
 
 type Type interface {
 	String() string
+	RawString() string
+	GetTypeKind() TypeKind
 }
 type Types []Type // each value can have multiple type possible
 
@@ -65,7 +67,7 @@ func (t Types) Contains(typ Types) bool {
 
 func (t Types) IsType(kind TypeKind) bool {
 	for _, typ := range t {
-		if typ == BasicTypesKind[kind] {
+		if typ == BasicTypes[kind] {
 			return true
 		}
 	}
@@ -83,6 +85,8 @@ const (
 	Null         //
 	Any          // any type
 	ErrorType
+	InterfaceTypeKind
+	FunctionTypeKind
 )
 
 type BasicType struct {
@@ -94,7 +98,15 @@ func (b BasicType) String() string {
 	return b.name
 }
 
-var BasicTypesKind = []BasicType{
+func (b BasicType) RawString() string {
+	return b.name
+}
+
+func (b BasicType) GetTypeKind() TypeKind {
+	return b.Kind
+}
+
+var BasicTypes = []BasicType{
 	Number:       {Number, "number"},
 	String:       {String, "string"},
 	Boolean:      {Boolean, "boolean"},
@@ -114,13 +126,17 @@ func GetType(i any) Type {
 func GetTypeByStr(typ string) Type {
 	switch typ {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64":
-		return BasicTypesKind[Number]
+		return BasicTypes[Number]
 	case "float", "float32", "float64", "double":
-		return BasicTypesKind[Number]
+		return BasicTypes[Number]
 	case "string":
-		return BasicTypesKind[String]
+		return BasicTypes[String]
 	case "bool":
-		return BasicTypesKind[Boolean]
+		return BasicTypes[Boolean]
+	case "interface {}":
+		return BasicTypes[Any]
+	case "error":
+		return BasicTypes[ErrorType]
 	default:
 		return nil
 	}
@@ -128,10 +144,10 @@ func GetTypeByStr(typ string) Type {
 
 // ====================== chan type
 type ChanType struct {
-	elem Types
+	elem Type
 }
 
-func NewChanType(elem Types) *ChanType {
+func NewChanType(elem Type) *ChanType {
 	return &ChanType{
 		elem: elem,
 	}
@@ -142,41 +158,52 @@ func (c ChanType) String() string {
 }
 
 // ==================== interface type
-type InterfaceTypeKind int
+type InterfaceKind int
 
 const (
-	Slice InterfaceTypeKind = iota
+	None InterfaceKind = iota
+	Slice
 	Map
 	Struct
 )
 
 type InterfaceType struct {
-	Kind    InterfaceTypeKind
+	Name    string
+	Kind    InterfaceKind
+	Len     int
 	Key     []Value
-	keyType []Types
-	Field   []Types
+	keyType []Type
+	Field   []Type
+}
+
+func (i InterfaceType) GetTypeKind() TypeKind {
+	return InterfaceTypeKind
 }
 
 var _ (Type) = (*InterfaceType)(nil)
 
+func (i *InterfaceType) SetName(name string) {
+	i.Name = name
+}
+
 func NewInterfaceType() *InterfaceType {
 	return &InterfaceType{
-		Kind:    Struct,
+		Kind:    None,
 		Key:     make([]Value, 0),
-		keyType: make([]Types, 0),
-		Field:   make([]Types, 0),
+		keyType: make([]Type, 0),
+		Field:   make([]Type, 0),
 	}
 }
 
 // for slice build
-func NewSliceType(elem Types) *InterfaceType {
+func NewSliceType(elem Type) *InterfaceType {
 	i := NewInterfaceType()
 	i.Kind = Slice
 	i.Field = append(i.Field, elem)
 	return i
 }
 
-func NewMapType(key, field Types) *InterfaceType {
+func NewMapType(key, field Type) *InterfaceType {
 	i := NewInterfaceType()
 	i.keyType = append(i.keyType, key)
 	i.Field = append(i.Field, field)
@@ -185,47 +212,63 @@ func NewMapType(key, field Types) *InterfaceType {
 }
 
 func (itype InterfaceType) String() string {
+	if itype.Name != "" {
+		return itype.Name
+	}
+	return itype.RawString()
+}
+
+func (itype InterfaceType) RawString() string {
 	ret := ""
 	switch itype.Kind {
 	case Slice:
 		// map[int]T
-		if len(itype.Field) == 1 {
+		if itype.Len == 0 {
 			ret += fmt.Sprintf("[]%s", itype.Field[0].String())
 		} else {
-			panic("this interface type not slice")
+			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.Field[0].String())
 		}
 	case Map:
 		// map[T]U
-		if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-			ret += fmt.Sprintf("map[%s]%s", itype.keyType[0].String(), itype.Field[0].String())
-		} else {
-			panic("this interface type not map")
-		}
+		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
+		ret += fmt.Sprintf("map[%s]%s", itype.keyType[0].String(), itype.Field[0].String())
+		// } else {
+		// 	panic("this interface type not map")
+		// }
 	case Struct:
 		// map[string](T/U/xx)
 		ret += fmt.Sprintf(
 			"struct {%s}",
 			strings.Join(
-				lo.Map(itype.Field, func(field Types, _ int) string { return field.String() }),
+				lo.Map(itype.Field, func(field Type, _ int) string { return field.String() }),
 				",",
 			),
 		)
+	case None:
+		ret += "interface{}"
 	}
 	return ret
 }
 
 // for struct build
-func (s *InterfaceType) AddField(key Value, field Types) {
+func (s *InterfaceType) AddField(key Value, field Type) {
 	s.Key = append(s.Key, key)
-	s.keyType = append(s.keyType, key.GetType())
+	keytyp := key.GetType()
+	if keytyp == nil {
+		keytyp = BasicTypes[Any]
+	}
+	s.keyType = append(s.keyType, keytyp)
+	if field == nil {
+		field = BasicTypes[Any]
+	}
 	s.Field = append(s.Field, field)
 }
 
 // return (field-type, key-type)
-func (s *InterfaceType) GetField(key Value) (Types, Types) {
+func (s *InterfaceType) GetField(key Value) (Type, Type) {
 	switch s.Kind {
 	case Slice:
-		return s.Field[0], Types{BasicTypesKind[Number]}
+		return s.Field[0], BasicTypes[Number]
 	case Map:
 		return s.Field[0], s.keyType[0]
 	case Struct:
@@ -238,20 +281,89 @@ func (s *InterfaceType) GetField(key Value) (Types, Types) {
 
 // ===================== Finish simply
 func (s *InterfaceType) Finish() {
-	field := lo.UniqBy(s.Field, func(t Types) string { return t.String() })
-	keytype := lo.UniqBy(s.keyType, func(t Types) string { return t.String() })
-	if len(field) == 1 {
-		if len(keytype) == 1 {
+	field := lo.UniqBy(s.Field, func(t Type) string { return t.String() })
+	keytype := lo.UniqBy(s.keyType, func(t Type) string { return t.String() })
+	if len(keytype) == 1 {
+		if len(field) == 1 {
 			// map[T]U
 			if keytype[0].String() == "number" {
 				// map[number]T ==> []T slice
+				// TODO: check increasing
 				s.Kind = Slice
 			} else {
 				// Map
 				s.Kind = Map
 			}
-			s.keyType = keytype
-			s.Field = field
+			// s.keyType = keytype
+			// s.Field = field
+		} else {
+			s.Kind = Struct
 		}
 	}
+}
+
+type FunctionType struct {
+	Name       string
+	ReturnType Type
+	Parameter  []Type
+	IsVariadic bool
+}
+
+func CalculateType(ts []Type) Type {
+	if len(ts) == 0 {
+		return BasicTypes[Null]
+	} else if len(ts) == 1 {
+		return ts[0]
+	} else {
+		i := NewInterfaceType()
+		for index, typ := range ts {
+			i.AddField(NewConst(index), typ)
+		}
+		i.Finish()
+		// i.SetLen(NewConst(len(ts)))
+		i.Len = len(ts)
+		return i
+	}
+}
+
+func NewFunctionType(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
+	f := &FunctionType{
+		Name:       name,
+		Parameter:  Parameter,
+		IsVariadic: IsVariadic,
+	}
+	f.ReturnType = CalculateType(ReturnType)
+	return f
+}
+
+func (s *FunctionType) SetName(name string) {
+	s.Name = name
+}
+
+func (s *FunctionType) String() string {
+	if s.Name != "" {
+		return s.Name
+	}
+	return s.RawString()
+}
+
+func (s *FunctionType) RawString() string {
+	str := ""
+	if s.IsVariadic {
+		str += "..."
+	}
+
+	return fmt.Sprintf(
+		"(%s %s) -> %s",
+		strings.Join(
+			lo.Map(s.Parameter, func(t Type, _ int) string { return t.String() }),
+			",",
+		),
+		str,
+		s.ReturnType,
+	)
+}
+
+func (s *FunctionType) GetTypeKind() TypeKind {
+	return FunctionTypeKind
 }
