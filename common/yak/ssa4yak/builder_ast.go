@@ -904,20 +904,20 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 		switch typ.Kind {
 		case ssa.Slice:
 			if len(exprs) == 0 {
-				return b.EmitInterfaceBuildWithType(ssa.Types{typ}, zero, zero)
+				return b.EmitInterfaceBuildWithType(typ, zero, zero)
 			} else if len(exprs) == 1 {
-				return b.EmitInterfaceBuildWithType(ssa.Types{typ}, exprs[0], exprs[0])
+				return b.EmitInterfaceBuildWithType(typ, exprs[0], exprs[0])
 			} else if len(exprs) == 2 {
-				return b.EmitInterfaceBuildWithType(ssa.Types{typ}, exprs[0], exprs[1])
+				return b.EmitInterfaceBuildWithType(typ, exprs[0], exprs[1])
 			} else {
 				b.NewError(ssa.Error, TAG, "make slice expression argument too much!")
 			}
 		case ssa.Map:
-			return b.EmitInterfaceBuildWithType(ssa.Types{typ}, zero, zero)
+			return b.EmitInterfaceBuildWithType(typ, zero, zero)
 		case ssa.Struct:
 		}
-	case *ssa.ChanType:
-		fmt.Printf("debug %v\n", "make chan")
+	// case *ssa.ChanType:
+	// 	fmt.Printf("debug %v\n", "make chan")
 	default:
 		b.NewError(ssa.Error, TAG, "make unknow type")
 	}
@@ -950,7 +950,7 @@ func (b *astbuilder) buildTypeLiteral(stmt *yak.TypeLiteralContext) ssa.Type {
 	if strings.HasPrefix(text, "chan") {
 		if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 			if typ := b.buildTypeLiteral(s); typ != nil {
-				return ssa.NewChanType(ssa.Types{typ})
+				// return ssa.NewChanType(typ)
 			}
 		}
 	}
@@ -964,7 +964,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) ss
 	defer recoverRange()
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
-			return ssa.NewSliceType(ssa.Types{eleTyp})
+			return ssa.NewSliceType(eleTyp)
 		}
 	}
 	return nil
@@ -986,7 +986,7 @@ func (b *astbuilder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) ssa.Ty
 		valueTyp = b.buildTypeLiteral(s)
 	}
 	if keyTyp != nil && valueTyp != nil {
-		return ssa.NewMapType(ssa.Types{keyTyp}, ssa.Types{valueTyp})
+		return ssa.NewMapType(keyTyp, valueTyp)
 
 	}
 
@@ -1084,9 +1084,10 @@ func (b *astbuilder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt
 			return b.buildFunctionCall(stmt, v)
 		}
 		if expr != nil {
-			if f, ok := buildin[expr.GetText()]; ok {
-				return b.buildFunctionCall(stmt, f)
-			}
+			//TODO handler buildin function
+			// if f, ok := buildin[expr.GetText()]; ok {
+			// 	return b.buildFunctionCall(stmt, f)
+			// }
 		}
 	}
 	b.NewError(ssa.Error, TAG, "call target is nil")
@@ -1120,9 +1121,7 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 	}
 	if ellipsis != nil {
 		//handler "..." to array
-		typ := v[len(v)-1].GetType()
-		typ = append(typ, ssa.NewInterfaceType())
-		v[len(v)-1].SetType(typ)
+		v[len(v)-1].SetType(ssa.NewInterfaceType())
 	}
 	return v
 }
@@ -1367,7 +1366,7 @@ func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.
 	values := make([]ssa.Value, 0, valueLen)
 	for _, e := range exprs {
 		if e, ok := e.(*yak.ExpressionContext); ok {
-			if v := b.buildExpression(e); v != nil && !reflect.ValueOf(v).IsNil() {
+			if v := b.buildExpression(e); !utils.IsNil(v) {
 				values = append(values, v)
 			}
 		}

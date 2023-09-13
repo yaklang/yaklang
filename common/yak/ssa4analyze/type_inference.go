@@ -1,8 +1,6 @@
 package ssa4analyze
 
 import (
-	"sort"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -110,11 +108,13 @@ func (t *TypeInference) CheckOnInstruction(inst ssa.InstructionValue) bool {
 if v.Type !match typ return true
 if v.Type match  typ return false
 */
-func checkType(v ssa.Value, typ ssa.Types) bool {
-	if v.GetType().Equal(typ) {
+func checkType(v ssa.Value, typ ssa.Type) bool {
+	if v.GetType() == nil {
+		v.SetType(typ)
 		return false
 	}
-	if !v.GetType().Contains(typ) {
+	//TODO:type kind check should handler interfaceTypeKind
+	if v.GetType().GetTypeKind() != typ.GetTypeKind() {
 		if inst, ok := v.(ssa.Instruction); ok {
 			inst.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", typ)
 		}
@@ -126,7 +126,7 @@ func checkType(v ssa.Value, typ ssa.Types) bool {
 func (t *TypeInference) TypeCheckField(f *ssa.Field) bool {
 	// use interface
 	// if _, ok := t.Finish[f.I]; ok {
-	interfaceTyp := f.I.GetType()[0].(*ssa.InterfaceType)
+	interfaceTyp := f.I.GetType().(*ssa.InterfaceType)
 	fTyp, kTyp := interfaceTyp.GetField(f.Key)
 	if fTyp == nil || kTyp == nil {
 		f.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this field not in interface")
@@ -152,7 +152,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 		return true
 	}
 	// set type in ast-builder
-	if len(inst.GetType()) != 0 {
+	if inst.GetType().GetTypeKind() != ssa.Any {
 		t.CheckList = append(t.CheckList, inst)
 		return true
 	}
@@ -188,11 +188,10 @@ func collectTypeFromValues(values []ssa.Value, skip func(int, ssa.Value) bool) [
 			continue
 		}
 		// uniq typ
-		for _, typ := range v.GetType() {
-			if _, ok := typMap[typ]; !ok {
-				typMap[typ] = struct{}{}
-				typs = append(typs, typ)
-			}
+		typ := v.GetType()
+		if _, ok := typMap[typ]; !ok {
+			typMap[typ] = struct{}{}
+			typs = append(typs, typ)
 		}
 	}
 	return typs
@@ -231,7 +230,7 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) bool {
 	)
 
 	// only first set type, phi will change
-	phi.SetType(typs)
+	phi.SetType(typs[0])
 	return true
 }
 
@@ -242,14 +241,16 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 		return false
 	}
 
-	handlerBinOpType := func(x, y ssa.Types) ssa.Types {
-		xmap := make(map[ssa.Type]struct{})
-		for _, typ := range x {
-			xmap[typ] = struct{}{}
+	handlerBinOpType := func(x, y ssa.Type) ssa.Type {
+		if x == nil {
+			return y
 		}
-		for _, typ := range y {
-			if _, ok := xmap[typ]; ok {
-				return ssa.Types{typ}
+		if x.GetTypeKind() == y.GetTypeKind() {
+			return x
+		}
+		if y.GetTypeKind() == ssa.Null {
+			if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
+				return ssa.BasicTypes[ssa.Boolean]
 			}
 		}
 		return nil
@@ -262,7 +263,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 
 	// typ := handler
 	if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
-		bin.SetType(ssa.Types{ssa.BasicTypesKind[ssa.Boolean]})
+		bin.SetType(ssa.BasicTypes[ssa.Boolean])
 		return true
 	} else {
 		bin.SetType(retTyp)
@@ -271,36 +272,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 }
 
 func (t *TypeInference) TypeInferenceInterface(i *ssa.Interface) bool {
-	// check field finish
-	if t.checkValuesNotFinish(
-		lo.MapToSlice(i.Field,
-			func(key ssa.Value, v *ssa.Field) ssa.Value {
-				return v
-			},
-		),
-	) {
-		return false
-	}
 
-	type pair struct {
-		key   ssa.Value
-		field *ssa.Field
-	}
-	// inference type
-	typ := ssa.NewInterfaceType()
-	// sort by key
-	vs := lo.MapToSlice(i.Field, func(key ssa.Value, v *ssa.Field) pair {
-		return pair{key: key, field: v}
-	})
-	// if number, sort
-	sort.Slice(vs, func(i, j int) bool {
-		return vs[i].key.String() < vs[j].key.String()
-	})
-	for _, pair := range vs {
-		typ.AddField(pair.key, pair.field.GetType())
-	}
-	typ.Finish()
-	i.SetType(ssa.Types{typ})
 
 	return true
 }
@@ -323,12 +295,14 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
 		return false
 	}
 
-	f.SetType(
-		collectTypeFromValues(
-			// f.Update,
-			vs,
-			func(i int, v ssa.Value) bool { return false }),
+	ts := collectTypeFromValues(
+		// f.Update,
+		vs,
+		func(i int, v ssa.Value) bool { return false },
 	)
+	if len(ts) != 0 {
+		f.SetType(ts[0])
+	}
 	return true
 }
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) bool {

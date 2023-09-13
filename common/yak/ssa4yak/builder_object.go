@@ -39,8 +39,7 @@ func (b *astbuilder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) 
 	slice := b.buildSliceFromExprList(stmt)
 
 	if s, ok := stmt.SliceTypeLiteral().(*yak.SliceTypeLiteralContext); ok {
-		typ := b.buildSliceTypeLiteral(s)
-		slice.SetType(ssa.Types{typ})
+		slice.SetType(b.buildSliceTypeLiteral(s))
 	} else {
 		b.NewError(ssa.Warn, TAG, "slice type not set")
 	}
@@ -99,8 +98,7 @@ func (b *astbuilder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) ssa.
 	maps := b.buildMapFromMapPairs(stmt)
 
 	if s, ok := stmt.MapTypeLiteral().(*yak.MapTypeLiteralContext); ok {
-		typ := b.buildMapTypeLiteral(s)
-		maps.SetType(ssa.Types{typ})
+		maps.SetType(b.buildMapTypeLiteral(s))
 	} else {
 		b.NewError(ssa.Warn, TAG, "map type not set")
 	}
