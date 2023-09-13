@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "synscan_openvpn_mock.yak"
+	var debugName = "output.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
