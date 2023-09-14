@@ -294,6 +294,7 @@ func NewDefaultHTTPClient() *http.Client {
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 				MaxVersion:         tls.VersionTLS13,
+				Renegotiation:      tls.RenegotiateFreelyAsClient,
 			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
@@ -313,6 +314,7 @@ func NewDefaultTLSConfig() *tls.Config {
 		InsecureSkipVerify: true,
 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 		MaxVersion:         tls.VersionTLS13,
+		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
 }
 

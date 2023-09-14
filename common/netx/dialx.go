@@ -270,6 +270,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 		MaxVersion:         tls.VersionTLS13,
 		InsecureSkipVerify: true,
+		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
 	if config.ShouldOverrideTLSConfig {
 		tlsConfig = config.TLSConfig
@@ -306,6 +307,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 					MaxVersion:         tls.VersionTLS13,
 					InsecureSkipVerify: true,
+					Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 				}
 			}
 			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout)
@@ -320,6 +322,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 				MaxVersion:         tls.VersionTLS13,
 				InsecureSkipVerify: true,
+				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 			}
 			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout)
 			if err != nil {
