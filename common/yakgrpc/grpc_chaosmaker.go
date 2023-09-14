@@ -159,7 +159,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		for _, client := range clients {
 			client.Msg().Send(vulinboxagentproto.NewSubscribeAction("suricata", suriraw))
 			client.RegisterDataback("suricata", func(data any) {
-				spew.Dump(data)
+				log.Infof("suricata hit: %100s...", spew.Sdump(data))
 				addMatchCounter()
 			})
 		}
