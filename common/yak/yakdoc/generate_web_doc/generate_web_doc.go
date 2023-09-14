@@ -37,7 +37,7 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 	for _, fun := range funcList {
 		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, fun.MethodName, fun.Document))
 		buf := strings.Builder{}
-		buf.WriteString(fmt.Sprintf("### %s.%s\n\n", fun.LibName, fun.MethodName))
+		buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
 		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", fun.Document))
 		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", fun.Decl))
 		if len(fun.Params) > 0 {
