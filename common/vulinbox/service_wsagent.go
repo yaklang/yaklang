@@ -78,15 +78,11 @@ func (a *wsAgent) run() {
 }
 
 func (a *wsAgent) TrySend(v any) {
-	if a == nil || a.ctx == nil || a.wChan == nil {
+	if a == nil || a.wChan == nil {
 		return
 	}
-	select {
-	case <-a.ctx.Done():
-		close(a.wChan)
-		return
-	default:
-	}
+
+	// the channel will never be closed
 	select {
 	case a.wChan <- v:
 	default:
