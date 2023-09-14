@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -174,15 +173,8 @@ func (s *Server) QueryDNSLogTokenByScript(ctx context.Context, req *ypb.RequireD
 		}
 		for _, v := range utils.InterfaceToSliceInterface(result) {
 			event := utils.InterfaceToMapInterface(v)
-			var ts int64
-			t, err := time.Parse(time.RFC3339, utils.MapGetString(event, "Timestamp"))
-			if err != nil {
-				log.Errorf(`time.Parse(time.RFC3339, utils.MapGetString(params, "time")) err: %v`, err)
-			}
-			if !t.IsZero() {
-				ts = t.Unix()
-			}
 			var raw = []byte(spew.Sdump(event))
+
 			e := &tpb.DNSLogEvent{
 				Type:       utils.MapGetString(event, "Type"),
 				Token:      utils.MapGetString(event, "Token"),
@@ -190,7 +182,7 @@ func (s *Server) QueryDNSLogTokenByScript(ctx context.Context, req *ypb.RequireD
 				RemoteAddr: utils.MapGetString(event, "RemoteAddr"),
 				RemoteIP:   utils.MapGetString(event, "RemoteIP"),
 				Raw:        raw,
-				Timestamp:  ts,
+				Timestamp:  int64(utils.MapGetInt(event, "Timestamp")),
 			}
 			events = append(events, e)
 		}
