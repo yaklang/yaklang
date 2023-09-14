@@ -22,6 +22,7 @@ type matcher struct {
 func (m *matcher) Run() {
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	handler, err := pcaputil.GetPublicInternetPcapHandler()
+	defer handler.Close()
 	if err != nil {
 		log.Error(err)
 		return
