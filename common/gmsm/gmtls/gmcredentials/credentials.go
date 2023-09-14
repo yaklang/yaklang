@@ -109,6 +109,7 @@ func (c *tlsCreds) ClientHandshake(ctx context.Context, addr string, rawConn net
 		}
 		cfg.ServerName = addr[:colonPos]
 	}
+	cfg.Renegotiation = gmtls.RenegotiateFreelyAsClient
 	conn := gmtls.Client(rawConn, cfg)
 	errChannel := make(chan error, 1)
 	go func() {

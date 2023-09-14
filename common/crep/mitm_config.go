@@ -247,6 +247,16 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		},
 	}
 
+	if opts.EnableGMTLS {
+		var gmDialCtx = netx.NewDialGMTLSContextFunc(
+			true,
+			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
+			extraDNSOpt...)
+		t.DialTLSContext = gmDialCtx
+	} else {
+		t.DialTLSContext = netx.NewDialGMTLSContextFunc(false, false, false, time.Duration(opts.DialTimeout)*time.Second, extraDNSOpt...)
+	}
+
 	if opts.EnableHTTP2 {
 		err := lowhttp2.ConfigureTransport(t)
 		if err != nil {
@@ -261,7 +271,6 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		为 httpTransport 设置 TLS 证书
 	*/
 	var gmCerts []gmtls.Certificate
-
 	pool := x509.NewCertPool()
 	for _, certs := range opts.ClientCerts {
 		for _, ca := range certs.CaPem {
@@ -281,14 +290,6 @@ func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
 		}
 	}
 
-	if opts.EnableGMTLS {
-		var gmDialCtx = netx.NewDialGMTLSContextFunc(
-			true,
-			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
-			extraDNSOpt...)
-		t.DialContext = dialContext
-		t.DialTLSContext = gmDialCtx
-	}
 	return t, nil
 }
 
