@@ -82,7 +82,7 @@ func (a *wsAgent) TrySend(v any) {
 		return
 	}
 
-	// the channel will never be closed
+	// the channel never closed
 	select {
 	case a.wChan <- v:
 	default:
@@ -173,11 +173,22 @@ func (r *VulinServer) handleSubscribe(a []byte) (any, error) {
 		}
 		appendRules = append(appendRules, rules...)
 	}
+
 	r.matcher.AddRule(appendRules...)
+
+	success := r.singlePcapLocker.TryLock()
+	if !success {
+		return nil, nil
+	}
+
 	r.matcher.SetCallback(func(data []byte) {
 		r.wsAgent.TrySend(vulinboxagentproto.NewDataBackAction("suricata", codec.EncodeBase64(data)))
 	})
-	go r.matcher.RunSingle()
+	go func() {
+		defer r.singlePcapLocker.Unlock()
+		r.matcher.Run()
+	}()
+
 	return nil, nil
 }
 

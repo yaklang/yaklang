@@ -19,20 +19,8 @@ type matcher struct {
 	callback func([]byte)
 }
 
-func (m *matcher) RunSingle() {
-	if m.ctx != nil {
-		select {
-		case <-m.ctx.Done():
-		default:
-			return
-		}
-	}
-
+func (m *matcher) Run() {
 	m.ctx, m.cancel = context.WithCancel(context.Background())
-	m.run()
-}
-
-func (m *matcher) run() {
 	handler, err := pcaputil.GetPublicInternetPcapHandler()
 	if err != nil {
 		log.Error(err)
