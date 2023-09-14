@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,8 @@ type VulinServer struct {
 
 	wsAgent wsAgent
 	matcher matcher
+
+	singlePcapLocker sync.Mutex
 
 	safeMode           bool
 	groupedRoutesCache []*GroupedRoutes
