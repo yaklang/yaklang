@@ -577,8 +577,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		mitmLock.Lock()
-		defer mitmLock.Unlock()
+		//如果需要劫持响应则需要处理来自req的锁
+		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
+			defer mitmLock.Unlock()
+		}
 
 		/* 这儿比单纯劫持响应要简单的多了 */
 		originRspRaw := raw[:]
@@ -668,9 +670,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		mitmLock.Lock()
-		defer mitmLock.Unlock()
-
+		// 如果劫持响应就需要释放来自req的锁
+		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
+			defer mitmLock.Unlock()
+		}
 		/*
 		   这里是调用 hijackHTTPResponse 的问题
 		*/
@@ -882,8 +885,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}
 	handleHijackWsRequest := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
+		var shouldHijackResponse bool
 		mitmLock.Lock()
-		defer mitmLock.Unlock()
+		defer func() {
+			// 根据是否劫持响应来判断是否释放锁
+			if !shouldHijackResponse {
+				mitmLock.Unlock()
+			}
+		}()
 		defer func() {
 			if err := recover(); err != nil {
 				log.Warnf("hijack ws websocket failed: %s", err)
@@ -1020,8 +1029,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) []byte {
+		var shouldHijackResponse bool
 		mitmLock.Lock()
-		defer mitmLock.Unlock()
+		defer func() {
+			// 根据是否劫持响应来判断是否释放锁
+			if !shouldHijackResponse {
+				mitmLock.Unlock()
+			}
+		}()
 		// 保证始终只有一个 Goroutine 在处理请求
 		defer func() {
 			if err := recover(); err != nil {
@@ -1152,7 +1167,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if !ok {
 				return req
 			}
-
 			httpctx.SetRequestViewedByUser(originReqIns)
 			for {
 				feedbackOrigin := &ypb.MITMResponse{
@@ -1199,6 +1213,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					continue
 				}
 
+				if reqInstance.GetHijackResponse() {
+					// 设置需要劫持resp
+					shouldHijackResponse = true // 设置不释放锁
+					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
+					hijackedPtr := fmt.Sprintf("%p", originReqIns)
+					log.Infof("the ptr: %v's mitm request is waiting for hijacked", hijackedPtr)
+					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
+					continue
+				}
 				// 如果 ID 对不上，返回来的是旧的，已经不需要处理的 ID，则重新接受等待新的
 				if reqInstance.GetId() < id {
 					log.Warnf("MITM %v recv old hijacked request[%v]", addr, reqInstance.GetId())
@@ -1253,15 +1276,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				// 原封不动转发
 				if reqInstance.GetForward() {
 					return originReqRaw
-				}
-
-				if reqInstance.GetHijackResponse() {
-					// 设置将会当读劫持
-					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
-					hijackedPtr := fmt.Sprintf("%p", originReqIns)
-					log.Infof("the ptr: %v's mitm request is waiting for hijacked", hijackedPtr)
-					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
-					continue
 				}
 
 				current := reqInstance.GetRequest()
