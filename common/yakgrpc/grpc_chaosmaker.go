@@ -131,47 +131,50 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		return rules
 	}
 
-	var attackOnce = func(ctx context.Context) {
-		concurrent := req.GetConcurrent()
-		if concurrent <= 0 {
-			concurrent = 30
-		}
+	concurrent := req.GetConcurrent()
+	if concurrent <= 0 {
+		concurrent = 30
+	}
 
-		sendLog("info", "正在初始化Agent")
-		var clients []*vulinboxagentclient.Client
-		vulinboxAgentMap.Range(func(key, value any) bool {
-			agent, ok := value.(*VulinboxAgentFacade)
-			if !ok {
-				return true
-			}
-			clients = append(clients, agent.client)
+	sendLog("info", "正在初始化Agent")
+	var clients []*vulinboxagentclient.Client
+	vulinboxAgentMap.Range(func(key, value any) bool {
+		agent, ok := value.(*VulinboxAgentFacade)
+		if !ok {
 			return true
+		}
+		clients = append(clients, agent.client)
+		return true
+	})
+
+	// 暂时只支持 suricata
+	rules := getRules()
+	var suriraw []string
+	for _, r := range rules {
+		if r.SuricataRaw != "" {
+			suriraw = append(suriraw, r.SuricataRaw)
+		}
+	}
+	for _, client := range clients {
+		client.Msg().Send(vulinboxagentproto.NewSubscribeAction("suricata", suriraw))
+		client.RegisterDataback("suricata", func(data any) {
+			log.Infof("suricata hit: %100s...", spew.Sdump(data))
+			addMatchCounter()
 		})
-
-		// 暂时只支持 suricata
-		rules := getRules()
-		var suriraw []string
-		for _, r := range rules {
-			if r.SuricataRaw != "" {
-				suriraw = append(suriraw, r.SuricataRaw)
-			}
-		}
+	}
+	defer func() {
 		for _, client := range clients {
-			client.Msg().Send(vulinboxagentproto.NewSubscribeAction("suricata", suriraw))
-			client.RegisterDataback("suricata", func(data any) {
-				log.Infof("suricata hit: %100s...", spew.Sdump(data))
-				addMatchCounter()
-			})
+			client.Msg().Send(vulinboxagentproto.NewUnsubscribeAction("suricata", suriraw))
 		}
-		defer func() {
-			for _, client := range clients {
-				client.Msg().Send(vulinboxagentproto.NewUnsubscribeAction("suricata", suriraw))
-			}
-		}()
+	}()
 
+	generator := chaosmaker.NewChaosMaker()
+	generator.FeedRule(rules...)
+	generator.SetContext(stream.Context())
+
+	var attackOnce = func() {
 		sendLog("info", "开始执行本地模拟攻击剧本")
 		swg := utils.NewSizedWaitGroup(int(concurrent))
-		var generator = chaosmaker.NewChaosMaker()
 
 		wp := workpool.New(int(concurrent), func(rec chan []byte) {
 			for traffic := range rec {
@@ -184,9 +187,6 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		})
 		wp.Start()
 		defer wp.Stop()
-
-		generator.FeedRule(rules...)
-		generator.SetContext(ctx)
 
 		for pk := range generator.Generate() {
 			addTrafficCounter()
@@ -206,7 +206,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 		}
 		for _index := 1; _index <= int(req.GetExtraRepeat())+1; _index++ {
 			sendLog("info", "开始进行第%v次攻击模拟", _index)
-			attackOnce(stream.Context())
+			attackOnce()
 			delayer.Wait()
 		}
 	} else {
@@ -219,7 +219,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			}
 			count++
 			sendLog("info", "开始进行第%v次攻击模拟", count)
-			attackOnce(stream.Context())
+			attackOnce()
 		}
 	}
 	return nil
