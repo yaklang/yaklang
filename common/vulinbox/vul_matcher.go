@@ -36,6 +36,7 @@ func (m *matcher) run() {
 	handler, err := pcaputil.GetPublicInternetPcapHandler()
 	if err != nil {
 		log.Error(err)
+		return
 	}
 	source := gopacket.NewPacketSource(handler, handler.LinkType())
 	for {
