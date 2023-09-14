@@ -87,11 +87,7 @@ func GetPublicInternetPcapHandler() (*pcap.Handle, error) {
 	if err != nil {
 		return nil, err
 	}
-	handler, err := pcap.OpenLive(ifaceName, 65535, true, pcap.BlockForever)
-	if err != nil {
-		return nil, utils.Errorf("pcap.OpenLive via(GetPublicInternetPcapHandler) failed: %s", err)
-	}
-	return handler, nil
+	return OpenIfaceLive(ifaceName)
 }
 
 func OpenFile(filename string) (*pcap.Handle, error) {
@@ -105,7 +101,8 @@ func OpenFile(filename string) (*pcap.Handle, error) {
 func OpenIfaceLive(iface string) (*pcap.Handle, error) {
 	handler, err := pcap.OpenLive(iface, 65535, true, pcap.BlockForever)
 	if err != nil {
-		return nil, utils.Errorf("pcap.OpenLive failed: %s", err)
+		return nil, utils.Errorf("pcap.OpenLive %s failed: %v", iface, err)
 	}
+	log.Infof("open iface %s success\n", iface)
 	return handler, nil
 }
