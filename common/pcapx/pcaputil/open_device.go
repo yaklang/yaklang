@@ -103,6 +103,6 @@ func OpenIfaceLive(iface string) (*pcap.Handle, error) {
 	if err != nil {
 		return nil, utils.Errorf("pcap.OpenLive %s failed: %v", iface, err)
 	}
-	log.Infof("open iface %s success\n", iface)
+	log.Infof("open iface %s success", iface)
 	return handler, nil
 }
