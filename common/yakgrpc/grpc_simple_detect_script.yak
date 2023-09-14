@@ -562,7 +562,7 @@ handleServiceScanResult = func(result) {
         manager.HandleServiceScanResult(result)
     }
 
-    if enableBrute {
+    if enableBrute  && len(result.GetServiceName()) != 0 {
         bruteWg.Add()
         go func {
             defer bruteWg.Done()
@@ -571,8 +571,6 @@ handleServiceScanResult = func(result) {
             yakit.Info("Start Brute for %s-%s:%d", serviceName, result.Target, result.Port)
             bruteScan(result)
         }
-
-        bruteWg.Wait()
     }
 
 }
@@ -721,7 +719,7 @@ for fileReader.Next(){
     }
 }
 
-
+bruteWg.Wait()
 synWg.Wait()
 swg.Wait()
 yakit.SetProgress(0.94)
