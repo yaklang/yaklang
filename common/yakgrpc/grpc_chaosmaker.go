@@ -204,7 +204,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 			return nil
 		default:
 		}
-		for _index := 1; _index <= int(req.GetExtraRepeat()); _index++ {
+		for _index := 1; _index <= int(req.GetExtraRepeat())+1; _index++ {
 			sendLog("info", "开始进行第%v次攻击模拟", _index)
 			attackOnce(stream.Context())
 			delayer.Wait()
