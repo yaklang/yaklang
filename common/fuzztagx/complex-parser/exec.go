@@ -1,4 +1,4 @@
-package fuzztagx
+package complex_parser
 
 func ExecuteWithStringHandler(source string, param map[string]func(s string) []string) ([]string, error) {
 	param1 := make(map[string]BuildInTagFun)
