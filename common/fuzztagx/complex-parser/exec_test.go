@@ -1,4 +1,4 @@
-package parser
+package complex_parser
 
 import (
 	"fmt"
@@ -123,7 +123,7 @@ func TestExecuteWithHandler(t *testing.T) {
 		{"{{xx12:-_(1)}}[[[[}}", "[[[[}}"},
 		{"{{xx12:-_:::::::(2)}}[[[[}}", "[[[[}}"},
 		{"{{xx12:-_()}}[[[[}}", "[[[[}}"},
-		//{"{{xx12:-_(____)____)}}[[[[}}", "{{xx12:-_(____)____)}}[[[[}}"}, // {{xx12:-_(____)____)}}应该被正确解析
+		{"{{xx12:-_(____)____)}}[[[[}}", "{{xx12:-_(____)____)}}[[[[}}"},
 		{"{{xx12:-_(____\\)____)}}[[[[}}", "[[[[}}"},
 		{"{{xx12:-_(____\\)} }____)}}{[[[[}}", "{[[[[}}"},
 		{"{{xx12:-_(____)} }}____)}}[[[[}}", "{{xx12:-_(____)} }}____)}}[[[[}}"},
@@ -133,11 +133,11 @@ func TestExecuteWithHandler(t *testing.T) {
 		{"{{xx12:-_(____\\)} }__\\)__)}}{{1[[[[}}", "{{1[[[[}}"},
 		{"{{{{1[[[[}}", "{{{{1[[[[}}"},
 		{"{{{{int}}{{1[[[[}}", "{{1{{1[[[[}}"},
-		//{"{{i{{int}}nt(1-2)}}", "{{i1nt(1-2)}}"}, // 不允许渲染函数名
+		{"{{i{{int}}nt(1-2)}}", "{{i1nt(1-2)}}"},
 		{"{{", "{{"},
-		//{"{{test(123123\\))}}", "123123)"}, // 括号不需要转义
-		//{"{{print(list{\\())}}", "{{print(list{\\())}}"},
-		//{"{{print(list{\\(\\))}}", ""},
+		{"{{test(123123\\))}}", "123123)"},
+		{"{{print(list{\\())}}", "{{print(list{\\())}}"},
+		{"{{print(list{\\(\\))}}", ""},
 		{"{{{test(123)}}", "{123"},
 		// {"{{i{{int}}n{{int}}t(1-2)}}", "{{i1nt(1-2)}}"},
 	} {
@@ -194,6 +194,104 @@ func TestExecuteWithHandler(t *testing.T) {
 
 }
 
+func TestExecuteWithHandlerEscaped(t *testing.T) {
+	for _, v := range [][]string{
+		{"{{test(123123\\))}}", "123123)"},
+		{"\\){{test(123123\\))}}", "\\)123123)"},
+		{"\\){{test(1{{test(\\)1)}}23123\\))}}", "\\)1)123123)"},
+	} {
+		t, r := v[0], v[1]
+		result, err := ExecuteWithStringHandler(t, map[string]func(string) []string{
+			"test": func(s string) []string {
+				return []string{s}
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+		if len(result) <= 0 {
+			panic(1)
+		}
+		if result[0] != r {
+			m := fmt.Sprintf("got: %v expect: %v", strconv.Quote(result[0]), strconv.Quote(r))
+			panic(m)
+		}
+	}
+
+	var testMap = map[string]func(string) []string{
+		"int": func(i string) []string {
+			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
+				return strconv.Itoa(i)
+			}).([]string)
+		},
+	}
+	for _, v := range [][]string{
+		{"{{int(1-29)}}", "29"},
+		{"{{int(1-29)}}==={{int(1-29}}", fmt.Sprint(29)},
+		{"{{int(1-29)}}==={{int(1-29)}}", fmt.Sprint(29 * 29)},
+		{"{{int(1-29)}}==={{int(1-2)}}", fmt.Sprint(29 * 2)},
+		{"{{int(1-29)}}==={{int(1)}}", fmt.Sprint(29)},
+	} {
+		t, r := v[0], v[1]
+		result, err := ExecuteWithStringHandler(t, testMap)
+		if err != nil {
+			panic(err)
+		}
+		if len(result) <= 0 {
+			panic(1)
+		}
+		rStr := fmt.Sprint(len(result))
+		if rStr != r {
+			m := fmt.Sprintf("got: %v expect: %v", strconv.Quote(rStr), strconv.Quote(r))
+			panic(m)
+		}
+	}
+
+}
+
+func TestExecuteWithConciseTag(t *testing.T) {
+	var testMap = map[string]func(string) []string{
+		"print": func(i string) []string {
+			return []string{i}
+		},
+		"list": func(s string) []string {
+			return strings.Split(s, "|")
+		},
+	}
+	a, err := ExecuteWithStringHandler(`{{print::out1(list(a|b))}}{{print::out1(list(a|b))}}`, testMap)
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(a)
+	if len(a) != 2 {
+		panic(a)
+	}
+}
+func TestExecuteWithMultimethod(t *testing.T) {
+	var m = map[string]func(string) []string{
+		"s": func(s string) []string {
+			return []string{s + "a"}
+		},
+	}
+
+	res, err := ExecuteWithStringHandler(`{{  s()    s()   }}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if len(res) < 1 || len(res[0]) != 2 {
+		panic("{{s()s()}}")
+	}
+
+	res, err = ExecuteWithStringHandler(`{{  s(s())   }}`, m)
+	spew.Dump(res)
+	if err != nil {
+		panic(err)
+	}
+	if len(res) < 1 || len(res[0]) != 2 {
+		panic("{{  s(s())   }}")
+	}
+}
 func TestExecuteWithNewLine(t *testing.T) {
 	var m = map[string]func(string) []string{
 		"s": func(s string) []string {

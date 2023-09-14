@@ -1,4 +1,4 @@
-package parser
+package standard_parser
 
 type trieNode struct {
 	children   map[rune]*trieNode
