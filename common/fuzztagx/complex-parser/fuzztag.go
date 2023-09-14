@@ -1,4 +1,4 @@
-package fuzztagx
+package complex_parser
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
@@ -238,7 +238,6 @@ func (l *LabelMethods) GenerateOne() bool {
 	}
 	return ok
 }
-
 
 type Generator struct {
 	container []string
