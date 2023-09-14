@@ -77,6 +77,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 			MaxVersion:         tls.VersionTLS13,
 			InsecureSkipVerify: true,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		}
 	}
 	var gmtlsConfig *gmtls.Config
@@ -84,6 +85,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	// i is a *tls.Config or *gmtls.Config
 	switch ret := i.(type) {
 	case *tls.Config:
+		ret.Renegotiation = tls.RenegotiateFreelyAsClient
 		tlsConfig = ret
 	case *gmtls.Config:
 		gmtlsConfig = ret
@@ -100,6 +102,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 
 	if tlsConfig != nil {
+		tlsConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 		var sConn = tls.Client(conn, tlsConfig)
 		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
@@ -107,6 +110,7 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		}
 		return sConn, nil
 	} else if gmtlsConfig != nil {
+		gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
 		var sConn = gmtls.Client(conn, gmtlsConfig)
 		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
 		if err != nil {
