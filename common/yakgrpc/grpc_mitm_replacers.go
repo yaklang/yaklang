@@ -12,7 +12,6 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -215,14 +214,9 @@ func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit
 	}
 }
 
-func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) {
-	tx := consts.GetGormProjectDatabase().Begin()
+func (m *mitmReplacer) hookColor(tx *gorm.DB, request, response []byte, req *http.Request, flow *yakit.HTTPFlow) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
-			tx.Rollback()
-		}
-		if err := tx.Commit().Error; err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
 	}()
