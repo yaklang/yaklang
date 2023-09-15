@@ -79,6 +79,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
 		},
 		StrictMode: true,
+		Id :"json in query test",
 	}
 
 	vulInForm := VulInfo{
@@ -97,6 +98,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
 		},
 		StrictMode: true,
+		Id: "json in form",
 	}
 	vulInBodyJson := VulInfo{
 		Method: "POST",
@@ -114,6 +116,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
 		},
 		StrictMode: true,
+		Id: "json in body",
 	}
 	vulInGetServeByJackson := VulInfo{ // 这里不应该检出任何漏洞，并且发包数量应该为 1
 		Method: "GET",
@@ -122,6 +125,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		},
 		ExpectedResult: map[string]int{},
 		StrictMode:     true,
+		Id: "jackson in query",
 	}
 	addFastjsonTestCase(vulInGet, "Fastjson 综合检测插件对于 json in query 检测结果不符合预期")
 	addFastjsonTestCase(vulInForm, "Fastjson 综合检测插件对于 json in form 检测结果不符合预期")
