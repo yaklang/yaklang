@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dlclark/regexp2"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -181,7 +182,7 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 	return m._hijackingRules
 }
 
-func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
+func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit.HTTPFlow) {
 	flow.AddTag(extraTag...)
 
 	log.Debugf("set color[%v] for %v", s, flow.Url)
@@ -206,7 +207,7 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 		flow.Red()
 	}
 	for i := 0; i < 3; i++ {
-		err := yakit.UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
+		err := yakit.UpdateHTTPFlowTags(db, flow)
 		if err != nil {
 			log.Errorf("update flow tags failed: %v", err)
 		}
@@ -214,14 +215,19 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 }
 
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) {
+	tx := consts.GetGormProjectDatabase().Begin()
 	defer func() {
 		if err := recover(); err != nil {
+			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
+			tx.Rollback()
+		}
+		if err := tx.Commit().Error; err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
 	}()
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
+		stringForSettingColor(tx, ret[0].Color, ret[0].ExtraTag, flow)
 		return
 	}
 	if m == nil {
@@ -230,73 +236,43 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 
 	for _, rule := range m.GetMirrorRules() {
 		r := m.getRule(rule)
-		if rule.EnableForRequest {
-			if r != nil {
-				if match, err := r.FindStringMatch(string(request)); err == nil && match != nil {
-					stringForSettingColor(rule.Color, rule.ExtraTag, flow)
-					for {
-						if match.GroupCount() > 1 {
-							yakit.SaveExtractedDataFromHTTPFlow(
-								consts.GetGormProjectDatabase(),
-								flow.CalcHash(), rule.VerboseName,
-								match.GroupByNumber(1).String(),
-								r.String(),
-							)
-						} else {
-							yakit.SaveExtractedDataFromHTTPFlow(
-								consts.GetGormProjectDatabase(),
-								flow.CalcHash(), rule.VerboseName,
-								match.String(),
-								r.String(),
-							)
-						}
-						match, err = r.FindNextMatch(match)
-						if err != nil || match == nil {
-							break
-						}
-					}
-					// return
-				}
-			}
-			//continue
+		if r == nil {
+			continue
 		}
 
-		if rule.EnableForResponse {
-			if r != nil {
-				if match, err := r.FindStringMatch(string(response)); err == nil && match != nil {
-					stringForSettingColor(rule.Color, rule.ExtraTag, flow)
-					for {
-						if match.GroupCount() > 0 {
-							var extractData string
-							extractGroup := match.GroupByNumber(1)
-							if extractGroup != nil {
-								extractData = extractGroup.String()
-							}
-							if extractData != "" {
-								yakit.SaveExtractedDataFromHTTPFlow(
-									consts.GetGormProjectDatabase(),
-									flow.CalcHash(), rule.VerboseName,
-									extractData, r.String(),
-								)
-							}
-						} else {
-							if ret := match.String(); ret != "" {
-								yakit.SaveExtractedDataFromHTTPFlow(
-									consts.GetGormProjectDatabase(),
-									flow.CalcHash(), rule.VerboseName,
-									ret, r.String(),
-								)
-							}
-						}
-						match, err = r.FindNextMatch(match)
-						if err != nil || match == nil {
-							break
-						}
-					}
-				}
-			}
+		match, err := r.FindStringMatch(string(request))
+		if err != nil || match == nil {
+			continue
 		}
 
+		if !rule.EnableForRequest && !rule.EnableForResponse {
+			continue
+		}
+
+		var ret string
+		stringForSettingColor(tx, rule.Color, rule.ExtraTag, flow)
+		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
+			if rule.EnableForRequest && match.GroupCount() > 1 {
+				ret = match.GroupByNumber(1).String()
+			} else if rule.EnableForResponse && match.GroupCount() > 0 {
+				extractGroup := match.GroupByNumber(1)
+				if extractGroup != nil {
+					ret = extractGroup.String()
+				}
+			} else {
+				ret = match.String()
+			}
+
+			if ret == "" {
+				continue
+			}
+			yakit.SaveExtractedDataFromHTTPFlow(
+				tx,
+				flow.CalcHash(), rule.VerboseName,
+				ret,
+				r.String(),
+			)
+		}
 	}
 	return
 }
