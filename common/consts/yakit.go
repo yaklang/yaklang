@@ -531,7 +531,6 @@ func GetGormProjectDatabase() *gorm.DB {
 		if utils.IsDir(profileDatabaseName) {
 			os.RemoveAll(profileDatabaseName)
 		}
-		//gormPluginDatabase, err = gorm.Open("sqlite3", fmt.Sprintf("file:%s?cache=shared", profileDatabaseName))
 		gormPluginDatabase, err = gorm.Open("sqlite3", profileDatabaseName)
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
@@ -547,7 +546,6 @@ func GetGormProjectDatabase() *gorm.DB {
 		if utils.IsDir(projectDatabaseName) {
 			os.RemoveAll(projectDatabaseName)
 		}
-		//gormDatabase, err = gorm.Open("sqlite3", fmt.Sprintf("file:%s?cache=shared", projectDatabaseName))
 		gormDatabase, err = gorm.Open("sqlite3", projectDatabaseName)
 		if err != nil {
 			log.Errorf("init db[%v] failed: %s", projectDatabaseName, err)
