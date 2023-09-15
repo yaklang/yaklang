@@ -15,6 +15,7 @@ import (
 )
 
 type BehidnerFileSystemAction struct {
+	behinderCache map[string]*Behinder
 }
 
 func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
@@ -111,7 +112,14 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 	return resErr.resources, nil
 }
 
-func (b BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, error) {
+func (b *BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, error) {
+	if b.behinderCache == nil {
+		b.behinderCache = make(map[string]*Behinder)
+	}
+	// 如果Behinder实例已经在缓存中，直接返回它
+	if manager, ok := b.behinderCache[id]; ok {
+		return manager, nil
+	}
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, utils.Errorf("cannot parse id[%s] as int: %s", id, err)
@@ -140,10 +148,11 @@ func (b BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, error
 		}
 		manager.SetPayloadScriptContent(script.Content)
 	}
+	b.behinderCache[id] = manager
 	return manager, nil
 }
 
-func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 
@@ -192,7 +201,7 @@ func (b BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 	}, nil
 }
 
-func (b BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 	_ = path
@@ -223,7 +232,7 @@ func (b BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.Re
 	}, nil
 }
 
-func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 
@@ -266,17 +275,17 @@ func (b BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Req
 	}, nil
 }
 
-func (b BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (b BehidnerFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (b BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -407,7 +416,7 @@ func (b *Behinder) downloadFile(remote, local string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileContent, err := b.SendHttpRequest(payload)
+	fileContent, err := b.sendHttpRequest(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +434,7 @@ func (b *Behinder) uploadFile(remote string, fileContent []byte) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	bres, err := b.SendHttpRequest(payload)
+	bres, err := b.sendHttpRequest(payload)
 	if err != nil {
 		return nil, err
 	}

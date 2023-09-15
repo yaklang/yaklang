@@ -12,7 +12,10 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"golang.org/x/net/publicsuffix"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 )
 
 //type WsmClient interface {
@@ -41,6 +44,28 @@ type Behinder struct {
 	customEchoEncoder    codecFunc
 	customEchoDecoder    codecFunc
 	customPacketEncoder  codecFunc
+}
+
+func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
+	log.Infof("NewBehinder ")
+	client := utils.NewDefaultHTTPClient()
+	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	client.Jar = jar
+	bs := &Behinder{
+		Url:           ys.GetUrl(),
+		SecretKey:     secretKey(ys.GetSecretKey()),
+		ShellScript:   ys.GetShellScript(),
+		Proxy:         ys.GetProxy(),
+		respPrefixLen: 0,
+		respSuffixLen: 0,
+		Headers:       make(map[string]string, 2),
+		Client:        client,
+	}
+	bs.setHeaders()
+	//if len(bs.Proxy) != 0 {
+	bs.setProxy()
+	//}
+	return bs, nil
 }
 
 func (b *Behinder) echoResultEncode(raw []byte) ([]byte, error) {
@@ -147,33 +172,6 @@ func (b *Behinder) SetPacketScriptContent(str string) {
 	b.PacketScriptContent = str
 }
 
-func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
-	client := utils.NewDefaultHTTPClient()
-
-	bs := &Behinder{
-		Url:           ys.GetUrl(),
-		SecretKey:     secretKey(ys.GetSecretKey()),
-		ShellScript:   ys.GetShellScript(),
-		Proxy:         ys.GetProxy(),
-		respPrefixLen: 0,
-		respSuffixLen: 0,
-		Headers:       make(map[string]string, 2),
-		Client:        client,
-	}
-	// 默认的加密方式
-	//bs.CustomEncoder = func(raw []byte) ([]byte, error) {
-	//	return bs.enCryption(raw)
-	//}
-	//bs.CustomDecoder = func(raw []byte) ([]byte, error) {
-	//	return bs.deCryption(raw)
-	//}
-	bs.setHeaders()
-	//if len(bs.Proxy) != 0 {
-	//	bs.setProxy()
-	//}
-	return bs, nil
-}
-
 func (b *Behinder) setHeaders() {
 	switch b.ShellScript {
 	case ypb.ShellScript_JSP.String():
@@ -192,13 +190,16 @@ func (b *Behinder) setHeaders() {
 	}
 }
 
-//func (b *Behinder) setProxy() {
-//	b.Client.Transport = &http.Transport{
-//		Proxy: func(r *http.Request) (*url.URL, error) {
-//			return url.Parse(b.Proxy)
-//		},
-//	}
-//}
+func (b *Behinder) setProxy() {
+	if b.Proxy == "" {
+		return
+	}
+	b.Client.Transport = &http.Transport{
+		Proxy: func(r *http.Request) (*url.URL, error) {
+			return url.Parse(b.Proxy)
+		},
+	}
+}
 
 func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string) ([]byte, error) {
 	var rawPayload []byte
@@ -232,7 +233,6 @@ func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string
 			return nil, err
 		}
 	}
-	//return b.CustomEncoder(rawPayload)
 	return rawPayload, nil
 }
 
@@ -253,7 +253,7 @@ func (b *Behinder) deCryption(raw []byte) ([]byte, error) {
 	return behinder.Decryption(raw, b.SecretKey, b.ShellScript)
 }
 
-func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
+func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
 	// request body 编码操作
 	data, err := b.clientRequestEncode(data)
 	if err != nil {
@@ -266,18 +266,18 @@ func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
 	for k, v := range b.Headers {
 		request.Header.Set(k, v)
 	}
-	lresp, err := lowhttp.HTTP(
-		lowhttp.WithRequest(request),
-		lowhttp.WithVerifyCertificate(false),
-		lowhttp.WithTimeoutFloat(15),
-		lowhttp.WithProxy(b.Proxy),
-	)
+	resp, err := b.Client.Do(request)
 
 	if err != nil {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 
-	raw := lowhttp.GetHTTPPacketBody(lresp.RawPacket)
+	respBs, err := utils.HttpDumpWithBody(resp, true)
+	if err != nil {
+		return nil, utils.Errorf("http DumpWithBody error: %v", err)
+	}
+
+	raw := lowhttp.GetHTTPPacketBody(respBs)
 
 	if len(raw) == 0 {
 		return nil, utils.Errorf("empty response")
@@ -291,22 +291,6 @@ func (b *Behinder) SendHttpRequest(data []byte) ([]byte, error) {
 
 	return result, nil
 }
-
-//func (b *Behinder) sendPayload(data []byte) ([]byte, error) {
-//	body, err := b.post(data)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return b.CustomDecoder(body)
-//}
-
-//func (b *Behinder) Encoder(f func(raw []byte) ([]byte, error)) {
-//	b.CustomEncoder = f
-//}
-//
-//func (b *Behinder) Decoder(f func(raw []byte) ([]byte, error)) {
-//	b.CustomDecoder = f
-//}
 
 func (b *Behinder) Unmarshal(bts []byte, m map[string]string) error {
 	err := json.Unmarshal(bts, &m)
@@ -332,15 +316,7 @@ func (b *Behinder) String() string {
 	)
 }
 
-//func (b *Behinder) cloneParams() map[string]string {
-//	encoderParams := make(map[string]string)
-//	value, _ := b.EchoResultEncodeFormYak([]byte(""))
-//	encoderParams["CustomEncoder"] = string(value)
-//	return encoderParams
-//}
-
 func (b *Behinder) processParams(params map[string]string) {
-
 	value, _ := b.echoResultEncode([]byte(""))
 	if len(value) != 0 {
 		params["customEncoderFromClass"] = string(value)
@@ -396,7 +372,7 @@ func (b *Behinder) sendRequestAndGetResponse(payloadType behinder.Payload, param
 	if err != nil {
 		return nil, err
 	}
-	bs64res, err := b.SendHttpRequest(payload)
+	bs64res, err := b.sendHttpRequest(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +396,7 @@ func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 	}
 	//
 	//res, err := b.sendPayload(payload)
-	res, err := b.SendHttpRequest(payload)
+	res, err := b.sendHttpRequest(payload)
 	if err != nil {
 		return false, err
 	}

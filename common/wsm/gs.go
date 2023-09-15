@@ -14,6 +14,7 @@ import (
 )
 
 type GodzillaFileSystemAction struct {
+	godzillaCache map[string]*Godzilla
 }
 
 // result
@@ -96,7 +97,15 @@ func godzillaResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 	return resources, nil
 }
 
-func (g GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, error) {
+func (g *GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, error) {
+	if g.godzillaCache == nil {
+		g.godzillaCache = make(map[string]*Godzilla)
+	}
+
+	if manager, ok := g.godzillaCache[id]; ok {
+		return manager, nil
+	}
+
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, utils.Errorf("cannot parse id[%s] as int: %s", id, err)
@@ -125,10 +134,11 @@ func (g GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, error
 		}
 		manager.SetPayloadScriptContent(script.Content)
 	}
+	g.godzillaCache[id] = manager
 	return manager, nil
 }
 
-func (g GodzillaFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 
@@ -170,27 +180,27 @@ func (g GodzillaFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Req
 	}, nil
 }
 
-func (g GodzillaFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g GodzillaFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g GodzillaFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g GodzillaFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g GodzillaFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (g *GodzillaFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }

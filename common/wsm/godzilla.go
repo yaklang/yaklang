@@ -7,13 +7,14 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"io/ioutil"
+	"golang.org/x/net/publicsuffix"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 )
@@ -41,6 +42,33 @@ type Godzilla struct {
 	dynamicFuncName map[string]string
 
 	CustomEncoder codecFunc
+}
+
+func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
+	client := utils.NewDefaultHTTPClient()
+	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	client.Jar = jar
+	gs := &Godzilla{
+		Url:             ys.GetUrl(),
+		Pass:            ys.GetPass(),
+		SecretKey:       secretKey(ys.GetSecretKey()),
+		ShellScript:     ys.GetShellScript(),
+		EncMode:         ys.GetEncMode(),
+		Proxy:           ys.Proxy,
+		Client:          client,
+		Headers:         make(map[string]string, 2),
+		dynamicFuncName: make(map[string]string, 2),
+	}
+	gs.CustomEncoder = func(raw []byte) ([]byte, error) {
+		enPayload, err := godzilla.Encryption(raw, gs.SecretKey, gs.Pass, gs.EncMode, gs.ShellScript, true)
+		if err != nil {
+			return nil, err
+		}
+		return enPayload, nil
+	}
+	gs.setHeaders()
+	gs.setProxy()
+	return gs, nil
 }
 
 func (g *Godzilla) SetPayloadScriptContent(content string) {
@@ -71,31 +99,6 @@ func (g *Godzilla) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
 func (g *Godzilla) SetPacketScriptContent(content string) {
 	//TODO implement me
 	panic("implement me")
-}
-
-func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
-	client := utils.NewDefaultHTTPClient()
-	gs := &Godzilla{
-		Url:             ys.GetUrl(),
-		Pass:            ys.GetPass(),
-		SecretKey:       secretKey(ys.GetSecretKey()),
-		ShellScript:     ys.GetShellScript(),
-		EncMode:         ys.GetEncMode(),
-		Proxy:           ys.Proxy,
-		Client:          client,
-		Headers:         make(map[string]string, 2),
-		dynamicFuncName: make(map[string]string, 2),
-	}
-	gs.CustomEncoder = func(raw []byte) ([]byte, error) {
-		enPayload, err := godzilla.Encryption(raw, gs.SecretKey, gs.Pass, gs.EncMode, gs.ShellScript, true)
-		if err != nil {
-			return nil, err
-		}
-		return enPayload, nil
-	}
-	gs.setHeaders()
-	gs.setProxy()
-	return gs, nil
 }
 
 func (g *Godzilla) setDefaultParams() map[string]string {
@@ -216,18 +219,15 @@ func (g *Godzilla) post(data []byte) ([]byte, error) {
 	}
 	resp, err := g.Client.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("http request error: %v", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error(err)
-		}
-	}(resp.Body)
-	raw, err := ioutil.ReadAll(resp.Body)
+
+	respBs, err := utils.HttpDumpWithBody(resp, true)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("http DumpWithBody error: %v", err)
 	}
+
+	raw := lowhttp.GetHTTPPacketBody(respBs)
 	raw = bytes.TrimRight(raw, "\r\n\r\n")
 	return raw, nil
 }
