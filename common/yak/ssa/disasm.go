@@ -319,3 +319,10 @@ func (s *Update) String() string {
 		getStr(s.Address), getStr(s.Value),
 	)
 }
+
+func (t *TypeCast) String() string {
+	return fmt.Sprintf(
+		"%s = type-case[%s] %s",
+		getStr(t), t.GetType(), getStr(t.Value),
+	)
+}
