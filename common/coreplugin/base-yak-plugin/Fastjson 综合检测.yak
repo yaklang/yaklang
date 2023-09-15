@@ -412,7 +412,8 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     if len(poc) != 1{
                         continue
                     }
-                    rsp,err = param.delayFuzz(poc[0])
+                    poc = poc[0]
+                    rsp,err = param.delayFuzz(poc)
                     if err{
                         continue
                     }
