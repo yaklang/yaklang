@@ -415,7 +415,14 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	// 提取数据
 	if requireResponse {
 		domains, rootDomains := domainextractor.ExtractDomainsEx(string(flow.Response))
-		jsonObjects := jsonextractor.ExtractStandardJSON(string(flow.Response))
+		var jsonObjects []string
+		if !utils.MatchAnyOfSubString(strings.ToLower(f.ContentType), "json") {
+			if len(flow.Response) > 1000*1000 {
+				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response[:1000*1000]))
+			} else {
+				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response))
+			}
+		}
 		flow.Domains = make([]string, len(domains))
 		for i, d := range domains {
 			flow.Domains[i] = utils.EscapeInvalidUTF8Byte([]byte(d))
