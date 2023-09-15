@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
 )
@@ -175,15 +176,12 @@ func ExtractRootDomains(code string) []string {
 
 func ExtractDomainsEx(code string) ([]string, []string) {
 	re1, re2 := scan(code)
-	var filters = filter.NewFilter()
 	var ret []string
 	for _, i := range append(re1, re2...) {
 		r := ExtractRootDomain(i)
-		if filters.Exist(r) {
-			continue
+		if !slices.Contains(ret, r) {
+			ret = append(ret, r)
 		}
-		filters.Insert(r)
-		ret = append(ret, r)
 	}
 	return re1, ret
 }
