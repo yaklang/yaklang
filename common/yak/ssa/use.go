@@ -302,3 +302,19 @@ func (s *Update) RemoveUser(u User) {
 
 func (s *Update) GetValues() []Value { return []Value{s.Value} }
 func (s *Update) AddValue(_ Value)   {}
+
+// ----------- Update
+func (t *TypeCast) ReplaceValue(v, to Value) {
+	if t.Value == v {
+		t.Value = to
+	} else {
+		panic("type cast not use this value")
+	}
+}
+func (t *TypeCast) GetUsers() []User { return t.user }
+func (t *TypeCast) AddUser(u User)   { t.user = append(t.user, u) }
+func (t *TypeCast) RemoveUser(u User) {
+	t.user = utils.Remove(t.user, u)
+}
+func (t *TypeCast) GetValues() []Value { return []Value{t.Value} }
+func (t *TypeCast) AddValue(_ Value)   {}

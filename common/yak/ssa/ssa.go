@@ -581,3 +581,18 @@ var _ Value = (*Update)(nil)
 var _ User = (*Update)(nil)
 var _ Instruction = (*Update)(nil)
 var _ InstructionValue = (*Update)(nil)
+
+// ----------- Type-cast
+// cast value -> type
+type TypeCast struct {
+	anInstruction
+
+	Value Value
+	user  []User
+}
+
+var _ Node = (*TypeCast)(nil)
+var _ Value = (*TypeCast)(nil)
+var _ User = (*TypeCast)(nil)
+var _ Instruction = (*TypeCast)(nil)
+var _ InstructionValue = (*TypeCast)(nil)

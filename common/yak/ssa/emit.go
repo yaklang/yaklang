@@ -66,6 +66,13 @@ func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	return u
 }
 
+func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
+	u := NewUnOp(op, v, f.CurrentBlock)
+	fixupUseChain(u)
+	f.emit(u)
+	return u
+}
+
 func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) Value {
 	if f.CurrentBlock.finish {
 		return nil
