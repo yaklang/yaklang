@@ -120,6 +120,16 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 	return r
 }
 
+func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
+	t := &TypeCast{
+		anInstruction: newAnInstuction(block),
+		Value:         v,
+		user:          make([]User, 0),
+	}
+	t.SetType(typ)
+	return t
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
