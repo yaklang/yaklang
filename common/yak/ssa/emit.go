@@ -73,7 +73,7 @@ func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 	return u
 }
 
-func (f *FunctionBuilder) EmitArith(op BinaryOpcode, x, y Value) Value {
+func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}

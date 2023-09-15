@@ -534,7 +534,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
 			return nil
 		}
-		rvalue := b.EmitArith(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+		rvalue := b.EmitBinOp(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
 		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	} else if stmt.SubSub() != nil { // --
@@ -543,7 +543,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
 			return nil
 		}
-		rvalue := b.EmitArith(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+		rvalue := b.EmitBinOp(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
 		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	}
@@ -580,7 +580,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 		case "^=":
 			opcode = ssa.OpXor
 		}
-		rvalue = b.EmitArith(opcode, lvalue.GetValue(b.FunctionBuilder), rvalue)
+		rvalue = b.EmitBinOp(opcode, lvalue.GetValue(b.FunctionBuilder), rvalue)
 		lvalue.Assign(rvalue, b.FunctionBuilder)
 		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	}
@@ -818,7 +818,28 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	if s, ok := stmt.MakeExpression().(*yak.MakeExpressionContext); ok {
 		return b.buildMakeExpression(s)
 	}
-	//TODO: unary operator expression
+
+	// unary operator expression
+	if s, ok := stmt.UnaryOperator().(*yak.UnaryOperatorContext); ok {
+		x := getValue(0)
+		var opcode ssa.UnaryOpcode
+		switch s.GetText() {
+		case "!":
+			opcode = ssa.OpNot
+		case "+":
+			opcode = ssa.OpPlus
+		case "-":
+			opcode = ssa.OpNeg
+		case "<-":
+			opcode = ssa.OpChan
+		case "^":
+			opcode = ssa.OpBitwiseNot
+		default:
+			b.NewError(ssa.Error, TAG, "unary operator not support: %s", s.GetText())
+			return nil
+		}
+		return b.EmitUnOp(opcode, x)
+	}
 
 	// 二元运算（位运算全面优先于数字运算，数字运算全面优先于高级逻辑运算）
 	// | expression bitBinaryOperator ws* expression
@@ -897,8 +918,11 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			opcode = ssa.OpNotEq
 		case "==":
 			opcode = ssa.OpEq
+		default:
+			b.NewError(ssa.Error, TAG, "binary operator not support: %s", op.GetText())
+			return nil
 		}
-		return b.EmitArith(opcode, op0, op1)
+		return b.EmitBinOp(opcode, op0, op1)
 	}
 
 	// //TODO: 高级逻辑
