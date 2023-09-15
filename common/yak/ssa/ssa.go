@@ -390,6 +390,9 @@ type Call struct {
 	Method Value
 	Args   []Value
 
+	// go function
+	Async bool
+
 	// call is a value
 	user []User
 
