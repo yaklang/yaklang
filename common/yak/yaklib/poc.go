@@ -176,24 +176,28 @@ func _pocOptWithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocC
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.retryTimes(3))` control retry times.
 func _pocOptWithRetryTimes(t int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryTimes = t
 	}
 }
 
-func _pocOptWithRetryInStausCode(codes ...int) PocConfig {
+// params: use it like: `poc.HTTP(..., poc.retryInStatusCode(200, 404))` control retry in(matched) status code.
+func _pocOptWithRetryInStatusCode(codes ...int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryInStatusCode = codes
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.retryNotInStatusCode(200, 404))` control retry not in(matched) status code.
 func _pocOptWithRetryNotInStausCode(codes ...int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryNotInStatusCode = codes
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.retryWaitTime(1))` control retry wait time(seconds).
 func _pocOptWithRetryWaitTime(t int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryWaitTime = time.Duration(t) * time.Second
@@ -206,24 +210,29 @@ func _pocOptWithRetryMaxWaitTime(t int) PocConfig {
 	}
 }
 
+// params: use it `poc.HTTP(..., poc.redirectTimes(3))` control redirect times.
 func _pocOptWithRedirectTimes(t int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RedirectTimes = t
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.noFixContentLength(true))` control fix content length.
+// use it in pipeline or smuggle case.
 func _pocOptWithNoFixContentLength(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.NoFixContentLength = b
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.noRedirect(true))` control redirect.
 func _pocOptWithNoRedirect(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.NoRedirect = b
 	}
 }
 
+// params: use it: `poc.HTTP(..., poc.proxy(15))` control proxy.
 func _pocOptWithProxy(proxies ...string) PocConfig {
 	return func(c *_pocConfig) {
 		data := utils.StringArrayFilterEmpty(proxies)
@@ -233,24 +242,28 @@ func _pocOptWithProxy(proxies ...string) PocConfig {
 	}
 }
 
+// params: use it `poc.HTTP(packet, poc.https(true))` control tls schema
 func _pocOptWithForceHTTPS(isHttps bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.ForceHttps = isHttps
 	}
 }
 
+// params: use it `poc.HTTP(packet, poc.http2(true))` control http2 schema
 func _pocOptWithForceHTTP2(isHttp2 bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.ForceHttp2 = isHttp2
 	}
 }
 
+// params: use it like: `poc.HTTP(..., poc.timeout(15))` control network timeout
 func _pocOptWithTimeout(f float64) PocConfig {
 	return func(c *_pocConfig) {
 		c.Timeout = utils.FloatSecondDuration(f)
 	}
 }
 
+// params: poc packet builder and sender params, use it like: `poc.HTTP(..., poc.host("127.0.0.1"))`
 func _pocOptWithHost(h string) PocConfig {
 	return func(c *_pocConfig) {
 		c.Host = h
@@ -261,6 +274,8 @@ var PoCOptWithSource = _pocOptWIthSource
 var PoCOptWithRuntimeId = _pocOptWithRuntimeId
 var PoCOptWithFromPlugin = _pocOptWithFromPlugin
 
+// params: bind runtimeId for http request and response
+// it 's useful for combining context, `poc.HTTP(..., poc.runtimeId(id))`
 func _pocOptWithRuntimeId(r string) PocConfig {
 	return func(c *_pocConfig) {
 		c.RuntimeId = r
@@ -291,24 +306,31 @@ func _pocOptWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfig
 	}
 }
 
+// params: poc packet builder and sender params, use it like: `poc.HTTP(..., poc.port(8080))`
 func _pocOptWithPort(port int) PocConfig {
 	return func(c *_pocConfig) {
 		c.Port = port
 	}
 }
 
+// params, use it as `poc.HTTP(packet, poc.jsRedirect(true))` to recognize js href(regexp)
 func _pocOptWithJSRedirect(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.JsRedirect = b
 	}
 }
 
+// params, inherit cookie via the same session key,
+// use it as `poc.HTTP(packet, poc.session("key"))`
+// it's useful for login case
 func _pocOptWithSession(i interface{}) PocConfig {
 	return func(c *_pocConfig) {
 		c.Session = i
 	}
 }
 
+// params, save the current request and response to database
+// find it in `yakit.QueryHTTPFlow`
 func _pocOptWithSave(i bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.SaveHTTPFlow = i
@@ -317,6 +339,7 @@ func _pocOptWithSave(i bool) PocConfig {
 
 var PoCOptWithSaveHTTPFlow = _pocOptWithSave
 
+// params, set request source field, for saving to database
 func _pocOptWIthSource(i string) PocConfig {
 	return func(c *_pocConfig) {
 		c.Source = i
@@ -325,6 +348,8 @@ func _pocOptWIthSource(i string) PocConfig {
 
 var PoCOptWithProxy = _pocOptWithProxy
 
+// params, replace request first line, it's hacky!
+// modified request bytes before request sent out
 func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -334,6 +359,7 @@ func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	}
 }
 
+// params, replace request method before sending.
 func _pocOptReplaceHttpPacketMethod(method string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -343,6 +369,7 @@ func _pocOptReplaceHttpPacketMethod(method string) PocConfig {
 	}
 }
 
+// params, replace request header before sending.
 func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -737,6 +764,9 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 	return response, err
 }
 
+// poc.HTTPEx means send http request and return (*LowhttpResponse, *http.Request, error)
+// it support many option, use it via: `poc.HTTPEx(packet, poc.https(true), poc.proxy(proxy))`.
+// you will handle *lowhttp.LowhttpResponse with your own code. LowhttpResponse include many details.
 func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -753,6 +783,7 @@ func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 	return response, request, nil
 }
 
+// BuildRequest will build a bytes request, you can use it to send request by yourself.
 func buildRequest(i interface{}, opts ...PocConfig) []byte {
 	packet, _, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -761,6 +792,8 @@ func buildRequest(i interface{}, opts ...PocConfig) []byte {
 	return packet
 }
 
+// poc.HTTP means send http request and return (response, request, error)
+// it support many option, use it via: `poc.HTTP(packet, poc.https(true), poc.proxy(proxy))`
 func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -770,6 +803,8 @@ func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, config.NoFixContentLength), err
 }
 
+// poc.Do is something like poc.HTTPEx, but the params is (method string, url string, opt...)
+// use it like `poc.Do("GET", "https://www.example.com", poc.proxy(proxy))`
 func do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
 	config, err := handleUrlAndConfig(urlStr, opts...)
 	if err != nil {
@@ -796,6 +831,12 @@ func methodDo(method string) func(urlStr string, opts ...PocConfig) (*lowhttp.Lo
 	}
 }
 
+// poc.Websocket is shortcut for `poc.HTTP(..., poc.websocket(true))`
+func wsShortcut(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+	opts = append(opts, _pocOptWebsocket(true))
+	return pocHTTP(raw, opts...)
+}
+
 var PoCExports = map[string]interface{}{
 	"HTTP":         pocHTTP,
 	"HTTPEx":       pocHTTPEx,
@@ -807,17 +848,15 @@ var PoCExports = map[string]interface{}{
 	"Options":      methodDo("OPTIONS"),
 	"Do":           do,
 	// websocket，可以直接复用 HTTP 参数
-	"Websocket": func(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
-		opts = append(opts, _pocOptWebsocket(true))
-		return pocHTTP(raw, opts...)
-	},
+	"Websocket": wsShortcut,
 
 	// options
 	"host":                 _pocOptWithHost,
 	"port":                 _pocOptWithPort,
 	"retryTimes":           _pocOptWithRetryTimes,
-	"retryInStatusCode":    _pocOptWithRetryInStausCode,
+	"retryInStatusCode":    _pocOptWithRetryInStatusCode,
 	"retryNotInStatusCode": _pocOptWithRetryNotInStausCode,
+	"retryWaitTime":        _pocOptWithRetryWaitTime,
 	"redirectTimes":        _pocOptWithRedirectTimes,
 	"noRedirect":           _pocOptWithNoRedirect,
 	"jsRedirect":           _pocOptWithJSRedirect,
