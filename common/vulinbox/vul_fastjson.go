@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,7 +21,7 @@ var fastjson_loginPage []byte
 
 type JsonParser func(data string) (map[string]any, error)
 
-var DnsRecord = []string{}
+var DnsRecord = sync.Map{}
 
 func generateFastjsonParser(version string) JsonParser {
 	if version == "intranet" { // 内网版本，不能成功解析 payload 中的 dnslog 且解析超时
@@ -53,9 +54,9 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		}
 	}
 	if dnslog != "" {
-		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second),netx.WithDNSNoCache(true))
+		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second), netx.WithDNSNoCache(true))
 		if ip != "" {
-			DnsRecord = append(DnsRecord, dnslog)
+			DnsRecord.Store(dnslog, ip)
 		}
 	}
 	var js map[string]any
