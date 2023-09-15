@@ -17,8 +17,9 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 			return nil, utils.Error(err)
 		}
 	}
-
-	action := yakurl.DefaultActionFactory{}.CreateAction(strings.ToLower(req.GetUrl().GetSchema()))
+	schema := strings.ToLower(req.GetUrl().GetSchema())
+	actionService := yakurl.GetActionService()
+	action := actionService.GetAction(schema)
 	if action == nil {
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
