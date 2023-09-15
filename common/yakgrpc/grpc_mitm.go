@@ -1398,35 +1398,34 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			},
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
-		startCreateFlow = time.Now()
 
 		// HOOK 存储过程
 		if flow != nil && !dropped.IsSet() {
 			flow.Hash = flow.CalcHash()
 			flow := flow
 			//log.Infof("start to do sth with tag")
+			startCreateFlow = time.Now()
+			tx := s.GetProjectDatabase().Begin()
+			err = yakit.InsertHTTPFlow(tx, flow)
 			if replacer != nil {
-				go func() {
-					if err := recover(); err != nil {
-						log.Errorf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v panic: %s", truncate(reqUrl), err)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-					replacer.hookColor(plainRequest, plainResponse, req, flow)
-					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
-				}()
-				startCreateFlow = time.Now()
+				replacer.hookColor(tx, plainRequest, plainResponse, req, flow)
+				log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			}
+
 			for i := 0; i < 3; i++ {
-				startCreateFlow = time.Now()
-				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
-				log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
-				if err != nil {
-					log.Errorf("create / save httpflow from mirror error: %s", err)
-					flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
-					time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
-					continue
+				err = tx.Commit().Error
+				if err == nil {
+					break
 				}
-				break
+				log.Errorf("commit error: %s", err)
+				time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
+			}
+
+			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+			if err != nil {
+				log.Errorf("create / save httpflow from mirror error: %s", err)
+				flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
+				tx.Rollback()
 			}
 		}
 
