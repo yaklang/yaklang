@@ -57,8 +57,10 @@ func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	if v := f.UndefineHijack(name); v != nil {
-		return v
+	if name != "" {
+		if v := f.UndefineHijack(name); v != nil {
+			return v
+		}
 	}
 	u := NewUndefine(name, f.CurrentBlock)
 	u.NewError(Error, SSATAG, "variable [%s] undefine", name)
@@ -180,4 +182,11 @@ func (f *FunctionBuilder) emitUpdate(address *Field, v Value) *Update {
 	s := NewUpdate(address, v, f.CurrentBlock)
 	f.emit(s)
 	return s
+}
+
+func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
+	t := NewTypeCast(typ, v, f.CurrentBlock)
+	fixupUseChain(t)
+	f.emit(t)
+	return t
 }
