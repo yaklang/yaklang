@@ -45,6 +45,8 @@ func IsChunkedHeaderLine(line string) bool {
 	return false
 }
 
+// ReplaceHTTPPacketFirstLine replace http packet first line
+// enable for request and response all
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	var isChunked bool
 	var header = []string{firstLine}
@@ -458,6 +460,11 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	return AppendHTTPPacketCookie(data, key, value)
 }
 
+// AppendHTTPPacketCookie append cookie to http packet
+// if packet is request, it will append to Cookie header
+// if packet is response, it will append to Set-Cookie header
+//
+//	packet = AppendHTTPPacketCookie(packet, "key", "value")
 func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var added bool
@@ -508,6 +515,11 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
+// DeleteHTTPPacketCookie delete cookie from http packet
+// if packet is request, it will delete from Cookie header
+// if packet is response, it will delete from Set-Cookie header
+//
+// packet = DeleteHTTPPacketCookie(packet, "key")
 func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 	var isReq bool
 	var isRsp bool
@@ -623,6 +635,16 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// AppendHTTPPacketFormEncoded replace form data in http packet
+// enable for request, it will replace form data in body
+//
+//	 packet = AppendHTTPPacketFormEncoded(packet, "key", "value")
+//
+//		--BOUNDARY---
+//		Content-Disposition: form-data; name="key"
+//
+//		value
+//		...
 func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
@@ -651,6 +673,10 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	})
 }
 
+// AppendHTTPPacketUploadFile replace form file in http packet
+// enable for request, it will replace form file in body
+// if fileContent is string, it will be treated as file path
+// variadic is content-type, if not set, it will be detected auto.
 func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	hasContentType := len(contentType) > 0
 
