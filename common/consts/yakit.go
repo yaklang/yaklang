@@ -456,6 +456,28 @@ ON "http_flows" (
 	}
 }
 
+func doDBRiskPatch() {
+	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_id ON risks(id);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.id: %v", err)
+	}
+	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_is_read ON risks(is_read);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.is_read: %v", err)
+	}
+
+	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_risk_type ON risks(risk_type);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.risk_type: %v", err)
+	}
+
+	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_ip ON risks(ip);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.ip: %v", err)
+	}
+
+}
+
 func GetGormProjectDatabase() *gorm.DB {
 	initOnce.Do(func() {
 		log.Debug("start to loading gorm project/profile database")
@@ -514,7 +536,6 @@ func GetGormProjectDatabase() *gorm.DB {
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
 		} else {
-			//gormPluginDatabase = gormPluginDatabase.Debug()
 			configureAndOptimizeDB(gormPluginDatabase)
 			err := os.Chmod(profileDatabaseName, 0666)
 			if err != nil {
@@ -531,7 +552,6 @@ func GetGormProjectDatabase() *gorm.DB {
 		if err != nil {
 			log.Errorf("init db[%v] failed: %s", projectDatabaseName, err)
 		} else {
-			//gormDatabase = gormDatabase.Debug()
 			configureAndOptimizeDB(gormDatabase)
 			err := os.Chmod(projectDatabaseName, 0666)
 			if err != nil {
@@ -540,6 +560,7 @@ func GetGormProjectDatabase() *gorm.DB {
 		}
 
 		doDBPatch()
+		doDBRiskPatch()
 
 	})
 	return gormDatabase
@@ -550,7 +571,6 @@ func configureAndOptimizeDB(db *gorm.DB) {
 	db.DB().SetMaxIdleConns(10)
 	db.DB().SetMaxOpenConns(100)
 
-	// sqlite 性能调优
 	db.Exec("PRAGMA synchronous = OFF;")
 	//db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
 	db.Exec("PRAGMA journal_mode = OFF;")

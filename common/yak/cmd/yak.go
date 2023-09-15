@@ -356,7 +356,7 @@ func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 
 	// 计算请求处理的时间
 	elapsed := time.Since(start)
-	log.Infof("exec RPC: %s, took %v \n", info.FullMethod, elapsed)
+	log.Debugf("exec RPC: %s, took %v \n", info.FullMethod, elapsed)
 
 	if elapsed > 250*time.Millisecond {
 		logMsg := fmt.Sprintf("slow RPC: %s, took %v\n", info.FullMethod, elapsed)
@@ -789,7 +789,7 @@ var translatingCommand = cli.Command{
 }
 
 func main() {
-	log.SetLevel(log.WarnLevel)
+	//log.SetLevel(log.WarnLevel)
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
 	app.Version = yakVersion
