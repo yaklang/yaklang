@@ -18,6 +18,7 @@ hostCount = cli.Int("host-count")
 
 // 恢复任务的指针
 recordPtr = cli.Int("record-ptr", cli.setDefault(0))
+recordFile = cli.String("record-file")
 
 progressData = cli.Float("progress-data")
 
@@ -332,8 +333,8 @@ if excludeHosts != "" {
     pingOpt = append(pingOpt, ping.excludeHosts(excludeHosts))
 }
 
-
-if !skippedHostAliveScan {
+HostAliveFile = ""
+if !skippedHostAliveScan && recordPtr == 0 {
     yakit.Info("开始探测存活~")
     hostRaw, _ = file.ReadFile(targetFiles)
     hosts = str.ReplaceAll(string(hostRaw), "\n", ",")
@@ -344,7 +345,7 @@ if !skippedHostAliveScan {
         yakit.StatusCard("存活主机数/扫描主机数", f"${aliveHostCount}/${ScanHostCount}")
     }
     aliveHostStr = ""
-    os.RemoveAll(targetFiles)~
+    // os.RemoveAll(targetFiles)~
     for res := range ping.Scan(hosts, pingOpt...) {
         if res.Ok {
             aliveHostCount++
@@ -361,7 +362,8 @@ if !skippedHostAliveScan {
     yakit.StatusCard("Ping存活主机数", aliveHostCount)
     aliveHostStr = str.Trim(aliveHostStr, "\n")
 
-    file.Save(targetFiles, aliveHostStr)~
+    HostAliveFile = file.Join(yakit.GetHomeTempDir(), runtimeID)
+    file.Save(HostAliveFile, aliveHostStr)~
 
     if len(aliveHostStr) == 0 {
         yakit.Error("没有存活主机")
@@ -372,12 +374,18 @@ if !skippedHostAliveScan {
     yakit.Info("跳过存活探测~")
 }
 
+if recordPtr > 0 && !skippedHostAliveScan {
+    HostAliveFile = recordFile
+}
 
 var files = make([]string)
 
-inputFiles = str.SplitAndTrim(targetFiles, ",")
-if len(inputFiles) > 0 {
-    files.Push(inputFiles...)
+inputFiles = []
+
+if !skippedHostAliveScan {
+    inputFiles = str.SplitAndTrim(HostAliveFile, ",")
+} else {
+    inputFiles = str.SplitAndTrim(targetFiles, ",")
 }
 
 
@@ -562,7 +570,7 @@ handleServiceScanResult = func(result) {
         manager.HandleServiceScanResult(result)
     }
 
-    if enableBrute {
+    if enableBrute  && len(result.GetServiceName()) != 0 {
         bruteWg.Add()
         go func {
             defer bruteWg.Done()
@@ -571,8 +579,6 @@ handleServiceScanResult = func(result) {
             yakit.Info("Start Brute for %s-%s:%d", serviceName, result.Target, result.Port)
             bruteScan(result)
         }
-
-        bruteWg.Wait()
     }
 
 }
@@ -721,7 +727,7 @@ for fileReader.Next(){
     }
 }
 
-
+bruteWg.Wait()
 synWg.Wait()
 swg.Wait()
 yakit.SetProgress(0.94)
