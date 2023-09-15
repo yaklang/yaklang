@@ -63,3 +63,14 @@ func NewFilter() *StringFilter {
 	f := NewStringFilter(filterConfig, NewGenericCuckoo())
 	return f
 }
+
+func NewFilterWithSize(entries, total uint) *StringFilter {
+	filterConfig := NewDefaultConfig()
+	filterConfig.CaseSensitive = true
+	f := NewStringFilter(filterConfig, cuckoo.New(
+		cuckoo.BucketEntries(entries),
+		cuckoo.BucketTotal(total),
+		cuckoo.Kicks(300),
+	))
+	return f
+}
