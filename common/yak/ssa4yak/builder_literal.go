@@ -243,11 +243,11 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 		if expr != nil {
 			s := templateQuoteEscapeChar(prefix, tmpStr)
 			tmpStr = ""
-			value = b.EmitArith(ssa.OpAdd, value, ssa.NewConst(s))
+			value = b.EmitBinOp(ssa.OpAdd, value, ssa.NewConst(s))
 
 			v := b.buildExpression(expr.(*yak.ExpressionContext))
 			t := b.EmitTypeCast(v, ssa.BasicTypes[ssa.String])
-			value = b.EmitArith(ssa.OpAdd, value, t)
+			value = b.EmitBinOp(ssa.OpAdd, value, t)
 		} else {
 			tmpStr += atom.GetText()
 		}
@@ -260,7 +260,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 
 		if tmpStr != "" {
 			s := templateQuoteEscapeChar(prefix, tmpStr)
-			value = b.EmitArith(ssa.OpAdd, value, ssa.NewConst(s))
+			value = b.EmitBinOp(ssa.OpAdd, value, ssa.NewConst(s))
 		}
 	}
 

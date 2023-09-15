@@ -285,11 +285,12 @@ func (b *BinOp) String() string {
 
 // ----------- UnOp
 var UnaryOpcodeName = map[UnaryOpcode]string{
-	OpNone: ``,
-	OpNot:  `not`,
-	OpPlus: `plus`,
-	OpNeg:  `neg`,
-	OpChan: `chan`,
+	OpNone:       ``,
+	OpNot:        `not`,
+	OpPlus:       `plus`,
+	OpNeg:        `neg`,
+	OpChan:       `chan`,
+	OpBitwiseNot: `bitwise-not`,
 }
 
 func (u *UnOp) String() string {
