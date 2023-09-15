@@ -37,9 +37,7 @@ func NewServer() (*Server, error) {
 }
 
 func NewServerWithLogCache(b bool) (*Server, error) {
-	if b {
-		utils.StartCacheLog(context.Background(), 200)
-	}
+
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0777)
 	s := &Server{
@@ -82,6 +80,9 @@ func NewServerWithLogCache(b bool) (*Server, error) {
 		//if err != nil {
 		//	return nil, err
 		//}
+	}
+	if b {
+		utils.StartCacheLog(context.Background(), 200)
 	}
 	return s, nil
 }

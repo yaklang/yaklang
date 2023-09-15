@@ -42,6 +42,7 @@ type VulInfo struct {
 	ExpectedResult map[string]int
 	StrictMode     bool
 	RawHTTPRequest []byte
+	Id             string
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
@@ -161,7 +162,8 @@ func TestCoreMitmPlug(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 
 	for k, expectedCount := range vulInfo.ExpectedResult {
 		if expected[k] != expectedCount {
-			t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v", k, expectedCount, expected[k])
+			vulinfo := fmt.Sprintf(",VulInfo Id: %v", vulInfo.Id)
+			t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v%v", k, expectedCount, expected[k], vulinfo)
 			t.FailNow()
 		}
 	}
