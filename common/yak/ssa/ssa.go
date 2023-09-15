@@ -485,11 +485,12 @@ var _ InstructionValue = (*BinOp)(nil)
 type UnaryOpcode int
 
 const (
-	OpNone UnaryOpcode = iota
-	OpNot              // !
-	OpPlus             // +
-	OpNeg              // -
-	OpChan             // ->
+	OpNone       UnaryOpcode = iota
+	OpNot                    // !
+	OpPlus                   // +
+	OpNeg                    // -
+	OpChan                   // ->
+	OpBitwiseNot             // ^
 )
 
 type UnOp struct {
