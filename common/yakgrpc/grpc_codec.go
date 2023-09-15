@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
@@ -17,10 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*ypb.AutoDecodeResponse, error) {
@@ -80,7 +81,6 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	for _, item := range req.GetParams() {
 		params[item.Key] = item.Value
 	}
-	rawParams := utils.InterfaceToGeneralMap(params)
 
 	getParams := func(key string, hexDecode bool) string {
 		value, ok := params[key]
@@ -291,7 +291,13 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		raw, err = yserx.ToJson(objs)
 		result = string(raw)
 	case "packet-to-curl":
-		cmd, err := lowhttp.GetCurlCommand(utils.MapGetBool(rawParams, "https"), []byte(text))
+		https := getParams("https", false)
+		isHttps := false
+
+		if strings.ToLower(https) == "true" {
+			isHttps = true
+		}
+		cmd, err := lowhttp.GetCurlCommand(isHttps, []byte(text))
 		if err != nil {
 			return nil, utils.Errorf("codec[%v] failed: %s", `packet-to-curl`, err)
 		}
@@ -556,7 +562,6 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 		for _, item := range work.GetParams() {
 			params[item.Key] = item.Value
 		}
-		rawParams := utils.InterfaceToGeneralMap(params)
 
 		getParams := func(key string, hexDecode bool) string {
 			value, ok := params[key]
@@ -746,7 +751,13 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 			raw, err = yserx.ToJson(objs)
 			result = string(raw)
 		case "packet-to-curl":
-			cmd, err := lowhttp.GetCurlCommand(utils.MapGetBool(rawParams, "https"), []byte(text))
+			https := getParams("https", false)
+			isHttps := false
+
+			if strings.ToLower(https) == "true" {
+				isHttps = true
+			}
+			cmd, err := lowhttp.GetCurlCommand(isHttps, []byte(text))
 			if err != nil {
 				return nil, utils.Errorf("codec[%v] failed: %s", `packet-to-curl`, err)
 			}
