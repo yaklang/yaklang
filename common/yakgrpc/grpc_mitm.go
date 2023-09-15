@@ -1409,7 +1409,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}()
 				startCreateFlow = time.Now()
 			}
-
 			for i := 0; i < 3; i++ {
 				startCreateFlow = time.Now()
 				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
