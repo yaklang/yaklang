@@ -117,7 +117,12 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		b.buildDeferStmt(s)
 		return
 	}
-	//TODO: go stmt
+
+	// go stmt
+	if s, ok := stmt.GoStmt().(*yak.GoStmtContext); ok {
+		b.buildGoStmt(s)
+	}
+
 	//TODO: assert stmt
 
 }
@@ -147,7 +152,8 @@ func (b *astbuilder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtCon
 }
 
 // TODO: include stmt
-// TODO: defer stmt
+
+// defer stmt
 func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
@@ -167,7 +173,22 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	}
 }
 
-// TODO: go stmt
+// go stmt
+func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	var c *ssa.Call
+	if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
+		c = b.buildInstanceCode(s)
+	} else {
+		v := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		c = b.buildFunctionCall(stmt.FunctionCall().(*yak.FunctionCallContext), v)
+	}
+	c.Async = true
+	return c
+}
+
 // return stmt
 func (b *astbuilder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
