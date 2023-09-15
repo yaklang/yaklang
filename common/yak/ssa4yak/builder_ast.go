@@ -1,6 +1,7 @@
 package ssa4yak
 
 import (
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -932,13 +933,110 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return b.EmitBinOp(opcode, op0, op1)
 	}
 
-	// //TODO: 高级逻辑
-	// | expression '&&' ws* expression
-	// | expression '||' ws* expression
+	//TODO:
 	// | expression 'not'? 'in' expression
 	// | expression '<-' expression
-	// | expression '?' ws* expression ws* ':' ws* expression
 	// ;
+
+	/*
+		expression:
+			c = t0, t1, t2
+		cfg:
+			enter:
+				t0 ...
+				if [t0] true-> if.true; false -> if.false
+			if.true:
+				t1 ...
+				jump if.done
+			if.false:
+				t2 ...
+				jump if.done
+			if.done
+				c = phi[....]
+
+		ast statement:
+			c = a || b
+				t0 = !a; t1 = b
+				c = phi[a enter; b if.true]
+
+			c = a && b
+				t0 = a; t1 = b
+				c = phi[a enter; b if.true]
+
+			c = cond ? a : b
+				t0 = cond; t1 = a; t2 = b
+				c = phi[a if.true; b if.false]
+	*/
+	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr func() ssa.Value, falseExpr func() ssa.Value) ssa.Value {
+		// 为了聚合产生Phi指令
+		id := uuid.NewString()
+		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
+		ifb := b.IfBuilder()
+		ifb.IfBranch(
+			func() ssa.Value {
+				// 在上层函数中决定是否设置id, 在三元运算符时不会将condition加入结果中
+				return cond(id)
+			},
+			func() {
+				v := trueExpr()
+				b.WriteVariable(id, v)
+			},
+		)
+		if falseExpr != nil {
+			ifb.ElseBranch(func() {
+				v := falseExpr()
+				b.WriteVariable(id, v)
+			})
+		}
+		ifb.Finish()
+		// generator phi instruction
+		return b.ReadVariable(id)
+	}
+
+	// | expression '&&' ws* expression
+	if s := stmt.LogicAnd(); s != nil {
+		return handlerJumpExpression(
+			func(id string) ssa.Value {
+				v := getValue(0)
+				b.WriteVariable(id, v)
+				return v
+			},
+			func() ssa.Value {
+				return getValue(1)
+			},
+			nil,
+		)
+	}
+
+	// | expression '||' ws* expression
+	if s := stmt.LogicOr(); s != nil {
+		return handlerJumpExpression(
+			func(id string) ssa.Value {
+				v := getValue(0)
+				b.WriteVariable(id, v)
+				return b.EmitUnOp(ssa.OpNot, v)
+			},
+			func() ssa.Value {
+				return getValue(1)
+			},
+			nil,
+		)
+	}
+
+	// | expression '?' ws* expression ws* ':' ws* expression
+	if s := stmt.Question(); s != nil {
+		return handlerJumpExpression(
+			func(_ string) ssa.Value {
+				return getValue(0)
+			},
+			func() ssa.Value {
+				return getValue(1)
+			},
+			func() ssa.Value {
+				return getValue(2)
+			},
+		)
+	}
 
 	return nil
 }
