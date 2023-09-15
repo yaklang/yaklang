@@ -5,11 +5,15 @@ import (
 	_ "embed"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/network"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -154,6 +158,16 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
 			Key:   "progress-data",
 			Value: fmt.Sprintf("%.3f", reqRecord.GetPercent()),
+		})
+
+		runtimeId := gjson.Get(reqRecord.ExtraInfo, `Params.#(Key="runtime_id").Value`).String()
+		var targets []string
+		for ah := range yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
+			targets = append(targets, ah.IP)
+		}
+		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+			Key:   "record-file",
+			Value: filepath.Join(consts.GetDefaultYakitBaseTempDir(), runtimeId),
 		})
 	}
 
