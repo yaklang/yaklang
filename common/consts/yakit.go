@@ -457,11 +457,7 @@ ON "http_flows" (
 }
 
 func doDBRiskPatch() {
-	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_id ON risks(id);`).Error
-	if err != nil {
-		log.Warnf("failed to add index on risks.id: %v", err)
-	}
-	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_is_read ON risks(is_read);`).Error
+	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_is_read ON risks(is_read);`).Error
 	if err != nil {
 		log.Warnf("failed to add index on risks.is_read: %v", err)
 	}
