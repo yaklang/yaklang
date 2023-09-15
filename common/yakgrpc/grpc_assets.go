@@ -666,7 +666,6 @@ func (s *Server) QueryNewRisk(ctx context.Context, req *ypb.QueryNewRiskRequest)
 	}
 	p, _, _ := yakit.QueryNewRisk(s.GetProjectDatabase(), req, true, false)
 
-	// 这一条语句查询很慢
 	paging, _, _ := yakit.QueryNewRisk(s.GetProjectDatabase(), req, false, true)
 
 	rsp := &ypb.QueryNewRiskResponse{
