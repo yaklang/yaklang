@@ -807,7 +807,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return b.EmitCall(b.buildFunctionCallWarp(stmt, s))
 	}
 
-	//TODO: parent expression
+	// paren expression
+	if s, ok := stmt.ParenExpression().(*yak.ParenExpressionContext); ok {
+		if e, ok := s.Expression().(*yak.ExpressionContext); ok {
+			return b.buildExpression(e)
+		} else {
+			return b.EmitUndefine("")
+		}
+	}
 
 	// instance code
 	if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
