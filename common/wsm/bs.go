@@ -116,7 +116,6 @@ func (b *BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, erro
 	if b.behinderCache == nil {
 		b.behinderCache = make(map[string]*Behinder)
 	}
-	// 如果Behinder实例已经在缓存中，直接返回它
 	if manager, ok := b.behinderCache[id]; ok {
 		return manager, nil
 	}
@@ -168,7 +167,6 @@ func (b *BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Re
 	var res []*ypb.YakURLResource
 	switch query.Get("mode") {
 	case "list":
-		//TODO implement me
 		list, err := manager.listFile(path)
 		if err != nil {
 			return nil, err
@@ -187,10 +185,33 @@ func (b *BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Re
 			return nil, err
 		}
 	case "check":
+		check, er := manager.checkFileHash(path, "")
+		if er != nil {
+			return nil, er
+		}
+		res, err = behidnerResultToYakURLResource(u, check)
+		if err != nil {
+			return nil, err
+		}
 	case "checkExist":
+		check, er := manager.checkFileExist(path)
+		if er != nil {
+			return nil, er
+		}
+		res, err = behidnerResultToYakURLResource(u, check)
+		if err != nil {
+			return nil, err
+		}
 
 	case "getTimeStamp":
-
+		check, er := manager.getTimeStamp(path)
+		if er != nil {
+			return nil, er
+		}
+		res, err = behidnerResultToYakURLResource(u, check)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &ypb.RequestYakURLResponse{
@@ -211,7 +232,6 @@ func (b *BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.R
 	}
 	id := query.Get("id")
 	manager, err := b.newBehinderFormId(id)
-	_ = manager
 	if err != nil {
 		return nil, err
 	}
@@ -219,8 +239,30 @@ func (b *BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.R
 	switch query.Get("mode") {
 
 	case "updateTimeStamp":
-
-		//updateTimeStamp,err := manager.updateTimeStamp(path)
+		cts := query.Get("createTimeStamp")
+		ats := query.Get("accessTimeStamp")
+		mts := query.Get("modifyTimeStamp")
+		if cts == "" && ats == "" && mts == "" {
+			return nil, utils.Errorf("createTimeStamp, accessTimeStamp, modifyTimeStamp cannot be empty at the same time")
+		}
+		updateTimeStamp, err := manager.updateTimeStamp(path, cts, ats, mts)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, updateTimeStamp)
+		if err != nil {
+			return nil, err
+		}
+	case "rename":
+		newPath := query.Get("")
+		rename, err := manager.renameFile(path, newPath)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, rename)
+		if err != nil {
+			return nil, err
+		}
 
 	}
 
@@ -248,6 +290,7 @@ func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Re
 	var res []*ypb.YakURLResource
 	switch query.Get("mode") {
 	case "create":
+		// TODO setting buffsize
 		list, err := manager.uploadFile(path, params.GetBody())
 		if err != nil {
 			return nil, err
@@ -263,7 +306,35 @@ func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Re
 		}
 		res, err = behidnerResultToYakURLResource(u, show)
 	case "createFile":
+		fileName := query.Get("")
+		createFile, err := manager.createFile(fileName)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, createFile)
+		if err != nil {
+			return nil, err
+		}
 	case "createDirectory":
+		dirName := query.Get("")
+		createDir, err := manager.createDirectory(dirName)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, createDir)
+		if err != nil {
+			return nil, err
+		}
+	case "update":
+		// TODO blcok size
+		update, err := manager.uploadFilePart(path, params.GetBody(), 0, 1)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, update)
+		if err != nil {
+			return nil, err
+		}
 
 	}
 
@@ -276,8 +347,37 @@ func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Re
 }
 
 func (b *BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+	path := u.GetPath()
+	_ = path
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	id := query.Get("id")
+	manager, err := b.newBehinderFormId(id)
+	if err != nil {
+		return nil, err
+	}
+	var res []*ypb.YakURLResource
+	switch query.Get("mode") {
+	case "delete":
+		del, err := manager.deleteFile(path)
+		if err != nil {
+			return nil, err
+		}
+		res, err = behidnerResultToYakURLResource(u, del)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  100,
+		Total:     int64(len(res)),
+		Resources: res,
+	}, nil
 }
 
 func (b *BehidnerFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
