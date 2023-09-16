@@ -75,11 +75,11 @@ func godzillaResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 
 		if typ == "0" {
 			resource.ResourceType = "dir"
-			resource.VerboseType = "behinder-directory"
+			resource.VerboseType = "godzilla-directory"
 			resource.HaveChildrenNodes = true
 		} else {
 			resource.ResourceType = "file"
-			resource.VerboseType = "behinder-file"
+			resource.VerboseType = "godzilla-file"
 			resource.HaveChildrenNodes = false
 		}
 
