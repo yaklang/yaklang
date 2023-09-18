@@ -74,6 +74,12 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		return
 	}
 
+	// for range stmt
+	if s, ok := stmt.ForRangeStmt().(*yak.ForRangeStmtContext); ok {
+		b.buildForRangeStmt(s)
+		return
+	}
+
 	// for stmt
 	if s, ok := stmt.ForStmt().(*yak.ForStmtContext); ok {
 		b.buildForStmt(s)
@@ -298,6 +304,39 @@ func (b *astbuilder) ForExpr(stmt forExpr) []ssa.Value {
 		return []ssa.Value{b.buildExpression(e)}
 	}
 	return nil
+}
+
+// for range stmt
+func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+	// current := f.currentBlock
+	loop := b.BuildLoop()
+
+	loop.BuildCondtion(func() ssa.Value {
+		lefts := b.buildLeftExpressionList(true, stmt.LeftExpressionList().(*yak.LeftExpressionListContext))
+		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		key, field, ok := b.EmitNext(value)
+		if len(lefts) == 1 {
+			if stmt.In() != nil {
+				// in
+				lefts[0].Assign(field, b.FunctionBuilder)
+			} else {
+				// range
+				lefts[0].Assign(key, b.FunctionBuilder)
+			}
+		} else if len(lefts) >= 2 {
+			lefts[0].Assign(key, b.FunctionBuilder)
+			lefts[1].Assign(field, b.FunctionBuilder)
+		}
+		return ok
+	})
+
+	loop.BuildBody(func() {
+		b.buildBlock(stmt.Block().(*yak.BlockContext))
+	})
+
+	loop.Finish()
 }
 
 // switch stmt
