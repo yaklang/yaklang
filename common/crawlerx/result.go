@@ -3,6 +3,10 @@
 package crawlerx
 
 import (
+	"context"
+	"github.com/go-rod/rod"
+	"io"
+	"net/http/httputil"
 	"strings"
 )
 
@@ -14,6 +18,7 @@ type ReqInfo interface {
 
 	RequestHeaders() map[string]string
 	RequestBody() string
+	RequestRaw() (string, error)
 
 	StatusCode() int
 	ResponseHeaders() map[string]string
@@ -25,8 +30,8 @@ type ReqInfo interface {
 }
 
 type RequestResult struct {
-	//request  *rod.HijackRequest
-	//response *rod.HijackResponse
+	// request  *rod.HijackRequest
+	// response *rod.HijackResponse
 
 	request  HijackRequest
 	response HijackResponse
@@ -54,6 +59,30 @@ func (result *RequestResult) RequestBody() string {
 	return result.request.Body()
 }
 
+// getLength returns length of a Reader efficiently
+func getLength(x io.Reader) (int64, error) {
+	len, err := io.Copy(io.Discard, x)
+	return len, err
+}
+func (result *RequestResult) RequestRaw() (string, error) {
+	resplen := int64(0)
+	dumpbody := true
+	clone := result.request.Req().Clone(context.TODO())
+	if clone.Body != nil {
+		resplen, _ = getLength(clone.Body)
+	}
+	if resplen == 0 {
+		dumpbody = false
+		clone.ContentLength = 0
+		clone.Body = nil
+		delete(clone.Header, "Content-length")
+	}
+	dumpBytes, err := httputil.DumpRequestOut(clone, dumpbody)
+	if err != nil {
+		return "", err
+	}
+	return string(dumpBytes), nil
+}
 func (result *RequestResult) ResponseHeaders() map[string]string {
 	headers := make(map[string]string, 0)
 	tempHeaders := result.response.Headers()
@@ -88,7 +117,7 @@ type SimpleResult struct {
 	screenshot string
 	resultType string
 	method     string
-	request    HijackRequest
+	request    *rod.HijackRequest
 	from       string
 }
 
@@ -126,6 +155,9 @@ func (simpleResult *SimpleResult) RequestBody() string {
 		return simpleResult.request.Body()
 	}
 	return ""
+}
+func (simpleResult *SimpleResult) RequestRaw() (string, error) {
+	return "", nil
 }
 
 func (simpleResult *SimpleResult) ResponseHeaders() map[string]string {

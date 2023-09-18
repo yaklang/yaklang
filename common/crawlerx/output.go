@@ -3,6 +3,7 @@
 package crawlerx
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
 )
@@ -22,6 +23,7 @@ type OutputRequest struct {
 	Method  string          `json:"method"`
 	Headers []*OutputHeader `json:"headers"`
 	Body    OutputBody      `json:"body"`
+	HTTPRaw string          `json:"http_raw"`
 }
 
 type OutputResponse struct {
@@ -52,6 +54,10 @@ func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 	for k, v := range responseHeaders {
 		tempResponseHeaders = append(tempResponseHeaders, &OutputHeader{k, v})
 	}
+	httpRaw, err := reqInfo.RequestRaw()
+	if err != nil {
+		log.Errorf("get http raw error: %v", err)
+	}
 	result := OutputResult{
 		Url: reqInfo.Url(),
 		Request: OutputRequest{
@@ -63,6 +69,7 @@ func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 				Size: strconv.Itoa(len(reqInfo.RequestBody())),
 				Data: reqInfo.RequestBody(),
 			},
+			HTTPRaw: httpRaw,
 		},
 		Response: OutputResponse{
 			StatusCode: reqInfo.StatusCode(),
