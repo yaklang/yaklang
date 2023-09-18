@@ -152,6 +152,16 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	return c
 }
 
+func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	a := NewAssert(cond, msgValue, msg, f.CurrentBlock)
+	fixupUseChain(a)
+	f.emit(a)
+	return a
+}
+
 func (f *FunctionBuilder) emitInterface(parentI User, typ Type, low, high, max, Len, Cap Value) *Interface {
 	i := NewInterface(parentI, typ, low, high, max, Len, Cap, f.CurrentBlock)
 	f.emit(i)

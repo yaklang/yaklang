@@ -130,6 +130,16 @@ func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
 	return t
 }
 
+func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
+	a := &Assert{
+		anInstruction: newAnInstuction(block),
+		Cond:          cond,
+		Msg:           msg,
+		MsgValue:      msgValue,
+	}
+	return a
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)

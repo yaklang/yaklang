@@ -318,3 +318,18 @@ func (t *TypeCast) RemoveUser(u User) {
 }
 func (t *TypeCast) GetValues() []Value { return []Value{t.Value} }
 func (t *TypeCast) AddValue(_ Value)   {}
+
+// ----------- Assert
+func (a *Assert) GetValues() []Value { return []Value{a.Cond, a.MsgValue} }
+func (a *Assert) GetUsers() []User   { return nil }
+func (a *Assert) AddValue(v Value)   {}
+
+func (a *Assert) ReplaceValue(v, to Value) {
+	if a.Cond == v {
+		a.Cond = to
+	} else if a.MsgValue == v {
+		a.MsgValue = to
+	} else {
+		panic("assert not use this value")
+	}
+}
