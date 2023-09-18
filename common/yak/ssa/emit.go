@@ -200,3 +200,19 @@ func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	f.emit(t)
 	return t
 }
+
+func (f *FunctionBuilder) EmitNextOnly(iter Value) *Next {
+	n := NewNext(iter, f.CurrentBlock)
+	fixupUseChain(n)
+	f.emit(n)
+	return n
+}
+
+func (f *FunctionBuilder) EmitNext(iter Value) (key, field, ok Value) {
+	n := f.EmitNextOnly(iter)
+	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
+	key = f.EmitField(n, NewConst("key"))
+	field = f.EmitField(n, NewConst("field"))
+	ok = f.EmitField(n, NewConst("ok"))
+	return
+}

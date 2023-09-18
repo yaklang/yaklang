@@ -140,6 +140,43 @@ func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 	return a
 }
 
+func NewNext(iter Value, block *BasicBlock) *Next {
+	n := &Next{
+		anInstruction: newAnInstuction(block),
+		Iter:          iter,
+	}
+
+	/*
+		next map[T]U
+			{
+				key: T
+				field: U
+				ok: bool
+			}
+	*/
+	typ := NewInterfaceType()
+	typ.Kind = Struct
+	typ.AddField(NewConst("ok"), BasicTypes[Boolean])
+	if it, ok := iter.GetType().(*InterfaceType); ok {
+		if keytyp := it.keyTyp; keytyp != nil {
+			typ.AddField(NewConst("key"), keytyp)
+		} else {
+			typ.AddField(NewConst("key"), BasicTypes[Any])
+		}
+		if fieldtyp := it.fieldType; fieldtyp != nil {
+			typ.AddField(NewConst("field"), fieldtyp)
+		} else {
+			typ.AddField(NewConst("field"), BasicTypes[Any])
+		}
+	} else {
+		typ.AddField(NewConst("key"), BasicTypes[Any])
+		typ.AddField(NewConst("field"), BasicTypes[Any])
+	}
+
+	n.SetType(typ)
+	return n
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
