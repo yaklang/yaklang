@@ -692,6 +692,22 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error
 	return nil
 }
 
+func CreateOrUpdateHTTPFlowWithoutRequest(db *gorm.DB, hash string, i interface{}) (fErr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			fErr = utils.Errorf("met panic error: %v", err)
+		}
+	}()
+
+	db = db.Model(&HTTPFlow{})
+
+	if db := db.Where("hash = ?", hash).Assign(i).Omit("request").FirstOrCreate(&HTTPFlow{}); db.Error != nil {
+		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
+	}
+
+	return nil
+}
+
 func GetHTTPFlow(db *gorm.DB, id int64) (*HTTPFlow, error) {
 	var req HTTPFlow
 	if db := db.Model(&HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {

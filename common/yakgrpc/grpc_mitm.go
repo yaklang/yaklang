@@ -1420,7 +1420,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
 				log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			} else {
-				err = yakit.CreateOrUpdateHTTPFlow(s.GetProjectDatabase(), oldflowHash, flow)
+				err = yakit.CreateOrUpdateHTTPFlowWithoutRequest(s.GetProjectDatabase(), oldflowHash, flow)
 				log.Debugf("update http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			}
 			if err != nil {
