@@ -1,13 +1,16 @@
-package tlsutils
+package netx
+
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"strings"
+	"time"
+)
 
 import (
 	"crypto/tls"
-	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 type TLSInspectResult struct {
@@ -36,7 +39,7 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 		host = addr
 	}
 
-	conn, err := netx.DialTCPTimeout(10*time.Second, utils.HostPort(host, port), netx.GetProxyFromEnv())
+	conn, err := DialTCPTimeout(10*time.Second, utils.HostPort(host, port), GetProxyFromEnv())
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +90,7 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 					}
 				}
 				domains = utils.RemoveRepeatStringSlice(domains)
-				text, err := CertificateText(cert)
+				text, err := tlsutils.CertificateText(cert)
 				if err != nil {
 					continue
 				}
