@@ -748,7 +748,25 @@ func (b *astbuilder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) ssa.Valu
 func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	//TODO: typeliteral expression
+
+	getValue := func(index int) ssa.Value {
+		if s, ok := stmt.Expression(index).(*yak.ExpressionContext); ok {
+			return b.buildExpression(s)
+		}
+		return nil
+	}
+
+	// typeliteral expression
+	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
+		if stmt.LParen() != nil && stmt.RParen() != nil {
+			v := getValue(0)
+			if v == nil {
+				v = b.EmitUndefine("")
+			}
+			typ := b.buildTypeLiteral(s)
+			return b.EmitTypeCast(v, typ)
+		}
+	}
 
 	// literal
 	if s, ok := stmt.Literal().(*yak.LiteralContext); ok {
@@ -773,13 +791,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		} else {
 			return b.EmitUndefine(text)
 		}
-	}
-
-	getValue := func(index int) ssa.Value {
-		if s, ok := stmt.Expression(index).(*yak.ExpressionContext); ok {
-			return b.buildExpression(s)
-		}
-		return nil
 	}
 
 	// member call
