@@ -124,8 +124,35 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		b.buildGoStmt(s)
 	}
 
-	//TODO: assert stmt
+	// assert stmt
+	if s, ok := stmt.AssertStmt().(*yak.AssertStmtContext); ok {
+		b.buildAssertStmt(s)
+	}
+}
 
+func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	getExpr := func(i int) ssa.Value {
+		if expr, ok := stmt.Expression(i).(*yak.ExpressionContext); ok {
+			return b.buildExpression(expr)
+		}
+		b.NewError(ssa.Error, TAG, "unexpection assert stmt, this not expression")
+		return nil
+	}
+
+	exprs := stmt.AllExpression()
+	lenexprs := len(exprs)
+
+	var cond, msgV ssa.Value
+
+	cond = getExpr(0)
+	if lenexprs > 1 {
+		msgV = getExpr(1)
+	}
+
+	b.EmitAssert(cond, msgV, exprs[0].GetText())
 }
 
 //TODO: try stmt

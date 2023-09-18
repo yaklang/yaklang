@@ -327,3 +327,15 @@ func (t *TypeCast) String() string {
 		getStr(t), t.GetType(), getStr(t.Value),
 	)
 }
+
+func (a *Assert) String() string {
+	msg := a.Msg
+	if a.MsgValue != nil {
+		msg = getStr(a.MsgValue)
+	}
+
+	return fmt.Sprintf(
+		"assert[%s] %s",
+		getStr(a.Cond), msg,
+	)
+}
