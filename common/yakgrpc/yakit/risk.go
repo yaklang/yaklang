@@ -451,7 +451,7 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 		db = db.Where("is_read = false")
 	}
 	db = db.Where("risk_type NOT IN (?) OR ip <> ?", []string{"reverse-http", "reverse-tcp", "reverse-https"}, "127.0.0.1")
-	db = db.Order("created_at desc")
+	db = db.Order("id desc")
 	var ret []*Risk
 	paging, db := bizhelper.Paging(db, 1, 5, &ret)
 
