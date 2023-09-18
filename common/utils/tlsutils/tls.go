@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
 	"net"
-	"testing"
 	"time"
 )
 
@@ -490,15 +489,4 @@ func GetX509MutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...[]
 	}
 
 	return &config, nil
-}
-
-func TestConnToH2(t *testing.T) {
-	conn, err := tls.Dial("tcp", "127.0.0.1:8882", &tls.Config{InsecureSkipVerify: false})
-	if err != nil {
-		panic(err)
-	}
-	conn.Write([]byte(`GET / HTTP/2.0
-Host: 127.0.0.1:8882
-
-`))
 }

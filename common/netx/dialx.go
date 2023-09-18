@@ -36,6 +36,8 @@ type dialXConfig struct {
 	TimeoutRetryMaxWait time.Duration
 
 	DNSOpts []DNSOption
+
+	Debug bool
 }
 
 type DialXOption func(c *dialXConfig)
@@ -79,6 +81,12 @@ func DialX_WithSNI(sni string) DialXOption {
 func DialX_WithTLSTimeout(t time.Duration) DialXOption {
 	return func(c *dialXConfig) {
 		c.TLSTimeout = t
+	}
+}
+
+func DialX_Debug(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.Debug = true
 	}
 }
 
@@ -182,17 +190,35 @@ RETRY:
 	// handle plain
 	// not need to upgrade
 	var conn net.Conn
-	var err error
-	dialerFunc := NewDialContextFunc(config.Timeout, config.DNSOpts...)
 	if len(config.Proxy) <= 0 {
-		conn, err = dialerFunc(utils.TimeoutContext(config.Timeout), "tcp", target)
-		//conn, err := DialTCPTimeout(config.Timeout, target, config.Proxy...)
+		if config.Debug {
+			log.Infof("dial %s without proxy", target)
+		}
+		host, port, err := utils.ParseStringToHostPort(target)
 		if err != nil {
+			return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
+		}
+		var ip = host
+		if net.ParseIP(utils.FixForParseIP(host)) == nil {
+			// not valid ip
+			ip = LookupFirst(host, config.DNSOpts...)
+		}
+		if ip == "" {
+			return nil, utils.Errorf("cannot resolve %v", target)
+		}
+		conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+		if err != nil {
+			if config.Debug {
+				log.Error("dial %s failed: %s", target, err)
+			}
 			lastError = err
 			var opError *net.OpError
 			switch {
 			case errors.As(err, &opError):
 				if opError.Timeout() {
+					if config.Debug {
+						log.Infof("dial %s timeout, retrying", target)
+					}
 					jitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
 					goto RETRY
 				}
@@ -245,6 +271,9 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	useTls := config.EnableTLS || config.GMTLSSupport
 
 	if !useTls {
+		if config.Debug {
+			log.Infof("dial %s without tls", target)
+		}
 		return dialPlainTCPConnWithRetry(target, config)
 	}
 
@@ -282,6 +311,9 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 
 	var errs = make([]error, 0, len(strategies))
 	for _, strategy := range strategies {
+		if config.Debug {
+			log.Infof("dial %v with tls strategy: %v", target, strategy)
+		}
 		conn, err := dialPlainTCPConnWithRetry(target, config)
 		if err != nil {
 			return nil, err
