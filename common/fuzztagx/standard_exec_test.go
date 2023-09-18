@@ -1,9 +1,8 @@
-package standard_parser
+package fuzztagx
 
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/fuzztagx"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
@@ -20,7 +19,7 @@ func TestExecuteWithRam(t *testing.T) {
 			return strings.Split(s, "|")
 		},
 	}
-	a, err := fuzztagx.ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err := ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -29,7 +28,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = fuzztagx.ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +37,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = fuzztagx.ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd|eee)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd|eee)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +46,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = fuzztagx.ExecuteWithStringHandler(`{{int::3({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{int::3({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +55,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = fuzztagx.ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +64,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = fuzztagx.ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +98,7 @@ func TestExecute(t *testing.T) {
 			return []string{s + "PUNC"}
 		},
 	}
-	a, err := fuzztagx.ExecuteWithStringHandler(
+	a, err := ExecuteWithStringHandler(
 		//`{{int(1-2)}}abc{{int(1-5)}}`,
 		//`abc{{in}}^t()))1{{a111-5)}}`,
 		`{{xx12:-_(____\)____)}}[[[[}}`,
@@ -144,7 +143,7 @@ func TestExecuteWithHandler(t *testing.T) {
 	} {
 		t, r := v[0], v[1]
 		spew.Dump(t)
-		result, err := fuzztagx.ExecuteWithStringHandler(t, map[string]func(string) []string{
+		result, err := ExecuteWithStringHandler(t, map[string]func(string) []string{
 			"int": func(s string) []string {
 				return []string{"1"}
 			},
@@ -179,7 +178,7 @@ func TestExecuteWithHandler(t *testing.T) {
 		{"{{int(1-29)}}==={{int(1)}}", fmt.Sprint(29)},
 	} {
 		t, r := v[0], v[1]
-		result, err := fuzztagx.ExecuteWithStringHandler(t, testMap)
+		result, err := ExecuteWithStringHandler(t, testMap)
 		if err != nil {
 			panic(err)
 		}
@@ -202,7 +201,7 @@ func TestExecuteWithNewLine(t *testing.T) {
 		},
 	}
 
-	res, err := fuzztagx.ExecuteWithStringHandler(`{{s 
+	res, err := ExecuteWithStringHandler(`{{s 
 () }}`, m)
 	spew.Dump(res)
 	if err != nil {
@@ -220,7 +219,7 @@ func TestExecuteBug1(t *testing.T) {
 		},
 	}
 
-	res, err := fuzztagx.ExecuteWithStringHandler(`{{int::aaa(1)}} {{int::aaa(1)}} {{int::aaa(1)}}`, m)
+	res, err := ExecuteWithStringHandler(`{{int::aaa(1)}} {{int::aaa(1)}} {{int::aaa(1)}}`, m)
 	spew.Dump(res)
 	if err != nil {
 		panic(err)
@@ -243,7 +242,7 @@ func TestExecuteBug_Execute(t *testing.T) {
 		},
 	}
 
-	res, err := fuzztagx.ExecuteWithStringHandler(`{{expr:a(base64(111) )}}`, m)
+	res, err := ExecuteWithStringHandler(`{{expr:a(base64(111) )}}`, m)
 	spew.Dump(res)
 	if err != nil {
 		panic(err)
@@ -268,7 +267,7 @@ func TestExecutePrefixTag(t *testing.T) {
 	}
 	for _, d := range testData {
 		println(d)
-		res, err := fuzztagx.ExecuteWithStringHandler(fmt.Sprintf(`{{expr:a(%s)}}`, d), m)
+		res, err := ExecuteWithStringHandler(fmt.Sprintf(`{{expr:a(%s)}}`, d), m)
 		if err != nil {
 			panic(utils.Errorf("test data [%v] error: %v", d, err))
 		}
@@ -277,6 +276,81 @@ func TestExecutePrefixTag(t *testing.T) {
 		}
 		if res[0] != d {
 			panic("TestExecutePrefixTag failed")
+		}
+	}
+}
+func TestMagicLabel(t *testing.T) {
+	checkSameString := func(s []string) bool {
+		set := utils.NewSet()
+		for _, v := range s {
+			set.Add(v)
+		}
+		return len(set.List()) == 1
+	}
+	_ = checkSameString
+	for _, v := range [][]any{
+		{"{{raw::raw({{aaa()}})}}", "{{aaa()}}"},
+		{"aaa{{raw::raw({{aaa()}})}}aaa{{repeat(3)}}", []string{"aaa{{aaa()}}aaa", "aaa{{aaa()}}aaa", "aaa{{aaa()}}aaa"}},
+		{"{{randstr::rep()}}{{repeat(10)}}", func(s []string) bool {
+			return true
+		}},
+		{"{{randstr()}}{{repeat(10)}}", func(s []string) bool {
+			return len(s) == 10 && s[0] != s[1]
+		}},
+		{"{{array::1(a|b)}}{{array::1(a|b|c)}}", []string{"aa", "bb", "c"}},
+		{"{{array::1::rep(a|b)}}{{array::1(a|b|c)}}", []string{"aa", "bb", "bc"}},
+		{"{{array::1(a|b|c)}}{{array::1::rep(a|b)}}", []string{"aa", "bb", "cb"}},
+	} {
+		t, r := v[0], v[1]
+		spew.Dump(t)
+		result, err := ExecuteWithStringHandler(t.(string), map[string]func(string) []string{
+			"array": func(s string) []string {
+				return strings.Split(s, "|")
+			},
+			"raw": func(s string) []string {
+				return []string{s}
+			},
+			"randstr": func(s string) []string {
+				return []string{utils.RandStringBytes(10)}
+			},
+			"repeat": func(s string) []string {
+				res := make([]string, 0)
+				n, err := strconv.Atoi(s)
+				if err != nil {
+					return res
+				}
+
+				for range make([]int, n) {
+					res = append(res, "")
+				}
+				return res
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+		spew.Dump(result)
+		switch ret := r.(type) {
+		case string:
+			if result[0] != r {
+				m := fmt.Sprintf("got: %v expect: %v", strconv.Quote(result[0]), strconv.Quote(ret))
+				panic(m)
+			}
+		case []string:
+			if len(result) != len(ret) {
+				panic("check failed")
+			}
+			for i, v := range result {
+				if v != ret[i] {
+					panic("check failed")
+				}
+			}
+		case func([]string) bool:
+			if !ret(result) {
+				panic("check failed")
+			}
+		default:
+			panic("unknown type")
 		}
 	}
 }
