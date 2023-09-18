@@ -452,7 +452,7 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 	}
 
 	if data, err := yakit.GetProjectKeyWithError(db, strconv.FormatInt(id, 10)+suffix); err != nil {
-		return nil, utils.Errorf("get bare from kv failed: %s", db.Error)
+		return nil, utils.Errorf("get bare from kv failed: %s", err)
 	} else {
 		return &ypb.HTTPFlowBareResponse{
 			Id:   id,
