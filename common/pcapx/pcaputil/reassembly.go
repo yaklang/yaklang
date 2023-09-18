@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sort"
 )
@@ -16,7 +17,43 @@ type futureFrame struct {
 	Payload []byte
 }
 
-type trafficConnection struct {
+// TrafficFlow is a tcp flow
+type TrafficFlow struct {
+	// ClientConn
+	ClientConn *TrafficConnection
+	ServerConn *TrafficConnection
+	Hash       string
+	Index      uint64
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	pool *trafficPool
+}
+
+func (t *TrafficFlow) String() string {
+	return fmt.Sprintf("stream[%3d]: %v <-> %v", t.Index, t.ClientConn.localAddr, t.ServerConn.localAddr)
+}
+
+func (t *TrafficFlow) Feed(packet *layers.TCP) {
+	if t != nil {
+		if t.pool != nil {
+			t.pool.flowCache.Set(t.Hash, t)
+		}
+	}
+	if !packet.ACK && !packet.FIN && !packet.SYN && len(packet.Payload) <= 0 && !packet.RST {
+		return
+	}
+
+	if t.ClientConn.localPort == int(packet.SrcPort) {
+		t.ClientConn.Feed(packet)
+	} else {
+		t.ServerConn.Feed(packet)
+	}
+}
+
+// TrafficConnection is a tcp connection
+type TrafficConnection struct {
 	isn        uint32
 	currentSeq uint32
 	nextSeq    uint32
@@ -32,14 +69,18 @@ type trafficConnection struct {
 
 	waitGroup []*futureFrame
 
-	flow *trafficFlow
+	Flow *TrafficFlow
 }
 
-func (t *trafficConnection) String() string {
+func (t *TrafficConnection) Read(buf []byte) (int, error) {
+	return t.buf.Read(buf)
+}
+
+func (t *TrafficConnection) String() string {
 	return fmt.Sprintf("%v -> %v", t.localAddr, t.remoteAddr)
 }
 
-func (t *trafficConnection) IsClosed() bool {
+func (t *TrafficConnection) IsClosed() bool {
 	select {
 	case <-t.ctx.Done():
 		return true
@@ -48,12 +89,12 @@ func (t *trafficConnection) IsClosed() bool {
 	}
 }
 
-func (t *trafficConnection) Close() bool {
+func (t *TrafficConnection) Close() bool {
 	t.cancel()
 	return t.IsClosed()
 }
 
-func (t *trafficConnection) Feed(tcp *layers.TCP) {
+func (t *TrafficConnection) Feed(tcp *layers.TCP) {
 	if t.IsClosed() {
 		return
 	}
@@ -135,4 +176,46 @@ func (t *trafficConnection) Feed(tcp *layers.TCP) {
 		}
 	}
 	log.Debugf("unknown *(%v -> %v) Packet(%-6d bytes):  PSH:%v ACK:%v", t.localAddr, t.remoteAddr, len(tcp.Payload), tcp.PSH, tcp.ACK)
+}
+
+func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
+
+	flowCtx, cancel := context.WithCancel(p.ctx)
+	_ = cancel
+
+	dst, err := net.ResolveTCPAddr(netType, dstAddr)
+	if err != nil {
+		return nil, utils.Errorf("parse [%v] to addr failed: %s", dstAddr, err)
+	}
+	src, err := net.ResolveTCPAddr(netType, srcAddr)
+	if err != nil {
+		return nil, utils.Errorf("parse [%v] to addr failed: %s", srcAddr, err)
+	}
+	c2sConn := &TrafficConnection{
+		buf:        &(bytes.Buffer{}),
+		remoteAddr: dst,
+		localAddr:  src,
+	}
+	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
+	s2cConn := &TrafficConnection{
+		buf:        &(bytes.Buffer{}),
+		remoteAddr: src,
+		localAddr:  dst,
+	}
+	s2cConn.ctx, s2cConn.cancel = context.WithCancel(flowCtx)
+
+	// bind flow
+	flow := &TrafficFlow{
+		ClientConn: c2sConn,
+		ServerConn: s2cConn,
+		Index:      p.nextStream(),
+		ctx:        flowCtx,
+		cancel:     cancel,
+		pool:       p,
+	}
+	c2sConn.Flow = flow
+	s2cConn.Flow = flow
+	p.flowCache.Set(flow.Hash, flow)
+	log.Debugf("%v is open", flow.String())
+	return flow, nil
 }
