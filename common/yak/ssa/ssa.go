@@ -612,3 +612,16 @@ type Assert struct {
 var _ Node = (*Assert)(nil)
 var _ User = (*Assert)(nil)
 var _ Instruction = (*Assert)(nil)
+
+// ------------- Next
+type Next struct {
+	anInstruction
+	Iter Value
+	user []User
+}
+
+var _ Node = (*Next)(nil)
+var _ User = (*Next)(nil)
+var _ Value = (*Next)(nil)
+var _ Instruction = (*Next)(nil)
+var _ InstructionValue = (*Next)(nil)

@@ -333,3 +333,19 @@ func (a *Assert) ReplaceValue(v, to Value) {
 		panic("assert not use this value")
 	}
 }
+
+// ----------- Next
+func (n *Next) GetValues() []Value { return []Value{n.Iter} }
+func (n *Next) GetUsers() []User   { return n.user }
+func (n *Next) AddValue(v Value)   {}
+func (n *Next) AddUser(u User)     { n.user = append(n.user, u) }
+func (n *Next) RemoveUser(u User) {
+	n.user = utils.Remove(n.user, u)
+}
+func (n *Next) ReplaceValue(v, to Value) {
+	if n.Iter == v {
+		n.Iter = to
+	} else {
+		panic("next instruction not use this value")
+	}
+}

@@ -168,12 +168,15 @@ const (
 )
 
 type InterfaceType struct {
-	Name    string
-	Kind    InterfaceKind
-	Len     int
-	Key     []Value
-	keyType []Type
-	Field   []Type
+	Name       string
+	Kind       InterfaceKind
+	Len        int
+	Key        []Value
+	keyTypes   []Type
+	FieldTypes []Type
+
+	keyTyp    Type
+	fieldType Type
 }
 
 func (i InterfaceType) GetTypeKind() TypeKind {
@@ -188,10 +191,10 @@ func (i *InterfaceType) SetName(name string) {
 
 func NewInterfaceType() *InterfaceType {
 	return &InterfaceType{
-		Kind:    None,
-		Key:     make([]Value, 0),
-		keyType: make([]Type, 0),
-		Field:   make([]Type, 0),
+		Kind:       None,
+		Key:        make([]Value, 0),
+		keyTypes:   make([]Type, 0),
+		FieldTypes: make([]Type, 0),
 	}
 }
 
@@ -199,14 +202,15 @@ func NewInterfaceType() *InterfaceType {
 func NewSliceType(elem Type) *InterfaceType {
 	i := NewInterfaceType()
 	i.Kind = Slice
-	i.Field = append(i.Field, elem)
+	i.keyTyp = BasicTypes[Number]
+	i.fieldType = elem
 	return i
 }
 
 func NewMapType(key, field Type) *InterfaceType {
 	i := NewInterfaceType()
-	i.keyType = append(i.keyType, key)
-	i.Field = append(i.Field, field)
+	i.keyTyp = key
+	i.fieldType = field
 	i.Kind = Map
 	return i
 }
@@ -224,14 +228,14 @@ func (itype InterfaceType) RawString() string {
 	case Slice:
 		// map[int]T
 		if itype.Len == 0 {
-			ret += fmt.Sprintf("[]%s", itype.Field[0].String())
+			ret += fmt.Sprintf("[]%s", itype.fieldType.String())
 		} else {
-			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.Field[0].String())
+			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.fieldType.String())
 		}
 	case Map:
 		// map[T]U
 		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-		ret += fmt.Sprintf("map[%s]%s", itype.keyType[0].String(), itype.Field[0].String())
+		ret += fmt.Sprintf("map[%s]%s", itype.keyTyp.String(), itype.fieldType.String())
 		// } else {
 		// 	panic("this interface type not map")
 		// }
@@ -240,7 +244,7 @@ func (itype InterfaceType) RawString() string {
 		ret += fmt.Sprintf(
 			"struct {%s}",
 			strings.Join(
-				lo.Map(itype.Field, func(field Type, _ int) string { return field.String() }),
+				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
 				",",
 			),
 		)
@@ -257,23 +261,21 @@ func (s *InterfaceType) AddField(key Value, field Type) {
 	if keytyp == nil {
 		keytyp = BasicTypes[Any]
 	}
-	s.keyType = append(s.keyType, keytyp)
+	s.keyTypes = append(s.keyTypes, keytyp)
 	if field == nil {
 		field = BasicTypes[Any]
 	}
-	s.Field = append(s.Field, field)
+	s.FieldTypes = append(s.FieldTypes, field)
 }
 
 // return (field-type, key-type)
 func (s *InterfaceType) GetField(key Value) (Type, Type) {
 	switch s.Kind {
-	case Slice:
-		return s.Field[0], BasicTypes[Number]
-	case Map:
-		return s.Field[0], s.keyType[0]
+	case Slice, Map:
+		return s.fieldType, s.keyTyp
 	case Struct:
 		if index := slices.Index(s.Key, key); index != -1 {
-			return s.Field[index], key.GetType()
+			return s.FieldTypes[index], key.GetType()
 		}
 	}
 	return nil, nil
@@ -281,23 +283,31 @@ func (s *InterfaceType) GetField(key Value) (Type, Type) {
 
 // ===================== Finish simply
 func (s *InterfaceType) Finish() {
-	field := lo.UniqBy(s.Field, func(t Type) string { return t.String() })
-	keytype := lo.UniqBy(s.keyType, func(t Type) string { return t.String() })
-	if len(keytype) == 1 {
-		if len(field) == 1 {
+	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) string { return t.String() })
+	keytypes := lo.UniqBy(s.keyTypes, func(t Type) string { return t.String() })
+	if len(keytypes) == 1 {
+		if len(fieldTypes) == 1 {
 			// map[T]U
-			if keytype[0].String() == "number" {
+			if keytypes[0].String() == "number" {
 				// map[number]T ==> []T slice
 				// TODO: check increasing
 				s.Kind = Slice
+				s.keyTyp = BasicTypes[Number]
+				s.fieldType = fieldTypes[0]
 			} else {
 				// Map
 				s.Kind = Map
+				s.keyTyp = keytypes[0]
+				s.fieldType = fieldTypes[0]
 			}
 			// s.keyType = keytype
 			// s.Field = field
-		} else {
+		}
+
+		if keytypes[0].String() == "string" {
 			s.Kind = Struct
+			s.keyTyp = BasicTypes[String]
+			s.fieldType = BasicTypes[Any]
 		}
 	}
 }

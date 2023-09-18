@@ -339,3 +339,10 @@ func (a *Assert) String() string {
 		getStr(a.Cond), msg,
 	)
 }
+
+func (n *Next) String() string {
+	return fmt.Sprintf(
+		"%s = next[%s]",
+		getStr(n), getStr(n.Iter),
+	)
+}
