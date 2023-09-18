@@ -364,7 +364,6 @@ if !skippedHostAliveScan && recordPtr == 0 {
 
     HostAliveFile = file.Join(yakit.GetHomeTempDir(), runtimeID)
     file.Save(HostAliveFile, aliveHostStr)~
-    yakit.Info("HostAliveFile : %v",HostAliveFile)
     if len(aliveHostStr) == 0 {
         yakit.Error("没有存活主机")
         //die("没有存活主机")
@@ -387,7 +386,6 @@ if !skippedHostAliveScan {
 } else {
     inputFiles = str.SplitAndTrim(targetFiles, ",")
 }
-yakit.Info("inputFiles : %v",inputFiles)
 files.Push(inputFiles...)
 
 hostTotal = hostCount
