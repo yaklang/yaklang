@@ -916,7 +916,7 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
 
-	db = db.Model(&HTTPFlow{}).Debug()
+	db = db.Model(&HTTPFlow{})
 	if !params.GetFull() {
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800
