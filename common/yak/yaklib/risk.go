@@ -47,7 +47,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 `, title, risk.IP))
 			}
 			client.Output(&YakitStatusCard{
-				Id: "漏洞/风险", Data: fmt.Sprint(fmt.Sprint(addCounter())), Tags: nil,
+				Id: "漏洞/风险/指纹", Data: fmt.Sprint(fmt.Sprint(addCounter())), Tags: nil,
 			})
 			client.Output(risk)
 		}
@@ -59,7 +59,7 @@ var (
 	RiskExports = map[string]interface{}{
 		"CreateRisk":             yakit.CreateRisk,
 		"Save":                   yakit.SaveRisk,
-		"NewRisk":    YakitNewRiskBuilder(GetYakitClientInstance()),
+		"NewRisk":                YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave": yakit.RegisterBeforeRiskSave,
 		"YieldRiskByTarget": func(target string) chan *yakit.Risk {
 			return yakit.YieldRisksByTarget(consts.GetGormProjectDatabase(), context.Background(), target)
