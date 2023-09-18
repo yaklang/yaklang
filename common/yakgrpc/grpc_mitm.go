@@ -1226,21 +1226,34 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Warnf("MITM %v recv old hijacked request[%v]", addr, reqInstance.GetId())
 					goto RECV
 				}
+				var current []byte
 
-				// 保存到数据库
-				log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
-				startCreateFlow := time.Now()
-				flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr)
-				if err != nil {
-					log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
-					return nil
-				}
-				log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
 				// 请求直接保存到数据库
 				defer func() {
+					// 创建flow
+					reqIns := originReqIns
+					// 被劫持修改过，则使用新的reqIns
+					if len(current) > 0 {
+						newReqIns, err := lowhttp.ParseBytesToHttpRequest(current)
+						if err != nil {
+							log.Errorf("parse new http request failed: %s", err)
+							return
+						}
+						reqIns = newReqIns
+					}
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, reqIns, "mitm", reqIns.URL.String(), remoteAddr)
+					if err != nil {
+						log.Errorf("create http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
+						return
+					}
+					// 丢包
+					if reqInstance.GetDrop() {
+						flow.AddTagToFirst("[请求被丢弃]")
+						flow.Purple()
+					}
 					flow.StatusCode = 200 // 这里先设置成200
 					flow.Response = ""
-					flow.HiddenIndex = getPacketIndex()
+					flow.HiddenIndex = getPacketIndex() // Hidden Index 用来标注 MITM 劫持的顺序
 					flow.Hash = flow.CalcHash()
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_HTTPFlowHash, flow.Hash)
 
@@ -1263,9 +1276,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if reqInstance.GetDrop() {
 					log.Infof("MITM %v recv drop hijacked request[%v]", addr, reqInstance.GetId())
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
-					// Hidden Index 用来标注 MITM 劫持的顺序
-					flow.AddTagToFirst("[请求被丢弃]")
-					flow.Purple()
 					return nil
 				}
 
@@ -1274,7 +1284,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return originReqRaw
 				}
 
-				current := reqInstance.GetRequest()
+				current = reqInstance.GetRequest()
 				if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
 					// 在这可能包含 fuzztag
 					result := mutate.MutateQuick(current)
@@ -1420,7 +1430,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
 				log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			} else {
-				err = yakit.CreateOrUpdateHTTPFlowWithoutRequest(s.GetProjectDatabase(), oldflowHash, flow)
+				flow, err = yakit.CreateOrUpdateHTTPFlowEx(s.GetProjectDatabase(), oldflowHash, flow)
 				log.Debugf("update http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			}
 			if err != nil {
@@ -1438,7 +1448,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(bareReq) == 0 {
 				bareReq = httpctx.GetBareRequestBytes(req)
 			}
-			log.Debugf("[KV] save bare Response(%d)", flow.ID)
+			log.Debugf("[KV] save bare Request(%d)", flow.ID)
 
 			if len(bareReq) > 0 && flow.ID > 0 {
 				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"

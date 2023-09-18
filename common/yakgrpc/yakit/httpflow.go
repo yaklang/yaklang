@@ -692,7 +692,7 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error
 	return nil
 }
 
-func CreateOrUpdateHTTPFlowWithoutRequest(db *gorm.DB, hash string, i interface{}) (fErr error) {
+func CreateOrUpdateHTTPFlowEx(db *gorm.DB, hash string, i interface{}) (flow *HTTPFlow, fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
@@ -700,12 +700,13 @@ func CreateOrUpdateHTTPFlowWithoutRequest(db *gorm.DB, hash string, i interface{
 	}()
 
 	db = db.Model(&HTTPFlow{})
+	flow = &HTTPFlow{}
 
-	if db := db.Where("hash = ?", hash).Assign(i).Omit("request").FirstOrCreate(&HTTPFlow{}); db.Error != nil {
-		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
+	if db := db.Where("hash = ?", hash).Assign(i).Omit("request").FirstOrCreate(flow); db.Error != nil {
+		return nil, utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
 
-	return nil
+	return flow, nil
 }
 
 func GetHTTPFlow(db *gorm.DB, id int64) (*HTTPFlow, error) {
@@ -915,7 +916,7 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
 
-	db = db.Model(&HTTPFlow{}) //.Debug()
+	db = db.Model(&HTTPFlow{}).Debug()
 	if !params.GetFull() {
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800
