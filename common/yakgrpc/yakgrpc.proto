@@ -533,6 +533,24 @@ service Yak {
   rpc ResetGlobalNetworkConfig(ResetGlobalNetworkConfigRequest) returns (Empty);
 
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
+
+  // Wireshark
+  rpc PcapX(stream PcapXRequest) returns (stream PcapXResponse);
+}
+
+message PcapXRequest {
+  // first request
+  repeated string NetInterfaceList = 1;
+  double TimeoutFloat = 2;
+  SuricataConfig SuricataLoader = 3;
+}
+
+message SuricataConfig {
+
+}
+
+message PcapXResponse {
+
 }
 
 message RequestYakURLParams {
