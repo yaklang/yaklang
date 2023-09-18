@@ -32,11 +32,14 @@ if err != nil {
     die(err)
 }
 
-hookManager := hook.NewManager()
-err = hook.LoadYakitPluginByName(
-    hookManager, 
-    name, 
-    "handle")
+hookManager, err := hook.NewMixPluginCaller()
+
+if err != nil {
+    updateStatus("创建插件调用模块失败")
+    die(err)
+}
+
+err = hookManager.LoadPlugin(name)
 if err != nil {
     yakit.Error("加载 Yak 插件失败：%v", err)
     die("no plugin loaded")
@@ -50,8 +53,7 @@ for result = range res {
         yakit.Info("CLOSED: %v", str.HostPort(result.Target, result.Port))
     }
     yakit.Info("扫描完成：%v，准备执行插件: %v", str.HostPort(result.Target, result.Port), name)
-    log.info("扫描完成：%v，准备执行插件: %v", str.HostPort(result.Target, result.Port), name)
-    hookManager.CallPluginKeyByName(name, "handle", result)
+    hookManager.HandleServiceScanResult(result)
 }
 `
 
