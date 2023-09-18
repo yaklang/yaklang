@@ -303,7 +303,7 @@ func (s *Update) RemoveUser(u User) {
 func (s *Update) GetValues() []Value { return []Value{s.Value} }
 func (s *Update) AddValue(_ Value)   {}
 
-// ----------- Update
+// ----------- Typecast
 func (t *TypeCast) ReplaceValue(v, to Value) {
 	if t.Value == v {
 		t.Value = to
