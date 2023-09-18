@@ -196,3 +196,13 @@ func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
 	b.symbolBlock.symbol[text] = newtext
 	return newtext
 }
+
+func (b *FunctionBuilder) GetIdByBlockSymbolTable(id string) string {
+	for block := b.symbolBlock; block != nil; block = block.next {
+		if v, ok := block.symbol[id]; ok {
+			return v
+		}
+	}
+
+	return id
+}

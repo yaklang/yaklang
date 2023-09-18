@@ -90,9 +90,7 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 }
 
 func (b *FunctionBuilder) ReadVariable(variable string) Value {
-	if t, ok := b.symbolBlock.symbol[variable]; ok {
-		variable = t
-	}
+	variable = b.GetIdByBlockSymbolTable(variable)
 	if b.CurrentBlock != nil {
 		// for building function
 		return b.readVariableByBlock(variable, b.CurrentBlock)
