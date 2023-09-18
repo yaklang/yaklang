@@ -36,6 +36,8 @@ type Capturer struct {
 
 	// output debug info
 	Debug bool
+
+	onFlowCreated func(*TrafficFlow)
 }
 
 type CaptureOption func(*Capturer) error
@@ -47,6 +49,13 @@ func emptyOption(_ *Capturer) error {
 func WithBPFFilter(bpf string) CaptureOption {
 	return func(c *Capturer) error {
 		c.BPFFilter = bpf
+		return nil
+	}
+}
+
+func WithOnTrafficFlow(h func(flow *TrafficFlow)) CaptureOption {
+	return func(capturer *Capturer) error {
+		capturer.onFlowCreated = h
 		return nil
 	}
 }
@@ -295,6 +304,7 @@ func Start(opt ...CaptureOption) error {
 	//assembler := tcpassembly.NewAssembler(streamPool)
 	// conf.Assembler = assembler
 	conf.trafficPool = NewTrafficPool(ctx)
+	conf.trafficPool.onFlowCreated = conf.onFlowCreated
 
 	utils.WaitRoutinesFromSlice(handlers, func(handler *pcap.Handle) {
 		if err := _open(ctx, handler, "", conf.packetHandler); err != nil {

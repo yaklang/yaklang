@@ -1,7 +1,6 @@
 package pcaputil
 
 import (
-	"bytes"
 	"context"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/google/gopacket"
@@ -9,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -24,6 +22,8 @@ type trafficPool struct {
 	currentStreamIndex uint64
 
 	flowCache *ttlcache.Cache
+
+	onFlowCreated func(flow *TrafficFlow)
 }
 
 func NewTrafficPool(ctx context.Context) *trafficPool {
@@ -31,11 +31,11 @@ func NewTrafficPool(ctx context.Context) *trafficPool {
 	fCache := ttlcache.NewCache()
 	fCache.SetExpirationCallback(func(key string, value interface{}) {
 		pool.pool.Delete(key)
-		flow, ok := value.(*trafficFlow)
+		flow, ok := value.(*TrafficFlow)
 		if !ok {
 			return
 		}
-		log.Infof("%v is close", flow.String())
+		log.Debugf("%v is close", flow.String())
 		flow.cancel()
 		flow.ServerConn.Close()
 		flow.ClientConn.Close()
@@ -71,7 +71,7 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 	var srcAddrString = utils.HostPort(srcIP, srcPort)
 	var dstAddrString = utils.HostPort(dstIP, dstPort)
 	var hash = p.flowhash(networkStr, srcAddrString, dstAddrString)
-	var flow *trafficFlow
+	var flow *TrafficFlow
 	if ret, ok := p.pool.Load(hash); !ok {
 		// no reason  ...
 		if transportLayer.Payload != nil && transportLayer.PSH {
@@ -85,6 +85,9 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 			flow.ClientConn.remotePort = dstPort
 			flow.Feed(transportLayer)
 			p.pool.Store(hash, flow)
+			if p.onFlowCreated != nil {
+				p.onFlowCreated(flow)
+			}
 			return
 		}
 		// SYN && !ACK -> start a conn
@@ -98,11 +101,14 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 			flow.ClientConn.localPort = srcPort
 			flow.ClientConn.remotePort = dstPort
 			p.pool.Store(hash, flow)
+			if p.onFlowCreated != nil {
+				p.onFlowCreated(flow)
+			}
 			return
 		}
 		return
 	} else {
-		flow = ret.(*trafficFlow)
+		flow = ret.(*TrafficFlow)
 	}
 	if flow == nil {
 		return
@@ -114,46 +120,4 @@ func (p *trafficPool) flowhash(netType, srcAddr, dstAddr string) string {
 	hashMaterial := []string{netType, srcAddr, dstAddr}
 	sort.Strings(hashMaterial)
 	return codec.Sha256(strings.Join(hashMaterial, "-"))
-}
-
-func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*trafficFlow, error) {
-
-	flowCtx, cancel := context.WithCancel(p.ctx)
-	_ = cancel
-
-	dst, err := net.ResolveTCPAddr(netType, dstAddr)
-	if err != nil {
-		return nil, utils.Errorf("parse [%v] to addr failed: %s", dstAddr, err)
-	}
-	src, err := net.ResolveTCPAddr(netType, srcAddr)
-	if err != nil {
-		return nil, utils.Errorf("parse [%v] to addr failed: %s", srcAddr, err)
-	}
-	c2sConn := &trafficConnection{
-		buf:        &(bytes.Buffer{}),
-		remoteAddr: dst,
-		localAddr:  src,
-	}
-	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
-	s2cConn := &trafficConnection{
-		buf:        &(bytes.Buffer{}),
-		remoteAddr: src,
-		localAddr:  dst,
-	}
-	s2cConn.ctx, s2cConn.cancel = context.WithCancel(flowCtx)
-
-	// bind flow
-	flow := &trafficFlow{
-		ClientConn: c2sConn,
-		ServerConn: s2cConn,
-		Index:      p.nextStream(),
-		ctx:        flowCtx,
-		cancel:     cancel,
-		pool:       p,
-	}
-	c2sConn.flow = flow
-	s2cConn.flow = flow
-	p.flowCache.Set(flow.Hash, flow)
-	log.Infof("%v is open", flow.String())
-	return flow, nil
 }
