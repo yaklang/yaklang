@@ -425,7 +425,7 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 				return stream.Send(r)
 			},
 		)
-	case "port-scan", "mitm", "nuclei":
+	case "mitm", "nuclei":
 		// yak / nuclei
 		log.Infof("start to exec yak script... : %v", script.ScriptName)
 		var target string
@@ -435,6 +435,15 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 			}
 		}
 		return s.execScript(script.ScriptName, target, stream)
+	case "port-scan":
+		params, code, err := s.generatePortScanParams(script.ScriptName, req.GetParams())
+		if err != nil {
+			return err
+		}
+		req.Params = params
+		req.Script = code
+		req.YakScriptId = int64(script.ID)
+		return s.ExecWithContext(stream.Context(), req, stream)
 	default:
 		req.ScriptId = script.ScriptName
 		req.YakScriptId = int64(script.ID)
