@@ -121,15 +121,15 @@ func (lb *LoopBuilder) Finish() {
 		lb.buildBody()
 		lb.b.PopTarget()
 	}
-	// body -> latch
-	lb.b.EmitJump(latch)
 
 	// build latch
 	if lb.buildThird != nil {
+		// body -> latch
+		lb.b.EmitJump(latch)
 		lb.b.CurrentBlock = latch
 		step = lb.buildThird()
 	}
-	// latch -> header
+	// latch/body -> header
 	lb.b.EmitJump(header)
 
 	// finish
@@ -166,7 +166,6 @@ func (lb *LoopBuilder) Finish() {
 // rest:
 //      ...rest.code....
 
-type conditionBuilder func() Value
 type IfBuilder struct {
 	b *FunctionBuilder
 	// enter block
@@ -176,11 +175,11 @@ type IfBuilder struct {
 	parent *IfBuilder
 
 	// if branch
-	ifCondition conditionBuilder
+	ifCondition func() Value
 	ifBody      func()
 
 	// elif branch
-	elifCondition []conditionBuilder
+	elifCondition []func() Value
 	elifBody      []func()
 
 	// else branch
@@ -191,7 +190,7 @@ func (b *FunctionBuilder) IfBuilder() *IfBuilder {
 	return &IfBuilder{
 		b:             b,
 		enter:         b.CurrentBlock,
-		elifCondition: make([]conditionBuilder, 0),
+		elifCondition: make([]func() Value, 0),
 		elifBody:      make([]func(), 0),
 	}
 }
@@ -201,12 +200,12 @@ func (i *IfBuilder) AddChild(child *IfBuilder) {
 	child.parent = i
 }
 
-func (i *IfBuilder) IfBranch(condition conditionBuilder, body func()) {
+func (i *IfBuilder) IfBranch(condition func() Value, body func()) {
 	i.ifCondition = condition
 	i.ifBody = body
 }
 
-func (i *IfBuilder) ElifBranch(condition conditionBuilder, body func()) {
+func (i *IfBuilder) ElifBranch(condition func() Value, body func()) {
 	i.elifCondition = append(i.elifCondition, condition)
 	i.elifBody = append(i.elifBody, body)
 }
