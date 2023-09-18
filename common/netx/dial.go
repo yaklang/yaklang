@@ -66,62 +66,6 @@ func DialForceGMTLSContextWithoutProxy(ctx context.Context, network, addr string
 	return defaultDialGMTLSContextFunc(ctx, network, addr)
 }
 
-func UpgradeToTLSConnection(conn net.Conn, sni string, i any) (net.Conn, error) {
-	return UpgradeToTLSConnectionWithTimeout(conn, sni, i, 10*time.Second)
-}
-
-func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration) (net.Conn, error) {
-	if i == nil {
-		i = &tls.Config{
-			ServerName:         sni,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			InsecureSkipVerify: true,
-			Renegotiation:      tls.RenegotiateFreelyAsClient,
-		}
-	}
-	var gmtlsConfig *gmtls.Config
-	var tlsConfig *tls.Config
-	// i is a *tls.Config or *gmtls.Config
-	switch ret := i.(type) {
-	case *tls.Config:
-		ret.Renegotiation = tls.RenegotiateFreelyAsClient
-		tlsConfig = ret
-	case *gmtls.Config:
-		gmtlsConfig = ret
-	case *gmtls.GMSupport:
-		gmtlsConfig = &gmtls.Config{
-			GMSupport:          ret,
-			ServerName:         sni,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			InsecureSkipVerify: true,
-		}
-	default:
-		return nil, utils.Errorf("invalid tlsConfig type %T", i)
-	}
-
-	if tlsConfig != nil {
-		tlsConfig.Renegotiation = tls.RenegotiateFreelyAsClient
-		var sConn = tls.Client(conn, tlsConfig)
-		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
-		if err != nil {
-			return nil, err
-		}
-		return sConn, nil
-	} else if gmtlsConfig != nil {
-		gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
-		var sConn = gmtls.Client(conn, gmtlsConfig)
-		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))
-		if err != nil {
-			return nil, err
-		}
-		return sConn, nil
-	} else {
-		return nil, utils.Errorf("invalid tlsConfig type %T", i)
-	}
-}
-
 func NewDialGMTLSContextFunc(enableGM bool, preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
 	origin := NewDialContextFunc(timeout, opts...)
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {

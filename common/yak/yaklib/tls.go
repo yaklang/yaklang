@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"time"
 )
@@ -28,7 +29,7 @@ var TlsExports = map[string]interface{}{
 	"SignClientCertAndKey": func(ca []byte, key []byte) (cert []byte, sKey []byte, _ error) {
 		return tlsutils.SignClientCrtNKeyWithParams(ca, key, "Server", time.Now().Add(time.Hour*24*365*99), false)
 	},
-	"Inspect":             tlsutils.TLSInspect,
+	"Inspect":             netx.TLSInspect,
 	"EncryptWithPkcs1v15": tlsutils.PemPkcs1v15Encrypt,
 	"DecryptWithPkcs1v15": tlsutils.PemPkcs1v15Decrypt,
 }
