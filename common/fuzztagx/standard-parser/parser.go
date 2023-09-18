@@ -88,13 +88,24 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 				methodName := strings.TrimSpace(methodInvokeCode[:leftPos[1]])
 				if isIdentifyString(methodName) {
 					splits := strings.Split(methodName, "::")
-					if len(splits) == 2 {
+					if len(splits) > 1 {
 						tag.Method = splits[0]
-						tag.Label = splits[1]
+						for _, label := range splits[1:] {
+							label = strings.TrimSpace(label)
+							if label == "" {
+								continue
+							}
+							if label == "raw" {
+								tag.isRawData = true
+								continue
+							} else {
+								tag.Labels = append(tag.Labels, label)
+							}
+						}
 					} else {
 						tag.Method = methodName
 					}
-					if strings.HasPrefix(methodName, "expr:") {
+					if strings.HasPrefix(methodName, "expr:") || tag.isRawData {
 						tag.Data = []Node{code[pos.start+leftPos[1]+1 : pos.start+rightPos[1]]}
 					} else {
 						tag.Data = newDatasFromPos(pos.start+leftPos[1]+1, pos.start+rightPos[1], pos.subs)

@@ -4,10 +4,11 @@ type Node interface {
 }
 
 type FuzzTag struct {
-	TypeName string
-	Method   string
-	Label    string
-	Data     []Node // 函数参数
+	TypeName  string
+	Method    string
+	Labels    []string
+	isRawData bool
+	Data      []Node // 函数参数
 }
 
 // TagDefine 自定义tag类型
