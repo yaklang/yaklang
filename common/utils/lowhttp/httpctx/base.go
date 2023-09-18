@@ -2,14 +2,15 @@ package httpctx
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func GetContextInfoMap(r *http.Request) *sync.Map {
@@ -240,6 +241,7 @@ const (
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
 	REQUEST_CONTEXT_KEY_RemoteAddr                   = "remoteAddr"
 	REQUEST_CONTEXT_KEY_ViaConnect                   = "viaConnect"
+	REQUEST_CONTEXT_KEY_HTTPFlowHash                 = "httpflowHash"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"

@@ -5,6 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
@@ -20,13 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
