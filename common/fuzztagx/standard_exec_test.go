@@ -258,6 +258,7 @@ func TestExecutePrefixTag(t *testing.T) {
 		},
 	}
 	testData := []string{
+		`}}`,
 		`x"{{int(a)}}"`,
 		"base64(111)",
 		" base64(111)",
