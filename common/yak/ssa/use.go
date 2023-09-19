@@ -349,3 +349,15 @@ func (n *Next) ReplaceValue(v, to Value) {
 		panic("next instruction not use this value")
 	}
 }
+
+// ------------- PANIC
+func (p *Panic) GetValues() []Value { return []Value{p.Info} }
+func (p *Panic) GetUsers() []User   { return nil }
+func (p *Panic) AddValue(v Value)   {}
+func (p *Panic) ReplaceValue(v, to Value) {
+	if p.Info == v {
+		p.Info = to
+	} else {
+		panic("panic instruction not use this value")
+	}
+}
