@@ -272,7 +272,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		} else if matcher != nil {
 			hasMatcherOrExtractor = true
 		}
-		payloads, err := generateYakPayloads(req)
+		payloads, err := GenerateYakPayloads(req)
 		if err != nil {
 			log.Debugf("extractYakPayloads failed: %v", err)
 		}
@@ -547,7 +547,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 	return matchInstance, nil
 }
 
-func generateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
+func GenerateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
 	data := utils.MapGetMapRaw(req, "payloads")
 	if data == nil {
 		return nil, nil

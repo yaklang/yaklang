@@ -102,7 +102,9 @@ func (v *YakVariables) SetNucleiDSL(key string, items []*NucleiTagData) {
 		Tags: items,
 	}
 }
-
+func (v *YakVariables) GetRaw() map[string]*Var {
+	return v.raw
+}
 func (v *YakVariables) ToMap() map[string]interface{} {
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
