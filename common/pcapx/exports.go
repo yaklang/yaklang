@@ -5,6 +5,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"math/rand"
@@ -419,3 +420,12 @@ var (
 		"InjectChaosTraffic": InjectChaosTraffic,
 	}
 )
+
+func init() {
+	for k, v := range pcaputil.Exports {
+		if _, ok := Exports[k]; ok {
+			log.Warnf("pcaputil.Exports[%s] already exists", k)
+		}
+		Exports[k] = v
+	}
+}
