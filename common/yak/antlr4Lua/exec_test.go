@@ -241,6 +241,7 @@ func init() {
 
 }
 
+
 func TestMultilineComment(t *testing.T) {
 	code := `--[[
  多行注释

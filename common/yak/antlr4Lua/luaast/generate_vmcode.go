@@ -172,11 +172,13 @@ func (l *LuaTranslator) pushNOP() {
 	})
 }
 
-func (l *LuaTranslator) pushBreak() {
-	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
+func (l *LuaTranslator) pushBreak() *yakvm.Code {
+	b := &yakvm.Code{
 		Opcode: yakvm.OpBreak,
 		Op1:    yakvm.NewIntValue(l.getNearliestBreakScopeCounter()),
-	})
+	}
+	l._pushOpcodeWithCurrentCodeContext(b)
+	return b
 }
 
 func (l *LuaTranslator) pushEllipsis(n int) {
@@ -256,6 +258,14 @@ func (l *LuaTranslator) pushValue(i *yakvm.Value) {
 	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1:    i,
+	})
+}
+
+func (l *LuaTranslator) pushValueWithCopy(i *yakvm.Value) {
+	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
+		Opcode: yakvm.OpPush,
+		Unary: 1,
+		Op1: i,
 	})
 }
 
