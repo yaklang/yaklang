@@ -27,7 +27,7 @@ func init() {
 	//for formatted output, but only as a quick way to show a value, for instance for
 	//debugging. For complete control over the output, use string.format and io.write.
 	// 原生lua的print会在多个参数中间加tab，这里问题不大go默认使用ws
-	yakvm.Import("print", func(v ...interface{}) {
+	Import("print", func(v ...interface{}) {
 		toStr := func(x interface{}) (string, bool) {
 			switch v := x.(type) {
 			case string:
@@ -56,7 +56,7 @@ func init() {
 		fmt.Println(v)
 	})
 
-	yakvm.Import("raw_print", func(v interface{}) {
+	Import("raw_print", func(v interface{}) {
 		fmt.Println(v)
 	})
 
@@ -64,7 +64,7 @@ func init() {
 	//Calls error if the value of its argument v is false (i.e., nil or false);
 	//otherwise, returns all its arguments. In case of error, message is the
 	//error object; when absent, it defaults to "assertion failed!"
-	yakvm.Import("assert", func(condition interface{}, message string) {
+	Import("assert", func(condition interface{}, message string) {
 		if condition == nil {
 			panic(message)
 		}
@@ -75,7 +75,7 @@ func init() {
 		}
 	})
 
-	yakvm.Import("@pow", func(x interface{}, y interface{}) float64 {
+	Import("@pow", func(x interface{}, y interface{}) float64 {
 		interfaceToFloat64 := func(a interface{}) (float64, bool) {
 			switch v := a.(type) {
 			case float64:
@@ -97,7 +97,7 @@ func init() {
 
 	})
 
-	yakvm.Import("@floor", func(x interface{}, y interface{}) float64 {
+	Import("@floor", func(x interface{}, y interface{}) float64 {
 		interfaceToFloat64 := func(a interface{}) (float64, bool) {
 			switch v := a.(type) {
 			case float64:
@@ -120,7 +120,7 @@ func init() {
 
 	})
 
-	yakvm.Import("tostring", func(x interface{}) string {
+	Import("tostring", func(x interface{}) string {
 		switch v := x.(type) {
 		case string:
 			return v
@@ -142,7 +142,7 @@ func init() {
 		}
 	})
 
-	yakvm.Import("@strcat", func(x interface{}, y interface{}) string {
+	Import("@strcat", func(x interface{}, y interface{}) string {
 		defer func() {
 			if recover() != nil {
 				panic(fmt.Sprintf("attempt to concatenate %v with %v", reflect.TypeOf(x).String(), reflect.TypeOf(y).String()))
@@ -166,7 +166,7 @@ func init() {
 		return toStr(x) + toStr(y)
 	})
 
-	yakvm.Import("@getlen-=", func(x interface{}) int {
+	Import("@getlen", func(x interface{}) int {
 		if str, ok := x.(string); ok {
 			return len(str)
 		}
@@ -195,7 +195,7 @@ func init() {
 		panic(fmt.Sprintf("attempt to get length of %v", reflect.TypeOf(x).String()))
 	})
 
-	yakvm.Import("next", func(x ...interface{}) (interface{}, interface{}) { // next(table[,index])
+	Import("next", func(x ...interface{}) (interface{}, interface{}) { // next(table[,index])
 		if len(x) == 1 || x[1] == nil {
 			keysString := make([]string, 0)
 			keysMap := make(map[string]interface{})
@@ -235,7 +235,7 @@ func init() {
 		return nil, nil
 	})
 
-	yakvm.Import("error", func(x any) {
+	Import("error", func(x any) {
 		panic(x)
 	})
 
