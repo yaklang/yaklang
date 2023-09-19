@@ -264,13 +264,15 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 
 	type HTTPFlowShare struct {
 		*yakit.HTTPFlow
-		ExtractedList      []*yakit.ExtractedData
-		WebsocketFlowsList []*yakit.WebsocketFlowShare
+		ExtractedList         []*yakit.ExtractedData
+		WebsocketFlowsList    []*yakit.WebsocketFlowShare
+		ProjectGeneralStorage []*yakit.ProjectGeneralStorage
 	}
 	var (
-		data               []HTTPFlowShare
-		extractedData      []*yakit.ExtractedData
-		websocketFlowsData []*yakit.WebsocketFlowShare
+		data                  []HTTPFlowShare
+		extractedData         []*yakit.ExtractedData
+		websocketFlowsData    []*yakit.WebsocketFlowShare
+		projectGeneralStorage []*yakit.ProjectGeneralStorage
 	)
 
 	if len(req.GetIds()) > 50 {
@@ -337,10 +339,23 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 			IsWebsocket:       httpFlow.IsWebsocket,
 			WebsocketHash:     httpFlow.WebsocketHash,
 		}
+		projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
+		projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
+		for _, v := range projectStorages {
+			projectGeneralStorage = append(projectGeneralStorage, &yakit.ProjectGeneralStorage{
+				Key:        v.Key,
+				Value:      v.Value,
+				Group:      v.Group,
+				Verbose:    v.Verbose,
+				ExpiredAt:  v.ExpiredAt,
+				ProcessEnv: v.ProcessEnv,
+			})
+		}
 		data = append(data, HTTPFlowShare{
-			HTTPFlow:           httpFlowShare,
-			ExtractedList:      extractedData,
-			WebsocketFlowsList: websocketFlowsData,
+			HTTPFlow:              httpFlowShare,
+			ExtractedList:         extractedData,
+			WebsocketFlowsList:    websocketFlowsData,
+			ProjectGeneralStorage: projectGeneralStorage,
 		})
 	}
 	shareContent, err := json.Marshal(data)
@@ -365,8 +380,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	}
 	type HTTPFlowShare struct {
 		*yakit.HTTPFlow
-		ExtractedList      []*yakit.ExtractedData
-		WebsocketFlowsList []*yakit.WebsocketFlowShare
+		ExtractedList         []*yakit.ExtractedData
+		WebsocketFlowsList    []*yakit.WebsocketFlowShare
+		ProjectGeneralStorage []*yakit.ProjectGeneralStorage
 	}
 	var (
 		shareData []*HTTPFlowShare
@@ -402,14 +418,16 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 			IsWebsocket:        data.IsWebsocket,
 			WebsocketHash:      data.WebsocketHash,
 		}
+		var httpFlowId int64
 		if shareHttpFlow != nil {
-			err = yakit.CreateOrUpdateHTTPFlow(s.GetProjectDatabase(), shareHttpFlow.Hash, shareHttpFlow)
-			if err != nil {
+			var httpFlow yakit.HTTPFlow
+			db := s.GetProjectDatabase().Where("hash = ?", shareHttpFlow.Hash).Assign(shareHttpFlow).FirstOrCreate(&httpFlow)
+			if db.Error != nil {
 				sw.Rollback()
 				return nil, utils.Errorf("HTTPFlowsExtract CreateOrUpdateHTTPFlow failed: %s", err)
 			}
+			httpFlowId = int64(httpFlow.ID)
 		}
-
 		for _, v := range data.ExtractedList {
 			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &yakit.ExtractedData{
 				SourceType:  v.SourceType,
@@ -434,7 +452,29 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				Hash:                 v.Hash,
 			}); db1.Error != nil {
 				sw.Rollback()
-				return nil, utils.Errorf("HTTPFlowsExtract failed: %s", db1.Error)
+				return nil, utils.Errorf("WebsocketFlow failed: %s", db1.Error)
+			}
+		}
+
+		for _, v := range data.ProjectGeneralStorage {
+			if strings.Contains(v.Key, "_request") {
+				v.Key = "_request"
+			} else if strings.Contains(v.Key, "_response") {
+				v.Key = "_response"
+			}
+			shareProjectGeneralStorage := &yakit.ProjectGeneralStorage{
+				Key:        strconv.Quote(strconv.FormatInt(httpFlowId, 10) + v.Key),
+				Value:      v.Value,
+				ExpiredAt:  v.ExpiredAt,
+				ProcessEnv: v.ProcessEnv,
+				Verbose:    v.Verbose,
+				Group:      v.Group,
+			}
+			if httpFlowId > 0 {
+				if db2 := s.GetProjectDatabase().Where("key = ?", strconv.FormatInt(httpFlowId, 10)+v.Key).Assign(shareProjectGeneralStorage).FirstOrCreate(&yakit.ProjectGeneralStorage{}); db2.Error != nil {
+					sw.Rollback()
+					return nil, utils.Errorf("SetProjectKey failed: %s", db2.Error)
+				}
 			}
 		}
 	}
