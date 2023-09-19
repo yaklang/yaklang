@@ -397,6 +397,7 @@ yakit.StatusCard("开放端口数/已扫主机数", "-/-")
 
 totalTasks = hostTotal * portTotal
 portResultFinalTotal = 0
+bruteTaskCompleted = 0
 progressLock = sync.NewLock()
 updateProgress = func(delta) {
     if totalTasks <= 0 {
@@ -411,22 +412,24 @@ updateProgress = func(delta) {
     if portResultFinalTotal > totalTasks {
         portResultFinalTotal = totalTasks
     }
-
+    allTotal = bruteTaskCompleted + portResultFinalTotal
     yakit.Info(
         "已出结果 %v",
         sprintf(
             "%v/%v/%.3f",
-            portResultFinalTotal,
+            allTotal,
             totalTasks,
-            0.1 + (float(portResultFinalTotal) / float(totalTasks)) * 0.9,
+            0.1 + (float(allTotal) / float(totalTasks)) * 0.9,
         ),
     )
-    yakit.SetProgress(baseProgress + 0.03 + (float(portResultFinalTotal) / float(totalTasks)) * 0.9)
+    yakit.SetProgress(baseProgress + 0.03 + (float(allTotal) / float(totalTasks)) * 0.9)
 }
 
 bruteScan = func(result) {
     bruteType = ""
-
+    if result.GetServiceName() == "exasoftport1" {
+        return
+    }
     for _, bt := range brute.GetAvailableBruteTypes() {
         if result.GetServiceName().Lower().Contains(bt) || bt.Contains(result.GetServiceName().Lower()) {
             bruteType = bt
@@ -499,6 +502,9 @@ bruteScan = func(result) {
         pL = append(pL, defaultpass...)
     }
 
+    bruteTasks := len(uL) * len(pL) // 计算爆破任务数量
+    totalTasks += bruteTasks // 将爆破任务数量添加到总任务数中
+
 
     addr := str.HostPort(result.Target, result.Port)
     yakit.Info("Start Load Bruter for %s: %s", bruteType, addr)
@@ -531,6 +537,8 @@ bruteScan = func(result) {
 
     for rt = range res {
         yakit.Info("rt string %v ", rt.String())
+        bruteTaskCompleted++
+        updateProgress(1) // 更新进度
         if rt == nil {
             continue
         }
@@ -539,7 +547,6 @@ bruteScan = func(result) {
         if !rt.Ok {
             continue
         }
-
 
         risk.NewRisk(
             riskTarget,
@@ -676,7 +683,7 @@ func handleSYN(target) {
     }(target)
 }
 
-swg = sync.NewSizedWaitGroup(10)
+swg = sync.NewSizedWaitGroup(20)
 
 fileReader, err = file.NewMultiFileLineReader(files...)
 if err != nil {
@@ -726,8 +733,8 @@ for fileReader.Next(){
     }
 }
 
-bruteWg.Wait()
 synWg.Wait()
+bruteWg.Wait()
 swg.Wait()
 yakit.SetProgress(0.94)
 
