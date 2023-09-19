@@ -7,8 +7,10 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"sort"
+	"sync"
 )
 
 type futureFrame struct {
@@ -16,51 +18,6 @@ type futureFrame struct {
 	Len     int
 	Payload []byte
 	FIN     bool
-}
-
-// TrafficFlow is a tcp flow
-type TrafficFlow struct {
-	// ClientConn
-	ClientConn *TrafficConnection
-	ServerConn *TrafficConnection
-	Hash       string
-	Index      uint64
-
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	pool *trafficPool
-}
-
-func (t *TrafficFlow) IsClosed() bool {
-	select {
-	case <-t.ctx.Done():
-		return true
-	default:
-		if t.ServerConn.IsClosed() && t.ClientConn.IsClosed() {
-			t.cancel()
-			return true
-		}
-		return false
-	}
-}
-
-func (t *TrafficFlow) String() string {
-	return fmt.Sprintf("stream[%3d]: %v <-> %v", t.Index, t.ClientConn.localAddr, t.ServerConn.localAddr)
-}
-
-func (t *TrafficFlow) Feed(packet *layers.TCP) {
-	if t != nil {
-		if t.pool != nil {
-			t.pool.flowCache.Set(t.Hash, t)
-		}
-	}
-
-	if t.ClientConn.localPort == int(packet.SrcPort) {
-		t.ClientConn.FeedClient(packet)
-	} else {
-		t.ServerConn.FeedServer(packet)
-	}
 }
 
 // TrafficConnection is a tcp connection
@@ -92,6 +49,10 @@ func (t *TrafficConnection) String() string {
 	return fmt.Sprintf("%v -> %v", t.localAddr, t.remoteAddr)
 }
 
+func (t *TrafficConnection) Hash() string {
+	return codec.Sha256(t.String())
+}
+
 func (t *TrafficConnection) IsClosed() bool {
 	select {
 	case <-t.ctx.Done():
@@ -109,13 +70,21 @@ func (t *TrafficConnection) Close() bool {
 func (t *TrafficConnection) CloseFlow() bool {
 	t.cancel()
 	if t.Flow != nil {
+		t.Flow.triggerCloseEvent(TrafficFlowCloseReason_RST)
 		t.Flow.cancel()
 	}
 	return t.IsClosed()
 }
 
-func (t *TrafficConnection) Write(b []byte) (int, error) {
+func (t *TrafficConnection) Write(b []byte, seq int64) (int, error) {
 	// log.Infof("write %v bytes to %v => %v total: %v", len(b), t.String(), len(b), t.buf.Len())
+	t.Flow.onFrame(&TrafficFrame{
+		ConnHash:   t.Hash(),
+		Seq:        uint32(seq),
+		Payload:    b,
+		Connection: t,
+	})
+
 	n, err := t.buf.Write(b)
 	if err != nil {
 		log.Errorf("write %v bytes to %v failed: %s", len(b), t.String(), err)
@@ -129,7 +98,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 	haveBody := len(tcp.Payload) > 0
 	if tcp.Seq == t.nextSeq {
 		if haveBody {
-			t.Write(tcp.Payload)
+			t.Write(tcp.Payload, int64(tcp.Seq))
 			t.currentSeq = tcp.Seq
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
 			var count = 0
@@ -142,7 +111,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 						break
 					}
 
-					t.Write(frame.Payload)
+					t.Write(frame.Payload, int64(tcp.Seq))
 					t.nextSeq = frame.Seq + uint32(frame.Len)
 					count++
 					continue
@@ -188,7 +157,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 			sort.SliceStable(t.waitGroup, func(i, j int) bool {
 				return t.waitGroup[i].Seq < t.waitGroup[j].Seq
 			})
-			debug(fmt.Sprintf("future fin[%v]", len(t.waitGroup)))
+			// debug(fmt.Sprintf("future fin[%v]", len(t.waitGroup)))
 			return
 		}
 	} else {
@@ -230,8 +199,13 @@ func (t *TrafficConnection) FeedServer(tcp *layers.TCP) {
 
 	// not initialed, in-completed flow
 	if !t.initialed {
-		if tcp.PSH {
+		havePayload := len(tcp.Payload) > 0
+		if havePayload {
 			t.currentSeq = tcp.Seq
+			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
+			t.isn = tcp.Seq
+			t.initialed = true
+			t.Write(tcp.Payload, int64(tcp.Seq))
 		}
 		return
 	}
@@ -281,7 +255,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP) {
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
 			t.isn = tcp.Seq
 			t.initialed = true
-			t.Write(tcp.Payload)
+			t.Write(tcp.Payload, int64(tcp.Seq))
 		}
 		return
 	}
@@ -289,7 +263,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP) {
 	t._feedHandlePayload(tcp, debug)
 }
 
-func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
+func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
 
 	flowCtx, cancel := context.WithCancel(p.ctx)
 	_ = cancel
@@ -319,12 +293,14 @@ func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 
 	// bind flow
 	flow := &TrafficFlow{
-		ClientConn: c2sConn,
-		ServerConn: s2cConn,
-		Index:      p.nextStream(),
-		ctx:        flowCtx,
-		cancel:     cancel,
-		pool:       p,
+		ClientConn:  c2sConn,
+		ServerConn:  s2cConn,
+		Index:       p.nextStream(),
+		ctx:         flowCtx,
+		cancel:      cancel,
+		pool:        p,
+		createdOnce: new(sync.Once),
+		closedOnce:  new(sync.Once),
 	}
 	c2sConn.Flow = flow
 	s2cConn.Flow = flow

@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type trafficPool struct {
+type TrafficPool struct {
 	// map<string, *TrafficConnection>
 	pool               *sync.Map
 	ctx                context.Context
@@ -23,11 +23,14 @@ type trafficPool struct {
 
 	flowCache *ttlcache.Cache
 
-	onFlowCreated func(flow *TrafficFlow)
+	onFlowCreated                   func(flow *TrafficFlow)
+	onFlowClosed                    func(reason TrafficFlowCloseReason, flow *TrafficFlow)
+	onFlowFrameDataFrameArrived     func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
+	onFlowFrameDataFrameReassembled func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
 }
 
-func NewTrafficPool(ctx context.Context) *trafficPool {
-	pool := &trafficPool{pool: new(sync.Map), ctx: ctx}
+func NewTrafficPool(ctx context.Context) *TrafficPool {
+	pool := &TrafficPool{pool: new(sync.Map), ctx: ctx}
 	fCache := ttlcache.NewCache()
 	fCache.SetExpirationCallback(func(key string, value interface{}) {
 		pool.pool.Delete(key)
@@ -35,20 +38,21 @@ func NewTrafficPool(ctx context.Context) *trafficPool {
 		if !ok {
 			return
 		}
+		flow.triggerCloseEvent(TrafficFlowCloseReason_INACTIVE)
 		flow.cancel()
 		flow.ServerConn.Close()
 		flow.ClientConn.Close()
 	})
-	fCache.SetTTL(time.Minute)
+	fCache.SetTTL(30 * time.Second)
 	pool.flowCache = fCache
 	return pool
 }
 
-func (p *trafficPool) nextStream() uint64 {
+func (p *TrafficPool) nextStream() uint64 {
 	return atomic.AddUint64(&p.currentStreamIndex, 1)
 }
 
-func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP) {
+func (p *TrafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP) {
 	var networkStr string
 	var srcIP string
 	var dstIP string
@@ -82,11 +86,9 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 			flow.Hash = hash
 			flow.ClientConn.localPort = srcPort
 			flow.ClientConn.remotePort = dstPort
-			flow.Feed(transportLayer)
+			flow.feed(transportLayer)
 			p.pool.Store(hash, flow)
-			if p.onFlowCreated != nil {
-				p.onFlowCreated(flow)
-			}
+			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return
 		}
 		// SYN && !ACK -> start a conn
@@ -100,9 +102,7 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 			flow.ClientConn.localPort = srcPort
 			flow.ClientConn.remotePort = dstPort
 			p.pool.Store(hash, flow)
-			if p.onFlowCreated != nil {
-				p.onFlowCreated(flow)
-			}
+			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return
 		}
 		return
@@ -112,10 +112,10 @@ func (p *trafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 	if flow == nil {
 		return
 	}
-	flow.Feed(transportLayer)
+	flow.feed(transportLayer)
 }
 
-func (p *trafficPool) flowhash(netType, srcAddr, dstAddr string) string {
+func (p *TrafficPool) flowhash(netType, srcAddr, dstAddr string) string {
 	hashMaterial := []string{netType, srcAddr, dstAddr}
 	sort.Strings(hashMaterial)
 	return codec.Sha256(strings.Join(hashMaterial, "-"))
