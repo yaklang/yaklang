@@ -967,3 +967,191 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 		}
 	}
 }
+
+func TestMitmDropWithHijackResp(t *testing.T) {
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer func() {
+		cancel()
+	}()
+
+	host, port := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+
+		return []byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+
+ok
+`)
+	})
+
+	addr := utils.HostPort(host, port)
+	log.Infof("start to mock h2 server: %v", utils.HostPort(host, port))
+	var rPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	//启动mitm服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(rPort),
+	})
+
+	packet := []byte(`GET / HTTP/1.1
+User-Agent: 111
+Host: ` + addr)
+
+	timeChecker := time.AfterFunc(5*time.Second, func() {
+		cancel()
+		t.Fatal("timeout err")
+	})
+	var hasDrop, started bool
+	var useID int64
+	for {
+		rsp, err := stream.Recv()
+		timeChecker.Reset(5 * time.Second)
+		if err != nil {
+			break
+		}
+		if hasDrop && len(rsp.GetResponse()) > 0 {
+			t.Fatal("hijackResp err")
+		}
+		if len(rsp.GetRequest()) > 0 {
+			err := stream.Send(&ypb.MITMRequest{
+				Id:             rsp.GetId(),
+				HijackResponse: true,
+			})
+			err = stream.Send(&ypb.MITMRequest{
+				Id:   rsp.GetId(),
+				Drop: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if hasDrop && rsp.GetId() != useID {
+				cancel()
+				break
+			}
+
+			hasDrop = true
+			useID = rsp.GetId()
+		}
+		//启动完毕之后换手动劫持，开始发包
+		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
+			started = true
+			stream.Send(&ypb.MITMRequest{
+				SetAutoForward:   true,
+				AutoForwardValue: false, //手动劫持
+			})
+			time.Sleep(1 * time.Second)
+			go func() {
+				for i := 0; i < 10; i++ {
+					resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
+					if err != nil {
+						log.Infof("send packet err : [%v]", err)
+					}
+					spew.Dump(resp.RawPacket)
+					spew.Dump(resp.RawRequest)
+
+				}
+			}()
+		}
+	}
+}
+
+func TestHijackResp(t *testing.T) {
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		panic(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer func() {
+		cancel()
+	}()
+
+	host, port := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+
+		return []byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+
+ok
+`)
+	})
+	addr := utils.HostPort(host, port)
+	log.Infof("start to mock http server: %v", utils.HostPort(host, port))
+	var rPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	//启动mitm服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		panic(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(rPort),
+	})
+
+	packet := `GET /%d HTTP/1.1
+User-Agent: 111
+Host: ` + addr
+	var hasForward, started bool
+	var useID int64
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		if len(rsp.GetResponse()) > 0 && hasForward {
+			cancel()
+			continue
+		}
+
+		if len(rsp.GetRequest()) > 0 {
+			spew.Dump(rsp)
+			if hasForward && useID != rsp.GetId() {
+				t.Fatal("hijack resp err : [get other request]")
+			}
+
+			err := stream.Send(&ypb.MITMRequest{
+				Id:             rsp.GetId(),
+				HijackResponse: true,
+			})
+			err = stream.Send(&ypb.MITMRequest{
+				Id:         rsp.GetId(),
+				Request:    rsp.GetRequest(),
+				ResponseId: rsp.GetResponseId(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			log.Infof("get packet")
+			useID = rsp.GetId()
+			hasForward = true
+		}
+		//启动完毕之后换手动劫持，开始发包
+		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
+			started = true
+			stream.Send(&ypb.MITMRequest{
+				SetAutoForward:   true,
+				AutoForwardValue: false, //手动劫持
+			})
+			time.Sleep(1 * time.Second)
+			go func() {
+				for i := 0; i < 10; i++ {
+					resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte(fmt.Sprintf(packet, i))), lowhttp.WithProxy(proxy))
+					if err != nil {
+						log.Info(err)
+					}
+					spew.Dump(resp.RawPacket)
+					spew.Dump(resp.RawRequest)
+
+				}
+			}()
+		}
+	}
+}
