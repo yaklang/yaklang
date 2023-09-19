@@ -150,3 +150,18 @@ func SetProjectKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, secon
 	}
 	return nil
 }
+
+func GetProjectKeyByWhere(db *gorm.DB, key []string) ([]*ProjectGeneralStorage, error) {
+	if db == nil {
+		return nil, utils.Error("no database set")
+	}
+	var kv []*ProjectGeneralStorage
+	if db := db.Where("key in (?)", key).Where(
+		"(expired_at IS NULL) OR (expired_at <= ?) OR (expired_at >= ?)",
+		yakitZeroTime,
+		time.Now(),
+	).Find(&kv); db.Error != nil {
+		return nil, db.Error
+	}
+	return kv, nil
+}
