@@ -143,12 +143,6 @@ func (s *TagGenerator) IsRep() bool {
 	return s.isRep
 }
 
-type GeneratorConfig struct {
-	AllDynMethod   bool
-	DynMethodNames *utils.Set
-	MethodTable    map[string]func(string) []string
-}
-
 type Generator struct {
 	container []string
 	//index     int
@@ -187,12 +181,12 @@ func NewBackpropagationGenerator(f func(s string), nodes []GeneratorNode) *Gener
 	}
 	return g
 }
-func NewGeneratorWithConfig(nodes []Node, config *GeneratorConfig) *Generator {
+func NewGenerator(nodes []Node,table map[string]func(string) []string) *Generator {
 	labelTable := map[string][]*TagGenerator{}
 	var node2generator func(nodes []Node) []GeneratorNode
 	node2generator = func(nodes []Node) []GeneratorNode {
 		methodCtx := &MethodContext{
-			methodTable: config.MethodTable,
+			methodTable: table,
 			labelTable:  labelTable,
 		}
 		generatorNodes := []GeneratorNode{}
@@ -219,12 +213,7 @@ func NewGeneratorWithConfig(nodes []Node, config *GeneratorConfig) *Generator {
 	}
 	return NewBackpropagationGenerator(func(s string) {}, node2generator(nodes))
 }
-func NewGenerator(nodes []Node, funcMap map[string]func(string) []string) *Generator {
-	return NewGeneratorWithConfig(nodes, &GeneratorConfig{
-		MethodTable:  funcMap,
-		AllDynMethod: true,
-	})
-}
+
 func (g *Generator) Generate() (string, bool) {
 	if g.first {
 		defer func() {
