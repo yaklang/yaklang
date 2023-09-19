@@ -517,17 +517,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				})
 				continue
 			}
-
-			go func() {
-				defer func() {
-					recover()
-				}()
-				select {
-				case messageChan <- reqInstance:
-				case <-stream.Context().Done():
-					return
-				}
-			}()
+			//defer func() {
+			//	recover()
+			//}()
+			messageChan <- reqInstance
 		}
 	}()
 
@@ -1007,6 +1000,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 直接丢包
 				if reqInstance.GetDrop() {
+					shouldHijackResponse = false
 					return nil
 				}
 
@@ -1230,6 +1224,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 直接丢包
 				if reqInstance.GetDrop() {
+					shouldHijackResponse = false
 					log.Infof("MITM %v recv drop hijacked request[%v]", addr, reqInstance.GetId())
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 					// 保存到数据库
