@@ -64,7 +64,7 @@ func getLength(x io.Reader) (int64, error) {
 	len, err := io.Copy(io.Discard, x)
 	return len, err
 }
-func (result *RequestResult) RequestRaw() (string, error) {
+func (result *RequestResult) RequestRaw() ([]byte, error) {
 	resplen := int64(0)
 	dumpbody := true
 	clone := result.request.Req().Clone(context.TODO())
@@ -79,9 +79,9 @@ func (result *RequestResult) RequestRaw() (string, error) {
 	}
 	dumpBytes, err := utils.DumpHTTPRequest(clone, dumpbody)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(dumpBytes), nil
+	return dumpBytes, nil
 }
 func (result *RequestResult) ResponseHeaders() map[string]string {
 	headers := make(map[string]string, 0)
