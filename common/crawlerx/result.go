@@ -5,8 +5,8 @@ package crawlerx
 import (
 	"context"
 	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
-	"net/http/httputil"
 	"strings"
 )
 
@@ -18,7 +18,7 @@ type ReqInfo interface {
 
 	RequestHeaders() map[string]string
 	RequestBody() string
-	RequestRaw() (string, error)
+	RequestRaw() ([]byte, error)
 
 	StatusCode() int
 	ResponseHeaders() map[string]string
@@ -77,7 +77,7 @@ func (result *RequestResult) RequestRaw() (string, error) {
 		clone.Body = nil
 		delete(clone.Header, "Content-length")
 	}
-	dumpBytes, err := httputil.DumpRequestOut(clone, dumpbody)
+	dumpBytes, err := utils.DumpHTTPRequest(clone, dumpbody)
 	if err != nil {
 		return "", err
 	}
@@ -156,8 +156,8 @@ func (simpleResult *SimpleResult) RequestBody() string {
 	}
 	return ""
 }
-func (simpleResult *SimpleResult) RequestRaw() (string, error) {
-	return "", nil
+func (simpleResult *SimpleResult) RequestRaw() ([]byte, error) {
+	return nil, nil
 }
 
 func (simpleResult *SimpleResult) ResponseHeaders() map[string]string {
