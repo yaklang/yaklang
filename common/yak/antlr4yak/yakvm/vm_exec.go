@@ -725,7 +725,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			val.SymbolId = id
 			v.push(val)
 			return
-		case YAK:
+		default:
 			id := c.Unary
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if !ok {
