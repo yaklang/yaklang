@@ -216,3 +216,10 @@ func (f *FunctionBuilder) EmitNext(iter Value) (key, field, ok Value) {
 	ok = f.EmitField(n, NewConst("ok"))
 	return
 }
+
+func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler {
+	e := NewErrorHandler(try, catch, f.CurrentBlock)
+	f.emit(e)
+	return e
+}
+

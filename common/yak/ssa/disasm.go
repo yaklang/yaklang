@@ -346,3 +346,15 @@ func (n *Next) String() string {
 		getStr(n), getStr(n.Iter),
 	)
 }
+
+func (e *ErrorHandler) String() string {
+	finalName := "nil"
+	if e.final != nil {
+		finalName = e.final.Name
+	}
+	return fmt.Sprintf(
+		"try %s; catch %s; final %s; rest %s",
+		e.try.Name, e.catch.Name, finalName, e.done.Name,
+	)
+}
+

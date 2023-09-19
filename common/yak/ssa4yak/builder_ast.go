@@ -61,7 +61,11 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		return
 	}
 
-	//TODO: try Stmt
+	// try Stmt
+	if s, ok := stmt.TryStmt().(*yak.TryStmtContext); ok {
+		b.buildTryCatchStmt(s)
+		return
+	}
 
 	// if stmt
 	if s, ok := stmt.IfStmt().(*yak.IfStmtContext); ok {
@@ -161,7 +165,41 @@ func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
 	b.EmitAssert(cond, msgV, exprs[0].GetText())
 }
 
-//TODO: try stmt
+// try stmt
+func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+	var final *ssa.BasicBlock
+	enter := b.CurrentBlock
+
+	b.CurrentBlock = enter
+	try := b.NewBasicBlock("error.try")
+	catch := b.NewBasicBlock("error.catch")
+	e := b.EmitErrorHandler(try, catch)
+
+	b.CurrentBlock = try
+	b.buildBlock(stmt.Block(0).(*yak.BlockContext))
+
+	b.CurrentBlock = catch
+	// if id := stmt.Identifier(); id != nil {
+	// 	b.WriteVariable(id.GetText(), )
+	// }
+	b.buildBlock(stmt.Block(1).(*yak.BlockContext))
+
+	if fblock, ok := stmt.Block(2).(*yak.BlockContext); ok {
+		b.CurrentBlock = enter
+		final = b.NewBasicBlock("error.final")
+		e.AddFinal(final)
+		b.CurrentBlock = final
+		b.buildBlock(fblock)
+	}
+
+	b.CurrentBlock = enter
+	done := b.NewBasicBlock("")
+	e.AddDone(done)
+
+	b.CurrentBlock = done
+}
 
 // expression stmt
 func (b *astbuilder) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {

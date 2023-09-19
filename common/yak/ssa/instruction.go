@@ -177,6 +177,19 @@ func NewNext(iter Value, block *BasicBlock) *Next {
 	return n
 }
 
+func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
+	e := &ErrorHandler{
+		anInstruction: newAnInstuction(block),
+		try:           try,
+		catch:         catch,
+	}
+	block.AddSucc(try)
+	try.Handler = e
+	block.AddSucc(catch)
+	catch.Handler = e
+	return e
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.Block.AddSucc(t)
@@ -239,4 +252,16 @@ func (f *Field) GetLastValue() Value {
 		return update.Value
 	}
 	return nil
+}
+
+func (e *ErrorHandler) AddFinal(f *BasicBlock) {
+	e.final = f
+	e.GetBlock().AddSucc(f)
+	f.Handler = e
+}
+
+func (e *ErrorHandler) AddDone(d *BasicBlock) {
+	e.done = d
+	e.GetBlock().AddSucc(d)
+	d.Handler = e
 }
