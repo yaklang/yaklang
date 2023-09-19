@@ -58,7 +58,7 @@ type LowhttpExecConfig struct {
 	DNSServers           []string
 	RuntimeId            string
 	FromPlugin           string
-	WithoutConnPool      bool
+	WithConnPool         bool
 	ConnPool             *lowHttpConnPool
 }
 
@@ -337,15 +337,15 @@ func WithSession(session interface{}) LowhttpOpt {
 	}
 }
 
-func WithConnPool(p *lowHttpConnPool) LowhttpOpt {
+func ConnPool(p *lowHttpConnPool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ConnPool = p
 	}
 }
 
-func WithoutConnPool(without bool) LowhttpOpt {
+func WithConnPool(flag bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.WithoutConnPool = without
+		o.WithConnPool = flag
 	}
 }
 
@@ -374,9 +374,8 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
-	if !option.WithoutConnPool && option.ConnPool == nil {
+	if option.WithConnPool && option.ConnPool == nil {
 		option.ConnPool = DefaultLowHttpConnPool
-		opts = append(opts, WithConnPool(DefaultLowHttpConnPool))
 	}
 
 	var (
@@ -475,9 +474,8 @@ var commonHTTPMethod = map[string]struct{}{
 // SendHttpRequestWithRawPacketWithOpt
 func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
-	if !option.WithoutConnPool && option.ConnPool == nil {
+	if option.WithConnPool && option.ConnPool == nil {
 		option.ConnPool = DefaultLowHttpConnPool
-		opts = append(opts, WithConnPool(DefaultLowHttpConnPool))
 	}
 	for _, opt := range opts {
 		opt(option)
@@ -507,7 +505,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dnsServers           = option.DNSServers
 		dnsHosts             = option.EtcHosts
 		connPool             = option.ConnPool
-		withoutConnPool      = option.WithoutConnPool
+		withConnPool         = option.WithConnPool
 	)
 	reqSchema := "HTTP"
 	if forceHttp2 {
@@ -806,10 +804,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		gmTls:  option.GmTLS,
 	}
 RECONNECT:
-	if withoutConnPool {
-		conn, err = netx.DialX(originAddr, dialopts...)
-	} else {
+	if withConnPool {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+	} else {
+		conn, err = netx.DialX(originAddr, dialopts...)
 	}
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
