@@ -1032,8 +1032,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		mitmLock.Lock()
 		defer func() {
-			// 根据是否劫持响应或者请求是否被丢弃来判断是否释放锁
-			if !shouldHijackResponse || httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+			// 根据是否劫持响应来判断是否释放锁
+			if !shouldHijackResponse {
 				mitmLock.Unlock()
 			}
 		}()
