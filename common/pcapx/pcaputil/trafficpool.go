@@ -35,7 +35,6 @@ func NewTrafficPool(ctx context.Context) *trafficPool {
 		if !ok {
 			return
 		}
-		log.Debugf("%v is close", flow.String())
 		flow.cancel()
 		flow.ServerConn.Close()
 		flow.ClientConn.Close()
