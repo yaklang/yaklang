@@ -1203,12 +1203,12 @@ func TestGRPCMUSTPASS_MITMCancelHijackResponse(t *testing.T) {
 				once = true
 				stream.Send(&ypb.MITMRequest{
 					Id:             rcpResponse.GetId(),
-					HijackResponse: 1,
+					HijackResponse: true,
 				})
 				time.Sleep(100 * time.Microsecond)
 				stream.Send(&ypb.MITMRequest{
-					Id:             rcpResponse.GetId(),
-					HijackResponse: 2, // 代表取消劫持响应
+					Id:                   rcpResponse.GetId(),
+					CancelhijackResponse: true, // 代表取消劫持响应
 				})
 				time.Sleep(100 * time.Microsecond)
 			}
