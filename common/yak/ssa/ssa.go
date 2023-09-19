@@ -157,6 +157,9 @@ type BasicBlock struct {
 	Instrs []Instruction
 	Phis   []*Phi
 
+	// error catch
+	Handler *ErrorHandler
+
 	// for build
 	finish        bool // if emitJump finish!
 	isSealed      bool
@@ -625,3 +628,12 @@ var _ User = (*Next)(nil)
 var _ Value = (*Next)(nil)
 var _ Instruction = (*Next)(nil)
 var _ InstructionValue = (*Next)(nil)
+
+// ------------- ErrorHandler
+type ErrorHandler struct {
+	anInstruction
+	try, catch, final, done *BasicBlock
+}
+
+var _ Instruction = (*ErrorHandler)(nil)
+
