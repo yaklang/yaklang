@@ -563,7 +563,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					}
 
 					rspInstance, err := lowhttp.HTTP(
-						lowhttp.WithoutConnPool(config.WithoutConnPool),
 						lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
