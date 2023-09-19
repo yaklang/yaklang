@@ -345,7 +345,7 @@ func startBridge(
 	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
 	if err != nil {
 		log.Errorf("server mitm failed: %s", err)
-		return nil
+		return err
 	}
-	return err
+	return nil
 }

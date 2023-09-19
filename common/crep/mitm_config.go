@@ -3,8 +3,10 @@ package crep
 import (
 	"bufio"
 	"bytes"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/v3"
@@ -92,7 +94,34 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 
 		c, err := tls.X509KeyPair(ca, key)
 		if err != nil {
-			return utils.Errorf("parse ca and privKey failed: %s", err)
+			// if not pem blocks
+			// try to parse as der
+			caDer, err := x509.ParseCertificate(ca)
+			if err != nil {
+				return utils.Errorf("parse ca[pem/der] failed: %s", err)
+			}
+			ca = pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
+			keyDer, err := x509.ParsePKCS8PrivateKey(key)
+			if err != nil {
+				log.Warnf("parse key[pem/der] pkcs8 pkey failed: %s", err)
+				keyDer, err = x509.ParsePKCS1PrivateKey(key)
+				if err != nil {
+					return utils.Errorf("parse key[pem/der] pkcs1/pkcs8 pkey failed: %s", err)
+				}
+				// pkcs1
+				key = pem.EncodeToMemory(&pem.Block{Type: `RSA PRIVATE KEY`, Bytes: x509.MarshalPKCS1PrivateKey(keyDer.(*rsa.PrivateKey))})
+			} else {
+				// pkcs8
+				keyRawBytes, err := x509.MarshalPKCS8PrivateKey(keyDer)
+				if err != nil {
+					return utils.Errorf("marshal key[pem/der] pkcs8 pkey failed: %s", err)
+				}
+				key = pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes})
+			}
+			c, err = tls.X509KeyPair(ca, key)
+			if err != nil {
+				return utils.Errorf("parse ca and privKey (DER) failed: %s", err)
+			}
 		}
 
 		cert, err := x509.ParseCertificate(c.Certificate[0])
