@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
@@ -11,17 +12,45 @@ import (
 	"strings"
 )
 
-var _noContentLengthHeader = map[string]bool{
-	"GET":     true,
-	"HEAD":    true,
-	"DELETE":  true,
-	"OPTIONS": true,
-	"CONNECT": true,
-	"get":     true,
-	"head":    true,
-	"delete":  true,
-	"options": true,
-	"connect": true,
+var _noContentLengthHeader = map[string]struct{}{
+	"GET":     {},
+	"HEAD":    {},
+	"DELETE":  {},
+	"OPTIONS": {},
+	"CONNECT": {},
+	"get":     {},
+	"head":    {},
+	"delete":  {},
+	"options": {},
+	"connect": {},
+}
+
+var _commonMethods = map[string]struct{}{
+	"GET":     {},
+	"POST":    {},
+	"HEAD":    {},
+	"OPTIONS": {},
+	"PUT":     {},
+	"DELETE":  {},
+	"TRACE":   {},
+	"CONNECT": {},
+}
+
+func IsCommonHTTPRequestMethod(i any) bool {
+	switch ret := i.(type) {
+	case string:
+		_, ok := _commonMethods[ret]
+		return ok
+	case []byte:
+		_, ok := _commonMethods[string(ret)]
+		return ok
+	case *http.Request:
+		_, ok := _commonMethods[ret.Method]
+		return ok
+	default:
+		log.Errorf("IsCommonHTTPRequestMethod unknown type: %T", i)
+		return false
+	}
 }
 
 func ShouldRemoveZeroContentLengthHeader(s string) bool {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"net/http"
 	"sync"
 )
 
@@ -43,6 +44,8 @@ type TrafficFlow struct {
 	onCloseHandler         func(reason TrafficFlowCloseReason, frame *TrafficFlow)
 	onDataFrameReassembled func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
 	onDataFrameArrived     func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
+
+	StashedHTTPRequest []*http.Request
 }
 
 func (t *TrafficFlow) IsClosed() bool {
@@ -143,4 +146,17 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 
 func (t *TrafficFlow) onCloseFlow(h func(reason TrafficFlowCloseReason, frame *TrafficFlow)) {
 	t.onCloseHandler = h
+}
+
+func (t *TrafficFlow) StashHTTPRequest(req *http.Request) {
+	t.StashedHTTPRequest = append(t.StashedHTTPRequest, req)
+}
+
+func (t *TrafficFlow) FetchStashedHTTPRequest() *http.Request {
+	if len(t.StashedHTTPRequest) > 0 {
+		req := t.StashedHTTPRequest[0]
+		t.StashedHTTPRequest = t.StashedHTTPRequest[1:]
+		return req
+	}
+	return nil
 }
