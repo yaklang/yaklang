@@ -36,12 +36,20 @@ type CaptureConfig struct {
 	Debug         bool
 	onPoolCreated []func(*TrafficPool)
 	onFlowCreated func(*TrafficFlow)
+	onEveryPacket func(any)
 }
 
 type CaptureOption func(*CaptureConfig) error
 
 func emptyOption(_ *CaptureConfig) error {
 	return nil
+}
+
+func WithEveryPacket(h func(any)) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.onEveryPacket = h
+		return nil
+	}
 }
 
 func WithBPFFilter(bpf string) CaptureOption {
