@@ -69,7 +69,7 @@ func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 				Size: strconv.Itoa(len(reqInfo.RequestBody())),
 				Data: reqInfo.RequestBody(),
 			},
-			HTTPRaw: httpRaw,
+			HTTPRaw: string(httpRaw),
 		},
 		Response: OutputResponse{
 			StatusCode: reqInfo.StatusCode(),
