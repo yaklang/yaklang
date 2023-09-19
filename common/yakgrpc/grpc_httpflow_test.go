@@ -237,6 +237,7 @@ func TestGRPCMUSTPASS_HijackedFlow_Response(t *testing.T) {
 		SetResetFilter: true,
 	})
 	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
+	var hasForward bool
 	for {
 		rcpResponse, err := stream.Recv()
 		if err != nil {
@@ -245,14 +246,6 @@ func TestGRPCMUSTPASS_HijackedFlow_Response(t *testing.T) {
 		rspMsg := string(rcpResponse.GetMessage().GetMessage())
 		if rcpResponse.GetHaveMessage() {
 		} else if len(rcpResponse.GetRequest()) > 0 {
-			stream.Send(&ypb.MITMRequest{
-				Id:      rcpResponse.GetId(),
-				Request: rcpResponse.GetRequest(),
-			})
-			stream.Send(&ypb.MITMRequest{
-				Id:             rcpResponse.GetId(),
-				HijackResponse: true,
-			})
 			if len(rcpResponse.GetResponse()) > 0 {
 				rsp := bytes.ReplaceAll(rcpResponse.GetResponse(), []byte(token1), []byte(token2))
 				stream.Send(&ypb.MITMRequest{
@@ -261,6 +254,18 @@ func TestGRPCMUSTPASS_HijackedFlow_Response(t *testing.T) {
 					ResponseId: rcpResponse.GetResponseId(),
 				})
 			}
+			if hasForward {
+				continue
+			}
+			stream.Send(&ypb.MITMRequest{
+				Id:             rcpResponse.GetId(),
+				HijackResponse: true,
+			})
+			stream.Send(&ypb.MITMRequest{
+				Id:      rcpResponse.GetId(),
+				Request: rcpResponse.GetRequest(),
+			})
+			hasForward = true
 		}
 		if strings.Contains(rspMsg, `starting mitm serve`) {
 			go func() {
