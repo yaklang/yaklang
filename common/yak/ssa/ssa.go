@@ -637,3 +637,19 @@ type ErrorHandler struct {
 
 var _ Instruction = (*ErrorHandler)(nil)
 
+// -------------- PANIC
+type Panic struct {
+	anInstruction
+	Info Value
+}
+
+var _ Node = (*Panic)(nil)
+var _ User = (*Panic)(nil)
+var _ Instruction = (*Panic)(nil)
+
+// --------------- RECOVER
+type Recover struct {
+	anInstruction
+}
+
+var _ Instruction = (*Recover)(nil)

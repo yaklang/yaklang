@@ -854,9 +854,16 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	if s, ok := stmt.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
 		return b.buildAnonymouseFunctionDecl(s)
 	}
-	//TODO: panic
+	// panic
+	if s := stmt.Panic(); s != nil {
+		b.EmitPanic(getValue(0))
+		return nil
+	}
 
-	//TODO: RECOVER
+	// RECOVER
+	if s := stmt.Recover(); s != nil {
+		b.EmitRecover()
+	}
 
 	// identifier
 	if s := stmt.Identifier(); s != nil { // 解析变量

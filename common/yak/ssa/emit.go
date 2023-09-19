@@ -223,3 +223,19 @@ func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler
 	return e
 }
 
+func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
+	p := &Panic{
+		anInstruction: newAnInstuction(f.CurrentBlock),
+		Info:          info,
+	}
+	fixupUseChain(p)
+	f.emit(p)
+	return p
+}
+
+func (f *FunctionBuilder) EmitRecover() {
+	r := &Recover{
+		anInstruction: newAnInstuction(f.CurrentBlock),
+	}
+	f.emit(r)
+}
