@@ -3,7 +3,6 @@ package yaklib
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
@@ -174,11 +173,10 @@ func queryYakitPluginByName(name string) (*yakit.YakScript, error) {
 }
 
 func YakitNewAliveHost(target string, opts ...yakit.AliveHostParamsOpt) {
-	_, err := yakit.NewAliveHost(target, opts...)
-	if err != nil {
+	risk, _ := yakit.NewAliveHost(target, opts...)
+	if risk != nil {
 		//yakitStatusCard("存活主机", fmt.Sprint(addCounter()))
-		//yakitOutputHelper(risk)
-		log.Errorf("save AliveHost failed: %s", err)
+		yakitOutputHelper(risk)
 	}
 }
 
