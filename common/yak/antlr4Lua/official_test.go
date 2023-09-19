@@ -1,8 +1,8 @@
-package tests
+package antlr4Lua
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/antlr4Lua"
+	// "github.com/yaklang/yaklang/common/yak/antlr4Lua"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
 	"reflect"
@@ -24,7 +24,7 @@ func init() {
 	//for formatted output, but only as a quick way to show a value, for instance for
 	//debugging. For complete control over the output, use string.format and io.write.
 	// 原生lua的print会在多个参数中间加tab，这里问题不大go默认使用ws
-	yakvm.Import("print", func(v ...interface{}) {
+	Import("print", func(v ...interface{}) {
 		toStr := func(x interface{}) (string, bool) {
 			switch v := x.(type) {
 			case string:
@@ -53,7 +53,7 @@ func init() {
 		fmt.Println(v)
 	})
 
-	yakvm.Import("raw_print", func(v interface{}) {
+	Import("raw_print", func(v interface{}) {
 		fmt.Println(v)
 	})
 
@@ -61,33 +61,18 @@ func init() {
 	//Calls error if the value of its argument v is false (i.e., nil or false);
 	//otherwise, returns all its arguments. In case of error, message is the
 	//error object; when absent, it defaults to "assertion failed!"
-	yakvm.Import("assert", func(x ...interface{}) {
-		if len(x) == 2 {
-			assert := func(condition interface{}, message string) {
-				if condition == nil {
-					panic(message)
-				}
-				if boolean, ok := condition.(bool); ok {
-					if !boolean {
-						panic(message)
-					}
-				}
-			}
-			assert(x[0], x[1].(string))
-		} else {
-			condition := x[0]
-			if condition == nil {
-				panic("assertion failed")
-			}
-			if boolean, ok := condition.(bool); ok {
-				if !boolean {
-					panic("assertion failed")
-				}
+	Import("assert", func(condition interface{}, message string) {
+		if condition == nil {
+			panic(message)
+		}
+		if boolean, ok := condition.(bool); ok {
+			if !boolean {
+				panic(message)
 			}
 		}
 	})
 
-	yakvm.Import("@pow", func(x interface{}, y interface{}) float64 {
+	Import("@pow", func(x interface{}, y interface{}) float64 {
 		interfaceToFloat64 := func(a interface{}) (float64, bool) {
 			switch v := a.(type) {
 			case float64:
@@ -109,7 +94,7 @@ func init() {
 
 	})
 
-	yakvm.Import("@floor", func(x interface{}, y interface{}) float64 {
+	Import("@floor", func(x interface{}, y interface{}) float64 {
 		interfaceToFloat64 := func(a interface{}) (float64, bool) {
 			switch v := a.(type) {
 			case float64:
@@ -132,7 +117,7 @@ func init() {
 
 	})
 
-	yakvm.Import("tostring", func(x interface{}) string {
+	Import("tostring", func(x interface{}) string {
 		switch v := x.(type) {
 		case string:
 			return v
@@ -153,7 +138,8 @@ func init() {
 
 		}
 	})
-	yakvm.Import("@strcat", func(x interface{}, y interface{}) string {
+
+	Import("@strcat", func(x interface{}, y interface{}) string {
 		defer func() {
 			if recover() != nil {
 				panic(fmt.Sprintf("attempt to concatenate %v with %v", reflect.TypeOf(x).String(), reflect.TypeOf(y).String()))
@@ -177,7 +163,7 @@ func init() {
 		return toStr(x) + toStr(y)
 	})
 
-	yakvm.Import("@getlen", func(x interface{}) int {
+	Import("@getlen", func(x interface{}) int {
 		if str, ok := x.(string); ok {
 			return len(str)
 		}
@@ -205,7 +191,8 @@ func init() {
 		}
 		panic(fmt.Sprintf("attempt to get length of %v", reflect.TypeOf(x).String()))
 	})
-	yakvm.Import("next", func(x ...interface{}) (interface{}, interface{}) { // next(table[,index])
+
+	Import("next", func(x ...interface{}) (interface{}, interface{}) { // next(table[,index])
 		if len(x) == 1 || x[1] == nil {
 			keysString := make([]string, 0)
 			keysMap := make(map[string]interface{})
@@ -245,6 +232,9 @@ func init() {
 		return nil, nil
 	})
 
+	Import("error", func(x any) {
+		panic(x)
+	})
 }
 
 // TODO: FIX LABEL
@@ -296,7 +286,7 @@ local a, b = foo()()
 assert(a == 3 and b == 14, "Test_BUG_5_2_Beta failed")
 
 print('OK')`
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 func TestUpValue(t *testing.T) {
@@ -308,12 +298,12 @@ func TestUpValue(t *testing.T) {
   end
   foo()
   assert(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and
-         b[3] == 1)
+         b[3] == 1, "failed")
   local t = {}
   (function (a) t[a], a = 10, 20  end)(1);
   assert(t[1] == 10, "failed")
 end`
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 // test conflicts in multiple assignment
@@ -323,7 +313,7 @@ func Test1(t *testing.T) {
   a = {'a', 'b'}; i=1; j=2; b=a
   i, a[i], a, j, a[j], a[i+j] = j, i, i, b, j, i
   assert(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and
-         b[3] == 1)
+         b[3] == 1,"failed")
   a = {}
   local function foo ()    -- assigining to upvalues
     b, a.x, a = a, 10, 20
@@ -332,7 +322,7 @@ func Test1(t *testing.T) {
   assert(a == 20 and b.x == 10,"failed")
 end
 `
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 // test conflicts in multiple assignment
@@ -342,7 +332,7 @@ func Test2(t *testing.T) {
   a = {'a', 'b'}; i=1; j=2; b=a
   i, a[i], a, j, a[j], a[i+j] = j, i, i, b, j, i
   assert(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and
-         b[3] == 1)
+         b[3] == 1,"failed")
   a = {}
   local function foo ()    -- assigining to upvalues
     b, a.x, a = a, 10, 20
@@ -351,7 +341,7 @@ func Test2(t *testing.T) {
   assert(a == 20 and b.x == 10,"failed")
 end
 `
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 // testing local-function recursion
@@ -364,10 +354,10 @@ do
     else return n*fact(n-1)
     end
   end
-  assert(fact(5) == 120)
+  assert(fact(5) == 120,"failed")
 end
-assert(fact == false)`
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+assert(fact == false,"failed")`
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 // testing declarations 这里因为目前实现不完整有删减
@@ -378,25 +368,25 @@ self = 20
 function a:x (x) return x+self.i end
 function a.y (x) return x+self end
 
-assert(a:x(1)+10 == a.y(1))
+assert(a:x(1)+10 == a.y(1),"failed")
 
 a.t = {i=-100}
 a["t"].x = function (self, a,b) return self.i+a+b end
 
-assert(a.t:x(2,3) == -95)
+assert(a.t:x(2,3) == -95,"failed")
 
 do
   local a = {x=0}
   function a:add (x) self.x, a.y = self.x+x, 20; return self end
-  assert(a:add(10):add(20):add(30).x == 60 and a.y == 20)
+  assert(a:add(10):add(20):add(30).x == 60 and a.y == 20,"failed")
 end
 
 local a = {b={c={}}}
 
 function a.b.c.f1 (x) return x+1 end
 function a.b.c:f2 (x,y) self[x] = y end
-assert(a.b.c.f1(4) == 5)
-a.b.c:f2('k', 12); assert(a.b.c.k == 12)
+assert(a.b.c.f1(4) == 5,"failed")
+a.b.c:f2('k', 12); assert(a.b.c.k == 12,"failed")
 
 print('+')
 
@@ -405,10 +395,10 @@ function f(a,b,c) local d = 'a'; t={a,b,c,d} end
 
 f(      -- this line change must be valid
   1,2)
-assert(t[1] == 1 and t[2] == 2 and t[3] == nil and t[4] == 'a')
+assert(t[1] == 1 and t[2] == 2 and t[3] == nil and t[4] == 'a',"failed")
 f(1,2,   -- this one too
       3,4)
-assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == 'a')
+assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == 'a',"failed")
 function deep (n)
   if n>0 then deep(n-1) end
 end
@@ -419,10 +409,10 @@ deep(180)
 print"testing tail calls"
 
 function deep (n) if n>0 then return deep(n-1) else return 101 end end
-assert(deep(30000) == 101)
+assert(deep(30000) == 101,"failed")
 a = {}
 function a:deep (n) if n>0 then return self:deep(n-1) else return 101 end end
-assert(a:deep(30000) == 101)
+assert(a:deep(30000) == 101,"failed")
 
 do   -- tail calls x varargs
   local function foo (x, ...) local a = {...}; return x, a[1], a[2] end
@@ -430,29 +420,29 @@ do   -- tail calls x varargs
   local function foo1 (x) return foo(10, x, x + 1) end
 
   local a, b, c = foo1(-2)
-  assert(a == 10 and b == -2 and c == -1)
+  assert(a == 10 and b == -2 and c == -1,"failed")
 
   a, b = (function () return foo() end)()
-  assert(a == nil and b == nil)
+  assert(a == nil and b == nil,"failed")
 
   local X, Y, A
   local function foo (x, y, ...) X = x; Y = y; A = {...} end
   local function foo1 (...) return foo(...) end
 
   local a, b, c = foo1()
-  assert(X == nil and Y == nil and #A == 0)
+  assert(X == nil and Y == nil and #A == 0,"failed")
 
   a, b, c = foo1(10)
-  assert(X == 10 and Y == nil and #A == 0)
+  assert(X == 10 and Y == nil and #A == 0,"failed")
 
   a, b, c = foo1(10, 20)
-  assert(X == 10 and Y == 20 and #A == 0)
+  assert(X == 10 and Y == 20 and #A == 0,"failed")
 
   a, b, c = foo1(10, 20, 30)
-  assert(X == 10 and Y == 20 and #A == 1 and A[1] == 30)
+  assert(X == 10 and Y == 20 and #A == 1 and A[1] == 30,"failed")
 end
 `
-	antlr4Lua.NewLuaSnippetExecutor(code).SmartRun()
+	NewLuaSnippetExecutor(code).SmartRun()
 }
 
 func Test5(t *testing.T) {
@@ -473,5 +463,5 @@ func Test5(t *testing.T) {
 print(b)
 print(c)
 end`
-	antlr4Lua.NewLuaSnippetExecutor(code).Run()
+	NewLuaSnippetExecutor(code).Run()
 }
