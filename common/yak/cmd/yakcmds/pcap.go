@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"strings"
 )
@@ -60,10 +61,20 @@ var PcapCommand = cli.Command{
 
 			if hellospec, err := tlsutils.ParseClientHello(frame.Payload); err == nil {
 				log.Infof("%v SNI: %v", flow.String(), hellospec.SNI())
-			} else if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil {
+			} else if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil && utils.IsCommonHTTPRequestMethod(req) {
+				flow.StashHTTPRequest(req)
 				u, _ := lowhttp.ExtractURLFromHTTPRequest(req, false)
 				if u != nil {
 					log.Infof("%v %v %v", flow.String(), req.Method, u.String())
+					httpctx.SetRequestURL(req, u.String())
+				}
+			} else if rsp, err := utils.ReadHTTPResponseFromBytes(frame.Payload, nil); err == nil && strings.HasPrefix(rsp.Proto, "HTTP/") {
+				rsp.Request = flow.FetchStashedHTTPRequest()
+				if rsp.Request != nil {
+					url := httpctx.GetRequestURL(rsp.Request)
+					if url != "" {
+						log.Infof("%v %v %v", flow.String(), rsp.Status, url)
+					}
 				}
 			}
 		}))
