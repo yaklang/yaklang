@@ -39,18 +39,22 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 	tagMarginPostions := IndexAllSubstrings(code, tagMargins...)
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
+	lastLeftPosMap := map[string]int{}
+	for _, tagType := range tagTypes {
+		lastLeftPosMap[tagType.name] = -1
+	}
 	for _, pos := range tagMarginPostions {
 		tagIndex := pos[0] / 2
 		isleft := pos[0]%2 == 0
 		typ := tagTypes[tagIndex]
 		if isleft {
 			tag := &fuzztagPos{start: pos[1] + 2, tagType: typ}
-			if stack.Size() != 0 {
-				top := stack.Peek()
-				top.subs = append(top.subs, tag)
-			} else {
-				rootTags = append(rootTags, tag)
-			}
+			//if stack.Size() != 0 {
+			//	top := stack.Peek()
+			//	top.subs = append(top.subs, tag)
+			//} else {
+			//	rootTags = append(rootTags, tag)
+			//}
 			stack.Push(tag)
 		} else {
 			if stack.Size() != 0 {
@@ -61,6 +65,28 @@ func Parse(code string, tagTypes ...*TagDefine) []Node {
 			}
 		}
 	}
+	//for _, pos := range tagMarginPostions {
+	//	tagIndex := pos[0] / 2
+	//	isleft := pos[0]%2 == 0
+	//	typ := tagTypes[tagIndex]
+	//	if isleft {
+	//		tag := &fuzztagPos{start: pos[1] + 2, tagType: typ}
+	//		if stack.Size() != 0 {
+	//			top := stack.Peek()
+	//			top.subs = append(top.subs, tag)
+	//		} else {
+	//			rootTags = append(rootTags, tag)
+	//		}
+	//		stack.Push(tag)
+	//	} else {
+	//		if stack.Size() != 0 {
+	//			if stack.Peek().tagType.name == typ.name {
+	//				top := stack.Pop()
+	//				top.end = pos[1]
+	//			}
+	//		}
+	//	}
+	//}
 	var filterValidTag func(rootTags []*fuzztagPos) (result []*fuzztagPos)
 	filterValidTag = func(rootTags []*fuzztagPos) (result []*fuzztagPos) {
 		for _, tag := range rootTags {
