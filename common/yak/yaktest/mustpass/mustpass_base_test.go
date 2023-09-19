@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "output.yak"
+	var debugName = "mitm_selfsigncert.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
