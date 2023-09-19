@@ -1009,11 +1009,20 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return originReqRaw
 				}
 
-				if reqInstance.GetHijackResponse() {
-					log.Infof("the ws hash: %s's mitm ws response is wait for hijacked", wshash)
-					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, req)
-					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
-					continue
+				hijackResponseFlag := reqInstance.GetHijackResponse()
+				if hijackResponseFlag > 0 {
+					if hijackResponseFlag == 1 {
+						// 设置需要劫持resp
+						shouldHijackResponse = true // 设置不释放锁
+						httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
+						log.Infof("the ws hash: %s's mitm ws response is waiting for hijack response", wshash)
+						continue
+					} else if hijackResponseFlag == 2 {
+						// 设置不需要劫持resp
+						shouldHijackResponse = false
+						httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
+						log.Infof("the ws hash: %s's mitm ws response cancel hijack response", wshash)
+					}
 				}
 
 				// 把修改后的请求放回去
@@ -1026,8 +1035,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		mitmLock.Lock()
 		defer func() {
-			// 根据是否劫持响应来判断是否释放锁
-			if !shouldHijackResponse {
+			// 根据是否劫持响应或者请求是否被丢弃来判断是否释放锁
+			if !shouldHijackResponse || httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 				mitmLock.Unlock()
 			}
 		}()
@@ -1207,13 +1216,22 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					continue
 				}
 
-				if reqInstance.GetHijackResponse() {
-					// 设置需要劫持resp
-					shouldHijackResponse = true // 设置不释放锁
-					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
-					hijackedPtr := fmt.Sprintf("%p", originReqIns)
-					log.Infof("the ptr: %v's mitm request is waiting for hijacked", hijackedPtr)
-					//hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
+				hijackResponseFlag := reqInstance.GetHijackResponse()
+				if hijackResponseFlag > 0 {
+					if hijackResponseFlag == 1 {
+						// 设置需要劫持resp
+						shouldHijackResponse = true // 设置不释放锁
+						httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
+						hijackedPtr := fmt.Sprintf("%p", originReqIns)
+						log.Infof("the ptr: %v's mitm request is waiting for hijack response", hijackedPtr)
+						//hijackedResponseByRequestPTRMap.Store(hijackedPtr, originReqIns)
+					} else if hijackResponseFlag == 2 {
+						// 设置不需要劫持resp
+						shouldHijackResponse = false
+						httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
+						hijackedPtr := fmt.Sprintf("%p", originReqIns)
+						log.Infof("the ptr: %v's mitm request cancel hijack response", hijackedPtr)
+					}
 					continue
 				}
 				// 如果 ID 对不上，返回来的是旧的，已经不需要处理的 ID，则重新接受等待新的

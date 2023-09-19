@@ -3,6 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -14,11 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestH2Hijack(t *testing.T) {
@@ -1154,4 +1156,90 @@ Host: ` + addr
 			}()
 		}
 	}
+}
+
+func TestGRPCMUSTPASS_MITMCancelHijackResponse(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := utils.RandStringBytes(20)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		fmt.Fprint(writer, token)
+	})
+	target := utils.HostPort(host, port)
+
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	stream.Send(&ypb.MITMRequest{
+		SetResetFilter: true,
+	})
+	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
+	once := false
+	for {
+		rcpResponse, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		rspMsg := string(rcpResponse.GetMessage().GetMessage())
+		if rcpResponse.GetHaveMessage() {
+
+		} else if len(rcpResponse.GetRequest()) > 0 {
+
+			// 模拟用户点击切换劫持响应为从不
+			if !once {
+				once = true
+				stream.Send(&ypb.MITMRequest{
+					Id:             rcpResponse.GetId(),
+					HijackResponse: 1,
+				})
+				time.Sleep(100 * time.Microsecond)
+				stream.Send(&ypb.MITMRequest{
+					Id:             rcpResponse.GetId(),
+					HijackResponse: 2, // 代表取消劫持响应
+				})
+				time.Sleep(100 * time.Microsecond)
+			}
+
+			stream.Send(&ypb.MITMRequest{
+				Id:      rcpResponse.GetId(),
+				Request: rcpResponse.GetRequest(),
+			})
+
+			// 如果劫持了响应，第二次会进来
+			if len(rcpResponse.GetResponse()) > 0 {
+				t.Fatalf("Should not hijack response, but hijacked")
+			}
+		}
+		if strings.Contains(rspMsg, `starting mitm serve`) {
+			go func() {
+				time.Sleep(time.Second)
+				packet := `GET / HTTP/1.1
+Host: ` + target
+				_, err := yak.Execute(`
+rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
+`, map[string]any{
+					"packet":    []byte(packet),
+					"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				cancel()
+			}()
+		}
+	}
+
 }
