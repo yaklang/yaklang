@@ -358,3 +358,13 @@ func (e *ErrorHandler) String() string {
 	)
 }
 
+func (p *Panic) String() string {
+	return fmt.Sprintf(
+		"panic %s",
+		getStr(p.Info),
+	)
+}
+
+func (r *Recover) String() string {
+	return "recover"
+}
