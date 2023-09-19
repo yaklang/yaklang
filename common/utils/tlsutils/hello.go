@@ -141,7 +141,7 @@ func ParseClientHello(data []byte) (*HandshakeClientHello, error) {
 	}
 
 	data = helloInfo[0:]
-	if ret := binary.BigEndian.Uint16([]byte{data[2], data[3]}); int(ret)+4 != originLen {
+	if ret := binary.BigEndian.Uint16([]byte{data[2], data[3]}); int(ret)+4 > originLen {
 		return nil, utils.Errorf("tls handshake client hello length error: %d", ret)
 	}
 

@@ -296,13 +296,11 @@ func Start(opt ...CaptureOption) error {
 		conf.Context = context.Background()
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
-	defer cancel()
+	defer func() {
+		log.Info("pcapx.utils.capture context done")
+		cancel()
+	}()
 
-	// create stream factory and pool
-	//streamFactory := NewStreamFactory(ctx)
-	//streamPool := tcpassembly.NewStreamPool(streamFactory)
-	//assembler := tcpassembly.NewAssembler(streamPool)
-	// conf.Assembler = assembler
 	conf.trafficPool = NewTrafficPool(ctx)
 	conf.trafficPool.onFlowCreated = conf.onFlowCreated
 
