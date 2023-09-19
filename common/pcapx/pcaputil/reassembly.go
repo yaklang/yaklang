@@ -15,6 +15,7 @@ type futureFrame struct {
 	Seq     uint32
 	Len     int
 	Payload []byte
+	FIN     bool
 }
 
 // TrafficFlow is a tcp flow
@@ -31,6 +32,19 @@ type TrafficFlow struct {
 	pool *trafficPool
 }
 
+func (t *TrafficFlow) IsClosed() bool {
+	select {
+	case <-t.ctx.Done():
+		return true
+	default:
+		if t.ServerConn.IsClosed() && t.ClientConn.IsClosed() {
+			t.cancel()
+			return true
+		}
+		return false
+	}
+}
+
 func (t *TrafficFlow) String() string {
 	return fmt.Sprintf("stream[%3d]: %v <-> %v", t.Index, t.ClientConn.localAddr, t.ServerConn.localAddr)
 }
@@ -41,14 +55,11 @@ func (t *TrafficFlow) Feed(packet *layers.TCP) {
 			t.pool.flowCache.Set(t.Hash, t)
 		}
 	}
-	if !packet.ACK && !packet.FIN && !packet.SYN && len(packet.Payload) <= 0 && !packet.RST {
-		return
-	}
 
 	if t.ClientConn.localPort == int(packet.SrcPort) {
-		t.ClientConn.Feed(packet)
+		t.ClientConn.FeedClient(packet)
 	} else {
-		t.ServerConn.Feed(packet)
+		t.ServerConn.FeedServer(packet)
 	}
 }
 
@@ -58,6 +69,7 @@ type TrafficConnection struct {
 	currentSeq uint32
 	nextSeq    uint32
 	initialed  bool
+	waitACK    bool
 
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -94,70 +106,66 @@ func (t *TrafficConnection) Close() bool {
 	return t.IsClosed()
 }
 
-func (t *TrafficConnection) Feed(tcp *layers.TCP) {
-	if t.IsClosed() {
-		return
+func (t *TrafficConnection) CloseFlow() bool {
+	t.cancel()
+	if t.Flow != nil {
+		t.Flow.cancel()
 	}
+	return t.IsClosed()
+}
 
-	// handle
-	if tcp.SYN {
-		t.isn = tcp.Seq
-		t.currentSeq = tcp.Seq
-		t.nextSeq = tcp.Seq + 1
-		t.initialed = true
-		return
-	} else if tcp.FIN || tcp.RST {
-		t.cancel()
-		return
+func (t *TrafficConnection) Write(b []byte) (int, error) {
+	// log.Infof("write %v bytes to %v => %v total: %v", len(b), t.String(), len(b), t.buf.Len())
+	n, err := t.buf.Write(b)
+	if err != nil {
+		log.Errorf("write %v bytes to %v failed: %s", len(b), t.String(), err)
+		return n, err
 	}
+	return n, err
+}
 
-	if len(tcp.Payload) == 0 {
-		return
-	}
-
-	var haveData = tcp.PSH || tcp.ACK
-	if haveData && !t.initialed {
-		t.isn = tcp.Seq
-		t.currentSeq = tcp.Seq
-		t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
-		t.initialed = true
-		t.buf.Write(tcp.Payload)
-		return
-	}
-
-	// check seq
-	if t.initialed {
-		if tcp.Seq == t.nextSeq && haveData {
-			t.buf.Write(tcp.Payload)
+func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(string)) {
+	// flow is created
+	haveBody := len(tcp.Payload) > 0
+	if tcp.Seq == t.nextSeq {
+		if haveBody {
+			t.Write(tcp.Payload)
 			t.currentSeq = tcp.Seq
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
-			t.buf.Write(tcp.Payload)
-			var count int
+			var count = 0
 			for _, frame := range t.waitGroup {
 				if frame.Seq == t.nextSeq {
-					t.buf.Write(frame.Payload)
-					t.currentSeq = frame.Seq
+					if frame.FIN {
+						//debug("close by fin(cached)")
+						t.nextSeq = tcp.Seq + 1
+						t.Close()
+						break
+					}
+
+					t.Write(frame.Payload)
 					t.nextSeq = frame.Seq + uint32(frame.Len)
 					count++
 					continue
-				} else {
-					break
 				}
+				break
 			}
 			if count > 0 {
+				//debug(fmt.Sprintf("use cached frames in WaitGroup[%v]", count))
 				t.waitGroup = t.waitGroup[count:]
 			}
 			return
 		}
 
-		// abnormal
-		if !haveData {
+		if tcp.FIN {
 			t.currentSeq = tcp.Seq
+			//debug("close by fin")
 			t.nextSeq = tcp.Seq + 1
+			t.Close()
 			return
 		}
-
-		if tcp.Seq > t.nextSeq {
+	} else if tcp.Seq > t.nextSeq {
+		// future frame, put it into packet
+		if haveBody {
 			t.waitGroup = append(t.waitGroup, &futureFrame{
 				Seq:     tcp.Seq,
 				Len:     len(tcp.Payload),
@@ -166,16 +174,119 @@ func (t *TrafficConnection) Feed(tcp *layers.TCP) {
 			sort.SliceStable(t.waitGroup, func(i, j int) bool {
 				return t.waitGroup[i].Seq < t.waitGroup[j].Seq
 			})
-			return
-		} else {
-			log.Debugf("retry... expect: %v, got: %v(%v) - (%v -> %v) Packet(%-4dbytes):  PSH: %v ACK: %v",
-				t.nextSeq, tcp.Seq, int64(tcp.Seq)-int64(t.nextSeq),
-				t.localAddr, t.remoteAddr, len(tcp.Payload), tcp.PSH, tcp.ACK,
-			)
+			//debug(fmt.Sprintf("future packet cached[%v]", len(t.waitGroup)))
 			return
 		}
+
+		if tcp.FIN {
+			t.waitGroup = append(t.waitGroup, &futureFrame{
+				Seq:     tcp.Seq,
+				Len:     len(tcp.Payload),
+				Payload: tcp.Payload,
+				FIN:     true,
+			})
+			sort.SliceStable(t.waitGroup, func(i, j int) bool {
+				return t.waitGroup[i].Seq < t.waitGroup[j].Seq
+			})
+			debug(fmt.Sprintf("future fin[%v]", len(t.waitGroup)))
+			return
+		}
+	} else {
+		// out-of-order frame, ignore
+		return
 	}
+
 	log.Debugf("unknown *(%v -> %v) Packet(%-6d bytes):  PSH:%v ACK:%v", t.localAddr, t.remoteAddr, len(tcp.Payload), tcp.PSH, tcp.ACK)
+}
+
+func (t *TrafficConnection) FeedServer(tcp *layers.TCP) {
+	//if t.IsClosed() {
+	//	return
+	//}
+
+	debug := func(verbose string) {
+		// future frame, put it into packet
+		log.Infof(`*server* -> `+verbose+": expect: %v, got: %v(%v) - (%v -> %v) Packet(%-4dbytes):  SYN: %v PSH: %v ACK: %v FIN: %v",
+			t.nextSeq, tcp.Seq, int64(tcp.Seq)-int64(t.nextSeq),
+			t.localAddr, t.remoteAddr, len(tcp.Payload),
+			tcp.SYN, tcp.PSH, tcp.ACK, tcp.FIN,
+		)
+	}
+	_ = debug
+
+	// syn-ack is initialized for server side
+	if tcp.SYN && tcp.ACK {
+		t.initialed = true
+		t.isn = tcp.Seq
+		t.nextSeq = tcp.Seq + 1
+		return
+	}
+
+	if tcp.RST {
+		//debug("close(rst)")
+		t.CloseFlow()
+		return
+	}
+
+	// not initialed, in-completed flow
+	if !t.initialed {
+		if tcp.PSH {
+			t.currentSeq = tcp.Seq
+		}
+		return
+	}
+
+	t._feedHandlePayload(tcp, debug)
+}
+
+func (t *TrafficConnection) FeedClient(tcp *layers.TCP) {
+	debug := func(verbose string) {
+		// future frame, put it into packet
+		log.Infof(`*client*-> `+verbose+": expect: %v, got: %v(%v) - (%v -> %v) Packet(%-4dbytes):  SYN: %v PSH: %v ACK: %v",
+			t.nextSeq, tcp.Seq, int64(tcp.Seq)-int64(t.nextSeq),
+			t.localAddr, t.remoteAddr, len(tcp.Payload), tcp.SYN, tcp.PSH, tcp.ACK,
+		)
+	}
+	_ = debug
+
+	if t.IsClosed() {
+		return
+	}
+
+	// SYN
+	if tcp.SYN && !tcp.ACK {
+		// ISN: initial sequence number
+		t.waitACK = true
+		t.isn = tcp.Seq
+		t.nextSeq = tcp.Seq + 1
+		return
+	}
+
+	if t.waitACK && tcp.ACK && tcp.Seq == t.nextSeq {
+		t.initialed = true
+		t.waitACK = false
+		return
+	}
+
+	if tcp.RST {
+		t.CloseFlow()
+		return
+	}
+
+	// if in-completed flow, just handle psh
+	if !t.initialed {
+		havePayload := len(tcp.Payload) > 0
+		if havePayload {
+			t.currentSeq = tcp.Seq
+			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
+			t.isn = tcp.Seq
+			t.initialed = true
+			t.Write(tcp.Payload)
+		}
+		return
+	}
+
+	t._feedHandlePayload(tcp, debug)
 }
 
 func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
@@ -191,14 +302,16 @@ func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 	if err != nil {
 		return nil, utils.Errorf("parse [%v] to addr failed: %s", srcAddr, err)
 	}
+	var c2sBuffer bytes.Buffer
 	c2sConn := &TrafficConnection{
-		buf:        &(bytes.Buffer{}),
+		buf:        &c2sBuffer,
 		remoteAddr: dst,
 		localAddr:  src,
 	}
+	var s2cBuffer bytes.Buffer
 	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
 	s2cConn := &TrafficConnection{
-		buf:        &(bytes.Buffer{}),
+		buf:        &s2cBuffer,
 		remoteAddr: src,
 		localAddr:  dst,
 	}
@@ -218,4 +331,8 @@ func (p *trafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 	p.flowCache.Set(flow.Hash, flow)
 	log.Debugf("%v is open", flow.String())
 	return flow, nil
+}
+
+func (c *TrafficConnection) GetBuffer() *bytes.Buffer {
+	return c.buf
 }
