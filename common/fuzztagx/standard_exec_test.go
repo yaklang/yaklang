@@ -258,6 +258,7 @@ func TestExecutePrefixTag(t *testing.T) {
 		},
 	}
 	testData := []string{
+		`x"{{int(a)}}"`,
 		"base64(111)",
 		" base64(111)",
 		" base64(111) ",
@@ -281,7 +282,7 @@ func TestExecutePrefixTag(t *testing.T) {
 }
 func TestMagicLabel(t *testing.T) {
 	checkSameString := func(s []string) bool {
-		set := utils.NewSet()
+		set := utils.NewSet[string]()
 		for _, v := range s {
 			set.Add(v)
 		}
