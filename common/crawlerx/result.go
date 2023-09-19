@@ -4,7 +4,6 @@ package crawlerx
 
 import (
 	"context"
-	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strings"
@@ -117,7 +116,7 @@ type SimpleResult struct {
 	screenshot string
 	resultType string
 	method     string
-	request    *rod.HijackRequest
+	request    HijackRequest
 	from       string
 }
 
