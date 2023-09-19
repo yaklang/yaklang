@@ -68,7 +68,7 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 	}
 
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
-	function.GetSymbolId()
+	
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
 	function.SetSymbol(funcSymbolId)
@@ -87,19 +87,17 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 		TypeVerbose: "anonymous-function",
 		Value:       function,
 	}
-
-	// 闭包函数，直接push到栈中
+	
 	if funcName != "" {
-		l.pushLeftRef(function.GetSymbolId())
-	}
-
-	l.pushValue(funcVal)
-
-	// 如果有函数名的话，进行快速赋值
-	if funcName != "" {
+		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
+		l.pushLeftRef(function.GetSymbolId())
+		l.pushValue(funcVal)
 		l.pushGlobalFastAssign()
 		l.pushOpPop()
+	} else {
+		// 闭包函数，直接push到栈中
+		l.pushValueWithCopy(funcVal)
 	}
 
 	recoverSymbolTable()
@@ -187,7 +185,6 @@ func (l *LuaTranslator) VisitLocalFuncNameAndBody(name string, body lua.IFuncbod
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
 	function.SetSourceCode(l.sourceCode)
 
-	function.GetSymbolId()
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
 	function.SetSymbol(funcSymbolId)
@@ -204,16 +201,17 @@ func (l *LuaTranslator) VisitLocalFuncNameAndBody(name string, body lua.IFuncbod
 		TypeVerbose: "anonymous-function",
 		Value:       function,
 	}
-	// 闭包函数，直接push到栈中
+	
 	if funcName != "" {
-		l.pushLeftRef(function.GetSymbolId())
-	}
-	l.pushValue(funcVal)
-	// 如果有函数名的话，进行快速赋值
-	if funcName != "" {
+		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
+		l.pushLeftRef(function.GetSymbolId())
+		l.pushValue(funcVal)
 		l.pushLocalFastAssign()
 		l.pushOpPop()
+	} else {
+		// 闭包函数，直接push到栈中
+		l.pushValueWithCopy(funcVal)
 	}
 
 	return nil
@@ -261,7 +259,6 @@ func (l *LuaTranslator) VisitFunctionDef(def lua.IFunctiondefContext) interface{
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
 	function.SetSourceCode(l.sourceCode)
 
-	function.GetSymbolId()
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
 	function.SetSymbol(funcSymbolId)
@@ -279,17 +276,15 @@ func (l *LuaTranslator) VisitFunctionDef(def lua.IFunctiondefContext) interface{
 		Value:       function,
 	}
 
-	// 闭包函数，直接push到栈中
 	if funcName != "" {
-		l.pushLeftRef(function.GetSymbolId())
-	}
-
-	l.pushValue(funcVal)
-
-	// 如果有函数名的话，进行快速赋值
-	if funcName != "" {
+		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
+		l.pushLeftRef(function.GetSymbolId())
+		l.pushValue(funcVal)
 		l.pushGlobalFastAssign()
+	} else {
+		// 闭包函数，直接push到栈中
+		l.pushValueWithCopy(funcVal)
 	}
 
 	return nil
