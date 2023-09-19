@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+var buildinLib = make(map[string]interface{})
+
+func Import(name string, f interface{}) {
+	buildinLib[name] = f
+}
+
 type LuaSnippetExecutor struct {
 	sourceCode string
 	engine     *Engine
@@ -14,7 +20,9 @@ type LuaSnippetExecutor struct {
 }
 
 func NewLuaSnippetExecutor(code string) *LuaSnippetExecutor {
-	return &LuaSnippetExecutor{sourceCode: code, engine: New(), translator: &luaast.LuaTranslator{}}
+	e := New()
+	e.ImportLibs(buildinLib)
+	return &LuaSnippetExecutor{sourceCode: code, engine: e, translator: &luaast.LuaTranslator{}}
 }
 
 func (l *LuaSnippetExecutor) Run() {
