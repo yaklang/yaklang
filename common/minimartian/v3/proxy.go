@@ -612,13 +612,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				res.Header.Set("Proxy-Authenticate", "Basic realm=\"yakit proxy\", charset=\"UTF-8\"")
 				e := fmt.Errorf("reason: %v", reason)
 				proxyutil.Warning(res.Header, e)
-				rspBytes, err := utils.DumpHTTPResponse(res, true)
+				_, err := utils.DumpHTTPResponse(res, true, brw)
 				if err != nil {
 					// never happen
 					err = errors.Join(err, e)
 					log.Errorf("got error while writing failed response back to client: %v", err)
-				} else {
-					brw.Write(rspBytes)
 				}
 				brw.Flush()
 				conn.Close()
