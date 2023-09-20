@@ -3,11 +3,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"reflect"
-	"strings"
 )
 
 func MapGetStringOr(m map[string]interface{}, key string, value string) string {
@@ -197,7 +198,6 @@ func InterfaceToMapInterfaceE(i interface{}) (map[string]interface{}, error) {
 			return result, nil
 		} else {
 			result["__[yaklang-raw]__"] = i
-			log.Debugf("InterfaceToRawMap error: %v", i)
 			return result, Errorf("interfaceToRawMap error, got: %v", spew.Sdump(i))
 		}
 	}
