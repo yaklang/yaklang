@@ -111,8 +111,8 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 
 func (t *TrafficFlow) init(
 	handle func(*TrafficFlow),
-	onReassembledFrame func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame),
-	onArrivedFrame func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame),
+	onReassembledFrame []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame),
+	onArrivedFrame []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame),
 	onClose func(reason TrafficFlowCloseReason, flow *TrafficFlow),
 ) {
 	t.createdOnce.Do(func() {
@@ -121,8 +121,16 @@ func (t *TrafficFlow) init(
 		}
 		handle(t)
 	})
-	t.onDataFrameReassembled = onReassembledFrame
-	t.onDataFrameArrived = onArrivedFrame
+	t.onDataFrameReassembled = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
+		for _, i := range onReassembledFrame {
+			i(flow, connection, frame)
+		}
+	}
+	t.onDataFrameArrived = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
+		for _, i := range onArrivedFrame {
+			i(flow, connection, frame)
+		}
+	}
 	t.onCloseHandler = onClose
 }
 
