@@ -4,9 +4,10 @@ import (
 	"container/list"
 	"encoding/json"
 	"fmt"
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
 )
 
 type iterKey struct {
@@ -27,7 +28,9 @@ func iterKeys(l *list.List, raw any, prefix string) *list.List {
 		return l
 	}
 
-	if reflect.TypeOf(raw).Kind() == reflect.Map {
+	refType := reflect.TypeOf(raw)
+	switch refType.Kind() {
+	case reflect.Map:
 		for k, v := range utils.InterfaceToMapInterface(raw) {
 			l.PushBack(&iterKey{Key: utils.InterfaceToString(k), JsonPath: prefix + k})
 			fixedVal, err := utils.InterfaceToMapInterfaceE(v)
@@ -45,9 +48,7 @@ func iterKeys(l *list.List, raw any, prefix string) *list.List {
 				continue
 			}
 		}
-	}
-
-	if reflect.TypeOf(raw).Kind() == reflect.Slice {
+	case reflect.Slice:
 		for index, val := range utils.InterfaceToSliceInterface(raw) {
 			jp := prefix + fmt.Sprintf("[%v]", index)
 			l.PushBack(&iterKey{JsonPath: jp})
@@ -64,6 +65,7 @@ func fetchAllIterKey(i any) []*iterKey {
 		err       error
 		originObj any
 	)
+
 	raw, originObj, err = ToMapInterface(i)
 	if err != nil {
 		gSlice, err := utils.InterfaceToSliceInterfaceE(originObj)
