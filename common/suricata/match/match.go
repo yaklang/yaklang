@@ -25,6 +25,14 @@ func (m *Matcher) Match(flow []byte) bool {
 		return false
 	}
 	pk := gopacket.NewPacket(flow, layers.LayerTypeEthernet, gopacket.NoCopy)
+	return m.MatchPackage(pk)
+}
+
+func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
+	if pk == nil {
+		return false
+	}
+
 	matcher := newMatchCtx(pk, m.rule, matchMutex)
 	err := matcher.Next()
 	if err != nil {
