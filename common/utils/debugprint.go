@@ -14,6 +14,9 @@ func PrintCurrentGoroutineRuntimeStack() {
 }
 
 func TryCloseChannel(i any) {
+	if i == nil {
+		return
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("close channel failed: %v", err)
