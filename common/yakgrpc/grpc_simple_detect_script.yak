@@ -421,7 +421,7 @@ updateProgress = func(delta) {
             0.1 + (float(portResultFinalTotal) / float(totalTasks)) * 0.9,
         ),
     )
-    yakit.SetProgress(baseProgress + ((1 - baseProgress) * (float(portResultFinalTotal) / float(totalTasks))))
+    yakit.SetProgress((baseProgress + ((1 - baseProgress) * (float(portResultFinalTotal) / float(totalTasks))))-0.01)
 
 }
 
