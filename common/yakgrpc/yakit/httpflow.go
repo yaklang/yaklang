@@ -5,6 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
@@ -20,13 +28,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
+)
+
+var (
+	globalHTTPFlowCache = make(map[string]*ypb.HTTPFlow)
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -249,7 +254,27 @@ func utf8safe(i string) string {
 	return utils.EscapeInvalidUTF8Byte([]byte(i))
 }
 
+func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
+	if f == nil {
+		return nil
+	}
+	if v, ok := globalHTTPFlowCache[f.CalcCacheHash(full)]; ok {
+		return v
+	}
+	return nil
+}
+
+func (f *HTTPFlow) setCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
+	if f == nil {
+		return
+	}
+	globalHTTPFlowCache[f.CalcCacheHash(full)] = m
+}
+
 func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
+	if flow := f.getCacheGRPCModel(full); flow != nil {
+		return flow, nil
+	}
 	flow := &ypb.HTTPFlow{
 		Id:                 uint64(f.ID),
 		IsHTTPS:            f.IsHTTPS,
@@ -445,12 +470,16 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 			flow.JsonObjects = append(flow.JsonObjects, utf8safe(j))
 		}
 	}
-
+	f.setCacheGRPCModel(full, flow)
 	return flow, nil
 }
 
 func (f *HTTPFlow) CalcHash() string {
 	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
+}
+
+func (f *HTTPFlow) CalcCacheHash(full bool) string {
+	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
 }
 
 func (f *HTTPFlow) BeforeSave() error {
