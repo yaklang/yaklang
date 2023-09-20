@@ -2,10 +2,10 @@ package yakast
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/go-funk"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
-	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
@@ -119,7 +119,8 @@ func (y *YakCompiler) writeEOS(raw yak.IEosContext) {
 }
 
 func (y *YakCompiler) writeEosWithText(s string) {
-	if strings.HasPrefix(s, "//") || strings.HasPrefix(s, "/*") {
+	trimedLeftStr := strings.TrimLeft(s, "\r\n")
+	if strings.HasPrefix(trimedLeftStr, "//") || strings.HasPrefix(trimedLeftStr, "/*") {
 		y.writeString(s)
 		return
 	}
@@ -150,27 +151,26 @@ type parserGetter interface {
 	GetStart() antlr.Token
 }
 
-func (y *YakCompiler) keepCommentLine(raw interface{}, index int) {
-	lines := funk.Map(raw, func(i interface{}) parserGetter {
-		return i.(parserGetter)
-	}).([]parserGetter)
+func (y *YakCompiler) keepCommentLine(stmts []parser.IStatementContext, index int) {
 
-	if len(lines) <= 1 || index <= 0 {
-		return
-	}
-	last := lines[index-1]
-	now := lines[index]
+	// ts := nowToken.GetParser().GetTokenStream()
+	// commentRaw := ts.GetTextFromInterval(&antlr.Interval{
+	// 	Start: startColumn,
+	// 	Stop:  nowToken.GetStart().GetTokenIndex() - 1,
+	// })
+	// commentLine := strings.TrimSpace(commentRaw)
 
-	ts := now.GetParser().GetTokenStream()
-	commentRaw := ts.GetTextFromInterval(&antlr.Interval{
-		Start: last.GetStop().GetTokenIndex(),
-		Stop:  now.GetStart().GetTokenIndex() - 1,
-	})
-	commentLine := strings.TrimSpace(commentRaw)
-	if strings.HasPrefix(commentLine, "//") ||
-		strings.HasPrefix(commentLine, "#") {
-		y.writeString(commentLine)
-	} else if strings.HasPrefix(commentLine, "/*") && strings.HasSuffix(commentLine, "*/") {
-		y.writeString(commentLine)
-	}
+	// if len(lines) <= 1 || index <= 0 {
+	// 	return
+	// }
+	// last := stmts[index-1]
+	// now := stmts[index]
+	// last.GetStart().GetLine()
+
+	// if strings.HasPrefix(commentLine, "//") ||
+	// 	strings.HasPrefix(commentLine, "#") {
+	// 	y.writeString(commentLine)
+	// } else if strings.HasPrefix(commentLine, "/*") && strings.HasSuffix(commentLine, "*/") {
+	// 	y.writeString(commentLine)
+	// }
 }
