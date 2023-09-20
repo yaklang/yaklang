@@ -739,11 +739,11 @@ yakit.SetProgress(0.94)
 go fn {
     for {
         yakit.Info("漏洞检测中...")
-        sleep(0.2)
+        sleep(3)
         yakit.Info("漏洞检测中.....")
-        sleep(0.2)
+        sleep(3)
         yakit.Info("漏洞检测中........")
-        sleep(0.1)
+        sleep(3)
     }
 
 }
