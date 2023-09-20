@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -9,7 +10,7 @@ import (
 	"testing"
 )
 
-func CompareNucleiYaml(yaml1, yaml2 string) bool {
+func CompareNucleiYaml(yaml1, yaml2 string) error {
 	yarml1Map := make(map[string]interface{})
 	yarml2Map := make(map[string]interface{})
 	if yaml.Unmarshal([]byte(yaml1), &yarml1Map) != nil {
@@ -39,6 +40,9 @@ func CompareNucleiYaml(yaml1, yaml2 string) bool {
 
 	}
 
+	if len(utils.InterfaceToSliceInterface(utils.MapGetRaw(yarml2Map, "http"))) != len(httpPackages) {
+		return errors.New("请求节点数不匹配")
+	}
 	for _, httpReq := range utils.InterfaceToSliceInterface(utils.MapGetRaw(yarml2Map, "http")) {
 		httpReqMap := utils.InterfaceToMapInterface(httpReq)
 		raws := utils.InterfaceToSliceInterface(httpReqMap["raw"])
@@ -54,18 +58,23 @@ func CompareNucleiYaml(yaml1, yaml2 string) bool {
 			key := utils.InterfaceToString(k)
 			otherFields = append(otherFields, key+":"+utils.InterfaceToString(httpReqMap[key]))
 		}
+		if len(raws) != 1 { // 请求包数量不匹配
+			return errors.New("请求包数量应该为1")
+		}
 		for _, raw := range raws {
-			if v, ok := httpPackages[utils.InterfaceToString(raw)]; ok {
+			if v, ok := httpPackages[utils.InterfaceToString(raw)]; ok { //请求包配置不匹配
 				if v != utils.InterfaceToString(matchers)+utils.InterfaceToString(extractors)+utils.InterfaceToString(otherFields) {
 					isSame = false
 				}
+			} else { // 请求包不匹配
+				return errors.New("请求包不匹配")
 			}
 			if !isSame {
-				return false
+				return errors.New("请求包配置不匹配")
 			}
 		}
 	}
-	return true
+	return nil
 }
 func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	client, err := NewLocalClient()
@@ -164,7 +173,7 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 			expect: `http:
   - raw:
     - |+
-      GET {{PathTrimEndSlash}}/images//////////////////../../../../../../../../etc/passwd HTTP/1.1
+      GET {{BaseURL}}/images//////////////////../../../../../../../../etc/passwd HTTP/1.1
       Host: {{Hostname}}
       User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
 
@@ -336,8 +345,8 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 			Requests: rsp.Requests,
 		})
 
-		if !CompareNucleiYaml(res.YamlContent, testCase.expect) {
-			t.Fatal("expect:", testCase.expect, "got:", res.YamlContent)
+		if err := CompareNucleiYaml(res.YamlContent, testCase.expect); err != nil {
+			t.Fatal("expect:", testCase.expect, "got:", res.YamlContent, "error:", err)
 		}
 	}
 }
