@@ -76,7 +76,7 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 	}
 	return nil
 }
-func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
+func TestGRPC_MUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

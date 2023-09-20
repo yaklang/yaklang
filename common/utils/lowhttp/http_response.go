@@ -319,7 +319,7 @@ func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) []byte {
 	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
 }
 func ReplaceHTTPPacketBodyWithoutFixCL(raw []byte, body []byte, chunk bool) []byte {
-	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
+	return ReplaceHTTPPacketBodyEx(raw, body, chunk, true)
 }
 
 func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceNotFixCL bool) []byte {

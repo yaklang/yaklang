@@ -238,7 +238,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
 			path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
 			bulk.Paths = []string{path}
-			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
+			bulk.Body = strings.TrimSpace(string(lowhttp.GetHTTPPacketBody(request.RequestRaw)))
 			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
 			req, err := lowhttp.ParseBytesToHttpRequest(request.RequestRaw)
 			if err != nil {
@@ -252,7 +252,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		default:
 			generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
 			bulk.HTTPRequests = []*httptpl.YakHTTPRequestPacket{&httptpl.YakHTTPRequestPacket{
-				Request: string(generalizedRequests),
+				Request: strings.TrimSpace(string(generalizedRequests)),
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
 			}}
 		}
