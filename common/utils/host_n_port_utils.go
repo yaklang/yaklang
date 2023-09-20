@@ -4,13 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/asaskevich/govalidator"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"google.golang.org/protobuf/encoding/protowire"
 	"math/big"
 	"math/rand"
 	"net"
@@ -20,6 +13,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ReneKroon/ttlcache"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 func GetLocalIPAddressViaIface() string {
@@ -386,28 +386,15 @@ func IsHttpOrHttpsUrl(raw string) bool {
 }
 
 func IsJSON(raw string) (string, bool) {
-	if govalidator.IsJSON(raw) {
-		return raw, true
-	}
-
-	fixRaw := jsonextractor.FixJson([]byte(raw))
-	if fixRaw != nil {
-		raw = string(fixRaw)
-		if govalidator.IsJSON(raw) {
-			return raw, true
-		}
-	}
-
 	unescapeJson, err := codec.QueryUnescape(raw)
 	if err != nil {
 		return raw, false
 	}
-
-	if govalidator.IsJSON(unescapeJson) {
-		return string(unescapeJson), true
+	raws := jsonextractor.ExtractStandardJSON(unescapeJson)
+	if len(raws) == 0 {
+		return "", false
 	}
-
-	return raw, false
+	return raws[0], true
 }
 
 func IsGzip(raw []byte) bool {
