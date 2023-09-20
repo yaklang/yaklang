@@ -165,6 +165,13 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			fuzzerReq.RedirectTimes = redirectTimes
 			fuzzerReq.InheritCookies = inheritCookies
 			fuzzerReq.InheritVariables = inheritVariables
+			for name, v := range sequence.Payloads.GetRawPayloads() {
+				params = append(params, &ypb.FuzzerParamItem{
+					Key:   name,
+					Value: strings.Join(v.Data, "\n"),
+					Type:  "raw",
+				})
+			}
 			fuzzerReq.Params = params
 			fuzzerRequest = append(fuzzerRequest, fuzzerReq)
 		}
@@ -298,6 +305,16 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}
 		bulk.StopAtFirstMatch = request.StopAtFirstMatch
 		bulk.AfterRequested = request.AfterRequested
+		payloadsMap := map[string]any{}
+		for k, v := range vars.GetRaw() {
+			data := strings.Split(v.Data, "\n")
+			payloadsMap[k] = data
+		}
+		payloads, err := httptpl.GenerateYakPayloads(map[string]interface{}{"payloads": payloadsMap})
+		if err != nil {
+			log.Errorf("generate yak payloads error: %v", err)
+		}
+		bulk.Payloads = payloads
 	}
 	if !hasMetcherOrExtractor {
 		res.Ok = false
@@ -419,6 +436,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			payloadsMap = sequenceItem.NewSubMapBuilder("payloads")
 			sequenceItem.Set("headers", sequence.Headers)
 			sequenceItem.Set("body", sequence.Body)
+			sequenceItem.AddEmptyLine()
 		} else {
 			addSignElements(sequence.HTTPRequests)
 			maxRequest += len(sequence.HTTPRequests)
@@ -438,10 +456,12 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 				reqArray = append(reqArray, strings.Replace(prefix+reqContent, "\r\n", "\n", -1))
 			}
 			sequenceItem.Set("raw", reqArray)
+			sequenceItem.AddEmptyLine()
 			payloadsMap = sequenceItem.NewSubMapBuilder("payloads")
 		}
 		// 写入payloads
-		if sequence.Payloads != nil {
+		if sequence.Payloads != nil && len(sequence.Payloads.GetRawPayloads()) > 0 {
+			sequenceItem.AddComment("attack: pitchfork")
 			for k, payload := range sequence.Payloads.GetRawPayloads() {
 				if payload.FromFile != "" {
 					payloadsMap.Set(k, payload.FromFile)
@@ -449,6 +469,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 					payloadsMap.Set(k, payload.Data)
 				}
 			}
+			sequenceItem.AddEmptyLine()
 		}
 		// 其它配置
 		sequenceItem.Set("redirects", sequence.EnableRedirect)
@@ -500,6 +521,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			matcherItem.Set("negative", subMatcher.Negative)
 			matcherItem.Set("condition", subMatcher.Condition)
 			matcherItem.Set("part", subMatcher.Scope)
+			matcherItem.AddEmptyLine()
 			matcherArray.Add(matcherItem)
 		}
 
@@ -531,6 +553,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 				extractorItem.Set("type", "dsl")
 				extractorItem.Set("dsl", extractor.Groups)
 			}
+			extractorItem.AddEmptyLine()
 			extratorsArray.Add(extractorItem)
 		}
 
