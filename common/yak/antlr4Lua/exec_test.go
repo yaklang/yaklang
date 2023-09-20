@@ -111,9 +111,11 @@ func init() {
 		}
 		base, ok1 := interfaceToFloat64(x)
 		index, ok2 := interfaceToFloat64(y)
-		res := base / index
-		if ok1 && ok2 {
+		if ok1 && ok2 && (index != 0){
+			res := base / index
 			return math.Floor(res)
+		} else if (index == 0) &&  ok1 && ok2{
+			panic("dividend can't be zero!")
 		} else {
 			panic("attempt to floor a '" + reflect.TypeOf(base).String() + "' with a '" + reflect.TypeOf(index).String() + "'")
 		}
@@ -1567,5 +1569,24 @@ Account.privatePocket.peekBalance(Account.privatePocket)
 Account.privatePocket.loopSuperPrivatePocket:peekBalance()
 Account.privatePocket.loopSuperPrivatePocket:peekBalance(Account.privatePocket.loopSuperPrivatePocket)
 `
+	NewLuaSnippetExecutor(code).SmartRun()
+}
+
+func TestScope(t *testing.T) {
+	code := `function Set(a) 
+		return function() 
+			return a
+		end 
+	end 
+	
+	f1 = Set(1)
+	assert(f1()==1, "clouse scope")
+	
+	f2 = Set(2)
+	assert(f2()==2, "clouse scope")
+	
+	
+	assert(f1()==1, "clouse scope") -- !!`
+
 	NewLuaSnippetExecutor(code).SmartRun()
 }
