@@ -23,6 +23,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/ReneKroon/ttlcache"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
@@ -33,14 +42,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
 	"github.com/yaklang/yaklang/common/minimartian/v3/nosigpipe"
@@ -611,6 +612,15 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				res.Header.Set("Proxy-Authenticate", "Basic realm=\"yakit proxy\", charset=\"UTF-8\"")
 				e := fmt.Errorf("reason: %v", reason)
 				proxyutil.Warning(res.Header, e)
+				rspBytes, err := utils.DumpHTTPResponse(res, true)
+				if err != nil {
+					// never happen
+					err = errors.Join(err, e)
+					log.Errorf("got error while writing failed response back to client: %v", err)
+				} else {
+					brw.Write(rspBytes)
+				}
+				brw.Flush()
 				conn.Close()
 				return e
 			}
