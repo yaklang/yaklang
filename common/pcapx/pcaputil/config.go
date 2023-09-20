@@ -12,8 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/match"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -76,13 +79,13 @@ func WithOnTrafficFlowClosed(h func(reason TrafficFlowCloseReason, flow *Traffic
 
 func WithOnTrafficFlowOnDataFrameArrived(h func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
-		pool.onFlowFrameDataFrameArrived = h
+		pool.onFlowFrameDataFrameArrived = append(pool.onFlowFrameDataFrameArrived, h)
 	})
 }
 
 func WithOnTrafficFlowOnDataFrameReassembled(h func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
-		pool.onFlowFrameDataFrameReassembled = h
+		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, h)
 	})
 }
 
@@ -170,6 +173,54 @@ func (c *CaptureConfig) Save(pk gopacket.Packet) {
 			log.Errorf("write packet data failed: %s", err)
 		}
 	}
+}
+
+func WithTLSClientHello(h func(flow *TrafficFlow, hello *tlsutils.HandshakeClientHello)) CaptureOption {
+	return withPool(func(pool *TrafficPool) {
+		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
+			if len(frame.Payload) <= 0 {
+				return
+			}
+
+			if hello, err := tlsutils.ParseClientHello(frame.Payload); err == nil {
+				h(flow, hello)
+			}
+		})
+	})
+}
+
+func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption {
+	return withPool(func(pool *TrafficPool) {
+		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
+			if len(frame.Payload) <= 0 {
+				return
+			}
+
+			if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil && utils.IsCommonHTTPRequestMethod(req) {
+				h(flow, req)
+			}
+		})
+	})
+}
+
+func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Response)) CaptureOption {
+	return withPool(func(pool *TrafficPool) {
+		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
+			if len(frame.Payload) <= 0 {
+				return
+			}
+
+			if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil && utils.IsCommonHTTPRequestMethod(req) {
+				flow.StashHTTPRequest(req)
+			} else if rsp, err := utils.ReadHTTPResponseFromBytes(frame.Payload, nil); err == nil && strings.HasPrefix(rsp.Proto, "HTTP/") {
+				rsp.Request = flow.FetchStashedHTTPRequest()
+				h(flow, rsp.Request, rsp)
+				if rsp.Request == nil {
+					log.Warnf("no request found for response: %v %v", rsp.Proto, rsp.Status)
+				}
+			}
+		})
+	})
 }
 
 func (c *CaptureConfig) assemblyWithTS(flow gopacket.Flow, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {

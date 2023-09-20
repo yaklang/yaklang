@@ -1,13 +1,13 @@
 package yakcmds
 
 import (
+	"fmt"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"net/http"
 	"strings"
 )
 
@@ -54,30 +54,23 @@ var PcapCommand = cli.Command{
 			opts = append(opts, pcaputil.WithSuricataFilter(suricata))
 		}
 
-		opts = append(opts, pcaputil.WithOnTrafficFlowOnDataFrameReassembled(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
-			if len(frame.Payload) <= 0 {
-				return
-			}
-
-			if hellospec, err := tlsutils.ParseClientHello(frame.Payload); err == nil {
-				log.Infof("%v SNI: %v", flow.String(), hellospec.SNI())
-			} else if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil && utils.IsCommonHTTPRequestMethod(req) {
-				flow.StashHTTPRequest(req)
-				u, _ := lowhttp.ExtractURLFromHTTPRequest(req, false)
-				if u != nil {
-					log.Infof("%v %v %v", flow.String(), req.Method, u.String())
-					httpctx.SetRequestURL(req, u.String())
+		opts = append(
+			opts,
+			pcaputil.WithTLSClientHello(func(flow *pcaputil.TrafficFlow, hello *tlsutils.HandshakeClientHello) {
+				log.Infof("%v SNI: %v", flow.String(), hello.SNI())
+			}),
+			pcaputil.WithHTTPFlow(func(flow *pcaputil.TrafficFlow, req *http.Request, rsp *http.Response) {
+				if req == nil {
+					return
 				}
-			} else if rsp, err := utils.ReadHTTPResponseFromBytes(frame.Payload, nil); err == nil && strings.HasPrefix(rsp.Proto, "HTTP/") {
-				rsp.Request = flow.FetchStashedHTTPRequest()
-				if rsp.Request != nil {
-					url := httpctx.GetRequestURL(rsp.Request)
-					if url != "" {
-						log.Infof("%v %v %v", flow.String(), rsp.Status, url)
-					}
-				}
-			}
-		}))
+				raw, _ := utils.DumpHTTPRequest(req, true)
+				fmt.Println(string(raw))
+				fmt.Println("-----------------------------------------")
+				raw, _ = utils.DumpHTTPResponse(rsp, true)
+				fmt.Println(string(raw))
+				fmt.Println("-----------------------------------------")
+			}),
+		)
 		return pcaputil.Start(opts...)
 	},
 }
