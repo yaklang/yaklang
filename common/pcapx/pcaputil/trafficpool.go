@@ -25,8 +25,8 @@ type TrafficPool struct {
 
 	onFlowCreated                   func(flow *TrafficFlow)
 	onFlowClosed                    func(reason TrafficFlowCloseReason, flow *TrafficFlow)
-	onFlowFrameDataFrameArrived     func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
-	onFlowFrameDataFrameReassembled func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
+	onFlowFrameDataFrameArrived     []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
+	onFlowFrameDataFrameReassembled []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
 }
 
 func NewTrafficPool(ctx context.Context) *TrafficPool {

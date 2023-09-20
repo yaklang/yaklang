@@ -13,6 +13,9 @@ var Exports = map[string]any{
 	"pcap_onFlowClosed":                 WithOnTrafficFlowClosed,
 	"pcap_onFlowDataFrameNoReassembled": WithOnTrafficFlowOnDataFrameArrived,
 	"pcap_onFlowDataFrame":              WithOnTrafficFlowOnDataFrameReassembled,
+	"pcap_onTLSClientHello":             WithTLSClientHello,
+	"pcap_onHTTPRequest":                WithHTTPRequest,
+	"pcap_onHTTPFlow":                   WithHTTPFlow,
 	"pcap_everyPacket":                  WithEveryPacket,
 	"pcap_debug":                        WithDebug,
 }
