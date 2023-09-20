@@ -5,6 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
@@ -20,13 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
-	"unicode/utf8"
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -691,6 +692,23 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error
 	return nil
 }
 
+func CreateOrUpdateHTTPFlowEx(db *gorm.DB, hash string, i interface{}) (flow *HTTPFlow, fErr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			fErr = utils.Errorf("met panic error: %v", err)
+		}
+	}()
+
+	db = db.Model(&HTTPFlow{})
+	flow = &HTTPFlow{}
+
+	if db := db.Where("hash = ?", hash).Assign(i).Omit("request").FirstOrCreate(flow); db.Error != nil {
+		return nil, utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
+	}
+
+	return flow, nil
+}
+
 func GetHTTPFlow(db *gorm.DB, id int64) (*HTTPFlow, error) {
 	var req HTTPFlow
 	if db := db.Model(&HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
@@ -898,7 +916,7 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
 
-	db = db.Model(&HTTPFlow{}) //.Debug()
+	db = db.Model(&HTTPFlow{})
 	if !params.GetFull() {
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800

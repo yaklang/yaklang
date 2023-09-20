@@ -3,6 +3,13 @@ package yakgrpc
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/dlclark/regexp2"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -14,12 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type mitmContentReplaceRulesSortable []*ypb.MITMContentReplacer
@@ -90,7 +91,7 @@ func (m *mitmReplacer) getRule(r *ypb.MITMContentReplacer) *regexp2.Regexp {
 			return re
 		}
 	}
-	log.Infof("regexp cache store: %v", r.GetVerboseName())
+	log.Debugf("regexp cache store: %v", r.GetVerboseName())
 	m._ruleRegexpCache.Store(r, re)
 	return re
 }
@@ -129,14 +130,14 @@ func (m *mitmReplacer) LoadRules(rules []*ypb.MITMContentReplacer) {
 			log.Infof("rule: %v is disabled(cannot compiled): %v", i.VerboseName, i.Rule)
 			return false
 		}
-		log.Infof("rule: %v is enabled", raw.String())
+		log.Debugf("rule: %v is enabled", raw.String())
 
 		if i.GetNoReplace() {
 			// mirror rules
-			log.Infof("load mirror rules; %s", i.VerboseName)
+			log.Debugf("load mirror rules; %s", i.VerboseName)
 			m._mirrorRules = append(m._mirrorRules, i)
 		} else {
-			log.Infof("load hijacked rules; %s", i.VerboseName)
+			log.Debugf("load hijacked rules; %s", i.VerboseName)
 			m._hijackingRules = append(m._hijackingRules, i)
 		}
 
