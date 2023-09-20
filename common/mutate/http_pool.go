@@ -76,8 +76,8 @@ type httpPoolConfig struct {
 	// batch
 	BatchTarget string
 
-	//without conn_pool
-	WithoutConnPool bool
+	//with conn_pool
+	WithConnPool bool
 }
 
 func WithPoolOpt_ExtraFuzzOptions(opts ...FuzzConfigOpt) HttpPoolConfigOption {
@@ -333,9 +333,9 @@ func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
 	}
 }
 
-func _httpPool_withoutConnPool() HttpPoolConfigOption {
+func _httpPool_withConnPool() HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
-		config.WithoutConnPool = true
+		config.WithConnPool = true
 	}
 }
 
@@ -503,6 +503,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					defer func() {
 						if err := recover(); err != nil {
 							log.Errorf("submit fuzzer task failed: %s", err)
+							utils.PrintCurrentGoroutineRuntimeStack()
 						}
 					}()
 
@@ -562,8 +563,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						config.RedirectTimes = 0
 					}
 
-					rspInstance, err := lowhttp.HTTP(
-						lowhttp.WithHttps(https),
+					lowhttpOptions := []lowhttp.LowhttpOpt{lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
 						lowhttp.WithPacketBytes(targetRequest),
@@ -582,8 +582,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
 						lowhttp.WithDNSServers(config.DNSServers),
 						lowhttp.WithETCHosts(config.EtcHosts),
-						lowhttp.WithGmTLS(config.IsGmTLS),
-					)
+						lowhttp.WithGmTLS(config.IsGmTLS)}
+					if config.WithConnPool {
+						lowhttpOptions = append(lowhttpOptions, lowhttp.WithConnPool())
+					}
+					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 					var rsp []byte
 					if rspInstance != nil {
 						rsp = rspInstance.RawPacket
@@ -814,4 +817,4 @@ var WithPoolOpt_DNSServers = _httpPool_DNSServers
 var WithPoolOpt_EtcHosts = _httpPool_EtcHosts
 var WithPoolOpt_NoSystemProxy = _httpPool_NoSystemProxy
 var WithPoolOpt_RequestCountLimiter = _httpPool_RequestCountLimiter
-var WithoutConnPool = _httpPool_withoutConnPool
+var WithConnPool = _httpPool_withConnPool
