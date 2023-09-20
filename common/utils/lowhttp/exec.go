@@ -343,9 +343,9 @@ func ConnPool(p *lowHttpConnPool) LowhttpOpt {
 	}
 }
 
-func WithConnPool(flag bool) LowhttpOpt {
+func WithConnPool() LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.WithConnPool = flag
+		o.WithConnPool = true
 	}
 }
 
@@ -474,11 +474,11 @@ var commonHTTPMethod = map[string]struct{}{
 // SendHttpRequestWithRawPacketWithOpt
 func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
-	if option.WithConnPool && option.ConnPool == nil {
-		option.ConnPool = DefaultLowHttpConnPool
-	}
 	for _, opt := range opts {
 		opt(option)
+	}
+	if option.WithConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
 	}
 
 	var (
