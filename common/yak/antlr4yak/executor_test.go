@@ -862,6 +862,26 @@ func _formattest(i string) []*yakvm.Code {
 	return codes1
 }
 
+func _formatCodeTest(i string) (string, string) {
+	e := NewExecutor(i)
+	codes1 := e.VM.GetCodes()
+	code2 := e.Compiler.GetFormattedCode()
+	e2 := NewExecutor(code2)
+	codes2 := e2.VM.GetCodes()
+	if len(codes1) != len(codes2) {
+		println("------------------------------------")
+		_printWithLine(i)
+		println("------------------------------------")
+		_printWithLine(code2)
+		println("---------------CODE1------------------")
+		yakvm.ShowOpcodes(codes1)
+		println("---------------CODE2------------------")
+		yakvm.ShowOpcodes(codes2)
+		panic("code format error, code1-length: " + fmt.Sprint(len(codes1)) + " formatted length: " + fmt.Sprint(len(codes2)))
+	}
+	return i, code2
+}
+
 func TestNewExecutor_YakFuncCallPanic(t *testing.T) {
 	code := `
 	func t(a, b) {
@@ -3769,4 +3789,41 @@ for a < 10000 {
 `
 	_marshallerTest(code)
 	_formattest(code)
+}
+
+func TestFixFormatterComment(t *testing.T) {
+	t.Run("double comment", func(t *testing.T) {
+		code := `f1 = () => 1
+f1()// 1
+f1()// 2
+`
+		code, code2 := _formatCodeTest(code)
+		if strings.Contains(code2, "// 1// 1") {
+			t.Fatalf("comment formatter failed, double comment")
+		}
+	})
+
+	t.Run("head comment", func(t *testing.T) {
+		code := `// here is head comment
+f1 = () => 1
+f1()// 1
+f1()// 2
+`
+		code, code2 := _formatCodeTest(code)
+		if !strings.Contains(code2, "// here is head comment") {
+			t.Fatalf("comment formatter failed, no head comment")
+		}
+	})
+
+	t.Run("middle comment", func(t *testing.T) {
+		code := `f1 = () => 1
+f1()// 1
+// middle comment
+f1()// 2
+`
+		code, code2 := _formatCodeTest(code)
+		if !strings.Contains(code2, "// middle comment") {
+			t.Fatalf("comment formatter failed, no middle comment")
+		}
+	})
 }
