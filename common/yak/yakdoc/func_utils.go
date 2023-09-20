@@ -327,9 +327,29 @@ func funcDescriptionAndDeclaration(f interface{}, libName string, overideName st
 				if decl == nil {
 					continue
 				}
+				// 解析第一个返回值，是函数类型
 				if funcDecl, ok := decl.(*ast.FuncDecl); ok {
-					params = handleParams(buf, funcDecl.Type)
-					results = handleResults(buf, funcDecl.Type)
+					typ := funcDecl.Type
+					if typ == nil {
+						continue
+					}
+					rets := typ.Results
+					if rets == nil {
+						continue
+					}
+					if rets.List == nil || len(rets.List) != 1 {
+						continue
+					}
+					field := rets.List[0]
+					if field == nil {
+						continue
+					}
+					typExpr := field.Type
+					if typ, ok = typExpr.(*ast.FuncType); !ok {
+						continue
+					}
+					params = handleParams(buf, typ)
+					results = handleResults(buf, typ)
 					found = true
 					break
 				}
