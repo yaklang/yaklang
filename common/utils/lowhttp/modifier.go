@@ -57,7 +57,7 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 		header = append(header, line)
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
 }
 
 func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
@@ -100,7 +100,7 @@ func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
@@ -143,7 +143,7 @@ func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func AppendHTTPPacketPath(packet []byte, p string) []byte {
@@ -183,7 +183,7 @@ func AppendHTTPPacketPath(packet []byte, p string) []byte {
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func handleHTTPPacketQueryParam(packet []byte, callback func(url.Values)) []byte {
@@ -224,7 +224,7 @@ func handleHTTPPacketQueryParam(packet []byte, callback func(url.Values)) []byte
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
@@ -272,7 +272,7 @@ func handleHTTPPacketPostParam(packet []byte, callback func(url.Values)) []byte 
 		bodyRaw = unsafe.Slice(unsafe.StringData(newBody), len(newBody))
 	}
 
-	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL([]byte(headersRaw), bodyRaw, isChunked)
 }
 
 func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []byte {
@@ -343,7 +343,7 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func ReplaceHTTPPacketHost(packet []byte, host string) []byte {
@@ -380,7 +380,7 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
@@ -412,7 +412,7 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, false)
 }
 
 func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
@@ -453,7 +453,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		}
 		return line
 	})
-	var data = ReplaceHTTPPacketBody([]byte(header), body, isChunked)
+	var data = ReplaceHTTPPacketBodyWithoutFixCL([]byte(header), body, isChunked)
 	if handled {
 		return data
 	}
@@ -512,7 +512,7 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 			})
 		}
 	}
-	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL([]byte(header), body, isChunked)
 }
 
 // DeleteHTTPPacketCookie delete cookie from http packet
@@ -551,7 +551,7 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL([]byte(header), body, isChunked)
 }
 
 func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *multipart.Reader, *multipart.Writer) bool) []byte {
@@ -632,7 +632,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(buf.Bytes(), body, isChunked)
 }
 
 // AppendHTTPPacketFormEncoded replace form data in http packet
@@ -1031,5 +1031,5 @@ func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 			isChunked = IsChunkedHeaderLine(line)
 		}
 	})
-	return ReplaceHTTPPacketBody(packet, body, isChunked)
+	return ReplaceHTTPPacketBodyWithoutFixCL(packet, body, isChunked)
 }

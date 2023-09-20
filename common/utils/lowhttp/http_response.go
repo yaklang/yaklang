@@ -318,8 +318,11 @@ func RemoveCEHeaders(headerBytes []byte) []byte {
 func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) []byte {
 	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
 }
+func ReplaceHTTPPacketBodyWithoutFixCL(raw []byte, body []byte, chunk bool) []byte {
+	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
+}
 
-func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) []byte {
+func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceNotFixCL bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
@@ -383,8 +386,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		buf.Write(body)
 		return buf.Bytes()
 	}
-
-	if len(body) > 0 || forceCL {
+	if !forceNotFixCL && len(body) > 0 {
 		headers = append(headers, fmt.Sprintf("Content-Length: %d", len(body)))
 	}
 	var buf = new(bytes.Buffer)
