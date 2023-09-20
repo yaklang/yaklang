@@ -77,7 +77,7 @@ finishingThreshold = cli.Int("finishing-threshold", cli.setDefault(1))
 
 cli.check()
 yakit.SetProgress(baseProgress + 0.01)
-
+sleep(1)
 yakit.Info("用户自定义字典预处理")
 // 定义存储用户名与密码的字典
 userdefinedUsernameList = make([]string)
@@ -216,11 +216,12 @@ x.Map(
 synPorts = str.Join(newSynPortsList, ",")
 
 yakit.SetProgress(baseProgress + 0.02)
-
+sleep(1)
 var synscanEnable = false
 try {
     yakit.Info("检测 SYN 扫描是否可用中")
-    yakit.SetProgress(0.1)
+    yakit.SetProgress(baseProgress+ 0.02)
+    baseProgress += 0.05
     for res in synscan.Scan("127.0.0.1", "80", synscan.wait(1))~ {  }
 
 
@@ -397,7 +398,6 @@ yakit.StatusCard("开放端口数/已扫主机数", "-/-")
 
 totalTasks = hostTotal * portTotal
 portResultFinalTotal = 0
-bruteTaskCompleted = 0
 progressLock = sync.NewLock()
 updateProgress = func(delta) {
     if totalTasks <= 0 {
@@ -412,17 +412,17 @@ updateProgress = func(delta) {
     if portResultFinalTotal > totalTasks {
         portResultFinalTotal = totalTasks
     }
-    allTotal = bruteTaskCompleted + portResultFinalTotal
     yakit.Info(
         "已出结果 %v",
         sprintf(
             "%v/%v/%.3f",
-            allTotal,
+            portResultFinalTotal,
             totalTasks,
-            0.1 + (float(allTotal) / float(totalTasks)) * 0.9,
+            0.1 + (float(portResultFinalTotal) / float(totalTasks)) * 0.9,
         ),
     )
-    yakit.SetProgress(baseProgress + 0.03 + (float(allTotal) / float(totalTasks)) * 0.9)
+    yakit.SetProgress(baseProgress + ((1 - baseProgress) * (float(portResultFinalTotal) / float(totalTasks))))
+
 }
 
 bruteScan = func(result) {
@@ -537,7 +537,6 @@ bruteScan = func(result) {
 
     for rt = range res {
         yakit.Info("rt string %v ", rt.String())
-        bruteTaskCompleted++
         updateProgress(1) // 更新进度
         if rt == nil {
             continue
@@ -569,7 +568,7 @@ bruteScan = func(result) {
 
 }
 
-bruteWg = sync.NewSizedWaitGroup(4)
+bruteWg = sync.NewSizedWaitGroup(10)
 
 handleServiceScanResult = func(result) {
     if !onlyBrute {
@@ -734,7 +733,6 @@ for fileReader.Next(){
 }
 
 synWg.Wait()
-bruteWg.Wait()
 swg.Wait()
 yakit.SetProgress(0.94)
 
@@ -751,5 +749,6 @@ go fn {
 }
 
 manager.Wait()
+bruteWg.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
