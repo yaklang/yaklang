@@ -51,7 +51,7 @@ var PcapCommand = cli.Command{
 			opts = append(opts, pcaputil.WithOutput(output))
 		}
 		if suricata := c.String("suricata"); suricata != "" {
-			opts = append(opts, pcaputil.WithSuricataFilter(suricata))
+			//opts = append(opts, pcaputil.WithSuricataFilter(suricata))
 		}
 
 		opts = append(
