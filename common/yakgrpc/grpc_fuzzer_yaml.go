@@ -107,7 +107,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		var matchersCondition string
 		if len(sequence.Matcher.SubMatchers) > 0 {
 			matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
-			matchersCondition = sequence.Matcher.Condition
+			matchersCondition = sequence.Matcher.SubMatcherCondition
 		} else {
 			matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{sequence.Matcher})
 			matchersCondition = "and"
@@ -290,8 +290,8 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		//bulk.RetryInStatusCode = request.RetryInStatusCode
 		//bulk.RetryNotInStatusCode = request.RetryNotInStatusCode
 		//
-		//bulk.EnableRedirect = !request.NoFollowRedirect
-		//bulk.MaxRedirects = int(request.RedirectTimes)
+		bulk.EnableRedirect = !request.NoFollowRedirect
+		bulk.MaxRedirects = int(request.RedirectTimes)
 		//
 		//bulk.JsEnableRedirect = request.FollowJSRedirect
 		//bulk.DNSServers = request.DNSServers
@@ -519,7 +519,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 				matcherItem.Set("dsl", subMatcher.Group)
 			}
 			matcherItem.Set("negative", subMatcher.Negative)
-			matcherItem.Set("condition", subMatcher.Condition)
+			matcherItem.Set("condition", subMatcher.SubMatcherCondition)
 			matcherItem.Set("part", subMatcher.Scope)
 			matcherItem.AddEmptyLine()
 			matcherArray.Add(matcherItem)
