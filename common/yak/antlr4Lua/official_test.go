@@ -61,14 +61,34 @@ func init() {
 	//Calls error if the value of its argument v is false (i.e., nil or false);
 	//otherwise, returns all its arguments. In case of error, message is the
 	//error object; when absent, it defaults to "assertion failed!"
-	Import("assert", func(condition interface{}, message string) {
+	
+	//todo
+	//https://www.lua.org/pil/8.3.html
+	Import("assert", func(condition ...interface{}) {
 		if condition == nil {
-			panic(message)
+			panic("assert nil")
 		}
-		if boolean, ok := condition.(bool); ok {
-			if !boolean {
-				panic(message)
+		if len(condition) == 2 {
+			Assert := func(condition interface{}, message string){
+				if condition == nil {
+					panic(message)
+				}
+				if boolean, ok := condition.(bool); ok {
+					if !boolean {
+						panic(message)
+					}
+				}
 			}
+			Assert(condition[0], condition[1].(string))
+		} else {
+			Assert := func(condition interface{}) {
+				if boolean, ok := condition.(bool); ok {
+					if !boolean {
+						panic("assert failed")
+					}
+				}
+			}
+			Assert(condition)
 		}
 	})
 
