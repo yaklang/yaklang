@@ -80,6 +80,11 @@ func init() {
 			withPluginHelp("检测参数中的 SSRF 漏洞"),
 		)
 		registerBuildInPlugin(
+			"mitm", "SQL注入扫描：UNION注入",
+			withPluginHelp("朴实无华的 SQL 注入检测，检测依赖输出响应的特征 Token"),
+			withPluginAuthors("V1ll4n"),
+		)
+		registerBuildInPlugin(
 			"mitm",
 			"SSTI Expr 服务器模版表达式注入",
 			withPluginHelp("SSTI 服务器模版表达式注入漏洞（通用漏洞检测）"),
