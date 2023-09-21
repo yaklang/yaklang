@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -32,6 +33,7 @@ import (
 
 var (
 	globalHTTPFlowCache = make(map[string]*ypb.HTTPFlow)
+	cacheMu             = new(sync.Mutex)
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -258,6 +260,8 @@ func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
 	if f == nil {
 		return nil
 	}
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
 	if v, ok := globalHTTPFlowCache[f.CalcCacheHash(full)]; ok {
 		return v
 	}
@@ -268,6 +272,8 @@ func (f *HTTPFlow) setCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
 	if f == nil {
 		return
 	}
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
 	globalHTTPFlowCache[f.CalcCacheHash(full)] = m
 }
 
