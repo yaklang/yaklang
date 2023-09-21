@@ -78,9 +78,18 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			}
 		}
 		extractors := funk.Map(sequence.Extractor, func(extractor *httptpl.YakExtractor) *ypb.HTTPResponseExtractor {
+			typeName := ""
+			switch extractor.Type {
+			case "dsl":
+				typeName = "nuclei-dsl"
+			case "key-value":
+				typeName = "kval"
+			default:
+				typeName = extractor.Type
+			}
 			return &ypb.HTTPResponseExtractor{
 				Name:             extractor.Name,
-				Type:             extractor.Type,
+				Type:             typeName,
 				Scope:            extractor.Scope,
 				Groups:           extractor.Groups,
 				RegexpMatchGroup: funk.Map(extractor.RegexpMatchGroup, func(n int) int64 { return int64(n) }).([]int64),
@@ -90,12 +99,25 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		var yakMatchers2HttpResponseMatchers func(matchers []*httptpl.YakMatcher) []*ypb.HTTPResponseMatcher
 		yakMatchers2HttpResponseMatchers = func(matchers []*httptpl.YakMatcher) []*ypb.HTTPResponseMatcher {
 			return funk.Map(matchers, func(matcher *httptpl.YakMatcher) *ypb.HTTPResponseMatcher {
+				scope := ""
+				switch matcher.Scope {
+				case "status":
+					scope = "status_code"
+				case "header":
+					scope = "all_headers"
+				default:
+					scope = matcher.Scope
+				}
+				condition := matcher.Condition
+				if matcher.Condition == "" {
+					condition = "and"
+				}
 				return &ypb.HTTPResponseMatcher{
 					SubMatchers:         yakMatchers2HttpResponseMatchers(matcher.SubMatchers),
 					SubMatcherCondition: matcher.SubMatcherCondition,
 					MatcherType:         matcher.MatcherType,
-					Scope:               matcher.Scope,
-					Condition:           matcher.Condition,
+					Scope:               scope,
+					Condition:           condition,
 					Group:               matcher.Group,
 					GroupEncoding:       matcher.GroupEncoding,
 					Negative:            matcher.Negative,
@@ -105,12 +127,14 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		}
 		var matchers []*ypb.HTTPResponseMatcher
 		var matchersCondition string
-		if len(sequence.Matcher.SubMatchers) > 0 {
-			matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
-			matchersCondition = sequence.Matcher.SubMatcherCondition
-		} else {
-			matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{sequence.Matcher})
-			matchersCondition = "and"
+		if sequence.Matcher != nil {
+			if len(sequence.Matcher.SubMatchers) > 0 {
+				matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
+				matchersCondition = sequence.Matcher.SubMatcherCondition
+			} else {
+				matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{sequence.Matcher})
+				matchersCondition = sequence.Matcher.SubMatcherCondition
+			}
 		}
 		var redirectTimes float64
 		if sequence.EnableRedirect {
@@ -126,7 +150,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			params = append(params, &ypb.FuzzerParamItem{
 				Key:   k,
 				Value: utils.InterfaceToString(v),
-				Type:  "raw",
+				Type:  "nuclei-dsl",
 			})
 		}
 		//fuzzerReq.IsHTTPS = sequence.IsHTTPS
@@ -148,7 +172,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		//fuzzerReq.RetryInStatusCode = sequence.RetryInStatusCode
 		//fuzzerReq.RetryNotInStatusCode = sequence.RetryNotInStatusCode
 		//
-		noFollowRedirect := sequence.EnableRedirect
+		noFollowRedirect := !sequence.EnableRedirect
 		//
 		//fuzzerReq.FollowJSRedirect = sequence.JsEnableRedirect
 		//fuzzerReq.DNSServers = sequence.DNSServers
@@ -169,7 +193,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				params = append(params, &ypb.FuzzerParamItem{
 					Key:   name,
 					Value: strings.Join(v.Data, "\n"),
-					Type:  "raw",
+					Type:  "nuclei-dsl",
 				})
 			}
 			fuzzerReq.Params = params
@@ -200,11 +224,20 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	var HttpResponseMatchers2YakMatchers func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher
 	HttpResponseMatchers2YakMatchers = func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher {
 		return funk.Map(matchers, func(matcher *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
+			scope := ""
+			switch matcher.Scope {
+			case "status_code":
+				scope = "status"
+			case "all_headers":
+				scope = "header"
+			default:
+				scope = matcher.Scope
+			}
 			return &httptpl.YakMatcher{
 				SubMatchers:         HttpResponseMatchers2YakMatchers(matcher.SubMatchers),
 				SubMatcherCondition: matcher.SubMatcherCondition,
 				MatcherType:         matcher.MatcherType,
-				Scope:               matcher.Scope,
+				Scope:               scope,
 				Condition:           matcher.Condition,
 				Group:               matcher.Group,
 				GroupEncoding:       matcher.GroupEncoding,
@@ -261,9 +294,18 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			SubMatcherCondition: request.MatchersCondition,
 		}
 		bulk.Extractor = funk.Map(request.Extractors, func(extractor *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
+			typeName := ""
+			switch extractor.Type {
+			case "nuclei-dsl":
+				typeName = "dsl"
+			case "kval":
+				typeName = "key-value"
+			default:
+				typeName = extractor.Type
+			}
 			return &httptpl.YakExtractor{
 				Name:             extractor.Name,
-				Type:             extractor.Type,
+				Type:             typeName,
 				Scope:            extractor.Scope,
 				Groups:           extractor.Groups,
 				RegexpMatchGroup: funk.Map(extractor.RegexpMatchGroup, func(n int64) int { return int(n) }).([]int),
@@ -486,7 +528,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		// matcher生成
 		matcher := sequence.Matcher
 		addSignElements(matcher)
-		matcherCondition := matcher.Condition
+		matcherCondition := matcher.SubMatcherCondition
 		if matcherCondition == "" {
 			matcherCondition = "and"
 		}
@@ -495,9 +537,11 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		for _, subMatcher := range matcher.SubMatchers {
 			matcherItem := NewYamlMapBuilder()
 			matcherItem.SetDefaultField(map[string]any{
-				"negative": false,
-				"part":     "raw",
+				"negative":  false,
+				"part":      "raw",
+				"condition": "and",
 			})
+			matcherItem.Set("condition", subMatcher.Condition)
 			switch subMatcher.MatcherType {
 			case "word":
 				matcherItem.Set("type", "word")
@@ -541,7 +585,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 				extractorItem.Set("group", extractor.RegexpMatchGroup)
 			case "key-value":
 				extractorItem.Set("type", "kval")
-				extractorItem.Set("group", extractor.Groups)
+				extractorItem.Set("kval", extractor.Groups)
 			case "json":
 				extractorItem.Set("type", "json")
 				extractorItem.Set("json", extractor.Groups)
