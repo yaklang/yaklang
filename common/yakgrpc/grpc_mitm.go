@@ -5,15 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"path"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
@@ -30,6 +21,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
 func _exactChecker(includes, excludes []string, target string) bool {
@@ -1399,27 +1398,57 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 
-		// HOOK 存储过程
+		// storage
 		if flow != nil && !dropped.IsSet() {
 			flow.Hash = flow.CalcHash()
 			flow := flow
 			//log.Infof("start to do sth with tag")
 			startCreateFlow = time.Now()
-			tx := s.GetProjectDatabase().Begin()
+			lock := new(sync.Mutex)
+			tx := s.GetProjectDatabase().Begin().Set("lock", lock)
 			err = yakit.InsertHTTPFlow(tx, flow)
+
+			colorOK := make(chan struct{})
 			if replacer != nil {
-				replacer.hookColor(tx, plainRequest, plainResponse, req, flow)
-				log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+				go func() {
+					replacer.hookColor(tx, plainRequest, plainResponse, req, flow)
+					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+					close(colorOK)
+				}()
+			} else {
+				close(colorOK)
 			}
 
-			for i := 0; i < 3; i++ {
-				err = tx.Commit().Error
-				if err == nil {
-					break
-				}
-				log.Errorf("commit error: %s", err)
-				time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
+			inserted := make(chan struct{})
+
+			// wait color
+			select {
+			case <-colorOK:
+			case <-time.NewTimer(time.Millisecond * 300).C:
+				lock.Lock()
+				newtx := s.GetProjectDatabase().Begin()
+				// swap tx passed into colorfunc with the new one
+				*newtx, *tx = *tx, *newtx
+				lock.Unlock()
+				// swap back for insert
+				tx, newtx = newtx, tx
+				go func() {
+					<-inserted
+					if err := utils.RetryWithExpBackOff(func() error {
+						return newtx.Commit().Error
+					}); err != nil {
+						log.Errorf("commit error: %s", err)
+					}
+				}()
 			}
+
+			// insert
+			if err := utils.RetryWithExpBackOff(func() error {
+				return tx.Commit().Error
+			}); err != nil {
+				log.Errorf("commit error: %s", err)
+			}
+			close(inserted)
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 			if err != nil {
