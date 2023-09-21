@@ -606,7 +606,10 @@ addScanHostCount = func() {
 }
 
 OpenPortCount = 0
+openPortCountLock = sync.NewLock()
 addOpenPortCount = func() {
+    openPortCountLock.Lock()
+    defer openPortCountLock.Unlock()
     OpenPortCount++
     yakit.StatusCard("开放端口数/已扫主机数", f"${OpenPortCount}/${ScanHostCount}")
     if skippedHostAliveScan {
@@ -745,10 +748,16 @@ go fn {
         yakit.Info("漏洞检测中........")
         sleep(3)
     }
-
+}
+// 定时器，超过一定时间，就扫描结束
+ticker := time.NewTicker(1*60*15)
+for t := range ticker.C {
+    yakit.SetProgress(1)
+    yakit.Info("本次扫描任务已完成。")
+    os.Exit(0)
 }
 
-manager.Wait()
 bruteWg.Wait()
+manager.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
