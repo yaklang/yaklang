@@ -1,37 +1,33 @@
 package utils
 
 import (
-	"github.com/akutz/memconn"
-	"github.com/google/uuid"
+	"context"
+	"net"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestReadConnWithTimeout(t *testing.T) {
-	token := uuid.New().String()
-	lis, err := memconn.Listen("memu", token)
-	if err != nil {
-		t.Logf("listen failed: %s", err)
-		t.FailNow()
-	}
-	defer func() {
-		_ = lis.Close()
-	}()
-
-	go func() {
-		conn, err := lis.Accept()
-		if err != nil {
-			t.Logf("accept failed: %s", err)
-			t.FailNow()
-		}
-
+	var listener net.Listener
+	host, port := DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		listener = lis
 		time.Sleep(500 * time.Millisecond)
-		conn.Write([]byte("hello"))
-	}()
-
-	c, err := memconn.Dial("memu", token)
+		_, err := conn.Write([]byte("hello"))
+		if err != nil {
+			log.Errorf("write tcp failed: %v", err)
+		}
+	})
+	if listener != nil {
+		defer func() {
+			_ = listener.Close()
+		}()
+	}
+	addr := HostPort(host, port)
+	c, err := net.Dial("tcp", addr)
 	if err != nil {
-		t.Logf("failed dail memu abc: %s", err)
+		t.Logf("failed dail %v: %s", addr, err)
 		t.FailNow()
 	}
 
