@@ -577,7 +577,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 	})
 	if hostInPacket == "" && host == "" {
-		return nil, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
+		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
 
 	var urlStr = forceOverrideURL
