@@ -31,16 +31,6 @@ pcapx.Sniff("", pcapx.pcap_everyFrame(data => {
 
 */
 
-type httpFlow struct {
-	ReqInstance *http.Request
-	Src         string
-	SrcPort     int
-	Dst         string
-	DstPort     int
-	Req         []byte
-	Rsp         []byte
-}
-
 // Group is a group of rules
 type Group struct {
 	pkCache *ttlcache.Cache
@@ -54,16 +44,21 @@ type Group struct {
 	cancel context.CancelFunc
 
 	frameChan   chan gopacket.Packet
-	httpRequest chan *httpFlow
+	httpRequest chan *HttpFlow
 
 	consumeOnce *sync.Once
+
+	onMatchedCallback func(packet gopacket.Packet, match *rule.Rule)
+
+	// control waitgroup
+	wg *sync.WaitGroup
 }
 
 type SuricataRuleLoaderType func(query string) (chan *rule.Rule, error)
 
 var defaultSuricataRuleLoader SuricataRuleLoaderType = nil
 
-func NewGroup() *Group {
+func NewGroup(opt ...GroupOption) *Group {
 	gopacketCacher := ttlcache.NewCache()
 	gopacketCacher.SetTTL(30 * time.Second)
 
@@ -75,10 +70,17 @@ func NewGroup() *Group {
 
 		// internal fields
 		frameChan:   make(chan gopacket.Packet, 50000),
-		httpRequest: make(chan *httpFlow, 50000),
+		httpRequest: make(chan *HttpFlow, 50000),
 		consumeOnce: new(sync.Once),
 		ctx:         ctx,
 		cancel:      cancel,
+		onMatchedCallback: func(packet gopacket.Packet, match *rule.Rule) {
+			log.Infof("matched: %v", match)
+		},
+		wg: new(sync.WaitGroup),
+	}
+	for _, i := range opt {
+		i(group)
 	}
 	group.consumeMain()
 	return group
@@ -160,27 +162,77 @@ func (g *Group) unSerializingFrame(loopback bool, raw []byte) (gopacket.Packet, 
 	return packet, nil
 }
 
+func (g *Group) feedPacket(pk gopacket.Packet) {
+	g.wg.Add(1)
+	select {
+	case g.frameChan <- pk:
+	case <-g.ctx.Done():
+		g.wg.Done()
+	default:
+		go func() {
+			select {
+			case g.frameChan <- pk:
+			case <-g.ctx.Done():
+				g.wg.Done()
+			}
+		}()
+	}
+}
+
+func (g *Group) feedHTTPFlow(flow *HttpFlow) {
+	if flow == nil {
+		return
+	}
+	g.wg.Add(1)
+	select {
+	case g.httpRequest <- flow:
+	case <-g.ctx.Done():
+		g.wg.Done()
+	default:
+		go func() {
+			select {
+			case g.httpRequest <- flow:
+			case <-g.ctx.Done():
+				g.wg.Done()
+			}
+		}()
+	}
+}
+
+func (g *Group) Wait() {
+	g.wg.Wait()
+}
+
 func (g *Group) FeedFrame(raw []byte) {
 	pk, err := g.unSerializingFrame(false, raw)
 	if err != nil {
 		log.Errorf("unserializing frame failed: %v", err)
 		return
 	}
-	select {
-	case g.frameChan <- pk:
-	case <-g.ctx.Done():
-	default:
-		go func() {
-			select {
-			case g.frameChan <- pk:
-			case <-g.ctx.Done():
-			}
-		}()
-	}
+	g.feedPacket(pk)
+}
+
+func (g *Group) FeedHTTPRequestBytes(reqBytes []byte) {
+	g.feedHTTPFlow(&HttpFlow{
+		Req: reqBytes,
+	})
+}
+
+func (g *Group) FeedHTTPResponseBytes(rsp []byte) {
+	g.feedHTTPFlow(&HttpFlow{
+		Rsp: rsp,
+	})
+}
+
+func (g *Group) FeedHTTPFlowBytes(req, rsp []byte) {
+	g.feedHTTPFlow(&HttpFlow{
+		Rsp: rsp,
+		Req: req,
+	})
 }
 
 func (g *Group) FeedHTTPFlow(src, dst string, srcPort, dstPort int, req *http.Request, rsp *http.Response) {
-	flow := &httpFlow{
+	flow := &HttpFlow{
 		ReqInstance: req,
 		Src:         src,
 		SrcPort:     srcPort,
@@ -189,6 +241,9 @@ func (g *Group) FeedHTTPFlow(src, dst string, srcPort, dstPort int, req *http.Re
 	}
 	if req == nil && rsp != nil {
 		flow.Rsp, _ = utils.DumpHTTPResponse(rsp, true)
+		if rsp.Request != nil {
+			flow.Req, _ = utils.DumpHTTPRequest(rsp.Request, true)
+		}
 	} else {
 		if ret := httpctx.GetBareRequestBytes(req); len(ret) > 0 {
 			flow.Req = ret
@@ -199,17 +254,7 @@ func (g *Group) FeedHTTPFlow(src, dst string, srcPort, dstPort int, req *http.Re
 	}
 
 	// TODO: 这里需要考虑一下，如果httpRequest chan满了，那么就会阻塞，这样会导致整个程序阻塞
-	select {
-	case g.httpRequest <- flow:
-	case <-g.ctx.Done():
-	default:
-		go func() {
-			select {
-			case g.httpRequest <- flow:
-			case <-g.ctx.Done():
-			}
-		}()
-	}
+	g.feedHTTPFlow(flow)
 }
 
 func (g *Group) consumeMain() {
@@ -224,17 +269,25 @@ func (g *Group) consumeMain() {
 				case packetFrame := <-g.frameChan:
 					for _, matcher := range g.OrdinaryMatcher {
 						if matcher.MatchPackage(packetFrame) {
-							// handle callback
+							g.onMatchedCallback(packetFrame, matcher.rule)
 						}
 					}
+					g.wg.Done()
 				case httpFlowInstance := <-g.httpRequest:
 					_ = httpFlowInstance
-					for _, matcher := range g.HTTPMatcher {
-						_ = matcher
-						//if matcher.MatchHTTPFlow(httpFlowInstance) {
-						//	// handle callback
-						//}
+					pkgs := httpFlowInstance.ToRequestPacket()
+					if len(pkgs) <= 0 {
+						g.wg.Done()
+						continue
 					}
+					for _, matcher := range g.HTTPMatcher {
+						for _, pkg := range pkgs {
+							if matcher.MatchPackage(pkg) {
+								g.onMatchedCallback(pkg, matcher.rule)
+							}
+						}
+					}
+					g.wg.Done()
 				case <-g.ctx.Done():
 					return
 				}
