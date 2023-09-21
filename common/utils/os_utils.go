@@ -5,11 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/miekg/dns"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/net/http2"
 	"math/rand"
 	"net"
 	"net/http"
@@ -17,7 +12,15 @@ import (
 	"os/user"
 	"sync"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/net/http2"
 )
+
+type handleTCPFunc func(ctx context.Context, lis net.Listener, conn net.Conn)
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -178,6 +181,52 @@ func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.Handl
 		panic(err)
 	}
 	return "127.0.0.1", port
+}
+
+func DebugMockTCPHandlerFuncContext(ctx context.Context, handlerFunc handleTCPFunc) (string, int) {
+	host := "0.0.0.0"
+	port := GetRandomAvailableTCPPort()
+	lis, err := net.Listen("tcp", HostPort(host, port))
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		select {
+		case <-ctx.Done():
+		}
+		lis.Close()
+	}()
+	go func() {
+		for {
+			conn, err := lis.Accept()
+			if err != nil {
+				log.Errorf("mock tcp server accept failed: %v", err)
+			}
+			go handlerFunc(ctx, lis, conn)
+		}
+	}()
+
+	err = WaitConnect(HostPort(host, port), 3)
+	if err != nil {
+		panic(err)
+	}
+	return "127.0.0.1", port
+}
+
+func DebugMockTCP(rsp []byte) (string, int) {
+	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		_, err := conn.Write(rsp)
+		if err != nil {
+			log.Errorf("write tcp failed: %v", err)
+		}
+		_ = conn.Close()
+		_ = lis.Close()
+	},
+	)
+}
+
+func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
+	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), handleFunc)
 }
 
 func DebugMockHTTP(rsp []byte) (string, int) {
