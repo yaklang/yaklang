@@ -16,8 +16,16 @@ HEURISTIC_CHECK_ALPHABET = [`"`, `'`, `)`, `(`, `,`, `.`]
 
 DBMS_ERRORS = {"MySQL": [`SQL syntax.*MySQL`, `Warning.*mysql_.*`, `valid MySQL result`, `MySqlClient\.`], "PostgreSQL": [`PostgreSQL.*ERROR`, `Warning.*\Wpg_.*`, `valid PostgreSQL result`, `Npgsql\.`], "Microsoft SQL Server": [`Driver.* SQL[\-\_\ ]*Server`, `OLE DB.* SQL Server`, `(\W|\A)SQL Server.*Driver`, `Warning.*mssql_.*`, `(\W|\A)SQL Server.*[0-9a-fA-F]{8}`, `(?s)Exception.*\WSystem\.Data\.SqlClient\.`, `(?s)Exception.*\WRoadhouse\.Cms\.`], "Microsoft Access": [`Microsoft Access Driver`, `JET Database Engine`, `Access Database Engine`], "Oracle": [`\bORA-[0-9][0-9][0-9][0-9]`, `Oracle error`, `Oracle.*Driver`, `Warning.*\Woci_.*`, `Warning.*\Wora_.*`], "IBM DB2": [`CLI Driver.*DB2`, `DB2 SQL error`, `\bdb2_\w+\(`], "SQLite": [`SQLite/JDBCDriver`, `SQLite.Exception`, `System.Data.SQLite.SQLiteException`, `Warning.*sqlite_.*`, `Warning.*SQLite3::`, `\[SQLITE_ERROR\]`], "Sybase": [`(?i)Warning.*sybase.*`, `Sybase message`, `Sybase.*Server message.*`]}
 
+isJavaScript = rsp => {
+    if poc.GetHTTPPacketContentType(rsp).Contains("javascript") {
+        return true
+    }
+    return false
+}
+
 # mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
 mirrorFilteredHTTPFlow = func(isHttps /* bool */, url /* string */, req /* []byte */, rsp /* []byte */, body /* []byte */) {
+    if isJavaScript(rsp) { return }
     pipeLine(isHttps, url, req, rsp, body)//对于每一个请求开启一个独立协程
 }
 
