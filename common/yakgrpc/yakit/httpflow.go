@@ -33,7 +33,7 @@ import (
 
 var (
 	globalHTTPFlowCache = make(map[string]*ypb.HTTPFlow)
-	cacheMu             = new(sync.Mutex)
+	cacheMu             = new(sync.RWMutex)
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -260,8 +260,8 @@ func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
 	if f == nil {
 		return nil
 	}
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
 	if v, ok := globalHTTPFlowCache[f.CalcCacheHash(full)]; ok {
 		return v
 	}
