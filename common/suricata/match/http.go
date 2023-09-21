@@ -4,17 +4,111 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"golang.org/x/exp/slices"
 	"io"
+	"math/rand"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+type HttpFlow struct {
+	ReqInstance *http.Request
+	Src         string
+	SrcPort     int
+	Dst         string
+	DstPort     int
+	Req         []byte
+	Rsp         []byte
+
+	packets   []gopacket.Packet
+	parseOnce *sync.Once
+}
+
+func (h *HttpFlow) ToRequestPacket() []gopacket.Packet {
+	if h.parseOnce == nil {
+		h.parseOnce = new(sync.Once)
+	}
+	h.parseOnce.Do(func() {
+		h.packets = h.createRequestPacket()
+	})
+	return h.packets
+}
+
+func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
+	var packets = make([]gopacket.Packet, 2)
+
+	if h.Src == "" {
+		h.Src = utils.GetLocalIPAddress()
+	}
+
+	if h.Dst == "" {
+		h.Dst = utils.GetRandomIPAddress()
+	}
+
+	if h.DstPort <= 0 {
+		h.DstPort = 80
+	}
+
+	if h.SrcPort <= 0 {
+		h.SrcPort = 10000 + rand.Intn(30000)
+	}
+
+	if len(h.Req) > 0 {
+		bytes, err := pcapx.PacketBuilder(
+			pcapx.WithEthernet_NextLayerType("ip"),
+			pcapx.WithEthernet_SrcMac("00:00:00:00:00:00"),
+			pcapx.WithEthernet_DstMac("00:00:00:00:00:00"),
+			pcapx.WithIPv4_SrcIP(h.Src),
+			pcapx.WithIPv4_DstIP(h.Dst),
+			pcapx.WithTCP_SrcPort(h.SrcPort),
+			pcapx.WithTCP_DstPort(h.DstPort),
+			pcapx.WithPayload(h.Req),
+		)
+		if err != nil {
+			log.Errorf("build packet failed: %v", err)
+		}
+		if len(bytes) > 0 {
+			packet := gopacket.NewPacket(bytes, layers.LayerTypeEthernet, gopacket.NoCopy)
+			if packet.ErrorLayer() == nil {
+				packets = append(packets, packet)
+			}
+		}
+	}
+
+	if len(h.Rsp) > 0 {
+		bytes, err := pcapx.PacketBuilder(
+			pcapx.WithEthernet_NextLayerType("ip"),
+			pcapx.WithEthernet_SrcMac("00:00:00:00:00:00"),
+			pcapx.WithEthernet_DstMac("00:00:00:00:00:00"),
+			pcapx.WithIPv4_SrcIP(h.Dst),
+			pcapx.WithIPv4_DstIP(h.Src),
+			pcapx.WithTCP_SrcPort(h.DstPort),
+			pcapx.WithTCP_DstPort(h.SrcPort),
+			pcapx.WithPayload(h.Rsp),
+		)
+		if err != nil {
+			log.Errorf("build packet failed: %v", err)
+		}
+		if len(bytes) > 0 {
+			packet := gopacket.NewPacket(bytes, layers.LayerTypeEthernet, gopacket.NoCopy)
+			if packet.ErrorLayer() == nil {
+				packets = append(packets, packet)
+			}
+		}
+	}
+
+	return packets
+}
 
 func httpIniter(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {

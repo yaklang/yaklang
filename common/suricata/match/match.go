@@ -28,6 +28,18 @@ func (m *Matcher) Match(flow []byte) bool {
 	return m.MatchPackage(pk)
 }
 
+func (m *Matcher) MatchHTTPFlow(flow *HttpFlow) bool {
+	if flow == nil {
+		return false
+	}
+	for _, packet := range flow.ToRequestPacket() {
+		if m.MatchPackage(packet) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
 	if pk == nil {
 		return false

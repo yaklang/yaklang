@@ -9,29 +9,20 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/suricata/match"
-	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 )
 
-type SuricataFilter struct {
-	Rule    *surirule.Rule
-	Matcher *match.Matcher
-}
-
 type CaptureConfig struct {
-	Device          []string
-	Filename        string
-	Output          *pcapgo.Writer
-	BPFFilter       string
-	SuricataFilters []*SuricataFilter
-	Context         context.Context
+	Device    []string
+	Filename  string
+	Output    *pcapgo.Writer
+	BPFFilter string
+	Context   context.Context
 
 	trafficPool *TrafficPool
 
@@ -94,35 +85,6 @@ func withPool(h func(pool *TrafficPool)) CaptureOption {
 		config.onPoolCreated = append(config.onPoolCreated, func(pool *TrafficPool) {
 			h(pool)
 		})
-		return nil
-	}
-}
-
-func WithSuricataFilter(filename string) CaptureOption {
-	return func(c *CaptureConfig) error {
-		file, err := os.Open(filename)
-		if err != nil {
-			return err
-		}
-
-		data, err := io.ReadAll(file)
-		if err != nil {
-			return err
-		}
-
-		rules, err := surirule.Parse(string(data))
-		if err != nil {
-			return err
-		}
-
-		var filters []*SuricataFilter
-		for _, rule := range rules {
-			filters = append(filters, &SuricataFilter{
-				Rule:    rule,
-				Matcher: match.New(rule),
-			})
-		}
-		c.SuricataFilters = append(c.SuricataFilters, filters...)
 		return nil
 	}
 }
@@ -255,20 +217,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		ts = time.Now()
 	}
 
-	// todo: suricata group matcher
 	var matched bool
-	for _, filter := range c.SuricataFilters {
-		if filter.Matcher.Match(packet.Data()) {
-			fmt.Printf("[%s] Alert %s\n", ts.String(), filter.Rule.Message)
-			fmt.Println(packet.String())
-			matched = true
-			break
-		}
-	}
-	if len(c.SuricataFilters) != 0 && !matched {
-		save = false
-	}
-
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk || ret == nil {
 		return
