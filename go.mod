@@ -18,9 +18,7 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/aquasecurity/go-dep-parser v0.0.0-20230627073354-fb7eb3159bd5
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/atotto/clipboard v0.1.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
-	github.com/c-bata/go-prompt v0.2.3
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
 	github.com/davecgh/go-spew v1.1.1
@@ -93,7 +91,6 @@ require (
 	github.com/pkg/sftp v1.11.0
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
 	github.com/refraction-networking/utls v1.3.2
-	github.com/rocket049/gocui v0.3.2
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/samber/lo v1.38.1
 	github.com/satori/go.uuid v1.2.0
@@ -182,16 +179,13 @@ require (
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
-	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
 	github.com/mdlayher/ethernet v0.0.0-20190313224307-5b5fc417d966 // indirect
 	github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
-	github.com/nsf/termbox-go v0.0.0-20191229070316-58d4fcbce2a7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
-	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
