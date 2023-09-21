@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dlclark/regexp2"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -181,7 +180,7 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 	return m._hijackingRules
 }
 
-func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit.HTTPFlow) {
+func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 	flow.AddTag(extraTag...)
 	log.Debugf("set color[%v] for %v", s, flow.Url)
 	switch strings.ToLower(s) {
@@ -204,36 +203,23 @@ func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit
 	default:
 		flow.Red()
 	}
-
-	lock, ok := db.Get("lock")
-	if ok {
-		lock, ok := lock.(*sync.Mutex)
-		if ok {
-			lock.Lock()
-			defer lock.Unlock()
-		}
-	}
-
-	if err := utils.Retry(3, func() error {
-		return yakit.UpdateHTTPFlowTags(db, flow)
-	}); err != nil {
-		log.Errorf("update http flow tags failed: %v", err)
-	}
+	return
 }
 
-func (m *mitmReplacer) hookColor(tx *gorm.DB, request, response []byte, req *http.Request, flow *yakit.HTTPFlow) {
+func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) []*yakit.ExtractedData {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
 	}()
+	var extracted []*yakit.ExtractedData
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		stringForSettingColor(tx, ret[0].Color, ret[0].ExtraTag, flow)
-		return
+		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
+		return nil
 	}
 	if m == nil {
-		return
+		return nil
 	}
 
 	for _, rule := range m.GetMirrorRules() {
@@ -252,7 +238,7 @@ func (m *mitmReplacer) hookColor(tx *gorm.DB, request, response []byte, req *htt
 		}
 
 		var ret string
-		stringForSettingColor(tx, rule.Color, rule.ExtraTag, flow)
+		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
 		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
 			if rule.EnableForRequest && match.GroupCount() > 1 {
 				ret = match.GroupByNumber(1).String()
@@ -268,15 +254,14 @@ func (m *mitmReplacer) hookColor(tx *gorm.DB, request, response []byte, req *htt
 			if ret == "" {
 				continue
 			}
-			yakit.SaveExtractedDataFromHTTPFlow(
-				tx,
+			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				flow.CalcHash(), rule.VerboseName,
 				ret,
 				r.String(),
-			)
+			))
 		}
 	}
-	return
+	return extracted
 }
 
 func (m *mitmReplacer) haveRules() bool {
