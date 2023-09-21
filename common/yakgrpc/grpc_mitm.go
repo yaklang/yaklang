@@ -8,6 +8,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -1402,16 +1403,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if flow != nil && !dropped.IsSet() {
 			flow.Hash = flow.CalcHash()
 			flow := flow
-			//log.Infof("start to do sth with tag")
 			startCreateFlow = time.Now()
-			lock := new(sync.Mutex)
-			tx := s.GetProjectDatabase().Begin().Set("lock", lock)
-			err = yakit.InsertHTTPFlow(tx, flow)
 
-			colorOK := make(chan struct{})
+			var colorOK = make(chan struct{})
+			var extracted []*yakit.ExtractedData
+
 			if replacer != nil {
 				go func() {
-					replacer.hookColor(tx, plainRequest, plainResponse, req, flow)
+					extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
 					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 					close(colorOK)
 				}()
@@ -1419,43 +1418,82 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				close(colorOK)
 			}
 
-			inserted := make(chan struct{})
-
-			// wait color
+			// wait for max 300ms
 			select {
 			case <-colorOK:
 			case <-time.NewTimer(time.Millisecond * 300).C:
-				lock.Lock()
-				newtx := s.GetProjectDatabase().Begin()
-				// swap tx passed into colorfunc with the new one
-				*newtx, *tx = *tx, *newtx
-				lock.Unlock()
-				// swap back for insert
-				tx, newtx = newtx, tx
+			}
+
+			var GoColor bool
+			if err := utils.RetryWithExpBackOff(func() (err error) {
+				select {
+				case <-colorOK:
+					GoColor = false
+				default:
+					GoColor = true
+				}
+
+				tx := s.GetProjectDatabase().Begin()
+				defer func() {
+					if err != nil {
+						tx.Rollback()
+					}
+				}()
+
+				if err = yakit.InsertHTTPFlow(tx, flow); err != nil {
+					return err
+				}
+
+				// for color hook
+				if !GoColor {
+					if len(extracted) != 0 {
+						for _, e := range extracted {
+							if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
+								return err
+							}
+						}
+					}
+					if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
+						return err
+					}
+				}
+
+				return tx.Commit().Error
+			}); err != nil {
+				log.Errorf("create / save httpflow from mirror error: %s", err)
+				flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
+			}
+
+			if GoColor {
 				go func() {
-					<-inserted
-					if err := utils.RetryWithExpBackOff(func() error {
-						return newtx.Commit().Error
+					<-colorOK
+					if err := utils.RetryWithExpBackOff(func() (err error) {
+						tx := consts.GetGormProjectDatabase().Begin()
+						defer func() {
+							if err != nil {
+								tx.Rollback()
+							}
+						}()
+
+						if len(extracted) != 0 {
+							for _, e := range extracted {
+								if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
+									return err
+								}
+							}
+						}
+						if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
+							return err
+						}
+
+						return tx.Commit().Error
 					}); err != nil {
-						log.Errorf("commit error: %s", err)
+						log.Errorf("hookcolor error: %s", err)
 					}
 				}()
 			}
 
-			// insert
-			if err := utils.RetryWithExpBackOff(func() error {
-				return tx.Commit().Error
-			}); err != nil {
-				log.Errorf("commit error: %s", err)
-			}
-			close(inserted)
-
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
-			if err != nil {
-				log.Errorf("create / save httpflow from mirror error: %s", err)
-				flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
-				tx.Rollback()
-			}
 		}
 
 		// 存储KV，将flow ID作为key，bare request和bare response作为value

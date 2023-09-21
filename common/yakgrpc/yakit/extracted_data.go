@@ -79,7 +79,7 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func SaveExtractedDataFromHTTPFlow(db *gorm.DB, flowHash string, ruleName string, data string, regexpStr ...string) error {
+func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, data string, regexpStr ...string) *ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
@@ -91,7 +91,7 @@ func SaveExtractedDataFromHTTPFlow(db *gorm.DB, flowHash string, ruleName string
 		RuleVerbose: ruleName,
 		Data:        data,
 	}
-	return CreateOrUpdateExtractedData(db, -1, extractData)
+	return extractData
 }
 
 func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *ExtractedData {
