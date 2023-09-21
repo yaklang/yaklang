@@ -45,6 +45,43 @@ func IsChunkedHeaderLine(line string) bool {
 	return false
 }
 
+func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
+	var buf bytes.Buffer
+	var header []string
+	var (
+		isChunked = false
+	)
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return packet
+	}
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			buf.WriteString(method + " " + parsed.RequestURI() + " " + proto)
+			buf.WriteString(CRLF)
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			if IsHeader(line, "Host") {
+				line = fmt.Sprintf("Host: %s", parsed.Host)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
 // ReplaceHTTPPacketFirstLine replace http packet first line
 // enable for request and response all
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
