@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/consts"
@@ -387,7 +388,7 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
 		var replacedValue []string
-		if govalidator.IsIn(value) {
+		if govalidator.IsInt(value) {
 			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
 		}
 		if govalidator.IsFloat(value) {
