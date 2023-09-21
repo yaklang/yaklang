@@ -1,8 +1,11 @@
 package lowhttp
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/url"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -12,7 +15,27 @@ var (
 	javaScriptRedirect = regexp.MustCompile(`(?i)window\.location(.href)?\s*?=\s*?["']?([^\s^'^"]+)["']?`)
 )
 
-func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) string {
+func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) (result string) {
+	defer func() {
+		if len(result) == 0 {
+			return
+		}
+		testURL := result
+		if !strings.HasPrefix(result, "http://") && !strings.HasPrefix(result, "https://") {
+			if !strings.HasPrefix(result, "/") {
+				result = "/" + result
+			}
+			testURL = fmt.Sprintf("http://127.0.0.1%s", result)
+		}
+		u, err := url.Parse(testURL)
+		if err != nil {
+			result = ""
+		}
+		if len(u.Host) == 0 {
+			result = ""
+		}
+	}()
+
 	lines := utils.ParseStringToLines(string(rawResponse))
 	if lines == nil {
 		return ""
@@ -28,15 +51,15 @@ func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) string {
 		return ""
 	}
 
-	res := htmlRedirect.FindSubmatch(rawResponse)
-	if len(res) > 1 {
-		return string(res[1])
+	matched := htmlRedirect.FindSubmatch(rawResponse)
+	if len(matched) > 1 {
+		return string(matched[1])
 	}
 
 	if jsRedirect {
-		res = javaScriptRedirect.FindSubmatch(rawResponse)
-		if len(res) > 2 {
-			return string(res[2])
+		matched = javaScriptRedirect.FindSubmatch(rawResponse)
+		if len(matched) > 2 {
+			return string(matched[2])
 		}
 	}
 
