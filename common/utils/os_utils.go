@@ -198,11 +198,17 @@ func DebugMockTCPHandlerFuncContext(ctx context.Context, handlerFunc handleTCPFu
 	}()
 	go func() {
 		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				log.Errorf("mock tcp server accept failed: %v", err)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				conn, err := lis.Accept()
+				if err != nil {
+					log.Errorf("mock tcp server accept failed: %v", err)
+					return
+				}
+				go handlerFunc(ctx, lis, conn)
 			}
-			go handlerFunc(ctx, lis, conn)
 		}
 	}()
 
