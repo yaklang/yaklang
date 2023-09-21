@@ -184,7 +184,6 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 
 func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit.HTTPFlow) {
 	flow.AddTag(extraTag...)
-
 	log.Debugf("set color[%v] for %v", s, flow.Url)
 	switch strings.ToLower(s) {
 	case "red":
@@ -206,11 +205,20 @@ func stringForSettingColor(db *gorm.DB, s string, extraTag []string, flow *yakit
 	default:
 		flow.Red()
 	}
-	for i := 0; i < 3; i++ {
-		err := yakit.UpdateHTTPFlowTags(db, flow)
-		if err != nil {
-			log.Errorf("update flow tags failed: %v", err)
+
+	lock, ok := db.Get("lock")
+	if ok {
+		lock, ok := lock.(*sync.Mutex)
+		if ok {
+			lock.Lock()
+			defer lock.Unlock()
 		}
+	}
+
+	if err := utils.Retry(3, func() error {
+		return yakit.UpdateHTTPFlowTags(db, flow)
+	}); err != nil {
+		log.Errorf("update http flow tags failed: %v", err)
 	}
 }
 
