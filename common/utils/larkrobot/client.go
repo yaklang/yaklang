@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"strconv"
 
 	"time"
+
+	uuid "github.com/satori/go.uuid"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 // Client feishu robot client
@@ -19,14 +22,15 @@ type Client struct {
 	Webhook string
 	// Secret robot secret
 	Secret string
-	client *resty.Client
+	// session id
+	SessionID string
 }
 
 // NewClient create Client
 func NewClient(webhook string) *Client {
 	return &Client{
-		client:  resty.New(),
-		Webhook: webhook,
+		SessionID: uuid.NewV4().String(),
+		Webhook:   webhook,
 	}
 }
 
@@ -70,18 +74,33 @@ func (c *Client) SendMessageStrByUrl(url, message string) (*Response, error) {
 	return c.send(url, body)
 }
 func (c *Client) send(url string, body interface{}) (*Response, error) {
-	resp, err := c.client.R().
-		SetHeader("Accept", "application/json").
-		SetHeader("Content-Type", "application/json").
-		SetResult(&Response{}).
-		ForceContentType("application/json").
-		SetBody(body).
-		Post(url)
+	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("larkrobot send error: json.Marshal error: %v", err)
 	}
-	result := resp.Result().(*Response)
-	return result, err
+
+	req := lowhttp.BasicRequest()
+	req = lowhttp.SetHTTPPacketUrl(req, url)
+	req = lowhttp.ReplaceHTTPPacketMethod(req, "POST")
+	req = lowhttp.ReplaceHTTPPacketHeader(req, "Accept", "application/json")
+	req = lowhttp.ReplaceHTTPPacketHeader(req, "Content-Type", "application/json")
+	req = lowhttp.ReplaceHTTPPacketBody(req, bodyBytes, false)
+	resp, err := lowhttp.HTTP(lowhttp.WithRequest(req))
+	if err != nil {
+		return nil, utils.Errorf("larkrobot send error: http error: %v", err)
+	}
+	statusCode := lowhttp.GetStatusCodeFromResponse(resp.RawPacket)
+	if statusCode != 200 {
+		return nil, utils.Errorf("larkrobot send error: http status code: %v", statusCode)
+	}
+
+	respBodyBytes := lowhttp.GetHTTPPacketBody(resp.RawPacket)
+	var result Response
+	err = json.Unmarshal(respBodyBytes, &result)
+	if err != nil {
+		return nil, utils.Errorf("larkrobot send error: json.Unmarshal error: %v", err)
+	}
+	return &result, nil
 }
 func (c *Client) GenSign(secret string, timestamp int64) (string, error) {
 	//timestamp + key 做sha256, 再进行base64 encode
