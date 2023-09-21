@@ -39,7 +39,6 @@ require (
 	github.com/go-ldap/ldap v3.0.3+incompatible
 	github.com/go-pg/pg/v10 v10.9.1
 	github.com/go-redis/redis/v8 v8.8.2
-	github.com/go-resty/resty/v2 v2.7.0
 	github.com/go-rod/rod v0.108.1
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobwas/glob v0.2.3
