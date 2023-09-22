@@ -269,7 +269,7 @@ func (g *Group) consumeMain() {
 				case packetFrame := <-g.frameChan:
 					for _, matcher := range g.OrdinaryMatcher {
 						if matcher.MatchPackage(packetFrame) {
-							g.onMatchedCallback(packetFrame, matcher.rule)
+							g.onMatchedCallback(packetFrame, matcher.matcher.Rule)
 						}
 					}
 					g.wg.Done()
@@ -283,7 +283,7 @@ func (g *Group) consumeMain() {
 					for _, matcher := range g.HTTPMatcher {
 						for _, pkg := range pkgs {
 							if matcher.MatchPackage(pkg) {
-								g.onMatchedCallback(pkg, matcher.rule)
+								g.onMatchedCallback(pkg, matcher.matcher.Rule)
 							}
 						}
 					}
