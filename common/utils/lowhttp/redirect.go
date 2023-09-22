@@ -23,7 +23,7 @@ func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) (result st
 		testURL := result
 		if !strings.HasPrefix(result, "http://") && !strings.HasPrefix(result, "https://") {
 			if !strings.HasPrefix(result, "/") {
-				result = "/" + result
+				testURL = "/" + result
 			}
 			testURL = fmt.Sprintf("http://127.0.0.1%s", result)
 		}
