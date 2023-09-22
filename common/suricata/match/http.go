@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"golang.org/x/exp/slices"
 	"io"
 	"math/rand"
 	"net/http"
@@ -110,7 +109,7 @@ func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
 	return packets
 }
 
-func httpIniter(c *matchContext) error {
+func httpParser(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return nil
 	}
@@ -121,75 +120,38 @@ func httpIniter(c *matchContext) error {
 		return nil
 	}
 
-	// prefilter
-	if c.Rule.ContentRuleConfig.PrefilterRule != nil {
-		// keyword prefilter not implement yet
-	}
-
 	// register buffer provider
 	c.SetBufferProvider(provider.Get)
+	c.Value["data"] = provider.Parsed()
+	c.Value["isReq"] = provider.GetRequest() != nil
 
-	// fast pattern
-	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
-		return rule.FastPattern
-	})
-	if idx != -1 {
-		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
-		if fastPatternRule.Modifier == modifier.FileData {
-			// filedata has its individual matcher
-			c.Attach(newFileDataMatcher(fastPatternRule, provider.Parsed()))
-		} else {
-			c.Attach(
-				newPayloadMatcher(
-					fastPatternCopy(fastPatternRule),
-					fastPatternRule.Modifier),
-			)
-		}
-		err := c.Next()
-		if c.IsRejected() {
-			return err
-		}
-	}
-	// http match
-	var err error
-	if provider.GetRequest() != nil {
-		err = httpReqMatcher(c, provider)
-	} else {
-		err = httpResMatcher(c, provider)
-	}
-	if c.IsRejected() {
-		return err
-	}
-
-	// payload match
-	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
-		if r.Modifier == modifier.FileData {
-			// filedata has its individual matcher
-			resp := provider.GetResponse()
-			if !c.Must(resp != nil) {
-				return nil
-			}
-			c.Attach(newFileDataMatcher(r, resp))
-		} else {
-			c.Attach(newPayloadMatcher(r, r.Modifier))
-		}
-	}
 	return nil
 }
 
-func httpReqMatcher(c *matchContext, spliter *httpProvider) error {
+func attachHTTPMatcher(c *matchContext) {
+	// http match
+	if isreq, ok := c.Value["isReq"].(bool); ok && isreq {
+		c.Attach(httpReqMatcher)
+	} else {
+		// suricata 文档没有 http resp 的非 sticky modifier
+		// c.Attach(httpResMatcher)
+	}
+}
+
+func httpReqMatcher(c *matchContext) error {
 	if cf := c.Rule.ContentRuleConfig.HTTPConfig; cf != nil {
 		if cf.Uricontent != "" {
 			log.Errorf("uricontent has been deprecated and not implemented yet")
 		}
-		if !c.Must(cf.Urilen.Match(len(spliter.Get(modifier.HTTPUri)))) {
+		if !c.Must(cf.Urilen.Match(len(c.GetBuffer(modifier.HTTPUri)))) {
 			return nil
 		}
 	}
 	return nil
 }
 
-func httpResMatcher(c *matchContext, spliter *httpProvider) error {
+func httpResMatcher(_ *matchContext) error {
+	// 没有需要匹配的
 	return nil
 }
 
