@@ -217,7 +217,7 @@ fn abc(p1,p2,p3...){}
 */
 anonymousFunctionDecl
     : Func functionNameDecl? '(' functionParamDecl? ')'  block
-    | ('('  functionParamDecl? ')' | Identifier ) '=>' (expression | block)
+    | ('('  functionParamDecl? ')' | Identifier ) '=>' (block | expression)
     ;
 
 functionNameDecl: Identifier;

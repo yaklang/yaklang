@@ -3827,3 +3827,9 @@ f1()// 2
 		}
 	})
 }
+
+func TestFixEmptyAnonymousFuncReturn(t *testing.T) {
+	code := `a = () => {}
+assert a() == nil`
+	_marshallerTest(code)
+}
