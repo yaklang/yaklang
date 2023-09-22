@@ -6,11 +6,9 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
-	"github.com/yaklang/yaklang/common/suricata/rule"
-	"golang.org/x/exp/slices"
 )
 
-func tcpIniter(c *matchContext) error {
+func tcpParser(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return nil
 	}
@@ -24,26 +22,6 @@ func tcpIniter(c *matchContext) error {
 	// register buffer provider
 	c.SetBufferProvider(provider)
 
-	// fast pattern
-	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
-		return rule.FastPattern
-	})
-	if idx != -1 {
-		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
-		c.Attach(
-			newPayloadMatcher(
-				fastPatternCopy(fastPatternRule),
-				fastPatternRule.Modifier),
-		)
-	}
-
-	// tcp match
-	c.Attach(tcpCfgMatch)
-
-	// payload match
-	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
-		c.Attach(newPayloadMatcher(r, r.Modifier))
-	}
 	return nil
 }
 
