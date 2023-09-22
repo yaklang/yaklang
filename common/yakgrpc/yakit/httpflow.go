@@ -485,7 +485,7 @@ func (f *HTTPFlow) CalcHash() string {
 }
 
 func (f *HTTPFlow) CalcCacheHash(full bool) string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
+	return utils.CalcSha1(f.ID, f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
 }
 
 func (f *HTTPFlow) BeforeSave() error {
@@ -938,7 +938,7 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800
 		// max response size is 500K -> 500 * 1024 -> 512000
-		db = db.Select(`id,created_at,updated_at, -- basic gorm fields
+		db = db.Select(`id,created_at,updated_at,hidden_index, -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
 
 -- metainfo
