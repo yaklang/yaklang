@@ -47,8 +47,7 @@ func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
 		return false
 	}
 
-	m.matcher.Match(pk)
-	return !m.matcher.rejected
+	return m.matcher.Match(pk)
 }
 
 type matchHandler func(*matchContext) error
@@ -79,6 +78,9 @@ type matchContext struct {
 
 func (c *matchContext) Clone() *matchContext {
 	return &matchContext{
+		Value:    make(map[string]any),
+		pos:      -1,
+		buffer:   make(map[modifier.Modifier][]byte),
 		Rule:     c.Rule,
 		workflow: c.workflow,
 	}
@@ -111,7 +113,6 @@ func (c *matchContext) Insert(handler ...matchHandler) {
 func (c *matchContext) Next() error {
 	c.pos++
 	defer func() {
-		c.workflow = c.workflow[:c.pos]
 		c.pos--
 	}()
 	if c.rejected || c.pos >= len(c.workflow) {
@@ -135,7 +136,7 @@ func (c *matchContext) Tidy() {
 	c.PK = nil
 	c.provider = nil
 	c.buffer = make(map[modifier.Modifier][]byte)
-	c.pos = 0
+	c.pos = -1
 	c.rejected = false
 	c.prevMatched = nil
 	c.prevModifier = modifier.Default
