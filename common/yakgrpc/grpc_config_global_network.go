@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -82,6 +83,25 @@ func loadConfig(c *ypb.GlobalNetworkConfig) {
 		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
 		netx.WithDNSServers(c.CustomDNSServers...),
 	)
+
+	for _, certs := range c.GetClientCertificates() {
+		if len(certs.GetPkcs12Bytes()) > 0 {
+			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))
+			if err != nil {
+				log.Errorf("load p12 bytes failed: %s", err)
+			}
+		} else {
+			p12bytes, err := tlsutils.BuildP12(certs.GetCrtPem(), certs.GetKeyPem(), "", certs.GetCaCertificates()...)
+			if err != nil {
+				log.Errorf("build p12 bytes failed: %s", err)
+				continue
+			}
+			err = netx.LoadP12Bytes(p12bytes, "")
+			if err != nil {
+				log.Errorf("load p12 bytes failed: %s", err)
+			}
+		}
+	}
 }
 
 func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalNetworkConfigRequest) (*ypb.GlobalNetworkConfig, error) {

@@ -650,6 +650,9 @@ message GlobalNetworkConfig {
   bool DNSFallbackTCP = 3;
   bool DNSFallbackDoH = 4;
   repeated string CustomDoHServers = 5;
+
+  // certificates
+  repeated Certificate ClientCertificates = 6;
 }
 
 message DiagnoseNetworkRequest {
