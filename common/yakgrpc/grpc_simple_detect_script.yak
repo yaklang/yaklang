@@ -335,12 +335,12 @@ if excludeHosts != "" {
 }
 
 HostAliveFile = ""
+aliveHostCount = 0
 if !skippedHostAliveScan && recordPtr == 0 {
     yakit.Info("开始探测存活~")
     hostRaw, _ = file.ReadFile(targetFiles)
     hosts = str.ReplaceAll(string(hostRaw), "\n", ",")
 
-    aliveHostCount = 0
     ScanHostCount = 0
     showAliveHostCount = func() {
         yakit.StatusCard("存活主机数/扫描主机数", f"${aliveHostCount}/${ScanHostCount}")
@@ -413,7 +413,7 @@ updateProgress = func(delta) {
         portResultFinalTotal = totalTasks
     }
     yakit.Info(
-        "已出结果 %v",
+        "Curr Progress %v",
         sprintf(
             "%v/%v/%.3f",
             portResultFinalTotal,
@@ -425,150 +425,152 @@ updateProgress = func(delta) {
 
 }
 
-bruteScan = func(result) {
-    bruteType = ""
-    if result.GetServiceName() == "exasoftport1" {
-        return
-    }
-    for _, bt := range brute.GetAvailableBruteTypes() {
-        if result.GetServiceName().Lower().Contains(bt) || bt.Contains(result.GetServiceName().Lower()) {
-            bruteType = bt
-            break
-        }
-
-    }
-
-    if bruteType == "" {
-        return
-    }
-
-    defaultusers = []
-    defaultpass = []
-
-    if bruteType == "ftp" {
-        defaultusers = ["ftp", "www", "anonymous", "admin"]
-        defaultpass = ["admin", "admin123", "123456"]
-    } else if bruteType == "memcached" {
-        defaultusers = ["root", "admin"]
-        defaultpass = ["root", "123456"]
-    } else if bruteType == "mongodb" {
-        defaultusers = ["root", "admin", "mongodb"]
-        defaultpass = ["root", "admin123", "root@123", "123456"]
-    } else if bruteType == "mssql" {
-        defaultusers = ["root", "admin", "mssql"]
-        defaultpass = ["root", "admin123", "root@123", "admin", "123456"]
-    } else if bruteType == "mysql" {
-        defaultusers = ["mysql", "root", "admin"]
-        defaultpass = ["root", "123456", "admin123", "admin", "root@123"]
-    } else if bruteType == "postgres" {
-        defaultusers = ["postgres", "root", "admin"]
-        defaultpass = ["root", "admin", "123456"]
-    } else if bruteType == "rdp" {
-        defaultusers = ["admin", "administrator", "root", "guest"]
-        defaultpass = ["administrator", "guest", "admin", "123456"]
-    } else if bruteType == "redis" {
-        defaultusers = ["redis"]
-        defaultpass = ["redis", "123456"]
-    } else if bruteType == "smb" {
-        defaultusers = ["administrator", "admin", "test", "guest", "system", "root", "sa"]
-        defaultpass = ["admin123!@#", "admin", "admin123", "admin@123", "admin#123", "123456", "root@123"]
-    } else if bruteType == "snmp" {
-        defaultusers = ["snmp"]
-        defaultpass = ["public", "private", "0", "0392a0", "1234", "2read", "4changes"]
-    } else if bruteType == "ssh" {
-        defaultusers = ["root", "admin"]
-        defaultpass = ["root", "admin123", "root@123", "123456", "admin", "admin@123"]
-    } else if bruteType == "telnet" {
-        defaultusers = ["root", "admin"]
-        defaultpass = ["root", "admin123", "root@123", "123456", "admin", "admin@123"]
-    } else if bruteType == "tomcat" {
-        defaultusers = ["manager", "tomcat"]
-        defaultpass = ["tomcat", "manager"]
-    } else if bruteType == "vnc" {
-        defaultusers = ["vnc"]
-        defaultpass = ["123456", "admin", "root"]
-    }
-
-
-    uL = make([]string)
-    pL = make([]string)
-
-    if (replaceDefaultUsernameDict) {
-        uL = append(uL, defaultusers...)
-    }
-
-
-    if (replaceDefaultPasswordDict) {
-        pL = append(pL, defaultpass...)
-    }
-
-    bruteTasks := len(uL) * len(pL) // 计算爆破任务数量
-    totalTasks += bruteTasks // 将爆破任务数量添加到总任务数中
-
-
-    addr := str.HostPort(result.Target, result.Port)
-    yakit.Info("Start Load Bruter for %s: %s", bruteType, addr)
-
-    instance, err := brute.New(
-        string(bruteType),
-        brute.userList(append(userdefinedUsernameList, uL...)...),
-        brute.passList(append(userdefinedPasswordList, pL...)...),
-        brute.debug(true),
-        brute.okToStop(okToStop),
-        bruteOpt...,
-    )
-    if err != nil {
-        yakit.Error(
-            "构建弱口令与未授权扫描失败：%v",
-            err,
-        )
-        return
-    }
-
-
-    res, err := instance.Start(addr)
-    if err != nil {
-        yakit.Error("输入目标失败：%v", err)
-        return
-    }
-
-
-    riskTarget = addr
-
-    for rt = range res {
-        yakit.Info("rt string %v ", rt.String())
-        updateProgress(1) // 更新进度
-        if rt == nil {
-            continue
-        }
-
-
-        if !rt.Ok {
-            continue
-        }
-
-        risk.NewRisk(
-            riskTarget,
-            risk.severity("high"),
-            risk.type("weak-pass"),
-            risk.typeVerbose("弱口令"),
-            risk.description("网站管理、运营人员由于安全意识不足，为了方便、避免忘记密码等，使用了非常容易记住的密码，或者是直接采用了系统的默认密码等。攻击者利用此漏洞可直接进入应用系统或者管理系统，从而进行系统、网页、数据的篡改与删除，非法获取系统、用户的数据，甚至可能导致服务器沦陷。"),
-            risk.solution("用户层面 : 不要使用常见的弱口令作为密码,不要多个系统或者社交账号使用同一套密码,定期修改密码,建议使用包含随机值的或者随机生成的字符串作为系统密码"),
-            risk.title(sprintf(
-                "Weak Password[%v]：%v user(%v) pass(%v)",
-                rt.Type,
-                rt.Target,
-                rt.Username,
-                rt.Password,
-            )),
-            risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", rt.Type, rt.Target, rt.Username, rt.Password)),
-            risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}),
-        )
-    }
-
-}
-
 bruteWg = sync.NewSizedWaitGroup(10)
+
+bruteScan = func(result) {
+    go func {
+        defer bruteWg.Done()
+        bruteType = ""
+        if result.GetServiceName() == "exasoftport1" {
+            return
+        }
+        for _, bt := range brute.GetAvailableBruteTypes() {
+            if result.GetServiceName().Lower().Contains(bt) || bt.Contains(result.GetServiceName().Lower()) {
+                bruteType = bt
+                break
+            }
+
+        }
+
+        if bruteType == "" {
+            return
+        }
+
+        defaultusers = []
+        defaultpass = []
+
+        if bruteType == "ftp" {
+            defaultusers = ["ftp", "www", "anonymous", "admin"]
+            defaultpass = ["admin", "admin123", "123456"]
+        } else if bruteType == "memcached" {
+            defaultusers = ["root", "admin"]
+            defaultpass = ["root", "123456"]
+        } else if bruteType == "mongodb" {
+            defaultusers = ["root", "admin", "mongodb"]
+            defaultpass = ["root", "admin123", "root@123", "123456"]
+        } else if bruteType == "mssql" {
+            defaultusers = ["root", "admin", "mssql"]
+            defaultpass = ["root", "admin123", "root@123", "admin", "123456"]
+        } else if bruteType == "mysql" {
+            defaultusers = ["mysql", "root", "admin"]
+            defaultpass = ["root", "123456", "admin123", "admin", "root@123"]
+        } else if bruteType == "postgres" {
+            defaultusers = ["postgres", "root", "admin"]
+            defaultpass = ["root", "admin", "123456"]
+        } else if bruteType == "rdp" {
+            defaultusers = ["admin", "administrator", "root", "guest"]
+            defaultpass = ["administrator", "guest", "admin", "123456"]
+        } else if bruteType == "redis" {
+            defaultusers = ["redis"]
+            defaultpass = ["redis", "123456"]
+        } else if bruteType == "smb" {
+            defaultusers = ["administrator", "admin", "test", "guest", "system", "root", "sa"]
+            defaultpass = ["admin123!@#", "admin", "admin123", "admin@123", "admin#123", "123456", "root@123"]
+        } else if bruteType == "snmp" {
+            defaultusers = ["snmp"]
+            defaultpass = ["public", "private", "0", "0392a0", "1234", "2read", "4changes"]
+        } else if bruteType == "ssh" {
+            defaultusers = ["root", "admin"]
+            defaultpass = ["root", "admin123", "root@123", "123456", "admin", "admin@123"]
+        } else if bruteType == "telnet" {
+            defaultusers = ["root", "admin"]
+            defaultpass = ["root", "admin123", "root@123", "123456", "admin", "admin@123"]
+        } else if bruteType == "tomcat" {
+            defaultusers = ["manager", "tomcat"]
+            defaultpass = ["tomcat", "manager"]
+        } else if bruteType == "vnc" {
+            defaultusers = ["vnc"]
+            defaultpass = ["123456", "admin", "root"]
+        }
+
+
+        uL = make([]string)
+        pL = make([]string)
+
+        if (replaceDefaultUsernameDict) {
+            uL = append(uL, defaultusers...)
+        }
+
+
+        if (replaceDefaultPasswordDict) {
+            pL = append(pL, defaultpass...)
+        }
+
+        bruteTasks := len(uL) * len(pL) // 计算爆破任务数量
+        totalTasks += bruteTasks // 将爆破任务数量添加到总任务数中
+
+
+        addr := str.HostPort(result.Target, result.Port)
+        yakit.Info("Start Load Bruter for %s: %s", bruteType, addr)
+
+        instance, err := brute.New(
+            string(bruteType),
+            brute.userList(append(userdefinedUsernameList, uL...)...),
+            brute.passList(append(userdefinedPasswordList, pL...)...),
+            brute.debug(true),
+            brute.okToStop(okToStop),
+            bruteOpt...,
+        )
+        if err != nil {
+            yakit.Error(
+                "构建弱口令与未授权扫描失败：%v",
+                err,
+            )
+            return
+        }
+
+
+        res, err := instance.Start(addr)
+        if err != nil {
+            yakit.Error("输入目标失败：%v", err)
+            return
+        }
+
+
+        riskTarget = addr
+
+        for rt = range res {
+            yakit.Info("rt string %v ", rt.String())
+            updateProgress(1) // 更新进度
+            if rt == nil {
+                continue
+            }
+
+
+            if !rt.Ok {
+                continue
+            }
+
+            risk.NewRisk(
+                riskTarget,
+                risk.severity("high"),
+                risk.type("weak-pass"),
+                risk.typeVerbose("弱口令"),
+                risk.description("网站管理、运营人员由于安全意识不足，为了方便、避免忘记密码等，使用了非常容易记住的密码，或者是直接采用了系统的默认密码等。攻击者利用此漏洞可直接进入应用系统或者管理系统，从而进行系统、网页、数据的篡改与删除，非法获取系统、用户的数据，甚至可能导致服务器沦陷。"),
+                risk.solution("用户层面 : 不要使用常见的弱口令作为密码,不要多个系统或者社交账号使用同一套密码,定期修改密码,建议使用包含随机值的或者随机生成的字符串作为系统密码"),
+                risk.title(sprintf(
+                    "Weak Password[%v]：%v user(%v) pass(%v)",
+                    rt.Type,
+                    rt.Target,
+                    rt.Username,
+                    rt.Password,
+                )),
+                risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", rt.Type, rt.Target, rt.Username, rt.Password)),
+                risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}),
+            )
+        }
+    }
+}
 
 handleServiceScanResult = func(result) {
     if !onlyBrute {
@@ -576,14 +578,11 @@ handleServiceScanResult = func(result) {
     }
 
     if enableBrute  && len(result.GetServiceName()) != 0 {
-        bruteWg.Add()
-        go func {
-            defer bruteWg.Done()
+        serviceName = result.GetServiceName()
+        yakit.Info("Start Brute for %s-%s:%d", serviceName, result.Target, result.Port)
+        bruteScan(result)
+        yakit.Info("End Brute for %s-%s:%d", serviceName, result.Target, result.Port)
 
-            serviceName = result.GetServiceName()
-            yakit.Info("Start Brute for %s-%s:%d", serviceName, result.Target, result.Port)
-            bruteScan(result)
-        }
     }
 
 }
@@ -613,7 +612,7 @@ addOpenPortCount = func() {
     OpenPortCount++
     yakit.StatusCard("开放端口数/已扫主机数", f"${OpenPortCount}/${ScanHostCount}")
     if skippedHostAliveScan {
-        aliveHostCount = len(aliveHostCountList)
+        aliveHostCount := len(aliveHostCountList)
         yakit.StatusCard("存活主机数/扫描主机数", f"${aliveHostCount}/${ScanHostCount}")
     }
 
@@ -740,6 +739,7 @@ swg.Wait()
 yakit.SetProgress(0.94)
 
 go fn {
+    yakit.Info("Start Vuln Check...")
     for {
         yakit.Info("漏洞检测中...")
         sleep(3)
@@ -749,15 +749,31 @@ go fn {
         sleep(3)
     }
 }
-// 定时器，超过一定时间，就扫描结束
-ticker := time.NewTicker(1*60*15)
-for t := range ticker.C {
-    yakit.SetProgress(1)
-    yakit.Info("本次扫描任务已完成。")
-    os.Exit(0)
+
+hostCountSec = 0
+if aliveHostCount != 0  {
+    hostCountSec = aliveHostCount
+}else {
+    hostCountSec = len(aliveHostCountList)
+}
+
+if hostCountSec != 0 {
+    // 根据存活 ip + (加载成功的插件数 * 2s)/concurrent  + 开放端口数
+    // 定时器，超过一定时间，就扫描结束
+    waitTimeSec = hostCountSec + (loadPluginFinished * 2)/20 + OpenPortCount
+    yakit.Info("waitTimeSec %v", waitTimeSec)
+    ticker := time.NewTicker(waitTimeSec)
+    go func(ticker) {
+        for t := range ticker.C {
+            yakit.SetProgress(1)
+            yakit.Info("ticker 本次扫描任务已完成。")
+            os.Exit(0)
+        }
+    }(ticker)
 }
 
 bruteWg.Wait()
+yakit.Info("brute end success!")
 manager.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
