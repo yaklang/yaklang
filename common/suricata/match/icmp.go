@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
-	"github.com/yaklang/yaklang/common/suricata/rule"
-	"golang.org/x/exp/slices"
 )
 
 // match icmp
-func icmpIniter(c *matchContext) error {
+func icmpParser(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return nil
 	}
@@ -30,28 +28,6 @@ func icmpIniter(c *matchContext) error {
 		}
 		return nil
 	})
-
-	// fast pattern
-	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
-		return rule.FastPattern
-	})
-	if idx != -1 {
-		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
-		c.Attach(newPayloadMatcher(fastPatternCopy(fastPatternRule), fastPatternRule.Modifier))
-		err := c.Next()
-		if c.IsRejected() {
-			return err
-		}
-	}
-
-	// icmp match
-	c.Attach(icmpCfgMatch)
-
-	// payload match
-	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
-		c.Attach(newPayloadMatcher(r, r.Modifier))
-	}
-
 	return nil
 }
 

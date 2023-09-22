@@ -10,9 +10,14 @@ import (
 )
 
 // untested
-func newFileDataMatcher(r *rule.ContentRule, data any) func(c *matchContext) error {
+func newFileDataMatcher(r *rule.ContentRule) func(c *matchContext) error {
 	return func(c *matchContext) error {
 		// 10 MB
+		data := c.Value["data"]
+		if !c.Must(data != nil) {
+			return nil
+		}
+
 		var files []io.Reader
 		switch data := data.(type) {
 		case *http.Request:
@@ -44,20 +49,20 @@ func newFileDataMatcher(r *rule.ContentRule, data any) func(c *matchContext) err
 			return errors.New("unknown type for filedata matcher")
 		}
 
+		// todo: use individual matchContext and remove c.Recover()
 		for _, f := range files {
 			all, err := io.ReadAll(f)
 			c.SetBuffer(modifier.FileData, all)
 			if !c.Must(err == nil) {
 				return nil
 			}
-			c.Insert(newPayloadMatcher(r, modifier.FileData))
-			c.Recover()
-			if err := c.Next(); err == nil {
+			if err := newPayloadMatcher(r, modifier.FileData)(c); err != nil {
 				return err
 			}
 			if !c.IsRejected() {
 				return nil
 			}
+			c.Recover()
 		}
 		c.Reject()
 		return nil

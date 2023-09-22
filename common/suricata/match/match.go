@@ -1,6 +1,7 @@
 package match
 
 import (
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -45,12 +46,8 @@ func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
 		return false
 	}
 
-	matcher := newMatchCtx(pk, m.rule, matchMutex)
-	err := matcher.Next()
-	if err != nil {
-		log.Errorf("match flow failed: %s", err.Error())
-		return false
-	}
+	matcher := compile(m.rule)
+	matcher.match(pk)
 	return !matcher.rejected
 }
 
@@ -122,32 +119,59 @@ func (c *matchContext) Must(ok bool) bool {
 	return ok
 }
 
-func newMatchCtx(pk gopacket.Packet, r *rule.Rule, hs ...matchHandler) *matchContext {
-	return &matchContext{
-		Value:    make(map[string]any),
-		PK:       pk,
-		Rule:     r,
-		workflow: hs,
-		pos:      -1,
-		buffer:   make(map[modifier.Modifier][]byte),
+func compile(r *rule.Rule) *matchContext {
+	c := &matchContext{
+		Value:  make(map[string]any),
+		Rule:   r,
+		pos:    -1,
+		buffer: make(map[modifier.Modifier][]byte),
 	}
+
+	if err := matchMutex(c); err != nil {
+		log.Errorf("match mutex failed: %s", err.Error())
+	}
+
+	return c
+}
+
+func (c *matchContext) match(pk gopacket.Packet) bool {
+	c.PK = pk
+	err := c.Next()
+	if err != nil {
+		log.Errorf("match flow failed: %s", err.Error())
+		return false
+	}
+	return !c.rejected
 }
 
 func matchMutex(c *matchContext) error {
 	switch c.Rule.Protocol {
 	case protocol.DNS:
-		c.Attach(ipMatcher, portMatcher, dnsIniter)
+		c.Attach(ipMatcher, portMatcher, dnsParser)
+		attachFastPattern(c)
+		c.Attach(dnsMatcher)
+		attachPayloadMatcher(c)
 	case protocol.HTTP:
-		c.Attach(ipMatcher, portMatcher, httpIniter)
+		c.Attach(ipMatcher, portMatcher, httpParser)
+		attachFastPattern(c)
+		attachHTTPMatcher(c)
+		attachPayloadMatcher(c)
 	case protocol.TCP:
-		c.Attach(ipMatcher, portMatcher, tcpIniter)
+		c.Attach(ipMatcher, portMatcher, tcpParser)
+		attachFastPattern(c)
+		c.Attach(tcpCfgMatch)
+		attachPayloadMatcher(c)
 	case protocol.UDP:
-		c.Attach(ipMatcher, portMatcher, udpIniter)
+		c.Attach(ipMatcher, portMatcher, udpParser)
+		attachFastPattern(c)
+		attachPayloadMatcher(c)
 	case protocol.ICMP:
-		c.Attach(ipMatcher, icmpIniter)
+		c.Attach(ipMatcher, icmpParser)
+		attachFastPattern(c)
+		c.Attach(icmpCfgMatch)
+		attachPayloadMatcher(c)
 	default:
-		log.Errorf("unsupported protocol: %s", c.Rule.Protocol)
-		c.Reject()
+		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
 	}
 	return nil
 }

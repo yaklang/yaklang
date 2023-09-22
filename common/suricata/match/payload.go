@@ -167,3 +167,30 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 		return nil
 	}
 }
+
+func attachPayloadMatcher(c *matchContext) {
+	// register buffer provider
+	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
+		c.Attach(newPayloadMatcher(r, r.Modifier))
+	}
+}
+
+func attachFastPattern(c *matchContext) {
+	// fast pattern
+	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
+		return rule.FastPattern
+	})
+	if idx != -1 {
+		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
+		if fastPatternRule.Modifier == modifier.FileData {
+			// filedata has its individual matcher
+			c.Attach(newFileDataMatcher(fastPatternRule))
+		} else {
+			c.Attach(
+				newPayloadMatcher(
+					fastPatternCopy(fastPatternRule),
+					fastPatternRule.Modifier),
+			)
+		}
+	}
+}
