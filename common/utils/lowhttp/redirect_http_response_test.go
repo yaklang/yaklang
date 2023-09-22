@@ -170,7 +170,7 @@ window.location="aaa/bbbb"
 <script>
 `
 	r = GetRedirectFromHTTPResponse([]byte(packet), true)
-	if r != "/aaa/bbbb" {
+	if r != "aaa/bbbb" {
 		println(r)
 		test.FailNow("parse meta redirect failed")
 		return
@@ -178,7 +178,28 @@ window.location="aaa/bbbb"
 
 	url = MergeUrlFromHTTPRequest([]byte(`GET /bai HTTP/1.1
 Host: baidu.com`), r, false)
-	if url != "http://baidu.com/aaa/bbbb" {
+	if url != "http://baidu.com/bai/aaa/bbbb" {
+		test.FailNow("error for merge url")
+		return
+	}
+
+	packet = `HTTP/1.1 200 Per
+Set-Cookie: asdfasdfasdf
+
+<script>
+window.location="/ccc/ddd"
+<script>
+`
+	r = GetRedirectFromHTTPResponse([]byte(packet), true)
+	if r != "/ccc/ddd" {
+		println(r)
+		test.FailNow("parse meta redirect failed")
+		return
+	}
+
+	url = MergeUrlFromHTTPRequest([]byte(`GET /bai HTTP/1.1
+Host: baidu.com`), r, false)
+	if url != "http://baidu.com/ccc/ddd" {
 		test.FailNow("error for merge url")
 		return
 	}
