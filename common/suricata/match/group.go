@@ -36,8 +36,8 @@ type Group struct {
 	pkCache *ttlcache.Cache
 	loader  SuricataRuleLoaderType
 
-	HTTPMatcher     []*Matcher
-	OrdinaryMatcher []*Matcher
+	HTTPMatcher     []*sync.Pool
+	OrdinaryMatcher []*sync.Pool
 
 	// context
 	ctx    context.Context
@@ -94,9 +94,17 @@ func (g *Group) LoadRule(r *rule.Rule) {
 	matcher := New(r)
 	switch r.Protocol {
 	case "http":
-		g.HTTPMatcher = append(g.HTTPMatcher, matcher)
+		g.HTTPMatcher = append(g.HTTPMatcher, &sync.Pool{New: func() any {
+			return &Matcher{
+				matcher: matcher.matcher.Clone(),
+			}
+		}})
 	default:
-		g.OrdinaryMatcher = append(g.OrdinaryMatcher, matcher)
+		g.OrdinaryMatcher = append(g.HTTPMatcher, &sync.Pool{New: func() any {
+			return &Matcher{
+				matcher: matcher.matcher.Clone(),
+			}
+		}})
 	}
 }
 
@@ -267,10 +275,12 @@ func (g *Group) consumeMain() {
 			for {
 				select {
 				case packetFrame := <-g.frameChan:
-					for _, matcher := range g.OrdinaryMatcher {
+					for _, matcherpool := range g.OrdinaryMatcher {
+						matcher := matcherpool.Get().(*Matcher)
 						if matcher.MatchPackage(packetFrame) {
 							g.onMatchedCallback(packetFrame, matcher.matcher.Rule)
 						}
+						matcherpool.Put(matcher)
 					}
 					g.wg.Done()
 				case httpFlowInstance := <-g.httpRequest:
@@ -280,11 +290,13 @@ func (g *Group) consumeMain() {
 						g.wg.Done()
 						continue
 					}
-					for _, matcher := range g.HTTPMatcher {
+					for _, matcherpool := range g.HTTPMatcher {
 						for _, pkg := range pkgs {
+							matcher := matcherpool.Get().(*Matcher)
 							if matcher.MatchPackage(pkg) {
 								g.onMatchedCallback(pkg, matcher.matcher.Rule)
 							}
+							matcherpool.Put(matcher)
 						}
 					}
 					g.wg.Done()
