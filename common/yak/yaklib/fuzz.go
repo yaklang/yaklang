@@ -592,6 +592,7 @@ var FuzzExports = map[string]interface{}{
 	"HTTPRequest":        mutate.NewFuzzHTTPRequest,
 	"MustHTTPRequest":    mutate.NewMustFuzzHTTPRequest,
 	"https":              mutate.OptHTTPS,
+	"proxy":              mutate.OptProxy,
 	"UrlsToHTTPRequests": mutate.UrlsToHTTPRequests,
 	"UrlToHTTPRequest":   _urlToFuzzRequest,
 
