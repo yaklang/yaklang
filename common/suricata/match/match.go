@@ -9,15 +9,16 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"sync"
 )
 
 type Matcher struct {
-	rule *rule.Rule
+	matcher *matchContext
 }
 
 func New(r *rule.Rule) *Matcher {
 	return &Matcher{
-		r,
+		matcher: compile(r),
 	}
 }
 
@@ -46,9 +47,8 @@ func (m *Matcher) MatchPackage(pk gopacket.Packet) bool {
 		return false
 	}
 
-	matcher := compile(m.rule)
-	matcher.match(pk)
-	return !matcher.rejected
+	m.matcher.Match(pk)
+	return !m.matcher.rejected
 }
 
 type matchHandler func(*matchContext) error
@@ -56,6 +56,10 @@ type matchHandler func(*matchContext) error
 type bufferProvider func(modifier modifier.Modifier) []byte
 
 type matchContext struct {
+	// matcher is not thread safe, you'd best clone it before use.
+	// lock is used to protect the matcher from being used by multiple goroutines.
+	lock sync.Mutex
+
 	rejected bool
 	pos      int
 
@@ -71,6 +75,13 @@ type matchContext struct {
 	Rule *rule.Rule
 
 	workflow []matchHandler
+}
+
+func (c *matchContext) Clone() *matchContext {
+	return &matchContext{
+		Rule:     c.Rule,
+		workflow: c.workflow,
+	}
 }
 
 func (c *matchContext) Reject() {
@@ -119,6 +130,17 @@ func (c *matchContext) Must(ok bool) bool {
 	return ok
 }
 
+func (c *matchContext) Tidy() {
+	c.Value = make(map[string]any)
+	c.PK = nil
+	c.provider = nil
+	c.buffer = make(map[modifier.Modifier][]byte)
+	c.pos = 0
+	c.rejected = false
+	c.prevMatched = nil
+	c.prevModifier = modifier.Default
+}
+
 func compile(r *rule.Rule) *matchContext {
 	c := &matchContext{
 		Value:  make(map[string]any),
@@ -134,7 +156,10 @@ func compile(r *rule.Rule) *matchContext {
 	return c
 }
 
-func (c *matchContext) match(pk gopacket.Packet) bool {
+func (c *matchContext) Match(pk gopacket.Packet) bool {
+	c.lock.Lock()
+	c.Tidy()
+	defer c.lock.Unlock()
 	c.PK = pk
 	err := c.Next()
 	if err != nil {
