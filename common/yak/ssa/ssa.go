@@ -471,6 +471,7 @@ const (
 	OpLtEq  // <=
 	OpEq    // ==
 	OpNotEq // != <>
+	OpIn    //  a in b
 )
 
 // ----------- BinOp
