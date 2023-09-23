@@ -1,13 +1,40 @@
 package ssa
 
-func NewPhi(block *BasicBlock, variable string) *Phi {
+func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
 		anInstruction: newAnInstuction(block),
 		Edge:          make([]Value, 0, len(block.Preds)),
 		user:          make([]User, 0),
+		create:        create,
 	}
 	p.SetVariable(variable)
 	return p
+}
+
+func (b *BasicBlock) Sealed() {
+	for _, p := range b.inCompletePhi {
+		v := p.Build()
+		if i, ok := v.(*Object); ok && i.buildField != nil {
+			for _, user := range i.GetValues() {
+				if f, ok := user.(*Field); ok {
+					newf := i.buildField(f.Key.String())
+					ReplaceValue(f, newf)
+					DeleteInst(f)
+				}
+			}
+		} else if v == nil {
+			if p.GetParent().builder.CanBuildFreeValue(p.variable) {
+				v = p.GetParent().builder.BuildFreeValue(p.variable)
+				p.Replace(v)
+			} else {
+				un := NewUndefine(p.GetVariable(), p.Block)
+				EmitBefore(p.Block.LastInst(), un)
+				p.Replace(un)
+			}
+		}
+	}
+	b.inCompletePhi = nil
+	b.isSealed = true
 }
 
 func (phi *Phi) Name() string { return phi.GetVariable() }
@@ -26,7 +53,9 @@ func (phi *Phi) Build() Value {
 		phi.Func.SetReg(phi)
 		phi.Func.WriteSymbolTable(phi.GetVariable(), phi)
 	}
-	fixupUseChain(v)
+	if v != nil {
+		fixupUseChain(v)
+	}
 	return v
 }
 
