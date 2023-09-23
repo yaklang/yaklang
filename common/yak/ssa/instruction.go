@@ -95,13 +95,18 @@ func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) Value {
 	return v
 }
 
-func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
-	b := &UnOp{
+func NewUnOpOnly(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
+	u := &UnOp{
 		anInstruction: newAnInstuction(block),
 		Op:            op,
 		X:             x,
 		user:          []User{},
 	}
+	return u
+}
+
+func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) Value {
+	b := HandlerUnOp(NewUnOpOnly(op, x, block))
 	fixupUseChain(b)
 	return b
 }

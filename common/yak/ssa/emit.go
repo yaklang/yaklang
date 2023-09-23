@@ -12,7 +12,7 @@ func fixupUseChain(node Node) {
 	if u, ok := node.(User); ok {
 		for _, v := range u.GetValues() {
 			if !utils.IsNil(v) {
-				v.AddUser(u)
+				AddUser(v, u)
 			}
 		}
 	}
@@ -64,8 +64,10 @@ func (f *FunctionBuilder) EmitUndefine(name string) Value {
 
 func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 	u := NewUnOp(op, v, f.CurrentBlock)
-	fixupUseChain(u)
-	f.emit(u)
+	if u, ok := u.(*UnOp); ok {
+		fixupUseChain(u)
+		f.emit(u)
+	}
 	return u
 }
 
