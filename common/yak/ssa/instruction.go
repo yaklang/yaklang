@@ -83,7 +83,7 @@ func NewBinOpOnly(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 		Y:             y,
 		user:          []User{},
 	}
-	if op >= OpGt && op <= OpNotEq {
+	if op >= OpGt && op <= OpIn {
 		b.SetType(BasicTypes[Boolean])
 	}
 	// fixupUseChain(b)
