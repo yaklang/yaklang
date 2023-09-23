@@ -51,6 +51,9 @@ func getStrFlag(v Node, hasType bool) string {
 			if i == i.Func.symbol {
 				return i.Func.Name + "-symbol"
 			}
+			if i.buildField != nil {
+				return i.variable + "-extern"
+			}
 		}
 		if i, ok := v.(*Field); ok {
 			if i.OutCapture {
