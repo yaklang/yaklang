@@ -15,8 +15,7 @@ func (phi *Phi) Name() string { return phi.GetVariable() }
 func (phi *Phi) Build() Value {
 	phi.Block.Skip = true
 	for _, predBlock := range phi.Block.Preds {
-		// phi.Edge[i] = phi.Parent.readVariableByBlock(phi.variable, p)
-		v := phi.Func.builder.readVariableByBlock(phi.GetVariable(), predBlock)
+		v := phi.Func.builder.readVariableByBlock(phi.GetVariable(), predBlock, phi.create)
 		phi.Edge = append(phi.Edge, v)
 	}
 	phi.Block.Skip = false

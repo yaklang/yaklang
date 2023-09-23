@@ -3,7 +3,23 @@ package ssa
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
+
+func EmitInst(i Instruction) {
+	if index := slices.Index(i.GetBlock().Instrs, i); index != -1 {
+		return
+	}
+	if len(i.GetBlock().Instrs) == 0 {
+		b := i.GetBlock().Parent.builder
+		current := b.CurrentBlock
+		b.CurrentBlock = i.GetBlock()
+		b.emit(i)
+		b.CurrentBlock = current
+	} else {
+		EmitBefore(i.GetBlock().LastInst(), i)
+	}
+}
 
 func Insert(i Instruction, b *BasicBlock) {
 	b.Instrs = append(b.Instrs, i)
