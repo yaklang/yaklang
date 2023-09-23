@@ -18,6 +18,9 @@ func (prog *Program) Build(b Builder) {
 type FunctionBuilder struct {
 	*Function
 
+	// build sub-function
+	subFuncBuild []func()
+
 	target *target // for break and continue
 	// defer function call
 	deferexpr []*Call // defer funciton, reverse  for-range
@@ -37,6 +40,7 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
 		Function:     f,
 		target:       &target{},
+		subFuncBuild: make([]func(), 0),
 		deferexpr:    make([]*Call, 0),
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
@@ -79,6 +83,12 @@ func (b *FunctionBuilder) AddDefer(call *Call) {
 
 // finish current function builder
 func (b *FunctionBuilder) Finish() {
+	// fmt.Println("finsh func: ", b.Name)
+
+	// sub-function
+	for _, builder := range b.subFuncBuild {
+		builder()
+	}
 	// set defer function
 	b.CurrentBlock = b.Blocks[len(b.Blocks)-1]
 	for i := len(b.deferexpr) - 1; i >= 0; i-- {
@@ -95,8 +105,12 @@ func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
 	return backup
 }
 
-// function stack
+// sub-function builder
+func (b *FunctionBuilder) AddSubFunction(builder func()) {
+	b.subFuncBuild = append(b.subFuncBuild, builder)
+}
 
+// function stack
 func (b *FunctionBuilder) PushFunction(newfunc *Function) *FunctionBuilder {
 	build := NewBuilder(newfunc, b)
 	return build
