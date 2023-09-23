@@ -1250,14 +1250,17 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	defer recoverRange()
 
 	newfunc := b.Package.NewFunctionWithParent("", b.Function)
-	b.FunctionBuilder = b.PushFunction(newfunc)
+	buildFunc := func() {
+		b.FunctionBuilder = b.PushFunction(newfunc)
 
-	if block, ok := stmt.Block().(*yak.BlockContext); ok {
-		b.buildBlock(block)
+		if block, ok := stmt.Block().(*yak.BlockContext); ok {
+			b.buildBlock(block)
+		}
+
+		b.Finish()
+		b.FunctionBuilder = b.PopFunction()
 	}
-
-	b.Finish()
-	b.FunctionBuilder = b.PopFunction()
+	b.AddSubFunction(buildFunc)
 
 	return b.NewCall(newfunc, nil, false)
 }
@@ -1271,40 +1274,43 @@ func (b *astbuilder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDecl
 		funcName = name.GetText()
 	}
 	newfunc := b.Package.NewFunctionWithParent(funcName, b.Function)
-	b.FunctionBuilder = b.PushFunction(newfunc)
+	buildFunc := func() {
+		b.FunctionBuilder = b.PushFunction(newfunc)
 
-	if stmt.EqGt() != nil {
-		if stmt.LParen() != nil && stmt.RParen() != nil {
-			// has param
-			// stmt FunctionParamDecl()
+		if stmt.EqGt() != nil {
+			if stmt.LParen() != nil && stmt.RParen() != nil {
+				// has param
+				// stmt FunctionParamDecl()
+				if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
+					b.buildFunctionParamDecl(para)
+				}
+			} else {
+				// only this param
+				b.NewParam(stmt.Identifier().GetText())
+			}
+			if block, ok := stmt.Block().(*yak.BlockContext); ok {
+				// build block
+				b.buildBlock(block)
+			} else if expression, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+				// hanlder expression
+				v := b.buildExpression(expression)
+				b.EmitReturn([]ssa.Value{v})
+			} else {
+				b.NewError(ssa.Error, TAG, "BUG: arrow function need expression or block at least")
+			}
+		} else {
+			// this global function
 			if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
 				b.buildFunctionParamDecl(para)
 			}
-		} else {
-			// only this param
-			b.NewParam(stmt.Identifier().GetText())
+			if block, ok := stmt.Block().(*yak.BlockContext); ok {
+				b.buildBlock(block)
+			}
 		}
-		if block, ok := stmt.Block().(*yak.BlockContext); ok {
-			// build block
-			b.buildBlock(block)
-		} else if expression, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-			// hanlder expression
-			v := b.buildExpression(expression)
-			b.EmitReturn([]ssa.Value{v})
-		} else {
-			b.NewError(ssa.Error, TAG, "BUG: arrow function need expression or block at least")
-		}
-	} else {
-		// this global function
-		if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
-			b.buildFunctionParamDecl(para)
-		}
-		if block, ok := stmt.Block().(*yak.BlockContext); ok {
-			b.buildBlock(block)
-		}
+		b.Finish()
+		b.FunctionBuilder = b.PopFunction()
 	}
-	b.Finish()
-	b.FunctionBuilder = b.PopFunction()
+	b.AddSubFunction(buildFunc)
 
 	if funcName != "" {
 		b.WriteVariable(funcName, newfunc)
