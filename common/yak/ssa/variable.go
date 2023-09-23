@@ -87,6 +87,16 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 	v.SetVariable(variable)
 }
 
+func (b *FunctionBuilder) ReplaceVariable(variable string, v, to Value) {
+	if m, ok := b.currentDef[variable]; ok {
+		for block, value := range m {
+			if value == v {
+				m[block] = to
+			}
+		}
+	}
+}
+
 func (b *FunctionBuilder) ReadVariable(variable string, create bool) (ret Value) {
 	variable = b.GetIdByBlockSymbolTable(variable)
 	if b.CurrentBlock != nil {
@@ -149,33 +159,16 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 
 // --------------- `f.freevalue`
 
-func (f *FunctionBuilder) BuildFreeValue(variable string) Value {
-	// for parent := f.parent; parent != nil; parent = parent.parent {
-	var build func(*FunctionBuilder) Value
-	build = func(b *FunctionBuilder) Value {
-		if b == nil {
-			fmt.Printf("warn: con't found variable %s in function %s and parent-function %s\n", variable, f.Name, b.Name)
-			return nil
-		}
-		if v := b.ReadVariable(variable); v != nil {
-			return v
-		} else {
-			if v := build(b.parent.builder); v != nil {
-				freevalue := &Parameter{
-					variable:    variable,
-					Func:        b.Function,
-					users:       []User{},
-					isFreevalue: true,
-				}
-				b.FreeValues = append(b.FreeValues, freevalue)
-				b.WriteVariable(variable, freevalue)
-				return freevalue
-			} else {
-				return nil
-			}
-		}
+func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
+	freevalue := &Parameter{
+		variable:    variable,
+		Func:        b.Function,
+		users:       []User{},
+		IsFreevalue: true,
 	}
-	return build(f)
+	b.FreeValues = append(b.FreeValues, freevalue)
+	b.WriteVariable(variable, freevalue)
+	return freevalue
 }
 
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {

@@ -57,13 +57,7 @@ func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	if name != "" {
-		if v := f.UndefineHijack(name); v != nil {
-			return v
-		}
-	}
 	u := NewUndefine(name, f.CurrentBlock)
-	u.NewError(Error, SSATAG, "variable [%s] undefine", name)
 	f.emit(u)
 	return u
 }
