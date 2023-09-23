@@ -90,7 +90,7 @@ func (t *TypeInference) CheckOnInstruction(inst ssa.InstructionValue) bool {
 
 	switch inst := inst.(type) {
 
-	case *ssa.Interface:
+	case *ssa.Object:
 		// pass; this is top instruction
 		return true
 	case *ssa.Field:
@@ -126,7 +126,7 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 func (t *TypeInference) TypeCheckField(f *ssa.Field) bool {
 	// use interface
 	// if _, ok := t.Finish[f.I]; ok {
-	interfaceTyp := f.I.GetType().(*ssa.InterfaceType)
+	interfaceTyp := f.I.GetType().(*ssa.ObjectType)
 	fTyp, kTyp := interfaceTyp.GetField(f.Key)
 	if fTyp == nil || kTyp == nil {
 		f.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this field not in interface")
@@ -169,7 +169,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 	// 	return t.TypeInferenceReturn(inst)
 	// case *ssa.Switch:
 	// case *ssa.If:
-	case *ssa.Interface:
+	case *ssa.Object:
 		return t.TypeInferenceInterface(inst)
 	case *ssa.Field:
 		return t.TypeInferenceField(inst)
@@ -271,8 +271,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 	}
 }
 
-func (t *TypeInference) TypeInferenceInterface(i *ssa.Interface) bool {
-
+func (t *TypeInference) TypeInferenceInterface(i *ssa.Object) bool {
 
 	return true
 }

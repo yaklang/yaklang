@@ -85,7 +85,7 @@ const (
 	Null         //
 	Any          // any type
 	ErrorType
-	InterfaceTypeKind
+	ObjectTypeKind
 	FunctionTypeKind
 )
 
@@ -167,7 +167,7 @@ const (
 	Struct
 )
 
-type InterfaceType struct {
+type ObjectType struct {
 	Name       string
 	Kind       InterfaceKind
 	Len        int
@@ -179,18 +179,18 @@ type InterfaceType struct {
 	fieldType Type
 }
 
-func (i InterfaceType) GetTypeKind() TypeKind {
-	return InterfaceTypeKind
+func (i *ObjectType) GetTypeKind() TypeKind {
+	return ObjectTypeKind
 }
 
-var _ (Type) = (*InterfaceType)(nil)
+var _ (Type) = (*ObjectType)(nil)
 
-func (i *InterfaceType) SetName(name string) {
+func (i *ObjectType) SetName(name string) {
 	i.Name = name
 }
 
-func NewInterfaceType() *InterfaceType {
-	return &InterfaceType{
+func NewObjectType() *ObjectType {
+	return &ObjectType{
 		Kind:       None,
 		Key:        make([]Value, 0),
 		keyTypes:   make([]Type, 0),
@@ -199,30 +199,30 @@ func NewInterfaceType() *InterfaceType {
 }
 
 // for slice build
-func NewSliceType(elem Type) *InterfaceType {
-	i := NewInterfaceType()
+func NewSliceType(elem Type) *ObjectType {
+	i := NewObjectType()
 	i.Kind = Slice
 	i.keyTyp = BasicTypes[Number]
 	i.fieldType = elem
 	return i
 }
 
-func NewMapType(key, field Type) *InterfaceType {
-	i := NewInterfaceType()
+func NewMapType(key, field Type) *ObjectType {
+	i := NewObjectType()
 	i.keyTyp = key
 	i.fieldType = field
 	i.Kind = Map
 	return i
 }
 
-func (itype InterfaceType) String() string {
+func (itype ObjectType) String() string {
 	if itype.Name != "" {
 		return itype.Name
 	}
 	return itype.RawString()
 }
 
-func (itype InterfaceType) RawString() string {
+func (itype ObjectType) RawString() string {
 	ret := ""
 	switch itype.Kind {
 	case Slice:
@@ -249,13 +249,13 @@ func (itype InterfaceType) RawString() string {
 			),
 		)
 	case None:
-		ret += "interface{}"
+		ret += "object{}"
 	}
 	return ret
 }
 
 // for struct build
-func (s *InterfaceType) AddField(key Value, field Type) {
+func (s *ObjectType) AddField(key Value, field Type) {
 	s.Key = append(s.Key, key)
 	keytyp := key.GetType()
 	if keytyp == nil {
@@ -269,7 +269,7 @@ func (s *InterfaceType) AddField(key Value, field Type) {
 }
 
 // return (field-type, key-type)
-func (s *InterfaceType) GetField(key Value) (Type, Type) {
+func (s *ObjectType) GetField(key Value) (Type, Type) {
 	switch s.Kind {
 	case Slice, Map:
 		return s.fieldType, s.keyTyp
@@ -282,13 +282,13 @@ func (s *InterfaceType) GetField(key Value) (Type, Type) {
 }
 
 // ===================== Finish simply
-func (s *InterfaceType) Finish() {
-	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) string { return t.String() })
-	keytypes := lo.UniqBy(s.keyTypes, func(t Type) string { return t.String() })
+func (s *ObjectType) Finish() {
+	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
+	keytypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
 	if len(keytypes) == 1 {
 		if len(fieldTypes) == 1 {
 			// map[T]U
-			if keytypes[0].String() == "number" {
+			if keytypes[0].GetTypeKind() == Number {
 				// map[number]T ==> []T slice
 				// TODO: check increasing
 				s.Kind = Slice
@@ -302,9 +302,7 @@ func (s *InterfaceType) Finish() {
 			}
 			// s.keyType = keytype
 			// s.Field = field
-		}
-
-		if keytypes[0].String() == "string" {
+		} else if keytypes[0].GetTypeKind() == String || keytypes[0].GetTypeKind() == Number {
 			s.Kind = Struct
 			s.keyTyp = BasicTypes[String]
 			s.fieldType = BasicTypes[Any]
@@ -325,7 +323,7 @@ func CalculateType(ts []Type) Type {
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {
-		i := NewInterfaceType()
+		i := NewObjectType()
 		for index, typ := range ts {
 			i.AddField(NewConst(index), typ)
 		}
