@@ -71,7 +71,7 @@ func NewUndefine(name string, block *BasicBlock) *Undefine {
 		values:        []Value{},
 	}
 	u.SetVariable(name)
-	block.Parent.WriteVariable(name, u)
+	block.Parent.builder.writeVariableByBlock(name, u, block)
 	return u
 }
 
