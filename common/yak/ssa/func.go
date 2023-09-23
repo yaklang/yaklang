@@ -37,7 +37,9 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 			users: []User{},
 		},
 		err: make(SSAErrors, 0),
-		// for build
+
+		externInstance: make(map[string]Value),
+		externType:     make(map[string]Type),
 	}
 	p.Funcs = append(p.Funcs, f)
 	f.symbol.Func = f
