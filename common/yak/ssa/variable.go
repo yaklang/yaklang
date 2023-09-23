@@ -147,24 +147,6 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 	return v
 }
 
-func (b *BasicBlock) Sealed() {
-	for _, p := range b.inCompletePhi {
-		if v := p.Build(); v == nil {
-			var res Value
-			res = b.Parent.builder.UndefineHijack(p.GetVariable())
-			if res == nil {
-				res = NewUndefine(p.GetVariable(), p.Block)
-			}
-			if inst, ok := res.(Instruction); ok {
-				EmitBefore(p.Block.LastInst(), inst)
-			}
-			p.Replace(res)
-		}
-	}
-	b.inCompletePhi = nil
-	b.isSealed = true
-}
-
 // --------------- `f.freevalue`
 
 func (f *FunctionBuilder) BuildFreeValue(variable string) Value {

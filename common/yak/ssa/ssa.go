@@ -235,8 +235,10 @@ func (a *anInstruction) GetVariable() string {
 // ----------- Phi
 type Phi struct {
 	anInstruction
-	Edge []Value // edge[i] from phi.Block.Preds[i]
-	user []User
+	Edge   []Value // edge[i] from phi.Block.Preds[i]
+	user   []User
+	create bool
+	values []Value
 	// for build
 	wit1, wit2 Value // witness for trivial-phi
 }
