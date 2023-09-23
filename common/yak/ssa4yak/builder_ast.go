@@ -1083,9 +1083,18 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 
 	//TODO:
-	// | expression 'not'? 'in' expression
 	// | expression '<-' expression
 	// ;
+
+	// | expression 'not'? 'in' expression
+	if s := stmt.In(); s != nil {
+		op1, op2 := getValue(0), getValue(1)
+		if op1 == nil || op2 == nil {
+			b.NewError(ssa.Error, TAG, "in operator need two expression")
+			return nil
+		}
+		return b.EmitBinOp(ssa.OpIn, op1, op2)
+	}
 
 	/*
 		expression:

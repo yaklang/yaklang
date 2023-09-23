@@ -277,6 +277,7 @@ var BinaryOpcodeName = map[BinaryOpcode]string{
 	OpGtEq:   `gt-eq`,
 	OpNotEq:  `neq`,
 	OpEq:     `eq`,
+	OpIn:     `in`,
 }
 
 func (b *BinOp) String() string {
