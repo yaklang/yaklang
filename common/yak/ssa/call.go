@@ -47,7 +47,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	for index := range freevalue {
 		if para, ok := freevalue[index].(*Parameter); ok { // not modify
 			// find freevalue in parent function
-			if v := parent.builder.ReadVariable(para.variable); !utils.IsNil(v) {
+			if v := parent.builder.ReadVariable(para.variable, false); !utils.IsNil(v) {
 				switch v := v.(type) {
 				case *Parameter:
 					if !v.isFreevalue {
@@ -62,7 +62,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 			}
 			if parent != f.Function {
 				// find freevalue in current function
-				if v := f.ReadVariable(para.variable); !utils.IsNil(v) {
+				if v := f.ReadVariable(para.variable, false); !utils.IsNil(v) {
 					binding = append(binding, v)
 					continue
 				}

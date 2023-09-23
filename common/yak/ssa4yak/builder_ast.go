@@ -753,12 +753,12 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		text := s.GetText()
 		if forceAssign {
 			text = b.MapBlockSymbolTable(text)
-		} else if v := b.ReadVariable(text); v != nil {
+		} else if v := b.ReadVariable(text, false); v != nil {
 			// when v exist
-			switch v := v.(type) {
+			switch value := v.(type) {
 			case *ssa.Field:
-				if v.OutCapture {
-					return v
+				if value.OutCapture {
+					return value
 				}
 			case *ssa.Parameter:
 			default:
@@ -799,7 +799,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 				idText := id.GetText()
 				return b.EmitFieldMust(inter, ssa.NewConst(idText))
 			} else if id := s.IdentifierWithDollar(); id != nil {
-				key := b.ReadVariable(id.GetText()[1:])
+				key := b.ReadVariable(id.GetText()[1:], true)
 				if key == nil {
 					b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
 					return nil
@@ -868,12 +868,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	// identifier
 	if s := stmt.Identifier(); s != nil { // 解析变量
 		text := s.GetText()
-		if ret := b.ReadVariable(text); ret != nil {
+		ret := b.ReadVariable(text, true)
+		if un, ok := ret.(*ssa.Undefine); !ok {
 			return ret
 		} else if b.CanBuildFreeValue(text) {
+			ssa.DeleteInst(un)
 			return b.BuildFreeValue(text)
 		} else {
-			return b.EmitUndefine(text)
+			return un
 		}
 	}
 
@@ -897,7 +899,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			idText := id.GetText()
 			return b.EmitField(inter, ssa.NewConst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
-			key := b.ReadVariable(id.GetText()[1:])
+			key := b.ReadVariable(id.GetText()[1:], true)
 			if key == nil {
 				b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
 				return nil
@@ -1112,7 +1114,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		}
 		ifb.Finish()
 		// generator phi instruction
-		return b.ReadVariable(id)
+		return b.ReadVariable(id, true)
 	}
 
 	// | expression '&&' ws* expression
