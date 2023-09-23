@@ -226,21 +226,29 @@ func (r *Return) String() string {
 
 // ----------- Call
 func (c *Call) String() string {
-	return fmt.Sprintf(
-		"%s = call %s (%s) [%s]",
-		getStr(c),
-		getStr(c.Method),
-		strings.Join(
-			lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
-			", ",
-		),
-		strings.Join(
-			lo.Map(c.binding, func(v Value, _ int) string {
-				return getStr(v)
-			}),
-			", ",
-		),
+	methodstr := getStr(c.Method)
+	argstr := strings.Join(
+		lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
+		", ",
 	)
+	binding := strings.Join(
+		lo.Map(c.binding, func(v Value, _ int) string {
+			return getStr(v)
+		}),
+		", ",
+	)
+	if c.Async {
+		return fmt.Sprintf(
+			"go %s (%s) [%s]",
+			methodstr, argstr, binding,
+		)
+	} else {
+		return fmt.Sprintf(
+			"%s = call %s (%s) [%s]",
+			getStr(c),
+			methodstr, argstr, binding,
+		)
+	}
 }
 
 // ----------- Switch
