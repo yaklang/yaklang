@@ -258,6 +258,7 @@ func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
 		c = b.buildFunctionCall(stmt.FunctionCall().(*yak.FunctionCallContext), v)
 	}
 	c.Async = true
+	b.EmitCall(c)
 	return c
 }
 
