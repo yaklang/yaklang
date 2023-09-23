@@ -751,6 +751,9 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	defer recoverRange()
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
+		if text == "_" {
+			return ssa.NewIndentifierLV("_")
+		}
 		if forceAssign {
 			text = b.MapBlockSymbolTable(text)
 		} else if v := b.ReadVariable(text, false); v != nil {
@@ -886,6 +889,10 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	// identifier
 	if s := stmt.Identifier(); s != nil { // 解析变量
 		text := s.GetText()
+		if text == "_" {
+			b.NewError(ssa.Error, TAG, "cannot use _ as value")
+			return nil
+		}
 		ret := b.ReadVariable(text, true)
 		if un, ok := ret.(*ssa.Undefine); !ok {
 			return ret
