@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -23,7 +21,7 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
-	v := f.ReadVariable(i.variable)
+	v := f.ReadVariable(i.variable, true)
 	if utils.IsNil(v) {
 		// v = NewUndefine(i.variable, f.CurrentBlock)
 		v = f.EmitUndefine(i.variable)
@@ -89,15 +87,16 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 	v.SetVariable(variable)
 }
 
-func (b *FunctionBuilder) ReadVariable(variable string) Value {
+func (b *FunctionBuilder) ReadVariable(variable string, create bool) (ret Value) {
 	variable = b.GetIdByBlockSymbolTable(variable)
 	if b.CurrentBlock != nil {
 		// for building function
-		return b.readVariableByBlock(variable, b.CurrentBlock)
+		ret = b.readVariableByBlock(variable, b.CurrentBlock, create)
 	} else {
 		// for finish function
-		return b.readVariableByBlock(variable, b.ExitBlock)
+		ret = b.readVariableByBlock(variable, b.ExitBlock, create)
 	}
+	return
 }
 
 func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
@@ -107,7 +106,7 @@ func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, blo
 	b.currentDef[variable][block] = value
 }
 
-func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock) Value {
+func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, creat bool) Value {
 	if block.Skip {
 		return nil
 	}
@@ -116,22 +115,31 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 			return value
 		}
 	}
-	return b.readVariableRecursive(variable, block)
+	return b.readVariableRecursive(variable, block, creat)
 }
 
-func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlock) Value {
+func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlock, create bool) Value {
 	var v Value
 	// if block in sealedBlock
 	if !block.isSealed {
-		phi := NewPhi(block, variable)
-		block.inCompletePhi = append(block.inCompletePhi, phi)
-		v = phi
+		if create {
+			phi := NewPhi(block, variable, create)
+			block.inCompletePhi = append(block.inCompletePhi, phi)
+			v = phi
+		}
 	} else if len(block.Preds) == 0 {
 		// this is enter block  in this function
+		if ret := b.TryBuildExternInstance(variable); ret != nil {
+			v = ret
+		} else if create {
+			un := NewUndefine(variable, block)
+			EmitInst(un)
+			v = un
+		}
 	} else if len(block.Preds) == 1 {
-		v = b.readVariableByBlock(variable, block.Preds[0])
+		v = b.readVariableByBlock(variable, block.Preds[0], create)
 	} else {
-		v = NewPhi(block, variable).Build()
+		v = NewPhi(block, variable, create).Build()
 	}
 	if v != nil {
 		b.writeVariableByBlock(variable, v, block)
@@ -190,7 +198,7 @@ func (f *FunctionBuilder) BuildFreeValue(variable string) Value {
 
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	for parent := b.parent; parent != nil; parent = parent.parent {
-		if v := parent.builder.ReadVariable(variable); v != nil {
+		if v := parent.builder.ReadVariable(variable, false); v != nil {
 			return true
 		}
 	}
