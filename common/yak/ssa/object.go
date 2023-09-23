@@ -7,8 +7,32 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func NewInterface(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Interface {
-	i := &Interface{
+func IsObject(v Value) bool {
+	_, ok := v.(*Object)
+	return ok
+}
+
+func ToObject(v Value) *Object {
+	o, _ := v.(*Object)
+	return o
+}
+
+func IsField(v Value) bool {
+	_, ok := v.(*Field)
+	return ok
+}
+
+func ToField(v Value) *Field {
+	if o, ok := v.(*Field); ok {
+		return o
+	} else {
+		return nil
+	}
+
+}
+
+func NewObject(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Object {
+	i := &Object{
 		anInstruction: newAnInstuction(block),
 		parentI:       parentI,
 		low:           low,
@@ -33,13 +57,13 @@ func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
 	return s
 }
 
-func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Interface {
+func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Object {
 	hasKey := true
 	if len(keys) == 0 {
 		hasKey = false
 	}
 	lValueLen := NewConst(len(vs))
-	ityp := NewInterfaceType()
+	ityp := NewObjectType()
 	itf := b.EmitInterfaceBuildNewType(lValueLen, lValueLen)
 	for i, rv := range vs {
 		var key Value
@@ -62,20 +86,34 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Inter
 // --------------- `f.symbol` hanlder, read && write
 func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Value {
 	var ftyp Type
-	if I, ok := i.(*Interface); ok {
+	var isMethod bool
+	if I, ok := i.(*Object); ok {
 		if I.buildField != nil {
-			return I.buildField(key.String())
+			if v := I.buildField(key.String()); v != nil {
+				return v
+			}
+		}
+	}
+	if t := i.GetType(); !utils.IsNil(t) {
+		if c, ok := key.(*Const); ok && c.IsString() {
+			if v := t.GetMethod(c.VarString()); v != nil {
+				isMethod = true
+				ftyp = v
+			}
 		}
 	}
 
-	if t := i.GetType(); !utils.IsNil(t) && t.GetTypeKind() == InterfaceTypeKind {
-		if it, ok := t.(*InterfaceType); ok {
-			ftyp, _ = it.GetField(key)
+	if t := i.GetType(); !utils.IsNil(t) && t.GetTypeKind() == ObjectTypeKind {
+		if it, ok := t.(*ObjectType); ok {
+			if t, _ := it.GetField(key); t != nil {
+				ftyp = t
+				isMethod = false
+			}
 		}
 	}
 	if index := slices.IndexFunc(i.GetValues(), func(v Value) bool {
 		if f, ok := v.(*Field); ok {
-			if f.Key == key {
+			if f.Key == key && f.I == i {
 				return true
 			}
 		}
@@ -102,6 +140,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 		if ftyp != nil {
 			field.SetType(ftyp)
 		}
+		field.isMethod = isMethod
 		b.emit(field)
 		fixupUseChain(field)
 		return field

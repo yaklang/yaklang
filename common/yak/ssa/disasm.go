@@ -47,7 +47,7 @@ func getStrFlag(v Node, hasType bool) string {
 	}
 	switch v := v.(type) {
 	case Instruction:
-		if i, ok := v.(*Interface); ok {
+		if i, ok := v.(*Object); ok {
 			if i == i.Func.symbol {
 				return i.Func.Name + "-symbol"
 			}
@@ -298,9 +298,9 @@ func (u *UnOp) String() string {
 }
 
 // ----------- Interface
-func (i *Interface) String() string {
+func (i *Object) String() string {
 	return fmt.Sprintf(
-		"%s = Interface %s [%s, %s]",
+		"%s = Object %s [%s, %s]",
 		getStr(i), i.typs, getStr(i.Len), getStr(i.Cap),
 	)
 }

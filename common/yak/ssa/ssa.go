@@ -103,9 +103,9 @@ type Function struct {
 	AnonFuncs []*Function
 
 	// if this function is anonFunc
-	parent     *Function  // parent function if anonymous function; nil if global function.
-	FreeValues []Value    // the value, captured variable form parent-function,
-	symbol     *Interface // for function symbol table
+	parent     *Function // parent function if anonymous function; nil if global function.
+	FreeValues []Value   // the value, captured variable form parent-function,
+	symbol     *Object   // for function symbol table
 
 	// User
 	user []User
@@ -513,10 +513,10 @@ var _ InstructionValue = (*UnOp)(nil)
 
 // special instruction ------------------------------------------
 
-// ----------- Interface
+// ----------- Object
 // instruction + value + user
 // use-chain: *interface(self) -> multiple field(value)
-type Interface struct {
+type Object struct {
 	anInstruction
 
 	// when slice
@@ -539,11 +539,11 @@ type Interface struct {
 	buildField func(key string) Value
 }
 
-var _ Node = (*Interface)(nil)
-var _ Value = (*Interface)(nil)
-var _ User = (*Interface)(nil)
-var _ Instruction = (*Interface)(nil)
-var _ InstructionValue = (*Interface)(nil)
+var _ Node = (*Object)(nil)
+var _ Value = (*Object)(nil)
+var _ User = (*Object)(nil)
+var _ Instruction = (*Object)(nil)
+var _ InstructionValue = (*Object)(nil)
 
 // instruction
 // ----------- Field
