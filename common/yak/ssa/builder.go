@@ -63,7 +63,7 @@ func (b *FunctionBuilder) NewFunc() *Function {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	b.Param[len(b.Param)-1].typs = NewInterfaceType()
+	b.Param[len(b.Param)-1].typs = NewObjectType()
 	b.hasEllipsis = true
 }
 

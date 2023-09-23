@@ -1184,7 +1184,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	}
 	zero := ssa.NewConst(0)
 	switch typ := typ.(type) {
-	case *ssa.InterfaceType:
+	case *ssa.ObjectType:
 		switch typ.Kind {
 		case ssa.Slice:
 			if len(exprs) == 0 {
@@ -1330,7 +1330,7 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 	}
 	if ellipsis != nil {
 		//handler "..." to array
-		v[len(v)-1].SetType(ssa.NewInterfaceType())
+		v[len(v)-1].SetType(ssa.NewObjectType())
 	}
 	return v
 }

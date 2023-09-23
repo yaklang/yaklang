@@ -31,7 +31,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		user:        make([]User, 0),
 		symbolTable: make(map[string][]InstructionValue),
 		InstReg:     make(map[Instruction]string),
-		symbol: &Interface{
+		symbol: &Object{
 			anInstruction: anInstruction{},
 			// I:     parent.symbol,
 			users: []User{},
@@ -73,7 +73,7 @@ func (f *Function) ReturnValue() []Value {
 	return ret.Results
 }
 
-func (f *Function) GetSymbol() *Interface {
+func (f *Function) GetSymbol() *Object {
 	return f.symbol
 }
 

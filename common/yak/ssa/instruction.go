@@ -154,10 +154,10 @@ func NewNext(iter Value, block *BasicBlock) *Next {
 				ok: bool
 			}
 	*/
-	typ := NewInterfaceType()
+	typ := NewObjectType()
 	typ.Kind = Struct
 	typ.AddField(NewConst("ok"), BasicTypes[Boolean])
-	if it, ok := iter.GetType().(*InterfaceType); ok {
+	if it, ok := iter.GetType().(*ObjectType); ok {
 		if keytyp := it.keyTyp; keytyp != nil {
 			typ.AddField(NewConst("key"), keytyp)
 		} else {

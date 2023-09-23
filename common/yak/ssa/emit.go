@@ -162,21 +162,21 @@ func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 	return a
 }
 
-func (f *FunctionBuilder) emitInterface(parentI User, typ Type, low, high, max, Len, Cap Value) *Interface {
-	i := NewInterface(parentI, typ, low, high, max, Len, Cap, f.CurrentBlock)
+func (f *FunctionBuilder) emitInterface(parentI User, typ Type, low, high, max, Len, Cap Value) *Object {
+	i := NewObject(parentI, typ, low, high, max, Len, Cap, f.CurrentBlock)
 	f.emit(i)
 	return i
 }
 
-func (f *FunctionBuilder) EmitInterfaceBuildWithType(typ Type, Len, Cap Value) *Interface {
+func (f *FunctionBuilder) EmitInterfaceBuildWithType(typ Type, Len, Cap Value) *Object {
 	i := f.emitInterface(nil, typ, nil, nil, nil, Len, Cap)
 	i.IsNew = true
 	return i
 }
-func (f *FunctionBuilder) EmitInterfaceBuildNewType(Len, Cap Value) *Interface {
+func (f *FunctionBuilder) EmitInterfaceBuildNewType(Len, Cap Value) *Object {
 	return f.emitInterface(nil, nil, nil, nil, nil, Len, Cap)
 }
-func (f *FunctionBuilder) EmitInterfaceSlice(i User, low, high, max Value) *Interface {
+func (f *FunctionBuilder) EmitInterfaceSlice(i User, low, high, max Value) *Object {
 	return f.emitInterface(i, i.GetType(), low, high, max, nil, nil)
 }
 
