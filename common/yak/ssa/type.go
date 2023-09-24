@@ -13,6 +13,10 @@ type Type interface {
 	String() string
 	RawString() string
 	GetTypeKind() TypeKind
+
+	// set/get method
+	SetMethod(map[string]*FunctionType)
+	GetMethod(id string) *FunctionType
 }
 type Types []Type // each value can have multiple type possible
 
@@ -67,7 +71,7 @@ func (t Types) Contains(typ Types) bool {
 
 func (t Types) IsType(kind TypeKind) bool {
 	for _, typ := range t {
-		if typ == BasicTypes[kind] {
+		if typ.GetTypeKind() == kind {
 			return true
 		}
 	}
@@ -86,34 +90,49 @@ const (
 	Any          // any type
 	ErrorType
 	ObjectTypeKind
+	InterfaceTypeKind
 	FunctionTypeKind
 )
 
 type BasicType struct {
 	Kind TypeKind
 	name string
+
+	method map[string]*FunctionType
 }
 
-func (b BasicType) String() string {
+func (b *BasicType) String() string {
 	return b.name
 }
 
-func (b BasicType) RawString() string {
+func (b *BasicType) RawString() string {
 	return b.name
 }
 
-func (b BasicType) GetTypeKind() TypeKind {
+func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
 }
+func (b *BasicType) GetMethod(id string) *FunctionType {
+	if v, ok := b.method[id]; ok {
+		return v
+	} else {
+		return nil
+	}
+}
+func (b *BasicType) SetMethod(method map[string]*FunctionType) {
+	b.method = method
+}
 
-var BasicTypes = []BasicType{
-	Number:       {Number, "number"},
-	String:       {String, "string"},
-	Boolean:      {Boolean, "boolean"},
-	UndefineType: {UndefineType, "undefine"},
-	Null:         {Null, "null"},
-	Any:          {Any, "any"},
-	ErrorType:    {ErrorType, "error"},
+var _ Type = (*BasicType)(nil)
+
+var BasicTypes = []*BasicType{
+	Number:       {Number, "number", make(map[string]*FunctionType, 0)},
+	String:       {String, "string", make(map[string]*FunctionType, 0)},
+	Boolean:      {Boolean, "boolean", make(map[string]*FunctionType, 0)},
+	UndefineType: {UndefineType, "undefine", make(map[string]*FunctionType, 0)},
+	Null:         {Null, "null", make(map[string]*FunctionType, 0)},
+	Any:          {Any, "any", make(map[string]*FunctionType, 0)},
+	ErrorType:    {ErrorType, "error", make(map[string]*FunctionType, 0)},
 }
 
 func GetType(i any) Type {
@@ -125,21 +144,109 @@ func GetType(i any) Type {
 }
 func GetTypeByStr(typ string) Type {
 	switch typ {
-	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64":
+	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
 		return BasicTypes[Number]
-	case "float", "float32", "float64", "double":
+	case "float", "float32", "float64", "double", "complex128", "complex64":
 		return BasicTypes[Number]
 	case "string":
 		return BasicTypes[String]
 	case "bool":
 		return BasicTypes[Boolean]
-	case "interface {}":
+	case "interface {}", "var":
 		return BasicTypes[Any]
 	case "error":
 		return BasicTypes[ErrorType]
 	default:
 		return nil
 	}
+}
+
+// ====================== alias type
+type AliasType struct {
+	elem   Type
+	method map[string]*FunctionType
+	Name   string
+}
+
+var _ Type = (*AliasType)(nil)
+
+func NewAliasType(name string, elem Type) *AliasType {
+	return &AliasType{
+		elem:   elem,
+		method: make(map[string]*FunctionType),
+		Name:   name,
+	}
+}
+
+func (a *AliasType) SetMethod(m map[string]*FunctionType) {
+	a.method = m
+}
+
+func (a *AliasType) GetMethod(id string) *FunctionType {
+	if v, ok := a.method[id]; ok {
+		return v
+	} else {
+		return nil
+	}
+}
+
+func (a *AliasType) String() string {
+	if a.Name != "" {
+		return a.Name
+	} else {
+		return a.RawString()
+	}
+}
+
+func (a *AliasType) RawString() string {
+	return fmt.Sprintf("type %s (%s)", a.Name, a.elem)
+}
+
+func (a *AliasType) GetTypeKind() TypeKind {
+	return a.elem.GetTypeKind()
+}
+
+// ====================== interface type
+type InterfaceType struct {
+	method map[string]*FunctionType
+	name   string
+}
+
+func NewInterfaceType(name string) *InterfaceType {
+	return &InterfaceType{
+		method: make(map[string]*FunctionType),
+		name:   name,
+	}
+}
+
+var _ Type = (*InterfaceType)(nil)
+
+func (i *InterfaceType) SetMethod(m map[string]*FunctionType) {
+	i.method = m
+}
+
+func (i *InterfaceType) GetMethod(id string) *FunctionType {
+	if v, ok := i.method[id]; ok {
+		return v
+	} else {
+		return nil
+	}
+}
+
+func (i *InterfaceType) GetTypeKind() TypeKind {
+	return InterfaceTypeKind
+}
+
+func (i *InterfaceType) String() string {
+	if i.name != "" {
+		return i.name
+	} else {
+		return i.RawString()
+	}
+}
+
+func (i *InterfaceType) RawString() string {
+	return fmt.Sprintf("type %s interface{}", i.name)
 }
 
 // ====================== chan type
@@ -175,12 +282,26 @@ type ObjectType struct {
 	keyTypes   []Type
 	FieldTypes []Type
 
+	method map[string]*FunctionType
+
 	keyTyp    Type
 	fieldType Type
 }
 
 func (i *ObjectType) GetTypeKind() TypeKind {
 	return ObjectTypeKind
+}
+
+func (i *ObjectType) GetMethod(id string) *FunctionType {
+	if v, ok := i.method[id]; ok {
+		return v
+	} else {
+		return nil
+	}
+}
+
+func (i *ObjectType) SetMethod(m map[string]*FunctionType) {
+	i.method = m
 }
 
 var _ (Type) = (*ObjectType)(nil)
@@ -195,6 +316,7 @@ func NewObjectType() *ObjectType {
 		Key:        make([]Value, 0),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
+		method:     make(map[string]*FunctionType, 0),
 	}
 }
 
@@ -315,6 +437,15 @@ type FunctionType struct {
 	ReturnType Type
 	Parameter  []Type
 	IsVariadic bool
+}
+
+var _ Type = (*FunctionType)(nil)
+
+func (f *FunctionType) GetMethod(string) *FunctionType {
+	return nil
+}
+
+func (f *FunctionType) SetMethod(m map[string]*FunctionType) {
 }
 
 func CalculateType(ts []Type) Type {
