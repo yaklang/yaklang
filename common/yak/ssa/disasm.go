@@ -48,9 +48,6 @@ func getStrFlag(v Node, hasType bool) string {
 	switch v := v.(type) {
 	case Instruction:
 		if i, ok := v.(*Object); ok {
-			if i == i.Func.symbol {
-				return i.Func.Name + "-symbol"
-			}
 			if i.buildField != nil {
 				return i.variable + "-extern"
 			}
