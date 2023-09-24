@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -579,13 +580,17 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 				return nil
 			}
 			if c, ok := rvalues[0].(*ssa.Call); ok {
-				if c.GetType().GetTypeKind() != ssa.InterfaceTypeKind {
-					b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
-					return nil
+				var length int
+				if c.GetType().GetTypeKind() != ssa.ObjectTypeKind {
+					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
+					// return nil
+					length = len(lvalues)
+				} else {
+					it := c.GetType().(*ssa.ObjectType)
+					length = it.Len
 				}
 				vs := make([]ssa.Value, 0)
-				it := c.GetType().(*ssa.InterfaceType)
-				for i := 0; i < it.Len; i++ {
+				for i := 0; i < length; i++ {
 					field := b.EmitField(c, ssa.NewConst(i))
 					vs = append(vs, field)
 				}
@@ -595,9 +600,8 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 					}
 				} else {
 					b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
-					return nil
 				}
-
+				return nil
 			}
 
 			// (n) = field(1, #index)
@@ -917,8 +921,12 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if user, ok := value.(ssa.User); ok {
 			inter = user
 		} else {
-			return nil
-			// 	}
+			if v, ok := value.(*ssa.Const); ok {
+				inter = b.EmitConstInst(v)
+			} else {
+				b.NewError(ssa.Error, TAG, "member call target Error")
+				return nil
+			}
 		}
 
 		if id := s.Identifier(); id != nil {

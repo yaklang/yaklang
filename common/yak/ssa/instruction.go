@@ -64,6 +64,15 @@ func NewLoop(block *BasicBlock, cond Value) *Loop {
 	return l
 }
 
+func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
+	v := &ConstInst{
+		Const:         *c,
+		anInstruction: newAnInstuction(block),
+		value:         make([]Value, 0),
+	}
+	return v
+}
+
 func NewUndefine(name string, block *BasicBlock) *Undefine {
 	u := &Undefine{
 		anInstruction: newAnInstuction(block),
