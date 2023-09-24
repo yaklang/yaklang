@@ -122,14 +122,15 @@ func (lb *LoopBuilder) Finish() {
 		lb.b.PopTarget()
 	}
 
+	// body -> latch
+	lb.b.EmitJump(latch)
+
+	lb.b.CurrentBlock = latch
 	// build latch
 	if lb.buildThird != nil {
-		// body -> latch
-		lb.b.EmitJump(latch)
-		lb.b.CurrentBlock = latch
 		step = lb.buildThird()
 	}
-	// latch/body -> header
+	// latch -> header
 	lb.b.EmitJump(header)
 
 	// finish
