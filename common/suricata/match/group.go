@@ -58,6 +58,10 @@ type SuricataRuleLoaderType func(query string) (chan *rule.Rule, error)
 
 var defaultSuricataRuleLoader SuricataRuleLoaderType = nil
 
+func RegisterSuricataRuleLoader(h SuricataRuleLoaderType) {
+	defaultSuricataRuleLoader = h
+}
+
 func NewGroup(opt ...GroupOption) *Group {
 	gopacketCacher := ttlcache.NewCache()
 	gopacketCacher.SetTTL(30 * time.Second)
@@ -122,8 +126,14 @@ func (g *Group) LoadRulesWithQuery(query string) error {
 	if err != nil {
 		return err
 	}
+	var count int
 	for r := range res {
+		count++
+		log.Infof("load rule: %v", r.Message)
 		g.LoadRule(r)
+	}
+	if count > 0 {
+		log.Infof("load %d rules", count)
 	}
 	return nil
 }

@@ -1229,6 +1229,7 @@ func main() {
 		translatingCommand,
 
 		yakcmds.PcapCommand,
+		yakcmds.SuricataLoaderCommand,
 
 		// chaosmaker
 		{
