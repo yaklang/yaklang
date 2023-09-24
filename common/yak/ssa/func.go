@@ -32,7 +32,9 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		symbolTable: make(map[string][]InstructionValue),
 		InstReg:     make(map[Instruction]string),
 		symbol: &Object{
-			anInstruction: anInstruction{},
+			anInstruction: anInstruction{
+				variable: name + "-symbol",
+			},
 			// I:     parent.symbol,
 			users: []User{},
 		},
