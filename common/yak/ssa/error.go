@@ -39,6 +39,10 @@ func (an anInstruction) NewError(kind ErrorKind, tag ErrorTag, format string, ar
 	an.Func.NewErrorWithPos(kind, tag, an.pos, format, arg...)
 }
 
+func (b *BasicBlock) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
+	b.Parent.NewErrorWithPos(kind, tag, b.pos, format, arg...)
+}
+
 func (prog *Program) GetErrors() SSAErrors {
 	result := make(SSAErrors, 0)
 	for _, pkg := range prog.Packages {

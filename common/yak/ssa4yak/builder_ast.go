@@ -530,6 +530,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	b.CurrentBlock.SetPosition(b.Pos)
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
 		b.PushBlockSymbolTable()
 		b.buildStatementList(s)
