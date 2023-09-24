@@ -771,12 +771,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 				}
 			case *ssa.Parameter:
 				if value.IsFreevalue {
-					field := &ssa.Field{
-						Key:        ssa.NewConst(text),
-						I:          b.GetParentBuilder().GetSymbol(),
-						OutCapture: true,
-						Update:     []ssa.Value{},
-					}
+					field := b.NewCaptureField(text)
 					var tmp ssa.Value = field
 					ssa.ReplaceValue(v, tmp)
 					if index := slices.Index(b.FreeValues, v); index != -1 {
@@ -789,12 +784,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			default:
 			}
 		} else if b.CanBuildFreeValue(text) {
-			field := &ssa.Field{
-				Key:        ssa.NewConst(text),
-				I:          b.GetParentBuilder().GetSymbol(),
-				OutCapture: true,
-				Update:     []ssa.Value{},
-			}
+			field := b.NewCaptureField(text)
 			b.FreeValues = append(b.FreeValues, field)
 			b.SetReg(field)
 			return field

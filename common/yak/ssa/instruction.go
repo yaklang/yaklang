@@ -7,17 +7,22 @@ import (
 )
 
 func EmitInst(i Instruction) {
-	if index := slices.Index(i.GetBlock().Instrs, i); index != -1 {
+	block := i.GetBlock()
+	if block == nil {
+		// println("void block!! %s")
 		return
 	}
-	if len(i.GetBlock().Instrs) == 0 {
-		b := i.GetBlock().Parent.builder
+	if index := slices.Index(block.Instrs, i); index != -1 {
+		return
+	}
+	if len(block.Instrs) == 0 {
+		b := block.Parent.builder
 		current := b.CurrentBlock
-		b.CurrentBlock = i.GetBlock()
+		b.CurrentBlock = block
 		b.emit(i)
 		b.CurrentBlock = current
 	} else {
-		EmitBefore(i.GetBlock().LastInst(), i)
+		EmitBefore(block.LastInst(), i)
 	}
 }
 

@@ -149,6 +149,18 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 	}
 }
 
+func (b *FunctionBuilder) NewCaptureField(text string) *Field {
+	f := &Field{
+		anInstruction: newAnInstuction(b.CurrentBlock),
+		Key:           NewConst(text),
+		I:             b.GetParentBuilder().GetSymbol(),
+		OutCapture:    true,
+		Update:        make([]Value, 0),
+		users:         make([]User, 0),
+	}
+	return f
+}
+
 func (b *FunctionBuilder) GetField(i User, key Value, create bool) *Field {
 	if field, ok := b.getFieldWithCreate(i, key, create).(*Field); ok {
 		return field
