@@ -275,6 +275,9 @@ func (sw *Switch) String() string {
 
 // ----------- BinOp
 var BinaryOpcodeName = map[BinaryOpcode]string{
+	OpLogicAnd: `&&`,
+	OpLogicOr:  `||`,
+
 	OpAnd:    `and`,
 	OpAndNot: `and-not`,
 	OpOr:     `or`,
