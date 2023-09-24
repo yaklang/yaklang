@@ -160,6 +160,9 @@ type BasicBlock struct {
 	// error catch
 	Handler *ErrorHandler
 
+	// position
+	pos *Position
+
 	// for build
 	finish        bool // if emitJump finish!
 	isSealed      bool
@@ -254,6 +257,7 @@ var _ InstructionValue = (*Phi)(nil)
 type ConstInst struct {
 	Const
 	anInstruction
+	value []Value
 }
 
 func (c *ConstInst) GetType() Type {
@@ -266,6 +270,7 @@ func (c *ConstInst) SetType(ts Type) {
 
 var _ Node = (*ConstInst)(nil)
 var _ Value = (*ConstInst)(nil)
+var _ User = (*ConstInst)(nil)
 var _ Instruction = (*ConstInst)(nil)
 var _ InstructionValue = (*ConstInst)(nil)
 
@@ -309,7 +314,7 @@ var _ Value = (*Const)(nil)
 type Parameter struct {
 	variable    string
 	Func        *Function
-	isFreevalue bool
+	IsFreevalue bool
 	typs        Type
 
 	values []Value
@@ -406,7 +411,7 @@ type Call struct {
 	binding []Value
 
 	// caller
-	caller Value
+	// caller Value
 	// ~ drop error
 	isDropError bool
 }
@@ -451,6 +456,9 @@ type BinaryOpcode int
 const (
 	// Binary
 	OpShl BinaryOpcode = iota // <<
+
+	OpLogicAnd // &&
+	OpLogicOr  // ||
 
 	OpShr    // >>
 	OpAnd    // &
@@ -557,6 +565,9 @@ type Field struct {
 	// field
 	Key Value
 	I   User // this I type must be InterfaceType
+
+	// Method or Feild
+	isMethod bool
 
 	// capture by other function
 	OutCapture bool

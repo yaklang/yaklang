@@ -45,7 +45,7 @@ func NewConst(i any) *Const {
 }
 
 func (c *Const) IsBoolean() bool {
-	return c.typ == BasicTypes[Boolean]
+	return c.typ.GetTypeKind() == Boolean
 }
 
 func (c *Const) Boolean() bool {
@@ -53,7 +53,7 @@ func (c *Const) Boolean() bool {
 }
 
 func (c *Const) IsNumber() bool {
-	return c.typ == BasicTypes[Number]
+	return c.typ.GetTypeKind() == Number
 }
 
 func (c *Const) Number() int64 {
@@ -83,7 +83,7 @@ func (c *Const) Number() int64 {
 }
 
 func (c *Const) IsFloat() bool {
-	return c.typ == BasicTypes[Number]
+	return c.typ.GetTypeKind() == Number
 }
 
 func (c *Const) Float() float64 {
@@ -97,7 +97,7 @@ func (c *Const) Float() float64 {
 }
 
 func (c *Const) IsString() bool {
-	return c.typ == BasicTypes[String]
+	return c.typ.GetTypeKind() == String
 }
 
 func (c *Const) VarString() string {

@@ -34,7 +34,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	default:
 		// other
 		// con't call
-		f.NewError(Error, SSATAG, "call target is con't call: "+target.String())
+		// f.NewError(Error, SSATAG, "call target is con't call: "+target.String())
 	}
 
 	if parent == nil {
@@ -53,7 +53,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 			if v := parent.builder.ReadVariable(para.variable, false); !utils.IsNil(v) {
 				switch v := v.(type) {
 				case *Parameter:
-					if !v.isFreevalue {
+					if !v.IsFreevalue {
 						// is parameter, just abort
 						continue
 					}

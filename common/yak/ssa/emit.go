@@ -53,6 +53,13 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	f.SetReg(i)
 }
 
+func (f *FunctionBuilder) EmitConstInst(c *Const) *ConstInst {
+	i := NewConstInst(c, f.CurrentBlock)
+	fixupUseChain(i)
+	f.emit(i)
+	return i
+}
+
 func (f *FunctionBuilder) EmitUndefine(name string) Value {
 	if f.CurrentBlock.finish {
 		return nil

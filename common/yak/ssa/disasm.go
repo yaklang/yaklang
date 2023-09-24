@@ -60,9 +60,8 @@ func getStrFlag(v Node, hasType bool) string {
 				return i.Key.String() + "-capture"
 			}
 		}
-		if v.GetParent() != nil {
-			// op += GetReg(v, v.GetParent())
-			if str, ok := v.GetParent().InstReg[v]; ok {
+		if f := v.GetParent(); f != nil {
+			if str, ok := f.InstReg[v]; ok {
 				op += str
 			}
 		}
@@ -173,6 +172,11 @@ func (b *BasicBlock) String() string {
 // ----------- const
 func (c Const) String() string {
 	return c.str
+}
+
+// ----------- const instruction
+func (c *ConstInst) String() string {
+	return fmt.Sprintf("%s = const <%s> %s", getStr(c), c.GetType(), c.Const)
 }
 
 // ----------- undefine

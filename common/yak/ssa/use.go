@@ -11,27 +11,54 @@ func ReplaceValue(v Value, to Value) {
 		user.ReplaceValue(v, to)
 		// user.InferenceType()
 		to.AddUser(user)
-		v.RemoveUser(user)
+		// v.RemoveUser(user)
 	}
 	// delete user in v.Value
 	if user, ok := v.(User); ok {
-		for _, value := range GetValue(user) {
-			value.RemoveUser(user)
+		if touser, ok := to.(User); ok {
+			for _, value := range GetValue(user) {
+				switch v := value.(type) {
+				case *Field:
+					v.I = touser
+					touser.AddValue(v)
+				default:
+					value.RemoveUser(user)
+				}
+			}
 		}
 	}
 	if iv, ok := v.(InstructionValue); ok {
 		iv.GetParent().ReplaceSymbolTable(iv, to)
+		iv.GetParent().builder.ReplaceVariable(iv.GetVariable(), v, to)
 	}
 }
 
-func GetValue(user User) []Value {
-	return lo.Filter(user.GetValues(), func(v Value, _ int) bool {
-		if utils.IsNil(v) {
+func GetUser(v Value) []User {
+	user, ok := v.(User)
+	return lo.Filter(v.GetUsers(), func(u User, _ int) bool {
+		if utils.IsNil(u) || (ok && u == user) {
 			return false
 		} else {
 			return true
 		}
 	})
+}
+
+func GetValue(user User) []Value {
+	value, ok := user.(Value)
+	return lo.Filter(user.GetValues(), func(v Value, _ int) bool {
+		if utils.IsNil(v) || (ok && v == value) {
+			return false
+		} else {
+			return true
+		}
+	})
+}
+
+func AddUser(v Value, u User) {
+	if index := slices.Index(v.GetUsers(), u); index == -1 {
+		v.AddUser(u)
+	}
 }
 
 // ----------- Function
@@ -55,6 +82,8 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
 	if index := slices.Index(p.Edge, v); index != -1 {
 		p.Edge[index] = to
+	} else if index := slices.Index(p.values, v); index != -1 {
+		p.values[index] = to
 	} else {
 		panic("phi not use this value")
 	}
@@ -65,8 +94,10 @@ func (p *Phi) AddUser(u User)   { p.user = append(p.user, u) }
 
 func (p *Phi) RemoveUser(u User) { p.user = utils.Remove(p.user, u) }
 
-func (p *Phi) GetValues() []Value { return p.Edge }
-func (p *Phi) AddValue(v Value)   {}
+func (p *Phi) GetValues() []Value { return append(p.Edge, p.values...) }
+
+// func (p *Phi) GetValues() []Value { return p.values }
+func (p *Phi) AddValue(v Value) { p.values = append(p.values, v) }
 
 // ----------- Const
 func (c *Const) GetValues() []Value { return nil }
@@ -75,6 +106,14 @@ func (c *Const) GetUsers() []User { return c.user }
 func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
 
 func (c *Const) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
+
+// ----------- ConstInst
+func (c *ConstInst) AddValue(v Value) { c.value = append(c.value, v) }
+func (c *ConstInst) ReplaceValue(v, to Value) {
+	if index := slices.Index(c.value, v); index != -1 {
+		c.value[index] = to
+	}
+}
 
 // ----------- undifne
 // node
@@ -91,7 +130,7 @@ func (c *Undefine) RemoveValue(u User)       { c.user = utils.Remove(c.user, u) 
 func (c *Undefine) ReplaceValue(v, to Value) { slices.Replace(c.values, 0, len(c.values), v, to) }
 
 // ----------- param
-func (p *Parameter) GetValues() []Value { return nil }
+func (p *Parameter) GetValues() []Value { return p.values }
 
 func (p *Parameter) GetUsers() []User { return p.users }
 
@@ -233,29 +272,31 @@ func (b *UnOp) GetValues() []Value { return []Value{b.X} }
 func (b *UnOp) AddValue(v Value)   {}
 
 // ----------- Interface
-func (i *Interface) ReplaceValue(v, to Value) {
+func (i *Object) ReplaceValue(v, to Value) {
 	if i.Cap == v {
 		i.Cap = to
 	} else if i.Len == v {
 		i.Len = v
+	} else if index := slices.Index(i.value, v); index != -1 {
+		i.value[index] = to
 	} else {
-		panic("interface not use this value")
+		panic("object not use this value")
 	}
 }
 
-func (i *Interface) GetUsers() []User { return i.users }
-func (i *Interface) AddUser(u User) {
+func (i *Object) GetUsers() []User { return i.users }
+func (i *Object) AddUser(u User) {
 	i.users = append(i.users, u)
 }
 
-func (i *Interface) RemoveUser(u User) {
+func (i *Object) RemoveUser(u User) {
 	i.users = utils.Remove(i.users, u)
 }
 
-func (i *Interface) GetValues() []Value {
+func (i *Object) GetValues() []Value {
 	return i.value
 }
-func (i *Interface) AddValue(v Value) {
+func (i *Object) AddValue(v Value) {
 	i.value = append(i.value, v)
 }
 
