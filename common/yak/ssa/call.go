@@ -10,6 +10,9 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	switch inst := target.(type) {
 	case *Field:
 		// field
+		if v, ok := inst.I.(Value); ok && inst.isMethod {
+			args = append([]Value{v}, args...)
+		}
 		fun, ok := inst.GetLastValue().(*Function)
 		if ok {
 			freevalue = fun.FreeValues
