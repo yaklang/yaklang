@@ -75,7 +75,7 @@ func NewGroup(opt ...GroupOption) *Group {
 		ctx:         ctx,
 		cancel:      cancel,
 		onMatchedCallback: func(packet gopacket.Packet, match *rule.Rule) {
-			log.Infof("matched: %v", match)
+			log.Infof("matched: %v", match.Raw)
 		},
 		wg: new(sync.WaitGroup),
 	}
