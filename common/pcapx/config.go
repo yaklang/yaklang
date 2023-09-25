@@ -93,6 +93,9 @@ func ParseTCPRaw(raw []byte) (*layers.IPv4, *layers.TCP, gopacket.Payload, error
 
 func ParseTCPIPv4(raw []byte) (*layers.IPv4, *layers.TCP, gopacket.Payload, error) {
 	packet := gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
+	if packet.ErrorLayer() != nil {
+		return nil, nil, nil, utils.Error("parse packet(ip4+tcp) failed")
+	}
 	ipLayer := packet.NetworkLayer()
 	var ipv4 *layers.IPv4
 	var ok bool
@@ -104,12 +107,15 @@ func ParseTCPIPv4(raw []byte) (*layers.IPv4, *layers.TCP, gopacket.Payload, erro
 	}
 	var tcp *layers.TCP
 	var payload gopacket.Payload
-	if ret := packet.TransportLayer(); ret.LayerType() == layers.LayerTypeTCP {
+	if ret := packet.TransportLayer(); ret != nil && ret.LayerType() == layers.LayerTypeTCP {
 		tcp, ok = ret.(*layers.TCP)
 		if !ok {
 			return nil, nil, nil, utils.Error("parse tcp layer failed")
 		}
 		payload = ret.LayerPayload()
+	}
+	if tcp == nil {
+		return nil, nil, nil, utils.Error("parse tcp layer failed")
 	}
 	return ipv4, tcp, payload, nil
 }
@@ -163,33 +169,33 @@ func ParseICMPIPv4(raw []byte) (*layers.IPv4, *layers.ICMPv4, gopacket.Payload, 
 	return ipv4, icmp, payload, nil
 }
 
-func ParseLinkLayer(raw []byte) (*layers.Ethernet, *layers.IPv4, *layers.TCP, error) {
-	packet := gopacket.NewPacket(raw, layers.LayerTypeIPv4, gopacket.Default)
-	var ok bool
+func parseFromLinkLayer(layerType layers.LinkType, raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	packet := gopacket.NewPacket(raw, layerType, gopacket.Default)
+	if packet.ErrorLayer() != nil && packet.ErrorLayer().Error() != nil {
+		return nil, nil, nil, nil, utils.Error("parse packet(ethernet) failed")
+	}
 	linkLayer := packet.LinkLayer()
-	var ethernet *layers.Ethernet
-	if linkLayer.LayerType() == layers.LayerTypeEthernet {
-		ethernet, ok = linkLayer.(*layers.Ethernet)
-		if !ok {
-			return nil, nil, nil, utils.Error("parse ethernet layer failed")
-		}
-		return ethernet, nil, nil, nil
+	if linkLayer == nil {
+		return nil, nil, nil, nil, utils.Error("parse ethernet layer failed")
 	}
 
-	ipLayer := packet.NetworkLayer()
-	var ipv4 *layers.IPv4
-	if ipLayer.LayerType() == layers.LayerTypeIPv4 {
-		ipv4, ok = ipLayer.(*layers.IPv4)
-		if !ok {
-			return nil, nil, nil, utils.Error("parse ipv4 layer failed")
-		}
+	netLayer := packet.NetworkLayer()
+	transLayer := packet.TransportLayer()
+
+	var payload = linkLayer.LayerPayload()
+	if netLayer != nil {
+		payload = netLayer.LayerPayload()
 	}
-	var tcp *layers.TCP
-	if ret := packet.TransportLayer(); ret.LayerType() == layers.LayerTypeTCP {
-		tcp, ok = ret.(*layers.TCP)
-		if !ok {
-			return nil, nil, nil, utils.Error("parse tcp layer failed")
-		}
+	if transLayer != nil {
+		payload = transLayer.LayerPayload()
 	}
-	return ethernet, ipv4, tcp, nil
+	return linkLayer, netLayer, transLayer, payload, nil
+}
+
+func ParseEthernetLinkLayer(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	return parseFromLinkLayer(layers.LinkTypeEthernet, raw)
+}
+
+func ParseRaw(raw []byte) (gopacket.LinkLayer, gopacket.NetworkLayer, gopacket.TransportLayer, gopacket.Payload, error) {
+	return parseFromLinkLayer(layers.LinkTypeRaw, raw)
 }
