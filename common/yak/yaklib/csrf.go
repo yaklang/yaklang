@@ -25,7 +25,7 @@ var csrfFormTemplate = template.Must(template.New("csrf-form").Parse(strings.Tri
 </body>
 </html>
 `)))
-var csrfXMLTemplate = template.Must(template.New("csrf-xml").Parse(strings.TrimSpace(`
+var csrfJSTemplate = template.Must(template.New("csrf-js").Parse(strings.TrimSpace(`
 <html>
 <body>
 <script>history.pushState('', '', '/')</script>
@@ -140,18 +140,24 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 				templateConfig.ContentType = value
 				templateConfig.EncType = "multipart/form-data"
 				break
+			} else if strings.Contains(strings.ToLower(value), "application/json") {
+				templateConfig.ContentType = value
+				break
 			}
 		}
 		break
 	}
 
 	if method == "POST" {
-		if !isMultipart {
-			rawBody, err = ioutil.ReadAll(req.Body)
-			if err != nil {
-				return "", utils.Errorf("parse request body failed: %s", err)
-			}
+		rawBody, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return "", utils.Errorf("parse request body failed: %s", err)
+		}
 
+		if config.MultipartDefaultValue || strings.Contains(strings.ToLower(value), "application/json") {
+			template = csrfJSTemplate
+			templateConfig.Body = string(rawBody)
+		} else if !isMultipart {
 			vals, err = url.ParseQuery(strings.TrimSpace(string(rawBody)))
 			if err != nil {
 				return "", err
@@ -161,27 +167,18 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 					templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
 				}
 			}
-		} else {
-			if config.MultipartDefaultValue {
-				rawBody, err = ioutil.ReadAll(req.Body)
-				if err != nil {
-					return "", utils.Errorf("parse request body failed: %s", err)
+		} else if !config.MultipartDefaultValue {
+			err = req.ParseMultipartForm(81920)
+			if err != nil {
+				return "", err
+			}
+			for key, values = range req.MultipartForm.Value {
+				for _, value = range values {
+					templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
 				}
-				template = csrfXMLTemplate
-				templateConfig.Body = string(rawBody)
-			} else {
-				err = req.ParseMultipartForm(81920)
-				if err != nil {
-					return "", err
-				}
-				for key, values = range req.MultipartForm.Value {
-					for _, value = range values {
-						templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
-					}
-				}
-				for key = range req.MultipartForm.File {
-					templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"file", key, ""})
-				}
+			}
+			for key = range req.MultipartForm.File {
+				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"file", key, ""})
 			}
 		}
 
