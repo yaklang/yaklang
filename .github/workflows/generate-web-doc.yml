@@ -18,6 +18,13 @@ jobs:
     - name: Install libpcap (Linux)
       run: |
         sudo apt-get update && sudo apt-get install libpcap-dev=1.9.1-3
+    
+    - name: Install node and yarn (Linux)
+      run: |
+        sudo apt-get install node
+        sudo apt-get install curl && sudo apt-get install gnupg
+        sudo curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+        sudo apt-get update && sudo apt-get install yarn
 
     - name: Generate docs
       run: |
@@ -36,11 +43,9 @@ jobs:
       run: |
         cp -rf web_doc/* websize/docs/api
 
-    - name: Push
+    - name: Add tag and Push
       run: |
         cd websize
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add .
-        git commit -m "Update api docs"
-        git push
+        git add . && (git commit -m "Update api docs" && yarn version --patch && git push)
