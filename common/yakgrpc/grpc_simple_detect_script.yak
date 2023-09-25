@@ -762,14 +762,11 @@ if hostCountSec != 0 {
     // 定时器，超过一定时间，就扫描结束
     waitTimeSec = hostCountSec + (loadPluginFinished * 2)/20 + OpenPortCount
     yakit.Info("waitTimeSec %v", waitTimeSec)
-    ticker := time.NewTicker(waitTimeSec)
-    go func(ticker) {
-        for t := range ticker.C {
-            yakit.SetProgress(1)
-            yakit.Info("ticker 本次扫描任务已完成。")
-            os.Exit(0)
-        }
-    }(ticker)
+    time.AfterFunc(waitTimeSec, func() {
+        yakit.SetProgress(1)
+        yakit.Info("AfterFunc 本次扫描任务已完成。")
+        os.Exit(0)
+    })
 }
 
 bruteWg.Wait()
