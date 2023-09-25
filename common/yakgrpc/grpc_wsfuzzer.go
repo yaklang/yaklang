@@ -3,13 +3,15 @@ package yakgrpc
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServer) error {
@@ -20,7 +22,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 	_ = firstReq
 
 	var id int64 = 0
-	var _requireIndexLock = new(sync.Mutex)
+	_requireIndexLock := new(sync.Mutex)
 	requireDataFrameID := func() int64 {
 		_requireIndexLock.Lock()
 		defer _requireIndexLock.Unlock()
@@ -41,7 +43,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 			}
 
 			_, isJson := utils.IsJSON(string(fromServer))
-			var dataVerbose = utils.EscapeInvalidUTF8Byte(fromServer)
+			dataVerbose := utils.EscapeInvalidUTF8Byte(fromServer)
 			if isJson {
 				var buf bytes.Buffer
 				_ = json.Indent(&buf, fromServer, "", "")
@@ -94,11 +96,16 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 				log.Errorf("stream recv wsfuzzer req failed: %s", err)
 				return
 			}
-			toServerStr := string(req.GetToServer())
-			client.Write(req.GetToServer())
+			message := req.GetToServer()
+			fuzzResult := mutate.MutateQuick(message)
+			if len(fuzzResult) > 0 {
+				message = utils.UnsafeStringToBytes(fuzzResult[0])
+			}
+			messageStr := string(message)
+			client.Write(message)
 
 			_, isJson := utils.IsJSON(string(req.GetToServer()))
-			var dataVerbose = ""
+			dataVerbose := ""
 			if isJson {
 				var buf bytes.Buffer
 				_ = json.Indent(&buf, req.GetToServer(), "", "")
@@ -107,19 +114,19 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 				}
 			}
 			if dataVerbose == "" {
-				dataVerbose = strings.Trim(strconv.Quote(toServerStr), `"`)
+				dataVerbose = strings.Trim(strconv.Quote(messageStr), `"`)
 			}
 
 			msg := &ypb.ClientWebsocketResponse{
 				SwitchProtocolSucceeded: true,
 				IsDataFrame:             true,
 				FromServer:              false,
-				Data:                    []byte(toServerStr),
+				Data:                    []byte(messageStr),
 				DataVerbose:             dataVerbose,
-				DataLength:              int64(len(toServerStr)),
-				DataSizeVerbose:         utils.ByteSize(uint64(len(toServerStr))),
+				DataLength:              int64(len(messageStr)),
+				DataSizeVerbose:         utils.ByteSize(uint64(len(messageStr))),
 				IsJson:                  isJson,
-				IsProtobuf:              utils.IsProtobuf([]byte(toServerStr)),
+				IsProtobuf:              utils.IsProtobuf([]byte(messageStr)),
 				DataFrameIndex:          requireDataFrameID(),
 			}
 			stream.Send(msg)
