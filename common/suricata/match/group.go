@@ -99,13 +99,12 @@ func (g *Group) LoadRule(r *rule.Rule) {
 				matcher: matcher.matcher.Clone(),
 			}
 		}})
-	default:
-		g.OrdinaryMatcher = append(g.HTTPMatcher, &sync.Pool{New: func() any {
-			return &Matcher{
-				matcher: matcher.matcher.Clone(),
-			}
-		}})
 	}
+	g.OrdinaryMatcher = append(g.OrdinaryMatcher, &sync.Pool{New: func() any {
+		return &Matcher{
+			matcher: matcher.matcher.Clone(),
+		}
+	}})
 }
 
 func (g *Group) LoadRules(r ...*rule.Rule) {
