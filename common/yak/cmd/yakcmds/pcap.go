@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/match"
@@ -12,49 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 )
-
-var SuricataLoaderCommand = cli.Command{
-	Name:  "suricata",
-	Usage: "Load suricata rules to database",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "rule-file",
-			Usage: `load suricata`,
-		},
-		cli.StringFlag{
-			Name: "domain",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		domain := c.String("domain")
-		if domain != "" {
-			domainRule := strings.Trim(strconv.Quote(domain), ` "'`+"`")
-			rule := `alert http any any -> any any (msg:"Domain Fetch: ` + domainRule + `"; content:"` + domainRule + `"; http_header; sid:1; rev:1;)`
-			log.Infof("generate suricata rule: %s", rule)
-			err := chaosmaker.LoadSuricataToDatabase(rule)
-			if err != nil {
-				return err
-			}
-		}
-
-		if c.String("rule-file") != "" {
-			raw, err := os.ReadFile(c.String("rule-file"))
-			if err != nil {
-				return err
-			}
-			log.Infof("start to load suricata rule: %s", c.String("rule-file"))
-			err = chaosmaker.LoadSuricataToDatabase(string(raw))
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	},
-}
 
 var PcapCommand = cli.Command{
 	Name:  "pcap",

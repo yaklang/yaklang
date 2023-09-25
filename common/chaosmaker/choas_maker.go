@@ -47,8 +47,13 @@ func (c *ChaosMaker) ApplyAll() error {
 	return nil
 }
 
-func (c *ChaosMaker) Generate() chan []byte {
-	fChan := make(chan []byte)
+type TrafficRule struct {
+	Rule *rule.Storage
+	Raw  []byte
+}
+
+func (c *ChaosMaker) GenerateWithRule() chan *TrafficRule {
+	fChan := make(chan *TrafficRule)
 	go func() {
 		defer close(fChan)
 		for _, r := range c.ChaosRules {
@@ -68,8 +73,19 @@ func (c *ChaosMaker) Generate() chan []byte {
 				continue
 			}
 			for t := range ch {
-				fChan <- t
+				fChan <- &TrafficRule{Rule: r, Raw: t}
 			}
+		}
+	}()
+	return fChan
+}
+
+func (c *ChaosMaker) Generate() chan []byte {
+	fChan := make(chan []byte)
+	go func() {
+		defer close(fChan)
+		for i := range c.GenerateWithRule() {
+			fChan <- i.Raw
 		}
 	}()
 	return fChan

@@ -1230,6 +1230,7 @@ func main() {
 
 		yakcmds.PcapCommand,
 		yakcmds.SuricataLoaderCommand,
+		yakcmds.ChaosMakerCommand,
 
 		// chaosmaker
 		{
