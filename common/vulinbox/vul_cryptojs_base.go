@@ -430,6 +430,7 @@ setTimeout(function(){
 						"decrypted_error":          fmt.Sprint(decErr),
 					}, "", "    ")
 					handled = string(raw)
+					_ = handled
 
 					if !utf8.Valid(origin) {
 						origin = []byte(strconv.Quote(string(origin)))
@@ -447,13 +448,21 @@ setTimeout(function(){
 					params := utils.InterfaceToGeneralMap(i)
 					username := utils.MapGetString(params, "username")
 					password := utils.MapGetString(params, "password")
-					renderLoginSuccess(writer, username, password, []byte(
-						`<br>`+
-							`<pre>`+string(data)+`</pre> <br><br><br>	`+
-							`<pre>`+handled+`</pre> <br><br>	`+
-							`<pre>`+string(origin)+`</pre> <br><br>	`+
-							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
-					))
+					var blocks []string
+					blocks = append(blocks, block("解密前端内容成功", string(origin)))
+					if isLogined(username, password) {
+						blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+					} else {
+						blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(origin)))
+					}
+					DefaultRender(BlockContent(blocks...), writer, request)
+					//renderLoginSuccess(writer, username, password, []byte(
+					//	`<br>`+
+					//		`<pre>`+string(data)+`</pre> <br><br><br>	`+
+					//		`<pre>`+handled+`</pre> <br><br>	`+
+					//		`<pre>`+string(origin)+`</pre> <br><br>	`+
+					//		`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
+					//))
 					return
 				}
 
@@ -510,6 +519,7 @@ setTimeout(function(){
 					}, "", "    ")
 					handled = string(raw)
 
+					_ = handled
 					if !utf8.Valid(origin) {
 						origin = []byte(strconv.Quote(string(origin)))
 					} else {
@@ -528,15 +538,15 @@ setTimeout(function(){
 					} else {
 						params = utils.InterfaceToGeneralMap(origin)
 					}
-					username := utils.MapGetString(params, "username")
-					password := utils.MapGetString(params, "password")
-					renderLoginSuccess(writer, username, password, []byte(
-						`<br>`+
-							`<pre>`+string(data)+`</pre> <br><br><br>	`+
-							`<pre>`+handled+`</pre> <br><br>	`+
-							`<pre>`+string(origin)+`</pre> <br><br>	`+
-							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
-					))
+
+					var blocks []string
+					blocks = append(blocks, block("解密前端内容成功", string(origin)))
+					if isLogined(username, password) {
+						blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+					} else {
+						blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(origin)))
+					}
+					DefaultRender(BlockContent(blocks...), writer, request)
 					return
 				}
 
@@ -592,6 +602,7 @@ setTimeout(function(){
 						"decrypted_error":          fmt.Sprint(decErr),
 					}, "", "    ")
 					handled = string(raw)
+					_ = handled
 
 					if !utf8.Valid(origin) {
 						origin = []byte(strconv.Quote(string(origin)))
@@ -613,13 +624,14 @@ setTimeout(function(){
 					}
 					username := utils.MapGetString(params, "username")
 					password := utils.MapGetString(params, "password")
-					renderLoginSuccess(writer, username, password, []byte(
-						`<br>`+
-							`<pre>`+string(data)+`</pre> <br><br><br>	`+
-							`<pre>`+handled+`</pre> <br><br>	`+
-							`<pre>`+string(origin)+`</pre> <br><br>	`+
-							`<pre>`+fmt.Sprint(err)+`</pre> <br><br>	`,
-					))
+					var blocks []string
+					blocks = append(blocks, block("解密前端内容成功", string(origin)))
+					if isLogined(username, password) {
+						blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
+					} else {
+						blocks = append(blocks, block("用户名密码验证失败", "origin data: "+string(origin)))
+					}
+					DefaultRender(BlockContent(blocks...), writer, request)
 					return
 				}
 
@@ -779,6 +791,7 @@ setTimeout(function(){
 
 					origin, err := codec.AESGCMDecryptWithNonceSize12(originKey, encryptedBase64Decoded, originIV)
 					if err != nil {
+						spew.Dump(originKey, originIV, encryptedBase64Decoded)
 						log.Warnf("AES-GCM Decrypt failed nonce size 12: %v", err)
 						writer.Write([]byte("<pre>" + string(data) + "<pre> <br/> <br/> <h2>error</h2> <br/>" + err.Error()))
 						return
