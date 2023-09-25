@@ -3,7 +3,10 @@ package match
 import (
 	"encoding/hex"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -139,33 +142,41 @@ func TestMUSTPASS_FastPattern(t *testing.T) {
 }
 
 func BenchmarkRule_Match(b *testing.B) {
-	raw := "alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;content:2024;http.header;distance:1;"
+	raw := `alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;pcre:"/[A-Z][a-z]*(-[A-Z][a-z]*)*(?<!abc):\\s[a-z]+(-[a-z]*)*=\\d(?=;)/";content:2024;http.header;distance:1;)`
 	rs, err := rule.Parse(raw)
 	if err != nil {
 		b.Error(err)
 		return
 	}
-	r := rs[0]
+	r := New(rs[0])
 	bytes, _ := hex.DecodeString("6afd6158af5c3066d026811b0800450001276ec7400036065b1cdde4d84ec0a8031200501a75fab0b874a3a722ec50180ffe576d0000485454502f312e312033303220466f756e640d0a4c6f636174696f6e3a2068747470733a2f2f6261696d656f772e636e2f0d0a436f6e74656e742d4c656e6774683a20300d0a582d4e57532d4c4f472d555549443a20393433363237373032323431383037313837350d0a436f6e6e656374696f6e3a206b6565702d616c6976650d0a5365727665723a20534c540d0a446174653a205468752c2030332041756720323032332030393a35383a333520474d540d0a582d43616368652d4c6f6f6b75703a2052657475726e204469726563746c790d0a5374726963742d5472616e73706f72742d53656375726974793a206d61782d6167653d313b0d0a0d0a")
+	pk := gopacket.NewPacket(bytes, layers.LayerTypeEthernet, gopacket.NoCopy)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		New(r).Match(bytes)
+		if r.MatchPackage(pk) {
+			spew.Dump(r)
+			log.Fatal("match should be failed")
+		}
 	}
 	b.StopTimer()
 }
 
 func BenchmarkRule_Match_FastPattern(b *testing.B) {
-	raw := "alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;content:2024;http.header;fast_pattern;distance:1;"
+	raw := `alert http any any -> any any (msg:httptest;content:https;http.location;startswith;content:slt;http.server;nocase;content:keep-alive;http.connection;content:302;http.stat_code;startswith;content:Aug;http.header;pcre:"/[A-Z][a-z]*(-[A-Z][a-z]*)*(?<!abc):\\s[a-z]+(-[a-z]*)*=\\d(?=;)/";content:2024;http.header;fast_pattern;distance:1;)`
 	rs, err := rule.Parse(raw)
 	if err != nil {
 		b.Error(err)
 		return
 	}
-	r := rs[0]
+	r := New(rs[0])
 	bytes, _ := hex.DecodeString("6afd6158af5c3066d026811b0800450001276ec7400036065b1cdde4d84ec0a8031200501a75fab0b874a3a722ec50180ffe576d0000485454502f312e312033303220466f756e640d0a4c6f636174696f6e3a2068747470733a2f2f6261696d656f772e636e2f0d0a436f6e74656e742d4c656e6774683a20300d0a582d4e57532d4c4f472d555549443a20393433363237373032323431383037313837350d0a436f6e6e656374696f6e3a206b6565702d616c6976650d0a5365727665723a20534c540d0a446174653a205468752c2030332041756720323032332030393a35383a333520474d540d0a582d43616368652d4c6f6f6b75703a2052657475726e204469726563746c790d0a5374726963742d5472616e73706f72742d53656375726974793a206d61782d6167653d313b0d0a0d0a")
+	pk := gopacket.NewPacket(bytes, layers.LayerTypeEthernet, gopacket.NoCopy)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		New(r).Match(bytes)
+		if r.MatchPackage(pk) {
+			spew.Dump(r)
+			log.Fatal("match should be failed")
+		}
 	}
 }
 

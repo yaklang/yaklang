@@ -55,7 +55,7 @@ type matchHandler func(*matchContext) error
 type bufferProvider func(modifier modifier.Modifier) []byte
 
 type matchContext struct {
-	// matcher is not thread safe, you'd best clone it before use.
+	// matcher itself not designed for multi threads, you'd best clone it before use.
 	// lock is used to protect the matcher from being used by multiple goroutines.
 	lock sync.Mutex
 
