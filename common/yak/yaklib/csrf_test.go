@@ -35,6 +35,22 @@ a[1]=1&a[2]=1&c=1&d=2
 	spew.Dump(err)
 }
 
+func TestCsrfPOCJSONPost(t *testing.T) {
+	poc, err := GenerateCSRFPoc(`POST /post?a=1&b=2 HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Host: httpbin.org
+User-Agent: HTTPie/3.2.1
+Content-Type: application/json
+Content-Length: 16
+
+{"key": "value"}
+`)
+	t.Log(poc)
+	spew.Dump(err)
+}
+
 func TestCsrfPOCMultipartTrue(t *testing.T) {
 	poc, err := GenerateCSRFPoc(`POST /post HTTP/1.1
 Accept: */*
