@@ -44,9 +44,10 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 			ellipsis = ellipsis[:150] + "..."
 		}
 
-		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, fun.MethodName, ellipsis))
+		lowerMethodName := strings.ToLower(fun.MethodName)
+		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, lowerMethodName, ellipsis))
 		buf := strings.Builder{}
-		buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
+		buf.WriteString(fmt.Sprintf("### %s\n\n", lowerMethodName))
 		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", document))
 		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", fun.Decl))
 		if len(fun.Params) > 0 {
