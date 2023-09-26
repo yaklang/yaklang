@@ -477,9 +477,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
-	if option.WithConnPool && option.ConnPool == nil {
-		option.ConnPool = DefaultLowHttpConnPool
-	}
 
 	var (
 		forceHttps           = option.Https
@@ -507,6 +504,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
 	)
+
+	if option.WithConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
+	}
+
 	reqSchema := "HTTP"
 	if forceHttp2 {
 		reqSchema = "HTTP2"
