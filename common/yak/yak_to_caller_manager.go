@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
@@ -62,10 +63,35 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 				}
 			}
 		}()
+		yakVar, ok := codeEnv.GetVar("handle")
+		if !ok {
+			log.Error(errors.New("not found handle function"))
+			return []*fuzztag.FuzzExecResult{}
+		}
+		yakFunc, ok := yakVar.(*yakvm.Function)
+		if !ok {
+			log.Error(errors.New("not found handle function"))
+			return []*fuzztag.FuzzExecResult{}
+		}
 		iparams := []any{}
-		funk.ForEach(strings.Split(params, "|"), func(s any) {
-			iparams = append(iparams, s)
-		})
+		if yakFunc.IsVariableParameter() {
+			funk.ForEach(strings.Split(params, "|"), func(s any) {
+				iparams = append(iparams, s)
+			})
+
+		} else {
+			paramIn := yakFunc.GetNumIn()
+			splits := strings.Split(params, "|")
+			for len(splits) < paramIn {
+				splits = append(splits, "")
+			}
+			i := 0
+			for ; i < paramIn-1; i++ {
+				iparams = append(iparams, splits[i])
+			}
+
+			iparams = append(iparams, strings.Join(splits[i:], "|"))
+		}
 		data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
 		if err != nil {
 			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
