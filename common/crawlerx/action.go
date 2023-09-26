@@ -353,7 +353,12 @@ func (starter *BrowserStarter) generateUrlsExploit() func(string, string) error 
 			}
 		}
 		starter.urlTree.Add(originUrl, targetUrl)
-		starter.uChan.In <- targetUrl
+		select {
+		case <-starter.ctx.Done():
+			return utils.Error("context deadline exceed")
+		default:
+			starter.uChan.In <- targetUrl
+		}
 		return nil
 	}
 }
@@ -444,7 +449,12 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 				method:     "EVENT GET",
 				from:       originUrl,
 			}
-			starter.ch <- &result
+			select {
+			case <-starter.ctx.Done():
+				log.Error("context deadline exceed")
+			default:
+				starter.ch <- &result
+			}
 			if starter.banList.Exist(currentUrl) {
 				return nil
 			}
@@ -494,7 +504,12 @@ func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string,
 				method:     "EVENT GET",
 				from:       originUrl,
 			}
-			starter.ch <- &result
+			select {
+			case <-starter.ctx.Done():
+				log.Error("context deadline exceed")
+			default:
+				starter.ch <- &result
+			}
 			if starter.banList.Exist(currentUrl) {
 				return nil
 			}
