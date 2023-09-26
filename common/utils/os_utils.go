@@ -236,23 +236,27 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute*5), false, false, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute*5), false, false, false, false, handle)
 }
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, false, false, false, handle)
+	return DebugMockHTTPServerWithContext(ctx, false, false, false, false, handle)
 }
 
 func DebugMockHTTP2(ctx context.Context, handler func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, true, true, false, handler)
+	return DebugMockHTTPServerWithContext(ctx, true, true, false, false, handler)
 }
 
 func DebugMockGMHTTP(ctx context.Context, handler func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, true, false, false, handler)
+	return DebugMockHTTPServerWithContext(ctx, true, false, false, false, handler)
 }
 
 func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, handle)
+}
+
+func DebugMockHTTPSKeepAliveEx(handle func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, true, handle)
 }
 
 var (
@@ -303,7 +307,7 @@ func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
 	return nil
 }
 
-func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gmtlsFlag bool, handle func([]byte) []byte) (string, int) {
+func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gmtlsFlag bool, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
@@ -425,9 +429,11 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 							return
 						}
 						conn.Write(handle(raw))
-						time.Sleep(500 * time.Millisecond)
-						conn.Close()
-						return
+						if !keepAlive {
+							time.Sleep(500 * time.Millisecond)
+							conn.Close()
+							return
+						}
 					}
 				}
 			}()
