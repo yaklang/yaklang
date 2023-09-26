@@ -28,7 +28,7 @@ const findHref = `() => {
 
 func (starter *BrowserStarter) actionOnPage(page *rod.Page) error {
 	originUrl, _ := getCurrentUrl(page)
-	log.Infof(`Crawler on page %s`, originUrl)
+	log.Debugf(`Crawler on page %s`, originUrl)
 
 	urls, err := starter.getUrls(page)
 	if err != nil {
@@ -149,7 +149,7 @@ func (starter *BrowserStarter) eventActionOnPage(page *rod.Page) error {
 
 func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 	if starter.vue {
-		log.Info("determined vue.")
+		log.Debug("determined vue.")
 		return starter.eventActionOnPage(page)
 	}
 	status, err := starter.vueCheck(page)
@@ -157,7 +157,7 @@ func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 		return utils.Errorf(`check vue error: %v`, err)
 	}
 	if status {
-		log.Info("presume vue")
+		log.Debug("presume vue")
 		return starter.eventActionOnPage(page)
 	} else {
 		return starter.normalActionOnPage(page)
@@ -239,14 +239,11 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 			originUrl = originUrl[:len(originUrl)-1]
 		}
 		if starter.maxDepth != 0 {
-			//log.Infof(`max depth: %d`, starter.maxDepth)
 			currentNode := starter.urlTree.Find(originUrl)
 			if currentNode == nil {
-				log.Infof(`Origin url %s current node not found.`, originUrl)
+				log.Debugf(`Origin url %s current node not found.`, originUrl)
 			} else {
-				//log.Infof(`Current node %s depth: %d`, originUrl, currentNode.Level())
 				if currentNode.Level() > starter.maxDepth {
-					//log.Infof(`Origin url %s reach max depth %d`, originUrl, starter.maxDepth)
 					return urls, nil
 				}
 			}
@@ -330,7 +327,7 @@ func (starter *BrowserStarter) generateGetEventElements() func(*rod.Page) ([]str
 		}
 		clickableElementArr := elementObjs.Value.Arr()
 		if len(clickableElementArr) == 0 {
-			log.Info(`page with no event.`)
+			log.Debug(`page with no event.`)
 			return results, nil
 		}
 		for _, element := range clickableElementArr {
@@ -348,7 +345,7 @@ func (starter *BrowserStarter) generateUrlsExploit() func(string, string) error 
 		for k, f := range starter.urlCheck {
 			afterUrl := starter.urlAfterRepeat(targetUrl)
 			if !f(afterUrl) {
-				log.Infof(`%s ban url: %s`, k, targetUrl)
+				log.Debugf(`%s ban url: %s`, k, targetUrl)
 				if !starter.banList.Exist(targetUrl) {
 					starter.banList.Insert(targetUrl)
 				}
@@ -412,7 +409,6 @@ func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element)
 		case "radio", "checkbox":
 			return element.Click(proto.InputMouseButtonLeft, 1)
 		default:
-			//log.Infof("unknown attribute: %s", attribute)
 			return nil
 		}
 	}

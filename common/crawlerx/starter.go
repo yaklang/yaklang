@@ -267,7 +267,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		return
 	}
 	defer func() {
-		log.Infof(`page with target ID %v closing...`, targetID)
+		log.Debugf(`page with target ID %v closing...`, targetID)
 		err = page.Close()
 		if err != nil {
 			log.Errorf(`page with target ID %v closing error: %v`, targetID, err)
@@ -288,10 +288,10 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		return
 	}
 	urlStr, _ := getCurrentUrl(page)
-	log.Infof(`page opened: %v with targetID %v`, urlStr, targetID)
+	log.Debugf(`page opened: %v with targetID %v`, urlStr, targetID)
 	if !starter.storageSave && len(starter.baseConfig.localStorage) > 0 {
 		starter.storageSave = true
-		log.Infof(`do local storage on %s`, urlStr)
+		log.Debugf(`do local storage on %s`, urlStr)
 		for key, value := range starter.baseConfig.localStorage {
 			setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
 			_, err := page.EvalOnNewDocument(setStorageJS)
@@ -331,7 +331,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 				if starter.jsResultSend != nil {
 					starter.jsResultSend(string(resultBytes))
 				} else {
-					log.Infof(`get eval js result: %v`, string(resultBytes))
+					log.Debugf(`get eval js result: %v`, string(resultBytes))
 				}
 			}
 		}
@@ -595,34 +595,31 @@ func (starter *BrowserStarter) Start() {
 	if err != nil {
 		log.Errorf("stealth.min.js read error: %v", err.Error())
 	} else {
-		log.Info("stealth.min.js load done!")
+		log.Debug("stealth.min.js load done!")
 	}
 	starter.baseConfig.startWaitGroup.Done()
 running:
 	for {
 		select {
 		case <-starter.ctx.Done():
-			log.Info("ctx done.")
 			if starter.running {
 				starter.running = false
 				starter.waitGroup.Done()
 			}
 			break running
 		case v, ok := <-starter.uChan.Out:
-			log.Infof(`current url chan len: %d`, starter.uChan.Len())
+			log.Debugf(`current url chan len: %d`, starter.uChan.Len())
 			if !ok {
-				log.Info("break running.")
+				log.Debug("break running.")
 				break running
 			}
 			if !starter.running {
-				log.Info(`start running.`)
+				log.Debug(`start running.`)
 				starter.waitGroup.Add()
 				starter.running = true
 			}
 			if starter.counter.OverLoad() {
-				//log.Infof(`overload, waiting for concurrent: %d`, starter.counter.Number())
 				starter.counter.Wait(starter.concurrent)
-				//log.Infof(`overload done: %d`, starter.counter.Number())
 			}
 			urlStr, _ := v.(string)
 			p, err := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
@@ -648,14 +645,14 @@ running:
 			}
 		default:
 			if starter.counter.LayDown() && starter.running {
-				log.Info(`lay down. `)
+				log.Debug(`lay down. `)
 				starter.running = false
 				starter.waitGroup.Done()
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
-	log.Info("done!")
+	log.Debug("done!")
 }
 
 func (starter *BrowserStarter) Test() {
@@ -694,5 +691,4 @@ func (starter *BrowserStarter) Test() {
 
 	starter.waitGroup.Done()
 	time.Sleep(500 * time.Millisecond)
-	log.Info("done test")
 }
