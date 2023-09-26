@@ -410,7 +410,7 @@ func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element)
 		case "file":
 			return starter.defaultUploadFile(element)
 		case "radio", "checkbox":
-			return element.Click(proto.InputMouseButtonLeft)
+			return element.Click(proto.InputMouseButtonLeft, 1)
 		default:
 			//log.Infof("unknown attribute: %s", attribute)
 			return nil
