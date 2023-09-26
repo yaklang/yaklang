@@ -13,7 +13,7 @@ import (
 func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, selector string) bool {
 	info, err := page.Info()
 	if err != nil {
-		log.Infof("page %v get info error: %v", page, err)
+		log.Errorf("page %v get info error: %v", page, err)
 		return false
 	}
 	var url string
@@ -26,23 +26,23 @@ func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, sele
 	status, element, err := page.Has(selector)
 	//element, err := page.Element(selector)
 	if err != nil {
-		log.Infof("On page %s element: %s", url, err)
+		log.Debugf("On page %s element: %s", url, err)
 		return false
 	}
 	if !status {
-		log.Infof("On page %s element: %s not found", url, selector)
+		log.Debugf("On page %s element: %s not found", url, selector)
 		return false
 	}
 	if element == nil {
-		log.Infof("On page %s element %s not found.", url, selector)
+		log.Debugf("On page %s element %s not found.", url, selector)
 		return false
 	}
 	if visible, _ := element.Visible(); !visible {
-		log.Infof(`On page %s element %s not visible`, url, selector)
+		log.Debugf(`On page %s element %s not visible`, url, selector)
 		return false
 	}
 	if starter.elementCheck != nil && !starter.elementCheck(element) {
-		log.Infof(`On page %s element check failed`, url)
+		log.Debugf(`On page %s element check failed`, url)
 		return false
 	}
 	//element.Click(proto.InputMouseButtonLeft)
@@ -82,7 +82,7 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 				//info := page.MustInfo()
 				info, err := page.Info()
 				if err != nil {
-					log.Infof("get page %v info error: %v", url, err)
+					log.Errorf("get page %v info error: %v", url, err)
 					return false
 				}
 				if info != nil {
@@ -92,7 +92,7 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 					url = url[:len(url)-1]
 				}
 			}
-			log.Infof(`In url %s element %s do not click because of sensitive word: %s`, url, element.Object.Description, word)
+			log.Debugf(`In url %s element %s do not click because of sensitive word: %s`, url, element.Object.Description, word)
 			return false
 		}
 		return true

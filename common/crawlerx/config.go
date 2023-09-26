@@ -138,10 +138,11 @@ func WithBrowserInfo(data string) ConfigOpt {
 		proxyUrl, err := url.Parse(jsonData.ProxyAddress)
 		if err != nil {
 			log.Errorf("proxy address %s error: %s", jsonData.ProxyAddress, err)
-		}
-		if jsonData.ProxyUsername != "" || jsonData.ProxyPassword != "" {
-			proxyUser := url.UserPassword(jsonData.ProxyUsername, jsonData.ProxyPassword)
-			proxyUrl.User = proxyUser
+		} else {
+			if jsonData.ProxyUsername != "" || jsonData.ProxyPassword != "" {
+				proxyUser := url.UserPassword(jsonData.ProxyUsername, jsonData.ProxyPassword)
+				proxyUrl.User = proxyUser
+			}
 		}
 		browserConfig.proxyAddress = proxyUrl
 	}
@@ -176,7 +177,7 @@ func WithBlackList(keywords ...string) ConfigOpt {
 			}
 			regKeyword, err := regexp.Compile(keyword)
 			if err != nil {
-				log.Infof("blacklist keyword %s compile error: %s", keyword, err)
+				log.Errorf("blacklist keyword %s compile error: %s", keyword, err)
 				continue
 			}
 			config.baseConfig.blacklist = append(config.baseConfig.blacklist, regKeyword)
@@ -192,7 +193,7 @@ func WithWhiteList(keywords ...string) ConfigOpt {
 			}
 			regKeyword, err := regexp.Compile(keyword)
 			if err != nil {
-				log.Infof("whitelist keyword %s compile error: %s", keyword, err)
+				log.Errorf("whitelist keyword %s compile error: %s", keyword, err)
 				continue
 			}
 			config.baseConfig.whitelist = append(config.baseConfig.whitelist, regKeyword)

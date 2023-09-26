@@ -50,7 +50,6 @@ func appCreate() {
 		},
 	}
 	app.Action = func(c *cli.Context) error {
-		//log.SetLevel(log.ErrorLevel)
 		url := c.String("url")
 		defaultFile := c.Bool("default-file-path")
 		file := c.String("file")
@@ -74,11 +73,10 @@ func appCreate() {
 				return nil
 			}
 			for item := range ch {
-				//log.Infof(item.Method() + " " + item.Url() + " from " + item.From())
 				info := fmt.Sprintf(`%v %d %v`, item.Method(), item.StatusCode(), item.Url())
 				fmt.Println(info)
 			}
-			log.Info("done run")
+			log.Debug("done run")
 			time.Sleep(time.Second * 2)
 			return nil
 		}
@@ -89,15 +87,14 @@ func appCreate() {
 		}
 		if output == "" {
 			for item := range ch {
-				//log.Infof(item.Method() + " " + item.Url() + " from " + item.From())
 				info := fmt.Sprintf(`%v %d %v`, item.Method(), item.StatusCode(), item.Url())
 				fmt.Println(info)
 			}
-			log.Infof(`output channel down.`)
+			log.Debug(`output channel down.`)
 		} else {
 			result := make([]*crawlerx.OutputResult, 0)
 			for item := range ch {
-				log.Infof(item.Method() + " " + item.Url())
+				log.Debug(item.Method() + " " + item.Url())
 				result = append(result, crawlerx.GeneratorOutput(item))
 			}
 			time.Sleep(2 * time.Second)
@@ -147,7 +144,6 @@ func loadFromFile(filePath string) []crawlerx.ConfigOpt {
 	maxDepth, _ := conf.GetValue("crawler", "maxDepth")
 	leakless, _ := conf.GetValue("crawler", "leakless")
 	concurrent, _ := conf.GetValue("crawler", "concurrent")
-	//log.Info(vueBool)
 	opts = append(opts,
 		crawlerx.WithBrowserInfo(string(browserBytes)),
 		crawlerx.WithFormFill(getMapFromString(formFill)),
