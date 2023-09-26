@@ -63,7 +63,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 				}
 			}
 		}()
-		yakVar, ok := codeEnv.GetVar("handle")
+		yakVar, ok := codeEnv.GetVar(handle)
 		if !ok {
 			log.Error(errors.New("not found handle function"))
 			return []*fuzztag.FuzzExecResult{}
