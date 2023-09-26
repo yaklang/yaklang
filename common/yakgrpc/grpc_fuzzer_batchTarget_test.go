@@ -16,7 +16,7 @@ import (
 
 func TestGRPCMUSTPASS_BatchTarget(t *testing.T) {
 	var newTarget []string
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	for i := 0; i < 2; i++ {
 		host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
