@@ -178,7 +178,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		//fuzzerReq.DNSServers = sequence.DNSServers
 
 		inheritCookies := sequence.CookieInherit
-		inheritVariables := sequence.InheritVariables
+		//inheritVariables := sequence.InheritVariables
 
 		for _, fuzzerReq := range fuzzerReqs {
 			fuzzerReq.Extractors = extractors
@@ -188,7 +188,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			fuzzerReq.NoFollowRedirect = noFollowRedirect
 			fuzzerReq.RedirectTimes = redirectTimes
 			fuzzerReq.InheritCookies = inheritCookies
-			fuzzerReq.InheritVariables = inheritVariables
+			fuzzerReq.InheritVariables = true
 			for name, v := range sequence.Payloads.GetRawPayloads() {
 				params = append(params, &ypb.FuzzerParamItem{
 					Key:   name,
@@ -522,6 +522,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		sequenceItem.Set("max-size", sequence.MaxSize)
 		sequenceItem.Set("unsafe", sequence.NoFixContentLength)
 		sequenceItem.Set("req-condition", sequence.AfterRequested)
+
 		//sequenceItem.Set("attack-mode", sequence.AttackMode)
 		//sequenceItem.Set("inherit-variables", sequence.InheritVariables)
 		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
