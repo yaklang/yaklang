@@ -296,7 +296,7 @@ func (r *Runner) InputCaptcha(cap_elements *RelatedElements) error {
 }
 
 func (r *Runner) Click(element *rod.Element) {
-	element.Click(proto.InputMouseButtonLeft)
+	element.Click(proto.InputMouseButtonLeft, 1)
 }
 
 func (r *Runner) WaitEvent(e proto.Event) func() {
