@@ -379,7 +379,7 @@ func (generalElement *GeneralElement) GeneralGetLatestElements(elementStr string
 
 func (generalElement *GeneralElement) Click() error {
 	//log.Info(generalElement.element)
-	err := generalElement.element.Click(proto.InputMouseButtonLeft)
+	err := generalElement.element.Click(proto.InputMouseButtonLeft, 1)
 	//_, err := generalElement.element.Eval("()=>this.click()")
 	if err != nil {
 		err = generalElement.Redirect()
@@ -387,7 +387,7 @@ func (generalElement *GeneralElement) Click() error {
 			return err
 		}
 		//_, err = generalElement.element.Eval("()=>this.click()")
-		err = generalElement.element.Click(proto.InputMouseButtonLeft)
+		err = generalElement.element.Click(proto.InputMouseButtonLeft, 1)
 		if err != nil {
 			return err
 		}

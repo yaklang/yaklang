@@ -29,7 +29,7 @@ func (page *VPage) Click(selector string) error {
 	if err != nil {
 		return utils.Errorf("click element find error: %s", err)
 	}
-	err = element.Click(proto.InputMouseButtonLeft)
+	err = element.Click(proto.InputMouseButtonLeft, 1)
 	if err != nil {
 		return utils.Errorf("element click error: %s", err)
 	}
