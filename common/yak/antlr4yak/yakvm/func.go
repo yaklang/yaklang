@@ -28,6 +28,10 @@ func (f *Function) GetActualName() string {
 	}
 	return f.name
 }
+func (f *Function) GetNumIn() int {
+	return len(f.paramSymbols)
+}
+
 func (f *Function) GetUUID() string {
 	return f.uuid
 }

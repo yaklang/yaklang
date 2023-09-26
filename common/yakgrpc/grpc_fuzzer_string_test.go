@@ -63,3 +63,56 @@ handle1 = s => {
 		t.Fatal("string (filetag + hotpatch) fuzzer fail")
 	}
 }
+func TestGRPCMUSTPASS_WithHotPatch(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, itestCase := range []any{
+		[]any{
+			`handle=(a)=>{
+				assert a =="a|b"
+				return "ok"
+			}`,
+			`{{yak(handle|a|b)}}`,
+		},
+		[]any{
+			`handle=(a,b)=>{
+				assert a =="a" && b=="b|c"
+				return "ok"
+			}`,
+			`{{yak(handle|a|b|c)}}`,
+		},
+		[]any{
+			`handle=(a,b,c,d)=>{
+				assert a =="a" && b=="b" && c=="" && d==""
+				return "ok"
+			}`,
+			`{{yak(handle|a|b)}}`,
+		},
+		[]any{
+			`handle=(params...)=>{
+				data = ["a","b","c"]
+				for i=0;i<3;i++ {
+					assert params[i] == data[i]
+				}
+				return "ok"
+			}`,
+			`{{yak(handle|a|b|c)}}`,
+		},
+	} {
+		testCase := itestCase.([]any)
+		code := testCase[0].(string)
+		template := testCase[1].(string)
+		res, err := client.StringFuzzer(context.Background(), &ypb.StringFuzzerRequest{
+			Template:     template,
+			HotPatchCode: code,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Results) != 1 || string(res.Results[0]) != "ok" {
+			t.Fatal(spew.Sprintf("hotpatch fail: %v,%v", template, code))
+		}
+	}
+}
