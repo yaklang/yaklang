@@ -263,13 +263,15 @@ func ToUnquoteFuzzTag(i []byte) string {
 		if b >= printableMin && b <= printableMax {
 			switch b {
 			case '(':
-				buf.WriteString(`\x29`)
-			case ')':
 				buf.WriteString(`\x28`)
+			case ')':
+				buf.WriteString(`\x29`)
 			case '}':
 				buf.WriteString(`\x7d`)
 			case '{':
 				buf.WriteString(`\x7b`)
+			case '\\':
+				buf.WriteString(`\\`)
 			case '"':
 				buf.WriteString(`\"`)
 			default:
