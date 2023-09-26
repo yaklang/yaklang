@@ -1,21 +1,18 @@
 package finscan
 
 import (
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
-	"time"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/pkg/errors"
 )
 
 var loopbackIP net.IP
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
 	loopbackIP = net.ParseIP("127.0.0.1")
 }
 
