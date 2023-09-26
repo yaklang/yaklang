@@ -204,6 +204,10 @@ func (starter *BrowserStarter) startBrowser() error {
 		return utils.Errorf(`browser connect error: %s`, err)
 	}
 	_ = starter.browser.IgnoreCertErrors(true)
+	err = starter.createBrowserHijack(starter.browser)
+	if err != nil {
+		return utils.Errorf(`create browser error: %v`, err)
+	}
 	starter.pageActionGenerator()
 	starter.pageDetectEventGenerator()
 	return nil
@@ -262,7 +266,13 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		log.Errorf(`TargetID %s get page error: %s`, targetID, err)
 		return
 	}
-	defer page.Close()
+	defer func() {
+		log.Infof(`page with target ID %v closing...`, targetID)
+		err = page.Close()
+		if err != nil {
+			log.Errorf(`page with target ID %v closing error: %v`, targetID, err)
+		}
+	}()
 	go page.EachEvent(
 		func(e *proto.PageJavascriptDialogOpening) {
 			proto.PageHandleJavaScriptDialog{
@@ -278,6 +288,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 		return
 	}
 	urlStr, _ := getCurrentUrl(page)
+	log.Infof(`page opened: %v with targetID %v`, urlStr, targetID)
 	if !starter.storageSave && len(starter.baseConfig.localStorage) > 0 {
 		starter.storageSave = true
 		log.Infof(`do local storage on %s`, urlStr)
@@ -289,6 +300,11 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 				break
 			}
 		}
+	}
+	_, err = page.EvalOnNewDocument(pageScript)
+	if err != nil {
+		log.Errorf(`page script run error: %v`, err)
+		return
 	}
 	if starter.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
@@ -329,6 +345,121 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if err != nil {
 		log.Errorf(`TargetID %s get page do action error: %s`, targetID, err)
 	}
+}
+
+func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
+	browserHijackRouter := NewBrowserHijackRequests(browser)
+	err := browserHijackRouter.Add("*", "", func(hijack *CrawlerHijack) {
+		//if pageUrl == "" {
+		//	pageUrl = hijack.Request.URL().String()
+		//}
+		for _, header := range starter.headers {
+			hijack.Request.Req().Header.Set(header.Key, header.Value)
+		}
+		contentType := hijack.Request.Header("Content-Type")
+		if strings.Contains(contentType, "multipart/form-data") {
+			hijack.ContinueRequest(&proto.FetchContinueRequest{})
+			result := SimpleResult{}
+			result.request = hijack.Request
+			result.resultType = "file upload result"
+			starter.ch <- &result
+			return
+		}
+		resourceType := hijack.Request.Type()
+		if notLoaderContains(resourceType) {
+			hijack.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
+			return
+		}
+		refererInfo := hijack.Request.Req().Header.Get("Referer")
+		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
+			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
+		}
+		opts := []lowhttp.LowhttpOpt{
+			lowhttp.WithTimeout(30 * time.Second),
+			lowhttp.WithHttps(starter.https),
+			lowhttp.WithSaveHTTPFlow(starter.saveToDB),
+			lowhttp.WithSource("crawlerx"),
+		}
+		if starter.browserConfig.proxyAddress != nil {
+			opts = append(opts, lowhttp.WithProxy(starter.browserConfig.proxyAddress.String()))
+		}
+		if starter.runtimeID != "" {
+			opts = append(opts, lowhttp.WithRuntimeId(starter.runtimeID))
+		}
+		err := hijack.LoadResponse(opts, true)
+		if err != nil {
+			if !strings.Contains(err.Error(), "context canceled") {
+				log.Errorf("load response error: %s", err)
+			}
+			hijack.Response.SetHeader()
+			hijack.Response.SetBody("")
+			return
+		}
+		if starter.stopSignal {
+			return
+		}
+		if !starter.scanRange(hijack.Request.URL().String()) {
+			return
+		}
+		var afterRepeatUrl string
+		if starter.requestAfterRepeat != nil {
+			afterRepeatUrl = starter.requestAfterRepeat(hijack.Request)
+		} else {
+			afterRepeatUrl = hijack.Request.URL().String()
+			if starter.urlAfterRepeat != nil {
+				afterRepeatUrl = starter.urlAfterRepeat(afterRepeatUrl)
+			}
+		}
+		if !starter.resultSent(afterRepeatUrl) {
+			return
+		}
+
+		//
+		// do tree
+		//
+
+		//if pageUrl != hijack.Request.URL().String() {
+		//	starter.urlTree.Add(pageUrl, hijack.Request.URL().String())
+		//}
+
+		if StringArrayContains(jsContentTypes, hijack.Response.Headers().Get("Content-Type")) {
+			jsUrls := analysisJsInfo(hijack.Request.URL().String(), hijack.Response.Body())
+			for _, jsUrl := range jsUrls {
+				var jsAfterRepeatUrl string
+				if starter.urlAfterRepeat != nil {
+					jsAfterRepeatUrl = starter.urlAfterRepeat(jsUrl)
+				} else {
+					jsAfterRepeatUrl = jsUrl
+				}
+				if !starter.resultSent(jsAfterRepeatUrl) {
+					continue
+				}
+				result := SimpleResult{
+					url:        jsUrl,
+					resultType: "js url",
+					method:     "JS GET",
+					from:       hijack.Request.URL().String(),
+				}
+				starter.ch <- &result
+			}
+		}
+
+		result := RequestResult{}
+		result.request = hijack.Request
+		result.response = hijack.Response
+		//result.from = pageUrl
+		starter.ch <- &result
+		if starter.maxUrl != 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
+			starter.stopSignal = true
+		}
+	})
+	if err != nil {
+		return utils.Errorf(`create hijack error: %v`, err.Error())
+	}
+	go func() {
+		browserHijackRouter.Run()
+	}()
+	return nil
 }
 
 func (starter *BrowserStarter) createPageHijack(page *rod.Page) error {
@@ -455,7 +586,10 @@ func (starter *BrowserStarter) Start() {
 		return
 	}
 	headlessBrowser := starter.browser
-	defer headlessBrowser.MustClose()
+	//defer headlessBrowser.MustClose()
+	defer func() {
+		_ = headlessBrowser.Close()
+	}()
 	defer starter.cancel()
 	stealthJs, err := embed.Asset("data/anti-crawler/stealth.min.js")
 	if err != nil {
@@ -467,6 +601,13 @@ func (starter *BrowserStarter) Start() {
 running:
 	for {
 		select {
+		case <-starter.ctx.Done():
+			log.Info("ctx done.")
+			if starter.running {
+				starter.running = false
+				starter.waitGroup.Done()
+			}
+			break running
 		case v, ok := <-starter.uChan.Out:
 			log.Infof(`current url chan len: %d`, starter.uChan.Len())
 			if !ok {
@@ -484,7 +625,11 @@ running:
 				//log.Infof(`overload done: %d`, starter.counter.Number())
 			}
 			urlStr, _ := v.(string)
-			p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			p, err := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			if err != nil {
+				log.Errorf("create page error: %v", err)
+				continue
+			}
 			if starter.stealth {
 				_, err := p.EvalOnNewDocument(string(stealthJs))
 				if err != nil {
@@ -492,11 +637,11 @@ running:
 					starter.stealth = false
 				}
 			}
-			err = starter.createPageHijack(p)
-			if err != nil {
-				log.Error(err)
-				return
-			}
+			//err = starter.createPageHijack(p)
+			//if err != nil {
+			//	log.Error(err)
+			//	return
+			//}
 			err = p.Navigate(urlStr)
 			if err != nil {
 				log.Errorf("page navigate %s error: %s", urlStr, err)
@@ -506,10 +651,48 @@ running:
 				log.Info(`lay down. `)
 				starter.running = false
 				starter.waitGroup.Done()
-			} else {
-				time.Sleep(500 * time.Millisecond)
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 	log.Info("done!")
+}
+
+func (starter *BrowserStarter) Test() {
+	time.Sleep(500 * time.Millisecond)
+	err := starter.startBrowser()
+	if err != nil {
+		log.Errorf("browser start error: %s", err)
+		starter.baseConfig.startWaitGroup.Done()
+		return
+	}
+	headlessBrowser := starter.browser
+	//defer headlessBrowser.MustClose()
+	defer func() {
+		_ = headlessBrowser.Close()
+	}()
+	defer starter.cancel()
+	starter.baseConfig.startWaitGroup.Done()
+	starter.waitGroup.Add()
+	time.Sleep(500 * time.Millisecond)
+	url, ok := <-starter.uChan.Out
+	if !ok {
+		return
+	}
+	urlStr, _ := url.(string)
+	p, _ := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+	//err = starter.createPageHijack(p)
+	//if err != nil {
+	//	log.Error(err)
+	//	return
+	//}
+	err = p.Navigate(urlStr)
+	if err != nil {
+		log.Errorf("page navigate %s error: %s", urlStr, err)
+	}
+	time.Sleep(20000 * time.Millisecond)
+
+	starter.waitGroup.Done()
+	time.Sleep(500 * time.Millisecond)
+	log.Info("done test")
 }

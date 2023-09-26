@@ -172,6 +172,8 @@ func TestStartCrawler(t *testing.T) {
 		WithLocalStorage(map[string]string{"test": "abc"}),
 		WithConcurrent(3),
 		WithStealth(true),
+		//WithFullTimeout(10),
+		//WithPageTimeout(1),
 		//WithBrowserInfo(`{"ws_address":"","exe_path":"","proxy_address":"http://127.0.0.1:8099","proxy_username":"","proxy_password":""}`),
 		//WithRuntimeID("abc123-123-123"),
 		//WithSaveToDB(true),

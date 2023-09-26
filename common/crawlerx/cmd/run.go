@@ -44,12 +44,18 @@ func appCreate() {
 			Name:  "out,o",
 			Usage: "result export file",
 		},
+		cli.BoolFlag{
+			Name:  "test,t",
+			Usage: "test mode",
+		},
 	}
 	app.Action = func(c *cli.Context) error {
+		//log.SetLevel(log.ErrorLevel)
 		url := c.String("url")
 		defaultFile := c.Bool("default-file-path")
 		file := c.String("file")
 		output := c.String("out")
+		test := c.Bool("test")
 
 		if url == "" {
 			return utils.Errorf(`EMPTY target url. Please read help for instruction.`)
@@ -61,6 +67,21 @@ func appCreate() {
 		if file != "" {
 			opts = append(opts, loadFromFile(file)...)
 		}
+		if test {
+			ch, err := crawlerx.StartCrawlerTest(url, opts...)
+			if err != nil {
+				log.Error(err)
+				return nil
+			}
+			for item := range ch {
+				//log.Infof(item.Method() + " " + item.Url() + " from " + item.From())
+				info := fmt.Sprintf(`%v %d %v`, item.Method(), item.StatusCode(), item.Url())
+				fmt.Println(info)
+			}
+			log.Info("done run")
+			time.Sleep(time.Second * 2)
+			return nil
+		}
 		ch, err := crawlerx.StartCrawler(url, opts...)
 		if err != nil {
 			log.Error(err)
@@ -68,7 +89,9 @@ func appCreate() {
 		}
 		if output == "" {
 			for item := range ch {
-				log.Infof(item.Method() + " " + item.Url() + " from " + item.From())
+				//log.Infof(item.Method() + " " + item.Url() + " from " + item.From())
+				info := fmt.Sprintf(`%v %d %v`, item.Method(), item.StatusCode(), item.Url())
+				fmt.Println(info)
 			}
 			log.Infof(`output channel down.`)
 		} else {
@@ -123,6 +146,7 @@ func loadFromFile(filePath string) []crawlerx.ConfigOpt {
 	sensitiveWord, _ := conf.GetValue("crawler", "sensitiveWord")
 	maxDepth, _ := conf.GetValue("crawler", "maxDepth")
 	leakless, _ := conf.GetValue("crawler", "leakless")
+	concurrent, _ := conf.GetValue("crawler", "concurrent")
 	//log.Info(vueBool)
 	opts = append(opts,
 		crawlerx.WithBrowserInfo(string(browserBytes)),
@@ -134,15 +158,16 @@ func loadFromFile(filePath string) []crawlerx.ConfigOpt {
 		crawlerx.WithSensitiveWords(getSliceFromString(sensitiveWord)),
 		crawlerx.WithLeakless(leakless),
 		crawlerx.WithLocalStorage(map[string]string{"abc": "123"}),
-		crawlerx.WithConcurrent(1),
-		crawlerx.WithLocalStorage(map[string]string{"test": "abc"}),
 		crawlerx.WithStealth(true),
-		crawlerx.WithVue(true),
+		crawlerx.WithVue(false),
 	)
 	maxDepthInt, err := strconv.Atoi(maxDepth)
 	if err == nil {
-		//log.Infof(`Config read max depth %d`, maxDepthInt)
 		opts = append(opts, crawlerx.WithMaxDepth(maxDepthInt))
+	}
+	concurrentInt, err := strconv.Atoi(concurrent)
+	if err == nil {
+		opts = append(opts, crawlerx.WithConcurrent(concurrentInt))
 	}
 	return opts
 }
