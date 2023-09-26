@@ -39,7 +39,7 @@ require (
 	github.com/go-ldap/ldap v3.0.3+incompatible
 	github.com/go-pg/pg/v10 v10.9.1
 	github.com/go-redis/redis/v8 v8.8.2
-	github.com/go-rod/rod v0.108.1
+	github.com/go-rod/rod v0.112.9
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobwas/glob v0.2.3
 	github.com/gobwas/httphead v0.1.0
@@ -107,7 +107,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
 	github.com/xiecat/wsm v0.1.3
-	github.com/ysmood/gson v0.7.1
+	github.com/ysmood/gson v0.7.3
 	golang.org/x/crypto v0.10.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/net v0.11.0
@@ -205,6 +205,7 @@ require (
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
+	github.com/ysmood/fetchup v0.2.2 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/leakless v0.8.0 // indirect
 	github.com/yuin/charsetutil v1.0.0 // indirect
