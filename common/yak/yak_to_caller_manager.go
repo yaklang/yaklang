@@ -2,8 +2,8 @@ package yak
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
@@ -65,13 +65,19 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		}()
 		yakVar, ok := codeEnv.GetVar(handle)
 		if !ok {
-			log.Error(errors.New("not found handle function"))
-			return []*fuzztag.FuzzExecResult{}
+			errorStr := spew.Sprintf("function %s not found", handle)
+			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errorStr)
+			pushNewResult([]byte(errInfo), []string{errInfo})
+			log.Errorf("call hotPatch code error: %s", errorStr)
+			return result
 		}
 		yakFunc, ok := yakVar.(*yakvm.Function)
 		if !ok {
-			log.Error(errors.New("not found handle function"))
-			return []*fuzztag.FuzzExecResult{}
+			errorStr := spew.Sprintf("function %s not found", handle)
+			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errorStr)
+			pushNewResult([]byte(errInfo), []string{errInfo})
+			log.Errorf("call hotPatch code error: %s", errorStr)
+			return result
 		}
 		iparams := []any{}
 		if yakFunc.IsVariableParameter() {
