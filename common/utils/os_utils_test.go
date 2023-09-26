@@ -5,12 +5,9 @@ import (
 	"math/rand"
 	"net"
 	"testing"
-	"time"
 )
 
 func TestIsPortAvailable(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	var port = -1
 	for !IsTCPPortAvailable(port) {
 		port = rand.Intn(4000) + 60000

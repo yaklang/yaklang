@@ -17,7 +17,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/davecgh/go-spew/spew"
@@ -847,10 +846,6 @@ func IsStrongPassword(s string) bool {
 	}
 
 	return haveSpecial && haveLittleChar && haveBigChar && haveNumber
-}
-
-func init() {
-	rand.Seed(time.Now().UnixMicro())
 }
 
 func RandSecret(n int) string {
