@@ -27,9 +27,6 @@ func (t *testDomainServer) AddHandler(cb testDomainServerHandler) {
 }
 
 func TestQueryDNS(t *testing.T) {
-
-	rand.Seed(time.Now().UnixNano())
-
 	handler := &testDomainServer{}
 	flag := "11.22.33.44"
 	handler.AddHandler(func(w dns.ResponseWriter, r *dns.Msg) {

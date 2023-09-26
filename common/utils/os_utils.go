@@ -22,10 +22,6 @@ import (
 
 type handleTCPFunc func(ctx context.Context, lis net.Listener, conn net.Conn)
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func IsUDPPortAvailable(p int) bool {
 	return IsPortAvailableWithUDP("0.0.0.0", p)
 }

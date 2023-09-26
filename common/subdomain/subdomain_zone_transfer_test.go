@@ -44,8 +44,6 @@ func TestAXFR(t *testing.T) {
 }
 
 func TestQueryNS(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	handler := &testDomainServer{}
 	flag := "ns.aaa.com."
 	handler.AddHandler(func(w dns.ResponseWriter, r *dns.Msg) {

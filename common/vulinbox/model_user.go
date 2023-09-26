@@ -3,7 +3,6 @@ package vulinbox
 import (
 	"github.com/jinzhu/gorm"
 	"math/rand"
-	"time"
 )
 
 type VulinUser struct {
@@ -23,9 +22,6 @@ type VulinUser struct {
 func generateRandomUsers(count int) []VulinUser {
 	// 定义可选的用户名和密码字符
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-	// 初始化随机数生成器
-	rand.Seed(time.Now().UnixNano())
 
 	// 生成测试数据
 	users := make([]VulinUser, count)
