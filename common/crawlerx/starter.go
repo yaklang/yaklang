@@ -362,7 +362,12 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 			result := SimpleResult{}
 			result.request = hijack.Request
 			result.resultType = "file upload result"
-			starter.ch <- &result
+			select {
+			case <-starter.ctx.Done():
+				log.Error("context deadline exceed")
+			default:
+				starter.ch <- &result
+			}
 			return
 		}
 		resourceType := hijack.Request.Type()
@@ -440,7 +445,12 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 					method:     "JS GET",
 					from:       hijack.Request.URL().String(),
 				}
-				starter.ch <- &result
+				select {
+				case <-starter.ctx.Done():
+					log.Error("context deadline exceed")
+				default:
+					starter.ch <- &result
+				}
 			}
 		}
 
@@ -448,7 +458,12 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		result.request = hijack.Request
 		result.response = hijack.Response
 		//result.from = pageUrl
-		starter.ch <- &result
+		select {
+		case <-starter.ctx.Done():
+			log.Error("context deadline exceed")
+		default:
+			starter.ch <- &result
+		}
 		if starter.maxUrl != 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
 			starter.stopSignal = true
 		}
