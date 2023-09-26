@@ -115,6 +115,17 @@ func (core *CrawlerCore) Start() {
 	log.Info(`core done.`)
 }
 
+func (core *CrawlerCore) Test() {
+	core.manager.Test()
+	core.uChan.In <- core.targetUrl
+	core.startWaitGroup.Wait()
+	time.Sleep(500 * time.Millisecond)
+	core.waitGroup.Wait()
+	close(core.uChan.In)
+	close(core.ch)
+	time.Sleep(2 * time.Second)
+}
+
 func StartCrawler(url string, opts ...ConfigOpt) (chan ReqInfo, error) {
 	ch := make(chan ReqInfo)
 	opts = append(opts, WithResultChannel(ch))
@@ -123,6 +134,17 @@ func StartCrawler(url string, opts ...ConfigOpt) (chan ReqInfo, error) {
 		return nil, utils.Errorf(`Create crawler core error: %s`, err)
 	}
 	go crawlerX.Start()
+	return ch, nil
+}
+
+func StartCrawlerTest(url string, opts ...ConfigOpt) (chan ReqInfo, error) {
+	ch := make(chan ReqInfo)
+	opts = append(opts, WithResultChannel(ch))
+	crawlerX, err := NewCrawlerCore(url, opts...)
+	if err != nil {
+		return nil, utils.Errorf(`Create crawler core error: %s`, err)
+	}
+	go crawlerX.Test()
 	return ch, nil
 }
 

@@ -11,10 +11,17 @@ import (
 )
 
 func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, selector string) bool {
-	info := page.MustInfo()
+	info, err := page.Info()
+	if err != nil {
+		log.Infof("page %v get info error: %v", page, err)
+		return false
+	}
 	var url string
 	if info != nil {
 		url = info.URL
+	}
+	if strings.HasSuffix(url, "#") {
+		url = url[:len(url)-1]
 	}
 	status, element, err := page.Has(selector)
 	//element, err := page.Element(selector)
@@ -45,7 +52,12 @@ func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, sele
 		return false
 	}
 	time.Sleep(500 * time.Millisecond)
-	page.MustWaitLoad()
+	//page.MustWaitLoad()
+	err = page.WaitLoad()
+	if err != nil {
+		log.Errorf("page %v wait load error: %v", page, err)
+		return false
+	}
 	return true
 }
 
@@ -67,9 +79,17 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 			var url string
 			page := element.Page()
 			if page != nil {
-				info := page.MustInfo()
+				//info := page.MustInfo()
+				info, err := page.Info()
+				if err != nil {
+					log.Infof("get page %v info error: %v", url, err)
+					return false
+				}
 				if info != nil {
 					url = info.URL
+				}
+				if strings.HasSuffix(url, "#") {
+					url = url[:len(url)-1]
 				}
 			}
 			log.Infof(`In url %s element %s do not click because of sensitive word: %s`, url, element.Object.Description, word)

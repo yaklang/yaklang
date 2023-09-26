@@ -36,7 +36,11 @@ func getCurrentUrl(page *rod.Page) (string, error) {
 	if err != nil {
 		return "", utils.Errorf("page %s get url error: %s", page, err)
 	}
-	return result.Value.Str(), nil
+	urlStr := result.Value.Str()
+	if strings.HasSuffix(urlStr, "#") {
+		urlStr = urlStr[:len(urlStr)-1]
+	}
+	return urlStr, nil
 }
 
 func isVisible(element *rod.Element) (bool, error) {
@@ -199,4 +203,16 @@ func cookieRawDataTransfer(domain, cookieRawData string) []*proto.NetworkCookieP
 		transferred = append(transferred, &proto.NetworkCookieParam{Name: items[0], Value: items[1], Domain: domain})
 	}
 	return transferred
+}
+
+func EvalOnPage(page *rod.Page, evalJs string) (*proto.RuntimeRemoteObject, error) {
+	elementObj, err := proto.RuntimeEvaluate{
+		IncludeCommandLineAPI: true,
+		ReturnByValue:         true,
+		Expression:            evalJs,
+	}.Call(page)
+	if err != nil {
+		return nil, utils.Errorf(`page eval js code error: %v`, err)
+	}
+	return elementObj.Result, nil
 }

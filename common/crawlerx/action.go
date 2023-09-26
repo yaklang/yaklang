@@ -235,6 +235,9 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 			return urls, err
 		}
 		originUrl := htmlInfo.URL
+		if strings.HasSuffix(originUrl, "#") {
+			originUrl = originUrl[:len(originUrl)-1]
+		}
 		if starter.maxDepth != 0 {
 			//log.Infof(`max depth: %d`, starter.maxDepth)
 			currentNode := starter.urlTree.Find(originUrl)
@@ -276,11 +279,28 @@ func (starter *BrowserStarter) generateGetClickElements() func(*rod.Page) ([]str
 			},
 			"button": {},
 		}
+		selectors := make([]string, 0)
 		clickElements, err := customizedGetElement(page, searchInfo)
 		if err != nil {
-			return []string{}, utils.Errorf(`Page %s get click elements error: %s`, page, err)
+			return selectors, utils.Errorf(`Page %s get click elements error: %s`, page, err)
 		}
-		return getElementsSelectors(clickElements), nil
+		selectors = append(selectors, getElementsSelectors(clickElements)...)
+		elementObj, err := EvalOnPage(page, getOnClickAction)
+		if err != nil {
+			log.Errorf(`page eval check onclick element code error: %v`, err)
+		} else {
+			elementArr := elementObj.Value.Arr()
+			for _, elementGson := range elementArr {
+				elementStr := elementGson.String()
+				if elementStr == "" {
+					continue
+				}
+				if !StringArrayContains(selectors, elementStr) {
+					selectors = append(selectors, elementStr)
+				}
+			}
+		}
+		return selectors, nil
 	}
 }
 
@@ -304,15 +324,15 @@ func (starter *BrowserStarter) generateGetInputElements() func(*rod.Page) (rod.E
 func (starter *BrowserStarter) generateGetEventElements() func(*rod.Page) ([]string, error) {
 	return func(page *rod.Page) ([]string, error) {
 		results := make([]string, 0)
-		clickableElementObjs, err := proto.RuntimeEvaluate{
-			IncludeCommandLineAPI: true,
-			ReturnByValue:         true,
-			Expression:            getClickEventElement,
-		}.Call(page)
+		elementObjs, err := EvalOnPage(page, getClickEventElement)
 		if err != nil {
-			return results, utils.Errorf("Page %s get click event listener elements error: %s", page, err)
+			return results, utils.Errorf(`page get click event listener elements error: %v`, err)
 		}
-		clickableElementArr := clickableElementObjs.Result.Value.Arr()
+		clickableElementArr := elementObjs.Value.Arr()
+		if len(clickableElementArr) == 0 {
+			log.Info(`page with no event.`)
+			return results, nil
+		}
 		for _, element := range clickableElementArr {
 			results = append(results, element.String())
 		}
@@ -350,6 +370,9 @@ func (starter *BrowserStarter) generateClickElementsExploit() func(*rod.Page, st
 		currentUrl, _ := getCurrentUrl(page)
 		// analysis page after click
 		if currentUrl != "" && currentUrl != originUrl {
+			if !starter.urlTree.Has(currentUrl) {
+				starter.urlTree.Add(originUrl, currentUrl)
+			}
 			urls, err := starter.getUrls(page)
 			if err != nil {
 				log.Errorf(`Page %s get urls error: %s`, originUrl, err)
@@ -401,7 +424,10 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 		if err != nil {
 			return utils.Errorf("page navigate %s error: %s", originUrl, err)
 		}
-		page.MustWaitLoad()
+		err = page.WaitLoad()
+		if err != nil {
+			return utils.Errorf(`page wait load error: %v`, err)
+		}
 		time.Sleep(time.Second)
 		status := starter.clickElementOnPageBySelector(page, eventSelector)
 		if !status {
@@ -449,7 +475,12 @@ func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string,
 					log.Errorf("page navigate %s error: %s", originUrl, err)
 					return
 				}
-				page.MustWaitLoad()
+				//page.MustWaitLoad()
+				err = page.WaitLoad()
+				if err != nil {
+					log.Errorf(`page wait load error: %v`, err)
+					return
+				}
 				if starter.extraWaitLoadTime != 0 {
 					time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 				}
