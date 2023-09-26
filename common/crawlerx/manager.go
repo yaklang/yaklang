@@ -32,3 +32,10 @@ func (manager *BrowserManager) Start() {
 		go starter.Start()
 	}
 }
+
+func (manager *BrowserManager) Test() {
+	for _, starter := range manager.browsers {
+		manager.config.baseConfig.startWaitGroup.Add()
+		go starter.Test()
+	}
+}

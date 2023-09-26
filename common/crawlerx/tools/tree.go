@@ -64,6 +64,15 @@ func (tree *UrlTree) Find(url string) *UrlNode {
 	return nil
 }
 
+func (tree *UrlTree) Has(url string) bool {
+	for node := tree.root; node != nil; node = node.next {
+		if node.url == url {
+			return true
+		}
+	}
+	return false
+}
+
 func (tree *UrlTree) Count() int {
 	return tree.count
 }

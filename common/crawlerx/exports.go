@@ -33,6 +33,7 @@ var CrawlerXExports = map[string]interface{}{
 	"runtimeID":         WithRuntimeID,
 	"evalJs":            WithEvalJs,
 	"jsResultSend":      WithJsResultSave,
+	"vue":               WithVue,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,

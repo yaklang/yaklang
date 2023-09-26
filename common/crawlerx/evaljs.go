@@ -4,6 +4,22 @@ package crawlerx
 
 import "regexp"
 
+const pageScript = `
+function randomStr(length) {
+	let str = '';
+	let chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	for (let i = 0; i < length; i++) {
+		str += chars.charAt(Math.floor(Math.random() * chars.length));
+	}
+	return str;
+}
+window.__originOpen = window.open
+window.open = function (url,name,specs,replace) {
+    name = name+'_'+randomStr(8);
+    window.__originOpen(url,name,specs,replace)
+}
+`
+
 const getSelector = `
 ()=>{
     let e = this;
@@ -30,6 +46,45 @@ const getSelector = `
 	domPath = domPath.toString().replaceAll(',', '>');
     return domPath
 }
+`
+
+const getOnClickAction = `
+function getSelector(e){
+	let domPath = Array();
+	if (e.getAttribute("id")) {
+		domPath.unshift('#'+e.getAttribute("id"));
+	} else {
+		while (e.nodeName.toLowerCase() !== "html") {
+			if(e.id){
+				domPath.unshift('#'+e.getAttribute("id"));
+				break;
+			}else if(e.tagName.toLocaleLowerCase() == "body") {
+				domPath.unshift(e.tagName.toLocaleLowerCase());
+			}else{
+				for (i = 0; i < e.parentNode.childElementCount; i++) {
+					if (e.parentNode.children[i] == e) {
+						domPath.unshift(e.tagName.toLocaleLowerCase() + ':nth-child(' + (i + 1) + ')');
+					}
+				}
+			}
+			e = e.parentNode;
+		}
+	}
+	domPath = domPath.toString().replaceAll(',', '>');
+	return domPath
+}
+let nodes = document.createNodeIterator(document.getRootNode())
+let clickSelectors = [];
+let node = nodes.nextNode();
+while ((node = nodes.nextNode())) {
+	if (node.onclick !== null && node.onclick !== undefined) {
+		var selectorStr = getSelector(node);
+		if (selectorStr !== "") {
+			clickSelectors.push(selectorStr);
+		}
+	}
+}
+clickSelectors
 `
 
 const getClickEventElement = `
@@ -61,14 +116,21 @@ function getSelector(e){
     let clickSelectors = [];
     let node = nodes.nextNode();
     while ((node = nodes.nextNode())) {
-		var events = getEventListeners(node);
-		for (var eventName in events) {
-			if (eventName === "click") {
-				var selectorStr = getSelector(node);
-				if (selectorStr !== "") {
-					clickSelectors.push(selectorStr);
+		if (node.onclick !== null && node.onclick !== undefined) {
+			var selectorStr = getSelector(node);
+			if (selectorStr !== "") {
+				clickSelectors.push(selectorStr);
+			}
+		} else {
+			var events = getEventListeners(node);
+			for (var eventName in events) {
+				if (eventName === "click") {
+					var selectorStr = getSelector(node);
+					if (selectorStr !== "") {
+						clickSelectors.push(selectorStr);
+					}
+					break;
 				}
-				break;
 			}
 		}
     }
