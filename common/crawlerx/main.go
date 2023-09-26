@@ -103,16 +103,16 @@ func (core *CrawlerCore) Start() {
 			}
 		}
 	}()
-	log.Info(`[crawlerx core]starting wait...`)
+	log.Debug(`[crawlerx core]starting wait...`)
 	core.startWaitGroup.Wait()
-	log.Info(`[crawlerx core]started!`)
+	log.Debug(`[crawlerx core]started!`)
 	time.Sleep(500 * time.Millisecond)
 	core.waitGroup.Wait()
 	close(core.uChan.In)
 	close(core.ch)
-	log.Info(`Close uChan & channel.`)
+	log.Debug(`Close uChan & channel.`)
 	time.Sleep(2 * time.Second)
-	log.Info(`core done.`)
+	log.Debug(`core done.`)
 }
 
 func (core *CrawlerCore) Test() {

@@ -89,7 +89,7 @@ func (tree *UrlTree) Add(parent string, sons ...string) {
 
 func (tree *UrlTree) add(parent string, sons ...string) {
 	if parent == "" {
-		log.Infof("parent url %s invalid", parent)
+		log.Errorf("parent url %s invalid", parent)
 		return
 	}
 	upper := tree.Find(parent)
@@ -99,7 +99,7 @@ func (tree *UrlTree) add(parent string, sons ...string) {
 	}
 	for _, son := range sons {
 		if son == "" {
-			log.Infof("son url %s invalid", son)
+			log.Errorf("son url %s invalid", son)
 			continue
 		}
 		temp := tree.Find(son)
