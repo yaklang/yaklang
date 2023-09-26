@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/gopacket"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +83,50 @@ match %d
 		// tcp not implement yet don't check it
 		if count < need || matchedCount <= int(0.6*float64(need)) {
 			t.Fatal("match error or no enough traffic")
+			return
+		}
+	}
+}
+
+func TestMUSTPASS_CrossVerifyGroup(t *testing.T) {
+	var (
+		getMap  = make(map[string]int)
+		wantMap = make(map[string]int)
+	)
+	group := match.NewGroup(match.WithGroupOnMatchedCallback(func(packet gopacket.Packet, match *surirule.Rule) {
+		getMap[match.Raw]++
+	}))
+
+	maker := NewChaosMaker()
+
+	for _, r := range rules {
+		rules, err := surirule.Parse(r)
+		if err != nil {
+			t.Error(err)
+		}
+		rr := rules[0]
+
+		group.LoadRule(rr)
+
+		// must single rule
+		maker.FeedRule(rule.NewRuleFromSuricata(rr))
+		wantMap[rr.Raw] = utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
+	}
+
+	res := maker.Generate()
+
+	// check generated chaos
+	for pk := range res {
+		group.FeedFrame(pk)
+	}
+
+	group.Wait()
+
+	for k, v := range wantMap {
+		// tcp not implement yet don't check it
+		t.Logf("RULE\n" + strings.TrimSpace(k) + fmt.Sprintf("\nneed: %d\nmatch %d\n", v, getMap[k]))
+		if float64(getMap[k]) < 0.6*float64(v) {
+			t.Fatalf("match error or no enough traffic")
 			return
 		}
 	}
