@@ -507,6 +507,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				payloads[i] = utils.ParseStringToVisible(payload)
 			}
 
+			var extractorResults []*ypb.KVPair
+
+			if result != nil && result.ExtraInfo != nil {
+				for k, v := range result.ExtraInfo {
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v))})
+				}
+			}
+
 			if result.Error != nil {
 				rsp := &ypb.FuzzerResponse{}
 				rsp.UUID = uuid.NewV4().String()
@@ -530,7 +538,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				continue
 			}
 
-			var extractorResults []*ypb.KVPair
 			if haveHTTPTplExtractor {
 				for _, extractor := range httpTplExtractor {
 					vars, err := extractor.Execute(result.ResponseRaw)

@@ -45,6 +45,92 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1-10)}}"
+
+mirrorHTTPFlow = (req, rsp) => {
+	return {"abc": "aaa"}
+}
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	count := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		count++
+		check := false
+		for _, kv := range rsp.GetExtractedResults() {
+			if kv.GetKey() == "abc" {
+				if kv.GetValue() == "aaa" {
+					check = true
+				}
+			}
+		}
+		if !check {
+			t.Fatal("mirror http flow output extractor data failed")
+		}
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_PANIC(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1-10)}}"
+
+mirrorHTTPFlow = (req, rsp) => {
+	die(1)
+	return {"abc": "aaa"}
+}
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	count := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		_ = rsp.Url
+		fmt.Println(rsp.Url)
+		count++
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+}
+
 /*
 handle = func(param) {
 a = codec.Sm2EncryptC1C3C2("0487c856a4a19e2cdc4271e839ea0ca3f8e6622f5de3a3190bb339641e225d28ef3d26348621d373d40c750af60e8dfd2154f4fd1d43fc0405faeeb15235715512", param)~
