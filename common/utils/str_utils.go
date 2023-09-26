@@ -495,7 +495,6 @@ func InterfaceToMap(i interface{}) map[string][]string {
 		}
 	default:
 		if reflect.TypeOf(ret).Kind() == reflect.Map {
-			spew.Dump(ret)
 			value := reflect.ValueOf(ret)
 			for _, keyValue := range value.MapKeys() {
 				finalResult[keyValue.String()] = []string{InterfaceToString(value.MapIndex(keyValue).Interface())}
