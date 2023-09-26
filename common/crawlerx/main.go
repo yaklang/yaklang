@@ -27,11 +27,12 @@ type CrawlerCore struct {
 	ch             chan ReqInfo
 	waitGroup      *utils.SizedWaitGroup
 	startWaitGroup *utils.SizedWaitGroup
+
+	cancel func()
 }
 
 func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	config := NewConfig()
-	ctx := context.Background()
 	pageVisit, resultSent := tools.NewCountFilter(), tools.NewCountFilter()
 	uChan, err := tools.NewUChan(128)
 	if err != nil {
@@ -39,6 +40,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	}
 	waitGroup := utils.NewSizedWaitGroup(20)
 	startWaitGroup := utils.NewSizedWaitGroup(20)
+	ctx, cancel := context.WithCancel(context.Background())
 	baseOpts := make([]ConfigOpt, 0)
 	baseOpts = append(baseOpts,
 		WithTargetUrl(targetUrl),
@@ -64,6 +66,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	}
 	checkedUrl, err := TargetUrlCheck(targetUrl, proxy)
 	if err != nil {
+		cancel()
 		return nil, utils.Errorf(`target url %s check failed: %s`, targetUrl, err)
 	}
 	WithTargetUrl(checkedUrl)(config)
@@ -75,6 +78,7 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 		ch:             config.baseConfig.ch,
 		waitGroup:      waitGroup,
 		startWaitGroup: startWaitGroup,
+		cancel:         cancel,
 	}
 	err = core.init()
 	if err != nil {
@@ -108,6 +112,7 @@ func (core *CrawlerCore) Start() {
 	log.Debug(`[crawlerx core]started!`)
 	time.Sleep(500 * time.Millisecond)
 	core.waitGroup.Wait()
+	core.cancel()
 	close(core.uChan.In)
 	close(core.ch)
 	log.Debug(`Close uChan & channel.`)
