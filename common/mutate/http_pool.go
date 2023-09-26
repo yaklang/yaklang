@@ -51,6 +51,7 @@ type httpPoolConfig struct {
 	// afterRequest
 	HookBeforeRequest func([]byte) []byte
 	HookAfterRequest  func([]byte) []byte
+	MirrorHTTPFlow    func([]byte, []byte) map[string]string
 
 	// 请求来源
 	Source string
@@ -147,10 +148,11 @@ func _httpPool_RetryNotInStatusCode(codes []int) HttpPoolConfigOption {
 	}
 }
 
-func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []byte) HttpPoolConfigOption {
+func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []byte, extractor func([]byte, []byte) map[string]string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
+		config.MirrorHTTPFlow = extractor
 	}
 }
 
@@ -345,6 +347,8 @@ type _httpResult struct {
 	Timestamp        int64
 	// 如果有关联插件的话，这就是插件名
 	Source string
+
+	ExtraInfo map[string]string
 
 	LowhttpResponse *lowhttp.LowhttpResponse
 }
@@ -583,6 +587,15 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						}
 					}
 
+					var extra = make(map[string]string)
+					if config.MirrorHTTPFlow != nil {
+						if ret := config.MirrorHTTPFlow(targetRequest, rsp); ret != nil {
+							for k, v := range ret {
+								extra[k] = v
+							}
+						}
+					}
+
 					if err != nil {
 						log.Errorf("exec packet raw failed: %s", err)
 						failedResult := &_httpResult{
@@ -596,6 +609,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 							Payloads:        payloads,
 							Source:          config.Source,
 							LowhttpResponse: rspInstance,
+							ExtraInfo:       extra,
 						}
 						results <- failedResult
 						return
@@ -604,6 +618,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						Url:              urlStr,
 						Request:          reqIns,
 						Error:            err,
+						ExtraInfo:        extra,
 						RequestRaw:       targetRequest,
 						ResponseRaw:      rsp,
 						DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
