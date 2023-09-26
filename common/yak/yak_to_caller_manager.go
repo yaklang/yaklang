@@ -62,8 +62,11 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 				}
 			}
 		}()
-
-		data, err := codeEnv.CallYakFunction(ctx, handle, []any{params})
+		iparams := []any{}
+		funk.ForEach(strings.Split(params, "|"), func(s any) {
+			iparams = append(iparams, s)
+		})
+		data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
 		if err != nil {
 			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
 			pushNewResult([]byte(errInfo), []string{errInfo})
