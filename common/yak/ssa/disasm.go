@@ -47,7 +47,7 @@ func getStrFlag(v Node, hasType bool) string {
 	}
 	switch v := v.(type) {
 	case Instruction:
-		if i, ok := v.(*Object); ok {
+		if i, ok := v.(*Make); ok {
 			if i.buildField != nil {
 				return i.variable + "-extern"
 			}
@@ -314,9 +314,9 @@ func (u *UnOp) String() string {
 }
 
 // ----------- Interface
-func (i *Object) String() string {
+func (i *Make) String() string {
 	return fmt.Sprintf(
-		"%s = Object %s [%s, %s]",
+		"%s = make %s [%s, %s]",
 		getStr(i), i.typs, getStr(i.Len), getStr(i.Cap),
 	)
 }
@@ -325,7 +325,7 @@ func (i *Object) String() string {
 func (f *Field) String() string {
 	return fmt.Sprintf(
 		"%s = %s field[%s]",
-		getStr(f), getStr(f.I), getStr(f.Key),
+		getStr(f), getStr(f.Obj), getStr(f.Key),
 	)
 }
 

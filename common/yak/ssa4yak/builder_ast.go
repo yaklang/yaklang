@@ -950,9 +950,9 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if len(keys) == 1 {
 			return b.EmitField(expr, keys[0])
 		} else if len(keys) == 2 {
-			return b.EmitInterfaceSlice(expr, keys[0], keys[1], nil)
+			return b.EmitMakeSlice(expr, keys[0], keys[1], nil)
 		} else if len(keys) == 3 {
-			return b.EmitInterfaceSlice(expr, keys[0], keys[1], keys[2])
+			return b.EmitMakeSlice(expr, keys[0], keys[1], keys[2])
 		} else {
 			b.NewError(ssa.Error, TAG, "slice call expression argument too much")
 		}
@@ -1131,7 +1131,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 				t0 = cond; t1 = a; t2 = b
 				c = phi[a if.true; b if.false]
 	*/
-	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr func() ssa.Value, falseExpr func() ssa.Value) ssa.Value {
+	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
@@ -1230,20 +1230,24 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 		switch typ.Kind {
 		case ssa.Slice:
 			if len(exprs) == 0 {
-				return b.EmitInterfaceBuildWithType(typ, zero, zero)
+				return b.EmitMakeBuildWithType(typ, zero, zero)
 			} else if len(exprs) == 1 {
-				return b.EmitInterfaceBuildWithType(typ, exprs[0], exprs[0])
+				return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
 			} else if len(exprs) == 2 {
-				return b.EmitInterfaceBuildWithType(typ, exprs[0], exprs[1])
+				return b.EmitMakeBuildWithType(typ, exprs[0], exprs[1])
 			} else {
 				b.NewError(ssa.Error, TAG, "make slice expression argument too much!")
 			}
 		case ssa.Map:
-			return b.EmitInterfaceBuildWithType(typ, zero, zero)
+			return b.EmitMakeBuildWithType(typ, zero, zero)
 		case ssa.Struct:
 		}
-	// case *ssa.ChanType:
-	// 	fmt.Printf("debug %v\n", "make chan")
+	case *ssa.ChanType:
+		if len(exprs) == 0 {
+			return b.EmitMakeBuildWithType(typ, zero, zero)
+		} else {
+			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
+		}
 	default:
 		b.NewError(ssa.Error, TAG, "make unknow type")
 	}
