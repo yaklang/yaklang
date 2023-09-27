@@ -93,6 +93,58 @@ mirrorHTTPFlow = (req, rsp) => {
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror2(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1-10)}}"
+
+mirrorHTTPFlow = (req, rsp, variables) => {
+	dump(variables)
+	assert ("cc1" in variables) && (variables["cc1"] == "c");
+	return {"abc": "aaa"}
+}
+`,
+		ForceFuzz: true,
+		Params: []*ypb.FuzzerParamItem{
+			{Key: "cc1", Value: "c"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	count := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		count++
+		check := false
+		for _, kv := range rsp.GetExtractedResults() {
+			if kv.GetKey() == "abc" {
+				if kv.GetValue() == "aaa" {
+					check = true
+				}
+			}
+		}
+		if !check {
+			t.Fatal("mirror http flow output extractor data failed")
+		}
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_PANIC(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
