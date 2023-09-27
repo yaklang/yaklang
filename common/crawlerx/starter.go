@@ -448,6 +448,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 				select {
 				case <-starter.ctx.Done():
 					log.Error("context deadline exceed")
+					return
 				default:
 					starter.ch <- &result
 				}
@@ -461,6 +462,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		select {
 		case <-starter.ctx.Done():
 			log.Error("context deadline exceed")
+			return
 		default:
 			starter.ch <- &result
 		}
