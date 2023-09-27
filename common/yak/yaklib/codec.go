@@ -137,7 +137,7 @@ var CodecExports = map[string]interface{}{
 	"RSAEncryptWithPKCS1v15": tlsutils.PemPkcs1v15Encrypt,
 	"RSADecryptWithPKCS1v15": tlsutils.PemPkcs1v15Decrypt,
 	"RSAEncryptWithOAEP":     tlsutils.PemPkcsOAEPEncrypt,
-	"RSADecryptWithOAEP":     tlsutils.PemPkcs1v15Decrypt,
+	"RSADecryptWithOAEP":     tlsutils.PemPkcsOAEPDecrypt,
 
 	"Sm2GenerateHexKeyPair":        codec.GenerateSM2PrivateKeyHEX,
 	"Sm2GeneratePemKeyPair":        codec.GenerateSM2PrivateKeyPEM,
