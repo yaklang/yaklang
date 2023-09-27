@@ -28,7 +28,18 @@ func ToField(v Value) *Field {
 	} else {
 		return nil
 	}
+}
 
+func GetFields(u User) []*Field {
+	f := make([]*Field, 0)
+	for _, v := range u.GetValues() {
+		if field, ok := v.(*Field); ok {
+			if field.I == u {
+				f = append(f, field)
+			}
+		}
+	}
+	return f
 }
 
 func NewObject(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Object {
@@ -111,13 +122,8 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 			}
 		}
 	}
-	if index := slices.IndexFunc(i.GetValues(), func(v Value) bool {
-		if f, ok := v.(*Field); ok {
-			if f.Key == key && f.I == i {
-				return true
-			}
-		}
-		return false
+	if index := slices.IndexFunc(GetFields(i), func(v *Field) bool {
+		return v.Key == key
 	}); index != -1 {
 		return i.GetValues()[index]
 	}

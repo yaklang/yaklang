@@ -44,6 +44,10 @@ func NewConst(i any) *Const {
 	return c
 }
 
+func (c *Const) GetTypeKind() TypeKind {
+	return c.typ.GetTypeKind()
+}
+
 func (c *Const) IsBoolean() bool {
 	return c.typ.GetTypeKind() == Boolean
 }
