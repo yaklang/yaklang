@@ -236,9 +236,11 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 	return p
 }
 
-func (f *FunctionBuilder) EmitRecover() {
+func (f *FunctionBuilder) EmitRecover() *Recover {
 	r := &Recover{
 		anInstruction: newAnInstuction(f.CurrentBlock),
+		anNode:        NewNode(),
 	}
 	f.emit(r)
+	return r
 }
