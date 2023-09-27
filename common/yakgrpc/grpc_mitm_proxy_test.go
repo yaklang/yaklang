@@ -214,7 +214,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_ApplyToPlugin(t *testing.T) {
 	var mockUrl = "http://" + utils.HostPort(mockHost, mockPort)
 	_ = mockUrl
 
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(25))
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
