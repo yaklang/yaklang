@@ -885,7 +885,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// RECOVER
 	if s := stmt.Recover(); s != nil {
-		b.EmitRecover()
+		return b.EmitRecover()
 	}
 
 	// identifier

@@ -382,5 +382,5 @@ func (p *Panic) String() string {
 }
 
 func (r *Recover) String() string {
-	return "recover"
+	return getStr(r) + " = recover"
 }
