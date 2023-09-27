@@ -343,9 +343,9 @@ func ConnPool(p *lowHttpConnPool) LowhttpOpt {
 	}
 }
 
-func WithConnPool() LowhttpOpt {
+func WithConnPool(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.WithConnPool = true
+		o.WithConnPool = b
 	}
 }
 
