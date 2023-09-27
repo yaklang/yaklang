@@ -182,9 +182,11 @@ func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
 	b.buildBlock(stmt.Block(0).(*yak.BlockContext))
 
 	b.CurrentBlock = catch
-	// if id := stmt.Identifier(); id != nil {
-	// 	b.WriteVariable(id.GetText(), )
-	// }
+	if id := stmt.Identifier(); id != nil {
+		p := ssa.NewParam(id.GetText(), false, b.Function)
+		p.SetType(ssa.BasicTypes[ssa.Error])
+		b.WriteVariable(id.GetText(), p)
+	}
 	b.buildBlock(stmt.Block(1).(*yak.BlockContext))
 
 	if fblock, ok := stmt.Block(2).(*yak.BlockContext); ok {
@@ -313,10 +315,17 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	}
 
 	loop.BuildCondtion(func() ssa.Value {
-		condition := b.buildExpression(cond)
-		if condition == nil {
+		var condition ssa.Value
+		if cond == nil {
 			condition = ssa.NewConst(true)
-			b.NewError(ssa.Warn, TAG, "if condition expression is nil, default is true")
+		} else {
+			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
+			// defer recoverRange()
+			condition = b.buildExpression(cond)
+			if condition == nil {
+				condition = ssa.NewConst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+			}
 		}
 		return condition
 	})
@@ -339,11 +348,12 @@ type forExpr interface {
 func (b *astbuilder) ForExpr(stmt forExpr) []ssa.Value {
 	if ae, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
 		return b.buildAssignExpression(ae)
-	}
-	if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+	} else if e, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		return []ssa.Value{b.buildExpression(e)}
+	} else {
+		// Impossible to get here
+		return nil
 	}
-	return nil
 }
 
 // for range stmt
@@ -357,7 +367,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 		var lefts []ssa.LeftValue
 		if leftList, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
 			lefts = b.buildLeftExpressionList(true, leftList)
-		} else {
+			// } else {
 		}
 		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		key, field, ok := b.EmitNext(value)
@@ -861,6 +871,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
 			v := getValue(0)
 			if v == nil {
+				//TODO:  int() => type-cast [number] undefine-""
 				v = b.EmitUndefine("")
 			}
 			typ := b.buildTypeLiteral(s)
@@ -1099,7 +1110,11 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			b.NewError(ssa.Error, TAG, "in operator need two expression")
 			return nil
 		}
-		return b.EmitBinOp(ssa.OpIn, op1, op2)
+		res := b.EmitBinOp(ssa.OpIn, op1, op2)
+		if stmt.NotLiteral() != nil {
+			res = b.EmitUnOp(ssa.OpNot, res)
+		}
+		return res
 	}
 
 	/*
@@ -1391,8 +1406,9 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	exprLen := len(stmt.AllColon()) + 1
 	exprs := stmt.AllExpression()
-	values := make([]ssa.Value, len(exprs))
+	values := make([]ssa.Value, exprLen)
 	if len(exprs) == 0 {
 		b.NewError(ssa.Error, TAG, "slicecall expression is zero")
 		return nil
@@ -1404,6 +1420,8 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	for i, expr := range exprs {
 		if s, ok := expr.(*yak.ExpressionContext); ok {
 			values[i] = b.buildExpression(s)
+		} else {
+			values[i] = ssa.NewConst(0)
 		}
 	}
 	return values
