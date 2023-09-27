@@ -80,9 +80,10 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		})
 	}
 	// debug printf json
-	for _, result := range results {
-		fmt.Printf("%+v\n", result)
-	}
+	// prog.Show()
+	// for _, result := range results {
+	// 	fmt.Printf("%+v\n", result)
+	// }
 
 	return results
 }
