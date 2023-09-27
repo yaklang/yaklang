@@ -354,7 +354,11 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	loop := b.BuildLoop()
 
 	loop.BuildCondtion(func() ssa.Value {
-		lefts := b.buildLeftExpressionList(true, stmt.LeftExpressionList().(*yak.LeftExpressionListContext))
+		var lefts []ssa.LeftValue
+		if leftList, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
+			lefts = b.buildLeftExpressionList(true, leftList)
+		} else {
+		}
 		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		key, field, ok := b.EmitNext(value)
 		if len(lefts) == 1 {
