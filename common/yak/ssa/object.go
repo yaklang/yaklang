@@ -138,10 +138,11 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 			}
 		}
 	}
-	if index := slices.IndexFunc(GetFields(i), func(v *Field) bool {
+	fields := GetFields(i)
+	if index := slices.IndexFunc(fields, func(v *Field) bool {
 		return v.Key == key
 	}); index != -1 {
-		return i.GetValues()[index]
+		return fields[index]
 	}
 
 	if parent := b.parent; parent != nil {
