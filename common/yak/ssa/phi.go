@@ -3,8 +3,8 @@ package ssa
 func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		Edge:          make([]Value, 0, len(block.Preds)),
-		user:          make([]User, 0),
 		create:        create,
 	}
 	p.SetVariable(variable)
@@ -18,6 +18,7 @@ func (b *BasicBlock) Sealed() {
 			for _, user := range i.GetValues() {
 				if f, ok := user.(*Field); ok {
 					newf := i.buildField(f.Key.String())
+					f.RemoveUser(i)
 					ReplaceValue(f, newf)
 					DeleteInst(f)
 				}

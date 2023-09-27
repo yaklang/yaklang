@@ -36,7 +36,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 				variable: name + "-symbol",
 			},
 			// I:     parent.symbol,
-			users: []User{},
+			anNode: NewNode(),
 		},
 		err: make(SSAErrors, 0),
 
@@ -61,12 +61,7 @@ func (f *Function) addAnonymous(anon *Function) {
 }
 
 func (f *Function) NewParam(name string) {
-	p := &Parameter{
-		variable: name,
-		Func:     f,
-		users:    []User{},
-		typs:     BasicTypes[Any],
-	}
+	p := NewParam(name, false, f)
 	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.WriteVariable(name, p)
