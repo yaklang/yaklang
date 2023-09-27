@@ -265,10 +265,10 @@ func (c ChanType) String() string {
 }
 
 // ==================== interface type
-type InterfaceKind int
+type ObjectKind int
 
 const (
-	None InterfaceKind = iota
+	None ObjectKind = iota
 	Slice
 	Map
 	Struct
@@ -276,11 +276,13 @@ const (
 
 type ObjectType struct {
 	Name       string
-	Kind       InterfaceKind
+	Kind       ObjectKind
 	Len        int
 	Key        []Value
 	keyTypes   []Type
 	FieldTypes []Type
+
+	Combination bool
 
 	method map[string]*FunctionType
 
@@ -346,32 +348,46 @@ func (itype ObjectType) String() string {
 
 func (itype ObjectType) RawString() string {
 	ret := ""
-	switch itype.Kind {
-	case Slice:
-		// map[int]T
-		if itype.Len == 0 {
-			ret += fmt.Sprintf("[]%s", itype.fieldType.String())
-		} else {
-			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.fieldType.String())
-		}
-	case Map:
-		// map[T]U
-		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-		ret += fmt.Sprintf("map[%s]%s", itype.keyTyp.String(), itype.fieldType.String())
-		// } else {
-		// 	panic("this interface type not map")
+	if itype.Combination {
+		// ret += itype.fieldType.String()
+		// for index := range itype.FieldTypes {
+		// 	ret += fmt.Sprintf(", %s")
 		// }
-	case Struct:
-		// map[string](T/U/xx)
-		ret += fmt.Sprintf(
-			"struct {%s}",
-			strings.Join(
-				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
-				",",
+		ret += strings.Join(
+			lo.Map(
+				itype.FieldTypes,
+				func(t Type, _ int) string { return t.String() },
 			),
+			", ",
 		)
-	case None:
-		ret += "object{}"
+	} else {
+		switch itype.Kind {
+		case Slice:
+			// map[int]T
+			if itype.Len == 0 {
+				ret += fmt.Sprintf("[]%s", itype.fieldType.String())
+			} else {
+				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.fieldType.String())
+			}
+		case Map:
+			// map[T]U
+			// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
+			ret += fmt.Sprintf("map[%s]%s", itype.keyTyp.String(), itype.fieldType.String())
+			// } else {
+			// 	panic("this interface type not map")
+			// }
+		case Struct:
+			// map[string](T/U/xx)
+			ret += fmt.Sprintf(
+				"struct {%s}",
+				strings.Join(
+					lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
+					",",
+				),
+			)
+		case None:
+			ret += "object{}"
+		}
 	}
 	return ret
 }
@@ -459,6 +475,7 @@ func CalculateType(ts []Type) Type {
 			i.AddField(NewConst(index), typ)
 		}
 		i.Finish()
+		i.Combination = true
 		// i.SetLen(NewConst(len(ts)))
 		i.Len = len(ts)
 		return i
