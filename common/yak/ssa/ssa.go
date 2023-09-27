@@ -571,7 +571,7 @@ type Make struct {
 	anNode
 
 	// when slice
-	low, high, max Value
+	low, high, step Value
 
 	parentI User // parent interface
 
