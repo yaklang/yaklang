@@ -451,7 +451,7 @@ func (starter *BrowserStarter) generateEventElementsExploit() func(*rod.Page, st
 			}
 			select {
 			case <-starter.ctx.Done():
-				log.Error("context deadline exceed")
+				return utils.Error("context deadline exceed")
 			default:
 				starter.ch <- &result
 			}
@@ -506,7 +506,7 @@ func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string,
 			}
 			select {
 			case <-starter.ctx.Done():
-				log.Error("context deadline exceed")
+				return utils.Error("context deadline exceed")
 			default:
 				starter.ch <- &result
 			}
