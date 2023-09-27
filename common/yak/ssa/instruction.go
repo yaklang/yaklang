@@ -49,7 +49,7 @@ func newAnInstuction(block *BasicBlock) anInstruction {
 		Block:    block,
 		typs:     nil,
 		variable: "",
-		pos:      block.Parent.builder.currtenPos,
+		pos:      block.Parent.builder.CurrtenPos,
 	}
 }
 
