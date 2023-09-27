@@ -73,7 +73,6 @@ func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
 	v := &ConstInst{
 		Const:         *c,
 		anInstruction: newAnInstuction(block),
-		value:         make([]Value, 0),
 	}
 	return v
 }
@@ -81,8 +80,7 @@ func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
 func NewUndefine(name string, block *BasicBlock) *Undefine {
 	u := &Undefine{
 		anInstruction: newAnInstuction(block),
-		user:          []User{},
-		values:        []Value{},
+		anNode:        NewNode(),
 	}
 	u.SetVariable(name)
 	block.Parent.builder.writeVariableByBlock(name, u, block)
@@ -92,11 +90,13 @@ func NewUndefine(name string, block *BasicBlock) *Undefine {
 func NewBinOpOnly(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 	b := &BinOp{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		Op:            op,
 		X:             x,
 		Y:             y,
-		user:          []User{},
 	}
+	b.AddValue(x)
+	b.AddValue(y)
 	if op >= OpGt && op <= OpIn {
 		b.SetType(BasicTypes[Boolean])
 	}
@@ -112,10 +112,11 @@ func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) Value {
 func NewUnOpOnly(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
 	u := &UnOp{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		Op:            op,
 		X:             x,
-		user:          []User{},
 	}
+	u.AddValue(x)
 	return u
 }
 
@@ -158,9 +159,10 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
 	t := &TypeCast{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		Value:         v,
-		user:          make([]User, 0),
 	}
+	t.AddValue(v)
 	t.SetType(typ)
 	return t
 }
@@ -178,8 +180,10 @@ func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 func NewNext(iter Value, block *BasicBlock) *Next {
 	n := &Next{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		Iter:          iter,
 	}
+	n.AddValue(iter)
 
 	/*
 		next map[T]U
@@ -223,6 +227,17 @@ func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
 	block.AddSucc(catch)
 	catch.Handler = e
 	return e
+}
+
+func NewParam(variable string, isFreevalue bool, fun *Function) *Parameter {
+	p := &Parameter{
+		anNode:      NewNode(),
+		variable:    variable,
+		Func:        fun,
+		IsFreevalue: isFreevalue,
+		typs:        nil,
+	}
+	return p
 }
 
 func (i *If) AddTrue(t *BasicBlock) {

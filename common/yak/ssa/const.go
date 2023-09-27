@@ -6,11 +6,11 @@ import (
 
 func init() {
 	ConstMap[nil] = &Const{
-		user:  []User{},
-		value: nil,
-		typ:   BasicTypes[Null],
-		str:   "nil",
-		Unary: 0,
+		anNode: NewNode(),
+		value:  nil,
+		typ:    BasicTypes[Null],
+		str:    "nil",
+		Unary:  0,
 	}
 }
 
@@ -33,10 +33,10 @@ func NewConst(i any) *Const {
 	// build new const
 	typ := GetType(i)
 	c := &Const{
-		user:  make([]User, 0),
-		value: i,
-		typ:   typ,
-		str:   fmt.Sprintf("%v", i),
+		anNode: NewNode(),
+		value:  i,
+		typ:    typ,
+		str:    fmt.Sprintf("%v", i),
 	}
 	// const should same
 	// assert newConst(1) ==newConst(1)

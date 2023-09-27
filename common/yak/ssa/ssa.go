@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"sync"
+
+	"github.com/samber/lo"
 )
 
 // TODO: save use-def chain in map[Node]struct{}
@@ -19,10 +21,7 @@ type Node interface {
 type Value interface {
 	Node
 
-	String() string
-
 	// user
-	GetUsers() []User
 	AddUser(User)
 	RemoveUser(User)
 
@@ -33,13 +32,59 @@ type Value interface {
 type User interface {
 	Node
 
-	String() string
-
-	GetValues() []Value
 	AddValue(Value)
+	RemoveValue(Value)
 
 	ReplaceValue(Value, Value)
 }
+
+type anNode struct {
+	user  map[User]struct{}
+	value map[Value]struct{}
+	// field map[*Field]struct{}
+}
+
+func NewNode() anNode {
+	return anNode{
+		user:  make(map[User]struct{}),
+		value: make(map[Value]struct{}),
+	}
+}
+
+func (n *anNode) GetUsers() []User {
+	return lo.Keys(n.user)
+}
+
+func (n *anNode) GetValues() []Value {
+	return lo.Keys(n.value)
+}
+
+func (n *anNode) AddUser(u User) {
+	n.user[u] = struct{}{}
+}
+
+func (n *anNode) AddValue(v Value) {
+	n.value[v] = struct{}{}
+}
+
+func (n *anNode) RemoveValue(v Value) {
+	delete(n.value, v)
+}
+func (n *anNode) RemoveUser(u User) {
+	delete(n.user, u)
+}
+
+// func (n *anNode) GetField() []*Field {
+// 	return lo.Keys(n.field)
+// }
+
+// func (n *anNode) AddField(f *Field) {
+// 	n.field[f] = struct{}{}
+// }
+
+// func (n *anNode) RemoveField(f *Field) {
+// 	delete(n.field, f)
+// }
 
 type Instruction interface {
 	GetParent() *Function
@@ -239,10 +284,10 @@ func (a *anInstruction) GetVariable() string {
 // ----------- Phi
 type Phi struct {
 	anInstruction
+	anNode
+
 	Edge   []Value // edge[i] from phi.Block.Preds[i]
-	user   []User
 	create bool
-	values []Value
 	// for build
 	wit1, wit2 Value // witness for trivial-phi
 }
@@ -258,7 +303,6 @@ var _ InstructionValue = (*Phi)(nil)
 type ConstInst struct {
 	Const
 	anInstruction
-	value []Value
 }
 
 func (c *ConstInst) GetType() Type {
@@ -277,8 +321,7 @@ var _ InstructionValue = (*ConstInst)(nil)
 
 type Undefine struct {
 	anInstruction
-	user   []User
-	values []Value
+	anNode
 }
 
 var _ Node = (*Undefine)(nil)
@@ -289,7 +332,7 @@ var _ InstructionValue = (*Undefine)(nil)
 
 // const only Value
 type Const struct {
-	user  []User
+	anNode
 	value any
 	// only one type
 	typ Type
@@ -313,14 +356,12 @@ var _ Value = (*Const)(nil)
 
 // ----------- Parameter
 type Parameter struct {
+	anNode
+
 	variable    string
 	Func        *Function
 	IsFreevalue bool
 	typs        Type
-
-	values []Value
-
-	users []User
 }
 
 func (p *Parameter) GetType() Type {
@@ -396,6 +437,8 @@ var _ Instruction = (*Return)(nil)
 // call instruction call method function  with args as argument
 type Call struct {
 	anInstruction
+	// call is a value
+	anNode
 
 	// for call function
 	Method Value
@@ -403,11 +446,6 @@ type Call struct {
 
 	// go function
 	Async bool
-
-	// call is a value
-	user []User
-
-	value []Value
 
 	binding []Value
 
@@ -486,9 +524,9 @@ const (
 // ----------- BinOp
 type BinOp struct {
 	anInstruction
+	anNode
 	Op   BinaryOpcode
 	X, Y Value
-	user []User
 }
 
 var _ Value = (*BinOp)(nil)
@@ -509,12 +547,12 @@ const (
 )
 
 type UnOp struct {
+	anNode
+
 	anInstruction
 
 	Op UnaryOpcode
 	X  Value
-
-	user []User
 }
 
 var _ Value = (*UnOp)(nil)
@@ -530,6 +568,7 @@ var _ InstructionValue = (*UnOp)(nil)
 // use-chain: *interface(self) -> multiple field(value)
 type Object struct {
 	anInstruction
+	anNode
 
 	// when slice
 	low, high, max Value
@@ -538,14 +577,8 @@ type Object struct {
 
 	IsNew bool
 
-	// Field
-	// Field map[Value]*Field // field.key->field
-	value []Value
-
 	// when slice or map
 	Len, Cap Value
-
-	users []User
 
 	// for extern lib
 	buildField func(key string) Value
@@ -562,10 +595,11 @@ var _ InstructionValue = (*Object)(nil)
 // use-chain: interface(user) -> *field(self) -> multiple update(value) -> value
 type Field struct {
 	anInstruction
+	anNode
 
 	// field
 	Key Value
-	I   User // this I type must be InterfaceType
+	I   User
 
 	// Method or Feild
 	isMethod bool
@@ -574,8 +608,6 @@ type Field struct {
 	OutCapture bool
 
 	Update []Value // value
-
-	users []User
 
 	//TODO:map[users]update
 	// i can add the map[users]update,
@@ -608,9 +640,9 @@ var _ InstructionValue = (*Update)(nil)
 // cast value -> type
 type TypeCast struct {
 	anInstruction
+	anNode
 
 	Value Value
-	user  []User
 }
 
 var _ Node = (*TypeCast)(nil)
@@ -634,8 +666,8 @@ var _ Instruction = (*Assert)(nil)
 // ------------- Next
 type Next struct {
 	anInstruction
+	anNode
 	Iter Value
-	user []User
 }
 
 var _ Node = (*Next)(nil)
@@ -655,6 +687,7 @@ var _ Instruction = (*ErrorHandler)(nil)
 // -------------- PANIC
 type Panic struct {
 	anInstruction
+	anNode
 	Info Value
 }
 
@@ -665,6 +698,9 @@ var _ Instruction = (*Panic)(nil)
 // --------------- RECOVER
 type Recover struct {
 	anInstruction
+	anNode
 }
 
+var _ Node = (*Recover)(nil)
+var _ Value = (*Recover)(nil)
 var _ Instruction = (*Recover)(nil)

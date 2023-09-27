@@ -45,15 +45,16 @@ func GetFields(u User) []*Field {
 func NewObject(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Object {
 	i := &Object{
 		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
 		parentI:       parentI,
 		low:           low,
 		high:          high,
 		max:           max,
 		Len:           Len,
 		Cap:           Cap,
-		users:         make([]User, 0),
 	}
 	i.SetType(typ)
+	//TODO: add this variable
 	fixupUseChain(i)
 	return i
 }
@@ -64,8 +65,23 @@ func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
 		Value:         v,
 		Address:       address,
 	}
+	s.AddValue(v)
+	s.AddUser(address)
 	fixupUseChain(s)
 	return s
+}
+
+func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
+	f := &Field{
+		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
+		Update:        make([]Value, 0),
+		Key:           key,
+		I:             obj,
+	}
+	f.AddValue(key)
+	f.AddUser(obj)
+	return f
 }
 
 func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Object {
@@ -136,13 +152,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 	}
 
 	if create {
-		field := &Field{
-			anInstruction: newAnInstuction(b.CurrentBlock),
-			Key:           key,
-			I:             i,
-			Update:        make([]Value, 0),
-			users:         make([]User, 0),
-		}
+		field := NewFieldOnly(key, i, b.CurrentBlock)
 		if ftyp != nil {
 			field.SetType(ftyp)
 		}
@@ -156,14 +166,8 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 }
 
 func (b *FunctionBuilder) NewCaptureField(text string) *Field {
-	f := &Field{
-		anInstruction: newAnInstuction(b.CurrentBlock),
-		Key:           NewConst(text),
-		I:             b.GetParentBuilder().GetSymbol(),
-		OutCapture:    true,
-		Update:        make([]Value, 0),
-		users:         make([]User, 0),
-	}
+	f := NewFieldOnly(NewConst(text), b.symbol, b.CurrentBlock)
+	f.OutCapture = true
 	return f
 }
 
