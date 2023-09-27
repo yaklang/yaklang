@@ -30,13 +30,13 @@ func (t *TypeInference) Analyze(config config, prog *ssa.Program) {
 		// finish
 		t.Finish[inst] = struct{}{}
 		// dfs from value to user
-		for _, user := range inst.GetUsers() {
-			uInst, ok := user.(ssa.InstructionValue)
-			if !ok {
-				continue
-			}
-			inference(uInst)
-		}
+		// for _, user := range inst.GetUsers() {
+		// 	uInst, ok := user.(ssa.InstructionValue)
+		// 	if !ok {
+		// 		continue
+		// 	}
+		// 	inference(uInst)
+		// }
 	}
 
 	// dfs: up-down; check and set type (from user to value)
@@ -152,17 +152,21 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 		return true
 	}
 	// set type in ast-builder
-	if inst.GetType().GetTypeKind() != ssa.Any {
-		t.CheckList = append(t.CheckList, inst)
-		return true
+	if typ := inst.GetType(); typ != nil {
+		// if typ.GetTypeKind() != ssa.Any {
+		// 	t.CheckList = append(t.CheckList, inst)
+		// 	return true
+		// }
+	} else {
+		inst.SetType(ssa.BasicTypes[ssa.Any])
 	}
 
 	switch inst := inst.(type) {
 	case *ssa.Phi:
-		return t.TypeInferencePhi(inst)
+		// return t.TypeInferencePhi(inst)
 	case *ssa.UnOp:
 	case *ssa.BinOp:
-		return t.TypeInferenceBinOp(inst)
+		// return t.TypeInferenceBinOp(inst)
 	case *ssa.Call:
 		return t.TypeInferenceCall(inst)
 	// case *ssa.Return:
@@ -174,7 +178,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 	case *ssa.Field:
 		return t.TypeInferenceField(inst)
 	case *ssa.Update:
-		return t.TypeInferenceUpdate(inst)
+		// return t.TypeInferenceUpdate(inst)
 	}
 	return false
 }
@@ -272,6 +276,38 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) bool {
 }
 
 func (t *TypeInference) TypeInferenceInterface(i *ssa.Object) bool {
+	// check error type
+
+	// check field finish
+	// if t.checkValuesNotFinish(
+	// 	lo.MapToSlice(i.Field,
+	// 		func(key ssa.Value, v *ssa.Field) ssa.Value {
+	// 			return v
+	// 		},
+	// 	),
+	// ) {
+	// 	return false
+	// }
+
+	// type pair struct {
+	// 	key   ssa.Value
+	// 	field *ssa.Field
+	// }
+	// // inference type
+	// typ := ssa.NewInterfaceType()
+	// // sort by key
+	// vs := lo.MapToSlice(i.Field, func(key ssa.Value, v *ssa.Field) pair {
+	// 	return pair{key: key, field: v}
+	// })
+	// // if number, sort
+	// sort.Slice(vs, func(i, j int) bool {
+	// 	return vs[i].key.String() < vs[j].key.String()
+	// })
+	// for _, pair := range vs {
+	// 	typ.AddField(pair.key, pair.field.GetType())
+	// }
+	// typ.Finish()
+	// i.SetType(ssa.Types{typ)
 
 	return true
 }
@@ -306,6 +342,46 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
 }
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) bool {
 	// TODO: type inference call
+	// get function type
+	functyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	if !ok {
+		return false
+	}
+
+	if c.GetType() == nil || c.GetType().GetTypeKind() == ssa.Any {
+		c.SetType(functyp.ReturnType)
+	}
+	// print("")
+	if c.GetVariable() == "" {
+		return false
+	}
+
+	if objType, ok := functyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
+		// a, b, err = fun()
+		rightLen := len(objType.FieldTypes)
+		if c.IsDropError {
+			rightLen -= 1
+		}
+		// a = func(); a = func()~
+		if rightLen == 1 {
+			return false
+		}
+
+		leftLen := len(ssa.GetFields(c))
+		// a, b = fun()~
+		if leftLen != rightLen {
+			// a = fun();
+			if leftLen == 0 {
+				leftLen = 1
+			}
+			c.NewError(
+				ssa.Error, TypeInferenceTAG,
+				"assignmemt mismatch: %d variable but return %d values",
+				leftLen, rightLen,
+			)
+		}
+	}
+
 	return false
 }
 

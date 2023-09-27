@@ -90,14 +90,14 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 		Method:        target,
 		Args:          args,
 		user:          []User{},
-		isDropError:   isDropError,
+		IsDropError:   isDropError,
 		binding:       binding,
 	}
 
-	if t := target.GetType(); !utils.IsNil(t) {
-		if ft, ok := t.(*FunctionType); ok {
-			c.SetType(ft.ReturnType)
-		}
-	}
+	// if t := target.GetType(); !utils.IsNil(t) {
+	// 	if ft, ok := t.(*FunctionType); ok {
+	// c.SetType(ft.ReturnType)
+	// 	}
+	// }
 	return c
 }
