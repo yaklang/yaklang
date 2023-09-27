@@ -161,12 +161,7 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 // --------------- `f.freevalue`
 
 func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
-	freevalue := &Parameter{
-		variable:    variable,
-		Func:        b.Function,
-		users:       []User{},
-		IsFreevalue: true,
-	}
+	freevalue := NewParam(variable, true, b.Function)
 	b.FreeValues = append(b.FreeValues, freevalue)
 	b.WriteVariable(variable, freevalue)
 	return freevalue

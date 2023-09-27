@@ -11,18 +11,23 @@ func ReplaceValue(v Value, to Value) {
 		user.ReplaceValue(v, to)
 		// user.InferenceType()
 		to.AddUser(user)
-		// v.RemoveUser(user)
+		v.RemoveUser(user)
 	}
 	// delete user in v.Value
 	if user, ok := v.(User); ok {
 		if touser, ok := to.(User); ok {
-			for _, value := range GetValue(user) {
+			values := user.GetValues()
+			for _, value := range values {
 				switch v := value.(type) {
+				// 		//TODO:handler field chain direction
 				case *Field:
 					v.I = touser
 					touser.AddValue(v)
+					v.RemoveUser(user)
+					user.RemoveValue(v)
+					// AddValue(user, v)
 				default:
-					value.RemoveUser(user)
+					// 			value.RemoveUser(user)
 				}
 			}
 		}
@@ -44,21 +49,49 @@ func GetUser(v Value) []User {
 	})
 }
 
-func GetValue(user User) []Value {
-	value, ok := user.(Value)
-	return lo.Filter(user.GetValues(), func(v Value, _ int) bool {
-		if utils.IsNil(v) || (ok && v == value) {
-			return false
-		} else {
-			return true
-		}
-	})
+func AddValue(user User, v Value) {
+	if index := slices.Index(user.GetValues(), v); index == -1 {
+		user.AddValue(v)
+	}
 }
+
+// func GetValue(user User) []Value {
+// 	value, ok := user.(Value)
+// 	var values []Value
+// 	if phi, ok := user.(*Phi); ok {
+// 		values = phi.values
+// 	} else {
+// 		values = lo.Uniq(user.GetValues())
+// 	}
+// 	return lo.Uniq(lo.Filter(values, func(v Value, _ int) bool {
+// 		if utils.IsNil(v) || (ok && v == value) {
+// 			return false
+// 		} else {
+// 			return true
+// 		}
+// 	}))
+// }
 
 func AddUser(v Value, u User) {
 	if index := slices.Index(v.GetUsers(), u); index == -1 {
 		v.AddUser(u)
 	}
+}
+
+func HasUser(n Node) bool {
+	if v, ok := n.(Value); ok {
+		if len(v.GetUsers()) != 0 {
+			return true
+		}
+	}
+	if u, ok := n.(User); ok {
+		for _, v := range u.GetValues() {
+			if _, ok := v.(*Field); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ----------- Function
@@ -77,71 +110,34 @@ func (b *BasicBlock) AddUser(u User)   { b.user = append(b.user, u) }
 
 func (b *BasicBlock) RemoveUser(u User) { b.user = utils.Remove(b.user, u) }
 
-// ----------- Phi
+// // ----------- Phi
 func (p *Phi) ReplaceValue(v Value, to Value) {
 	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
 	if index := slices.Index(p.Edge, v); index != -1 {
 		p.Edge[index] = to
-	} else if index := slices.Index(p.values, v); index != -1 {
-		p.values[index] = to
 	} else {
 		panic("phi not use this value")
 	}
 }
 
-func (p *Phi) GetUsers() []User { return p.user }
-func (p *Phi) AddUser(u User)   { p.user = append(p.user, u) }
-
-func (p *Phi) RemoveUser(u User) { p.user = utils.Remove(p.user, u) }
-
-func (p *Phi) GetValues() []Value { return append(p.Edge, p.values...) }
-
-// func (p *Phi) GetValues() []Value { return p.values }
-func (p *Phi) AddValue(v Value) { p.values = append(p.values, v) }
-
-// ----------- Const
-func (c *Const) GetValues() []Value { return nil }
-
-func (c *Const) GetUsers() []User { return c.user }
-func (c *Const) AddUser(u User)   { c.user = append(c.user, u) }
-
-func (c *Const) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
+func (p *Phi) AddEdge(v Value) {
+	p.Edge = append(p.Edge, v)
+	p.AddValue(v)
+}
 
 // ----------- ConstInst
-func (c *ConstInst) AddValue(v Value) { c.value = append(c.value, v) }
 func (c *ConstInst) ReplaceValue(v, to Value) {
-	if index := slices.Index(c.value, v); index != -1 {
-		c.value[index] = to
-	}
+	panic("this const instruction con't repalce ")
 }
 
 // ----------- undifne
-// node
-func (u *Undefine) GetValues() []Value { return u.values }
-func (c *Undefine) GetUsers() []User   { return c.user }
+func (c *Undefine) ReplaceValue(v, to Value) {
+	panic("undefine instruction con't replace")
+}
 
-// value
-func (c *Undefine) AddUser(u User)    { c.user = append(c.user, u) }
-func (c *Undefine) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
-
-// user
-func (c *Undefine) AddValue(v Value)         { c.values = append(c.values, v) }
-func (c *Undefine) RemoveValue(u User)       { c.user = utils.Remove(c.user, u) }
-func (c *Undefine) ReplaceValue(v, to Value) { slices.Replace(c.values, 0, len(c.values), v, to) }
-
-// ----------- param
-func (p *Parameter) GetValues() []Value { return p.values }
-
-func (p *Parameter) GetUsers() []User { return p.users }
-
-func (p *Parameter) AddUser(u User)    { p.users = append(p.users, u) }
-func (p *Parameter) RemoveUser(u User) { p.users = utils.Remove(p.users, u) }
-func (p *Parameter) AddValue(v Value)  { p.values = append(p.values, v) }
-
+// // ----------- param
 func (p *Parameter) ReplaceValue(v, to Value) {
-	if index := slices.Index(p.values, v); index != -1 {
-		p.values[index] = to
-	}
+	panic("parameter instruction con't replace")
 }
 
 // ----------- IF
@@ -155,8 +151,9 @@ func (i *If) ReplaceValue(v Value, to Value) {
 
 func (i *If) GetUsers() []User { return nil }
 
-func (i *If) GetValues() []Value { return []Value{i.Cond} }
-func (i *If) AddValue(v Value)   {}
+func (i *If) GetValues() []Value  { return []Value{i.Cond} }
+func (i *If) AddValue(v Value)    {}
+func (i *If) RemoveValue(v Value) {}
 
 // ----------- Loop
 func (l *Loop) ReplaceValue(v Value, to Value) {
@@ -173,8 +170,9 @@ func (l *Loop) ReplaceValue(v Value, to Value) {
 
 func (l *Loop) GetUsers() []User { return nil }
 
-func (l *Loop) GetValues() []Value { return []Value{l.Cond, l.Step, l.Init} }
-func (l *Loop) AddValue(v Value)   {}
+func (l *Loop) GetValues() []Value  { return []Value{l.Cond, l.Step, l.Init} }
+func (l *Loop) AddValue(v Value)    {}
+func (l *Loop) RemoveValue(v Value) {}
 
 // ----------- Return
 func (r *Return) ReplaceValue(v Value, to Value) {
@@ -187,10 +185,11 @@ func (r *Return) ReplaceValue(v Value, to Value) {
 
 func (r *Return) GetUsers() []User { return nil }
 
-func (r *Return) GetValues() []Value { return r.Results }
-func (r *Return) AddValue(v Value)   {}
+func (r *Return) GetValues() []Value  { return r.Results }
+func (r *Return) AddValue(v Value)    {}
+func (r *Return) RemoveValue(v Value) {}
 
-// ----------- Call
+// // ----------- Call
 func (c *Call) ReplaceValue(v Value, to Value) {
 	if c.Method == v {
 		c.Method = to
@@ -199,17 +198,8 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	} else {
 		panic("call not use this value")
 	}
+
 }
-
-func (c *Call) GetUsers() []User { return c.user }
-func (c *Call) AddUser(u User)   { c.user = append(c.user, u) }
-
-func (c *Call) RemoveUser(u User) { c.user = utils.Remove(c.user, u) }
-
-func (c *Call) GetValues() []Value {
-	return append(c.value, append(c.Args, append(c.binding, c.Method)...)...)
-}
-func (c *Call) AddValue(v Value) { c.value = append(c.value, v) }
 
 // ----------- Switch
 func (sw *Switch) ReplaceValue(v Value, to Value) {
@@ -233,27 +223,22 @@ func (sw *Switch) GetValues() []Value {
 		sw.Cond,
 	)
 }
-func (sw *Switch) AddValue(v Value) {}
+func (sw *Switch) AddValue(v Value)    {}
+func (sw *Switch) RemoveValue(v Value) {}
 
-// ----------- BinOp
+// // ----------- BinOp
 func (b *BinOp) ReplaceValue(v Value, to Value) {
 	if b.X == v {
 		b.X = to
-	}
-
-	if b.Y == v {
+	} else if b.Y == v {
 		b.Y = to
+	} else {
+		panic("binop not use this value")
 	}
+
 }
-func (b *BinOp) GetUsers() []User { return b.user }
-func (b *BinOp) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *BinOp) RemoveUser(u User) { b.user = utils.Remove(b.user, u) }
-
-func (b *BinOp) GetValues() []Value { return []Value{b.X, b.Y} }
-func (b *BinOp) AddValue(v Value)   {}
-
-// ----------- UnOp
+// // ----------- UnOp
 
 func (u *UnOp) ReplaceValue(v Value, to Value) {
 	if u.X == v {
@@ -263,44 +248,18 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 	}
 }
 
-func (b *UnOp) GetUsers() []User { return b.user }
-func (b *UnOp) AddUser(u User)   { b.user = append(b.user, u) }
-
-func (b *UnOp) RemoveUser(u User) { b.user = utils.Remove(b.user, u) }
-
-func (b *UnOp) GetValues() []Value { return []Value{b.X} }
-func (b *UnOp) AddValue(v Value)   {}
-
-// ----------- Interface
+// // ----------- Interface
 func (i *Object) ReplaceValue(v, to Value) {
 	if i.Cap == v {
 		i.Cap = to
 	} else if i.Len == v {
 		i.Len = v
-	} else if index := slices.Index(i.value, v); index != -1 {
-		i.value[index] = to
 	} else {
 		panic("object not use this value")
 	}
 }
 
-func (i *Object) GetUsers() []User { return i.users }
-func (i *Object) AddUser(u User) {
-	i.users = append(i.users, u)
-}
-
-func (i *Object) RemoveUser(u User) {
-	i.users = utils.Remove(i.users, u)
-}
-
-func (i *Object) GetValues() []Value {
-	return i.value
-}
-func (i *Object) AddValue(v Value) {
-	i.value = append(i.value, v)
-}
-
-// ----------- Field
+// // ----------- Field
 func (f *Field) ReplaceValue(v, to Value) {
 	if f.Key == v {
 		f.Key = to
@@ -308,17 +267,6 @@ func (f *Field) ReplaceValue(v, to Value) {
 		f.Update[index] = to
 	} else {
 		panic("field not use this value")
-	}
-}
-
-func (f *Field) GetUsers() []User  { return append(f.users, f.I) }
-func (f *Field) AddUser(u User)    { f.users = append(f.users, u) }
-func (f *Field) RemoveUser(u User) { f.users = utils.Remove(f.users, u) }
-
-func (f *Field) GetValues() []Value { return append(f.Update, f.Key) }
-func (f *Field) AddValue(v Value) {
-	if s, ok := v.(*Update); ok {
-		f.Update = append(f.Update, s)
 	}
 }
 
@@ -341,10 +289,11 @@ func (s *Update) RemoveUser(u User) {
 	}
 }
 
-func (s *Update) GetValues() []Value { return []Value{s.Value} }
-func (s *Update) AddValue(_ Value)   {}
+func (s *Update) GetValues() []Value  { return []Value{s.Value} }
+func (s *Update) AddValue(_ Value)    {}
+func (s *Update) RemoveValue(_ Value) {}
 
-// ----------- Typecast
+// // ----------- Typecast
 func (t *TypeCast) ReplaceValue(v, to Value) {
 	if t.Value == v {
 		t.Value = to
@@ -352,18 +301,12 @@ func (t *TypeCast) ReplaceValue(v, to Value) {
 		panic("type cast not use this value")
 	}
 }
-func (t *TypeCast) GetUsers() []User { return t.user }
-func (t *TypeCast) AddUser(u User)   { t.user = append(t.user, u) }
-func (t *TypeCast) RemoveUser(u User) {
-	t.user = utils.Remove(t.user, u)
-}
-func (t *TypeCast) GetValues() []Value { return []Value{t.Value} }
-func (t *TypeCast) AddValue(_ Value)   {}
 
 // ----------- Assert
-func (a *Assert) GetValues() []Value { return []Value{a.Cond, a.MsgValue} }
-func (a *Assert) GetUsers() []User   { return nil }
-func (a *Assert) AddValue(v Value)   {}
+func (a *Assert) GetValues() []Value  { return []Value{a.Cond, a.MsgValue} }
+func (a *Assert) GetUsers() []User    { return nil }
+func (a *Assert) AddValue(v Value)    {}
+func (a *Assert) RemoveValue(v Value) {}
 
 func (a *Assert) ReplaceValue(v, to Value) {
 	if a.Cond == v {
@@ -375,14 +318,7 @@ func (a *Assert) ReplaceValue(v, to Value) {
 	}
 }
 
-// ----------- Next
-func (n *Next) GetValues() []Value { return []Value{n.Iter} }
-func (n *Next) GetUsers() []User   { return n.user }
-func (n *Next) AddValue(v Value)   {}
-func (n *Next) AddUser(u User)     { n.user = append(n.user, u) }
-func (n *Next) RemoveUser(u User) {
-	n.user = utils.Remove(n.user, u)
-}
+// // ----------- Next
 func (n *Next) ReplaceValue(v, to Value) {
 	if n.Iter == v {
 		n.Iter = to
@@ -392,9 +328,6 @@ func (n *Next) ReplaceValue(v, to Value) {
 }
 
 // ------------- PANIC
-func (p *Panic) GetValues() []Value { return []Value{p.Info} }
-func (p *Panic) GetUsers() []User   { return nil }
-func (p *Panic) AddValue(v Value)   {}
 func (p *Panic) ReplaceValue(v, to Value) {
 	if p.Info == v {
 		p.Info = to

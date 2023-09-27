@@ -2,6 +2,26 @@ package ssa
 
 import "github.com/yaklang/yaklang/common/utils"
 
+func NewCall(target Value, args, binding []Value, isDropError bool, block *BasicBlock) *Call {
+	c := &Call{
+		anInstruction: newAnInstuction(block),
+		anNode:        NewNode(),
+		Method:        target,
+		Args:          args,
+		IsDropError:   isDropError,
+		binding:       binding,
+	}
+	c.AddValue(target)
+	for _, v := range args {
+		c.AddValue(v)
+	}
+	for _, v := range binding {
+		c.AddValue(v)
+	}
+
+	return c
+}
+
 func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) *Call {
 	var freevalue []Value
 	var parent *Function
@@ -85,19 +105,10 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 			f.NewError(Error, SSATAG, "call target clouse binding variable not found: %s", field)
 		}
 	}
-	c := &Call{
-		anInstruction: newAnInstuction(f.CurrentBlock),
-		Method:        target,
-		Args:          args,
-		user:          []User{},
-		IsDropError:   isDropError,
-		binding:       binding,
-	}
-
 	// if t := target.GetType(); !utils.IsNil(t) {
 	// 	if ft, ok := t.(*FunctionType); ok {
 	// c.SetType(ft.ReturnType)
 	// 	}
 	// }
-	return c
+	return NewCall(target, args, binding, isDropError, f.CurrentBlock)
 }
