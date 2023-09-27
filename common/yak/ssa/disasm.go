@@ -315,10 +315,17 @@ func (u *UnOp) String() string {
 
 // ----------- Interface
 func (i *Make) String() string {
-	return fmt.Sprintf(
-		"%s = make %s [%s, %s]",
-		getStr(i), i.typs, getStr(i.Len), getStr(i.Cap),
-	)
+	if i.parentI != nil {
+		return fmt.Sprintf(
+			"%s = %s [%s:%s:%s]",
+			getStr(i), getStr(i.parentI), getStr(i.low), getStr(i.high), getStr(i.step),
+		)
+	} else {
+		return fmt.Sprintf(
+			"%s = make %s [%s, %s]",
+			getStr(i), i.typs, getStr(i.Len), getStr(i.Cap),
+		)
+	}
 }
 
 // ----------- Field

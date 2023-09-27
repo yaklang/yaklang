@@ -165,8 +165,8 @@ func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 	return a
 }
 
-func (f *FunctionBuilder) emitMake(parentI User, typ Type, low, high, max, Len, Cap Value) *Make {
-	i := NewMake(parentI, typ, low, high, max, Len, Cap, f.CurrentBlock)
+func (f *FunctionBuilder) emitMake(parentI User, typ Type, low, high, step, Len, Cap Value) *Make {
+	i := NewMake(parentI, typ, low, high, step, Len, Cap, f.CurrentBlock)
 	f.emit(i)
 	return i
 }
@@ -179,8 +179,8 @@ func (f *FunctionBuilder) EmitMakeBuildWithType(typ Type, Len, Cap Value) *Make 
 func (f *FunctionBuilder) EmitMakeWithoutType(Len, Cap Value) *Make {
 	return f.emitMake(nil, nil, nil, nil, nil, Len, Cap)
 }
-func (f *FunctionBuilder) EmitMakeSlice(i User, low, high, max Value) *Make {
-	return f.emitMake(i, i.GetType(), low, high, max, nil, nil)
+func (f *FunctionBuilder) EmitMakeSlice(i User, low, high, step Value) *Make {
+	return f.emitMake(i, i.GetType(), low, high, step, nil, nil)
 }
 
 func (f *FunctionBuilder) EmitField(i User, key Value) Value {

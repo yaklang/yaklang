@@ -42,14 +42,14 @@ func GetFields(u User) []*Field {
 	return f
 }
 
-func NewMake(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Make {
+func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *BasicBlock) *Make {
 	i := &Make{
 		anInstruction: newAnInstuction(block),
 		anNode:        NewNode(),
 		parentI:       parentI,
 		low:           low,
 		high:          high,
-		max:           max,
+		step:          step,
 		Len:           Len,
 		Cap:           Cap,
 	}
