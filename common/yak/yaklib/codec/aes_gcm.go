@@ -22,7 +22,11 @@ import (
 	}
 */
 func AESGCMEncrypt(key []byte, data interface{}, nonceRaw []byte) ([]byte, error) {
-	return AESGCMEncryptWithNonceSize(key, data, nonceRaw, 16)
+	nonceSize := 12
+	if len(nonceRaw) == 16 {
+		nonceSize = 16
+	}
+	return AESGCMEncryptWithNonceSize(key, data, nonceRaw, nonceSize)
 }
 
 var AESGCMEncryptWithNonceSize16 = AESGCMEncrypt
@@ -103,4 +107,10 @@ func AESGCMDecryptWithNonceSize16(key []byte, data interface{}, nonce []byte) ([
 	return AESGCMDecryptWithNonceSize(key, data, nonce, 16)
 }
 
-var AESGCMDecrypt = AESGCMDecryptWithNonceSize16
+func AESGCMDecrypt(key []byte, data interface{}, nonce []byte) ([]byte, error) {
+	nonceSize := 12
+	if len(nonce) == 16 {
+		nonceSize = 16
+	}
+	return AESGCMDecryptWithNonceSize(key, data, nonce, nonceSize)
+}
