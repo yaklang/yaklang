@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"reflect"
 	"regexp"
 	"strings"
@@ -18,7 +19,7 @@ import (
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)
 
-func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, func([]byte, []byte) map[string]string) {
+func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
 	// 发送数据包之前的 hook
 	entry := NewScriptEngine(2)
 	entry.HookOsExit()
@@ -32,13 +33,17 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 
 	_, beforeRequestOk := engine.GetVar("beforeRequest")
 	_, afterRequestOk := engine.GetVar("afterRequest")
-	_, mirrorFlowOK := engine.GetVar("mirrorHTTPFlow")
+	mirrorHandlerInstance, mirrorFlowOK := engine.GetVar("mirrorHTTPFlow")
+	var mirrorHTTPFlowNumIn = 2
+	if ret, ok := mirrorHandlerInstance.(*yakvm.Function); ok {
+		mirrorHTTPFlowNumIn = ret.GetNumIn()
+	}
 
 	var hookLock = new(sync.Mutex)
 
 	var hookBefore func([]byte) []byte = nil
 	var hookAfter func([]byte) []byte = nil
-	var mirrorFlow func(req []byte, rsp []byte) map[string]string = nil
+	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
 
 	if beforeRequestOk {
 		hookBefore = func(bytes []byte) []byte {
@@ -90,7 +95,7 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 	}
 
 	if mirrorFlowOK {
-		mirrorFlow = func(req []byte, rsp []byte) map[string]string {
+		mirrorFlow = func(req []byte, rsp []byte, existed map[string]string) map[string]string {
 			hookLock.Lock()
 			defer hookLock.Unlock()
 
@@ -102,7 +107,11 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 
 			var result = make(map[string]string)
 			if engine != nil {
-				mirrorResult, err := engine.CallYakFunction(context.Background(), "mirrorHTTPFlow", []interface{}{req, rsp})
+				var params = []any{req, rsp}
+				if mirrorHTTPFlowNumIn > 2 {
+					params = []any{req, rsp, existed}
+				}
+				mirrorResult, err := engine.CallYakFunction(context.Background(), "mirrorHTTPFlow", params)
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
 				}

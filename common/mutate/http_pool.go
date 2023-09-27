@@ -51,7 +51,7 @@ type httpPoolConfig struct {
 	// afterRequest
 	HookBeforeRequest func([]byte) []byte
 	HookAfterRequest  func([]byte) []byte
-	MirrorHTTPFlow    func([]byte, []byte) map[string]string
+	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
 
 	// 请求来源
 	Source string
@@ -148,7 +148,7 @@ func _httpPool_RetryNotInStatusCode(codes []int) HttpPoolConfigOption {
 	}
 }
 
-func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []byte, extractor func([]byte, []byte) map[string]string) HttpPoolConfigOption {
+func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []byte, extractor func([]byte, []byte, map[string]string) map[string]string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
@@ -587,9 +587,16 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						}
 					}
 
+					existedParams := make(map[string]string)
+					if config.FuzzParams != nil {
+						for k, v := range config.FuzzParams {
+							existedParams[k] = strings.Join(v, ",")
+						}
+					}
+
 					var extra = make(map[string]string)
 					if config.MirrorHTTPFlow != nil {
-						if ret := config.MirrorHTTPFlow(targetRequest, rsp); ret != nil {
+						if ret := config.MirrorHTTPFlow(targetRequest, rsp, existedParams); ret != nil {
 							for k, v := range ret {
 								extra[k] = v
 							}
