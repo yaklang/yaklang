@@ -52,6 +52,7 @@ var _ LeftValue = (*Field)(nil)
 // --------------- `f.currentDef` hanlder, read && write
 func (f *Function) WriteVariable(variable string, value Value) {
 	if b := f.builder; b != nil {
+		variable = b.GetIdByBlockSymbolTable(variable)
 		b.writeVariableByBlock(variable, value, b.CurrentBlock)
 	}
 	// if value is InstructionValue
