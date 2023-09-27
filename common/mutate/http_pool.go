@@ -333,9 +333,9 @@ func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
 	}
 }
 
-func _httpPool_withConnPool() HttpPoolConfigOption {
+func _httpPool_withConnPool(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
-		config.WithConnPool = true
+		config.WithConnPool = b
 	}
 }
 
@@ -582,10 +582,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
 						lowhttp.WithDNSServers(config.DNSServers),
 						lowhttp.WithETCHosts(config.EtcHosts),
-						lowhttp.WithGmTLS(config.IsGmTLS)}
-					if config.WithConnPool {
-						lowhttpOptions = append(lowhttpOptions, lowhttp.WithConnPool())
-					}
+						lowhttp.WithGmTLS(config.IsGmTLS),
+						lowhttp.WithConnPool(config.WithConnPool)}
+
 					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 					var rsp []byte
 					if rspInstance != nil {
