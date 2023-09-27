@@ -89,14 +89,54 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	return f
 }
 
+// calculate all return instruction in function, get return type
+func handlerReturnType(rs []*Return) []Type {
+
+	tmp := make(map[string][]Type, len(rs))
+	for _, r := range rs {
+		id := ""
+		typs := lo.Map(r.Results,
+			func(r Value, _ int) Type {
+				t := r.GetType()
+				id += t.RawString()
+				return t
+			},
+		)
+
+		if _, ok := tmp[id]; !ok {
+			tmp[id] = typs
+		}
+	}
+
+	typs := lo.Values(tmp)
+	if len(typs) == 0 {
+		return []Type{BasicTypes[Null]}
+	} else if len(typs) == 1 {
+		return typs[0]
+	} else {
+		//TODO: how handler this?
+		// should set Warn!!
+		// and ?? Type ??
+	}
+
+	return nil
+}
+
 // current function finish
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
 	f.SetType(NewFunctionType("",
-		lo.Map(f.Param, func(p *Parameter, _ int) Type { return p.GetType() }),
-		lo.Map(f.Return, func(r *Return, _ int) Type { return r.GetType() }),
+		lo.Map(f.Param, func(p *Parameter, _ int) Type {
+			t := p.GetType()
+			if t == nil {
+				t = BasicTypes[Any]
+				p.SetType(t)
+			}
+			return t
+		}),
+		handlerReturnType(f.Return),
 		f.hasEllipsis,
 	))
 }
