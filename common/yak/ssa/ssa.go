@@ -4,7 +4,8 @@ import (
 	"sync"
 )
 
-// TODO
+// TODO: save use-def chain in map[Node]struct{}
+
 // data flow graph node
 type Node interface {
 	String() string
@@ -413,7 +414,7 @@ type Call struct {
 	// caller
 	// caller Value
 	// ~ drop error
-	isDropError bool
+	IsDropError bool
 }
 
 var _ Node = (*Call)(nil)
