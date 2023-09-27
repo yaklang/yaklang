@@ -123,7 +123,7 @@ func (b *astbuilder) buildTypeLiteral(stmt *yak.TypeLiteralContext) ssa.Type {
 	if strings.HasPrefix(text, "chan") {
 		if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 			if typ := b.buildTypeLiteral(s); typ != nil {
-				// return ssa.NewChanType(typ)
+				return ssa.NewChanType(typ)
 			}
 		}
 	}

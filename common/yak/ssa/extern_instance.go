@@ -35,7 +35,7 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 	// ivalue := reflect.ValueOf(v)
 
 	if itype == reflect.TypeOf(make(map[string]interface{})) {
-		i := NewObject(nil,
+		i := NewMake(nil,
 			NewMapType(BasicTypes[String], BasicTypes[Any]),
 			nil, nil, nil, nil, nil, b.CurrentBlock)
 
@@ -138,6 +138,8 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = obj
 	case reflect.Interface:
 		ret = NewInterfaceType(typStr)
+	case reflect.Chan:
+		ret = NewChanType(f.handlerType(typ.Elem(), level))
 	default:
 		if ret == nil {
 			fmt.Println("con't handler this type:" + typ.Kind().String())

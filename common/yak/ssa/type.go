@@ -88,6 +88,7 @@ const (
 	UndefineType // undefine is nil in golnag
 	Null         //
 	Any          // any type
+	ChanTypeKind
 	ErrorType
 	ObjectTypeKind
 	InterfaceTypeKind
@@ -251,7 +252,21 @@ func (i *InterfaceType) RawString() string {
 
 // ====================== chan type
 type ChanType struct {
-	elem Type
+	elem   Type
+	method map[string]*FunctionType
+}
+
+var _ (Type) = (*ChanType)(nil)
+
+func (c *ChanType) SetMethod(m map[string]*FunctionType) {
+	c.method = m
+}
+func (c *ChanType) GetMethod(id string) *FunctionType {
+	return c.method[id]
+}
+
+func (c *ChanType) GetTypeKind() TypeKind {
+	return ChanTypeKind
 }
 
 func NewChanType(elem Type) *ChanType {
@@ -262,6 +277,10 @@ func NewChanType(elem Type) *ChanType {
 
 func (c ChanType) String() string {
 	return fmt.Sprintf("chan %s", c.elem)
+}
+
+func (c ChanType) RawString() string {
+	return c.String()
 }
 
 // ==================== interface type

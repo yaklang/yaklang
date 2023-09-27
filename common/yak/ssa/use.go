@@ -21,7 +21,7 @@ func ReplaceValue(v Value, to Value) {
 				switch v := value.(type) {
 				// 		//TODO:handler field chain direction
 				case *Field:
-					v.I = touser
+					v.Obj = touser
 					touser.AddValue(v)
 					v.RemoveUser(user)
 					user.RemoveValue(v)
@@ -249,7 +249,7 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 }
 
 // // ----------- Interface
-func (i *Object) ReplaceValue(v, to Value) {
+func (i *Make) ReplaceValue(v, to Value) {
 	if i.Cap == v {
 		i.Cap = to
 	} else if i.Len == v {
