@@ -33,7 +33,7 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, 
 	})
 }
 func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	b.NewErrorWithPos(kind, tag, b.currtenPos, format, arg...)
+	b.NewErrorWithPos(kind, tag, b.CurrtenPos, format, arg...)
 }
 func (an anInstruction) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
 	an.Func.NewErrorWithPos(kind, tag, an.pos, format, arg...)

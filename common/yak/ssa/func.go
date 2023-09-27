@@ -48,7 +48,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.currtenPos,
-		f.Pos = parent.builder.currtenPos
+		f.Pos = parent.builder.CurrtenPos
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f

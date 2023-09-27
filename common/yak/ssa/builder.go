@@ -28,7 +28,7 @@ type FunctionBuilder struct {
 	// for build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
 	CurrentBlock *BasicBlock                      // current block to build
-	currtenPos   *Position                        // current position in source code
+	CurrtenPos   *Position                        // current position in source code
 	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
 
 	buildExtern func(string, *FunctionBuilder) Value
@@ -44,7 +44,7 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 		deferexpr:    make([]*Call, 0),
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
-		currtenPos:   nil,
+		CurrtenPos:   nil,
 		symbolBlock:  nil,
 		prev:         next,
 	}
@@ -100,8 +100,8 @@ func (b *FunctionBuilder) Finish() {
 
 // handler position: set new position and return original position for backup
 func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
-	backup := b.currtenPos
-	b.currtenPos = pos
+	backup := b.CurrtenPos
+	b.CurrtenPos = pos
 	return backup
 }
 
