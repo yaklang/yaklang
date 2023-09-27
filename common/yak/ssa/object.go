@@ -8,12 +8,12 @@ import (
 )
 
 func IsObject(v Value) bool {
-	_, ok := v.(*Object)
+	_, ok := v.(*Make)
 	return ok
 }
 
-func ToObject(v Value) *Object {
-	o, _ := v.(*Object)
+func ToObject(v Value) *Make {
+	o, _ := v.(*Make)
 	return o
 }
 
@@ -34,7 +34,7 @@ func GetFields(u User) []*Field {
 	f := make([]*Field, 0)
 	for _, v := range u.GetValues() {
 		if field, ok := v.(*Field); ok {
-			if field.I == u {
+			if field.Obj == u {
 				f = append(f, field)
 			}
 		}
@@ -42,8 +42,8 @@ func GetFields(u User) []*Field {
 	return f
 }
 
-func NewObject(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Object {
-	i := &Object{
+func NewMake(parentI User, typ Type, low, high, max, Len, Cap Value, block *BasicBlock) *Make {
+	i := &Make{
 		anInstruction: newAnInstuction(block),
 		anNode:        NewNode(),
 		parentI:       parentI,
@@ -77,21 +77,21 @@ func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
 		anNode:        NewNode(),
 		Update:        make([]Value, 0),
 		Key:           key,
-		I:             obj,
+		Obj:           obj,
 	}
 	f.AddValue(key)
 	f.AddUser(obj)
 	return f
 }
 
-func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Object {
+func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make {
 	hasKey := true
 	if len(keys) == 0 {
 		hasKey = false
 	}
 	lValueLen := NewConst(len(vs))
 	ityp := NewObjectType()
-	itf := b.EmitInterfaceBuildNewType(lValueLen, lValueLen)
+	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
 	for i, rv := range vs {
 		var key Value
 		if hasKey {
@@ -114,7 +114,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Objec
 func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Value {
 	var ftyp Type
 	var isMethod bool
-	if I, ok := i.(*Object); ok {
+	if I, ok := i.(*Make); ok {
 		if I.buildField != nil {
 			if v := I.buildField(key.String()); v != nil {
 				return v

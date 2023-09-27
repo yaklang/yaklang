@@ -151,7 +151,7 @@ type Function struct {
 	// if this function is anonFunc
 	parent     *Function // parent function if anonymous function; nil if global function.
 	FreeValues []Value   // the value, captured variable form parent-function,
-	symbol     *Object   // for function symbol table
+	symbol     *Make     // for function symbol table
 
 	// User
 	user []User
@@ -563,10 +563,10 @@ var _ InstructionValue = (*UnOp)(nil)
 
 // special instruction ------------------------------------------
 
-// ----------- Object
+// ----------- Make
 // instruction + value + user
 // use-chain: *interface(self) -> multiple field(value)
-type Object struct {
+type Make struct {
 	anInstruction
 	anNode
 
@@ -584,11 +584,11 @@ type Object struct {
 	buildField func(key string) Value
 }
 
-var _ Node = (*Object)(nil)
-var _ Value = (*Object)(nil)
-var _ User = (*Object)(nil)
-var _ Instruction = (*Object)(nil)
-var _ InstructionValue = (*Object)(nil)
+var _ Node = (*Make)(nil)
+var _ Value = (*Make)(nil)
+var _ User = (*Make)(nil)
+var _ Instruction = (*Make)(nil)
+var _ InstructionValue = (*Make)(nil)
 
 // instruction
 // ----------- Field
@@ -599,7 +599,7 @@ type Field struct {
 
 	// field
 	Key Value
-	I   User
+	Obj User
 
 	// Method or Feild
 	isMethod bool
