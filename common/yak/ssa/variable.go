@@ -7,6 +7,7 @@ import (
 // --------------- for assign
 type LeftValue interface {
 	Assign(Value, *FunctionBuilder)
+	GetPosition() *Position
 	GetValue(*FunctionBuilder) Value
 }
 
@@ -14,9 +15,13 @@ type LeftValue interface {
 // --------------- is SSA value
 type IdentifierLV struct {
 	variable string
+	pos      *Position
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
+	if inst, ok := v.(Instruction); ok {
+		inst.SetPosition(i.GetPosition())
+	}
 	f.WriteVariable(i.variable, v)
 }
 
@@ -29,9 +34,14 @@ func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
 	return v
 }
 
-func NewIndentifierLV(variable string) *IdentifierLV {
+func (i *IdentifierLV) GetPosition() *Position {
+	return i.pos
+}
+
+func NewIndentifierLV(variable string, pos *Position) *IdentifierLV {
 	return &IdentifierLV{
 		variable: variable,
+		pos:      pos,
 	}
 }
 
