@@ -99,6 +99,9 @@ type Instruction interface {
 
 	// pos
 	Pos() string
+
+	GetPosition() *Position
+	SetPosition(pos *Position)
 }
 
 // both instruction and value
@@ -281,6 +284,14 @@ func (a *anInstruction) SetVariable(name string) {
 
 func (a *anInstruction) GetVariable() string {
 	return a.variable
+}
+
+func (a *anInstruction) GetPosition() *Position {
+	return a.pos
+}
+
+func (a *anInstruction) SetPosition(pos *Position) {
+	a.pos = pos
 }
 
 // value
@@ -617,7 +628,7 @@ type Field struct {
 	Obj User
 
 	// Method or Feild
-	isMethod bool
+	IsMethod bool
 
 	// capture by other function
 	OutCapture bool

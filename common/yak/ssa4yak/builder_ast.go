@@ -775,7 +775,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
 		if text == "_" {
-			return ssa.NewIndentifierLV("_")
+			return ssa.NewIndentifierLV("_", b.CurrtenPos)
 		}
 		if forceAssign {
 			text = b.MapBlockSymbolTable(text)
@@ -806,7 +806,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			b.SetReg(field)
 			return field
 		}
-		return ssa.NewIndentifierLV(text)
+		return ssa.NewIndentifierLV(text, b.CurrtenPos)
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		expr := b.buildExpression(s)

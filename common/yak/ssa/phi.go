@@ -14,6 +14,9 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
 		v := p.Build()
+		if inst, ok := v.(Instruction); ok {
+			inst.SetPosition(p.GetPosition())
+		}
 		if i, ok := v.(*Make); ok && i.buildField != nil {
 			for _, user := range i.GetValues() {
 				if f, ok := user.(*Field); ok {
