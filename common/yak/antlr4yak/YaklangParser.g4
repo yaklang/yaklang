@@ -184,12 +184,16 @@ expression
     | expression additiveBinaryOperator ws* expression
     | expression comparisonBinaryOperator ws* expression
 
+    // 包含运算仍然是初级逻辑
+    | expression 'not'? 'in' expression
+
     // 高级逻辑
     | expression '&&' ws* expression
     | expression '||' ws* expression
-    | expression 'not'? 'in' expression
-    | expression '<-' expression
     | expression '?' ws* expression ws* ':' ws* expression
+
+    // 管道操作符
+    | expression '<-' expression
     ;
 
 parenExpression: '(' expression? ')' ;
