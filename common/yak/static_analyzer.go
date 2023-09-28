@@ -60,8 +60,12 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 	}
 
 	// ssa
-	prog := ssa4yak.ParseSSA(code)
-	for _, err := range prog.GetErrors() {
+	prog := ssa4yak.ParseSSA(
+		code,
+		ssa4yak.WithSymbolTable(yaklang.New().GetFntable()),
+	)
+	errs := prog.GetErrors()
+	for _, err := range errs {
 		var severity string
 		switch err.Kind {
 		case ssa.Warn:
