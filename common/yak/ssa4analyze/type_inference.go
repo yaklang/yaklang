@@ -20,41 +20,17 @@ func init() {
 func (t *TypeInference) Analyze(config config, prog *ssa.Program) {
 	t.Finish = make(map[ssa.InstructionValue]struct{})
 
-	// dfs: down-up; inference type (from value to user)
 	var inference func(ssa.InstructionValue)
 	inference = func(inst ssa.InstructionValue) {
-		if !t.InferenceOnInstruction(inst) {
-			// not finish, just next
-			return
+		if t.InferenceOnInstruction(inst) {
+			t.CheckList = append(t.CheckList, inst)
 		}
-		// finish
-		t.Finish[inst] = struct{}{}
-		// dfs from value to user
-		// for _, user := range inst.GetUsers() {
-		// 	uInst, ok := user.(ssa.InstructionValue)
-		// 	if !ok {
-		// 		continue
-		// 	}
-		// 	inference(uInst)
-		// }
 	}
 
 	// dfs: up-down; check and set type (from user to value)
 	var check func(ssa.InstructionValue)
 	check = func(inst ssa.InstructionValue) {
-		if !t.CheckOnInstruction(inst) {
-			// not finish, just next
-			return
-		}
-		t.Finish[inst] = struct{}{}
-		// dfs from user to value
-		for _, value := range inst.GetValues() {
-			vInst, ok := value.(ssa.InstructionValue)
-			if !ok {
-				continue
-			}
-			check(vInst)
-		}
+		t.CheckOnInstruction(inst)
 	}
 
 	analyzeOnFunction := func(f *ssa.Function) {
@@ -89,7 +65,6 @@ func (t *TypeInference) CheckOnInstruction(inst ssa.InstructionValue) bool {
 	// }
 
 	switch inst := inst.(type) {
-
 	case *ssa.Make:
 		// pass; this is top instruction
 		return true
@@ -97,8 +72,10 @@ func (t *TypeInference) CheckOnInstruction(inst ssa.InstructionValue) bool {
 		return t.TypeCheckField(inst)
 	case *ssa.Update:
 		return t.TypeCheckUpdate(inst)
-		// case *ssa.ConstInst:
-		// case *ssa.BinOp:
+	// case *ssa.ConstInst:
+	// case *ssa.BinOp:
+	case *ssa.Call:
+		return t.TypeCheckCall(inst)
 	}
 
 	return false
@@ -114,7 +91,7 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 		return false
 	}
 	//TODO:type kind check should handler interfaceTypeKind
-	if v.GetType().GetTypeKind() != typ.GetTypeKind() {
+	if t := v.GetType(); t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any {
 		if inst, ok := v.(ssa.Instruction); ok {
 			inst.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this shoud be %s", typ)
 		}
@@ -123,19 +100,58 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 	return true
 }
 
+func (t *TypeInference) TypeCheckCall(c *ssa.Call) bool {
+	functyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	if !ok {
+		return false
+	}
+	if c.GetVariable() == "" {
+		return false
+	}
+
+	if objType, ok := functyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
+		// a, b, err = fun()
+		rightLen := len(objType.FieldTypes)
+		if c.IsDropError {
+			rightLen -= 1
+		}
+		// a = func(); a = func()~
+		if rightLen == 1 {
+			return false
+		}
+
+		leftLen := len(ssa.GetFields(c))
+		// a, b = fun()~
+		if leftLen != rightLen {
+			// a = fun();
+			if leftLen == 0 {
+				leftLen = 1
+			}
+			c.NewError(
+				ssa.Error, TypeInferenceTAG,
+				"assignmemt mismatch: %d variable but return %d values",
+				leftLen, rightLen,
+			)
+		}
+	}
+	return false
+}
+
 func (t *TypeInference) TypeCheckField(f *ssa.Field) bool {
 	// use interface
 	// if _, ok := t.Finish[f.I]; ok {
-	interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
-	fTyp, kTyp := interfaceTyp.GetField(f.Key)
-	if fTyp == nil || kTyp == nil {
-		f.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this field not in interface")
+	typ := f.GetType()
+	// if typ.GetTypeKind() == ssa.ErrorType {
+	// }
+	switch typ.GetTypeKind() {
+	case ssa.ErrorType:
+		if len(f.GetUserOnly()) == 0 && f.GetVariable() != "_" {
+			f.NewError(ssa.Error, TypeInferenceTAG, "this error not handler")
+		}
+		return false
+	default:
 		return false
 	}
-	// if one change, will next check
-	fcheck := checkType(f, fTyp)
-	kcheck := checkType(f.Key, kTyp)
-	return fcheck || kcheck
 }
 
 func (t *TypeInference) TypeCheckUpdate(u *ssa.Update) bool {
@@ -148,9 +164,9 @@ func (t *TypeInference) TypeCheckUpdate(u *ssa.Update) bool {
 }
 
 func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
-	if _, ok := t.Finish[inst]; ok {
-		return true
-	}
+	// if _, ok := t.Finish[inst]; ok {
+	// 	return true
+	// }
 	// set type in ast-builder
 	// if typ := inst.GetType(); typ != nil {
 	// 	// if typ.GetTypeKind() != ssa.Any {
@@ -179,6 +195,8 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 		return t.TypeInferenceField(inst)
 	case *ssa.Update:
 		// return t.TypeInferenceUpdate(inst)
+	case *ssa.Undefine:
+		return t.TypeInferenceUndefine(inst)
 	}
 	return false
 }
@@ -212,6 +230,11 @@ func (t *TypeInference) checkValuesNotFinish(vs []ssa.Value) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func (t *TypeInference) TypeInferenceUndefine(un *ssa.Undefine) bool {
+	un.NewError(ssa.Error, TypeInferenceTAG, "this value undefine:%s", un.GetVariable())
 	return false
 }
 
@@ -313,7 +336,26 @@ func (t *TypeInference) TypeInferenceInterface(i *ssa.Make) bool {
 }
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) bool {
-
+	if t := f.Obj.GetType(); t.GetTypeKind() != ssa.Any {
+		if t.GetTypeKind() == ssa.ObjectTypeKind {
+			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
+			fTyp, kTyp := interfaceTyp.GetField(f.Key)
+			if fTyp == nil || kTyp == nil {
+				if methodTyp := interfaceTyp.GetMethod(f.Key.String()); methodTyp != nil {
+					f.SetType(methodTyp)
+					f.IsMethod = true
+					return true
+				} else {
+					f.NewError(ssa.Error, TypeInferenceTAG, "type check failed, this field not in interface")
+					return false
+				}
+			}
+			// if one change, will next check
+			fcheck := checkType(f, fTyp)
+			kcheck := checkType(f.Key, kTyp)
+			return fcheck || kcheck
+		}
+	}
 	// use update
 	vs := lo.Map(f.Update, func(v ssa.Value, i int) ssa.Value {
 		switch v := v.(type) {
@@ -350,39 +392,10 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) bool {
 
 	if c.GetType() == nil || c.GetType().GetTypeKind() == ssa.Any {
 		c.SetType(functyp.ReturnType)
-	}
-	// print("")
-	if c.GetVariable() == "" {
+		return true
+	} else {
 		return false
 	}
-
-	if objType, ok := functyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
-		// a, b, err = fun()
-		rightLen := len(objType.FieldTypes)
-		if c.IsDropError {
-			rightLen -= 1
-		}
-		// a = func(); a = func()~
-		if rightLen == 1 {
-			return false
-		}
-
-		leftLen := len(ssa.GetFields(c))
-		// a, b = fun()~
-		if leftLen != rightLen {
-			// a = fun();
-			if leftLen == 0 {
-				leftLen = 1
-			}
-			c.NewError(
-				ssa.Error, TypeInferenceTAG,
-				"assignmemt mismatch: %d variable but return %d values",
-				leftLen, rightLen,
-			)
-		}
-	}
-
-	return false
 }
 
 func (t *TypeInference) TypeInferenceReturn(r *ssa.Return) bool {
