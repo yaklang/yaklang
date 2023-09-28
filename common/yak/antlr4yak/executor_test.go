@@ -110,6 +110,19 @@ assert b"abc".EndsWith("c"),"EndsWith error"
 	}
 }
 
+func TestChanAndINOP(t *testing.T) {
+	code := `
+assert true && "b" in "abc"  // in 的优先级要高于 &&
+c = make(chan var, 1)
+c <- 1 > 0 &&  true
+d = <-c
+assert d
+`
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
+}
+
 // 本测试只针对try-catch与流程控制、return共用的情况,try-catch的其他情况在其他测试中已经覆盖
 func TestTryCatchWithProcessControl(t *testing.T) {
 	code := `
