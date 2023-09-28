@@ -739,10 +739,10 @@ func (b *astbuilder) buildDeclareVariableExpression(stmt *yak.DeclareVariableExp
 func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	for _, idstmt := range stmt.AllIdentifier() {
-		id := idstmt.GetText()
-		b.WriteVariable(id, b.EmitUndefine(id))
-	}
+	// for _, idstmt := range stmt.AllIdentifier() {
+	// id := idstmt.GetText()
+	// b.WriteVariable(id, b.EmitUndefine(id))
+	// }
 }
 
 func (b *astbuilder) buildDeclareAndAssignExpression(stmt *yak.DeclareAndAssignExpressionContext) {

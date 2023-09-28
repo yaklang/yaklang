@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 
+	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 )
 
@@ -39,6 +40,17 @@ func GetFields(u User) []*Field {
 		}
 	}
 	return f
+}
+
+// get user without object
+func (f *Field) GetUserOnly() []User {
+	return lo.Filter(f.GetUsers(), func(u User, _ int) bool {
+		if u == f.Obj {
+			return false
+		} else {
+			return true
+		}
+	})
 }
 
 func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *BasicBlock) *Make {
@@ -154,7 +166,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 		if ftyp != nil {
 			field.SetType(ftyp)
 		}
-		field.isMethod = isMethod
+		field.IsMethod = isMethod
 		b.emit(field)
 		fixupUseChain(field)
 		return field

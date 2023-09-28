@@ -37,6 +37,8 @@ func DeleteInst(i Instruction) {
 	} else {
 		b.Instrs = utils.Remove(b.Instrs, i)
 	}
+	f := i.GetParent()
+	delete(f.InstReg, i)
 	// if v, ok := i.(Value); ok {
 	// 	f := i.GetParent()
 	// 	f.symbolTable[v.GetVariable()] = remove(f.symbolTable[v.GetVariable()], v)
