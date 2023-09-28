@@ -149,22 +149,22 @@ func yaklangparserParserInit() {
 		40, 1, 40, 1, 40, 1, 40, 5, 40, 529, 8, 40, 10, 40, 12, 40, 532, 9, 40,
 		1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 539, 8, 40, 10, 40, 12, 40, 542,
 		9, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 549, 8, 40, 10, 40, 12,
-		40, 552, 9, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 559, 8, 40, 10,
-		40, 12, 40, 562, 9, 40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 568, 8, 40,
-		10, 40, 12, 40, 571, 9, 40, 1, 40, 1, 40, 1, 40, 3, 40, 576, 8, 40, 1,
-		40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 586, 8, 40,
-		10, 40, 12, 40, 589, 9, 40, 1, 40, 1, 40, 5, 40, 593, 8, 40, 10, 40, 12,
-		40, 596, 9, 40, 1, 40, 1, 40, 5, 40, 600, 8, 40, 10, 40, 12, 40, 603, 9,
-		40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 3, 40, 611, 8, 40, 5, 40,
-		613, 8, 40, 10, 40, 12, 40, 616, 9, 40, 1, 41, 1, 41, 3, 41, 620, 8, 41,
-		1, 41, 1, 41, 1, 42, 1, 42, 1, 42, 5, 42, 627, 8, 42, 10, 42, 12, 42, 630,
-		9, 42, 1, 42, 1, 42, 1, 42, 5, 42, 635, 8, 42, 10, 42, 12, 42, 638, 9,
-		42, 1, 42, 3, 42, 641, 8, 42, 1, 42, 1, 42, 1, 43, 1, 43, 1, 43, 1, 43,
-		1, 43, 1, 43, 3, 43, 651, 8, 43, 1, 44, 1, 44, 1, 44, 1, 44, 1, 45, 1,
-		45, 1, 45, 1, 45, 1, 45, 1, 45, 1, 46, 1, 46, 1, 46, 1, 47, 1, 47, 3, 47,
-		668, 8, 47, 1, 47, 1, 47, 3, 47, 672, 8, 47, 1, 47, 1, 47, 1, 47, 1, 47,
-		3, 47, 678, 8, 47, 1, 47, 1, 47, 3, 47, 682, 8, 47, 1, 47, 1, 47, 1, 47,
-		3, 47, 687, 8, 47, 3, 47, 689, 8, 47, 1, 48, 1, 48, 1, 49, 5, 49, 694,
+		40, 552, 9, 40, 1, 40, 1, 40, 1, 40, 1, 40, 3, 40, 558, 8, 40, 1, 40, 1,
+		40, 1, 40, 1, 40, 1, 40, 5, 40, 565, 8, 40, 10, 40, 12, 40, 568, 9, 40,
+		1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 574, 8, 40, 10, 40, 12, 40, 577, 9,
+		40, 1, 40, 1, 40, 1, 40, 1, 40, 5, 40, 583, 8, 40, 10, 40, 12, 40, 586,
+		9, 40, 1, 40, 1, 40, 5, 40, 590, 8, 40, 10, 40, 12, 40, 593, 9, 40, 1,
+		40, 1, 40, 5, 40, 597, 8, 40, 10, 40, 12, 40, 600, 9, 40, 1, 40, 1, 40,
+		1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 1, 40, 3, 40, 611, 8, 40, 5,
+		40, 613, 8, 40, 10, 40, 12, 40, 616, 9, 40, 1, 41, 1, 41, 3, 41, 620, 8,
+		41, 1, 41, 1, 41, 1, 42, 1, 42, 1, 42, 5, 42, 627, 8, 42, 10, 42, 12, 42,
+		630, 9, 42, 1, 42, 1, 42, 1, 42, 5, 42, 635, 8, 42, 10, 42, 12, 42, 638,
+		9, 42, 1, 42, 3, 42, 641, 8, 42, 1, 42, 1, 42, 1, 43, 1, 43, 1, 43, 1,
+		43, 1, 43, 1, 43, 3, 43, 651, 8, 43, 1, 44, 1, 44, 1, 44, 1, 44, 1, 45,
+		1, 45, 1, 45, 1, 45, 1, 45, 1, 45, 1, 46, 1, 46, 1, 46, 1, 47, 1, 47, 3,
+		47, 668, 8, 47, 1, 47, 1, 47, 3, 47, 672, 8, 47, 1, 47, 1, 47, 1, 47, 1,
+		47, 3, 47, 678, 8, 47, 1, 47, 1, 47, 3, 47, 682, 8, 47, 1, 47, 1, 47, 1,
+		47, 3, 47, 687, 8, 47, 3, 47, 689, 8, 47, 1, 48, 1, 48, 1, 49, 5, 49, 694,
 		8, 49, 10, 49, 12, 49, 697, 9, 49, 1, 49, 1, 49, 5, 49, 701, 8, 49, 10,
 		49, 12, 49, 704, 9, 49, 1, 49, 1, 49, 5, 49, 708, 8, 49, 10, 49, 12, 49,
 		711, 9, 49, 1, 49, 5, 49, 714, 8, 49, 10, 49, 12, 49, 717, 9, 49, 1, 49,
@@ -386,30 +386,30 @@ func yaklangparserParserInit() {
 		544, 613, 1, 0, 0, 0, 545, 546, 10, 6, 0, 0, 546, 550, 3, 72, 36, 0, 547,
 		549, 3, 148, 74, 0, 548, 547, 1, 0, 0, 0, 549, 552, 1, 0, 0, 0, 550, 548,
 		1, 0, 0, 0, 550, 551, 1, 0, 0, 0, 551, 553, 1, 0, 0, 0, 552, 550, 1, 0,
-		0, 0, 553, 554, 3, 80, 40, 7, 554, 613, 1, 0, 0, 0, 555, 556, 10, 5, 0,
-		0, 556, 560, 5, 59, 0, 0, 557, 559, 3, 148, 74, 0, 558, 557, 1, 0, 0, 0,
-		559, 562, 1, 0, 0, 0, 560, 558, 1, 0, 0, 0, 560, 561, 1, 0, 0, 0, 561,
-		563, 1, 0, 0, 0, 562, 560, 1, 0, 0, 0, 563, 613, 3, 80, 40, 6, 564, 565,
-		10, 4, 0, 0, 565, 569, 5, 60, 0, 0, 566, 568, 3, 148, 74, 0, 567, 566,
-		1, 0, 0, 0, 568, 571, 1, 0, 0, 0, 569, 567, 1, 0, 0, 0, 569, 570, 1, 0,
-		0, 0, 570, 572, 1, 0, 0, 0, 571, 569, 1, 0, 0, 0, 572, 613, 3, 80, 40,
-		5, 573, 575, 10, 3, 0, 0, 574, 576, 5, 32, 0, 0, 575, 574, 1, 0, 0, 0,
-		575, 576, 1, 0, 0, 0, 576, 577, 1, 0, 0, 0, 577, 578, 5, 31, 0, 0, 578,
-		613, 3, 80, 40, 4, 579, 580, 10, 2, 0, 0, 580, 581, 5, 58, 0, 0, 581, 613,
-		3, 80, 40, 3, 582, 583, 10, 1, 0, 0, 583, 587, 5, 61, 0, 0, 584, 586, 3,
-		148, 74, 0, 585, 584, 1, 0, 0, 0, 586, 589, 1, 0, 0, 0, 587, 585, 1, 0,
-		0, 0, 587, 588, 1, 0, 0, 0, 588, 590, 1, 0, 0, 0, 589, 587, 1, 0, 0, 0,
-		590, 594, 3, 80, 40, 0, 591, 593, 3, 148, 74, 0, 592, 591, 1, 0, 0, 0,
-		593, 596, 1, 0, 0, 0, 594, 592, 1, 0, 0, 0, 594, 595, 1, 0, 0, 0, 595,
-		597, 1, 0, 0, 0, 596, 594, 1, 0, 0, 0, 597, 601, 5, 62, 0, 0, 598, 600,
-		3, 148, 74, 0, 599, 598, 1, 0, 0, 0, 600, 603, 1, 0, 0, 0, 601, 599, 1,
-		0, 0, 0, 601, 602, 1, 0, 0, 0, 602, 604, 1, 0, 0, 0, 603, 601, 1, 0, 0,
-		0, 604, 605, 3, 80, 40, 2, 605, 613, 1, 0, 0, 0, 606, 610, 10, 14, 0, 0,
+		0, 0, 553, 554, 3, 80, 40, 7, 554, 613, 1, 0, 0, 0, 555, 557, 10, 5, 0,
+		0, 556, 558, 5, 32, 0, 0, 557, 556, 1, 0, 0, 0, 557, 558, 1, 0, 0, 0, 558,
+		559, 1, 0, 0, 0, 559, 560, 5, 31, 0, 0, 560, 613, 3, 80, 40, 6, 561, 562,
+		10, 4, 0, 0, 562, 566, 5, 59, 0, 0, 563, 565, 3, 148, 74, 0, 564, 563,
+		1, 0, 0, 0, 565, 568, 1, 0, 0, 0, 566, 564, 1, 0, 0, 0, 566, 567, 1, 0,
+		0, 0, 567, 569, 1, 0, 0, 0, 568, 566, 1, 0, 0, 0, 569, 613, 3, 80, 40,
+		5, 570, 571, 10, 3, 0, 0, 571, 575, 5, 60, 0, 0, 572, 574, 3, 148, 74,
+		0, 573, 572, 1, 0, 0, 0, 574, 577, 1, 0, 0, 0, 575, 573, 1, 0, 0, 0, 575,
+		576, 1, 0, 0, 0, 576, 578, 1, 0, 0, 0, 577, 575, 1, 0, 0, 0, 578, 613,
+		3, 80, 40, 4, 579, 580, 10, 2, 0, 0, 580, 584, 5, 61, 0, 0, 581, 583, 3,
+		148, 74, 0, 582, 581, 1, 0, 0, 0, 583, 586, 1, 0, 0, 0, 584, 582, 1, 0,
+		0, 0, 584, 585, 1, 0, 0, 0, 585, 587, 1, 0, 0, 0, 586, 584, 1, 0, 0, 0,
+		587, 591, 3, 80, 40, 0, 588, 590, 3, 148, 74, 0, 589, 588, 1, 0, 0, 0,
+		590, 593, 1, 0, 0, 0, 591, 589, 1, 0, 0, 0, 591, 592, 1, 0, 0, 0, 592,
+		594, 1, 0, 0, 0, 593, 591, 1, 0, 0, 0, 594, 598, 5, 62, 0, 0, 595, 597,
+		3, 148, 74, 0, 596, 595, 1, 0, 0, 0, 597, 600, 1, 0, 0, 0, 598, 596, 1,
+		0, 0, 0, 598, 599, 1, 0, 0, 0, 599, 601, 1, 0, 0, 0, 600, 598, 1, 0, 0,
+		0, 601, 602, 3, 80, 40, 3, 602, 613, 1, 0, 0, 0, 603, 604, 10, 1, 0, 0,
+		604, 605, 5, 58, 0, 0, 605, 613, 3, 80, 40, 2, 606, 610, 10, 14, 0, 0,
 		607, 611, 3, 104, 52, 0, 608, 611, 3, 106, 53, 0, 609, 611, 3, 100, 50,
 		0, 610, 607, 1, 0, 0, 0, 610, 608, 1, 0, 0, 0, 610, 609, 1, 0, 0, 0, 611,
 		613, 1, 0, 0, 0, 612, 515, 1, 0, 0, 0, 612, 525, 1, 0, 0, 0, 612, 535,
-		1, 0, 0, 0, 612, 545, 1, 0, 0, 0, 612, 555, 1, 0, 0, 0, 612, 564, 1, 0,
-		0, 0, 612, 573, 1, 0, 0, 0, 612, 579, 1, 0, 0, 0, 612, 582, 1, 0, 0, 0,
+		1, 0, 0, 0, 612, 545, 1, 0, 0, 0, 612, 555, 1, 0, 0, 0, 612, 561, 1, 0,
+		0, 0, 612, 570, 1, 0, 0, 0, 612, 579, 1, 0, 0, 0, 612, 603, 1, 0, 0, 0,
 		612, 606, 1, 0, 0, 0, 613, 616, 1, 0, 0, 0, 614, 612, 1, 0, 0, 0, 614,
 		615, 1, 0, 0, 0, 615, 81, 1, 0, 0, 0, 616, 614, 1, 0, 0, 0, 617, 619, 5,
 		65, 0, 0, 618, 620, 3, 80, 40, 0, 619, 618, 1, 0, 0, 0, 619, 620, 1, 0,
@@ -577,7 +577,7 @@ func yaklangparserParserInit() {
 		213, 219, 224, 243, 251, 262, 271, 276, 280, 284, 288, 292, 298, 302, 305,
 		312, 318, 325, 329, 335, 341, 343, 348, 362, 366, 371, 377, 381, 386, 394,
 		409, 415, 423, 436, 452, 455, 470, 474, 479, 491, 498, 513, 520, 530, 540,
-		550, 560, 569, 575, 587, 594, 601, 610, 612, 614, 619, 628, 636, 640, 650,
+		550, 557, 566, 575, 584, 591, 598, 610, 612, 614, 619, 628, 636, 640, 650,
 		667, 671, 677, 681, 686, 688, 695, 702, 709, 715, 719, 724, 728, 733, 738,
 		742, 747, 754, 761, 767, 771, 776, 780, 785, 793, 797, 801, 806, 810, 817,
 		830, 840, 849, 858, 866, 871, 877, 882, 888, 893, 899, 909, 913, 918, 928,
@@ -7459,14 +7459,6 @@ func (s *ExpressionContext) ComparisonBinaryOperator() IComparisonBinaryOperator
 	return t.(IComparisonBinaryOperatorContext)
 }
 
-func (s *ExpressionContext) LogicAnd() antlr.TerminalNode {
-	return s.GetToken(YaklangParserLogicAnd, 0)
-}
-
-func (s *ExpressionContext) LogicOr() antlr.TerminalNode {
-	return s.GetToken(YaklangParserLogicOr, 0)
-}
-
 func (s *ExpressionContext) In() antlr.TerminalNode {
 	return s.GetToken(YaklangParserIn, 0)
 }
@@ -7475,8 +7467,12 @@ func (s *ExpressionContext) NotLiteral() antlr.TerminalNode {
 	return s.GetToken(YaklangParserNotLiteral, 0)
 }
 
-func (s *ExpressionContext) ChanIn() antlr.TerminalNode {
-	return s.GetToken(YaklangParserChanIn, 0)
+func (s *ExpressionContext) LogicAnd() antlr.TerminalNode {
+	return s.GetToken(YaklangParserLogicAnd, 0)
+}
+
+func (s *ExpressionContext) LogicOr() antlr.TerminalNode {
+	return s.GetToken(YaklangParserLogicOr, 0)
 }
 
 func (s *ExpressionContext) Question() antlr.TerminalNode {
@@ -7485,6 +7481,10 @@ func (s *ExpressionContext) Question() antlr.TerminalNode {
 
 func (s *ExpressionContext) Colon() antlr.TerminalNode {
 	return s.GetToken(YaklangParserColon, 0)
+}
+
+func (s *ExpressionContext) ChanIn() antlr.TerminalNode {
+	return s.GetToken(YaklangParserChanIn, 0)
 }
 
 func (s *ExpressionContext) MemberCall() IMemberCallContext {
@@ -7900,82 +7900,82 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
 				}
-				{
-					p.SetState(556)
-					p.Match(YaklangParserLogicAnd)
-				}
-				p.SetState(560)
+				p.SetState(557)
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
+				if _la == YaklangParserNotLiteral {
 					{
-						p.SetState(557)
-						p.Ws()
+						p.SetState(556)
+						p.Match(YaklangParserNotLiteral)
 					}
 
-					p.SetState(562)
-					p.GetErrorHandler().Sync(p)
-					_la = p.GetTokenStream().LA(1)
 				}
 				{
-					p.SetState(563)
+					p.SetState(559)
+					p.Match(YaklangParserIn)
+				}
+				{
+					p.SetState(560)
 					p.expression(6)
 				}
 
 			case 6:
 				localctx = NewExpressionContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, YaklangParserRULE_expression)
-				p.SetState(564)
+				p.SetState(561)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
 				}
 				{
-					p.SetState(565)
-					p.Match(YaklangParserLogicOr)
+					p.SetState(562)
+					p.Match(YaklangParserLogicAnd)
 				}
-				p.SetState(569)
+				p.SetState(566)
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
 					{
-						p.SetState(566)
+						p.SetState(563)
 						p.Ws()
 					}
 
-					p.SetState(571)
+					p.SetState(568)
 					p.GetErrorHandler().Sync(p)
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
-					p.SetState(572)
+					p.SetState(569)
 					p.expression(5)
 				}
 
 			case 7:
 				localctx = NewExpressionContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, YaklangParserRULE_expression)
-				p.SetState(573)
+				p.SetState(570)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+				}
+				{
+					p.SetState(571)
+					p.Match(YaklangParserLogicOr)
 				}
 				p.SetState(575)
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if _la == YaklangParserNotLiteral {
+				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
 					{
-						p.SetState(574)
-						p.Match(YaklangParserNotLiteral)
+						p.SetState(572)
+						p.Ws()
 					}
 
-				}
-				{
 					p.SetState(577)
-					p.Match(YaklangParserIn)
+					p.GetErrorHandler().Sync(p)
+					_la = p.GetTokenStream().LA(1)
 				}
 				{
 					p.SetState(578)
@@ -7992,77 +7992,77 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				{
 					p.SetState(580)
-					p.Match(YaklangParserChanIn)
+					p.Match(YaklangParserQuestion)
+				}
+				p.SetState(584)
+				p.GetErrorHandler().Sync(p)
+				_la = p.GetTokenStream().LA(1)
+
+				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
+					{
+						p.SetState(581)
+						p.Ws()
+					}
+
+					p.SetState(586)
+					p.GetErrorHandler().Sync(p)
+					_la = p.GetTokenStream().LA(1)
 				}
 				{
-					p.SetState(581)
+					p.SetState(587)
+					p.expression(0)
+				}
+				p.SetState(591)
+				p.GetErrorHandler().Sync(p)
+				_la = p.GetTokenStream().LA(1)
+
+				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
+					{
+						p.SetState(588)
+						p.Ws()
+					}
+
+					p.SetState(593)
+					p.GetErrorHandler().Sync(p)
+					_la = p.GetTokenStream().LA(1)
+				}
+				{
+					p.SetState(594)
+					p.Match(YaklangParserColon)
+				}
+				p.SetState(598)
+				p.GetErrorHandler().Sync(p)
+				_la = p.GetTokenStream().LA(1)
+
+				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
+					{
+						p.SetState(595)
+						p.Ws()
+					}
+
+					p.SetState(600)
+					p.GetErrorHandler().Sync(p)
+					_la = p.GetTokenStream().LA(1)
+				}
+				{
+					p.SetState(601)
 					p.expression(3)
 				}
 
 			case 9:
 				localctx = NewExpressionContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, YaklangParserRULE_expression)
-				p.SetState(582)
+				p.SetState(603)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
 				}
 				{
-					p.SetState(583)
-					p.Match(YaklangParserQuestion)
-				}
-				p.SetState(587)
-				p.GetErrorHandler().Sync(p)
-				_la = p.GetTokenStream().LA(1)
-
-				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
-					{
-						p.SetState(584)
-						p.Ws()
-					}
-
-					p.SetState(589)
-					p.GetErrorHandler().Sync(p)
-					_la = p.GetTokenStream().LA(1)
-				}
-				{
-					p.SetState(590)
-					p.expression(0)
-				}
-				p.SetState(594)
-				p.GetErrorHandler().Sync(p)
-				_la = p.GetTokenStream().LA(1)
-
-				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
-					{
-						p.SetState(591)
-						p.Ws()
-					}
-
-					p.SetState(596)
-					p.GetErrorHandler().Sync(p)
-					_la = p.GetTokenStream().LA(1)
-				}
-				{
-					p.SetState(597)
-					p.Match(YaklangParserColon)
-				}
-				p.SetState(601)
-				p.GetErrorHandler().Sync(p)
-				_la = p.GetTokenStream().LA(1)
-
-				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&7) != 0 {
-					{
-						p.SetState(598)
-						p.Ws()
-					}
-
-					p.SetState(603)
-					p.GetErrorHandler().Sync(p)
-					_la = p.GetTokenStream().LA(1)
-				}
-				{
 					p.SetState(604)
+					p.Match(YaklangParserChanIn)
+				}
+				{
+					p.SetState(605)
 					p.expression(2)
 				}
 
