@@ -3,6 +3,12 @@ package mutate
 import (
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fuzztag"
@@ -12,11 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yso"
-	"io/ioutil"
-	"math/rand"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var fuzztagfallback = []string{""}
@@ -752,6 +753,15 @@ func init() {
 				paddingRight = strings.HasPrefix(paddingSuffix, "-")
 				rawLen := strings.TrimLeft(paddingSuffix, "-")
 				paddingLength, _ = strconv.Atoi(rawLen)
+			}
+
+			if strings.Contains(s, "-") {
+				splited := strings.Split(s, "-")
+				left := splited[0]
+				if len(left) > 1 && strings.HasPrefix(left, "0") {
+					enablePadding = true
+					paddingLength = len(left)
+				}
 			}
 
 			if len(parts) > 2 {
