@@ -32,12 +32,21 @@ func IsTCPPortAvailable(p int) bool {
 
 func GetRandomAvailableTCPPort() int {
 RESET:
-	randPort := 55000 + rand.Intn(10000)
-	if !IsTCPPortOpen("127.0.0.1", randPort) && IsTCPPortAvailable(randPort) {
-		return randPort
+	lis, err := net.Listen("tcp", ":0")
+	if err == nil {
+		port := lis.Addr().(*net.TCPAddr).Port
+		_ = lis.Close()
+		return port
 	} else {
-		goto RESET
+		// fallback
+		randPort := 55000 + rand.Intn(10000)
+		if !IsTCPPortOpen("127.0.0.1", randPort) && IsTCPPortAvailable(randPort) {
+			return randPort
+		} else {
+			goto RESET
+		}
 	}
+
 }
 
 func GetRandomAvailableUDPPort() int {
