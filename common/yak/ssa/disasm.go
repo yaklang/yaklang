@@ -16,13 +16,9 @@ func (f *Function) SetReg(i Instruction) {
 }
 
 func GetTypeStr(n Node) string {
-	if t := n.GetType(); t != nil {
-		return fmt.Sprintf(
-			"<%s> ", t,
-		)
-	} else {
-		return "<>"
-	}
+	return fmt.Sprintf(
+		"<%s> ", n.GetType(),
+	)
 }
 
 func (p *Position) String() string {
@@ -293,6 +289,7 @@ var BinaryOpcodeName = map[BinaryOpcode]string{
 	OpNotEq:  `neq`,
 	OpEq:     `eq`,
 	OpIn:     `in`,
+	OpSend:   `send`,
 }
 
 func (b *BinOp) String() string {

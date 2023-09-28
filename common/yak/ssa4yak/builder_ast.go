@@ -123,7 +123,8 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		}
 		return
 	}
-	//TODO: include stmt
+	//TODO: include stmt and check file path
+
 	// defer stmt
 	if s, ok := stmt.DeferStmt().(*yak.DeferStmtContext); ok {
 		b.buildDeferStmt(s)
@@ -1099,9 +1100,16 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return b.EmitBinOp(opcode, op0, op1)
 	}
 
-	//TODO:
 	// | expression '<-' expression
-	// ;
+	if stmt.ChanIn() == nil {
+		op1, op2 := getValue(0), getValue(1)
+		if u, ok := op1.(ssa.User); ok {
+			return b.EmitUpdate(u, op2)
+		} else {
+			b.NewError(ssa.Error, TAG, "left of <- must be a chan variable")
+			return nil
+		}
+	}
 
 	// | expression 'not'? 'in' expression
 	if s := stmt.In(); s != nil {

@@ -160,8 +160,8 @@ func CalcConstBinary(x, y *Const, op BinaryOpcode) *Const {
 			return NewConst(x.Number() <= y.Number())
 		}
 	case OpEq:
-		if x.IsNumber() && y.IsNumber() {
-			return NewConst(x.Number() == y.Number())
+		if x.GetTypeKind() == y.GetTypeKind() {
+			return NewConst(x.value == y.value)
 		}
 	case OpNotEq:
 		if x.IsNumber() && y.IsNumber() {
