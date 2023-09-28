@@ -2,7 +2,6 @@ package ssa4yak
 
 import (
 	"fmt"
-	"runtime/debug"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -41,12 +40,14 @@ var _ (ssa.Builder) = (*builder)(nil)
 type config struct {
 	analyzeOpt  []ssa4analyze.Option
 	symboltable map[string]any
+	typeMethod  map[string]any
 }
 
 func defaultConfig() *config {
 	return &config{
 		analyzeOpt:  make([]ssa4analyze.Option, 0),
 		symboltable: nil,
+		typeMethod:  nil,
 	}
 
 }
@@ -65,11 +66,18 @@ func WithSymbolTable(table map[string]any) Option {
 	}
 }
 
+func WithTypeMethod(table map[string]any) Option {
+	return func(c *config) {
+		c.typeMethod = table
+	}
+}
+
 func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in parseSSA", r)
-			debug.PrintStack()
+			// fmt.Println(src)
+			// debug.PrintStack()
 			prog = nil
 		}
 	}()

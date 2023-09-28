@@ -262,7 +262,11 @@ func (a *anInstruction) Pos() string {
 	}
 }
 func (a *anInstruction) GetType() Type {
-	return a.typs
+	t := a.typs
+	if t == nil {
+		return BasicTypes[Any]
+	}
+	return t
 }
 
 func (a *anInstruction) SetType(ts Type) {
@@ -344,7 +348,11 @@ type Const struct {
 
 // get type
 func (c *Const) GetType() Type {
-	return c.typ
+	t := c.typ
+	if t == nil {
+		t = BasicTypes[Any]
+	}
+	return t
 }
 
 func (c *Const) SetType(ts Type) {
@@ -365,7 +373,12 @@ type Parameter struct {
 }
 
 func (p *Parameter) GetType() Type {
-	return p.typs
+	t := p.typs
+	if t == nil {
+		t = BasicTypes[Any]
+		p.SetType(t)
+	}
+	return t
 }
 
 func (p *Parameter) SetType(ts Type) {
@@ -519,6 +532,8 @@ const (
 	OpEq    // ==
 	OpNotEq // != <>
 	OpIn    //  a in b
+
+	OpSend // <-
 )
 
 // ----------- BinOp
@@ -542,7 +557,7 @@ const (
 	OpNot                    // !
 	OpPlus                   // +
 	OpNeg                    // -
-	OpChan                   // ->
+	OpChan                   // <-
 	OpBitwiseNot             // ^
 )
 
@@ -627,7 +642,7 @@ type Update struct {
 	anInstruction
 
 	Value   Value
-	Address *Field
+	Address User
 }
 
 var _ Node = (*Update)(nil)
