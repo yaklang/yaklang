@@ -359,6 +359,12 @@ func NewMapType(key, field Type) *ObjectType {
 	return i
 }
 
+func NewStructType() *ObjectType {
+	i := NewObjectType()
+	i.Kind = Struct
+	return i
+}
+
 func (itype ObjectType) String() string {
 	if itype.Name != "" {
 		return itype.Name
@@ -446,6 +452,9 @@ func (s *ObjectType) GetField(key Value) (Type, Type) {
 
 // ===================== Finish simply
 func (s *ObjectType) Finish() {
+	if s.Kind != None {
+		return
+	}
 	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
 	keytypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
 	if len(keytypes) == 1 {
