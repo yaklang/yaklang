@@ -91,13 +91,13 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 
 // calculate all return instruction in function, get return type
 func handlerReturnType(rs []*Return) []Type {
-
 	tmp := make(map[string][]Type, len(rs))
 	for _, r := range rs {
 		id := ""
 		typs := lo.Map(r.Results,
 			func(r Value, _ int) Type {
 				t := r.GetType()
+				//TODO: modify this id
 				id += t.RawString()
 				return t
 			},
@@ -117,9 +117,8 @@ func handlerReturnType(rs []*Return) []Type {
 		//TODO: how handler this?
 		// should set Warn!!
 		// and ?? Type ??
+		return nil
 	}
-
-	return nil
 }
 
 // current function finish
@@ -130,10 +129,6 @@ func (f *Function) Finish() {
 	f.SetType(NewFunctionType("",
 		lo.Map(f.Param, func(p *Parameter, _ int) Type {
 			t := p.GetType()
-			if t == nil {
-				t = BasicTypes[Any]
-				p.SetType(t)
-			}
 			return t
 		}),
 		handlerReturnType(f.Return),

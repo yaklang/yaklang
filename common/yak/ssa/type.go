@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -391,7 +392,15 @@ func (itype ObjectType) RawString() string {
 		case Map:
 			// map[T]U
 			// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-			ret += fmt.Sprintf("map[%s]%s", itype.keyTyp.String(), itype.fieldType.String())
+			keyTyp := itype.keyTyp
+			if utils.IsNil(keyTyp) {
+				keyTyp = BasicTypes[Any]
+			}
+			fieldType := itype.fieldType
+			if utils.IsNil(fieldType) {
+				fieldType = BasicTypes[Any]
+			}
+			ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
 			// } else {
 			// 	panic("this interface type not map")
 			// }
@@ -415,9 +424,6 @@ func (itype ObjectType) RawString() string {
 func (s *ObjectType) AddField(key Value, field Type) {
 	s.Key = append(s.Key, key)
 	keytyp := key.GetType()
-	if keytyp == nil {
-		keytyp = BasicTypes[Any]
-	}
 	s.keyTypes = append(s.keyTypes, keytyp)
 	if field == nil {
 		field = BasicTypes[Any]

@@ -40,7 +40,7 @@ var _ LeftValue = (*IdentifierLV)(nil)
 // --------------- point variable to value `f.symbol[variable]value`
 // --------------- it's memory address, not SSA value
 func (field *Field) Assign(v Value, f *FunctionBuilder) {
-	f.emitUpdate(field, v)
+	f.EmitUpdate(field, v)
 }
 
 func (f *Field) GetValue(_ *FunctionBuilder) Value {

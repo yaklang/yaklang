@@ -152,14 +152,14 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.InstructionValue) bool {
 		return true
 	}
 	// set type in ast-builder
-	if typ := inst.GetType(); typ != nil {
-		// if typ.GetTypeKind() != ssa.Any {
-		// 	t.CheckList = append(t.CheckList, inst)
-		// 	return true
-		// }
-	} else {
-		inst.SetType(ssa.BasicTypes[ssa.Any])
-	}
+	// if typ := inst.GetType(); typ != nil {
+	// 	// if typ.GetTypeKind() != ssa.Any {
+	// 	// 	t.CheckList = append(t.CheckList, inst)
+	// 	// 	return true
+	// 	// }
+	// } else {
+	// 	inst.SetType(ssa.BasicTypes[ssa.Any])
+	// }
 
 	switch inst := inst.(type) {
 	case *ssa.Phi:

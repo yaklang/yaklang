@@ -3,7 +3,6 @@ package ssa
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -59,7 +58,7 @@ func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *Bas
 	return i
 }
 
-func NewUpdate(address *Field, v Value, block *BasicBlock) *Update {
+func NewUpdate(address User, v Value, block *BasicBlock) *Update {
 	s := &Update{
 		anInstruction: newAnInstuction(block),
 		Value:         v,
@@ -101,7 +100,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 		}
 		field := b.EmitFieldMust(itf, key)
 		field.SetType(rv.GetType())
-		b.emitUpdate(field, rv)
+		b.EmitUpdate(field, rv)
 		ityp.AddField(key, rv.GetType())
 	}
 	ityp.Finish()
@@ -121,16 +120,14 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 			}
 		}
 	}
-	if t := i.GetType(); !utils.IsNil(t) {
-		if c, ok := key.(*Const); ok && c.IsString() {
-			if v := t.GetMethod(c.VarString()); v != nil {
-				isMethod = true
-				ftyp = v
-			}
+	if c, ok := key.(*Const); ok && c.IsString() {
+		if v := i.GetType().GetMethod(c.VarString()); v != nil {
+			isMethod = true
+			ftyp = v
 		}
 	}
 
-	if t := i.GetType(); !utils.IsNil(t) && t.GetTypeKind() == ObjectTypeKind {
+	if t := i.GetType(); t.GetTypeKind() == ObjectTypeKind {
 		if it, ok := t.(*ObjectType); ok {
 			if t, _ := it.GetField(key); t != nil {
 				ftyp = t
@@ -192,6 +189,6 @@ func (b *FunctionBuilder) writeField(key string, v Value) {
 		panic(fmt.Sprintf("writeField: %s not found", key))
 	}
 	if field.GetLastValue() != v {
-		b.emitUpdate(field, v)
+		b.EmitUpdate(field, v)
 	}
 }
