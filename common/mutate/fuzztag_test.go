@@ -154,3 +154,49 @@ func TestRegenTag(t *testing.T) {
 	println(len(result))
 	spew.Dump(result)
 }
+
+func TestIntWithAutoZeroPadding(t *testing.T) {
+	t.Run("000-999", func(t *testing.T) {
+		result := MutateQuick(`{{int(000-999)}}`)
+		for i := 0; i < 100; i++ {
+			r := result[i]
+			count := 2
+			if i >= 9 {
+				count = 1
+			} else if i >= 99 {
+				count = 0
+			}
+			if !strings.HasPrefix(r, strings.Repeat("0", count)) {
+				t.Fatalf("%s padding zero in left error: want %d zero", r, count)
+			}
+		}
+	})
+
+	t.Run("011-999", func(t *testing.T) {
+		result := MutateQuick(`{{int(011-999)}}`)
+		for i := 0; i < 100; i++ {
+			r := result[i]
+			count := 1
+			if i >= 9 {
+				count = 0
+			}
+			if !strings.HasPrefix(r, strings.Repeat("0", count)) {
+				t.Fatalf("%s padding zero in left error: want %d zero", r, count)
+			}
+		}
+	})
+
+	t.Run("01-999", func(t *testing.T) {
+		result := MutateQuick(`{{int(01-999)}}`)
+		for i := 0; i < 100; i++ {
+			r := result[i]
+			count := 1
+			if i >= 9 {
+				count = 0
+			}
+			if !strings.HasPrefix(r, strings.Repeat("0", count)) {
+				t.Fatalf("%s padding zero in left error: want %d zero", r, count)
+			}
+		}
+	})
+}
