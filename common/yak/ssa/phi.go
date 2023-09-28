@@ -23,14 +23,12 @@ func (b *BasicBlock) Sealed() {
 					DeleteInst(f)
 				}
 			}
-		} else if v == nil {
+		} else if un, ok := v.(*Undefine); ok {
 			if p.GetParent().builder.CanBuildFreeValue(p.variable) {
 				v = p.GetParent().builder.BuildFreeValue(p.variable)
-				p.Replace(v)
-			} else {
-				un := NewUndefine(p.GetVariable(), p.Block)
-				EmitBefore(p.Block.LastInst(), un)
-				p.Replace(un)
+				// un.Replace(v)
+				ReplaceValue(un, v)
+				DeleteInst(un)
 			}
 		}
 	}

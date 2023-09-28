@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MAXTYPELEVEL = 4
+	MAXTYPELEVEL = 2
 )
 
 func (b *FunctionBuilder) WithExternInstance(vs map[string]any) {
@@ -122,7 +122,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	case reflect.Map:
 		ret = NewMapType(f.handlerType(typ.Key(), level), f.handlerType(typ.Elem(), level))
 	case reflect.Struct:
-		structType := NewObjectType()
+		structType := NewStructType()
 		for i := 0; i < typ.NumField(); i++ {
 			structType.AddField(NewConst(typ.Field(i).Name), f.handlerType(typ.Field(i).Type, level))
 		}
@@ -132,6 +132,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = f.CoverReflectFunctionType(typ)
 	case reflect.Pointer:
 		ret = f.handlerType(typ.Elem(), level)
+		return ret
 	case reflect.UnsafePointer:
 		obj := NewObjectType()
 		obj.SetName(typStr)

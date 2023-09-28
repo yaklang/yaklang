@@ -30,7 +30,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	switch inst := target.(type) {
 	case *Field:
 		// field
-		if v, ok := inst.Obj.(Value); ok && inst.isMethod {
+		if v, ok := inst.Obj.(Value); ok && inst.IsMethod {
 			args = append([]Value{v}, args...)
 		}
 		fun, ok := inst.GetLastValue().(*Function)
