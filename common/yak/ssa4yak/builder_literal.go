@@ -42,7 +42,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		lit := stmt.CharaterLiteral().GetText()
 		var s string
 		var err error
-		if lit == "'\\'" {
+		if lit == "'\\''" {
 			s = "'"
 		} else {
 			lit = strings.ReplaceAll(lit, `"`, `\"`)
