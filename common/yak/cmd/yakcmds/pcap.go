@@ -3,13 +3,17 @@ package yakcmds
 import (
 	"fmt"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
 )
@@ -18,8 +22,12 @@ var PcapCommand = cli.Command{
 	Name:  "pcap",
 	Usage: "Sniff network traffic and output to stdout",
 	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "l,list-devices",
+			Usage: `List available devices`,
+		},
 		cli.StringFlag{
-			Name:  "device",
+			Name:  "device,d",
 			Usage: "网卡（可选多个,使用逗号分隔）",
 		},
 		cli.StringFlag{
@@ -44,6 +52,20 @@ var PcapCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		if c.Bool("list-devices") {
+			ifaces, err := pcap.FindAllDevs()
+			if err != nil {
+				return err
+			}
+			for _, i := range ifaces {
+				fmt.Printf("%s (%s)\n", i.Name, i.Description)
+				for _, addr := range i.Addresses {
+					fmt.Printf("  %s\n", addr.IP)
+				}
+			}
+			return nil
+		}
+
 		var opts []pcaputil.CaptureOption
 		if c.Bool("v") {
 			opts = append(opts, pcaputil.WithDebug(true))
@@ -73,9 +95,13 @@ var PcapCommand = cli.Command{
 			}
 			defer group.Wait()
 		}
+		mng := yakit.NewTrafficStorageManager(consts.GetGormProjectDatabase())
 
 		opts = append(
 			opts,
+			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
+				mng.Save(packet)
+			}),
 			pcaputil.WithTLSClientHello(func(flow *pcaputil.TrafficFlow, hello *tlsutils.HandshakeClientHello) {
 				if group == nil {
 					log.Infof("%v SNI: %v", flow.String(), hello.SNI())
@@ -94,6 +120,13 @@ var PcapCommand = cli.Command{
 					rspBytes, _ := utils.DumpHTTPResponse(rsp, true)
 					fmt.Println(string(rspBytes))
 					fmt.Println("-----------------------------------------")
+
+					var urlStr string
+					urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, false)
+					if urlIns != nil {
+						urlStr = urlIns.String()
+					}
+					yakit.SaveFromHTTPFromRaw(consts.GetGormProjectDatabase(), false, reqBytes, rspBytes, "pcap", urlStr, "")
 					return
 				}
 				reqBytes, _ := utils.DumpHTTPRequest(req, true)

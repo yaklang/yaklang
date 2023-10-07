@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
@@ -231,6 +232,13 @@ func CalcSha1(items ...interface{}) string {
 	raw := sha1.Sum([]byte(s))
 	return hex.EncodeToString(raw[:])
 }
+
+func CalcSha256(items ...interface{}) string {
+	s := fmt.Sprintf("%v", items)
+	raw := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(raw[:])
+}
+
 func CalcSha1WithSuffix(items []interface{}, suffix string) string {
 	s := fmt.Sprintf("%v", items) + suffix
 	raw := sha1.Sum([]byte(s))
