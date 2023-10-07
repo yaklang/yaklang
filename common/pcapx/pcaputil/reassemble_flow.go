@@ -105,7 +105,7 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 			lastFrame := t.frames[len(t.frames)-1]
 			t.onDataFrameReassembled(t, lastFrame.Connection, lastFrame)
 		}
-		log.Warnf("writing frame to a closed flow: %v", t.String())
+		log.Warnf("writing frame to a closed flow: %v (%#v)", t.String(), frame.Payload)
 	}
 }
 

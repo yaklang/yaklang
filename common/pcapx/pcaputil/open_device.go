@@ -78,6 +78,17 @@ func IfaceNameToPcapIfaceName(name string) (string, error) {
 	return "", NewConvertIfaceNameError(name)
 }
 
+func GetPcapInterfaceByIndex(i int) (*pcap.Interface, error) {
+	devs, err := cachedFindAllDevs()
+	if err != nil {
+		return nil, utils.Errorf("find pcap dev failed: %s", err)
+	}
+	if i < 0 || i >= len(devs) {
+		return nil, utils.Errorf("index out of range: %d", i)
+	}
+	return &devs[i], nil
+}
+
 func GetPublicInternetPcapHandler() (*pcap.Handle, error) {
 	iface, _, _, err := netutil.GetPublicRoute()
 	if err != nil {
