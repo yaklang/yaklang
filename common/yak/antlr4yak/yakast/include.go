@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
-	"github.com/go-rod/rod/lib/utils"
+	"github.com/yaklang/yaklang/common/utils"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )
 
 func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} {
@@ -31,7 +31,7 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 	if err != nil {
 		y.panicCompilerError(includeUnquoteError, fpath, err)
 	}
-	if !utils.FileExists(fpath) {
+	if _, err := utils.GetFirstExistedFileE(fpath); err != nil {
 		y.panicCompilerError(includePathNotFoundError, fpath)
 	}
 
@@ -40,6 +40,12 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 		y.panicCompilerError(readFileError, fpath, err)
 	}
 	codeStr := string(code)
+	fileHash := utils.CalcSha1(codeStr)
+	if _, ok := y.importCycleHash[fileHash]; ok {
+		y.panicCompilerError(includeCycleError, fpath)
+		return nil
+	}
+	y.importCycleHash[fileHash] = struct{}{}
 
 	y.writeString(`"` + fpath + `"`)
 
