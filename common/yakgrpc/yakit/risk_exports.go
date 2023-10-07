@@ -179,6 +179,14 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 
 		details := utils.InterfaceToGeneralMap(i)
 		if details != nil {
+			// 遍历 details map 并检查每个值的大小
+			for key, value := range details {
+				valueStr := utils.InterfaceToString(value)
+				if len(valueStr) > MaxSize {
+					// 如果值的大小超过2MB，裁剪它
+					details[key] = limitSize(valueStr, MaxSize)
+				}
+			}
 			requestRaw := utils.MapGetFirstRaw(
 				details,
 				"request", "req", "request_raw", "request_bytes", "request_str",
@@ -194,7 +202,6 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 			} else {
 				requestStr = string(requestBytes)
 			}
-			requestStr = limitSize(requestStr, MaxSize)
 			if requestStr != "" {
 				r.QuotedRequest = strconv.Quote(requestStr)
 			}
@@ -214,13 +221,11 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 			} else {
 				responseStr = string(responseBytes)
 			}
-			responseStr = limitSize(responseStr, MaxSize)
 			if responseStr != "" {
 				r.QuotedResponse = strconv.Quote(responseStr)
 			}
 
 			payloadStr := utils.InterfaceToString(utils.MapGetFirstRaw(details, "payload", "payloads", "payloadStr", "payloadRaw", "Payload", "Payloads", "cmd", "command"))
-			payloadStr = limitSize(payloadStr, MaxSize)
 			if payloadStr != "" {
 				if strings.HasPrefix(payloadStr, `"`) && strings.HasSuffix(payloadStr, `"`) {
 					raw, _ := strconv.Unquote(payloadStr)
@@ -232,7 +237,7 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 			}
 		}
 
-		raw, err := json.Marshal(i)
+		raw, err := json.Marshal(details)
 		if err != nil {
 			log.Error(err)
 			return
