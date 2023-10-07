@@ -57,6 +57,9 @@ type YakCompiler struct {
 	extVars                   []string
 	extVarsMap                map[string]struct{}
 	contextInfo               *vmstack.Stack
+
+	// import cycle check
+	importCycleHash map[string]struct{}
 }
 
 func (y *YakCompiler) SetStrictMode(b bool) {
@@ -120,6 +123,7 @@ func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...Com
 		language:         en,
 		extVarsMap:       make(map[string]struct{}),
 		contextInfo:      vmstack.New(),
+		importCycleHash:  make(map[string]struct{}),
 	}
 	for _, o := range options {
 		o(compiler)
