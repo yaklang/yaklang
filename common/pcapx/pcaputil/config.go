@@ -30,7 +30,7 @@ type CaptureConfig struct {
 	Debug         bool
 	onPoolCreated []func(*TrafficPool)
 	onFlowCreated func(*TrafficFlow)
-	onEveryPacket func(any)
+	onEveryPacket func(packet gopacket.Packet)
 }
 
 type CaptureOption func(*CaptureConfig) error
@@ -39,7 +39,7 @@ func emptyOption(_ *CaptureConfig) error {
 	return nil
 }
 
-func WithEveryPacket(h func(any)) CaptureOption {
+func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.onEveryPacket = h
 		return nil
@@ -208,6 +208,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+
+	if c.onEveryPacket != nil {
+		c.onEveryPacket(packet)
+	}
 
 	save := true
 	var ts time.Time
