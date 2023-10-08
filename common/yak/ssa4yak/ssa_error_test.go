@@ -53,6 +53,16 @@ func TestError(t *testing.T) {
 				"this value undefine:a2",
 			},
 		},
+
+		{
+			name: "undefined lexical",
+			code: `
+			a == undefined
+			`,
+			err: []string{
+				"this value undefine:a",
+			},
+		},
 	}
 
 	for _, tc := range testcase {
