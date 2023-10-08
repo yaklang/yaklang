@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -10,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"time"
@@ -110,7 +108,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				}
 				condition := matcher.Condition
 				if matcher.Condition == "" {
-					condition = "and"
+					condition = "or"
 				}
 				return &ypb.HTTPResponseMatcher{
 					SubMatchers:         yakMatchers2HttpResponseMatchers(matcher.SubMatchers),
@@ -444,17 +442,17 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	yakitInfo := infoMap.NewSubMapBuilder("yakit-info")
 	//生成req sequences
 	maxRequest := 0
-	signElements := make([]string, 0)
-	addSignElements := func(i ...any) {
-		for _, a := range i {
-			res, err := json.Marshal(a)
-			if err != nil {
-				return
-			}
-
-			signElements = append(signElements, string(res))
-		}
-	}
+	//signElements := make([]string, 0)
+	//addSignElements := func(i ...any) {
+	//	for _, a := range i {
+	//		res, err := json.Marshal(a)
+	//		if err != nil {
+	//			return
+	//		}
+	//
+	//		signElements = append(signElements, string(res))
+	//	}
+	//}
 	for _, sequence := range y.HTTPRequestSequences {
 		sequenceItem := NewYamlMapBuilder()
 		sequenceItem.SetDefaultField(map[string]any{
@@ -471,7 +469,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		isPaths := len(sequence.Paths) > 0
 		var payloadsMap *YamlMapBuilder
 		if isPaths {
-			addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
+			//addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
 			maxRequest += len(sequence.Paths)
 			sequenceItem.Set("method", sequence.Method)
 			sequenceItem.Set("path", sequence.Paths)
@@ -480,7 +478,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			sequenceItem.Set("body", sequence.Body)
 			sequenceItem.AddEmptyLine()
 		} else {
-			addSignElements(sequence.HTTPRequests)
+			//addSignElements(sequence.HTTPRequests)
 			maxRequest += len(sequence.HTTPRequests)
 			reqArray := []string{}
 			for _, request := range sequence.HTTPRequests {
@@ -528,10 +526,10 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
 		// matcher生成
 		matcher := sequence.Matcher
-		addSignElements(matcher)
+		//addSignElements(matcher)
 		matcherCondition := matcher.SubMatcherCondition
 		if matcherCondition == "" {
-			matcherCondition = "and"
+			matcherCondition = "or"
 		}
 		sequenceItem.Set("matchers-condition", matcherCondition)
 		matcherArray := sequenceItem.NewSubArrayBuilder("matchers")
@@ -540,39 +538,43 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			matcherItem.SetDefaultField(map[string]any{
 				"negative":  false,
 				"part":      "raw",
-				"condition": "and",
+				"condition": "or",
 			})
-			matcherItem.Set("condition", subMatcher.Condition)
 			switch subMatcher.MatcherType {
 			case "word":
 				matcherItem.Set("type", "word")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("words", subMatcher.Group)
 			case "status_code":
 				matcherItem.Set("type", "status")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("status", subMatcher.Group)
 			case "content_length":
 				matcherItem.Set("type", "size")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("size", subMatcher.Group)
 			case "binary":
 				matcherItem.Set("type", "binary")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("binary", subMatcher.Group)
 			case "regex":
 				matcherItem.Set("type", "regex")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("regex", subMatcher.Group)
 			case "expr":
 				matcherItem.Set("type", "dsl")
+				matcherItem.Set("part", subMatcher.Scope)
 				matcherItem.Set("dsl", subMatcher.Group)
 			}
 			matcherItem.Set("negative", subMatcher.Negative)
-			matcherItem.Set("condition", subMatcher.SubMatcherCondition)
-			matcherItem.Set("part", subMatcher.Scope)
+			matcherItem.Set("condition", subMatcher.Condition)
 			matcherItem.AddEmptyLine()
 			matcherArray.Add(matcherItem)
 		}
 
 		sequenceItem.Set("attack", sequence.AttackMode)
 
-		addSignElements(sequence.Extractor)
+		//addSignElements(sequence.Extractor)
 		// extractor生成
 		extratorsArray := sequenceItem.NewSubArrayBuilder("extractors")
 		for _, extractor := range sequence.Extractor {
@@ -610,7 +612,8 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	metadata.Set("max-request", maxRequest)
 	metadata.ForceSet("shodan-query", "")
 	metadata.Set("verified", true)
-	yakitInfo.Set("sign", codec.Md5(strings.Join(signElements, "\n")))
+	yakitInfo.Set("sign", y.SignMainParams()) // 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名
+
 	rootMap.AddEmptyLine()
 	rootMap.AddComment("Generated From WebFuzzer on " + time.Now().Format("2006-01-02 15:04:05"))
 	return rootMap.MarshalToString()
