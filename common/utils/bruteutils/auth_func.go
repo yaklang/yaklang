@@ -1,8 +1,9 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func fixToTarget(target string, defaultPort int) string {
@@ -54,6 +55,7 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"snmpv3_sha-256": snmpV3BruteFactory("snmpv3_sha-256"),
 	"snmpv3_sha-384": snmpV3BruteFactory("snmpv3_sha-384"),
 	"snmpv3_sha-512": snmpV3BruteFactory("snmpv3_sha-512"),
+	"rtsp":           rtspAuth,
 	//"oracle": func(item *BruteItem) *BruteItemResult {
 	//
 	//},
