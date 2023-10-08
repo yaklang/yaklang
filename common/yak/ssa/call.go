@@ -2,13 +2,12 @@ package ssa
 
 import "github.com/yaklang/yaklang/common/utils"
 
-func NewCall(target Value, args, binding []Value, isDropError bool, block *BasicBlock) *Call {
+func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 	c := &Call{
 		anInstruction: newAnInstuction(block),
 		anNode:        NewNode(),
 		Method:        target,
 		Args:          args,
-		IsDropError:   isDropError,
 		binding:       binding,
 	}
 	c.AddValue(target)
@@ -18,11 +17,10 @@ func NewCall(target Value, args, binding []Value, isDropError bool, block *Basic
 	for _, v := range binding {
 		c.AddValue(v)
 	}
-
 	return c
 }
 
-func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) *Call {
+func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	var freevalue []Value
 	var parent *Function
 	binding := make([]Value, 0, len(freevalue))
@@ -110,5 +108,5 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value, isDropError bool) 
 	// c.SetType(ft.ReturnType)
 	// 	}
 	// }
-	return NewCall(target, args, binding, isDropError, f.CurrentBlock)
+	return NewCall(target, args, binding, f.CurrentBlock)
 }

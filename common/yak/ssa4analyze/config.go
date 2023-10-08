@@ -15,7 +15,7 @@ func defaultConfig() config {
 
 type Option func(*config)
 
-func UseAnalyzer(a []Analyzer) Option {
+func WithAnalyzer(a []Analyzer) Option {
 	return func(c *config) {
 		c.analyzers = a
 	}
