@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strings"
 )
 
 const startBruteScript = `yakit.AutoInitYakit()
@@ -62,12 +63,16 @@ target = str.ParseStringToLines(string(raw))
 
 targetRaw = make([]string)
 for _, t := range target {
-    host, port, err := str.ParseStringToHostPort(t)
-    if err != nil {
-        targetRaw = append(targetRaw, t)
-    }else{
-        targetRaw = append(targetRaw, str.HostPort(host, port))
-    }
+	if t.Contains("://") {
+		targetRaw = append(targetRaw, t)
+	} else {
+		host, port, err := str.ParseStringToHostPort(t)
+		if err != nil {
+			targetRaw = append(targetRaw, t)
+		}else{
+			targetRaw = append(targetRaw, str.HostPort(host, port))
+		}
+	}
 }
 target = targetRaw
 
