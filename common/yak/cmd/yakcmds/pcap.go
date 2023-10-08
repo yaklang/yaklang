@@ -127,11 +127,11 @@ var PcapCommand = cli.Command{
 				var err error
 				switch reason {
 				case pcaputil.TrafficFlowCloseReason_INACTIVE:
-					err = mng.CloseTCPStream(flow, false)
+					err = mng.CloseTCPFlow(flow, false)
 				case pcaputil.TrafficFlowCloseReason_FIN:
-					err = mng.CloseTCPStream(flow, false)
+					err = mng.CloseTCPFlow(flow, false)
 				case pcaputil.TrafficFlowCloseReason_RST:
-					err = mng.CloseTCPStream(flow, true)
+					err = mng.CloseTCPFlow(flow, true)
 				}
 				if err != nil {
 					log.Errorf("close flow failed: %s", err)
