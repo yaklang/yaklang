@@ -359,7 +359,7 @@ func SplitHTTPPacket(
 
 	var headers []string
 	headers = append(headers, string(firstLineBytes))
-	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) {
+	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) || bytes.HasPrefix(firstLineBytes, []byte("RTSP/")) {
 		// rsp
 		if rspFirstLine != nil {
 			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
