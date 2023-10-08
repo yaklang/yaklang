@@ -33,6 +33,26 @@ func TestError(t *testing.T) {
 				"this value undefine:b",
 			},
 		},
+
+		{
+			name: "only declear variable",
+			code: `
+			var a1 
+			if 1 {
+				a1 = 1
+			}
+			b = a1
+
+			// var a2 -> undefine
+			if 1 {
+				a2 = 1
+			}
+			c = a2
+			`,
+			err: []string{
+				"this value undefine:a2",
+			},
+		},
 	}
 
 	for _, tc := range testcase {
