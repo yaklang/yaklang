@@ -69,12 +69,13 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 		switch itype.Kind() {
 		case reflect.Func:
 			value = NewFunctionWithType(str, b.CoverReflectFunctionType(itype))
-			b.externInstance[str] = value
-			return
 		default:
+			value = NewParam(str, false, b.Function)
+			value.SetType(b.handlerType(itype, 0))
 		}
+		b.externInstance[str] = value
+		return
 	}
-	return nil
 }
 
 func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type) *FunctionType {

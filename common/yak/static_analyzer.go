@@ -59,10 +59,28 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		}
 	}
 
+	// yak function table
+	functionTable := yaklang.New().GetFntable()
+	// yak-main
+	functionTable["YAK_DIR"] = ""
+	functionTable["YAK_FILENAME"] = ""
+	functionTable["YAK_MAIN"] = false
+	functionTable["id"] = ""
+	// param
+	getParam := func(key string) interface{} {
+		return nil
+	}
+	functionTable["getParam"] = getParam
+	functionTable["getParams"] = getParam
+	functionTable["param"] = getParam
+
+	// mitm
+	functionTable["MITM_PLUGIN"] = ""
+	functionTable["MITM_PARAMS"] = make(map[string]string)
 	// ssa
 	prog := ssa4yak.ParseSSA(
 		code,
-		ssa4yak.WithSymbolTable(yaklang.New().GetFntable()),
+		ssa4yak.WithSymbolTable(functionTable),
 	)
 	errs := prog.GetErrors()
 	for _, err := range errs {
