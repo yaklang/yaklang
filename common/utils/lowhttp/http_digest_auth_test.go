@@ -9,7 +9,7 @@ func TestComputeDigestResponseFromRequest(t *testing.T) {
 	req = SetHTTPPacketUrl(req, "https://pie.dev/digest-auth/auth/admin/admin123/MD5")
 	req = ReplaceHTTPPacketMethod(req, "GET")
 
-	rsp, err := HTTP(WithPacketBytes(req), WithHttps(true), WithProxy("http://127.0.0.1:7890"))
+	rsp, err := HTTP(WithPacketBytes(req), WithHttps(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestComputeDigestResponseFromRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	req = ReplaceHTTPPacketHeader(req, "Authorization", authHeader)
-	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true), WithProxy("http://127.0.0.1:7890"))
+	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestComputeDigestResponseFromRequestEx(t *testing.T) {
 	req = SetHTTPPacketUrl(req, "https://pie.dev/digest-auth/auth/admin/admin123/MD5")
 	req = ReplaceHTTPPacketMethod(req, "GET")
 
-	rsp, err := HTTP(WithPacketBytes(req), WithHttps(true), WithProxy("http://127.0.0.1:7890"))
+	rsp, err := HTTP(WithPacketBytes(req), WithHttps(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestComputeDigestResponseFromRequestEx(t *testing.T) {
 		t.Fatal(err)
 	}
 	req = ReplaceHTTPPacketHeader(req, "Authorization", ah.String())
-	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true), WithProxy("http://127.0.0.1:7890"))
+	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestComputeDigestResponseFromRequestEx(t *testing.T) {
 	dr.UpdateRequestWithUsernameAndPassword("admin", "admin123")
 	ah.RefreshAuthorizationWithoutConce(dr)
 	req = ReplaceHTTPPacketHeader(req, "Authorization", ah.String())
-	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true), WithProxy("http://127.0.0.1:7890"))
+	rsp, err = HTTP(WithPacketBytes(req), WithHttps(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,5 +83,4 @@ func TestComputeDigestResponseFromRequestEx2(t *testing.T) {
 	ah.URI = "rtsp://172.27.252.174:8554/publisher"
 	ah.RefreshAuthorizationWithoutConce(dr)
 	_ = dr
-	t.Logf("response: %v", ah.String())
 }
