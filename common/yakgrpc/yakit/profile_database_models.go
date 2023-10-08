@@ -46,7 +46,7 @@ var ProjectTables = []interface{}{
 	&AliveHost{},
 
 	// traffic
-	&TrafficSession{}, &TrafficPacket{},
+	&TrafficSession{}, &TrafficPacket{}, &TrafficTCPReassembledFrame{},
 }
 
 func UserDataAndPluginDatabaseScope(db *gorm.DB) *gorm.DB {

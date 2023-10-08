@@ -7,14 +7,16 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // TrafficFrame is a tcp frame
 type TrafficFrame struct {
-	ConnHash string // connection local -> remote
-	Seq      uint32
-	Payload  []byte
-	Done     bool
+	ConnHash  string // connection local -> remote
+	Seq       uint32
+	Payload   []byte
+	Timestamp time.Time
+	Done      bool
 
 	Connection *TrafficConnection
 }
@@ -26,10 +28,17 @@ type TrafficFrame struct {
 // OnCreated: flow created
 type TrafficFlow struct {
 	// ClientConn
-	ClientConn *TrafficConnection
-	ServerConn *TrafficConnection
-	Hash       string
-	Index      uint64
+	IsIpv4              bool
+	IsIpv6              bool
+	IsEthernetLinkLayer bool
+	HardwareSrcMac      string
+	HardwareDstMac      string
+	ClientConn          *TrafficConnection
+	ServerConn          *TrafficConnection
+	Hash                string
+	Index               uint64
+	// no three-way handshake detected
+	IsHalfOpen bool
 
 	ctx    context.Context
 	cancel context.CancelFunc

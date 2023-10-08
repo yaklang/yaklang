@@ -11,6 +11,7 @@ import (
 	"net"
 	"sort"
 	"sync"
+	"time"
 )
 
 type futureFrame struct {
@@ -31,8 +32,10 @@ type TrafficConnection struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	buf        *bytes.Buffer
+	remoteIP   net.IP
 	remoteAddr net.Addr
 	remotePort int
+	localIP    net.IP
 	localAddr  net.Addr
 	localPort  int
 
@@ -47,6 +50,30 @@ func (t *TrafficConnection) Read(buf []byte) (int, error) {
 
 func (t *TrafficConnection) String() string {
 	return fmt.Sprintf("%v -> %v", t.localAddr, t.remoteAddr)
+}
+
+func (t *TrafficConnection) LocalAddr() net.Addr {
+	return t.localAddr
+}
+
+func (t *TrafficConnection) LocalIP() net.IP {
+	return t.localIP
+}
+
+func (t *TrafficConnection) LocalPort() int {
+	return t.localPort
+}
+
+func (t *TrafficConnection) RemoteAddr() net.Addr {
+	return t.remoteAddr
+}
+
+func (t *TrafficConnection) RemoteIP() net.IP {
+	return t.remoteIP
+}
+
+func (t *TrafficConnection) RemotePort() int {
+	return t.remotePort
 }
 
 func (t *TrafficConnection) Hash() string {
@@ -82,6 +109,7 @@ func (t *TrafficConnection) Write(b []byte, seq int64) (int, error) {
 		ConnHash:   t.Hash(),
 		Seq:        uint32(seq),
 		Payload:    b,
+		Timestamp:  time.Now(),
 		Connection: t,
 	})
 
