@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -52,45 +53,65 @@ func (p *TrafficPool) nextStream() uint64 {
 	return atomic.AddUint64(&p.currentStreamIndex, 1)
 }
 
-func (p *TrafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP) {
+func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP) {
 	var networkStr string
-	var srcIP string
-	var dstIP string
+	var srcIP net.IP
+	var dstIP net.IP
 	var srcPort = int(transportLayer.SrcPort)
 	var dstPort = int(transportLayer.DstPort)
+	var isIpv4 = false
+	var isIpv6 = false
 	switch ret := networkLayer.(type) {
 	case *layers.IPv4:
 		networkStr = "tcp4"
-		srcIP = ret.SrcIP.String()
-		dstIP = ret.DstIP.String()
+		srcIP = ret.SrcIP
+		dstIP = ret.DstIP
+		isIpv4 = true
 	case *layers.IPv6:
 		networkStr = "tcp6"
-		srcIP = ret.SrcIP.String()
-		dstIP = ret.DstIP.String()
+		srcIP = ret.SrcIP
+		dstIP = ret.DstIP
+		isIpv6 = true
 	default:
 		return
 	}
 
-	var srcAddrString = utils.HostPort(srcIP, srcPort)
-	var dstAddrString = utils.HostPort(dstIP, dstPort)
+	var srcAddrString = utils.HostPort(srcIP.String(), srcPort)
+	var dstAddrString = utils.HostPort(dstIP.String(), dstPort)
 	var hash = p.flowhash(networkStr, srcAddrString, dstAddrString)
 	var flow *TrafficFlow
+
 	if ret, ok := p.pool.Load(hash); !ok {
-		// no reason  ...
+		var fitFlow = func(flow *TrafficFlow) {
+			flow.Hash = hash
+			flow.IsIpv4 = isIpv4
+			flow.IsIpv6 = isIpv6
+			flow.ClientConn.localPort = srcPort
+			flow.ClientConn.localIP = srcIP
+			flow.ClientConn.remotePort = dstPort
+			flow.ClientConn.remoteIP = dstIP
+			if ethernetLayer != nil {
+				flow.IsEthernetLinkLayer = true
+				flow.HardwareSrcMac = ethernetLayer.SrcMAC.String()
+				flow.HardwareDstMac = ethernetLayer.DstMAC.String()
+			}
+		}
+
+		// half open
 		if transportLayer.Payload != nil && transportLayer.PSH {
 			flow, err := p.NewFlow(networkStr, srcAddrString, dstAddrString)
 			if err != nil {
 				log.Errorf("create new connection failed: %s", err)
 				return
 			}
-			flow.Hash = hash
-			flow.ClientConn.localPort = srcPort
-			flow.ClientConn.remotePort = dstPort
+			fitFlow(flow)
 			flow.feed(transportLayer)
+			flow.IsHalfOpen = true
 			p.pool.Store(hash, flow)
 			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return
 		}
+
 		// SYN && !ACK -> start a conn
 		if transportLayer.SYN && !transportLayer.ACK {
 			flow, err := p.NewFlow(networkStr, srcAddrString, dstAddrString)
@@ -98,9 +119,7 @@ func (p *TrafficPool) Feed(networkLayerFlow gopacket.Flow, networkLayer gopacket
 				log.Errorf("create new connection failed: %s", err)
 				return
 			}
-			flow.Hash = hash
-			flow.ClientConn.localPort = srcPort
-			flow.ClientConn.remotePort = dstPort
+			fitFlow(flow)
 			p.pool.Store(hash, flow)
 			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return

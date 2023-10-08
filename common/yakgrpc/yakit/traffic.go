@@ -34,10 +34,10 @@ type TrafficSession struct {
 	LinkLayerDst        string
 
 	// NetworkLayer network layer
-	NetworkLayerSrc string
+	IsIpv4          bool
+	IsIpv6          bool
 	NetworkSrcIP    string
 	NetworkSrcIPInt int64
-	NetworkLayerDst string
 	NetworkDstIP    string
 	NetworkDstIPInt int64
 
@@ -62,6 +62,15 @@ type TrafficSession struct {
 	SNI             string
 }
 
+type TrafficTCPReassembledFrame struct {
+	gorm.Model
+
+	SessionUuid string `gorm:"index"`
+	QuotedData  string
+	Seq         int64
+	Timestamp   int64
+}
+
 type TrafficPacket struct {
 	gorm.Model
 
@@ -77,6 +86,15 @@ type TrafficPacket struct {
 	// caution: QuotedRaw is (maybe) not an utf8-valid string
 	// quoted-used for save to database
 	QuotedRaw string
+
+	EthernetEndpointHardwareAddrSrc string
+	EthernetEndpointHardwareAddrDst string
+	IsIpv4                          bool
+	IsIpv6                          bool
+	NetworkEndpointIPSrc            string
+	NetworkEndpointIPDst            string
+	TransportEndpointPortSrc        int
+	TransportEndpointPortDst        int
 }
 
 func SaveTrafficSession(db *gorm.DB, session *TrafficSession) error {

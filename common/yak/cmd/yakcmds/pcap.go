@@ -100,12 +100,41 @@ var PcapCommand = cli.Command{
 		opts = append(
 			opts,
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				mng.Save(packet)
+				err := mng.SaveRawPacket(packet)
+				if err != nil {
+					log.Errorf("save traffic failed: %s", err)
+				}
 			}),
 			pcaputil.WithTLSClientHello(func(flow *pcaputil.TrafficFlow, hello *tlsutils.HandshakeClientHello) {
 				if group == nil {
 					log.Infof("%v SNI: %v", flow.String(), hello.SNI())
 					return
+				}
+			}),
+			pcaputil.WithOnTrafficFlowCreated(func(flow *pcaputil.TrafficFlow) {
+				err := mng.CreateTCPReassembledFlow(flow)
+				if err != nil {
+					log.Errorf("create flow failed: %s", err)
+				}
+			}),
+			pcaputil.WithOnTrafficFlowOnDataFrameReassembled(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+				err := mng.SaveTCPReassembledFrame(flow, frame)
+				if err != nil {
+					log.Errorf("save frame failed: %s", err)
+				}
+			}),
+			pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
+				var err error
+				switch reason {
+				case pcaputil.TrafficFlowCloseReason_INACTIVE:
+					err = mng.CloseTCPStream(flow, false)
+				case pcaputil.TrafficFlowCloseReason_FIN:
+					err = mng.CloseTCPStream(flow, false)
+				case pcaputil.TrafficFlowCloseReason_RST:
+					err = mng.CloseTCPStream(flow, true)
+				}
+				if err != nil {
+					log.Errorf("close flow failed: %s", err)
 				}
 			}),
 			pcaputil.WithHTTPFlow(func(flow *pcaputil.TrafficFlow, req *http.Request, rsp *http.Response) {
