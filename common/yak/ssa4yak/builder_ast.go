@@ -614,6 +614,11 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 				}
 				if len(vs) == len(lvalues) {
 					for i := range vs {
+
+						if inst, ok := vs[i].(ssa.Instruction); ok {
+							inst.SetPosition(lvalues[i].GetPosition())
+						}
+
 						lvalues[i].Assign(vs[i], b.FunctionBuilder)
 					}
 				} else {
@@ -625,6 +630,9 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 			// (n) = field(1, #index)
 			for i, lv := range lvalues {
 				field := b.EmitField(inter, ssa.NewConst(i))
+				if inst, ok := field.(ssa.Instruction); ok {
+					inst.SetPosition(lv.GetPosition())
+				}
 				lv.Assign(field, b.FunctionBuilder)
 			}
 		} else if len(lvalues) == 1 {

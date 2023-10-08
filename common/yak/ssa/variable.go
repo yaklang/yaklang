@@ -19,18 +19,11 @@ type IdentifierLV struct {
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	if inst, ok := v.(Instruction); ok {
-		inst.SetPosition(i.GetPosition())
-	}
 	f.WriteVariable(i.variable, v)
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
 	v := f.ReadVariable(i.variable, true)
-	if utils.IsNil(v) {
-		// v = NewUndefine(i.variable, f.CurrentBlock)
-		v = f.EmitUndefine(i.variable)
-	}
 	return v
 }
 
