@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -16,30 +17,32 @@ import (
 )
 
 type DigestRequest struct {
-	Body     string
-	Method   string
-	Password string
-	URI      string
-	Username string
-	Auth     *DigestAuthorization
-	Wa       *wwwAuthenticate
-	CertVal  bool
+	Body           string
+	Method         string
+	Password       string
+	URI            string
+	Username       string
+	Auth           *DigestAuthorization
+	Wa             *wwwAuthenticate
+	CertVal        bool
+	useCompleteURL bool
 }
 
 // NewDigestRequest creates a new DigestRequest object
-func NewDigestRequest(username, password, method, uri, body string) *DigestRequest {
+func NewDigestRequest(username, password, method, uri, body string, useCompleteURL bool) *DigestRequest {
 	dr := &DigestRequest{}
-	dr.UpdateRequest(username, password, method, uri, body)
+	dr.UpdateRequest(username, password, method, uri, body, useCompleteURL)
 	dr.CertVal = true
 	return dr
 }
 
-func (dr *DigestRequest) UpdateRequest(username, password, method, uri, body string) *DigestRequest {
+func (dr *DigestRequest) UpdateRequest(username, password, method, uri, body string, useCompleteURL bool) *DigestRequest {
 	dr.Body = body
 	dr.Method = method
 	dr.Password = password
 	dr.URI = uri
 	dr.Username = username
+	dr.useCompleteURL = useCompleteURL
 	return dr
 }
 
@@ -115,7 +118,17 @@ func (ah *DigestAuthorization) RefreshAuthorization(dr *DigestRequest) (*DigestA
 
 	ah.Cnonce = ah.hash(fmt.Sprintf("%d:%s:yak", time.Now().UnixNano(), dr.Username))
 
-	ah.URI = dr.URI
+	if dr.useCompleteURL {
+		ah.URI = dr.URI
+	} else {
+		u, err := url.Parse(dr.URI)
+		if err != nil {
+			return nil, err
+		}
+
+		ah.URI = u.RequestURI()
+	}
+
 	ah.Response = ah.computeResponse(dr)
 
 	return ah, nil
@@ -129,7 +142,17 @@ func (ah *DigestAuthorization) RefreshAuthorizationWithoutConce(dr *DigestReques
 		ah.Username = ah.hash(fmt.Sprintf("%s:%s", ah.Username, ah.Realm))
 	}
 
-	ah.URI = dr.URI
+	if dr.useCompleteURL {
+		ah.URI = dr.URI
+	} else {
+		u, err := url.Parse(dr.URI)
+		if err != nil {
+			return nil, err
+		}
+
+		ah.URI = u.RequestURI()
+	}
+
 	ah.Response = ah.computeResponse(dr)
 
 	return ah, nil
@@ -262,7 +285,7 @@ type wwwAuthenticate struct {
 	Userhash  bool   // quoted
 }
 
-func newWwwAuthenticate(s string) *wwwAuthenticate {
+func newWWWAuthenticate(s string) *wwwAuthenticate {
 
 	var wa = wwwAuthenticate{}
 
@@ -314,14 +337,14 @@ func newWwwAuthenticate(s string) *wwwAuthenticate {
 	return &wa
 }
 
-func GetDigestAuthorizationFromRequestEx(method, url, body, authorization, username, password string) (*DigestRequest, *DigestAuthorization, error) {
+func GetDigestAuthorizationFromRequestEx(method, url, body, authorization, username, password string, useCompleteURL bool) (*DigestRequest, *DigestAuthorization, error) {
 	s := strings.SplitN(authorization, " ", 2)
 	if len(s) != 2 || s[0] != "Digest" {
 		return nil, nil, utils.Errorf("WWW-Authenticate is not digest auth")
 	}
 
-	dr := NewDigestRequest(username, password, method, url, body)
-	dr.Wa = newWwwAuthenticate(authorization)
+	dr := NewDigestRequest(username, password, method, url, body, useCompleteURL)
+	dr.Wa = newWWWAuthenticate(authorization)
 	ah, err := newAuthorization(dr)
 	if err != nil {
 		return nil, nil, err
@@ -340,7 +363,14 @@ func GetDigestAuthorizationFromRequest(raw []byte, authorization, username, pass
 		return "", err
 	}
 
-	_, ah, err := GetDigestAuthorizationFromRequestEx(req.Method, req.URL.String(), utils.UnsafeBytesToString(body), authorization, username, password)
+	splited := strings.Split(utils.UnsafeBytesToString(FixHTTPPacketCRLF(raw, true)), "\r\n")
+	_, uri, _, _ := utils.ParseHTTPRequestLine(splited[0])
+	useCompleteURL := false
+	if strings.Contains(uri, "://") {
+		useCompleteURL = true
+	}
+
+	_, ah, err := GetDigestAuthorizationFromRequestEx(req.Method, req.URL.String(), utils.UnsafeBytesToString(body), authorization, username, password, useCompleteURL)
 	if err != nil {
 		return "", err
 	}
