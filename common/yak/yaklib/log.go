@@ -2,10 +2,11 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/kataras/golog"
-	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"path/filepath"
+
+	"github.com/kataras/golog"
+	"github.com/yaklang/yaklang/common/log"
 
 	"strings"
 	"sync"
@@ -78,4 +79,10 @@ var LogExports = map[string]interface{}{
 	"debug":    log.Debugf,
 	"warn":     log.Warningf,
 	"error":    log.Errorf,
+
+	"Info":     log.Infof,
+	"SetLevel": setLogLevel,
+	"Debug":    log.Debugf,
+	"Warn":     log.Warningf,
+	"Error":    log.Errorf,
 }
