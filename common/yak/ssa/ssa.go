@@ -477,6 +477,7 @@ type Call struct {
 	// caller Value
 	// ~ drop error
 	IsDropError bool
+	IsEllipsis  bool
 }
 
 var _ Node = (*Call)(nil)

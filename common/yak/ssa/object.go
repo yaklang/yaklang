@@ -42,6 +42,17 @@ func GetFields(u User) []*Field {
 	return f
 }
 
+func GetField(u User, key Value) *Field {
+	fields := GetFields(u)
+	if index := slices.IndexFunc(fields, func(v *Field) bool {
+		return v.Key == key
+	}); index != -1 {
+		return fields[index]
+	} else {
+		return nil
+	}
+}
+
 // get user without object
 func (f *Field) GetUserOnly() []User {
 	return lo.Filter(f.GetUsers(), func(u User, _ int) bool {
@@ -92,6 +103,10 @@ func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
 	}
 	f.AddValue(key)
 	f.AddUser(obj)
+	if t, ok := obj.GetType().(*ObjectType); ok {
+		ft, _ := t.GetField(key)
+		f.SetType(ft)
+	}
 	return f
 }
 
@@ -147,11 +162,8 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 			}
 		}
 	}
-	fields := GetFields(i)
-	if index := slices.IndexFunc(fields, func(v *Field) bool {
-		return v.Key == key
-	}); index != -1 {
-		return fields[index]
+	if f := GetField(i, key); f != nil {
+		return f
 	}
 
 	if parent := b.parent; parent != nil {

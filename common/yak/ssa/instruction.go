@@ -179,6 +179,15 @@ func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 	return a
 }
 
+var NextType = NewObjectType()
+
+func init() {
+	NextType.Kind = Struct
+	NextType.AddField(NewConst("ok"), BasicTypes[Boolean])
+	NextType.AddField(NewConst("key"), BasicTypes[Any])
+	NextType.AddField(NewConst("field"), BasicTypes[Any])
+}
+
 func NewNext(iter Value, block *BasicBlock) *Next {
 	n := &Next{
 		anInstruction: newAnInstuction(block),
@@ -186,35 +195,7 @@ func NewNext(iter Value, block *BasicBlock) *Next {
 		Iter:          iter,
 	}
 	n.AddValue(iter)
-
-	/*
-		next map[T]U
-			{
-				key: T
-				field: U
-				ok: bool
-			}
-	*/
-	typ := NewObjectType()
-	typ.Kind = Struct
-	typ.AddField(NewConst("ok"), BasicTypes[Boolean])
-	if it, ok := iter.GetType().(*ObjectType); ok {
-		if keytyp := it.keyTyp; keytyp != nil {
-			typ.AddField(NewConst("key"), keytyp)
-		} else {
-			typ.AddField(NewConst("key"), BasicTypes[Any])
-		}
-		if fieldtyp := it.fieldType; fieldtyp != nil {
-			typ.AddField(NewConst("field"), fieldtyp)
-		} else {
-			typ.AddField(NewConst("field"), BasicTypes[Any])
-		}
-	} else {
-		typ.AddField(NewConst("key"), BasicTypes[Any])
-		typ.AddField(NewConst("field"), BasicTypes[Any])
-	}
-
-	n.SetType(typ)
+	n.SetType(NextType)
 	return n
 }
 
