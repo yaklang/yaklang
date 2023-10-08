@@ -2,7 +2,10 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/exp/maps"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -62,6 +65,68 @@ type YakTemplate struct {
 	// placeHolderMap
 	PlaceHolderMap map[string]string
 	Variables      *YakVariables
+}
+
+// SignMainParams 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名
+func (y *YakTemplate) SignMainParams() string {
+	signData := []any{}
+	addData := func(data any) {
+		signData = append(signData, data)
+	}
+	for _, seq := range y.HTTPRequestSequences {
+		addData(seq.Method)
+		addData(seq.Paths)
+		headerInfos := []any{}
+		keys := maps.Keys(seq.Headers)
+		sort.Strings(keys)
+		for _, key := range keys {
+			headerInfos = append(headerInfos, []any{key, seq.Headers[key]})
+		}
+		addData(headerInfos)
+		addData(seq.Body)
+		reqInfos := []any{}
+		for _, request := range seq.HTTPRequests {
+			reqInfos = append(reqInfos, []any{string(lowhttp.FixHTTPRequest([]byte(request.Request))), request.SNI, request.Timeout.String(), request.OverrideHost})
+		}
+		addData(reqInfos)
+		matcherInfos := []any{}
+		var addMatcher func(matcher *YakMatcher, id int)
+		addMatcher = func(matcher *YakMatcher, id int) {
+			if matcher.Condition == "" {
+				matcher.Condition = "and"
+			}
+			matcherInfos = append(matcherInfos, []any{id, matcher.MatcherType, matcher.ExprType, matcher.Scope, matcher.Condition, matcher.Group, matcher.GroupEncoding, matcher.Negative})
+			for i, m := range matcher.SubMatchers {
+				addMatcher(m, id<<1+i)
+			}
+		}
+		addMatcher(seq.Matcher, 1)
+		addData(matcherInfos)
+		extractorInfos := []any{}
+		for _, extractor := range seq.Extractor {
+			extractorInfos = append(extractorInfos, []any{extractor.Name, extractor.Type, extractor.Scope, extractor.Groups, extractor.RegexpMatchGroup, extractor.XPathAttribute})
+		}
+		addData(extractorInfos)
+		if seq.Payloads != nil {
+			payloads := seq.Payloads.GetRawPayloads()
+			keys = maps.Keys(payloads)
+			sort.Strings(keys)
+			datas := []any{}
+			for _, key := range keys {
+				datas = append(datas, []any{key, payloads[key].Data, payloads[key].FromFile})
+			}
+			addData(datas)
+		} else {
+			addData("")
+		}
+	}
+
+	signDataStr := fmt.Sprintf("%#v", signData)
+	for k, v := range y.PlaceHolderMap {
+		signDataStr = strings.Replace(signDataStr, k, v, -1)
+	}
+	//spew.Dump(signDataStr)
+	return codec.Md5(signDataStr)
 }
 
 type YakRequestBulkConfig struct {
