@@ -143,7 +143,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		if sc == 401 {
 			if strings.HasPrefix(authHeader, "Digest") {
 				authMethod = RTSPAuthMethod_Digest
-				_, ah, err := lowhttp.GetDigestAuthorizationFromRequestEx("DESCRIBE", u, "", authHeader, i.Username, i.Password)
+				_, ah, err := lowhttp.GetDigestAuthorizationFromRequestEx("DESCRIBE", u, "", authHeader, i.Username, i.Password, true)
 				if err == nil {
 					authResponseHeader = ah.String()
 				}
