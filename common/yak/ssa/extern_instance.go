@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MAXTYPELEVEL = 5
+	MAXTYPELEVEL = 15
 )
 
 func IsExternInstanc(v Value) bool {
@@ -76,7 +76,7 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 		}
 		switch itype.Kind() {
 		case reflect.Func:
-			value = NewFunctionWithType(str, b.CoverReflectFunctionType(itype))
+			value = NewFunctionWithType(str, b.CoverReflectFunctionType(itype, 0))
 		default:
 			value = NewParam(str, false, b.Function)
 			value.SetType(b.handlerType(itype, 0))
@@ -86,17 +86,17 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 	}
 }
 
-func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type) *FunctionType {
+func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {
 	params := make([]Type, 0)
 	returns := make([]Type, 0)
 	hasEllipsis := itype.IsVariadic()
 	// parameter
 	for i := 0; i < itype.NumIn(); i++ {
-		params = append(params, f.handlerType(itype.In(i), 0))
+		params = append(params, f.handlerType(itype.In(i), level))
 	}
 	// return
 	for i := 0; i < itype.NumOut(); i++ {
-		returns = append(returns, f.handlerType(itype.Out(i), 0))
+		returns = append(returns, f.handlerType(itype.Out(i), level))
 	}
 	return NewFunctionType(itype.String(), params, returns, hasEllipsis)
 }
@@ -143,7 +143,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		structType.Finish()
 		ret = structType
 	case reflect.Func:
-		ret = f.CoverReflectFunctionType(typ)
+		ret = f.CoverReflectFunctionType(typ, level)
 	case reflect.Pointer:
 		ret = f.handlerType(typ.Elem(), level)
 		return ret
@@ -174,7 +174,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	Methods := make(map[string]*FunctionType, typ.NumMethod()+pTyp.NumMethod())
 	handlerMethod := func(typ reflect.Type, i int) {
 		method := typ.Method(i)
-		funTyp := f.CoverReflectFunctionType(method.Type)
+		funTyp := f.CoverReflectFunctionType(method.Type, level)
 		funTyp.SetName(method.Name)
 		Methods[method.Name] = funTyp
 	}
