@@ -35,7 +35,8 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		}
 		return ssa.NewConst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
-		return b.EmitUndefine(stmt.GetText())
+		//TODO: this ok??
+		return ssa.NewParam("undefined", false, b.Function)
 	} else if stmt.NilLiteral() != nil {
 		return ssa.NewConst(nil)
 	} else if stmt.CharacterLiteral() != nil {
@@ -289,7 +290,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 		b.NewError(ssa.Error, TAG, "parse template stirng literal error")
 	}
 
-	return nil
+	return value
 }
 
 // string literal
