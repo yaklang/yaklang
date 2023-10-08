@@ -25,6 +25,9 @@ type SSAError struct {
 type SSAErrors []*SSAError
 
 func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, format string, arg ...any) {
+	if Pos == nil {
+		return
+	}
 	f.err = append(f.err, &SSAError{
 		Pos:     Pos,
 		tag:     tag,
