@@ -12,6 +12,22 @@ func init() {
 		str:    "nil",
 		Unary:  0,
 	}
+
+	ConstMap[struct{}{}] = &Const{
+		anNode: anNode{},
+		value:  struct{}{},
+		typ:    BasicTypes[Any],
+		str:    "any",
+		Unary:  0,
+	}
+}
+
+func NewNil() *Const {
+	return ConstMap[nil]
+}
+
+func NewAny() *Const {
+	return ConstMap[struct{}{}]
 }
 
 var (
