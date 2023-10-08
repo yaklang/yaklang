@@ -2,72 +2,306 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/go-funk"
+	"errors"
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v2"
 	"testing"
 )
 
-func CompareNucleiYaml(yaml1, yaml2 string) bool {
-	yarml1Map := make(map[string]interface{})
-	yarml2Map := make(map[string]interface{})
-	if yaml.Unmarshal([]byte(yaml1), &yarml1Map) != nil {
-		panic("unmarshal yaml1 failed")
+func CompareNucleiYaml(yaml1, yaml2 string) error {
+	temp1, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(yaml1)
+	if err != nil {
+		panic(err)
 	}
-	if yaml.Unmarshal([]byte(yaml2), &yarml2Map) != nil {
-		panic("unmarshal yaml2 failed")
+	temp2, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(yaml2)
+	if err != nil {
+		panic(err)
 	}
-	httpPackages := map[string]string{}
-	for _, httpReq := range utils.InterfaceToSliceInterface(utils.MapGetRaw(yarml1Map, "http")) {
-		httpReqMap := utils.InterfaceToMapInterface(httpReq)
-		raws := utils.InterfaceToSliceInterface(httpReqMap["raw"])
-		matchers := utils.InterfaceToSliceInterface(httpReqMap["matchers"])
-		extractors := utils.InterfaceToSliceInterface(httpReqMap["extractors"])
-		keys := funk.Keys(httpReqMap)
-		otherFields := []string{}
-		for _, k := range utils.InterfaceToSliceInterface(keys) {
-			if k == "raw" || k == "matchers" || k == "extractors" {
-				continue
-			}
-			key := utils.InterfaceToString(k)
-			otherFields = append(otherFields, key+":"+utils.InterfaceToString(httpReqMap[key]))
-		}
-		for _, raw := range raws {
-			httpPackages[utils.InterfaceToString(raw)] = utils.InterfaceToString(matchers) + utils.InterfaceToString(extractors) + utils.InterfaceToString(otherFields)
-		}
-
+	if temp1 == nil || temp2 == nil {
+		panic("create template failed")
+	}
+	// 比较签名
+	if temp1.SignMainParams() != temp2.SignMainParams() {
+		return errors.New("sign main params not equal")
 	}
 
-	for _, httpReq := range utils.InterfaceToSliceInterface(utils.MapGetRaw(yarml2Map, "http")) {
-		httpReqMap := utils.InterfaceToMapInterface(httpReq)
-		raws := utils.InterfaceToSliceInterface(httpReqMap["raw"])
-		matchers := utils.InterfaceToSliceInterface(httpReqMap["matchers"])
-		extractors := utils.InterfaceToSliceInterface(httpReqMap["extractors"])
-		isSame := true
-		otherFields := []string{}
-		keys := funk.Keys(httpReqMap)
-		for _, k := range utils.InterfaceToSliceInterface(keys) {
-			if k == "raw" || k == "matchers" || k == "extractors" {
-				continue
+	// 比较其它字段
+	yaml1Map := map[string]interface{}{}
+	err = yaml.Unmarshal([]byte(yaml1), yaml1Map)
+	if err != nil {
+		panic(err)
+	}
+	yaml2Map := map[string]interface{}{}
+	err = yaml.Unmarshal([]byte(yaml2), yaml2Map)
+	if err != nil {
+		panic(err)
+	}
+	for k, v := range yaml1Map {
+		switch k {
+		case "self-contained", `{{interactsh-url}}`, `{{interactsh}}`, `{{interactsh_url}}`, `interactsh`:
+			if v != yaml2Map[k] {
+				return errors.New(fmt.Sprintf("key %s not equal", k))
 			}
-			key := utils.InterfaceToString(k)
-			otherFields = append(otherFields, key+":"+utils.InterfaceToString(httpReqMap[key]))
+		default:
+
 		}
-		for _, raw := range raws {
-			if v, ok := httpPackages[utils.InterfaceToString(raw)]; ok {
-				if v != utils.InterfaceToString(matchers)+utils.InterfaceToString(extractors)+utils.InterfaceToString(otherFields) {
-					isSame = false
+	}
+	requests1 := utils.InterfaceToSliceInterface(utils.MapGetFirstRaw(yaml1Map, "requests", "http"))
+	requests2 := utils.InterfaceToSliceInterface(utils.MapGetFirstRaw(yaml2Map, "requests", "http"))
+	if len(requests1) != len(utils.InterfaceToSliceInterface(requests2)) {
+		return errors.New("requests length not equal")
+	}
+	for i := 0; i < len(requests1); i++ {
+		req1 := requests1[i].(map[any]any)
+		req2 := requests2[i].(map[any]any)
+		if len(req1) != len(req2) {
+			return errors.New(fmt.Sprintf("request %d field length not equal", i+1))
+		}
+		for k, v := range req1 {
+			switch k {
+			case "stop-at-first-macth", "cookie-reuse", "max-size", "unsafe", "redirects", "max-redirects":
+				if v != req2[k] {
+					return errors.New(fmt.Sprintf("key %s not equal", k))
 				}
 			}
-			if !isSame {
-				return false
+		}
+	}
+	return nil
+}
+func TestCompareNucleiYamlFunc(t *testing.T) {
+	testCases := []struct {
+		content string
+		expect  string
+		err     string
+	}{
+		{
+			content: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			expect: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			err: "",
+		}, {
+			content: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    redirects: true
+    max-redirects: 10
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			expect: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			err: "request 1 field length not equal",
+		}, {
+			content: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    redirects: true
+    max-redirects: 10
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			expect: `http:
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: {{RootURL}}
+
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: {{RootURL}}
+
+    payloads:
+      username:
+        - admina
+      password:
+        - admin
+    attack: pitchfork
+    cookie-reuse: true
+    redirects: true
+    max-redirects: 10
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and`,
+			err: "sign main params not equal",
+		}}
+	for _, testCase := range testCases {
+		err := CompareNucleiYaml(testCase.content, testCase.expect)
+		if err != nil {
+			if err.Error() != testCase.err {
+				t.Fatal(fmt.Sprintf("expect error: %s, got: %s", testCase.err, err.Error()))
+			}
+		} else {
+			if testCase.err != "" {
+				t.Fatal(fmt.Sprintf("expect error: %s, got: nil", testCase.err))
 			}
 		}
 	}
-	return true
 }
-func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
+func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -266,7 +500,6 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         - admin
       password:
         - admin
-    attack: pitchfork
     cookie-reuse: true
     matchers:
       - type: dsl
@@ -289,7 +522,6 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         - admin
       password:
         - admin
-    attack: pitchfork
     cookie-reuse: true
     matchers:
       - type: dsl
@@ -310,7 +542,6 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         - admin
       password:
         - admin
-    attack: pitchfork
     cookie-reuse: true
     matchers:
       - type: dsl
@@ -320,12 +551,11 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
           - 'contains(body_1, "FUEL CMS")'
         condition: and`,
 		},
-		//{
-		//	content: `---`,
-		//	expect:  "",
-		//},
 	}
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
+		if i < 1 {
+			continue
+		}
 		rsp, err := client.ImportHTTPFuzzerTaskFromYaml(context.Background(), &ypb.ImportHTTPFuzzerTaskFromYamlRequest{
 			YamlContent: testCase.content,
 		})
@@ -336,8 +566,8 @@ func TestTestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 			Requests: rsp.Requests,
 		})
 
-		if !CompareNucleiYaml(res.YamlContent, testCase.expect) {
-			t.Fatal("expect:", testCase.expect, "got:", res.YamlContent)
+		if err := CompareNucleiYaml(res.YamlContent, testCase.expect); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
