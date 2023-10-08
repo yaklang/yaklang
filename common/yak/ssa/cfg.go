@@ -125,13 +125,15 @@ func (lb *LoopBuilder) Finish() {
 	// body -> latch
 	lb.b.EmitJump(latch)
 
-	lb.b.CurrentBlock = latch
-	// build latch
-	if lb.buildThird != nil {
-		step = lb.buildThird()
+	if len(latch.Preds) != 0 {
+		lb.b.CurrentBlock = latch
+		// build latch
+		if lb.buildThird != nil {
+			step = lb.buildThird()
+		}
+		// latch -> header
+		lb.b.EmitJump(header)
 	}
-	// latch -> header
-	lb.b.EmitJump(header)
 
 	// finish
 	header.Sealed()
@@ -278,7 +280,7 @@ func (i *IfBuilder) Finish() {
 		prevIf.AddFalse(doneBlock)
 	}
 
-	if i.parent == nil {
+	if i.parent == nil && len(doneBlock.Preds) != 0 {
 		i.b.CurrentBlock = doneBlock
 		rest := i.b.NewBasicBlock("")
 		i.b.EmitJump(rest)
