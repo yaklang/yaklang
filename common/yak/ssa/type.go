@@ -306,8 +306,8 @@ type ObjectType struct {
 
 	method map[string]*FunctionType
 
-	keyTyp    Type
-	fieldType Type
+	KeyTyp    Type
+	FieldType Type
 }
 
 func (i *ObjectType) GetTypeKind() TypeKind {
@@ -346,15 +346,15 @@ func NewObjectType() *ObjectType {
 func NewSliceType(elem Type) *ObjectType {
 	i := NewObjectType()
 	i.Kind = Slice
-	i.keyTyp = BasicTypes[Number]
-	i.fieldType = elem
+	i.KeyTyp = BasicTypes[Number]
+	i.FieldType = elem
 	return i
 }
 
 func NewMapType(key, field Type) *ObjectType {
 	i := NewObjectType()
-	i.keyTyp = key
-	i.fieldType = field
+	i.KeyTyp = key
+	i.FieldType = field
 	i.Kind = Map
 	return i
 }
@@ -391,18 +391,18 @@ func (itype ObjectType) RawString() string {
 		case Slice:
 			// map[int]T
 			if itype.Len == 0 {
-				ret += fmt.Sprintf("[]%s", itype.fieldType.String())
+				ret += fmt.Sprintf("[]%s", itype.FieldType.String())
 			} else {
-				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.fieldType.String())
+				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
 			}
 		case Map:
 			// map[T]U
 			// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-			keyTyp := itype.keyTyp
+			keyTyp := itype.KeyTyp
 			if utils.IsNil(keyTyp) {
 				keyTyp = BasicTypes[Any]
 			}
-			fieldType := itype.fieldType
+			fieldType := itype.FieldType
 			if utils.IsNil(fieldType) {
 				fieldType = BasicTypes[Any]
 			}
@@ -441,7 +441,7 @@ func (s *ObjectType) AddField(key Value, field Type) {
 func (s *ObjectType) GetField(key Value) (Type, Type) {
 	switch s.Kind {
 	case Slice, Map:
-		return s.fieldType, s.keyTyp
+		return s.FieldType, s.KeyTyp
 	case Struct:
 		if index := slices.Index(s.Key, key); index != -1 {
 			return s.FieldTypes[index], key.GetType()
@@ -464,20 +464,20 @@ func (s *ObjectType) Finish() {
 				// map[number]T ==> []T slice
 				// TODO: check increasing
 				s.Kind = Slice
-				s.keyTyp = BasicTypes[Number]
-				s.fieldType = fieldTypes[0]
+				s.KeyTyp = BasicTypes[Number]
+				s.FieldType = fieldTypes[0]
 			} else {
 				// Map
 				s.Kind = Map
-				s.keyTyp = keytypes[0]
-				s.fieldType = fieldTypes[0]
+				s.KeyTyp = keytypes[0]
+				s.FieldType = fieldTypes[0]
 			}
 			// s.keyType = keytype
 			// s.Field = field
 		} else if keytypes[0].GetTypeKind() == String || keytypes[0].GetTypeKind() == Number {
 			s.Kind = Struct
-			s.keyTyp = BasicTypes[String]
-			s.fieldType = BasicTypes[Any]
+			s.KeyTyp = BasicTypes[String]
+			s.FieldType = BasicTypes[Any]
 		}
 	}
 }

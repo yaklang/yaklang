@@ -1295,7 +1295,7 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	}
 	b.AddSubFunction(buildFunc)
 
-	return b.NewCall(newfunc, nil, false)
+	return b.NewCall(newfunc, nil)
 }
 
 // anonymous function decl
@@ -1383,31 +1383,34 @@ func (b *astbuilder) buildFunctionCall(stmt *yak.FunctionCallContext, v ssa.Valu
 	// recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	// defer recoverRange()
 	var args []ssa.Value
-	isDropErr := false
+	isEllipsis := false
 	if s, ok := stmt.OrdinaryArguments().(*yak.OrdinaryArgumentsContext); ok {
-		args = b.buildOrdinaryArguments(s)
+		args, isEllipsis = b.buildOrdinaryArguments(s)
 	}
+	c := b.NewCall(v, args)
 	if stmt.Wavy() != nil {
-		isDropErr = true
+		c.IsDropError = true
 	}
-	return b.NewCall(v, args, isDropErr)
+	if isEllipsis {
+		c.IsEllipsis = true
+	}
+	return c
 }
 
 // ordinary argument
-func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) []ssa.Value {
+func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) (v []ssa.Value, hasEll bool) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis()
 	allexpre := stmt.AllExpression()
-	v := make([]ssa.Value, 0, len(allexpre))
+	// v := make([]ssa.Value, 0, len(allexpre))
 	for _, expr := range allexpre {
 		v = append(v, b.buildExpression(expr.(*yak.ExpressionContext)))
 	}
 	if ellipsis != nil {
-		//handler "..." to array
-		v[len(v)-1].SetType(ssa.NewObjectType())
+		hasEll = true
 	}
-	return v
+	return
 }
 
 // slice call
