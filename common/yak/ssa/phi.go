@@ -26,13 +26,6 @@ func (b *BasicBlock) Sealed() {
 					DeleteInst(f)
 				}
 			}
-		} else if un, ok := v.(*Undefine); ok {
-			if p.GetParent().builder.CanBuildFreeValue(p.variable) {
-				v = p.GetParent().builder.BuildFreeValue(p.variable)
-				// un.Replace(v)
-				ReplaceValue(un, v)
-				DeleteInst(un)
-			}
 		}
 	}
 	b.inCompletePhi = nil
