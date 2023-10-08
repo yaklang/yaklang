@@ -368,6 +368,9 @@ type YakClient interface {
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
 	// Wireshark
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error)
+	QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error)
+	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
+	QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error)
 }
 
 type yakClient struct {
@@ -3853,6 +3856,33 @@ func (x *yakPcapXClient) Recv() (*PcapXResponse, error) {
 	return m, nil
 }
 
+func (c *yakClient) QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error) {
+	out := new(QueryTrafficSessionResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryTrafficSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error) {
+	out := new(QueryTrafficPacketResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryTrafficPacket", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error) {
+	out := new(QueryTrafficTCPReassembledResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryTrafficTCPReassembled", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -4207,6 +4237,9 @@ type YakServer interface {
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
 	// Wireshark
 	PcapX(Yak_PcapXServer) error
+	QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error)
+	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
+	QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -5044,6 +5077,15 @@ func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParam
 }
 func (UnimplementedYakServer) PcapX(Yak_PcapXServer) error {
 	return status.Errorf(codes.Unimplemented, "method PcapX not implemented")
+}
+func (UnimplementedYakServer) QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTrafficSession not implemented")
+}
+func (UnimplementedYakServer) QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTrafficPacket not implemented")
+}
+func (UnimplementedYakServer) QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTrafficTCPReassembled not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -10208,6 +10250,60 @@ func (x *yakPcapXServer) Recv() (*PcapXRequest, error) {
 	return m, nil
 }
 
+func _Yak_QueryTrafficSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTrafficSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryTrafficSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryTrafficSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryTrafficSession(ctx, req.(*QueryTrafficSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryTrafficPacket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTrafficPacketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryTrafficPacket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryTrafficPacket",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryTrafficPacket(ctx, req.(*QueryTrafficPacketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryTrafficTCPReassembled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTrafficTCPReassembledRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryTrafficTCPReassembled(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryTrafficTCPReassembled",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryTrafficTCPReassembled(ctx, req.(*QueryTrafficTCPReassembledRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -11150,6 +11246,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RequestYakURL",
 			Handler:    _Yak_RequestYakURL_Handler,
+		},
+		{
+			MethodName: "QueryTrafficSession",
+			Handler:    _Yak_QueryTrafficSession_Handler,
+		},
+		{
+			MethodName: "QueryTrafficPacket",
+			Handler:    _Yak_QueryTrafficPacket_Handler,
+		},
+		{
+			MethodName: "QueryTrafficTCPReassembled",
+			Handler:    _Yak_QueryTrafficTCPReassembled_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

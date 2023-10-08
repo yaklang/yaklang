@@ -296,7 +296,7 @@ func (m *TrafficStorageManager) CreateTCPReassembledFlow(flow *pcaputil.TrafficF
 	return nil
 }
 
-func (m *TrafficStorageManager) CloseTCPStream(flow *pcaputil.TrafficFlow, force bool) error {
+func (m *TrafficStorageManager) CloseTCPFlow(flow *pcaputil.TrafficFlow, force bool) error {
 	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
 	sessionRaw, ok := m.sessions.Get(hash)
 	if !ok {
