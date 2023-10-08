@@ -2,18 +2,20 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/ReneKroon/ttlcache"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type TrafficStorageManager struct {
@@ -25,7 +27,7 @@ type TrafficStorageManager struct {
 	// icmp: hash = srcip + dstip + icmpid + seq
 	// arp: hash(device + req-ip + req-mac)
 	// dns: hash(id)
-	sessions map[string]*TrafficSession
+	sessions *ttlcache.Cache // map[string]*TrafficSession
 }
 
 func getPacketPayload(packet gopacket.Packet) ([]byte, bool) {
@@ -46,9 +48,11 @@ func getPacketPayload(packet gopacket.Packet) ([]byte, bool) {
 }
 
 func NewTrafficStorageManager(db *gorm.DB) *TrafficStorageManager {
+	sessionCacher := ttlcache.NewCache()
+	sessionCacher.SetTTL(time.Minute)
 	return &TrafficStorageManager{
 		db:       db,
-		sessions: make(map[string]*TrafficSession),
+		sessions: sessionCacher,
 	}
 }
 
@@ -74,11 +78,33 @@ func (m *TrafficStorageManager) handleLinkLayerTraffic(t *TrafficPacket, packet 
 			return "", false
 		}
 		return "", true
+	case "ethernet":
+		l := packet.Layer(layers.LayerTypeEthernet)
+		if l == nil {
+			return "", false
+		}
+		ethernet, ok := l.(*layers.Ethernet)
+		if !ok {
+			return "", false
+		}
+		t.EthernetEndpointHardwareAddrSrc = ethernet.SrcMAC.String()
+		t.EthernetEndpointHardwareAddrDst = ethernet.DstMAC.String()
 	}
 	return "", false
 }
 
 func (m *TrafficStorageManager) handleNetworkLayerTraffic(t *TrafficPacket, packet gopacket.Packet) (string, bool) {
+	switch ret := packet.NetworkLayer().(type) {
+	case *layers.IPv4:
+		t.NetworkEndpointIPSrc = ret.SrcIP.String()
+		t.NetworkEndpointIPDst = ret.DstIP.String()
+		t.IsIpv4 = true
+	case *layers.IPv6:
+		t.NetworkEndpointIPSrc = ret.SrcIP.String()
+		t.NetworkEndpointIPDst = ret.DstIP.String()
+		t.IsIpv6 = true
+	}
+
 	switch t.NetworkLayerType {
 	case "icmpv4", "icmp", "icmp4":
 		l := packet.Layer(layers.LayerTypeICMPv4)
@@ -111,6 +137,14 @@ func networkFlowHash(packet gopacket.Packet) string {
 	return extra
 }
 
+func flowHashCalc(src string, dst string) string {
+	item := []string{
+		src, dst,
+	}
+	sort.Strings(item)
+	return strings.Join(item, "-")
+}
+
 func transportFlowHash(packet gopacket.Packet) string {
 	var extra string
 	if nl := packet.NetworkLayer(); nl != nil {
@@ -133,18 +167,22 @@ func transportFlowHash(packet gopacket.Packet) string {
 			if src == "" || dst == "" {
 				return ""
 			}
-			item := []string{
-				utils.HostPort(src, int(tcp.SrcPort)),
-				utils.HostPort(dst, int(tcp.DstPort)),
-			}
-			sort.Strings(item)
-			return strings.Join(item, "-")
+			return flowHashCalc(utils.HostPort(src, int(tcp.SrcPort)), utils.HostPort(dst, int(tcp.DstPort)))
 		}
 	}
 	return extra
 }
 
 func (m *TrafficStorageManager) handleTransportLayerTraffic(t *TrafficPacket, packet gopacket.Packet) (string, bool) {
+	switch ret := packet.TransportLayer().(type) {
+	case *layers.TCP:
+		t.TransportEndpointPortSrc = int(ret.SrcPort)
+		t.TransportEndpointPortDst = int(ret.DstPort)
+	case *layers.UDP:
+		t.TransportEndpointPortSrc = int(ret.SrcPort)
+		t.TransportEndpointPortDst = int(ret.DstPort)
+	}
+
 	switch t.TransportLayerType {
 	case "tcp", "udp", "tcp4", "udp4":
 		// skip tcp, because tcp is a stream handled by pdu reassembled
@@ -175,7 +213,7 @@ func (m *TrafficStorageManager) handleApplicationLayerTraffic(t *TrafficPacket, 
 	return "", false
 }
 
-func (m *TrafficStorageManager) CreateOrFetchSession(hash string, packet gopacket.Packet, tpacket *TrafficPacket, typeStr string) (*TrafficSession, error) {
+func (m *TrafficStorageManager) FetchSession(hash string, packet gopacket.Packet, tpacket *TrafficPacket, typeStr string, noCreate bool) (*TrafficSession, error) {
 	if packet == nil {
 		return nil, utils.Error("packet is nil")
 	}
@@ -188,27 +226,26 @@ func (m *TrafficStorageManager) CreateOrFetchSession(hash string, packet gopacke
 		return nil, utils.Error("traffic_packet is nil")
 	}
 
-	session, ok := m.sessions[hash]
+	sessionRaw, ok := m.sessions.Get(hash)
+	var session *TrafficSession
+	if ok {
+		session = sessionRaw.(*TrafficSession)
+	}
 	if !ok {
+		if noCreate {
+			return nil, utils.Errorf("no existed session/flow: %s", hash)
+		}
 		session = &TrafficSession{
 			Uuid:                  uuid.NewV4().String(),
 			SessionType:           strings.ToLower(typeStr),
-			LinkLayerSrc:          "",
-			LinkLayerDst:          "",
-			NetworkLayerSrc:       "",
-			NetworkSrcIP:          "",
-			NetworkSrcIPInt:       0,
-			NetworkLayerDst:       "",
-			NetworkDstIP:          "",
-			NetworkDstIPInt:       0,
-			TransportLayerSrcPort: 0,
-			TransportLayerDstPort: 0,
-			IsTCPReassembled:      false,
-			IsHalfOpen:            false,
-			IsClosed:              false,
-			IsForceClosed:         false,
-			HaveClientHello:       false,
-			SNI:                   "",
+			LinkLayerSrc:          tpacket.EthernetEndpointHardwareAddrSrc,
+			LinkLayerDst:          tpacket.EthernetEndpointHardwareAddrDst,
+			NetworkSrcIP:          tpacket.NetworkEndpointIPSrc,
+			NetworkDstIP:          tpacket.NetworkEndpointIPDst,
+			TransportLayerSrcPort: tpacket.TransportEndpointPortSrc,
+			TransportLayerDstPort: tpacket.TransportEndpointPortDst,
+			IsIpv4:                tpacket.IsIpv4,
+			IsIpv6:                tpacket.IsIpv6,
 		}
 		if ret := packet.Metadata(); ret != nil && ret.InterfaceIndex >= 0 {
 			iface, err := pcaputil.GetPcapInterfaceByIndex(ret.InterfaceIndex)
@@ -228,12 +265,72 @@ func (m *TrafficStorageManager) CreateOrFetchSession(hash string, packet gopacke
 			session.IsTcpIpStack = true
 		}
 
-		m.sessions[hash] = session
+		m.sessions.Set(hash, session)
 	}
 	return session, nil
 }
 
-func (m *TrafficStorageManager) Save(packet gopacket.Packet) error {
+func (m *TrafficStorageManager) CreateTCPReassembledFlow(flow *pcaputil.TrafficFlow) error {
+	if flow == nil {
+		return utils.Error("flow is nil")
+	}
+	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	session := &TrafficSession{
+		Uuid:                  uuid.NewV4().String(),
+		SessionType:           "tcp",
+		IsIpv4:                flow.IsIpv4,
+		IsIpv6:                flow.IsIpv6,
+		NetworkSrcIP:          flow.ClientConn.LocalAddr().String(),
+		NetworkDstIP:          flow.ClientConn.RemoteAddr().String(),
+		IsTcpIpStack:          true,
+		TransportLayerSrcPort: flow.ClientConn.LocalPort(),
+		TransportLayerDstPort: flow.ClientConn.RemotePort(),
+		IsTCPReassembled:      true,
+		IsHalfOpen:            flow.IsHalfOpen,
+	}
+	err := SaveTrafficSession(m.db, session)
+	if err != nil {
+		return err
+	}
+	m.sessions.Set(hash, session)
+	return nil
+}
+
+func (m *TrafficStorageManager) CloseTCPStream(flow *pcaputil.TrafficFlow, force bool) error {
+	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	sessionRaw, ok := m.sessions.Get(hash)
+	if !ok {
+		return utils.Errorf("no existed session/flow: %s", hash)
+	}
+	session := sessionRaw.(*TrafficSession)
+	session.IsClosed = true
+	if force {
+		session.IsForceClosed = true
+	}
+	return m.db.Save(session).Error
+}
+
+func (m *TrafficStorageManager) SaveTCPReassembledFrame(flow *pcaputil.TrafficFlow, frame *pcaputil.TrafficFrame) error {
+	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	sessionRaw, ok := m.sessions.Get(hash)
+	if !ok {
+		return utils.Errorf("no existed session/flow: %s", hash)
+	}
+	session := sessionRaw.(*TrafficSession)
+	storageFrame := &TrafficTCPReassembledFrame{
+		SessionUuid: session.Uuid,
+		QuotedData:  strconv.Quote(string(frame.Payload)),
+		Seq:         int64(frame.Seq),
+		Timestamp:   frame.Timestamp.Unix(),
+	}
+	return m.db.Save(storageFrame).Error
+}
+
+func (m *TrafficStorageManager) CreateHTTPFlow(flow *pcaputil.TrafficFlow, req *http.Request, rsp *http.Response) error {
+	return nil
+}
+
+func (m *TrafficStorageManager) SaveRawPacket(packet gopacket.Packet) error {
 	payload, ok := getPacketPayload(packet)
 	if !ok {
 		payload = nil
@@ -248,16 +345,25 @@ func (m *TrafficStorageManager) Save(packet gopacket.Packet) error {
 	}
 
 	var hash string
+	var sessionType string
+	var noCreateFlow bool
 	if hash, ok = m.handleLinkLayerTraffic(trafficPacket, packet); ok {
 		if hash != "" {
+			sessionType = trafficPacket.LinkLayerType
 			log.Infof("%v: %v", trafficPacket.LinkLayerType, hash)
 		}
 	} else if hash, ok = m.handleNetworkLayerTraffic(trafficPacket, packet); ok {
 		if hash != "" {
+			sessionType = trafficPacket.NetworkLayerType
 			log.Infof("%v: %v", trafficPacket.NetworkLayerType, hash)
 		}
 	} else if hash, ok = m.handleTransportLayerTraffic(trafficPacket, packet); ok {
+		// transport layer traffic is a flow
+		// not created simple session
+		// create via pdu reassembled
+		noCreateFlow = true
 		if hash != "" {
+			sessionType = trafficPacket.TransportLayerType
 			log.Infof("%v: %v", trafficPacket.TransportLayerType, hash)
 		}
 	} else {
@@ -266,10 +372,18 @@ func (m *TrafficStorageManager) Save(packet gopacket.Packet) error {
 	}
 
 	if hash != "" {
-
+		session, err := m.FetchSession(hash, packet, trafficPacket, sessionType, noCreateFlow)
+		if err != nil {
+			return err
+		}
+		trafficPacket.SessionUuid = session.Uuid
+		err = SaveTrafficSession(m.db, session)
+		if err != nil {
+			log.Errorf("save traffic session failed: %s", err)
+		}
 	}
 
-	if err := SaveTrafficPacket(consts.GetGormProjectDatabase(), trafficPacket); err != nil {
+	if err := SaveTrafficPacket(m.db, trafficPacket); err != nil {
 		log.Errorf("save traffic packet failed: %s", err)
 		return err
 	}

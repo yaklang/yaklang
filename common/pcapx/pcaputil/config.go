@@ -185,14 +185,15 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 	})
 }
 
-func (c *CaptureConfig) assemblyWithTS(flow gopacket.Flow, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {
+func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	c.trafficPool.Feed(flow, networkLayer, tcp)
+	raw, _ := flow.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
+	c.trafficPool.Feed(raw, networkLayer, tcp)
 	//if c.Assembler != nil {
 	//	if tcp.Payload == nil {
 	//		return
@@ -209,10 +210,6 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		}
 	}()
 
-	if c.onEveryPacket != nil {
-		c.onEveryPacket(packet)
-	}
-
 	save := true
 	var ts time.Time
 	if packet.Metadata() != nil {
@@ -221,6 +218,12 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		ts = time.Now()
 	}
 
+	defer func() {
+		if c.onEveryPacket != nil {
+			c.onEveryPacket(packet)
+		}
+	}()
+
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk || ret == nil {
@@ -228,9 +231,9 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	}
 
 	if netIPv4Layer, ipv4ok := packet.NetworkLayer().(*layers.IPv4); ipv4ok {
-		c.assemblyWithTS(netIPv4Layer.NetworkFlow(), netIPv4Layer, ret, ts)
+		c.assemblyWithTS(packet, netIPv4Layer, ret, ts)
 	} else if netIPv6Layer, ipv6ok := packet.NetworkLayer().(*layers.IPv6); ipv6ok {
-		c.assemblyWithTS(netIPv6Layer.NetworkFlow(), netIPv6Layer, ret, ts)
+		c.assemblyWithTS(packet, netIPv6Layer, ret, ts)
 	} else {
 		log.Warnf("unknown network layer: %v", packet.NetworkLayer())
 	}
