@@ -3848,3 +3848,33 @@ b = () => {1:2}
 assert b() == {1:2}`
 	_marshallerTest(code)
 }
+
+func TestIincludeCycle(t *testing.T) {
+	// include
+	file, err := os.CreateTemp("", "test*.yak")
+	if err != nil {
+		panic(err)
+	}
+	cycleCode := fmt.Sprintf(`
+include "%s"
+`, file.Name())
+	file.WriteString(cycleCode)
+	defer os.Remove(file.Name())
+
+	inputStream := antlr.NewInputStream(cycleCode)
+	lex := yak.NewYaklangLexer(inputStream)
+	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
+	p := yak.NewYaklangParser(tokenStream)
+	vt := yakast.NewYakCompiler()
+	vt.AntlrTokenStream = tokenStream
+	p.AddErrorListener(vt.GetParserErrorListener())
+	vt.VisitProgram(p.Program().(*yak.ProgramContext))
+	if len(vt.GetCompileErrors()) <= 0 {
+		t.Fatalf("expect compile error, but get nil")
+	}
+
+	if !strings.Contains(vt.GetCompileErrors()[0].Message, "include cycle not allowed") {
+		t.Fatalf("expect inclue cycle error, but get %v", vt.GetCompileErrors()[0].Message)
+	}
+
+}
