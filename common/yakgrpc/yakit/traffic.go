@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type TrafficSession struct {
@@ -103,4 +105,34 @@ func SaveTrafficSession(db *gorm.DB, session *TrafficSession) error {
 
 func SaveTrafficPacket(db *gorm.DB, packet *TrafficPacket) error {
 	return db.Save(packet).Error
+}
+
+func QueryTrafficSession(db *gorm.DB, request *ypb.QueryTrafficSessionRequest) (*bizhelper.Paginator, []*TrafficSession, error) {
+	db = db.Model(&TrafficSession{})
+	var data []*TrafficSession
+	p, err := bizhelper.Paging(
+		db,
+		int(request.GetPagination().GetPage()),
+		int(request.GetPagination().GetLimit()),
+		&data,
+	)
+	if err.Error != nil {
+		return nil, nil, err.Error
+	}
+	return p, data, nil
+}
+
+func QueryTrafficPacket(db *gorm.DB, request *ypb.QueryTrafficPacketRequest) (*bizhelper.Paginator, []*TrafficPacket, error) {
+	db = db.Model(&TrafficPacket{})
+	var data []*TrafficPacket
+	p, err := bizhelper.Paging(
+		db,
+		int(request.GetPagination().GetPage()),
+		int(request.GetPagination().GetLimit()),
+		&data,
+	)
+	if err.Error != nil {
+		return nil, nil, err.Error
+	}
+	return p, data, nil
 }

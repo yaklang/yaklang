@@ -617,7 +617,7 @@ message TrafficPacket {
   int64 TransportEndpointPortDst = 14;
 
   string SessionId = 15;
-  string Id = 16;
+  int64 Id = 16;
 }
 
 message QueryTrafficPacketResponse {
