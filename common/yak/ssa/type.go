@@ -302,6 +302,8 @@ type ObjectType struct {
 	keyTypes   []Type
 	FieldTypes []Type
 
+	AnonymousField []*ObjectType
+
 	Combination bool
 
 	method map[string]*FunctionType
@@ -443,8 +445,20 @@ func (s *ObjectType) GetField(key Value) (Type, Type) {
 	case Slice, Map:
 		return s.FieldType, s.KeyTyp
 	case Struct:
-		if index := slices.Index(s.Key, key); index != -1 {
-			return s.FieldTypes[index], key.GetType()
+		getField := func(o *ObjectType) Type {
+			if index := slices.Index(o.Key, key); index != -1 {
+				return o.FieldTypes[index]
+			} else {
+				return nil
+			}
+		}
+		if t := getField(s); t != nil {
+			return t, key.GetType()
+		}
+		for _, obj := range s.AnonymousField {
+			if t := getField(obj); t != nil {
+				return t, key.GetType()
+			}
 		}
 	}
 	return nil, nil
