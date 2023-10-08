@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MAXTYPELEVEL = 2
+	MAXTYPELEVEL = 5
 )
 
 func (b *FunctionBuilder) WithExternInstance(vs map[string]any) {
@@ -125,7 +125,12 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	case reflect.Struct:
 		structType := NewStructType()
 		for i := 0; i < typ.NumField(); i++ {
-			structType.AddField(NewConst(typ.Field(i).Name), f.handlerType(typ.Field(i).Type, level))
+			field := typ.Field(i)
+			fieldType := f.handlerType(field.Type, level)
+			structType.AddField(NewConst(field.Name), fieldType)
+			if field.Anonymous && fieldType.GetTypeKind() == ObjectTypeKind {
+				structType.AnonymousField = append(structType.AnonymousField, fieldType.(*ObjectType))
+			}
 		}
 		structType.Finish()
 		ret = structType
