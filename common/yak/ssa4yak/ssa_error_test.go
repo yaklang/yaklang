@@ -63,9 +63,21 @@ func TestError(t *testing.T) {
 				"this value undefine:a",
 			},
 		},
+
+		{
+			name: "free-value in extern-instance ahead",
+			code: `
+			param = ""
+			delayFuzz =() =>{
+				param.a().b()
+			}
+			`,
+			err: []string{},
+		},
 	}
 
 	for _, tc := range testcase {
+		t.Logf("run test : %s", tc.name)
 		prog := ParseSSA(tc.code)
 		prog.Show()
 		fmt.Println(prog.GetErrors().String())

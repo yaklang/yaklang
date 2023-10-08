@@ -782,10 +782,10 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		} else if v := b.ReadVariable(text, false); v != nil {
 			// when v exist
 			switch value := v.(type) {
-			case *ssa.Field:
-				if value.OutCapture {
-					return value
-				}
+			// case *ssa.Field:
+			// 	if value.OutCapture {
+			// 		return value
+			// 	}
 			case *ssa.Parameter:
 				if value.IsFreevalue {
 					field := b.NewCaptureField(text)
@@ -800,11 +800,11 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 				}
 			default:
 			}
-		} else if b.CanBuildFreeValue(text) {
-			field := b.NewCaptureField(text)
-			b.FreeValues = append(b.FreeValues, field)
-			b.SetReg(field)
-			return field
+			// } else if b.CanBuildFreeValue(text) {
+			// 	field := b.NewCaptureField(text)
+			// 	b.FreeValues = append(b.FreeValues, field)
+			// 	b.SetReg(field)
+			// 	return field
 		}
 		return ssa.NewIndentifierLV(text, b.CurrtenPos)
 	}
@@ -907,15 +907,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			b.NewError(ssa.Error, TAG, "cannot use _ as value")
 			return nil
 		}
-		ret := b.ReadVariable(text, true)
-		if un, ok := ret.(*ssa.Undefine); !ok {
-			return ret
-		} else if b.CanBuildFreeValue(text) {
-			ssa.DeleteInst(un)
-			return b.BuildFreeValue(text)
-		} else {
-			return un
-		}
+		return b.ReadVariable(text, true)
 	}
 
 	// member call

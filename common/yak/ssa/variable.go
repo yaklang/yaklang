@@ -108,6 +108,23 @@ func (b *FunctionBuilder) ReplaceVariable(variable string, v, to Value) {
 	}
 }
 
+func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
+	if _, ok := b.currentDef[variable]; !ok {
+		b.currentDef[variable] = make(map[*BasicBlock]Value)
+	}
+	b.currentDef[variable][block] = value
+}
+
+// get value by variable and block
+//
+//	return : undefine \ value \ phi
+
+// * first check builder.currentDef
+//
+// * if block sealed; just create a phi
+// * if len(block.preds) == 0: undefine
+// * if len(block.preds) == 1: just recursive
+// * if len(block.preds) >  1: create phi and builder
 func (b *FunctionBuilder) ReadVariable(variable string, create bool) (ret Value) {
 	variable = b.GetIdByBlockSymbolTable(variable)
 	if b.CurrentBlock != nil {
@@ -119,15 +136,7 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) (ret Value)
 	}
 	return
 }
-
-func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	if _, ok := b.currentDef[variable]; !ok {
-		b.currentDef[variable] = make(map[*BasicBlock]Value)
-	}
-	b.currentDef[variable][block] = value
-}
-
-func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, creat bool) Value {
+func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, create bool) Value {
 	if block.Skip {
 		return nil
 	}
@@ -136,10 +145,7 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 			return value
 		}
 	}
-	return b.readVariableRecursive(variable, block, creat)
-}
 
-func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlock, create bool) Value {
 	var v Value
 	// if block in sealedBlock
 	if !block.isSealed {
@@ -149,19 +155,24 @@ func (b *FunctionBuilder) readVariableRecursive(variable string, block *BasicBlo
 			v = phi
 		}
 	} else if len(block.Preds) == 0 {
-		// this is enter block  in this function
-		if ret := b.TryBuildExternInstance(variable); ret != nil {
-			v = ret
+		// v = nil
+		if b.CanBuildFreeValue(variable) {
+			v = b.BuildFreeValue(variable)
+		} else if i := b.TryBuildExternInstance(variable); i != nil {
+			v = i
 		} else if create {
 			un := NewUndefine(variable, block)
 			EmitInst(un)
 			v = un
+		} else {
+			v = nil
 		}
 	} else if len(block.Preds) == 1 {
 		v = b.readVariableByBlock(variable, block.Preds[0], create)
 	} else {
 		v = NewPhi(block, variable, create).Build()
 	}
+	// if _, ok := v.(*Undefine); !ok && v != nil {
 	if v != nil {
 		b.writeVariableByBlock(variable, v, block)
 	}
@@ -180,7 +191,11 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	for parent := b.parent; parent != nil; parent = parent.parent {
 		if v := parent.builder.ReadVariable(variable, false); v != nil {
-			return true
+			if IsExternInstanc(v) {
+				return false
+			} else {
+				return true
+			}
 		}
 	}
 	return false

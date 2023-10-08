@@ -10,6 +10,14 @@ const (
 	MAXTYPELEVEL = 5
 )
 
+func IsExternInstanc(v Value) bool {
+	if m, ok := v.(*Make); ok && m.buildField != nil {
+		return true
+	} else {
+		return false
+	}
+}
+
 func (b *FunctionBuilder) WithExternInstance(vs map[string]any) {
 	b.buildExtern = func(id string, builder *FunctionBuilder) Value {
 		if v, ok := vs[id]; ok {
