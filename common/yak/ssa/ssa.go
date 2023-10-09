@@ -118,7 +118,7 @@ type Program struct {
 	Packages []*Package
 
 	// for build
-	buildOnece sync.Once
+	buildOnce sync.Once
 }
 
 type Package struct {
@@ -194,7 +194,7 @@ type BasicBlock struct {
 	Name  string
 	// function
 	Parent *Function
-	// basicblock graph
+	// BasicBlock graph
 	Preds, Succs []*BasicBlock
 
 	/*
@@ -203,8 +203,8 @@ type BasicBlock struct {
 	Condition Value
 
 	// instruction list
-	Instrs []Instruction
-	Phis   []*Phi
+	Insts []Instruction
+	Phis  []*Phi
 
 	// error catch
 	Handler *ErrorHandler
@@ -244,7 +244,7 @@ type Position struct {
 type anInstruction struct {
 	// function
 	Func *Function
-	// basicblock
+	// BasicBlock
 	Block *BasicBlock
 	// type
 	typs Type
@@ -301,9 +301,11 @@ type Phi struct {
 	anInstruction
 	anNode
 
-	Edge   []Value // edge[i] from phi.Block.Preds[i]
-	create bool
+	Edge []Value // edge[i] from phi.Block.Preds[i]
+	//	what instruction create this control-flow merge?
+	branch *Instruction // loop or if :
 	// for build
+	create     bool  // for ReadVariable method
 	wit1, wit2 Value // witness for trivial-phi
 }
 
@@ -314,7 +316,7 @@ var _ Instruction = (*Phi)(nil)
 var _ InstructionValue = (*Phi)(nil)
 
 // ----------- Const
-// constinst also have block pointer, which block set this const to variable
+// ConstInst also have block pointer, which block set this const to variable
 type ConstInst struct {
 	Const
 	anInstruction
@@ -379,7 +381,7 @@ type Parameter struct {
 
 	variable    string
 	Func        *Function
-	IsFreevalue bool
+	IsFreeValue bool
 	typs        Type
 }
 
@@ -628,7 +630,7 @@ type Field struct {
 	Key Value
 	Obj User
 
-	// Method or Feild
+	// Method or Field
 	IsMethod bool
 
 	// capture by other function

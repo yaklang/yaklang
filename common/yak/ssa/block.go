@@ -24,7 +24,7 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 		Parent:        f,
 		Preds:         make([]*BasicBlock, 0),
 		Succs:         make([]*BasicBlock, 0),
-		Instrs:        make([]Instruction, 0),
+		Insts:         make([]Instruction, 0),
 		Phis:          make([]*Phi, 0),
 		isSealed:      isSealed,
 		inCompletePhi: make([]*Phi, 0),
@@ -40,8 +40,8 @@ func (b *BasicBlock) SetPosition(pos *Position) {
 
 /*
 	if condition is true  :  1 reach
-	if condition is false : -1 unreach
-	if condition need calc: 0  unknow
+	if condition is false : -1 unreachable
+	if condition need calc: 0  unknown
 */
 
 func (b *BasicBlock) Reachable() int {
@@ -64,5 +64,5 @@ func (b *BasicBlock) AddSucc(succ *BasicBlock) {
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.Instrs[len(b.Instrs)-1]
+	return b.Insts[len(b.Insts)-1]
 }

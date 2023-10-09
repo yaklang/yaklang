@@ -33,7 +33,7 @@ func (b *BasicBlock) GetBlock(name string) *BasicBlock {
 
 // enter:
 //        ...
-//	    // for first expre in here
+//	    // for first expression in here
 //      jump loop.header
 // loop.header: 		    <- enter, loop.latch
 //      // for stmt cond in here
@@ -73,7 +73,7 @@ func (lb *LoopBuilder) BuildFirstExpr(f func() []Value) {
 	lb.buildFirst = f
 }
 
-func (lb *LoopBuilder) BuildCondtion(f func() Value) {
+func (lb *LoopBuilder) BuildCondition(f func() Value) {
 	lb.buildCondition = f
 }
 
@@ -173,7 +173,7 @@ type IfBuilder struct {
 	b *FunctionBuilder
 	// enter block
 	enter, done *BasicBlock
-	// child ifbuilder
+	// child ifBuilder
 	child  *IfBuilder
 	parent *IfBuilder
 
@@ -189,7 +189,7 @@ type IfBuilder struct {
 	elseBody func()
 }
 
-func (b *FunctionBuilder) IfBuilder() *IfBuilder {
+func (b *FunctionBuilder) BuildIf() *IfBuilder {
 	return &IfBuilder{
 		b:             b,
 		enter:         b.CurrentBlock,
@@ -198,22 +198,24 @@ func (b *FunctionBuilder) IfBuilder() *IfBuilder {
 	}
 }
 
-func (i *IfBuilder) AddChild(child *IfBuilder) {
+func (i *IfBuilder) BuildChild(child *IfBuilder) {
 	i.child = child
 	child.parent = i
 }
 
-func (i *IfBuilder) IfBranch(condition func() Value, body func()) {
+func (i *IfBuilder) BuildCondition(condition func() Value) {
 	i.ifCondition = condition
+}
+func (i *IfBuilder) BuildTrue(body func()) {
 	i.ifBody = body
 }
 
-func (i *IfBuilder) ElifBranch(condition func() Value, body func()) {
+func (i *IfBuilder) BuildElif(condition func() Value, body func()) {
 	i.elifCondition = append(i.elifCondition, condition)
 	i.elifBody = append(i.elifBody, body)
 }
 
-func (i *IfBuilder) ElseBranch(body func()) {
+func (i *IfBuilder) BuildFalse(body func()) {
 	i.elseBody = body
 }
 
@@ -229,39 +231,39 @@ func (i *IfBuilder) Finish() {
 	}
 	trueBlock := i.b.NewBasicBlock(IfTrue)
 
-	// build ifssa
+	// build ifSSA
 	cond := i.ifCondition()
-	ifssa := i.b.EmitIf(cond)
-	ifssa.AddTrue(trueBlock)
+	ifSSA := i.b.EmitIf(cond)
+	ifSSA.AddTrue(trueBlock)
 	// build true block
 	i.b.CurrentBlock = trueBlock
 	i.ifBody()
 	// true -> done
 	i.b.EmitJump(doneBlock)
 
-	prevIf := ifssa
+	prevIf := ifSSA
 	for index := range i.elifCondition {
-		buildcondition := i.elifCondition[index]
-		buildbody := i.elifBody[index]
+		buildCondition := i.elifCondition[index]
+		buildBody := i.elifBody[index]
 		// set block
 		if prevIf.False == nil {
 			prevIf.AddFalse(i.b.NewBasicBlock(IfElif))
 		}
 		i.b.CurrentBlock = prevIf.False
 		// build condition
-		cond := buildcondition()
+		cond := buildCondition()
 		if cond == nil {
 			continue
 		}
 		// build if
-		ifssa := i.b.EmitIf(cond)
-		ifssa.AddTrue(i.b.NewBasicBlock(IfTrue))
+		ifSSA := i.b.EmitIf(cond)
+		ifSSA.AddTrue(i.b.NewBasicBlock(IfTrue))
 		// build if body
-		i.b.CurrentBlock = ifssa.True
-		buildbody()
+		i.b.CurrentBlock = ifSSA.True
+		buildBody()
 		// if -> done
 		i.b.EmitJump(doneBlock)
-		prevIf = ifssa
+		prevIf = ifSSA
 	}
 
 	if i.elseBody != nil {

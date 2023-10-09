@@ -18,7 +18,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	// template stirng literal
+	// template string literal
 	if s, ok := stmt.TemplateStringLiteral().(*yak.TemplateStringLiteralContext); ok {
 		return b.buildTemplateStringLiteral(s)
 	}
@@ -287,7 +287,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 				return item, ok
 			}))
 	} else {
-		b.NewError(ssa.Error, TAG, "parse template stirng literal error")
+		b.NewError(ssa.Error, TAG, "parse template string literal error")
 	}
 
 	return value
@@ -320,7 +320,7 @@ ParseStrLit:
 		} else {
 			val, err := strconv.Unquote(text)
 			if err != nil {
-				fmt.Printf("parse %v to stirng literal fieled: %s", stmt.GetText(), err.Error())
+				fmt.Printf("parse %v to string literal failed: %s", stmt.GetText(), err.Error())
 			}
 			return ssa.NewConstWithUnary(val, int(prefix))
 		}

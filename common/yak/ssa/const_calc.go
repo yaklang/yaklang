@@ -24,7 +24,7 @@ func HandlerBinOp(b *BinOp) Value {
 
 	// both not const
 
-	return CalcBianry(b)
+	return CalcBinary(b)
 }
 
 func HandlerUnOp(u *UnOp) Value {
@@ -36,7 +36,7 @@ func HandlerUnOp(u *UnOp) Value {
 	return u
 }
 
-func CalcBianry(b *BinOp) Value {
+func CalcBinary(b *BinOp) Value {
 	isNot := func(x, y Value) bool {
 		if u, ok := x.(*UnOp); ok {
 			if u.X == y && u.Op == OpNot {
