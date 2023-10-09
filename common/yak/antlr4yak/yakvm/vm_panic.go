@@ -17,22 +17,22 @@ type VMPanicSignal struct {
 	AdditionalInfo interface{}
 }
 type PanicInfo struct {
-	code           *Code
-	postionVerbose string
-	codeReview     string
+	code            *Code
+	positionVerbose string
+	codeReview      string
 }
 
 func newPanicInfo(code *Code, codeReview string) *PanicInfo {
 	return &PanicInfo{code: code, codeReview: codeReview}
 }
-func (p *PanicInfo) SetPostionVerbose(s string) {
-	p.postionVerbose = s
+func (p *PanicInfo) SetPositionVerbose(s string) {
+	p.positionVerbose = s
 }
 func (p *PanicInfo) String() string {
 	if p.code.SourceCodeFilePath == nil {
-		return p.postionVerbose
+		return p.positionVerbose
 	}
-	return fmt.Sprintf("File \"%s\", in %s", *p.code.SourceCodeFilePath, p.postionVerbose)
+	return fmt.Sprintf("File \"%s\", in %s", *p.code.SourceCodeFilePath, p.positionVerbose)
 }
 
 type VMPanic struct {
