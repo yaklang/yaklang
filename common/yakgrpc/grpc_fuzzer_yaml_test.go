@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v2"
+	"strings"
 	"testing"
 )
 
@@ -71,7 +72,7 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 	}
 	return nil
 }
-func TestCompareNucleiYamlFunc(t *testing.T) {
+func TestGRPCMUSTPASS_CompareNucleiYamlFunc(t *testing.T) {
 	testCases := []struct {
 		content string
 		expect  string
@@ -301,6 +302,167 @@ func TestCompareNucleiYamlFunc(t *testing.T) {
 		}
 	}
 }
+func TestGRPCMUSTPASS_CheckSignParam(t *testing.T) {
+	template := `http:
+- raw:
+  - |-
+    @timeout: 30s
+    POST / HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+`
+	//对 method, paths, headers, body、raw、matcher、extractor、payloads 签名检查
+	testCase := []func(req *httptpl.YakRequestBulkConfig){
+		func(req *httptpl.YakRequestBulkConfig) {
+
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Method = "GET"
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Paths = []string{"/a"}
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Headers = map[string]string{"a": "b"}
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Body = "a"
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.HTTPRequests = []*httptpl.YakHTTPRequestPacket{
+				{
+					Request: "a",
+				},
+			}
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Matcher = &httptpl.YakMatcher{
+				MatcherType: "a",
+			}
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			req.Extractor = []*httptpl.YakExtractor{
+				{
+					Name: "a",
+				},
+			}
+		},
+		func(req *httptpl.YakRequestBulkConfig) {
+			payloads, err := httptpl.NewYakPayloads(map[string]interface{}{
+				"a": []string{"b"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Payloads = payloads
+		},
+	}
+	signMap := map[string]struct{}{}
+	for i, testCaseFunc := range testCase {
+		tmp, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(template)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testCaseFunc(tmp.HTTPRequestSequences[0])
+		sign := tmp.SignMainParams()
+		if _, ok := signMap[sign]; ok {
+			t.Fatal(fmt.Sprintf("test case %d sign repeat", i))
+		}
+		signMap[sign] = struct{}{}
+	}
+}
+func TestGRPCMUSTPASS_SignProtectCheck(t *testing.T) {
+	testCases := []struct {
+		content string
+		expect  bool
+	}{
+		{
+			content: `id: WebFuzzer-Template-FlTJsZDz
+
+info:
+  name: WebFuzzer Template FlTJsZDz
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: a386aa7978804e102ca438bc2d72b942
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    POST / HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+
+  max-redirects: 3
+  matchers-condition: and
+
+# Generated From WebFuzzer on 2023-10-09 11:42:55
+`,
+			expect: true,
+		},
+		{
+			content: `id: WebFuzzer-Template-FlTJsZDz
+
+info:
+  name: WebFuzzer Template FlTJsZDz
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: a386aa7978804e102ca438bc2d72b942
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    POST / HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value "}
+
+  max-redirects: 3
+  matchers-condition: and`,
+			expect: false,
+		},
+	}
+	for _, testCase := range testCases {
+		tmp, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(testCase.content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tmp.CheckTemplateRisks()
+		if testCase.expect && err != nil && strings.Contains(err.Error(), "signature error") {
+			t.Fatal(fmt.Sprintf("expect no signature error, got: %s", err.Error()))
+		}
+		if !testCase.expect && (err == nil || !strings.Contains(err.Error(), "signature error")) {
+			t.Fatal(fmt.Sprintf("expect signature error: not nil, got: %s", err.Error()))
+		}
+	}
+}
 func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -309,7 +471,6 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	testCases := []struct {
 		content string
 		expect  string
-		err     string
 	}{
 		{ // 一个请求节点包含两个请求，预期解析为两个请求节点
 			content: `http:
@@ -513,7 +674,8 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         POST /fuel/login/ HTTP/1.1
         Host: {{Hostname}}
         Content-Type: application/x-www-form-urlencoded
-        Referer: {{RootURL}}
+        Referer: /
+        Content-Length: 65
 
         user_name={{username}}&password={{password}}&Login=Login&forward=
 
@@ -536,7 +698,7 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
         Host: {{Hostname}}
         X-Requested-With: XMLHttpRequest
-        Referer: {{RootURL}}
+        Referer: /
     payloads:
       username:
         - admin

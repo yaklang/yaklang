@@ -195,6 +195,10 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	yakTemp.Description = utils.MapGetString(info, "description")
 	yakTemp.Reference = utils.InterfaceToStringSlice(utils.MapGetRaw(info, "reference"))
 	yakTemp.Tags = utils.PrettifyListFromStringSplitEx(utils.MapGetString(info, "tags"), ",")
+	yakitInfo := utils.InterfaceToMapInterface(utils.MapGetRaw(info, "yakit-info"))
+	if yakitInfo != nil {
+		yakTemp.Sign = utils.MapGetString(yakitInfo, "sign")
+	}
 	yakTemp.CVE = utils.MapGetString(cveInfo, "cve-id")
 
 	reqs := utils.MapGetFirstRaw(mid, "requests", "http")
@@ -272,7 +276,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		} else if matcher != nil {
 			hasMatcherOrExtractor = true
 		}
-		payloads, err := GenerateYakPayloads(req)
+		payloads, err := generateYakPayloads(req)
 		if err != nil {
 			log.Debugf("extractYakPayloads failed: %v", err)
 		}
@@ -357,9 +361,10 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		}
 		reqSeq = append(reqSeq, reqIns)
 	}
-	if !hasMatcherOrExtractor {
-		return nil, utils.Error("matcher and extractor are both empty")
-	}
+	_ = hasMatcherOrExtractor
+	//if !hasMatcherOrExtractor {
+	//	return nil, utils.Error("matcher and extractor are both empty")
+	//}
 	yakTemp.HTTPRequestSequences = reqSeq
 	//extractConfig(&yakTemp.RequestConfig, mid)
 	return yakTemp, nil
@@ -547,14 +552,9 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 	return matchInstance, nil
 }
 
-func GenerateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
-	data := utils.MapGetMapRaw(req, "payloads")
-	if data == nil {
-		return nil, nil
-	}
-
+func NewYakPayloads(data map[string]any) (*YakPayloads, error) {
 	payloads := &YakPayloads{raw: map[string]*YakPayload{}}
-	for k, v := range utils.InterfaceToMapInterface(data) {
+	for k, v := range data {
 		if reflect.TypeOf(v).Kind() == reflect.Slice {
 			payloads.raw[k] = &YakPayload{
 				Data: utils.InterfaceToStringSlice(v),
@@ -574,6 +574,14 @@ func GenerateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
 		}
 	}
 	return payloads, nil
+}
+
+func generateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
+	data := utils.MapGetMapRaw(req, "payloads")
+	if data == nil {
+		return nil, nil
+	}
+	return NewYakPayloads(utils.InterfaceToMapInterface(data))
 }
 
 func generateYakVariables(req map[string]interface{}) *YakVariables {
