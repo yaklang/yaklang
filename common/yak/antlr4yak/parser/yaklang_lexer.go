@@ -71,7 +71,7 @@ func yaklanglexerLexerInit() {
 		"RBrace", "Comma", "AssignEq", "Wavy", "ColonAssignEq", "PlusPlus",
 		"SubSub", "PlusEq", "MinusEq", "MulEq", "DivEq", "ModEq", "BitOrEq",
 		"LtLtEq", "GtGtEq", "AmpEq", "BitAndEq", "BitAndNotEq", "SemiColon",
-		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommontStart", "CommontEnd",
+		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommentStart", "CommentEnd",
 		"BackTickL", "COMMENT", "LINE_COMMENT", "LF", "EOS", "IntegerLiteral",
 		"FloatLiteral", "TemplateSingleQuoteStringStart", "TemplateDoubleQuoteStringStart",
 		"TemplateBackTickStringStart", "StringLiteral", "CharacterLiteral",
@@ -94,7 +94,7 @@ func yaklanglexerLexerInit() {
 		"RBrace", "Comma", "AssignEq", "Wavy", "ColonAssignEq", "PlusPlus",
 		"SubSub", "PlusEq", "MinusEq", "MulEq", "DivEq", "ModEq", "BitOrEq",
 		"LtLtEq", "GtGtEq", "AmpEq", "BitAndEq", "BitAndNotEq", "SemiColon",
-		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommontStart", "CommontEnd",
+		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommentStart", "CommentEnd",
 		"BackTickL", "COMMENT", "LINE_COMMENT", "LF", "EOS", "IntegerLiteral",
 		"FloatLiteral", "TemplateSingleQuoteStringStart", "TemplateDoubleQuoteStringStart",
 		"TemplateBackTickStringStart", "StringLiteral", "CharacterLiteral",
@@ -726,8 +726,8 @@ const (
 	YaklangLexerNot                                         = 91
 	YaklangLexerDot                                         = 92
 	YaklangLexerWS                                          = 93
-	YaklangLexerCommontStart                                = 94
-	YaklangLexerCommontEnd                                  = 95
+	YaklangLexerCommentStart                                = 94
+	YaklangLexerCommentEnd                                  = 95
 	YaklangLexerBackTickL                                   = 96
 	YaklangLexerCOMMENT                                     = 97
 	YaklangLexerLINE_COMMENT                                = 98

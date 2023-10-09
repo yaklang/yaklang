@@ -126,8 +126,8 @@ func (y *YakCompiler) VisitLiteral(raw yak.ILiteralContext) interface{} {
 		return nil
 	}
 
-	if b := i.CharaterLiteral(); b != nil {
-		y.VisitCharaterLiteral(b)
+	if b := i.CharacterLiteral(); b != nil {
+		y.VisitCharacterLiteral(b)
 		return nil
 	}
 
@@ -405,8 +405,8 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 	if ilit := i.TemplateDoubleQuoteStringLiteral(); ilit != nil {
 		if lit, _ := ilit.(*yak.TemplateDoubleQuoteStringLiteralContext); lit != nil {
 			handleTemplate('"', func() []StringAtom {
-				return lo.FilterMap(lit.AllTemplateDoubleQupteStringAtom(), func(atom yak.ITemplateDoubleQupteStringAtomContext, _ int) (StringAtom, bool) {
-					item, ok := atom.(*yak.TemplateDoubleQupteStringAtomContext)
+				return lo.FilterMap(lit.AllTemplateDoubleQuoteStringAtom(), func(atom yak.ITemplateDoubleQuoteStringAtomContext, _ int) (StringAtom, bool) {
+					item, ok := atom.(*yak.TemplateDoubleQuoteStringAtomContext)
 					return item, ok
 				})
 			})
@@ -423,8 +423,8 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 	} else if ilit := i.TemplateSingleQuoteStringLiteral(); ilit != nil {
 		if lit, _ := ilit.(*yak.TemplateSingleQuoteStringLiteralContext); lit != nil {
 			handleTemplate('\'', func() []StringAtom {
-				return lo.FilterMap(lit.AllTemplateSingleQupteStringAtom(), func(atom yak.ITemplateSingleQupteStringAtomContext, _ int) (StringAtom, bool) {
-					item, ok := atom.(*yak.TemplateSingleQupteStringAtomContext)
+				return lo.FilterMap(lit.AllTemplateSingleQuoteStringAtom(), func(atom yak.ITemplateSingleQuoteStringAtomContext, _ int) (StringAtom, bool) {
+					item, ok := atom.(*yak.TemplateSingleQuoteStringAtomContext)
 					return item, ok
 				})
 			})
@@ -526,12 +526,12 @@ ParseStrLit:
 	return nil
 }
 
-func (y *YakCompiler) VisitCharaterLiteral(raw yak.ICharaterLiteralContext) interface{} {
+func (y *YakCompiler) VisitCharacterLiteral(raw yak.ICharacterLiteralContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*yak.CharaterLiteralContext)
+	i, _ := raw.(*yak.CharacterLiteralContext)
 	if i == nil {
 		return nil
 	}

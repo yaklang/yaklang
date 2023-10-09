@@ -1381,7 +1381,7 @@ assert a == 3`
 	_formattest(code)
 }
 
-func TestNewExecutor_DeclearVariables(t *testing.T) {
+func TestNewExecutor_DeclareVariables(t *testing.T) {
 	code := `
 var a,b,c,d
 assert a == undefined

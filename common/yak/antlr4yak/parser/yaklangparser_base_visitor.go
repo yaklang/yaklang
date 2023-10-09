@@ -116,19 +116,19 @@ func (v *BaseYaklangParserVisitor) VisitAssignExpression(ctx *AssignExpressionCo
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitDeclearVariableExpressionStmt(ctx *DeclearVariableExpressionStmtContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitDeclareVariableExpressionStmt(ctx *DeclareVariableExpressionStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitDeclearVariableExpression(ctx *DeclearVariableExpressionContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitDeclareVariableExpression(ctx *DeclareVariableExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitDeclearVariableOnly(ctx *DeclearVariableOnlyContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitDeclareVariableOnly(ctx *DeclareVariableOnlyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitDeclearAndAssignExpression(ctx *DeclearAndAssignExpressionContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitDeclareAndAssignExpression(ctx *DeclareAndAssignExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -252,11 +252,11 @@ func (v *BaseYaklangParserVisitor) VisitTemplateStringLiteral(ctx *TemplateStrin
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitTemplateSingleQupteStringAtom(ctx *TemplateSingleQupteStringAtomContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitTemplateSingleQuoteStringAtom(ctx *TemplateSingleQuoteStringAtomContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitTemplateDoubleQupteStringAtom(ctx *TemplateDoubleQupteStringAtomContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitTemplateDoubleQuoteStringAtom(ctx *TemplateDoubleQuoteStringAtomContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -268,7 +268,7 @@ func (v *BaseYaklangParserVisitor) VisitBoolLiteral(ctx *BoolLiteralContext) int
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitCharaterLiteral(ctx *CharaterLiteralContext) interface{} {
+func (v *BaseYaklangParserVisitor) VisitCharacterLiteral(ctx *CharacterLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

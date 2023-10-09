@@ -64,8 +64,8 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 		return false
 	}
 
-	if s := i.DeclearVariableExpressionStmt(); s != nil {
-		y.VisitDeclearVariableExpressionStmt(s)
+	if s := i.DeclareVariableExpressionStmt(); s != nil {
+		y.VisitDeclareVariableExpressionStmt(s)
 		return false
 	}
 

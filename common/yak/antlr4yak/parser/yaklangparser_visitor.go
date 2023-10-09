@@ -89,17 +89,17 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#assignExpression.
 	VisitAssignExpression(ctx *AssignExpressionContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#declearVariableExpressionStmt.
-	VisitDeclearVariableExpressionStmt(ctx *DeclearVariableExpressionStmtContext) interface{}
+	// Visit a parse tree produced by YaklangParser#declareVariableExpressionStmt.
+	VisitDeclareVariableExpressionStmt(ctx *DeclareVariableExpressionStmtContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#declearVariableExpression.
-	VisitDeclearVariableExpression(ctx *DeclearVariableExpressionContext) interface{}
+	// Visit a parse tree produced by YaklangParser#declareVariableExpression.
+	VisitDeclareVariableExpression(ctx *DeclareVariableExpressionContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#declearVariableOnly.
-	VisitDeclearVariableOnly(ctx *DeclearVariableOnlyContext) interface{}
+	// Visit a parse tree produced by YaklangParser#declareVariableOnly.
+	VisitDeclareVariableOnly(ctx *DeclareVariableOnlyContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#declearAndAssignExpression.
-	VisitDeclearAndAssignExpression(ctx *DeclearAndAssignExpressionContext) interface{}
+	// Visit a parse tree produced by YaklangParser#declareAndAssignExpression.
+	VisitDeclareAndAssignExpression(ctx *DeclareAndAssignExpressionContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#leftExpressionList.
 	VisitLeftExpressionList(ctx *LeftExpressionListContext) interface{}
@@ -191,11 +191,11 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#templateStringLiteral.
 	VisitTemplateStringLiteral(ctx *TemplateStringLiteralContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#templateSingleQupteStringAtom.
-	VisitTemplateSingleQupteStringAtom(ctx *TemplateSingleQupteStringAtomContext) interface{}
+	// Visit a parse tree produced by YaklangParser#templateSingleQuoteStringAtom.
+	VisitTemplateSingleQuoteStringAtom(ctx *TemplateSingleQuoteStringAtomContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#templateDoubleQupteStringAtom.
-	VisitTemplateDoubleQupteStringAtom(ctx *TemplateDoubleQupteStringAtomContext) interface{}
+	// Visit a parse tree produced by YaklangParser#templateDoubleQuoteStringAtom.
+	VisitTemplateDoubleQuoteStringAtom(ctx *TemplateDoubleQuoteStringAtomContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#templateBackTickStringAtom.
 	VisitTemplateBackTickStringAtom(ctx *TemplateBackTickStringAtomContext) interface{}
@@ -203,8 +203,8 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#boolLiteral.
 	VisitBoolLiteral(ctx *BoolLiteralContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#charaterLiteral.
-	VisitCharaterLiteral(ctx *CharaterLiteralContext) interface{}
+	// Visit a parse tree produced by YaklangParser#characterLiteral.
+	VisitCharacterLiteral(ctx *CharacterLiteralContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#sliceLiteral.
 	VisitSliceLiteral(ctx *SliceLiteralContext) interface{}
