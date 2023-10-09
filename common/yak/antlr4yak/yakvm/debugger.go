@@ -107,7 +107,7 @@ type Debugger struct {
 
 type DebuggerState struct {
 	code                 *Code
-	lineInedx, codeIndex int
+	lineIndex, codeIndex int
 	stackLen             int
 	stateName            string
 	frame                *Frame
@@ -718,7 +718,7 @@ func (g *Debugger) StepNext() error {
 		stackLen = stackTrace.Len()
 	}
 	g.nextState = &DebuggerState{
-		lineInedx: g.linePointer,
+		lineIndex: g.linePointer,
 		frame:     g.frame,
 		stackLen:  stackLen,
 	}
@@ -729,7 +729,7 @@ func (g *Debugger) StepIn() error {
 	g.GetLineFirstCode(g.linePointer)
 	// 不会用到stackLen,所以设置为-1
 	g.stepInState = &DebuggerState{
-		lineInedx: g.linePointer,
+		lineIndex: g.linePointer,
 		frame:     g.frame,
 	}
 	return nil
@@ -741,7 +741,7 @@ func (g *Debugger) StepOut() error {
 	if stackTrace != nil && stackLen > 0 {
 		// 不会用到frame,所以设置为nil
 		g.stepoutState = &DebuggerState{
-			lineInedx: g.linePointer,
+			lineIndex: g.linePointer,
 			stackLen:  stackLen,
 		}
 		return nil
@@ -882,7 +882,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		if g.jmpState != nil && g.jmpState.codeIndex == codeIndex && g.jmpState.frame == frame {
 			g.jmpState = nil
 			g.HandleForStepNext()
-		} else if g.nextState.frame == frame && g.linePointer > g.nextState.lineInedx {
+		} else if g.nextState.frame == frame && g.linePointer > g.nextState.lineIndex {
 			// 如果debugger想要步过且确实在后面行,则回调
 			g.HandleForStepNext()
 		} else if stackTrace.Len() < g.nextState.stackLen {
@@ -905,7 +905,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 		// 在同一个线程下，如果debugger想要步进且frame不同，则回调
 		if g.stepInState.frame.ThreadID == frame.ThreadID && g.stepInState.frame != frame {
 			g.HandleForStepIn()
-		} else if g.stepInState.lineInedx < g.linePointer {
+		} else if g.stepInState.lineIndex < g.linePointer {
 			// 如果已经超出此行，则回调
 			g.HandleForStepIn()
 		}
@@ -1000,7 +1000,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 				// 2. hitCount存在并减为0
 				// 3. condition成立,hitCondition成立
 
-				g.description = fmt.Sprintf("Trigger condtional breakpoint [%s] at line %d in %s", cond, g.linePointer, g.StateName())
+				g.description = fmt.Sprintf("Trigger conditional breakpoint [%s] at line %d in %s", cond, g.linePointer, g.StateName())
 			} else {
 				// 普通断点
 				g.description = fmt.Sprintf("Trigger normal breakpoint at line %d in %s", g.linePointer, g.StateName())
@@ -1022,7 +1022,7 @@ func (g *Debugger) Callback() {
 	defer g.WaitGroupDone()
 	defer g.ResetStopReason()
 
-	// 处理stopOnEtry的情况
+	// 处理stopOnEntry的情况
 	if !g.started {
 		g.started = true
 		g.StartWGDone()
