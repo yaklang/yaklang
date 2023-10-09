@@ -1,4 +1,4 @@
-package ssa4yak
+package yak2ssa
 
 import (
 	"github.com/google/uuid"
@@ -38,7 +38,7 @@ func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	// declear Variable Expression
+	// declare Variable Expression
 	if s, ok := stmt.DeclareVariableExpressionStmt().(*yak.DeclareVariableExpressionStmtContext); ok {
 		b.buildDeclareVariableExpressionStmt(s)
 		return

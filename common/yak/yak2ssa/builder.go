@@ -1,7 +1,8 @@
-package ssa4yak
+package yak2ssa
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -75,9 +76,8 @@ func WithTypeMethod(table map[string]any) Option {
 func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in parseSSA", r)
-			// fmt.Println(src)
-			// debug.PrintStack()
+			fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
+			debug.PrintStack()
 			prog = nil
 		}
 	}()
