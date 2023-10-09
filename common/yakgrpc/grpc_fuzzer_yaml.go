@@ -26,6 +26,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	if err != nil {
 		return nil, utils.Errorf("cannot create yak template from yaml: %v", err)
 	}
+
 	// 转FuzzerRequest
 	for _, sequence := range yakTemplate.HTTPRequestSequences {
 		var fuzzerReqs []*ypb.FuzzerRequest
@@ -48,11 +49,15 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 						}
 						v = newv
 					}
-					if v == "Hostname" {
-						v = "www.example.com"
-					} else {
-						v = "{{" + v + "}}"
-					}
+					//switch v {
+					//case "Hostname":
+					//	v = "www.example.com"
+					//case "RootUrl":
+					//	v = "/"
+					//default:
+					//	v = "{{" + v + "}}"
+					//}
+					v = "{{" + v + "}}"
 					req = strings.ReplaceAll(req, k, v)
 				}
 				fuzzerReqs[i] = &ypb.FuzzerRequest{
@@ -198,12 +203,17 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			fuzzerRequest = append(fuzzerRequest, fuzzerReq)
 		}
 	}
+	warningMsgStr := ""
+	if err := yakTemplate.CheckTemplateRisks(); err != nil {
+		warningMsgStr = err.Error()
+	}
 	result := &ypb.ImportHTTPFuzzerTaskFromYamlResponse{
 		Requests: &ypb.FuzzerRequests{
 			Requests: fuzzerRequest,
 		},
 		Status: &ypb.GeneralResponse{
-			Ok: true,
+			Ok:     true,
+			Reason: warningMsgStr,
 		},
 	}
 	return result, nil
@@ -246,7 +256,6 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	}
 	// 生成请求桶
 	requestBulks := []*httptpl.YakRequestBulkConfig{}
-	hasMetcherOrExtractor := false
 	for _, request := range seq.GetRequests() {
 		vars := httptpl.NewVars()
 		for _, param := range request.Params {
@@ -340,9 +349,6 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 
 		bulk.CookieInherit = request.InheritCookies
 		bulk.InheritVariables = request.InheritVariables
-		if bulk.Matcher != nil || len(bulk.Extractor) > 0 {
-			hasMetcherOrExtractor = true
-		}
 		bulk.StopAtFirstMatch = request.StopAtFirstMatch
 		bulk.AfterRequested = request.AfterRequested
 		payloadsMap := map[string]any{}
@@ -350,19 +356,11 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			data := strings.Split(v.Data, "\n")
 			payloadsMap[k] = data
 		}
-		payloads, err := httptpl.GenerateYakPayloads(map[string]interface{}{"payloads": payloadsMap})
+		payloads, err := httptpl.NewYakPayloads(payloadsMap)
 		if err != nil {
 			log.Errorf("generate yak payloads error: %v", err)
 		}
 		bulk.Payloads = payloads
-	}
-	if !hasMetcherOrExtractor {
-		res.Ok = false
-		res.Reason = "no matcher or extractor"
-		return &ypb.ExportHTTPFuzzerTaskToYamlResponse{
-			YamlContent: "",
-			Status:      res,
-		}, nil
 	}
 	//
 	template := &httptpl.YakTemplate{}
@@ -375,11 +373,16 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	template.Severity = "low"
 	template.Description = "write your description here"
 	template.Reference = []string{"https://github.com/", "https://cve.mitre.org/"}
+	template.Sign = template.SignMainParams()
 	// 转换为Yaml
 	yamlContent, err := MarshalYakTemplateToYaml(template)
 	if err != nil {
 		res.Ok = false
 		res.Reason = err.Error()
+	} else {
+		if err := template.CheckTemplateRisks(); err != nil {
+			res.Reason = err.Error()
+		}
 	}
 	return &ypb.ExportHTTPFuzzerTaskToYamlResponse{
 		YamlContent: yamlContent,
@@ -612,7 +615,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	metadata.Set("max-request", maxRequest)
 	metadata.ForceSet("shodan-query", "")
 	metadata.Set("verified", true)
-	yakitInfo.Set("sign", y.SignMainParams()) // 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名
+	yakitInfo.Set("sign", y.Sign) // 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名
 
 	rootMap.AddEmptyLine()
 	rootMap.AddComment("Generated From WebFuzzer on " + time.Now().Format("2006-01-02 15:04:05"))
