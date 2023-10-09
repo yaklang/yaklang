@@ -28,8 +28,9 @@ func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) (result st
 			testURL = fmt.Sprintf("http://127.0.0.1%s", result)
 		}
 		u, err := url.Parse(testURL)
-		if err != nil {
+		if err != nil || u == nil {
 			result = ""
+			return
 		}
 		if len(u.Host) == 0 {
 			result = ""
