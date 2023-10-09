@@ -318,7 +318,7 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		vmstackLock.Unlock()
 	}
 	if lastPanic := v.recover(); lastPanic != nil {
-		lastPanic.contextInfos.Peek().(*PanicInfo).SetPostionVerbose(frame.GetVerbose())
+		lastPanic.contextInfos.Peek().(*PanicInfo).SetPositionVerbose(frame.GetVerbose())
 		if exitValue, ok := lastPanic.data.(*VMPanicSignal); ok {
 			panic(exitValue)
 		} else {
