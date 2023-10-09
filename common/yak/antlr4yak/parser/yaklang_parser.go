@@ -59,7 +59,7 @@ func yaklangparserParserInit() {
 		"RBrace", "Comma", "AssignEq", "Wavy", "ColonAssignEq", "PlusPlus",
 		"SubSub", "PlusEq", "MinusEq", "MulEq", "DivEq", "ModEq", "BitOrEq",
 		"LtLtEq", "GtGtEq", "AmpEq", "BitAndEq", "BitAndNotEq", "SemiColon",
-		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommontStart", "CommontEnd",
+		"Ellipsis", "EqGt", "LtGt", "Not", "Dot", "WS", "CommentStart", "CommentEnd",
 		"BackTickL", "COMMENT", "LINE_COMMENT", "LF", "EOS", "IntegerLiteral",
 		"FloatLiteral", "TemplateSingleQuoteStringStart", "TemplateDoubleQuoteStringStart",
 		"TemplateBackTickStringStart", "StringLiteral", "CharacterLiteral",
@@ -75,8 +75,8 @@ func yaklangparserParserInit() {
 		"goStmt", "assertStmt", "fallthroughStmt", "breakStmt", "continueStmt",
 		"returnStmt", "forStmt", "forStmtCond", "forFirstExpr", "forThirdExpr",
 		"forRangeStmt", "switchStmt", "ifStmt", "elseBlock", "block", "empty",
-		"inplaceAssignOperator", "assignExpression", "declearVariableExpressionStmt",
-		"declearVariableExpression", "declearVariableOnly", "declearAndAssignExpression",
+		"inplaceAssignOperator", "assignExpression", "declareVariableExpressionStmt",
+		"declareVariableExpression", "declareVariableOnly", "declareAndAssignExpression",
 		"leftExpressionList", "unaryOperator", "bitBinaryOperator", "additiveBinaryOperator",
 		"multiplicativeBinaryOperator", "comparisonBinaryOperator", "leftExpression",
 		"leftMemberCall", "leftSliceCall", "expression", "parenExpression",
@@ -85,8 +85,8 @@ func yaklangparserParserInit() {
 		"functionCall", "ordinaryArguments", "memberCall", "sliceCall", "literal",
 		"numericLiteral", "stringLiteral", "templateSingleQuoteStringLiteral",
 		"templateDoubleQuoteStringLiteral", "templateBackTickStringLiteral",
-		"templateStringLiteral", "templateSingleQupteStringAtom", "templateDoubleQupteStringAtom",
-		"templateBackTickStringAtom", "boolLiteral", "charaterLiteral", "sliceLiteral",
+		"templateStringLiteral", "templateSingleQuoteStringAtom", "templateDoubleQuoteStringAtom",
+		"templateBackTickStringAtom", "boolLiteral", "characterLiteral", "sliceLiteral",
 		"sliceTypedLiteral", "expressionList", "expressionListMultiline", "mapLiteral",
 		"mapTypedLiteral", "mapPairs", "mapPair", "ws", "eos",
 	}
@@ -714,8 +714,8 @@ const (
 	YaklangParserNot                                         = 91
 	YaklangParserDot                                         = 92
 	YaklangParserWS                                          = 93
-	YaklangParserCommontStart                                = 94
-	YaklangParserCommontEnd                                  = 95
+	YaklangParserCommentStart                                = 94
+	YaklangParserCommentEnd                                  = 95
 	YaklangParserBackTickL                                   = 96
 	YaklangParserCOMMENT                                     = 97
 	YaklangParserLINE_COMMENT                                = 98
@@ -768,10 +768,10 @@ const (
 	YaklangParserRULE_empty                            = 24
 	YaklangParserRULE_inplaceAssignOperator            = 25
 	YaklangParserRULE_assignExpression                 = 26
-	YaklangParserRULE_declearVariableExpressionStmt    = 27
-	YaklangParserRULE_declearVariableExpression        = 28
-	YaklangParserRULE_declearVariableOnly              = 29
-	YaklangParserRULE_declearAndAssignExpression       = 30
+	YaklangParserRULE_declareVariableExpressionStmt    = 27
+	YaklangParserRULE_declareVariableExpression        = 28
+	YaklangParserRULE_declareVariableOnly              = 29
+	YaklangParserRULE_declareAndAssignExpression       = 30
 	YaklangParserRULE_leftExpressionList               = 31
 	YaklangParserRULE_unaryOperator                    = 32
 	YaklangParserRULE_bitBinaryOperator                = 33
@@ -802,11 +802,11 @@ const (
 	YaklangParserRULE_templateDoubleQuoteStringLiteral = 58
 	YaklangParserRULE_templateBackTickStringLiteral    = 59
 	YaklangParserRULE_templateStringLiteral            = 60
-	YaklangParserRULE_templateSingleQupteStringAtom    = 61
-	YaklangParserRULE_templateDoubleQupteStringAtom    = 62
+	YaklangParserRULE_templateSingleQuoteStringAtom    = 61
+	YaklangParserRULE_templateDoubleQuoteStringAtom    = 62
 	YaklangParserRULE_templateBackTickStringAtom       = 63
 	YaklangParserRULE_boolLiteral                      = 64
-	YaklangParserRULE_charaterLiteral                  = 65
+	YaklangParserRULE_characterLiteral                 = 65
 	YaklangParserRULE_sliceLiteral                     = 66
 	YaklangParserRULE_sliceTypedLiteral                = 67
 	YaklangParserRULE_expressionList                   = 68
@@ -1206,10 +1206,10 @@ func (s *StatementContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *StatementContext) DeclearVariableExpressionStmt() IDeclearVariableExpressionStmtContext {
+func (s *StatementContext) DeclareVariableExpressionStmt() IDeclareVariableExpressionStmtContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IDeclearVariableExpressionStmtContext); ok {
+		if _, ok := ctx.(IDeclareVariableExpressionStmtContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -1219,7 +1219,7 @@ func (s *StatementContext) DeclearVariableExpressionStmt() IDeclearVariableExpre
 		return nil
 	}
 
-	return t.(IDeclearVariableExpressionStmtContext)
+	return t.(IDeclareVariableExpressionStmtContext)
 }
 
 func (s *StatementContext) AssignExpressionStmt() IAssignExpressionStmtContext {
@@ -1553,7 +1553,7 @@ func (p *YaklangParser) Statement() (localctx IStatementContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(169)
-			p.DeclearVariableExpressionStmt()
+			p.DeclareVariableExpressionStmt()
 		}
 		{
 			p.SetState(170)
@@ -5480,48 +5480,48 @@ func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
 	return localctx
 }
 
-// IDeclearVariableExpressionStmtContext is an interface to support dynamic dispatch.
-type IDeclearVariableExpressionStmtContext interface {
+// IDeclareVariableExpressionStmtContext is an interface to support dynamic dispatch.
+type IDeclareVariableExpressionStmtContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsDeclearVariableExpressionStmtContext differentiates from other interfaces.
-	IsDeclearVariableExpressionStmtContext()
+	// IsDeclareVariableExpressionStmtContext differentiates from other interfaces.
+	IsDeclareVariableExpressionStmtContext()
 }
 
-type DeclearVariableExpressionStmtContext struct {
+type DeclareVariableExpressionStmtContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyDeclearVariableExpressionStmtContext() *DeclearVariableExpressionStmtContext {
-	var p = new(DeclearVariableExpressionStmtContext)
+func NewEmptyDeclareVariableExpressionStmtContext() *DeclareVariableExpressionStmtContext {
+	var p = new(DeclareVariableExpressionStmtContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_declearVariableExpressionStmt
+	p.RuleIndex = YaklangParserRULE_declareVariableExpressionStmt
 	return p
 }
 
-func (*DeclearVariableExpressionStmtContext) IsDeclearVariableExpressionStmtContext() {}
+func (*DeclareVariableExpressionStmtContext) IsDeclareVariableExpressionStmtContext() {}
 
-func NewDeclearVariableExpressionStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclearVariableExpressionStmtContext {
-	var p = new(DeclearVariableExpressionStmtContext)
+func NewDeclareVariableExpressionStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableExpressionStmtContext {
+	var p = new(DeclareVariableExpressionStmtContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_declearVariableExpressionStmt
+	p.RuleIndex = YaklangParserRULE_declareVariableExpressionStmt
 
 	return p
 }
 
-func (s *DeclearVariableExpressionStmtContext) GetParser() antlr.Parser { return s.parser }
+func (s *DeclareVariableExpressionStmtContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *DeclearVariableExpressionStmtContext) DeclearVariableExpression() IDeclearVariableExpressionContext {
+func (s *DeclareVariableExpressionStmtContext) DeclareVariableExpression() IDeclareVariableExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IDeclearVariableExpressionContext); ok {
+		if _, ok := ctx.(IDeclareVariableExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5531,33 +5531,33 @@ func (s *DeclearVariableExpressionStmtContext) DeclearVariableExpression() IDecl
 		return nil
 	}
 
-	return t.(IDeclearVariableExpressionContext)
+	return t.(IDeclareVariableExpressionContext)
 }
 
-func (s *DeclearVariableExpressionStmtContext) GetRuleContext() antlr.RuleContext {
+func (s *DeclareVariableExpressionStmtContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *DeclearVariableExpressionStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *DeclareVariableExpressionStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclearVariableExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *DeclareVariableExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitDeclearVariableExpressionStmt(s)
+		return t.VisitDeclareVariableExpressionStmt(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) DeclearVariableExpressionStmt() (localctx IDeclearVariableExpressionStmtContext) {
+func (p *YaklangParser) DeclareVariableExpressionStmt() (localctx IDeclareVariableExpressionStmtContext) {
 	this := p
 	_ = this
 
-	localctx = NewDeclearVariableExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 54, YaklangParserRULE_declearVariableExpressionStmt)
+	localctx = NewDeclareVariableExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 54, YaklangParserRULE_declareVariableExpressionStmt)
 
 	defer func() {
 		p.ExitRule()
@@ -5578,54 +5578,54 @@ func (p *YaklangParser) DeclearVariableExpressionStmt() (localctx IDeclearVariab
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(411)
-		p.DeclearVariableExpression()
+		p.DeclareVariableExpression()
 	}
 
 	return localctx
 }
 
-// IDeclearVariableExpressionContext is an interface to support dynamic dispatch.
-type IDeclearVariableExpressionContext interface {
+// IDeclareVariableExpressionContext is an interface to support dynamic dispatch.
+type IDeclareVariableExpressionContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsDeclearVariableExpressionContext differentiates from other interfaces.
-	IsDeclearVariableExpressionContext()
+	// IsDeclareVariableExpressionContext differentiates from other interfaces.
+	IsDeclareVariableExpressionContext()
 }
 
-type DeclearVariableExpressionContext struct {
+type DeclareVariableExpressionContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyDeclearVariableExpressionContext() *DeclearVariableExpressionContext {
-	var p = new(DeclearVariableExpressionContext)
+func NewEmptyDeclareVariableExpressionContext() *DeclareVariableExpressionContext {
+	var p = new(DeclareVariableExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_declearVariableExpression
+	p.RuleIndex = YaklangParserRULE_declareVariableExpression
 	return p
 }
 
-func (*DeclearVariableExpressionContext) IsDeclearVariableExpressionContext() {}
+func (*DeclareVariableExpressionContext) IsDeclareVariableExpressionContext() {}
 
-func NewDeclearVariableExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclearVariableExpressionContext {
-	var p = new(DeclearVariableExpressionContext)
+func NewDeclareVariableExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableExpressionContext {
+	var p = new(DeclareVariableExpressionContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_declearVariableExpression
+	p.RuleIndex = YaklangParserRULE_declareVariableExpression
 
 	return p
 }
 
-func (s *DeclearVariableExpressionContext) GetParser() antlr.Parser { return s.parser }
+func (s *DeclareVariableExpressionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *DeclearVariableExpressionContext) DeclearVariableOnly() IDeclearVariableOnlyContext {
+func (s *DeclareVariableExpressionContext) DeclareVariableOnly() IDeclareVariableOnlyContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IDeclearVariableOnlyContext); ok {
+		if _, ok := ctx.(IDeclareVariableOnlyContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5635,13 +5635,13 @@ func (s *DeclearVariableExpressionContext) DeclearVariableOnly() IDeclearVariabl
 		return nil
 	}
 
-	return t.(IDeclearVariableOnlyContext)
+	return t.(IDeclareVariableOnlyContext)
 }
 
-func (s *DeclearVariableExpressionContext) DeclearAndAssignExpression() IDeclearAndAssignExpressionContext {
+func (s *DeclareVariableExpressionContext) DeclareAndAssignExpression() IDeclareAndAssignExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IDeclearAndAssignExpressionContext); ok {
+		if _, ok := ctx.(IDeclareAndAssignExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5651,33 +5651,33 @@ func (s *DeclearVariableExpressionContext) DeclearAndAssignExpression() IDeclear
 		return nil
 	}
 
-	return t.(IDeclearAndAssignExpressionContext)
+	return t.(IDeclareAndAssignExpressionContext)
 }
 
-func (s *DeclearVariableExpressionContext) GetRuleContext() antlr.RuleContext {
+func (s *DeclareVariableExpressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *DeclearVariableExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *DeclareVariableExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclearVariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *DeclareVariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitDeclearVariableExpression(s)
+		return t.VisitDeclareVariableExpression(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) DeclearVariableExpression() (localctx IDeclearVariableExpressionContext) {
+func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableExpressionContext) {
 	this := p
 	_ = this
 
-	localctx = NewDeclearVariableExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 56, YaklangParserRULE_declearVariableExpression)
+	localctx = NewDeclareVariableExpressionContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 56, YaklangParserRULE_declareVariableExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -5702,14 +5702,14 @@ func (p *YaklangParser) DeclearVariableExpression() (localctx IDeclearVariableEx
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(413)
-			p.DeclearVariableOnly()
+			p.DeclareVariableOnly()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(414)
-			p.DeclearAndAssignExpression()
+			p.DeclareAndAssignExpression()
 		}
 
 	}
@@ -5717,88 +5717,88 @@ func (p *YaklangParser) DeclearVariableExpression() (localctx IDeclearVariableEx
 	return localctx
 }
 
-// IDeclearVariableOnlyContext is an interface to support dynamic dispatch.
-type IDeclearVariableOnlyContext interface {
+// IDeclareVariableOnlyContext is an interface to support dynamic dispatch.
+type IDeclareVariableOnlyContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsDeclearVariableOnlyContext differentiates from other interfaces.
-	IsDeclearVariableOnlyContext()
+	// IsDeclareVariableOnlyContext differentiates from other interfaces.
+	IsDeclareVariableOnlyContext()
 }
 
-type DeclearVariableOnlyContext struct {
+type DeclareVariableOnlyContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyDeclearVariableOnlyContext() *DeclearVariableOnlyContext {
-	var p = new(DeclearVariableOnlyContext)
+func NewEmptyDeclareVariableOnlyContext() *DeclareVariableOnlyContext {
+	var p = new(DeclareVariableOnlyContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_declearVariableOnly
+	p.RuleIndex = YaklangParserRULE_declareVariableOnly
 	return p
 }
 
-func (*DeclearVariableOnlyContext) IsDeclearVariableOnlyContext() {}
+func (*DeclareVariableOnlyContext) IsDeclareVariableOnlyContext() {}
 
-func NewDeclearVariableOnlyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclearVariableOnlyContext {
-	var p = new(DeclearVariableOnlyContext)
+func NewDeclareVariableOnlyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableOnlyContext {
+	var p = new(DeclareVariableOnlyContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_declearVariableOnly
+	p.RuleIndex = YaklangParserRULE_declareVariableOnly
 
 	return p
 }
 
-func (s *DeclearVariableOnlyContext) GetParser() antlr.Parser { return s.parser }
+func (s *DeclareVariableOnlyContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *DeclearVariableOnlyContext) Var() antlr.TerminalNode {
+func (s *DeclareVariableOnlyContext) Var() antlr.TerminalNode {
 	return s.GetToken(YaklangParserVar, 0)
 }
 
-func (s *DeclearVariableOnlyContext) AllIdentifier() []antlr.TerminalNode {
+func (s *DeclareVariableOnlyContext) AllIdentifier() []antlr.TerminalNode {
 	return s.GetTokens(YaklangParserIdentifier)
 }
 
-func (s *DeclearVariableOnlyContext) Identifier(i int) antlr.TerminalNode {
+func (s *DeclareVariableOnlyContext) Identifier(i int) antlr.TerminalNode {
 	return s.GetToken(YaklangParserIdentifier, i)
 }
 
-func (s *DeclearVariableOnlyContext) AllComma() []antlr.TerminalNode {
+func (s *DeclareVariableOnlyContext) AllComma() []antlr.TerminalNode {
 	return s.GetTokens(YaklangParserComma)
 }
 
-func (s *DeclearVariableOnlyContext) Comma(i int) antlr.TerminalNode {
+func (s *DeclareVariableOnlyContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(YaklangParserComma, i)
 }
 
-func (s *DeclearVariableOnlyContext) GetRuleContext() antlr.RuleContext {
+func (s *DeclareVariableOnlyContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *DeclearVariableOnlyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *DeclareVariableOnlyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclearVariableOnlyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *DeclareVariableOnlyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitDeclearVariableOnly(s)
+		return t.VisitDeclareVariableOnly(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) DeclearVariableOnly() (localctx IDeclearVariableOnlyContext) {
+func (p *YaklangParser) DeclareVariableOnly() (localctx IDeclareVariableOnlyContext) {
 	this := p
 	_ = this
 
-	localctx = NewDeclearVariableOnlyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 58, YaklangParserRULE_declearVariableOnly)
+	localctx = NewDeclareVariableOnlyContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 58, YaklangParserRULE_declareVariableOnly)
 
 	defer func() {
 		p.ExitRule()
@@ -5851,49 +5851,49 @@ func (p *YaklangParser) DeclearVariableOnly() (localctx IDeclearVariableOnlyCont
 	return localctx
 }
 
-// IDeclearAndAssignExpressionContext is an interface to support dynamic dispatch.
-type IDeclearAndAssignExpressionContext interface {
+// IDeclareAndAssignExpressionContext is an interface to support dynamic dispatch.
+type IDeclareAndAssignExpressionContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsDeclearAndAssignExpressionContext differentiates from other interfaces.
-	IsDeclearAndAssignExpressionContext()
+	// IsDeclareAndAssignExpressionContext differentiates from other interfaces.
+	IsDeclareAndAssignExpressionContext()
 }
 
-type DeclearAndAssignExpressionContext struct {
+type DeclareAndAssignExpressionContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyDeclearAndAssignExpressionContext() *DeclearAndAssignExpressionContext {
-	var p = new(DeclearAndAssignExpressionContext)
+func NewEmptyDeclareAndAssignExpressionContext() *DeclareAndAssignExpressionContext {
+	var p = new(DeclareAndAssignExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_declearAndAssignExpression
+	p.RuleIndex = YaklangParserRULE_declareAndAssignExpression
 	return p
 }
 
-func (*DeclearAndAssignExpressionContext) IsDeclearAndAssignExpressionContext() {}
+func (*DeclareAndAssignExpressionContext) IsDeclareAndAssignExpressionContext() {}
 
-func NewDeclearAndAssignExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclearAndAssignExpressionContext {
-	var p = new(DeclearAndAssignExpressionContext)
+func NewDeclareAndAssignExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareAndAssignExpressionContext {
+	var p = new(DeclareAndAssignExpressionContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_declearAndAssignExpression
+	p.RuleIndex = YaklangParserRULE_declareAndAssignExpression
 
 	return p
 }
 
-func (s *DeclearAndAssignExpressionContext) GetParser() antlr.Parser { return s.parser }
+func (s *DeclareAndAssignExpressionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *DeclearAndAssignExpressionContext) Var() antlr.TerminalNode {
+func (s *DeclareAndAssignExpressionContext) Var() antlr.TerminalNode {
 	return s.GetToken(YaklangParserVar, 0)
 }
 
-func (s *DeclearAndAssignExpressionContext) LeftExpressionList() ILeftExpressionListContext {
+func (s *DeclareAndAssignExpressionContext) LeftExpressionList() ILeftExpressionListContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(ILeftExpressionListContext); ok {
@@ -5909,7 +5909,7 @@ func (s *DeclearAndAssignExpressionContext) LeftExpressionList() ILeftExpression
 	return t.(ILeftExpressionListContext)
 }
 
-func (s *DeclearAndAssignExpressionContext) ExpressionList() IExpressionListContext {
+func (s *DeclareAndAssignExpressionContext) ExpressionList() IExpressionListContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IExpressionListContext); ok {
@@ -5925,38 +5925,38 @@ func (s *DeclearAndAssignExpressionContext) ExpressionList() IExpressionListCont
 	return t.(IExpressionListContext)
 }
 
-func (s *DeclearAndAssignExpressionContext) AssignEq() antlr.TerminalNode {
+func (s *DeclareAndAssignExpressionContext) AssignEq() antlr.TerminalNode {
 	return s.GetToken(YaklangParserAssignEq, 0)
 }
 
-func (s *DeclearAndAssignExpressionContext) ColonAssignEq() antlr.TerminalNode {
+func (s *DeclareAndAssignExpressionContext) ColonAssignEq() antlr.TerminalNode {
 	return s.GetToken(YaklangParserColonAssignEq, 0)
 }
 
-func (s *DeclearAndAssignExpressionContext) GetRuleContext() antlr.RuleContext {
+func (s *DeclareAndAssignExpressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *DeclearAndAssignExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *DeclareAndAssignExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclearAndAssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *DeclareAndAssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitDeclearAndAssignExpression(s)
+		return t.VisitDeclareAndAssignExpression(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) DeclearAndAssignExpression() (localctx IDeclearAndAssignExpressionContext) {
+func (p *YaklangParser) DeclareAndAssignExpression() (localctx IDeclareAndAssignExpressionContext) {
 	this := p
 	_ = this
 
-	localctx = NewDeclearAndAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 60, YaklangParserRULE_declearAndAssignExpression)
+	localctx = NewDeclareAndAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 60, YaklangParserRULE_declareAndAssignExpression)
 	var _la int
 
 	defer func() {
@@ -10569,10 +10569,10 @@ func (s *LiteralContext) NumericLiteral() INumericLiteralContext {
 	return t.(INumericLiteralContext)
 }
 
-func (s *LiteralContext) CharaterLiteral() ICharaterLiteralContext {
+func (s *LiteralContext) CharacterLiteral() ICharacterLiteralContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ICharaterLiteralContext); ok {
+		if _, ok := ctx.(ICharacterLiteralContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -10582,7 +10582,7 @@ func (s *LiteralContext) CharaterLiteral() ICharaterLiteralContext {
 		return nil
 	}
 
-	return t.(ICharaterLiteralContext)
+	return t.(ICharacterLiteralContext)
 }
 
 func (s *LiteralContext) UndefinedLiteral() antlr.TerminalNode {
@@ -10742,7 +10742,7 @@ func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(822)
-			p.CharaterLiteral()
+			p.CharacterLiteral()
 		}
 
 	case 5:
@@ -11041,20 +11041,20 @@ func (s *TemplateSingleQuoteStringLiteralContext) TemplateSingleQuoteStringChara
 	return s.GetToken(YaklangParserTemplateSingleQuoteStringCharacterStringEnd, 0)
 }
 
-func (s *TemplateSingleQuoteStringLiteralContext) AllTemplateSingleQupteStringAtom() []ITemplateSingleQupteStringAtomContext {
+func (s *TemplateSingleQuoteStringLiteralContext) AllTemplateSingleQuoteStringAtom() []ITemplateSingleQuoteStringAtomContext {
 	children := s.GetChildren()
 	len := 0
 	for _, ctx := range children {
-		if _, ok := ctx.(ITemplateSingleQupteStringAtomContext); ok {
+		if _, ok := ctx.(ITemplateSingleQuoteStringAtomContext); ok {
 			len++
 		}
 	}
 
-	tst := make([]ITemplateSingleQupteStringAtomContext, len)
+	tst := make([]ITemplateSingleQuoteStringAtomContext, len)
 	i := 0
 	for _, ctx := range children {
-		if t, ok := ctx.(ITemplateSingleQupteStringAtomContext); ok {
-			tst[i] = t.(ITemplateSingleQupteStringAtomContext)
+		if t, ok := ctx.(ITemplateSingleQuoteStringAtomContext); ok {
+			tst[i] = t.(ITemplateSingleQuoteStringAtomContext)
 			i++
 		}
 	}
@@ -11062,11 +11062,11 @@ func (s *TemplateSingleQuoteStringLiteralContext) AllTemplateSingleQupteStringAt
 	return tst
 }
 
-func (s *TemplateSingleQuoteStringLiteralContext) TemplateSingleQupteStringAtom(i int) ITemplateSingleQupteStringAtomContext {
+func (s *TemplateSingleQuoteStringLiteralContext) TemplateSingleQuoteStringAtom(i int) ITemplateSingleQuoteStringAtomContext {
 	var t antlr.RuleContext
 	j := 0
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ITemplateSingleQupteStringAtomContext); ok {
+		if _, ok := ctx.(ITemplateSingleQuoteStringAtomContext); ok {
 			if j == i {
 				t = ctx.(antlr.RuleContext)
 				break
@@ -11079,7 +11079,7 @@ func (s *TemplateSingleQuoteStringLiteralContext) TemplateSingleQupteStringAtom(
 		return nil
 	}
 
-	return t.(ITemplateSingleQupteStringAtomContext)
+	return t.(ITemplateSingleQuoteStringAtomContext)
 }
 
 func (s *TemplateSingleQuoteStringLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -11136,7 +11136,7 @@ func (p *YaklangParser) TemplateSingleQuoteStringLiteral() (localctx ITemplateSi
 	for _la == YaklangParserTemplateSingleQuoteStringCharacter || _la == YaklangParserTemplateSingleQuoteStringStartExpression {
 		{
 			p.SetState(837)
-			p.TemplateSingleQupteStringAtom()
+			p.TemplateSingleQuoteStringAtom()
 		}
 
 		p.SetState(842)
@@ -11197,20 +11197,20 @@ func (s *TemplateDoubleQuoteStringLiteralContext) TemplateDoubleQuoteStringChara
 	return s.GetToken(YaklangParserTemplateDoubleQuoteStringCharacterStringEnd, 0)
 }
 
-func (s *TemplateDoubleQuoteStringLiteralContext) AllTemplateDoubleQupteStringAtom() []ITemplateDoubleQupteStringAtomContext {
+func (s *TemplateDoubleQuoteStringLiteralContext) AllTemplateDoubleQuoteStringAtom() []ITemplateDoubleQuoteStringAtomContext {
 	children := s.GetChildren()
 	len := 0
 	for _, ctx := range children {
-		if _, ok := ctx.(ITemplateDoubleQupteStringAtomContext); ok {
+		if _, ok := ctx.(ITemplateDoubleQuoteStringAtomContext); ok {
 			len++
 		}
 	}
 
-	tst := make([]ITemplateDoubleQupteStringAtomContext, len)
+	tst := make([]ITemplateDoubleQuoteStringAtomContext, len)
 	i := 0
 	for _, ctx := range children {
-		if t, ok := ctx.(ITemplateDoubleQupteStringAtomContext); ok {
-			tst[i] = t.(ITemplateDoubleQupteStringAtomContext)
+		if t, ok := ctx.(ITemplateDoubleQuoteStringAtomContext); ok {
+			tst[i] = t.(ITemplateDoubleQuoteStringAtomContext)
 			i++
 		}
 	}
@@ -11218,11 +11218,11 @@ func (s *TemplateDoubleQuoteStringLiteralContext) AllTemplateDoubleQupteStringAt
 	return tst
 }
 
-func (s *TemplateDoubleQuoteStringLiteralContext) TemplateDoubleQupteStringAtom(i int) ITemplateDoubleQupteStringAtomContext {
+func (s *TemplateDoubleQuoteStringLiteralContext) TemplateDoubleQuoteStringAtom(i int) ITemplateDoubleQuoteStringAtomContext {
 	var t antlr.RuleContext
 	j := 0
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ITemplateDoubleQupteStringAtomContext); ok {
+		if _, ok := ctx.(ITemplateDoubleQuoteStringAtomContext); ok {
 			if j == i {
 				t = ctx.(antlr.RuleContext)
 				break
@@ -11235,7 +11235,7 @@ func (s *TemplateDoubleQuoteStringLiteralContext) TemplateDoubleQupteStringAtom(
 		return nil
 	}
 
-	return t.(ITemplateDoubleQupteStringAtomContext)
+	return t.(ITemplateDoubleQuoteStringAtomContext)
 }
 
 func (s *TemplateDoubleQuoteStringLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -11292,7 +11292,7 @@ func (p *YaklangParser) TemplateDoubleQuoteStringLiteral() (localctx ITemplateDo
 	for _la == YaklangParserTemplateDoubleQuoteStringCharacter || _la == YaklangParserTemplateDoubleQuoteStringStartExpression {
 		{
 			p.SetState(846)
-			p.TemplateDoubleQupteStringAtom()
+			p.TemplateDoubleQuoteStringAtom()
 		}
 
 		p.SetState(851)
@@ -11622,57 +11622,57 @@ func (p *YaklangParser) TemplateStringLiteral() (localctx ITemplateStringLiteral
 	return localctx
 }
 
-// ITemplateSingleQupteStringAtomContext is an interface to support dynamic dispatch.
-type ITemplateSingleQupteStringAtomContext interface {
+// ITemplateSingleQuoteStringAtomContext is an interface to support dynamic dispatch.
+type ITemplateSingleQuoteStringAtomContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsTemplateSingleQupteStringAtomContext differentiates from other interfaces.
-	IsTemplateSingleQupteStringAtomContext()
+	// IsTemplateSingleQuoteStringAtomContext differentiates from other interfaces.
+	IsTemplateSingleQuoteStringAtomContext()
 }
 
-type TemplateSingleQupteStringAtomContext struct {
+type TemplateSingleQuoteStringAtomContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyTemplateSingleQupteStringAtomContext() *TemplateSingleQupteStringAtomContext {
-	var p = new(TemplateSingleQupteStringAtomContext)
+func NewEmptyTemplateSingleQuoteStringAtomContext() *TemplateSingleQuoteStringAtomContext {
+	var p = new(TemplateSingleQuoteStringAtomContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_templateSingleQupteStringAtom
+	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringAtom
 	return p
 }
 
-func (*TemplateSingleQupteStringAtomContext) IsTemplateSingleQupteStringAtomContext() {}
+func (*TemplateSingleQuoteStringAtomContext) IsTemplateSingleQuoteStringAtomContext() {}
 
-func NewTemplateSingleQupteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateSingleQupteStringAtomContext {
-	var p = new(TemplateSingleQupteStringAtomContext)
+func NewTemplateSingleQuoteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateSingleQuoteStringAtomContext {
+	var p = new(TemplateSingleQuoteStringAtomContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_templateSingleQupteStringAtom
+	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringAtom
 
 	return p
 }
 
-func (s *TemplateSingleQupteStringAtomContext) GetParser() antlr.Parser { return s.parser }
+func (s *TemplateSingleQuoteStringAtomContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *TemplateSingleQupteStringAtomContext) AllTemplateSingleQuoteStringCharacter() []antlr.TerminalNode {
+func (s *TemplateSingleQuoteStringAtomContext) AllTemplateSingleQuoteStringCharacter() []antlr.TerminalNode {
 	return s.GetTokens(YaklangParserTemplateSingleQuoteStringCharacter)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) TemplateSingleQuoteStringCharacter(i int) antlr.TerminalNode {
+func (s *TemplateSingleQuoteStringAtomContext) TemplateSingleQuoteStringCharacter(i int) antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateSingleQuoteStringCharacter, i)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) TemplateSingleQuoteStringStartExpression() antlr.TerminalNode {
+func (s *TemplateSingleQuoteStringAtomContext) TemplateSingleQuoteStringStartExpression() antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateSingleQuoteStringStartExpression, 0)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) Expression() IExpressionContext {
+func (s *TemplateSingleQuoteStringAtomContext) Expression() IExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IExpressionContext); ok {
@@ -11688,34 +11688,34 @@ func (s *TemplateSingleQupteStringAtomContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) TemplateCloseBrace() antlr.TerminalNode {
+func (s *TemplateSingleQuoteStringAtomContext) TemplateCloseBrace() antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateCloseBrace, 0)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) GetRuleContext() antlr.RuleContext {
+func (s *TemplateSingleQuoteStringAtomContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *TemplateSingleQupteStringAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *TemplateSingleQuoteStringAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateSingleQupteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *TemplateSingleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitTemplateSingleQupteStringAtom(s)
+		return t.VisitTemplateSingleQuoteStringAtom(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) TemplateSingleQupteStringAtom() (localctx ITemplateSingleQupteStringAtomContext) {
+func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingleQuoteStringAtomContext) {
 	this := p
 	_ = this
 
-	localctx = NewTemplateSingleQupteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 122, YaklangParserRULE_templateSingleQupteStringAtom)
+	localctx = NewTemplateSingleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 122, YaklangParserRULE_templateSingleQuoteStringAtom)
 
 	defer func() {
 		p.ExitRule()
@@ -11783,57 +11783,57 @@ func (p *YaklangParser) TemplateSingleQupteStringAtom() (localctx ITemplateSingl
 	return localctx
 }
 
-// ITemplateDoubleQupteStringAtomContext is an interface to support dynamic dispatch.
-type ITemplateDoubleQupteStringAtomContext interface {
+// ITemplateDoubleQuoteStringAtomContext is an interface to support dynamic dispatch.
+type ITemplateDoubleQuoteStringAtomContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsTemplateDoubleQupteStringAtomContext differentiates from other interfaces.
-	IsTemplateDoubleQupteStringAtomContext()
+	// IsTemplateDoubleQuoteStringAtomContext differentiates from other interfaces.
+	IsTemplateDoubleQuoteStringAtomContext()
 }
 
-type TemplateDoubleQupteStringAtomContext struct {
+type TemplateDoubleQuoteStringAtomContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyTemplateDoubleQupteStringAtomContext() *TemplateDoubleQupteStringAtomContext {
-	var p = new(TemplateDoubleQupteStringAtomContext)
+func NewEmptyTemplateDoubleQuoteStringAtomContext() *TemplateDoubleQuoteStringAtomContext {
+	var p = new(TemplateDoubleQuoteStringAtomContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_templateDoubleQupteStringAtom
+	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringAtom
 	return p
 }
 
-func (*TemplateDoubleQupteStringAtomContext) IsTemplateDoubleQupteStringAtomContext() {}
+func (*TemplateDoubleQuoteStringAtomContext) IsTemplateDoubleQuoteStringAtomContext() {}
 
-func NewTemplateDoubleQupteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateDoubleQupteStringAtomContext {
-	var p = new(TemplateDoubleQupteStringAtomContext)
+func NewTemplateDoubleQuoteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateDoubleQuoteStringAtomContext {
+	var p = new(TemplateDoubleQuoteStringAtomContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_templateDoubleQupteStringAtom
+	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringAtom
 
 	return p
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) GetParser() antlr.Parser { return s.parser }
+func (s *TemplateDoubleQuoteStringAtomContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *TemplateDoubleQupteStringAtomContext) AllTemplateDoubleQuoteStringCharacter() []antlr.TerminalNode {
+func (s *TemplateDoubleQuoteStringAtomContext) AllTemplateDoubleQuoteStringCharacter() []antlr.TerminalNode {
 	return s.GetTokens(YaklangParserTemplateDoubleQuoteStringCharacter)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) TemplateDoubleQuoteStringCharacter(i int) antlr.TerminalNode {
+func (s *TemplateDoubleQuoteStringAtomContext) TemplateDoubleQuoteStringCharacter(i int) antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateDoubleQuoteStringCharacter, i)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) TemplateDoubleQuoteStringStartExpression() antlr.TerminalNode {
+func (s *TemplateDoubleQuoteStringAtomContext) TemplateDoubleQuoteStringStartExpression() antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateDoubleQuoteStringStartExpression, 0)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) Expression() IExpressionContext {
+func (s *TemplateDoubleQuoteStringAtomContext) Expression() IExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IExpressionContext); ok {
@@ -11849,34 +11849,34 @@ func (s *TemplateDoubleQupteStringAtomContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) TemplateCloseBrace() antlr.TerminalNode {
+func (s *TemplateDoubleQuoteStringAtomContext) TemplateCloseBrace() antlr.TerminalNode {
 	return s.GetToken(YaklangParserTemplateCloseBrace, 0)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) GetRuleContext() antlr.RuleContext {
+func (s *TemplateDoubleQuoteStringAtomContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *TemplateDoubleQuoteStringAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateDoubleQupteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *TemplateDoubleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitTemplateDoubleQupteStringAtom(s)
+		return t.VisitTemplateDoubleQuoteStringAtom(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) TemplateDoubleQupteStringAtom() (localctx ITemplateDoubleQupteStringAtomContext) {
+func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubleQuoteStringAtomContext) {
 	this := p
 	_ = this
 
-	localctx = NewTemplateDoubleQupteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 124, YaklangParserRULE_templateDoubleQupteStringAtom)
+	localctx = NewTemplateDoubleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 124, YaklangParserRULE_templateDoubleQuoteStringAtom)
 
 	defer func() {
 		p.ExitRule()
@@ -12209,72 +12209,72 @@ func (p *YaklangParser) BoolLiteral() (localctx IBoolLiteralContext) {
 	return localctx
 }
 
-// ICharaterLiteralContext is an interface to support dynamic dispatch.
-type ICharaterLiteralContext interface {
+// ICharacterLiteralContext is an interface to support dynamic dispatch.
+type ICharacterLiteralContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsCharaterLiteralContext differentiates from other interfaces.
-	IsCharaterLiteralContext()
+	// IsCharacterLiteralContext differentiates from other interfaces.
+	IsCharacterLiteralContext()
 }
 
-type CharaterLiteralContext struct {
+type CharacterLiteralContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyCharaterLiteralContext() *CharaterLiteralContext {
-	var p = new(CharaterLiteralContext)
+func NewEmptyCharacterLiteralContext() *CharacterLiteralContext {
+	var p = new(CharacterLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = YaklangParserRULE_charaterLiteral
+	p.RuleIndex = YaklangParserRULE_characterLiteral
 	return p
 }
 
-func (*CharaterLiteralContext) IsCharaterLiteralContext() {}
+func (*CharacterLiteralContext) IsCharacterLiteralContext() {}
 
-func NewCharaterLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CharaterLiteralContext {
-	var p = new(CharaterLiteralContext)
+func NewCharacterLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CharacterLiteralContext {
+	var p = new(CharacterLiteralContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = YaklangParserRULE_charaterLiteral
+	p.RuleIndex = YaklangParserRULE_characterLiteral
 
 	return p
 }
 
-func (s *CharaterLiteralContext) GetParser() antlr.Parser { return s.parser }
+func (s *CharacterLiteralContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *CharaterLiteralContext) CharacterLiteral() antlr.TerminalNode {
+func (s *CharacterLiteralContext) CharacterLiteral() antlr.TerminalNode {
 	return s.GetToken(YaklangParserCharacterLiteral, 0)
 }
 
-func (s *CharaterLiteralContext) GetRuleContext() antlr.RuleContext {
+func (s *CharacterLiteralContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *CharaterLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *CharacterLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CharaterLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *CharacterLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case YaklangParserVisitor:
-		return t.VisitCharaterLiteral(s)
+		return t.VisitCharacterLiteral(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *YaklangParser) CharaterLiteral() (localctx ICharaterLiteralContext) {
+func (p *YaklangParser) CharacterLiteral() (localctx ICharacterLiteralContext) {
 	this := p
 	_ = this
 
-	localctx = NewCharaterLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 130, YaklangParserRULE_charaterLiteral)
+	localctx = NewCharacterLiteralContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 130, YaklangParserRULE_characterLiteral)
 
 	defer func() {
 		p.ExitRule()

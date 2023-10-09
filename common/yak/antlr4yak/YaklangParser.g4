@@ -19,7 +19,7 @@ statement
     : lineCommentStmt eos
 
     // 声明变量的优先级比表达式高，这个规则匹配应该是 var a,d,b,c 只能支持 Var，特殊语法
-    | declearVariableExpressionStmt eos
+    | declareVariableExpressionStmt eos
 
     // var(...) 或者 var 单独使用，作为类型，expression 是右值
     | assignExpressionStmt eos
@@ -103,10 +103,10 @@ assignExpression
     ;
 
 // 变量声明语句，和赋值不一样
-declearVariableExpressionStmt: declearVariableExpression;
-declearVariableExpression: declearVariableOnly | declearAndAssignExpression;
-declearVariableOnly: Var Identifier (',' Identifier) *;
-declearAndAssignExpression: Var leftExpressionList ('=' | ':=') expressionList;
+declareVariableExpressionStmt: declareVariableExpression;
+declareVariableExpression: declareVariableOnly | declareAndAssignExpression;
+declareVariableOnly: Var Identifier (',' Identifier) *;
+declareAndAssignExpression: Var leftExpressionList ('=' | ':=') expressionList;
 
 leftExpressionList
     : leftExpression (',' leftExpression) *
@@ -244,7 +244,7 @@ literal
     : templateStringLiteral
     | stringLiteral
     | numericLiteral
-    | charaterLiteral
+    | characterLiteral
     | UndefinedLiteral
     | NilLiteral
     | boolLiteral
@@ -262,10 +262,10 @@ stringLiteral
     : StringLiteral
     ;
 templateSingleQuoteStringLiteral
-    : TemplateSingleQuoteStringStart (templateSingleQupteStringAtom)* TemplateSingleQuoteStringCharacterStringEnd
+    : TemplateSingleQuoteStringStart (templateSingleQuoteStringAtom)* TemplateSingleQuoteStringCharacterStringEnd
     ;
 templateDoubleQuoteStringLiteral
-    : TemplateDoubleQuoteStringStart (templateDoubleQupteStringAtom)* TemplateDoubleQuoteStringCharacterStringEnd
+    : TemplateDoubleQuoteStringStart (templateDoubleQuoteStringAtom)* TemplateDoubleQuoteStringCharacterStringEnd
     ;
 templateBackTickStringLiteral
     : TemplateBackTickStringStart (templateBackTickStringAtom)* TemplateBackTickStringCharacterStringEnd
@@ -273,11 +273,11 @@ templateBackTickStringLiteral
 templateStringLiteral
     : templateSingleQuoteStringLiteral | templateDoubleQuoteStringLiteral | templateBackTickStringLiteral 
     ;
-templateSingleQupteStringAtom
+templateSingleQuoteStringAtom
     :TemplateSingleQuoteStringCharacter+
     | TemplateSingleQuoteStringStartExpression expression TemplateCloseBrace
     ;
-templateDoubleQupteStringAtom
+templateDoubleQuoteStringAtom
     :TemplateDoubleQuoteStringCharacter+
     | TemplateDoubleQuoteStringStartExpression expression TemplateCloseBrace
     ;
@@ -288,7 +288,7 @@ templateBackTickStringAtom
 boolLiteral
     : ('true' | 'false')
     ;
-charaterLiteral: CharacterLiteral;
+characterLiteral: CharacterLiteral;
 
 sliceLiteral: '[' ws* expressionListMultiline? ws* ']';
 

@@ -38,8 +38,8 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		return b.EmitUndefine(stmt.GetText())
 	} else if stmt.NilLiteral() != nil {
 		return ssa.NewConst(nil)
-	} else if stmt.CharaterLiteral() != nil {
-		lit := stmt.CharaterLiteral().GetText()
+	} else if stmt.CharacterLiteral() != nil {
+		lit := stmt.CharacterLiteral().GetText()
 		var s string
 		var err error
 		if lit == "'\\''" {
@@ -57,7 +57,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 			return ssa.NewConst(byte(runeChar))
 		} else {
 			// unbelievable
-			log.Warnf("charater literal is rune: %s", stmt.CharaterLiteral().GetText())
+			log.Warnf("Character literal is rune: %s", stmt.CharacterLiteral().GetText())
 			return ssa.NewConst(runeChar)
 		}
 	} else if s := stmt.MapLiteral(); s != nil {
@@ -266,9 +266,9 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 
 	if s, ok := stmt.TemplateDoubleQuoteStringLiteral().(*yak.TemplateDoubleQuoteStringLiteralContext); ok {
 		handlerTemplate('"', lo.FilterMap(
-			s.AllTemplateDoubleQupteStringAtom(),
-			func(atom yak.ITemplateDoubleQupteStringAtomContext, _ int) (StringAtom, bool) {
-				item, ok := atom.(*yak.TemplateDoubleQupteStringAtomContext)
+			s.AllTemplateDoubleQuoteStringAtom(),
+			func(atom yak.ITemplateDoubleQuoteStringAtomContext, _ int) (StringAtom, bool) {
+				item, ok := atom.(*yak.TemplateDoubleQuoteStringAtomContext)
 				return item, ok
 			}))
 	} else if s, ok := stmt.TemplateBackTickStringLiteral().(*yak.TemplateBackTickStringLiteralContext); ok {
@@ -280,9 +280,9 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 			}))
 	} else if s, ok := stmt.TemplateSingleQuoteStringLiteral().(*yak.TemplateSingleQuoteStringLiteralContext); ok {
 		handlerTemplate('\'', lo.FilterMap(
-			s.AllTemplateSingleQupteStringAtom(),
-			func(atom yak.ITemplateSingleQupteStringAtomContext, _ int) (StringAtom, bool) {
-				item, ok := atom.(*yak.TemplateSingleQupteStringAtomContext)
+			s.AllTemplateSingleQuoteStringAtom(),
+			func(atom yak.ITemplateSingleQuoteStringAtomContext, _ int) (StringAtom, bool) {
+				item, ok := atom.(*yak.TemplateSingleQuoteStringAtomContext)
 				return item, ok
 			}))
 	} else {
