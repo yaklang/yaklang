@@ -39,8 +39,8 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// declear Variable Expression
-	if s, ok := stmt.DeclearVariableExpressionStmt().(*yak.DeclearVariableExpressionStmtContext); ok {
-		b.buildDeclearVariableExpressionStmt(s)
+	if s, ok := stmt.DeclareVariableExpressionStmt().(*yak.DeclareVariableExpressionStmtContext); ok {
+		b.buildDeclareVariableExpressionStmt(s)
 		return
 	}
 
@@ -715,28 +715,28 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	return nil
 }
 
-// declear variable expression
-func (b *astbuilder) buildDeclearVariableExpressionStmt(stmt *yak.DeclearVariableExpressionStmtContext) {
+// declare variable expression
+func (b *astbuilder) buildDeclareVariableExpressionStmt(stmt *yak.DeclareVariableExpressionStmtContext) {
 	// recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	// defer recoverRange()
-	if s, ok := stmt.DeclearVariableExpression().(*yak.DeclearVariableExpressionContext); ok {
-		b.buildDeclearVariableExpression(s)
+	if s, ok := stmt.DeclareVariableExpression().(*yak.DeclareVariableExpressionContext); ok {
+		b.buildDeclareVariableExpression(s)
 	}
 }
 
-func (b *astbuilder) buildDeclearVariableExpression(stmt *yak.DeclearVariableExpressionContext) {
+func (b *astbuilder) buildDeclareVariableExpression(stmt *yak.DeclareVariableExpressionContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	if s, ok := stmt.DeclearVariableOnly().(*yak.DeclearVariableOnlyContext); ok {
-		b.buildDeclearVariableOnly(s)
+	if s, ok := stmt.DeclareVariableOnly().(*yak.DeclareVariableOnlyContext); ok {
+		b.buildDeclareVariableOnly(s)
 	}
-	if s, ok := stmt.DeclearAndAssignExpression().(*yak.DeclearAndAssignExpressionContext); ok {
-		b.buildDeclearAndAssignExpression(s)
+	if s, ok := stmt.DeclareAndAssignExpression().(*yak.DeclareAndAssignExpressionContext); ok {
+		b.buildDeclareAndAssignExpression(s)
 	}
 }
 
-func (b *astbuilder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyContext) {
+func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	for _, idstmt := range stmt.AllIdentifier() {
@@ -745,7 +745,7 @@ func (b *astbuilder) buildDeclearVariableOnly(stmt *yak.DeclearVariableOnlyConte
 	}
 }
 
-func (b *astbuilder) buildDeclearAndAssignExpression(stmt *yak.DeclearAndAssignExpressionContext) {
+func (b *astbuilder) buildDeclareAndAssignExpression(stmt *yak.DeclareAndAssignExpressionContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	b.AssignList(stmt)
@@ -887,7 +887,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// anonymous function decl
 	if s, ok := stmt.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
-		return b.buildAnonymouseFunctionDecl(s)
+		return b.buildAnonymousFunctionDecl(s)
 	}
 	// panic
 	if s := stmt.Panic(); s != nil {
@@ -1299,7 +1299,7 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 }
 
 // anonymous function decl
-func (b *astbuilder) buildAnonymouseFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) ssa.Value {
+func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	funcName := ""
