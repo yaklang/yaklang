@@ -28,7 +28,7 @@ func fixupUseChain(node Node) {
 
 func EmitBefore(before, inst Instruction) {
 	block := before.GetBlock()
-	insts := block.Instrs
+	insts := block.Insts
 	if index := slices.Index(insts, before); index > -1 {
 		// Extend the slice
 		insts = append(insts, nil)
@@ -36,7 +36,7 @@ func EmitBefore(before, inst Instruction) {
 		copy(insts[index+1:], insts[index:])
 		// Insert new element
 		insts[index] = inst
-		block.Instrs = insts
+		block.Insts = insts
 		block.Parent.SetReg(inst)
 	}
 }
@@ -48,7 +48,7 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	// 	}
 	// }
 
-	f.CurrentBlock.Instrs = append(f.CurrentBlock.Instrs, i)
+	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
 	f.SetReg(i)
 }
 
@@ -93,10 +93,10 @@ func (f *FunctionBuilder) EmitIf(cond Value) *If {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	ifssa := NewIf(cond, f.CurrentBlock)
-	f.emit(ifssa)
+	ifSSA := NewIf(cond, f.CurrentBlock)
+	f.emit(ifSSA)
 	f.CurrentBlock.finish = true
-	return ifssa
+	return ifSSA
 }
 
 func (f *FunctionBuilder) EmitJump(to *BasicBlock) *Jump {
@@ -227,7 +227,7 @@ func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler
 
 func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 	p := &Panic{
-		anInstruction: newAnInstuction(f.CurrentBlock),
+		anInstruction: newAnInstruction(f.CurrentBlock),
 		Info:          info,
 	}
 	fixupUseChain(p)
@@ -237,7 +237,7 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 
 func (f *FunctionBuilder) EmitRecover() *Recover {
 	r := &Recover{
-		anInstruction: newAnInstuction(f.CurrentBlock),
+		anInstruction: newAnInstruction(f.CurrentBlock),
 		anNode:        NewNode(),
 	}
 	f.emit(r)

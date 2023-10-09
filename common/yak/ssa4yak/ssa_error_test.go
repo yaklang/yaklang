@@ -9,13 +9,13 @@ import (
 )
 
 func TestError(t *testing.T) {
-	testcase := []struct {
+	testCase := []struct {
 		name string
 		code string
 		err  []string
 	}{
 		{
-			name: "loop-if empty basicblock",
+			name: "loop-if empty BasicBlock",
 			code: `
 			for i {
 				if j {
@@ -35,7 +35,7 @@ func TestError(t *testing.T) {
 		},
 
 		{
-			name: "only declear variable",
+			name: "only declare variable",
 			code: `
 			var a1 
 			if 1 {
@@ -76,7 +76,7 @@ func TestError(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcase {
+	for _, tc := range testCase {
 		t.Logf("run test : %s", tc.name)
 		prog := ParseSSA(tc.code)
 		prog.Show()

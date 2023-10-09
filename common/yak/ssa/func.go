@@ -15,7 +15,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		if parent != nil {
 			name = fmt.Sprintf("%s$%d", parent.Name, index)
 		} else {
-			name = fmt.Sprintf("Anonymousfunc%d", index)
+			name = fmt.Sprintf("AnonymousFunc-%d", index)
 		}
 	}
 	f := &Function{
@@ -47,8 +47,8 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	f.symbol.Func = f
 	if parent != nil {
 		parent.addAnonymous(f)
-		// Pos: parent.currtenPos,
-		f.Pos = parent.builder.CurrtenPos
+		// Pos: parent.CurrentPos,
+		f.Pos = parent.builder.CurrentPos
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f

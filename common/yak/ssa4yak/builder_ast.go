@@ -96,7 +96,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _break := b.GetBreak(); _break != nil {
 			b.EmitJump(_break)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpection break stmt")
+			b.NewError(ssa.Error, TAG, "unexpected break stmt")
 		}
 		return
 	}
@@ -110,7 +110,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _continue := b.GetContinue(); _continue != nil {
 			b.EmitJump(_continue)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpection continue stmt")
+			b.NewError(ssa.Error, TAG, "unexpected continue stmt")
 		}
 		return
 	}
@@ -119,7 +119,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _fall := b.GetFallthrough(); _fall != nil {
 			b.EmitJump(_fall)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpection fallthrough stmt")
+			b.NewError(ssa.Error, TAG, "unexpected fallthrough stmt")
 		}
 		return
 	}
@@ -150,7 +150,7 @@ func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
 		if expr, ok := stmt.Expression(i).(*yak.ExpressionContext); ok {
 			return b.buildExpression(expr)
 		}
-		b.NewError(ssa.Error, TAG, "unexpection assert stmt, this not expression")
+		b.NewError(ssa.Error, TAG, "unexpected assert stmt, this not expression")
 		return nil
 	}
 
@@ -315,7 +315,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		}
 	}
 
-	loop.BuildCondtion(func() ssa.Value {
+	loop.BuildCondition(func() ssa.Value {
 		var condition ssa.Value
 		if cond == nil {
 			condition = ssa.NewConst(true)
@@ -364,7 +364,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	// current := f.currentBlock
 	loop := b.BuildLoop()
 
-	loop.BuildCondtion(func() ssa.Value {
+	loop.BuildCondition(func() ssa.Value {
 		var lefts []ssa.LeftValue
 		if leftList, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
 			lefts = b.buildLeftExpressionList(true, leftList)
@@ -441,7 +441,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 			} else {
 				_fallthrough = handlers[i+1]
 			}
-			b.PushTarget(done, nil, _fallthrough) // fall throught just jump to next handler
+			b.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
 			// build handlers block
 			b.CurrentBlock = handlers[i]
 			b.buildStatementList(stmtlist)
@@ -478,14 +478,15 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 		defer recoverRange()
 
-		i := b.IfBuilder()
+		i := b.BuildIf()
 
-		i.IfBranch(
-			// if instruction condition
+		// if instruction condition
+		i.BuildCondition(
 			func() ssa.Value {
 				return b.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
-			},
-			// build true body
+			})
+		// build true body
+		i.BuildTrue(
 			func() {
 				if blockstmt, ok := stmt.Block(0).(*yak.BlockContext); ok {
 					b.buildBlock(blockstmt)
@@ -499,7 +500,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 			if !ok {
 				continue
 			}
-			i.ElifBranch(
+			i.BuildElif(
 				// condition
 				func() ssa.Value {
 					recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
@@ -517,13 +518,13 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 			)
 		}
 
-		// hanlder "else" and "else if "
+		// handle "else" and "else if "
 		elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext)
 		if !ok {
 			return i
 		}
 		if elseblock, ok := elseStmt.Block().(*yak.BlockContext); ok {
-			i.ElseBranch(
+			i.BuildFalse(
 				// create false block
 				func() {
 					b.buildBlock(elseblock)
@@ -532,7 +533,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 		} else if elifstmt, ok := elseStmt.IfStmt().(*yak.IfStmtContext); ok {
 			// "else if"
 			// create elif block
-			i.AddChild(buildIf(elifstmt))
+			i.BuildChild(buildIf(elifstmt))
 		}
 		return i
 	}
@@ -545,7 +546,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.CurrentBlock.SetPosition(b.CurrtenPos)
+	b.CurrentBlock.SetPosition(b.CurrentPos)
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
 		b.PushBlockSymbolTable()
 		b.buildStatementList(s)
@@ -555,14 +556,14 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	}
 }
 
-type assiglist interface {
+type assignlist interface {
 	AssignEq() antlr.TerminalNode
 	ColonAssignEq() antlr.TerminalNode
 	ExpressionList() yak.IExpressionListContext
 	LeftExpressionList() yak.ILeftExpressionListContext
 }
 
-func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
+func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
@@ -646,7 +647,7 @@ func (b *astbuilder) AssignList(stmt assiglist) []ssa.Value {
 			_interface := b.CreateInterfaceWithVs(nil, rvalues)
 			lvalues[0].Assign(_interface, b.FunctionBuilder)
 		} else {
-			// (n) = (m) && n!=m  faltal
+			// (n) = (m) && n!=m
 			b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
 			return nil
 		}
@@ -783,7 +784,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
 		if text == "_" {
-			return ssa.NewIndentifierLV("_", b.CurrtenPos)
+			return ssa.NewIdentifierLV("_", b.CurrentPos)
 		}
 		if forceAssign {
 			text = b.MapBlockSymbolTable(text)
@@ -795,7 +796,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			// 		return value
 			// 	}
 			case *ssa.Parameter:
-				if value.IsFreevalue {
+				if value.IsFreeValue {
 					field := b.NewCaptureField(text)
 					var tmp ssa.Value = field
 					ssa.ReplaceValue(v, tmp)
@@ -814,7 +815,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			// 	b.SetReg(field)
 			// 	return field
 		}
-		return ssa.NewIndentifierLV(text, b.CurrtenPos)
+		return ssa.NewIdentifierLV(text, b.CurrentPos)
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		expr := b.buildExpression(s)
@@ -1158,19 +1159,20 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
-		ifb := b.IfBuilder()
-		ifb.IfBranch(
+		ifb := b.BuildIf()
+		ifb.BuildCondition(
 			func() ssa.Value {
 				// 在上层函数中决定是否设置id, 在三元运算符时不会将condition加入结果中
 				return cond(id)
-			},
+			})
+		ifb.BuildTrue(
 			func() {
 				v := trueExpr()
 				b.WriteVariable(id, v)
 			},
 		)
 		if falseExpr != nil {
-			ifb.ElseBranch(func() {
+			ifb.BuildFalse(func() {
 				v := falseExpr()
 				b.WriteVariable(id, v)
 			})

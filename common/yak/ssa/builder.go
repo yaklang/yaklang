@@ -11,7 +11,7 @@ type Builder interface {
 // build enter pointer
 // front implement `Builder`
 func (prog *Program) Build(b Builder) {
-	prog.buildOnece.Do(b.Build)
+	prog.buildOnce.Do(b.Build)
 }
 
 // Function builder API
@@ -23,12 +23,12 @@ type FunctionBuilder struct {
 
 	target *target // for break and continue
 	// defer function call
-	deferexpr []*Call // defer funciton, reverse  for-range
+	deferExpr []*Call // defer function, reverse  for-range
 
 	// for build
 	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
 	CurrentBlock *BasicBlock                      // current block to build
-	CurrtenPos   *Position                        // current position in source code
+	CurrentPos   *Position                        // current position in source code
 	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
 
 	buildExtern func(string, *FunctionBuilder) Value
@@ -41,10 +41,10 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 		Function:     f,
 		target:       &target{},
 		subFuncBuild: make([]func(), 0),
-		deferexpr:    make([]*Call, 0),
+		deferExpr:    make([]*Call, 0),
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
-		CurrtenPos:   nil,
+		CurrentPos:   nil,
 		symbolBlock:  nil,
 		prev:         next,
 	}
@@ -78,12 +78,12 @@ func (b FunctionBuilder) GetParentBuilder() *FunctionBuilder {
 
 // add current function defer function
 func (b *FunctionBuilder) AddDefer(call *Call) {
-	b.deferexpr = append(b.deferexpr, call)
+	b.deferExpr = append(b.deferExpr, call)
 }
 
 // finish current function builder
 func (b *FunctionBuilder) Finish() {
-	// fmt.Println("finsh func: ", b.Name)
+	// fmt.Println("finish func: ", b.Name)
 
 	// sub-function
 	for _, builder := range b.subFuncBuild {
@@ -91,8 +91,8 @@ func (b *FunctionBuilder) Finish() {
 	}
 	// set defer function
 	b.CurrentBlock = b.Blocks[len(b.Blocks)-1]
-	for i := len(b.deferexpr) - 1; i >= 0; i-- {
-		b.EmitCall(b.deferexpr[i])
+	for i := len(b.deferExpr) - 1; i >= 0; i-- {
+		b.EmitCall(b.deferExpr[i])
 	}
 	// function finish
 	b.Function.Finish()
@@ -100,8 +100,8 @@ func (b *FunctionBuilder) Finish() {
 
 // handler position: set new position and return original position for backup
 func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
-	backup := b.CurrtenPos
-	b.CurrtenPos = pos
+	backup := b.CurrentPos
+	b.CurrentPos = pos
 	return backup
 }
 
@@ -111,8 +111,8 @@ func (b *FunctionBuilder) AddSubFunction(builder func()) {
 }
 
 // function stack
-func (b *FunctionBuilder) PushFunction(newfunc *Function) *FunctionBuilder {
-	build := NewBuilder(newfunc, b)
+func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
+	build := NewBuilder(newFunc, b)
 	return build
 }
 
@@ -148,7 +148,7 @@ func (b *FunctionBuilder) PopTarget() bool {
 	}
 }
 
-// get target feild
+// get target field
 func (b *FunctionBuilder) GetBreak() *BasicBlock {
 	for target := b.target; target != nil; target = target.tail {
 		if target._break != nil {
@@ -176,8 +176,8 @@ func (b *FunctionBuilder) GetFallthrough() *BasicBlock {
 }
 
 type blockSymbolTable struct {
-	symbol  map[string]string // variable -> variableId(variable-blockid)
-	blockid string
+	symbol  map[string]string // variable -> variableId(variable-blockId)
+	blockId string
 	next    *blockSymbolTable
 }
 
@@ -191,11 +191,11 @@ func NewBlockId() string {
 	return ret
 }
 
-// block symboltable stack
+// block symbol-table stack
 func (b *FunctionBuilder) PushBlockSymbolTable() {
 	b.symbolBlock = &blockSymbolTable{
 		symbol:  make(map[string]string),
-		blockid: NewBlockId(),
+		blockId: NewBlockId(),
 		next:    b.symbolBlock,
 	}
 }
@@ -204,11 +204,11 @@ func (b *FunctionBuilder) PopBlockSymbolTable() {
 	b.symbolBlock = b.symbolBlock.next
 }
 
-// use block symbol table map variable -> variable+blockid
+// use block symbol table map variable -> variable+blockId
 func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
-	newtext := text + b.symbolBlock.blockid
-	b.symbolBlock.symbol[text] = newtext
-	return newtext
+	newText := text + b.symbolBlock.blockId
+	b.symbolBlock.symbol[text] = newText
+	return newText
 }
 
 func (b *FunctionBuilder) GetIdByBlockSymbolTable(id string) string {

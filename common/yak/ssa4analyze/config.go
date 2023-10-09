@@ -3,7 +3,7 @@ package ssa4analyze
 // config
 type config struct {
 	analyzers  []Analyzer
-	enablePass bool // if true enable pass, analyzer more infomation
+	enablePass bool // if true enable pass, analyzer more information
 }
 
 func defaultConfig() config {

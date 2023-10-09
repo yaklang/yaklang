@@ -16,7 +16,7 @@ type astbuilder struct {
 type builder struct {
 	ast  *yak.YaklangParser
 	prog *ssa.Program
-	// symboltable map[string]any
+	// symbolTable map[string]any
 	c *config
 }
 
@@ -25,11 +25,11 @@ func (b *builder) Build() {
 	pkg := ssa.NewPackage("main")
 	b.prog.AddPackage(pkg)
 	main := pkg.NewFunction("yak-main")
-	funcbuilder := ssa.NewBuilder(main, nil)
-	funcbuilder.WithExternInstance(b.c.symboltable)
+	funcBuilder := ssa.NewBuilder(main, nil)
+	funcBuilder.WithExternInstance(b.c.symbolTable)
 
 	astbuilder := astbuilder{
-		FunctionBuilder: funcbuilder,
+		FunctionBuilder: funcBuilder,
 	}
 	astbuilder.build(b.ast)
 	astbuilder.Finish()
@@ -39,14 +39,14 @@ var _ (ssa.Builder) = (*builder)(nil)
 
 type config struct {
 	analyzeOpt  []ssa4analyze.Option
-	symboltable map[string]any
+	symbolTable map[string]any
 	typeMethod  map[string]any
 }
 
 func defaultConfig() *config {
 	return &config{
 		analyzeOpt:  make([]ssa4analyze.Option, 0),
-		symboltable: nil,
+		symbolTable: nil,
 		typeMethod:  nil,
 	}
 
@@ -62,7 +62,7 @@ func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
 
 func WithSymbolTable(table map[string]any) Option {
 	return func(c *config) {
-		c.symboltable = table
+		c.symbolTable = table
 	}
 }
 

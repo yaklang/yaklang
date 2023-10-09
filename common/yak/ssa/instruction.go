@@ -12,10 +12,10 @@ func EmitInst(i Instruction) {
 		// println("void block!! %s")
 		return
 	}
-	if index := slices.Index(block.Instrs, i); index != -1 {
+	if index := slices.Index(block.Insts, i); index != -1 {
 		return
 	}
-	if len(block.Instrs) == 0 {
+	if len(block.Insts) == 0 {
 		b := block.Parent.builder
 		current := b.CurrentBlock
 		b.CurrentBlock = block
@@ -27,7 +27,7 @@ func EmitInst(i Instruction) {
 }
 
 func Insert(i Instruction, b *BasicBlock) {
-	b.Instrs = append(b.Instrs, i)
+	b.Insts = append(b.Insts, i)
 }
 
 func DeleteInst(i Instruction) {
@@ -35,7 +35,7 @@ func DeleteInst(i Instruction) {
 	if phi, ok := i.(*Phi); ok {
 		b.Phis = utils.Remove(b.Phis, phi)
 	} else {
-		b.Instrs = utils.Remove(b.Instrs, i)
+		b.Insts = utils.Remove(b.Insts, i)
 	}
 	f := i.GetParent()
 	delete(f.InstReg, i)
@@ -45,19 +45,19 @@ func DeleteInst(i Instruction) {
 	// }
 }
 
-func newAnInstuction(block *BasicBlock) anInstruction {
+func newAnInstruction(block *BasicBlock) anInstruction {
 	return anInstruction{
 		Func:     block.Parent,
 		Block:    block,
 		typs:     nil,
 		variable: "",
-		pos:      block.Parent.builder.CurrtenPos,
+		pos:      block.Parent.builder.CurrentPos,
 	}
 }
 
 func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
 	j := &Jump{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		To:            to,
 	}
 	return j
@@ -65,7 +65,7 @@ func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
 
 func NewLoop(block *BasicBlock, cond Value) *Loop {
 	l := &Loop{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		Cond:          cond,
 	}
 	return l
@@ -74,14 +74,14 @@ func NewLoop(block *BasicBlock, cond Value) *Loop {
 func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
 	v := &ConstInst{
 		Const:         *c,
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 	}
 	return v
 }
 
 func NewUndefine(name string, block *BasicBlock) *Undefine {
 	u := &Undefine{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 	}
 	u.SetVariable(name)
@@ -91,7 +91,7 @@ func NewUndefine(name string, block *BasicBlock) *Undefine {
 
 func NewBinOpOnly(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
 	b := &BinOp{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Op:            op,
 		X:             x,
@@ -113,7 +113,7 @@ func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) Value {
 
 func NewUnOpOnly(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
 	u := &UnOp{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Op:            op,
 		X:             x,
@@ -129,17 +129,17 @@ func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) Value {
 }
 
 func NewIf(cond Value, block *BasicBlock) *If {
-	ifssa := &If{
-		anInstruction: newAnInstuction(block),
+	ifSSA := &If{
+		anInstruction: newAnInstruction(block),
 		Cond:          cond,
 	}
-	fixupUseChain(ifssa)
-	return ifssa
+	fixupUseChain(ifSSA)
+	return ifSSA
 }
 
 func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel, block *BasicBlock) *Switch {
 	sw := &Switch{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		Cond:          cond,
 		DefaultBlock:  defaultb,
 		Label:         label,
@@ -150,7 +150,7 @@ func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel, block *Bas
 
 func NewReturn(vs []Value, block *BasicBlock) *Return {
 	r := &Return{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		Results:       vs,
 	}
 	fixupUseChain(r)
@@ -160,7 +160,7 @@ func NewReturn(vs []Value, block *BasicBlock) *Return {
 
 func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
 	t := &TypeCast{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Value:         v,
 	}
@@ -171,7 +171,7 @@ func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
 
 func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 	a := &Assert{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		Cond:          cond,
 		Msg:           msg,
 		MsgValue:      msgValue,
@@ -190,7 +190,7 @@ func init() {
 
 func NewNext(iter Value, block *BasicBlock) *Next {
 	n := &Next{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Iter:          iter,
 	}
@@ -201,7 +201,7 @@ func NewNext(iter Value, block *BasicBlock) *Next {
 
 func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
 	e := &ErrorHandler{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		try:           try,
 		catch:         catch,
 	}
@@ -212,12 +212,12 @@ func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
 	return e
 }
 
-func NewParam(variable string, isFreevalue bool, fun *Function) *Parameter {
+func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p := &Parameter{
 		anNode:      NewNode(),
 		variable:    variable,
 		Func:        fun,
-		IsFreevalue: isFreevalue,
+		IsFreeValue: isFreeValue,
 		typs:        nil,
 	}
 	return p
@@ -277,8 +277,8 @@ func (l *Loop) Finish(init, step []Value) {
 }
 
 func (f *Field) GetLastValue() Value {
-	if lenght := len(f.Update); lenght != 0 {
-		update, ok := f.Update[lenght-1].(*Update)
+	if length := len(f.Update); length != 0 {
+		update, ok := f.Update[length-1].(*Update)
 		if !ok {
 			panic("")
 		}

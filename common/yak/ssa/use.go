@@ -15,14 +15,14 @@ func ReplaceValue(v Value, to Value) {
 	}
 	// delete user in v.Value
 	if user, ok := v.(User); ok {
-		if touser, ok := to.(User); ok {
+		if toUser, ok := to.(User); ok {
 			values := user.GetValues()
 			for _, value := range values {
 				switch v := value.(type) {
 				// 		//TODO:handler field chain direction
 				case *Field:
-					v.Obj = touser
-					touser.AddValue(v)
+					v.Obj = toUser
+					toUser.AddValue(v)
 					v.RemoveUser(user)
 					user.RemoveValue(v)
 					// AddValue(user, v)
@@ -127,10 +127,10 @@ func (p *Phi) AddEdge(v Value) {
 
 // ----------- ConstInst
 func (c *ConstInst) ReplaceValue(v, to Value) {
-	panic("this const instruction con't repalce ")
+	panic("this const instruction con't replace ")
 }
 
-// ----------- undifne
+// ----------- undefine
 func (c *Undefine) ReplaceValue(v, to Value) {
 	panic("undefine instruction con't replace")
 }
@@ -233,7 +233,7 @@ func (b *BinOp) ReplaceValue(v Value, to Value) {
 	} else if b.Y == v {
 		b.Y = to
 	} else {
-		panic("binop not use this value")
+		panic("BinOp not use this value")
 	}
 
 }
@@ -244,7 +244,7 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 	if u.X == v {
 		u.X = to
 	} else {
-		panic("unop not use this value")
+		panic("UnOp not use this value")
 	}
 }
 

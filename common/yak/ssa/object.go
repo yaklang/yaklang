@@ -66,7 +66,7 @@ func (f *Field) GetUserOnly() []User {
 
 func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *BasicBlock) *Make {
 	i := &Make{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		parentI:       parentI,
 		low:           low,
@@ -83,7 +83,7 @@ func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *Bas
 
 func NewUpdate(address User, v Value, block *BasicBlock) *Update {
 	s := &Update{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		Value:         v,
 		Address:       address,
 	}
@@ -95,7 +95,7 @@ func NewUpdate(address User, v Value, block *BasicBlock) *Update {
 
 func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
 	f := &Field{
-		anInstruction: newAnInstuction(block),
+		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Update:        make([]Value, 0),
 		Key:           key,
@@ -136,9 +136,9 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 	return itf
 }
 
-// --------------- `f.symbol` hanlder, read && write
+// --------------- `f.symbol` handler, read && write
 func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Value {
-	var ftyp Type
+	var fTyp Type
 	var isMethod bool
 	if I, ok := i.(*Make); ok {
 		if I.buildField != nil {
@@ -150,14 +150,14 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 	if c, ok := key.(*Const); ok && c.IsString() {
 		if v := i.GetType().GetMethod(c.VarString()); v != nil {
 			isMethod = true
-			ftyp = v
+			fTyp = v
 		}
 	}
 
 	if t := i.GetType(); t.GetTypeKind() == ObjectTypeKind {
 		if it, ok := t.(*ObjectType); ok {
 			if t, _ := it.GetField(key); t != nil {
-				ftyp = t
+				fTyp = t
 				isMethod = false
 			}
 		}
@@ -175,8 +175,8 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 
 	if create {
 		field := NewFieldOnly(key, i, b.CurrentBlock)
-		if ftyp != nil {
-			field.SetType(ftyp)
+		if fTyp != nil {
+			field.SetType(fTyp)
 		}
 		field.IsMethod = isMethod
 		b.emit(field)
