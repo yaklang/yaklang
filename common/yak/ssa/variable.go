@@ -31,7 +31,7 @@ func (i *IdentifierLV) GetPosition() *Position {
 	return i.pos
 }
 
-func NewIndentifierLV(variable string, pos *Position) *IdentifierLV {
+func NewIdentifierLV(variable string, pos *Position) *IdentifierLV {
 	return &IdentifierLV{
 		variable: variable,
 		pos:      pos,
@@ -52,7 +52,7 @@ func (f *Field) GetValue(_ *FunctionBuilder) Value {
 
 var _ LeftValue = (*Field)(nil)
 
-// --------------- `f.currentDef` hanlder, read && write
+// --------------- `f.currentDef` handler, read && write
 func (f *Function) WriteVariable(variable string, value Value) {
 	if b := f.builder; b != nil {
 		variable = b.GetIdByBlockSymbolTable(variable)
@@ -79,7 +79,7 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 	case *Const:
 		v = &ConstInst{
 			Const:         *value,
-			anInstruction: newAnInstuction(f.builder.CurrentBlock),
+			anInstruction: newAnInstruction(f.builder.CurrentBlock),
 		}
 	default:
 		return
@@ -172,19 +172,19 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 	return v
 }
 
-// --------------- `f.freevalue`
+// --------------- `f.freeValue`
 
 func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
-	freevalue := NewParam(variable, true, b.Function)
-	b.FreeValues = append(b.FreeValues, freevalue)
-	b.WriteVariable(variable, freevalue)
-	return freevalue
+	freeValue := NewParam(variable, true, b.Function)
+	b.FreeValues = append(b.FreeValues, freeValue)
+	b.WriteVariable(variable, freeValue)
+	return freeValue
 }
 
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	for parent := b.parent; parent != nil; parent = parent.parent {
 		if v := parent.builder.ReadVariable(variable, false); v != nil {
-			if IsExternInstanc(v) {
+			if IsExternInstance(v) {
 				return false
 			} else {
 				return true

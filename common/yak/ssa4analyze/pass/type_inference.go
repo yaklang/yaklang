@@ -17,7 +17,7 @@ type TypeInference struct {
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	for _, b := range fun.Blocks {
-		for _, inst := range b.Instrs {
+		for _, inst := range b.Insts {
 			t.InferenceOnInstruction(inst)
 		}
 	}
@@ -89,9 +89,10 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 		return false
 	}
 	//TODO:type kind check should handler interfaceTypeKind
-	if t := v.GetType(); t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any {
+	t := v.GetType()
+	if t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any && typ.GetTypeKind() != ssa.Any {
 		if inst, ok := v.(ssa.Instruction); ok {
-			inst.NewError(ssa.Error, TITAG, "type check failed, this shoud be %s", typ)
+			inst.NewError(ssa.Error, TITAG, "type check failed, this should be %s", typ)
 		}
 	}
 	v.SetType(typ)
@@ -152,9 +153,6 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	XTyps := bin.X.GetType()
 	YTyps := bin.Y.GetType()
-	// if t.checkvaluesnotfinish([]ssa.value{bin.x, bin.y}) {
-	// 	return
-	// }
 
 	handlerBinOpType := func(x, y ssa.Type) ssa.Type {
 		if x == nil {
@@ -180,7 +178,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	}
 	retTyp := handlerBinOpType(XTyps, YTyps)
 	if retTyp == nil {
-		bin.NewError(ssa.Error, TITAG, "this expression type error: x[%s] %s y[%s]", XTyps, ssa.BinaryOpcodeName[bin.Op], YTyps)
+		// bin.NewError(ssa.Error, TITAG, "this expression type error: x[%s] %s y[%s]", XTyps, ssa.BinaryOpcodeName[bin.Op], YTyps)
 		return
 	}
 
@@ -272,13 +270,13 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 
 	// get function type
-	functyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
 	if !ok {
 		return
 	}
 
 	if c.IsDropError {
-		if t, ok := functyp.ReturnType.(*ssa.ObjectType); ok {
+		if t, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok {
 			if t.Combination && t.FieldTypes[len(t.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {
 				// if len(t.FieldTypes) == 1 {
 				// 	c.SetType(ssa.BasicTypes[ssa.Null])
@@ -294,8 +292,8 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 				return
 			}
 		}
-		c.NewError(ssa.Error, TITAG, "this function con't retrn error")
+		c.NewError(ssa.Error, TITAG, "this function con't return error")
 	} else {
-		c.SetType(functyp.ReturnType)
+		c.SetType(funcTyp.ReturnType)
 	}
 }

@@ -25,7 +25,7 @@ func (t *TypeCheck) Analyze(config config, prog *ssa.Program) {
 			for _, phi := range b.Phis {
 				check(phi)
 			}
-			for _, inst := range b.Instrs {
+			for _, inst := range b.Insts {
 				check(inst)
 			}
 		}
@@ -65,9 +65,10 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 		return false
 	}
 	//TODO:type kind check should handler interfaceTypeKind
-	if t := v.GetType(); t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any {
+	t := v.GetType()
+	if t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any && typ.GetTypeKind() != ssa.Any {
 		if inst, ok := v.(ssa.Instruction); ok {
-			inst.NewError(ssa.Error, TypeCheckTAG, "type check failed, this shoud be %s", typ)
+			inst.NewError(ssa.Error, TypeCheckTAG, "type check failed, this should be %s", typ)
 		}
 	}
 	v.SetType(typ)
@@ -79,7 +80,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefine) {
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
-	functyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
 	if !ok {
 		return
 	}
@@ -87,7 +88,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		return
 	}
 
-	if objType, ok := functyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
+	if objType, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
 		// a, b, err = fun()
 		rightLen := len(objType.FieldTypes)
 		if c.IsDropError {
@@ -107,7 +108,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 			c.NewError(
 				ssa.Error, TypeCheckTAG,
-				"assignmemt mismatch: %d variable but return %d values",
+				"assignment mismatch: %d variable but return %d values",
 				leftLen, rightLen,
 			)
 		}

@@ -6,8 +6,8 @@ import (
 
 func NewProgram() *Program {
 	prog := &Program{
-		Packages:   make([]*Package, 0),
-		buildOnece: sync.Once{},
+		Packages:  make([]*Package, 0),
+		buildOnce: sync.Once{},
 	}
 	return prog
 }

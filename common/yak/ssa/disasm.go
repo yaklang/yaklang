@@ -65,7 +65,7 @@ func getStrFlag(v Node, hasType bool) string {
 	case *Function:
 		op += v.Name
 	default:
-		panic("instruction unknow value type: " + v.String())
+		panic("instruction unknown value type: " + v.String())
 	}
 	return op
 }
@@ -117,21 +117,21 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			for _, p := range b.Phis {
 				ret += fmt.Sprintf("\t%s\n", p)
 			}
-			for _, i := range b.Instrs {
+			for _, i := range b.Insts {
 				ret += fmt.Sprintf("\t%s\n", i)
 			}
 		} else {
-			insts := make([]string, 0, len(b.Instrs)+len(b.Phis))
-			pos := make([]string, 0, len(b.Instrs)+len(b.Phis))
+			insts := make([]string, 0, len(b.Insts)+len(b.Phis))
+			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, p := range b.Phis {
 				insts = append(insts, fmt.Sprintf("\t%s", p))
 				pos = append(pos, p.Pos())
 			}
-			for _, i := range b.Instrs {
+			for _, i := range b.Insts {
 				insts = append(insts, fmt.Sprintf("\t%s", i))
 				pos = append(pos, i.Pos())
 			}
-			// get maxlen
+			// get MaxLen
 			max := 0
 			for _, s := range insts {
 				if len(s) > max {
@@ -226,8 +226,8 @@ func (r *Return) String() string {
 
 // ----------- Call
 func (c *Call) String() string {
-	methodstr := getStr(c.Method)
-	argstr := strings.Join(
+	methodStr := getStr(c.Method)
+	argStr := strings.Join(
 		lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
 		", ",
 	)
@@ -240,13 +240,13 @@ func (c *Call) String() string {
 	if c.Async {
 		return fmt.Sprintf(
 			"go %s (%s) [%s]",
-			methodstr, argstr, binding,
+			methodStr, argStr, binding,
 		)
 	} else {
 		return fmt.Sprintf(
 			"%s = call %s (%s) [%s]",
 			getStr(c),
-			methodstr, argstr, binding,
+			methodStr, argStr, binding,
 		)
 	}
 }

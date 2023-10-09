@@ -10,7 +10,7 @@ const (
 	MAXTYPELEVEL = 15
 )
 
-func IsExternInstanc(v Value) bool {
+func IsExternInstance(v Value) bool {
 	if m, ok := v.(*Make); ok && m.buildField != nil {
 		return true
 	} else {
@@ -34,13 +34,12 @@ func (b *FunctionBuilder) TryBuildExternInstance(id string) Value {
 	return b.buildExtern(id, b)
 }
 
-func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Value) {
-	if value, ok := b.externInstance[libname+id]; ok {
+func (b *FunctionBuilder) BuildValueFromAny(libName, id string, v any) (value Value) {
+	if value, ok := b.externInstance[libName+id]; ok {
 		return value
 	}
 
 	itype := reflect.TypeOf(v)
-	// ivalue := reflect.ValueOf(v)
 
 	if itype == reflect.TypeOf(make(map[string]interface{})) {
 		i := NewMake(nil,
@@ -55,8 +54,8 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 			return nil
 		}
 		str := id
-		if libname != "" {
-			str = libname + "." + id
+		if libName != "" {
+			str = libName + "." + id
 		}
 		i.SetVariable(str)
 		b.externInstance[str] = i
@@ -71,8 +70,8 @@ func (b *FunctionBuilder) BuildValueFromAny(libname, id string, v any) (value Va
 		}
 
 		str := id
-		if libname != "" {
-			str = libname + "." + id
+		if libName != "" {
+			str = libName + "." + id
 		}
 		switch itype.Kind() {
 		case reflect.Func:

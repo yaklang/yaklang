@@ -86,7 +86,7 @@ const (
 	Number TypeKind = iota
 	String
 	Boolean
-	UndefineType // undefine is nil in golnag
+	UndefineType // undefine is nil in golang
 	Null         //
 	Any          // any type
 	ChanTypeKind
@@ -431,8 +431,8 @@ func (itype ObjectType) RawString() string {
 // for struct build
 func (s *ObjectType) AddField(key Value, field Type) {
 	s.Key = append(s.Key, key)
-	keytyp := key.GetType()
-	s.keyTypes = append(s.keyTypes, keytyp)
+	keyTyp := key.GetType()
+	s.keyTypes = append(s.keyTypes, keyTyp)
 	if field == nil {
 		field = BasicTypes[Any]
 	}
@@ -470,11 +470,11 @@ func (s *ObjectType) Finish() {
 		return
 	}
 	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
-	keytypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
-	if len(keytypes) == 1 {
+	keyTypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
+	if len(keyTypes) == 1 {
 		if len(fieldTypes) == 1 {
 			// map[T]U
-			if keytypes[0].GetTypeKind() == Number {
+			if keyTypes[0].GetTypeKind() == Number {
 				// map[number]T ==> []T slice
 				// TODO: check increasing
 				s.Kind = Slice
@@ -483,13 +483,13 @@ func (s *ObjectType) Finish() {
 			} else {
 				// Map
 				s.Kind = Map
-				s.KeyTyp = keytypes[0]
+				s.KeyTyp = keyTypes[0]
 				s.FieldType = fieldTypes[0]
 			}
-			// s.keyType = keytype
+			// s.keyType = keyType
 			// s.Field = field
-		} else if keytypes[0].GetTypeKind() == String || keytypes[0].GetTypeKind() == Number {
-			s.Kind = Struct
+		} else if keyTypes[0].GetTypeKind() == String || keyTypes[0].GetTypeKind() == Number {
+			s.Kind = Map
 			s.KeyTyp = BasicTypes[String]
 			s.FieldType = BasicTypes[Any]
 		}

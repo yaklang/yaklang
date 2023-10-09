@@ -23,12 +23,12 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	s.edge = make(Edge)
 	s.Finish = make(map[*ssa.BasicBlock]struct{})
 	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
-		fromtable, ok := s.edge[to]
+		fromTable, ok := s.edge[to]
 		if !ok {
-			fromtable = make(map[*ssa.BasicBlock]ssa.Value)
+			fromTable = make(map[*ssa.BasicBlock]ssa.Value)
 		}
-		fromtable[from] = condition
-		s.edge[to] = fromtable
+		fromTable[from] = condition
+		s.edge[to] = fromTable
 	}
 
 	handleIfEdge := func(i *ssa.If) {
@@ -90,11 +90,11 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	deleteStmt := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
-		for _, inst := range b.Instrs {
+		for _, inst := range b.Insts {
 			switch inst := inst.(type) {
 			// call function
 			case *ssa.Call:
-				// TODO: config can set funciton return is a const
+				// TODO: config can set function return is a const
 				// !! medium: need a good interface for user config this
 
 			case *ssa.Field:
@@ -157,8 +157,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	getCondition := func(to, from *ssa.BasicBlock) ssa.Value {
 		var edgeCond ssa.Value
-		if fromtable, ok := s.edge[to]; ok {
-			if value, ok := fromtable[from]; ok {
+		if fromTable, ok := s.edge[to]; ok {
+			if value, ok := fromTable[from]; ok {
 				edgeCond = value
 			}
 		}
