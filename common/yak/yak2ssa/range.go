@@ -1,4 +1,4 @@
-package ssa4yak
+package yak2ssa
 
 import (
 	"strings"
