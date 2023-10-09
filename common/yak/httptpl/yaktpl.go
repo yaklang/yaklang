@@ -1,6 +1,7 @@
 package httptpl
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"golang.org/x/exp/maps"
@@ -52,7 +53,7 @@ type YakTemplate struct {
 	CVE           string
 	ShodanQuery   string
 	Verified      string
-
+	Sign          string
 	// SelfContained
 	SelfContained bool
 
@@ -92,6 +93,9 @@ func (y *YakTemplate) SignMainParams() string {
 		matcherInfos := []any{}
 		var addMatcher func(matcher *YakMatcher, id int)
 		addMatcher = func(matcher *YakMatcher, id int) {
+			if matcher == nil {
+				return
+			}
 			if matcher.Condition == "" {
 				matcher.Condition = "and"
 			}
@@ -125,8 +129,35 @@ func (y *YakTemplate) SignMainParams() string {
 	for k, v := range y.PlaceHolderMap {
 		signDataStr = strings.Replace(signDataStr, k, v, -1)
 	}
-	//spew.Dump(signDataStr)
 	return codec.Md5(signDataStr)
+}
+func (y *YakTemplate) CheckTemplateRisks() error {
+	var errs utils.MergeErrors
+	addErrorMsg := func(msg string) {
+		errs = append(errs, errors.New(msg))
+	}
+	hasMatcherOrExtractor := false
+	for _, sequence := range y.HTTPRequestSequences {
+		if sequence.Matcher != nil && len(sequence.Matcher.SubMatchers) != 0 {
+			hasMatcherOrExtractor = true
+			break
+		}
+		if sequence.Extractor != nil && len(sequence.Extractor) != 0 {
+			hasMatcherOrExtractor = true
+			break
+		}
+	}
+	if !hasMatcherOrExtractor {
+		addErrorMsg("matcher and extractor are both empty, may be the script is invalid")
+	}
+	if y.Sign != "" {
+		if y.Sign != y.SignMainParams() {
+			addErrorMsg("signature error, may be the script is invalid")
+		}
+	} else {
+		addErrorMsg("lack of signature information, unable to verify script validity")
+	}
+	return errs
 }
 
 type YakRequestBulkConfig struct {
