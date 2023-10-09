@@ -1,6 +1,7 @@
-package ssa4yak
+package yak2ssa
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -21,7 +22,17 @@ func TestTypePrediction_Int64(t *testing.T) {
 }
 
 func TestTypePrediction_STR(t *testing.T) {
-	prog := ParseSSA(`var a = 1; a = "abc"`)
+	prog := ParseSSA(`
+	for 1 {
+		if a {
+			return
+		}else {
+			return 
+		}
+	}
+	print(1)
+	`)
+	prog.Show()
 	result := prog.InspectVariable("a")
 	if !utils.StringArrayContains(result.ProbablyTypes, "string") {
 		t.Error("ProbablyTypes should contain string")
@@ -80,7 +91,8 @@ func TestTypePrediction_Map2(t *testing.T) {
 }
 
 func TestTypePrediction_MapTypeError(t *testing.T) {
-	prog := ParseSSA(`a = make([]int, 0); a["aa"] = "1" + "2"`)
+	prog := ParseSSA(`a = make([]int, 0); a["aa"] = "1" + "2"; a["bb"]=12;`)
+	prog.Show()
 	errs := strings.Join(lo.Map(
 		prog.GetErrors(),
 		func(err *ssa.SSAError, _ int) string {
@@ -93,6 +105,14 @@ func TestTypePrediction_MapTypeError(t *testing.T) {
 
 }
 
+func TestTypePrediction_FuncType(t *testing.T) {
+	prog := ParseSSA(`b = 1;a = a => a + 1; c = a(b); d = b + 1`)
+	fmt.Printf("debug %v\n", prog.GetErrors().String())
+	cType := strings.Join(prog.InspectVariableLast("c").ProbablyTypes, ",")
+	fmt.Printf("debug %v\n", cType)
+	aType := strings.Join(prog.InspectVariableLast("a").ProbablyTypes, ",")
+	fmt.Printf("debug %v\n", aType)
+}
 
 func TestTypePrediction_Static_PhiAndSccp(t *testing.T) {
 	prog := ParseSSA(`a = 1;b=1; if a>2{b = "arst"};print(b)`)

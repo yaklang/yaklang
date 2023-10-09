@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa4yak"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -78,9 +78,9 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 	functionTable["MITM_PLUGIN"] = ""
 	functionTable["MITM_PARAMS"] = make(map[string]string)
 	// ssa
-	prog := ssa4yak.ParseSSA(
+	prog := yak2ssa.ParseSSA(
 		code,
-		ssa4yak.WithSymbolTable(functionTable),
+		yak2ssa.WithSymbolTable(functionTable),
 	)
 	errs := prog.GetErrors()
 	for _, err := range errs {

@@ -1,4 +1,4 @@
-package ssa4yak
+package yak2ssa
 
 import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
