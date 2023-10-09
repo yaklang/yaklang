@@ -1,9 +1,10 @@
 package yakast
 
 import (
+	"strings"
+
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 )
 
 func (y *YakCompiler) VisitAssignExpressionStmt(raw yak.IAssignExpressionStmtContext) interface{} {
@@ -265,35 +266,35 @@ func (y *YakCompiler) VisitLeftSliceCall(raw yak.ILeftSliceCallContext) interfac
 	return nil
 }
 
-func (y *YakCompiler) VisitDeclearVariableExpression(raw yak.IDeclearVariableExpressionContext) interface{} {
+func (y *YakCompiler) VisitDeclareVariableExpression(raw yak.IDeclareVariableExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*yak.DeclearVariableExpressionContext)
+	i, _ := raw.(*yak.DeclareVariableExpressionContext)
 	if i == nil {
 		return nil
 	}
 
-	if s := i.DeclearVariableOnly(); s != nil {
-		y.VisitDeclearVariableOnly(s)
+	if s := i.DeclareVariableOnly(); s != nil {
+		y.VisitDeclareVariableOnly(s)
 		return nil
 	}
 
-	if s := i.DeclearAndAssignExpression(); s != nil {
-		y.VisitDeclearAndAssignExpression(s)
+	if s := i.DeclareAndAssignExpression(); s != nil {
+		y.VisitDeclareAndAssignExpression(s)
 		return nil
 	}
 
 	return nil
 }
 
-func (y *YakCompiler) VisitDeclearAndAssignExpression(raw yak.IDeclearAndAssignExpressionContext) interface{} {
+func (y *YakCompiler) VisitDeclareAndAssignExpression(raw yak.IDeclareAndAssignExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*yak.DeclearAndAssignExpressionContext)
+	i, _ := raw.(*yak.DeclareAndAssignExpressionContext)
 	if i == nil {
 		return nil
 	}
@@ -313,12 +314,12 @@ func (y *YakCompiler) VisitDeclearAndAssignExpression(raw yak.IDeclearAndAssignE
 	return nil
 }
 
-func (y *YakCompiler) VisitDeclearVariableOnly(raw yak.IDeclearVariableOnlyContext) interface{} {
+func (y *YakCompiler) VisitDeclareVariableOnly(raw yak.IDeclareVariableOnlyContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*yak.DeclearVariableOnlyContext)
+	i, _ := raw.(*yak.DeclareVariableOnlyContext)
 	if i == nil {
 		return nil
 	}
@@ -349,18 +350,18 @@ func (y *YakCompiler) VisitDeclearVariableOnly(raw yak.IDeclearVariableOnlyConte
 	return nil
 }
 
-func (y *YakCompiler) VisitDeclearVariableExpressionStmt(raw yak.IDeclearVariableExpressionStmtContext) interface{} {
+func (y *YakCompiler) VisitDeclareVariableExpressionStmt(raw yak.IDeclareVariableExpressionStmtContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*yak.DeclearVariableExpressionStmtContext)
+	i, _ := raw.(*yak.DeclareVariableExpressionStmtContext)
 	if i == nil {
 		return nil
 	}
 	recoverRange := y.SetRange(i.BaseParserRuleContext)
 	defer recoverRange()
 
-	y.VisitDeclearVariableExpression(i.DeclearVariableExpression())
+	y.VisitDeclareVariableExpression(i.DeclareVariableExpression())
 	return nil
 }

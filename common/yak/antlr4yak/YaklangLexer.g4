@@ -113,8 +113,8 @@ Not: '!';
 Dot: '.';
 // white space
 WS: [ \t\r]+ -> skip;
-CommontStart: '/*';
-CommontEnd: '*/';
+CommentStart: '/*';
+CommentEnd: '*/';
 BackTickL: '`';
 COMMENT: '/*' .*? '*/';
 

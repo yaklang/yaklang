@@ -212,8 +212,8 @@ LtGt
 Not
 Dot
 WS
-CommontStart
-CommontEnd
+CommentStart
+CommentEnd
 BackTickL
 COMMENT
 LINE_COMMENT
@@ -330,8 +330,8 @@ LtGt
 Not
 Dot
 WS
-CommontStart
-CommontEnd
+CommentStart
+CommentEnd
 BackTickL
 COMMENT
 LINE_COMMENT
