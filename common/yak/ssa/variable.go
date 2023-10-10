@@ -66,7 +66,7 @@ func (f *Function) ReplaceSymbolTable(v InstructionValue, to Value) {
 	variable := v.GetVariable()
 	// remove
 	if t, ok := f.symbolTable[variable]; ok {
-		f.symbolTable[variable] = utils.Remove(t, v)
+		f.symbolTable[variable] = utils.RemoveSliceItem(t, v)
 	}
 	f.WriteSymbolTable(variable, to)
 }

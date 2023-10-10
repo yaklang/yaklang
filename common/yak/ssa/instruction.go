@@ -33,9 +33,9 @@ func Insert(i Instruction, b *BasicBlock) {
 func DeleteInst(i Instruction) {
 	b := i.GetBlock()
 	if phi, ok := i.(*Phi); ok {
-		b.Phis = utils.Remove(b.Phis, phi)
+		b.Phis = utils.RemoveSliceItem(b.Phis, phi)
 	} else {
-		b.Insts = utils.Remove(b.Insts, i)
+		b.Insts = utils.RemoveSliceItem(b.Insts, i)
 	}
 	f := i.GetParent()
 	delete(f.InstReg, i)

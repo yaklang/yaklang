@@ -2,6 +2,7 @@ package pass
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -192,20 +193,15 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	if t := f.Obj.GetType(); t.GetTypeKind() != ssa.Any {
 		if t.GetTypeKind() == ssa.ObjectTypeKind {
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
-			fTyp, kTyp := interfaceTyp.GetField(f.Key)
-			if fTyp == nil || kTyp == nil {
-				if methodTyp := interfaceTyp.GetMethod(f.Key.String()); methodTyp != nil {
-					f.SetType(methodTyp)
-					f.IsMethod = true
-					return
-				} else {
-					f.NewError(ssa.Error, TITAG, "type check failed, this field not in interface")
-					return
-				}
+			fTyp, _ := interfaceTyp.GetField(f.Key)
+			if fTyp != nil {
+				f.SetType(fTyp)
 			}
-			// if one change, will next check
-			checkType(f, fTyp)
-			checkType(f.Key, kTyp)
+		}
+		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil {
+			f.SetType(methodTyp)
+			f.IsMethod = true
+			return
 		}
 	}
 	// use update
@@ -242,6 +238,10 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 			ssa.EmitBefore(c, f)
 		}
 		return f
+	}
+	// handler call method
+	if field, ok := c.Method.(*ssa.Field); ok && field.IsMethod {
+		c.Args = utils.InsertSliceItem(c.Args, ssa.Value(field), 0)
 	}
 
 	// handler ellipsis, unpack argument
