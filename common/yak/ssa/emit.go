@@ -240,6 +240,7 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 		anInstruction: newAnInstruction(f.CurrentBlock),
 		anNode:        NewNode(),
 	}
+	r.SetType(BasicTypes[ErrorType])
 	f.emit(r)
 	return r
 }
