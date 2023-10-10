@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"time"
 )
 
 type TrafficSession struct {
@@ -125,6 +126,12 @@ func QueryTrafficSession(db *gorm.DB, request *ypb.QueryTrafficSessionRequest) (
 func QueryTrafficPacket(db *gorm.DB, request *ypb.QueryTrafficPacketRequest) (*bizhelper.Paginator, []*TrafficPacket, error) {
 	db = db.Model(&TrafficPacket{})
 	var data []*TrafficPacket
+
+	if request.GetTimestampNow() > 0 {
+		db = db.Where("created_at >= ?", time.Unix(request.GetTimestampNow(), 0))
+	}
+	
+	db = db.Where("id > ?", request.GetFromId())
 	p, err := bizhelper.Paging(
 		db,
 		int(request.GetPagination().GetPage()),

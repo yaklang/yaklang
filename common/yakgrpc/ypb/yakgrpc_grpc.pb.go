@@ -367,6 +367,7 @@ type YakClient interface {
 	ResetGlobalNetworkConfig(ctx context.Context, in *ResetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*Empty, error)
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
 	// Wireshark
+	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error)
 	QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error)
 	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
@@ -3825,6 +3826,15 @@ func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, 
 	return out, nil
 }
 
+func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error) {
+	out := new(PcapMetadata)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetPcapMetadata", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[42], "/ypb.Yak/PcapX", opts...)
 	if err != nil {
@@ -4236,6 +4246,7 @@ type YakServer interface {
 	ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error)
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
 	// Wireshark
+	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
 	PcapX(Yak_PcapXServer) error
 	QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error)
 	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
@@ -5074,6 +5085,9 @@ func (UnimplementedYakServer) ResetGlobalNetworkConfig(context.Context, *ResetGl
 }
 func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestYakURL not implemented")
+}
+func (UnimplementedYakServer) GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPcapMetadata not implemented")
 }
 func (UnimplementedYakServer) PcapX(Yak_PcapXServer) error {
 	return status.Errorf(codes.Unimplemented, "method PcapX not implemented")
@@ -10224,6 +10238,24 @@ func _Yak_RequestYakURL_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetPcapMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PcapMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetPcapMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetPcapMetadata",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetPcapMetadata(ctx, req.(*PcapMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_PcapX_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).PcapX(&yakPcapXServer{stream})
 }
@@ -11246,6 +11278,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RequestYakURL",
 			Handler:    _Yak_RequestYakURL_Handler,
+		},
+		{
+			MethodName: "GetPcapMetadata",
+			Handler:    _Yak_GetPcapMetadata_Handler,
 		},
 		{
 			MethodName: "QueryTrafficSession",

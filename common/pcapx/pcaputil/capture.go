@@ -20,7 +20,6 @@ func _open(ctx context.Context, handler *pcap.Handle, bpf string, packetEntry fu
 	}
 
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -106,6 +105,9 @@ func Start(opt ...CaptureOption) error {
 		p(conf.trafficPool)
 	}
 	utils.WaitRoutinesFromSlice(handlers, func(handler *pcap.Handle) {
+		defer func() {
+			handler.Close()
+		}()
 		if err := _open(ctx, handler, "", conf.packetHandler); err != nil {
 			log.Errorf("open device failed: %s", err)
 		}

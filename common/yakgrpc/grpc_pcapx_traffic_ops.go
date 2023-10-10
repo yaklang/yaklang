@@ -41,7 +41,7 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 	return &ypb.QueryTrafficPacketResponse{
 		Data:       rspData,
 		Pagination: req.GetPagination(),
-		Total:      int64(pg.TotalPage),
+		Total:      int64(pg.TotalRecord),
 	}, nil
 }
 
@@ -79,6 +79,6 @@ func (s *Server) QueryTrafficSession(ctx context.Context, req *ypb.QueryTrafficS
 	return &ypb.QueryTrafficSessionResponse{
 		Data:       rspData,
 		Pagination: req.GetPagination(),
-		Total:      int64(pg.TotalPage),
+		Total:      int64(pg.TotalRecord),
 	}, nil
 }
