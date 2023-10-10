@@ -1,6 +1,7 @@
 package yak2ssa
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/samber/lo"
@@ -230,3 +231,35 @@ func TestExternStruct(t *testing.T) {
 	})
 }
 
+func TestErrorHandler(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: ` 
+		// this ok
+		getError1()
+		getError2()
+
+		err = getError1() 
+		die(err)
+		a, err = getError2()
+		if err {
+			panic(err)
+		}
+
+		// not handle error
+		err = getError1()     // error 
+		a, err = getError2()  // error
+
+		// (1) = (n contain error) 
+		all = getError2()
+		`,
+		errs: []string{
+			"this error not handler",
+			"this error not handler",
+		},
+		ExternInstance: map[string]any{
+			"getError1": func() error { return errors.New("err") },
+			"getError2": func() (int, error) { return 1, errors.New("err") },
+			"die":       func(error) {},
+		},
+	})
+}

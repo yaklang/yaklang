@@ -39,6 +39,18 @@ func (t *TypeCheck) Analyze(config config, prog *ssa.Program) {
 }
 
 func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
+
+	if v, ok := inst.(ssa.InstructionValue); ok {
+		switch v.GetType().GetTypeKind() {
+		case ssa.ErrorType:
+			variable := v.GetVariable()
+			if len(ssa.GetUserOnly(v)) == 0 && variable != "_" && variable != "" {
+				v.NewError(ssa.Error, TypeCheckTAG, "this error not handler")
+			}
+		default:
+		}
+	}
+
 	switch inst := inst.(type) {
 	case *ssa.Make:
 		// pass; this is top instruction
@@ -125,18 +137,9 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 func (t *TypeCheck) TypeCheckField(f *ssa.Field) {
 	// use interface
-	typ := f.GetType()
+	// typ := f.GetType()
 	// if typ.GetTypeKind() == ssa.ErrorType {
 	// }
-	switch typ.GetTypeKind() {
-	case ssa.ErrorType:
-		if len(f.GetUserOnly()) == 0 && f.GetVariable() != "_" {
-			f.NewError(ssa.Error, TypeCheckTAG, "this error not handler")
-		}
-		return
-	default:
-		return
-	}
 }
 
 func (t *TypeCheck) TypeCheckUpdate(u *ssa.Update) {
