@@ -198,7 +198,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 				f.SetType(fTyp)
 			}
 		}
-		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil {
+		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
 			f.SetType(methodTyp)
 			f.IsMethod = true
 			return
@@ -241,7 +241,10 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 	// handler call method
 	if field, ok := c.Method.(*ssa.Field); ok && field.IsMethod {
-		c.Args = utils.InsertSliceItem(c.Args, ssa.Value(field), 0)
+		if v, ok := field.Obj.(ssa.Value); ok {
+			c.Args = utils.InsertSliceItem(c.Args, v, 0)
+		}
+		field.IsMethod = false
 	}
 
 	// handler ellipsis, unpack argument

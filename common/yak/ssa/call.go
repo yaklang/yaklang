@@ -30,6 +30,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 		// field
 		if v, ok := inst.Obj.(Value); ok && inst.IsMethod {
 			args = append([]Value{v}, args...)
+			inst.IsMethod = false
 		}
 		fun, ok := inst.GetLastValue().(*Function)
 		if ok {
