@@ -104,14 +104,14 @@ func (lb *LoopBuilder) Finish() {
 
 	// build condition
 	var condition Value
-	if lb.buildCondition != nil {
-		// if in header end; to exit or body
-		lb.b.CurrentBlock = header
-		condition = lb.buildCondition()
-	} else {
-		condition = NewConst(true)
-		lb.b.NewError(Error, SSATAG, "this condition not set!")
-	}
+	// if lb.buildCondition != nil {
+	// if in header end; to exit or body
+	lb.b.CurrentBlock = header
+	condition = lb.buildCondition()
+	// } else {
+	// 	condition = NewConst(true)
+	// lb.b.NewError(Error, SSATAG, "this condition not set!")
+	// }
 	loop = lb.b.EmitLoop(body, exit, condition)
 
 	// build body
@@ -145,7 +145,6 @@ func (lb *LoopBuilder) Finish() {
 	lb.b.EmitJump(rest)
 	lb.b.CurrentBlock = rest
 }
-
 
 // if builder
 
