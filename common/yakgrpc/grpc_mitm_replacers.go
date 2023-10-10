@@ -207,6 +207,37 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 	return
 }
 
+func (m *mitmReplacer) matchAndRenderColor(flow *yakit.HTTPFlow, r *regexp2.Regexp, rule *ypb.MITMContentReplacer, origin []byte) *yakit.ExtractedData {
+	match, err := r.FindStringMatch(utils.UnsafeBytesToString(origin))
+	if err != nil || match == nil {
+		return nil
+	}
+
+	var ret string
+	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
+		if match.GroupCount() > 0 {
+			extractGroup := match.GroupByNumber(1)
+			if extractGroup != nil {
+				ret = extractGroup.String()
+			}
+		} else {
+			ret = match.String()
+		}
+
+		if ret == "" {
+			continue
+		}
+		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
+		yakit.ExtractedDataFromHTTPFlow(
+			flow.CalcHash(), rule.VerboseName,
+			ret,
+			r.String(),
+		)
+	}
+
+	return nil
+}
+
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) []*yakit.ExtractedData {
 	defer func() {
 		if err := recover(); err != nil {
@@ -214,6 +245,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		}
 	}()
 	var extracted []*yakit.ExtractedData
+	var singleExtracted *yakit.ExtractedData
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
@@ -228,38 +260,22 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		if r == nil {
 			continue
 		}
-
-		match, err := r.FindStringMatch(string(request))
-		if err != nil || match == nil {
-			continue
-		}
-
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
 
-		var ret string
-		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
-		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
-			if rule.EnableForRequest && match.GroupCount() > 1 {
-				ret = match.GroupByNumber(1).String()
-			} else if rule.EnableForResponse && match.GroupCount() > 0 {
-				extractGroup := match.GroupByNumber(1)
-				if extractGroup != nil {
-					ret = extractGroup.String()
-				}
-			} else {
-				ret = match.String()
+		if rule.EnableForRequest {
+			singleExtracted = m.matchAndRenderColor(flow, r, rule, request)
+			if singleExtracted != nil {
+				extracted = append(extracted, singleExtracted)
 			}
+		}
 
-			if ret == "" {
-				continue
+		if rule.EnableForResponse {
+			singleExtracted = m.matchAndRenderColor(flow, r, rule, response)
+			if singleExtracted != nil {
+				extracted = append(extracted, singleExtracted)
 			}
-			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
-				flow.CalcHash(), rule.VerboseName,
-				ret,
-				r.String(),
-			))
 		}
 	}
 	return extracted
