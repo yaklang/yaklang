@@ -16,7 +16,9 @@ const TAG ssa.ErrorTag = "yakast"
 // entry point
 func (b *astbuilder) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
-	b.buildStatementList(ast.StatementList().(*yak.StatementListContext))
+	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
+		b.buildStatementList(stmt)
+	}
 }
 
 // statement list
