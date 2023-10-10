@@ -232,8 +232,9 @@ func TestExternStruct(t *testing.T) {
 }
 
 func TestErrorHandler(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: ` 
+	t.Run("error handler check", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
 		// this ok
 		getError1()
 		getError2()
@@ -252,14 +253,30 @@ func TestErrorHandler(t *testing.T) {
 		// (1) = (n contain error) 
 		all = getError2()
 		`,
-		errs: []string{
-			ssa4analyze.ErrorUnhandled(),
-			ssa4analyze.ErrorUnhandled(),
-		},
-		ExternInstance: map[string]any{
-			"getError1": func() error { return errors.New("err") },
-			"getError2": func() (int, error) { return 1, errors.New("err") },
-			"die":       func(error) {},
-		},
+			errs: []string{
+				ssa4analyze.ErrorUnhandled(),
+				ssa4analyze.ErrorUnhandled(),
+			},
+			ExternInstance: map[string]any{
+				"getError1": func() error { return errors.New("err") },
+				"getError2": func() (int, error) { return 1, errors.New("err") },
+				"die":       func(error) {},
+			},
+		})
 	})
+
+	t.Run("recover error", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			err := recover()
+			if err != nil {
+				print(err.Error())
+			}
+			`,
+			ExternInstance: map[string]any{
+				"print": func(any) {},
+			},
+		})
+	})
+
 }

@@ -732,4 +732,5 @@ type Recover struct {
 
 var _ Node = (*Recover)(nil)
 var _ Value = (*Recover)(nil)
+var _ User = (*Recover)(nil)
 var _ Instruction = (*Recover)(nil)

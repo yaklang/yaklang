@@ -335,3 +335,7 @@ func (p *Panic) ReplaceValue(v, to Value) {
 		panic("panic instruction not use this value")
 	}
 }
+
+// ---------- RECOVER
+func (r *Recover) ReplaceValue(v, to Value) {
+}

@@ -10,6 +10,15 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+func init() {
+	BasicTypes[ErrorType].method["Error"] = NewFunctionType(
+		"error.Error",
+		[]Type{BasicTypes[ErrorType]},
+		[]Type{BasicTypes[String]},
+		false,
+	)
+}
+
 type Type interface {
 	String() string
 	RawString() string
