@@ -95,6 +95,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v3 v3.23.4
+	github.com/sijms/go-ora/v2 v2.7.19
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/steambap/captcha v1.4.1
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
