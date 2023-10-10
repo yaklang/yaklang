@@ -215,7 +215,7 @@ func (m *mitmReplacer) matchAndRenderColor(flow *yakit.HTTPFlow, r *regexp2.Rege
 
 	var ret string
 	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
-		if match.GroupCount() > 0 {
+		if match.GroupCount() > 1 {
 			extractGroup := match.GroupByNumber(1)
 			if extractGroup != nil {
 				ret = extractGroup.String()
@@ -228,7 +228,7 @@ func (m *mitmReplacer) matchAndRenderColor(flow *yakit.HTTPFlow, r *regexp2.Rege
 			continue
 		}
 		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
-		yakit.ExtractedDataFromHTTPFlow(
+		return yakit.ExtractedDataFromHTTPFlow(
 			flow.CalcHash(), rule.VerboseName,
 			ret,
 			r.String(),
