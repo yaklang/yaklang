@@ -88,7 +88,7 @@ func (b *FunctionBuilder) BuildValueFromAny(libName, id string, v any) (value Va
 func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {
 	params := make([]Type, 0)
 	returns := make([]Type, 0)
-	hasEllipsis := itype.IsVariadic()
+	isVariadic := itype.IsVariadic()
 	// parameter
 	for i := 0; i < itype.NumIn(); i++ {
 		params = append(params, f.handlerType(itype.In(i), level))
@@ -97,7 +97,14 @@ func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int
 	for i := 0; i < itype.NumOut(); i++ {
 		returns = append(returns, f.handlerType(itype.Out(i), level))
 	}
-	return NewFunctionType(itype.String(), params, returns, hasEllipsis)
+	if isVariadic {
+		if t, ok := params[len(params)-1].(*ObjectType); ok {
+			t.VariadicPara = true
+		} else {
+			// error
+		}
+	}
+	return NewFunctionType(itype.String(), params, returns, isVariadic)
 }
 
 func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
