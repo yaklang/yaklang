@@ -1,22 +1,40 @@
 package yak2ssa
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func TestError(t *testing.T) {
-	testCase := []struct {
-		name string
-		code string
-		err  []string
-	}{
-		{
-			name: "loop-if empty BasicBlock",
-			code: `
+type TestCase struct {
+	code           string
+	errs           []string
+	ExternInstance map[string]any
+}
+
+func CheckTestCase(t *testing.T, tc TestCase) {
+	opts := make([]Option, 0)
+	if tc.ExternInstance != nil {
+		opts = append(opts, WithSymbolTable(tc.ExternInstance))
+	}
+	prog := ParseSSA(tc.code, opts...)
+	// prog.Show()
+	// fmt.Println(prog.GetErrors().String())
+	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
+	if len(errs) != len(tc.errs) {
+		t.Fatalf("error len not match %d vs %d", len(errs), len(tc.errs))
+	}
+	for i := 0; i < len(errs); i++ {
+		for errs[i] != tc.errs[i] {
+			t.Fatalf("error not match %s vs %s", errs[i], tc.errs[i])
+		}
+	}
+}
+
+func TestCfgEmptyBasic(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: `
 			for i {
 				if j {
 					return a  
@@ -26,17 +44,19 @@ func TestError(t *testing.T) {
 				// unreachable
 			}
 			`,
-			err: []string{
-				"this value undefine:i",
-				"this value undefine:j",
-				"this value undefine:a",
-				"this value undefine:b",
-			},
+		errs: []string{
+			"this value undefine:i",
+			"this value undefine:j",
+			"this value undefine:a",
+			"this value undefine:b",
 		},
+	})
 
-		{
-			name: "only declare variable",
-			code: `
+}
+
+func TestOnlyDeclareVariable(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: `
 			var a1 
 			if 1 {
 				a1 = 1
@@ -49,46 +69,36 @@ func TestError(t *testing.T) {
 			}
 			c = a2
 			`,
-			err: []string{
-				"this value undefine:a2",
-			},
+		errs: []string{
+			"this value undefine:a2",
 		},
+	})
+}
 
-		{
-			name: "undefined lexical",
-			code: `
+func TestUndefinedLexical(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: `
 			a == undefined
 			`,
-			err: []string{
-				"this value undefine:a",
-			},
+		errs: []string{
+			"this value undefine:a",
 		},
+	})
+}
 
-		{
-			name: "free-value in extern-instance ahead",
-			code: `
-			param = ""
+func TestFreeValueAheadExternInstance(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: `
+			param() // extern value 
+			param = "" // value
 			delayFuzz =() =>{
-				param.a().b()
+				param.a().b() // freeValue 
 			}
 			`,
-			err: []string{},
+		errs: []string{},
+		ExternInstance: map[string]any{
+			"param": func() {},
 		},
-	}
+	})
 
-	for _, tc := range testCase {
-		t.Logf("run test : %s", tc.name)
-		prog := ParseSSA(tc.code)
-		prog.Show()
-		fmt.Println(prog.GetErrors().String())
-		err := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
-		if len(err) != len(tc.err) {
-			t.Fatalf("error len not match %d vs %d", len(err), len(tc.err))
-		}
-		for i := 0; i < len(err); i++ {
-			for err[i] != tc.err[i] {
-				t.Fatalf("error not match %s vs %s", err[i], tc.err[i])
-			}
-		}
-	}
 }
