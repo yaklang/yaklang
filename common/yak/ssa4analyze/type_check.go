@@ -1,6 +1,7 @@
 package ssa4analyze
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -45,7 +46,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		case ssa.ErrorType:
 			variable := v.GetVariable()
 			if len(ssa.GetUserOnly(v)) == 0 && variable != "_" && variable != "" {
-				v.NewError(ssa.Error, TypeCheckTAG, "this error not handler")
+				v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
 			}
 		default:
 		}
@@ -68,7 +69,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 }
 
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefine) {
-	inst.NewError(ssa.Error, TypeCheckTAG, "this value undefine:%s", inst.GetVariable())
+	inst.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetVariable()))
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
@@ -79,6 +80,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	// check argument number
 	func() {
 		wantParaLen := len(funcTyp.Parameter)
+		var gotPara ssa.Types = lo.Map(c.Args, func(arg ssa.Value, _ int) ssa.Type { return arg.GetType() })
 		gotParaLen := len(c.Args)
 		// not match
 		if wantParaLen == gotParaLen {
@@ -98,8 +100,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 		c.NewError(
 			ssa.Error, TypeCheckTAG,
-			`not enough arguments in call %s have (%s) want (%s)`,
-			str, c.Args, funcTyp.Parameter,
+			NotEnoughArgument(str, gotPara.String(), funcTyp.Parameter.String()),
 		)
 	}()
 
@@ -128,8 +129,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			// }
 			c.NewError(
 				ssa.Error, TypeCheckTAG,
-				"function call assignment mismatch: left: %d variable but right return %d values",
-				leftLen, rightLen,
+				CallAssignmentMismatch(leftLen, rightLen),
 			)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
 type TestCase struct {
@@ -46,10 +47,10 @@ func TestCfgEmptyBasic(t *testing.T) {
 			}
 			`,
 		errs: []string{
-			"this value undefine:i",
-			"this value undefine:j",
-			"this value undefine:a",
-			"this value undefine:b",
+			ssa4analyze.ValueUndefined("i"),
+			ssa4analyze.ValueUndefined("j"),
+			ssa4analyze.ValueUndefined("a"),
+			ssa4analyze.ValueUndefined("b"),
 		},
 	})
 
@@ -71,7 +72,7 @@ func TestOnlyDeclareVariable(t *testing.T) {
 			c = a2
 			`,
 		errs: []string{
-			"this value undefine:a2",
+			ssa4analyze.ValueUndefined("a2"),
 		},
 	})
 }
@@ -82,7 +83,7 @@ func TestUndefinedLexical(t *testing.T) {
 			a == undefined
 			`,
 		errs: []string{
-			"this value undefine:a",
+			ssa4analyze.ValueUndefined("a"),
 		},
 	})
 }
@@ -96,7 +97,6 @@ func TestFreeValueAheadExternInstance(t *testing.T) {
 				param.a().b() // freeValue 
 			}
 			`,
-		errs: []string{},
 		ExternInstance: map[string]any{
 			"param": func() {},
 		},
@@ -112,8 +112,8 @@ func TestMemberCall(t *testing.T) {
 		`,
 		errs: []string{
 			"member call target Error",
-			"this value undefine:b",
-			"this value undefine:param",
+			ssa4analyze.ValueUndefined("b"),
+			ssa4analyze.ValueUndefined("param"),
 		},
 		ExternInstance: map[string]any{
 			"param": func() {},
@@ -139,10 +139,10 @@ func TestCallParamReturn(t *testing.T) {
 		func3()
 		`,
 			errs: []string{
-				"not enough arguments in call func1 have ([]) want (number)",
-				"not enough arguments in call func2 have ([1]) want (number, number)",
-				"not enough arguments in call func2 have ([]) want (number, number)",
-				"not enough arguments in call func3 have ([]) want (number, ...number)",
+				ssa4analyze.NotEnoughArgument("func1", "", "number"),
+				ssa4analyze.NotEnoughArgument("func2", "number", "number, number"),
+				ssa4analyze.NotEnoughArgument("func2", "", "number, number"),
+				ssa4analyze.NotEnoughArgument("func3", "", "number, ...number"),
 			},
 			ExternInstance: map[string]any{
 				"func1": func(a int) {},
@@ -176,8 +176,8 @@ func TestCallParamReturn(t *testing.T) {
 			a, b = func3()    // get error 2 vs 3
 			`,
 			errs: []string{
-				"function call assignment mismatch: left: 3 variable but right return 2 values",
-				"function call assignment mismatch: left: 2 variable but right return 3 values",
+				ssa4analyze.CallAssignmentMismatch(3, 2),
+				ssa4analyze.CallAssignmentMismatch(2, 3),
 			},
 
 			ExternInstance: map[string]any{
@@ -253,8 +253,8 @@ func TestErrorHandler(t *testing.T) {
 		all = getError2()
 		`,
 		errs: []string{
-			"this error not handler",
-			"this error not handler",
+			ssa4analyze.ErrorUnhandled(),
+			ssa4analyze.ErrorUnhandled(),
 		},
 		ExternInstance: map[string]any{
 			"getError1": func() error { return errors.New("err") },
