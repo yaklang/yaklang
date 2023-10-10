@@ -17,11 +17,16 @@ type canStartStopToken interface {
 func (b *astbuilder) SetRange(token canStartStopToken) func() {
 	// fmt.Printf("debug %v\n", b.GetText())
 	source := strings.Split(token.GetText(), "\n")[0]
-	endLine, endColumn := yakast.GetEndPosition(token.GetStop())
+	end := token.GetStop()
+	start := token.GetStart()
+	if end == nil || start == nil {
+		return func() {}
+	}
+	endLine, endColumn := yakast.GetEndPosition(end)
 	pos := &ssa.Position{
 		SourceCode:  source,
-		StartLine:   token.GetStart().GetLine(),
-		StartColumn: token.GetStart().GetColumn(),
+		StartLine:   start.GetLine(),
+		StartColumn: start.GetColumn(),
 		EndLine:     endLine,
 		EndColumn:   endColumn,
 	}
