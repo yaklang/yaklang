@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"fmt"
 	"github.com/google/gopacket/pcap"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
@@ -76,6 +77,16 @@ func IfaceNameToPcapIfaceName(name string) (string, error) {
 		}
 	}
 	return "", NewConvertIfaceNameError(name)
+}
+
+func AllDevices() []*pcap.Interface {
+	ifs, err := pcap.FindAllDevs()
+	if err != nil {
+		log.Errorf("find pcap dev failed: %s", err)
+	}
+	return lo.Map(ifs, func(item pcap.Interface, index int) *pcap.Interface {
+		return &item
+	})
 }
 
 func GetPcapInterfaceByIndex(i int) (*pcap.Interface, error) {
