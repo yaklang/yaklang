@@ -535,16 +535,32 @@ service Yak {
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
 
   // Wireshark
+  rpc GetPcapMetadata(PcapMetadataRequest) returns (PcapMetadata);
   rpc PcapX(stream PcapXRequest) returns (stream PcapXResponse);
   rpc QueryTrafficSession(QueryTrafficSessionRequest) returns (QueryTrafficSessionResponse);
   rpc QueryTrafficPacket(QueryTrafficPacketRequest) returns (QueryTrafficPacketResponse);
   rpc QueryTrafficTCPReassembled(QueryTrafficTCPReassembledRequest) returns (QueryTrafficTCPReassembledResponse);
 }
 
+message PcapMetadataRequest {
+
+}
+
+message PcapMetadata {
+  repeated NetInterface AvailablePcapDevices = 1;
+  repeated KVPair AvailableSessionTypes = 2;
+  repeated KVPair AvailableLinkLayerTypes = 3;
+  repeated KVPair AvailableNetworkLayerTypes = 4;
+  repeated KVPair AvailableTransportLayerTypes = 5;
+
+  // AutoDetect Public Net If
+  NetInterface DefaultPublicNetInterface = 6;
+}
+
 message QueryTrafficPacketRequest {
   Paging Pagination = 1;
 
-  bool FromNow = 2;
+  int64 TimestampNow = 2;
   string SessionId = 3;
   string LinkLayerTypes = 4;
   string NetworkLayerTypes = 5;
@@ -554,6 +570,8 @@ message QueryTrafficPacketRequest {
   string DstIP = 9;
   string SrcPort = 10;
   string DstPort = 11;
+
+  int64 FromId = 12;
 }
 
 message QueryTrafficTCPReassembledRequest {
@@ -2116,6 +2134,8 @@ message NetInterface {
   string Name = 1;
   string Addr = 2;
   string IP = 3;
+  bool IsIpv4 = 5;
+  bool IsIpv6 = 6;
 }
 
 message ConfigGlobalReverseParams {

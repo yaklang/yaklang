@@ -85,9 +85,11 @@ func (s *Server) AvailableLocalAddr(ctx context.Context, empty *ypb.Empty) (*ypb
 		}
 
 		data = append(data, &ypb.NetInterface{
-			Name: iface.Name,
-			IP:   ipAddr,
-			Addr: ipAddr,
+			Name:   iface.Name,
+			IP:     ipAddr,
+			Addr:   ipAddr,
+			IsIpv4: utils.IsIPv4(ipAddr),
+			IsIpv6: utils.IsIPv6(ipAddr),
 		})
 	}
 
