@@ -23,6 +23,13 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	}
 	// 转Template
 	yakTemplate, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(content)
+	yakTemplate.RecoverPlaceHolder()
+	warningMsgStr := ""
+	if err := yakTemplate.CheckTemplateRisks(); err != nil {
+		warningMsgStr = err.Error()
+	}
+	yakTemplate.RenderTemplateWithDefaultValue()
+
 	if err != nil {
 		return nil, utils.Errorf("cannot create yak template from yaml: %v", err)
 	}
@@ -33,36 +40,9 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		if len(sequence.HTTPRequests) != 0 {
 			fuzzerReqs = make([]*ypb.FuzzerRequest, len(sequence.HTTPRequests)) // 每个package对应一个fuzzerRequest,使用相同配置
 			for i, request := range sequence.HTTPRequests {
-				req := request.Request
-				for k, v := range yakTemplate.PlaceHolderMap { // 做替换这些事应该是执行时做，需要改，这里暂时做下兼容
-					if strings.HasPrefix(v, "__") && strings.HasSuffix(v, "__") {
-						newv := ""
-						var nextAdd = ('A' - 'a') //首字母大写
-						for _, ch := range v[2 : len(v)-2] {
-							if ch == '_' {
-								nextAdd += ('A' - 'a')
-								continue
-							} else {
-								newv += string(ch + nextAdd)
-								nextAdd = 0
-							}
-						}
-						v = newv
-					}
-					//switch v {
-					//case "Hostname":
-					//	v = "www.example.com"
-					//case "RootUrl":
-					//	v = "/"
-					//default:
-					//	v = "{{" + v + "}}"
-					//}
-					v = "{{" + v + "}}"
-					req = strings.ReplaceAll(req, k, v)
-				}
 				fuzzerReqs[i] = &ypb.FuzzerRequest{
-					Request:                  req,
-					RequestRaw:               []byte(req),
+					Request:                  request.Request,
+					RequestRaw:               []byte(request.Request),
 					PerRequestTimeoutSeconds: request.Timeout.Seconds(),
 				}
 			}
@@ -203,10 +183,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			fuzzerRequest = append(fuzzerRequest, fuzzerReq)
 		}
 	}
-	warningMsgStr := ""
-	if err := yakTemplate.CheckTemplateRisks(); err != nil {
-		warningMsgStr = err.Error()
-	}
+
 	result := &ypb.ImportHTTPFuzzerTaskFromYamlResponse{
 		Requests: &ypb.FuzzerRequests{
 			Requests: fuzzerRequest,
@@ -275,9 +252,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			if err != nil {
 				log.Error(err)
 			}
-			rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
-			path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
-			bulk.Paths = []string{path}
+			//rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
+			//path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
+			bulk.Paths = []string{url.Path}
 			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
 			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
 			req, err := lowhttp.ParseBytesToHttpRequest(request.RequestRaw)
@@ -290,15 +267,18 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		case "raw":
 			fallthrough
 		default:
-			generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
+			//generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
 			bulk.HTTPRequests = []*httptpl.YakHTTPRequestPacket{&httptpl.YakHTTPRequestPacket{
-				Request: string(generalizedRequests),
+				Request: string(request.RequestRaw),
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
 			}}
 		}
-		bulk.Matcher = &httptpl.YakMatcher{
-			SubMatchers:         HttpResponseMatchers2YakMatchers(request.Matchers),
-			SubMatcherCondition: request.MatchersCondition,
+		matchers := HttpResponseMatchers2YakMatchers(request.Matchers)
+		if len(matchers) > 0 {
+			bulk.Matcher = &httptpl.YakMatcher{
+				SubMatchers:         matchers,
+				SubMatcherCondition: request.MatchersCondition,
+			}
 		}
 		bulk.Extractor = funk.Map(request.Extractors, func(extractor *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
 			typeName := ""
@@ -373,6 +353,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	template.Severity = "low"
 	template.Description = "write your description here"
 	template.Reference = []string{"https://github.com/", "https://cve.mitre.org/"}
+	template.GeneralizeTemplateVar()
 	template.Sign = template.SignMainParams()
 	// 转换为Yaml
 	yamlContent, err := MarshalYakTemplateToYaml(template)
@@ -528,55 +509,55 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		//sequenceItem.Set("inherit-variables", sequence.InheritVariables)
 		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
 		// matcher生成
-		matcher := sequence.Matcher
-		//addSignElements(matcher)
-		matcherCondition := matcher.SubMatcherCondition
-		if matcherCondition == "" {
-			matcherCondition = "or"
-		}
-		sequenceItem.Set("matchers-condition", matcherCondition)
-		matcherArray := sequenceItem.NewSubArrayBuilder("matchers")
-		for _, subMatcher := range matcher.SubMatchers {
-			matcherItem := NewYamlMapBuilder()
-			matcherItem.SetDefaultField(map[string]any{
-				"negative":  false,
-				"part":      "raw",
-				"condition": "or",
-			})
-			switch subMatcher.MatcherType {
-			case "word":
-				matcherItem.Set("type", "word")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("words", subMatcher.Group)
-			case "status_code":
-				matcherItem.Set("type", "status")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("status", subMatcher.Group)
-			case "content_length":
-				matcherItem.Set("type", "size")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("size", subMatcher.Group)
-			case "binary":
-				matcherItem.Set("type", "binary")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("binary", subMatcher.Group)
-			case "regex":
-				matcherItem.Set("type", "regex")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("regex", subMatcher.Group)
-			case "expr":
-				matcherItem.Set("type", "dsl")
-				matcherItem.Set("part", subMatcher.Scope)
-				matcherItem.Set("dsl", subMatcher.Group)
+		if sequence.Matcher != nil {
+			matcher := sequence.Matcher
+			//addSignElements(matcher)
+			matcherCondition := matcher.SubMatcherCondition
+			if matcherCondition == "" {
+				matcherCondition = "or"
 			}
-			matcherItem.Set("negative", subMatcher.Negative)
-			matcherItem.Set("condition", subMatcher.Condition)
-			matcherItem.AddEmptyLine()
-			matcherArray.Add(matcherItem)
+			sequenceItem.Set("matchers-condition", matcherCondition)
+			matcherArray := sequenceItem.NewSubArrayBuilder("matchers")
+			for _, subMatcher := range matcher.SubMatchers {
+				matcherItem := NewYamlMapBuilder()
+				matcherItem.SetDefaultField(map[string]any{
+					"negative":  false,
+					"part":      "raw",
+					"condition": "or",
+				})
+				switch subMatcher.MatcherType {
+				case "word":
+					matcherItem.Set("type", "word")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("words", subMatcher.Group)
+				case "status_code":
+					matcherItem.Set("type", "status")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("status", subMatcher.Group)
+				case "content_length":
+					matcherItem.Set("type", "size")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("size", subMatcher.Group)
+				case "binary":
+					matcherItem.Set("type", "binary")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("binary", subMatcher.Group)
+				case "regex":
+					matcherItem.Set("type", "regex")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("regex", subMatcher.Group)
+				case "expr":
+					matcherItem.Set("type", "dsl")
+					matcherItem.Set("part", subMatcher.Scope)
+					matcherItem.Set("dsl", subMatcher.Group)
+				}
+				matcherItem.Set("negative", subMatcher.Negative)
+				matcherItem.Set("condition", subMatcher.Condition)
+				matcherItem.AddEmptyLine()
+				matcherArray.Add(matcherItem)
+			}
 		}
-
 		sequenceItem.Set("attack", sequence.AttackMode)
-
 		//addSignElements(sequence.Extractor)
 		// extractor生成
 		extratorsArray := sequenceItem.NewSubArrayBuilder("extractors")
