@@ -88,7 +88,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 					continue
 				}
 			}
-			f.NewError(Error, SSATAG, "call target closure binding variable not found: %s", para)
+			f.NewError(Error, SSATAG, BindingNotFound(para))
 		}
 
 		if field, ok := freeValue[index].(*Field); ok { // will modify in function must field
@@ -100,7 +100,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 					continue
 				}
 			}
-			f.NewError(Error, SSATAG, "call target closure binding variable not found: %s", field)
+			f.NewError(Error, SSATAG, BindingNotFound(field))
 		}
 	}
 	// if t := target.GetType(); !utils.IsNil(t) {

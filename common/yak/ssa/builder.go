@@ -141,7 +141,7 @@ func (b *FunctionBuilder) PushTarget(_break, _continue, _fallthrough *BasicBlock
 func (b *FunctionBuilder) PopTarget() bool {
 	b.target = b.target.tail
 	if b.target == nil {
-		b.NewError(Error, SSATAG, "error target struct this position when build")
+		// b.NewError(Error, SSATAG, "error target struct this position when build")
 		return false
 	} else {
 		return true

@@ -140,7 +140,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		bb.Condition = cond
 
 		if bb.Reachable() == -1 {
-			bb.NewError(ssa.Warn, BCTag, "this block unreachable!")
+			bb.NewError(ssa.Warn, BCTag, BlockUnreachable())
 		}
 
 		// dfs

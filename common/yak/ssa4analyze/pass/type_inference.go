@@ -285,7 +285,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 				return
 			}
 		}
-		c.NewError(ssa.Error, TITAG, "this function con't return error")
+		c.NewError(ssa.Error, TITAG, FunctionContReturnError())
 	} else {
 		c.SetType(funcTyp.ReturnType)
 	}

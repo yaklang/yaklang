@@ -24,13 +24,9 @@ func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmtlist.AllStatement()
-	if len(allstmt) == 0 {
-		b.NewError(ssa.Warn, TAG, "empty statement list")
-	} else {
-		for _, stmt := range allstmt {
-			if stmt, ok := stmt.(*yak.StatementContext); ok {
-				b.buildStatement(stmt)
-			}
+	for _, stmt := range allstmt {
+		if stmt, ok := stmt.(*yak.StatementContext); ok {
+			b.buildStatement(stmt)
 		}
 	}
 }
