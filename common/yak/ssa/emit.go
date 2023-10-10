@@ -59,7 +59,7 @@ func (f *FunctionBuilder) EmitConstInst(c *Const) *ConstInst {
 	return i
 }
 
-func (f *FunctionBuilder) EmitUndefine(name string) Value {
+func (f *FunctionBuilder) EmitUndefine(name string) *Undefine {
 	if f.CurrentBlock.finish {
 		return nil
 	}

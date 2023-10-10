@@ -631,9 +631,9 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			// (n) = field(1, #index)
 			for i, lv := range lvalues {
 				field := b.EmitField(inter, ssa.NewConst(i))
-				if inst, ok := field.(ssa.Instruction); ok {
-					inst.SetPosition(lv.GetPosition())
-				}
+				// if inst, ok := field.(ssa.Instruction); ok {
+				// 	inst.SetPosition(lv.GetPosition())
+				// }
 				lv.Assign(field, b.FunctionBuilder)
 			}
 		} else if len(lvalues) == 1 {
@@ -820,7 +820,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		expr := b.buildExpression(s)
 		if expr == nil {
-			b.NewError(ssa.Error, TAG, "leftexpression expression is nil")
+			b.NewError(ssa.Error, TAG, "left expression expression is nil")
 			return nil
 		}
 		//TODO: check interface type
@@ -828,7 +828,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		if expr, ok := expr.(ssa.User); ok {
 			inter = expr
 		} else {
-			b.NewError(ssa.Error, TAG, "leftexprssion exprssion is not interface")
+			b.NewError(ssa.Error, TAG, "left expression is not interface")
 			return nil
 		}
 
@@ -876,7 +876,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		return nil
 	}
 
-	// typeliteral expression
+	// typeLiteral expression
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
 			v := getValue(0)
@@ -935,7 +935,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 				inter = b.EmitConstInst(v)
 			} else {
 				b.NewError(ssa.Error, TAG, "member call target Error")
-				return nil
+				// return nil
+				{
+					expr := stmt.Expression(0).(*yak.ExpressionContext)
+					recoverRange := b.SetRange(expr.BaseParserRuleContext)
+					text := expr.GetText()
+					inter = b.EmitUndefine(text)
+					recoverRange()
+				}
 			}
 		}
 
@@ -1274,7 +1281,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
 		}
 	default:
-		b.NewError(ssa.Error, TAG, "make unknow type")
+		b.NewError(ssa.Error, TAG, "make unknown type")
 	}
 	return nil
 }
@@ -1327,7 +1334,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 				// build block
 				b.buildBlock(block)
 			} else if expression, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-				// hanlder expression
+				// handler expression
 				v := b.buildExpression(expression)
 				b.EmitReturn([]ssa.Value{v})
 			} else {
@@ -1404,9 +1411,9 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis()
-	allexpre := stmt.AllExpression()
-	// v := make([]ssa.Value, 0, len(allexpre))
-	for _, expr := range allexpre {
+	allExprs := stmt.AllExpression()
+	// v := make([]ssa.Value, 0, len(allExprs))
+	for _, expr := range allExprs {
 		v = append(v, b.buildExpression(expr.(*yak.ExpressionContext)))
 	}
 	if ellipsis != nil {
@@ -1423,11 +1430,11 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	exprs := stmt.AllExpression()
 	values := make([]ssa.Value, exprLen)
 	if len(exprs) == 0 {
-		b.NewError(ssa.Error, TAG, "slicecall expression is zero")
+		b.NewError(ssa.Error, TAG, "slice call expression is zero")
 		return nil
 	}
 	if len(exprs) > 3 {
-		b.NewError(ssa.Error, TAG, "slicecall expression too much")
+		b.NewError(ssa.Error, TAG, "slice call expression too much")
 		return nil
 	}
 	for i, expr := range exprs {
@@ -1461,9 +1468,9 @@ func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.
 func (b *astbuilder) buildExpressionListMultiline(stmt *yak.ExpressionListMultilineContext) []ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	allexpr := stmt.AllExpression()
-	exprs := make([]ssa.Value, 0, len(allexpr))
-	for _, expr := range allexpr {
+	allExprs := stmt.AllExpression()
+	exprs := make([]ssa.Value, 0, len(allExprs))
+	for _, expr := range allExprs {
 		if expr, ok := expr.(*yak.ExpressionContext); ok {
 			exprs = append(exprs, b.buildExpression(expr))
 		}

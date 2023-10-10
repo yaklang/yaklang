@@ -304,7 +304,8 @@ type ObjectType struct {
 
 	AnonymousField []*ObjectType
 
-	Combination bool
+	Combination  bool // function multiple return will combined to struct
+	VariadicPara bool // function last variadic parameter will become slice
 
 	method map[string]*FunctionType
 
@@ -368,6 +369,18 @@ func NewStructType() *ObjectType {
 }
 
 func (itype ObjectType) String() string {
+	if itype.Combination {
+		return strings.Join(
+			lo.Map(
+				itype.FieldTypes,
+				func(t Type, _ int) string { return t.String() },
+			),
+			", ",
+		)
+	}
+	if itype.VariadicPara {
+		return "..." + itype.FieldType.String()
+	}
 	if itype.Name != "" {
 		return itype.Name
 	}
@@ -376,54 +389,40 @@ func (itype ObjectType) String() string {
 
 func (itype ObjectType) RawString() string {
 	ret := ""
-	if itype.Combination {
-		// ret += itype.fieldType.String()
-		// for index := range itype.FieldTypes {
-		// 	ret += fmt.Sprintf(", %s")
-		// }
-		ret += strings.Join(
-			lo.Map(
-				itype.FieldTypes,
-				func(t Type, _ int) string { return t.String() },
-			),
-			", ",
-		)
-	} else {
-		switch itype.Kind {
-		case Slice:
-			// map[int]T
-			if itype.Len == 0 {
-				ret += fmt.Sprintf("[]%s", itype.FieldType.String())
-			} else {
-				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
-			}
-		case Map:
-			// map[T]U
-			// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
-			keyTyp := itype.KeyTyp
-			if utils.IsNil(keyTyp) {
-				keyTyp = BasicTypes[Any]
-			}
-			fieldType := itype.FieldType
-			if utils.IsNil(fieldType) {
-				fieldType = BasicTypes[Any]
-			}
-			ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
-			// } else {
-			// 	panic("this interface type not map")
-			// }
-		case Struct:
-			// map[string](T/U/xx)
-			ret += fmt.Sprintf(
-				"struct {%s}",
-				strings.Join(
-					lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
-					",",
-				),
-			)
-		case None:
-			ret += "object{}"
+	switch itype.Kind {
+	case Slice:
+		// map[int]T
+		if itype.Len == 0 {
+			ret += fmt.Sprintf("[]%s", itype.FieldType.String())
+		} else {
+			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
 		}
+	case Map:
+		// map[T]U
+		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
+		keyTyp := itype.KeyTyp
+		if utils.IsNil(keyTyp) {
+			keyTyp = BasicTypes[Any]
+		}
+		fieldType := itype.FieldType
+		if utils.IsNil(fieldType) {
+			fieldType = BasicTypes[Any]
+		}
+		ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
+		// } else {
+		// 	panic("this interface type not map")
+		// }
+	case Struct:
+		// map[string](T/U/xx)
+		ret += fmt.Sprintf(
+			"struct {%s}",
+			strings.Join(
+				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
+				",",
+			),
+		)
+	case None:
+		ret += "object{}"
 	}
 	return ret
 }
@@ -499,7 +498,7 @@ func (s *ObjectType) Finish() {
 type FunctionType struct {
 	Name       string
 	ReturnType Type
-	Parameter  []Type
+	Parameter  Types
 	IsVariadic bool
 }
 
@@ -518,7 +517,7 @@ func CalculateType(ts []Type) Type {
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {
-		i := NewObjectType()
+		i := NewStructType()
 		for index, typ := range ts {
 			i.AddField(NewConst(index), typ)
 		}
