@@ -51,7 +51,7 @@ var i18n = map[CompilerLanguage]map[constError]string{
 		expressionError:            "BUG: 无法将 `%s` 解析为表达式",
 		includeUnquoteError:        "包含路径[%s] 解析错误: %v",
 		includePathNotFoundError:   "包含路径[%s] 不存在",
-		includeCycleError:          "不允许包含循环: %s",
+		includeCycleError:          "不允许循环包含文件: %s",
 		readFileError:              "读取文件[%s] 错误: %v",
 		stringLiteralError:         "非法的字符串字面量: %s",
 		notImplemented:             "[%s] 未实现",
