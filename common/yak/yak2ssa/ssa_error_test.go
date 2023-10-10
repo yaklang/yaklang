@@ -102,3 +102,89 @@ func TestFreeValueAheadExternInstance(t *testing.T) {
 	})
 
 }
+
+func TestMemberCall(t *testing.T) {
+	CheckTestCase(t, TestCase{
+		code: `
+		b.F()
+		param.F() // param is extern variable
+		`,
+		errs: []string{
+			"member call target Error",
+			"this value undefine:b",
+			"this value undefine:param",
+		},
+		ExternInstance: map[string]any{
+			"param": func() {},
+		},
+	})
+}
+
+func TestCallParamReturn(t *testing.T) {
+	// check argument
+	t.Run("check argument", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+		func1(1)
+		func1() // err
+
+		func2(1, 2)
+		func2(1)
+		func2()
+
+		func3(1, 2, 3)
+		func3(1, 2)
+		func3(1)
+		func3()
+		`,
+			errs: []string{
+				"not enough arguments in call func1 have ([]) want (number)",
+				"not enough arguments in call func2 have ([1]) want (number, number)",
+				"not enough arguments in call func2 have ([]) want (number, number)",
+				"not enough arguments in call func3 have ([]) want (number, ...number)",
+			},
+			ExternInstance: map[string]any{
+				"func1": func(a int) {},
+				"func2": func(a, b int) {},
+				"func3": func(a int, b ...int) {},
+			},
+		})
+	})
+
+	t.Run("check return", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			// just call
+			// (0) = (n)
+			func1()
+			func2()
+			func3()
+
+			// (n) = (n) 
+			a = func1()
+			a, b = func2()
+			a, b, c = func3()
+
+			// (1) = (n) 
+			a = func2()
+			a = func3()
+
+			// (m) = (n) 
+			// m != 1 && m != n
+			a, b, c = func2() // get error 3 vs 2
+			a, b = func3()    // get error 2 vs 3
+			`,
+			errs: []string{
+				"function call assignment mismatch: left: 3 variable but right return 2 values",
+				"function call assignment mismatch: left: 2 variable but right return 3 values",
+			},
+
+			ExternInstance: map[string]any{
+				"func1": func() int { return 1 },
+				"func2": func() (a, b int) { return 1, 2 },
+				"func3": func() (a, b, c int) { return 1, 2, 3 },
+			},
+		})
+	})
+}
+

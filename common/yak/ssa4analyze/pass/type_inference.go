@@ -88,13 +88,6 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 		v.SetType(typ)
 		return false
 	}
-	//TODO:type kind check should handler interfaceTypeKind
-	t := v.GetType()
-	if t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any && typ.GetTypeKind() != ssa.Any {
-		if inst, ok := v.(ssa.Instruction); ok {
-			inst.NewError(ssa.Error, TITAG, "type check failed, this should be %s", typ)
-		}
-	}
 	v.SetType(typ)
 	return true
 }
@@ -241,7 +234,6 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	}
 }
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
-	// TODO: type inference call
 
 	getField := func(object ssa.User, key ssa.Value) *ssa.Field {
 		var f *ssa.Field
@@ -252,7 +244,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		return f
 	}
 
-	// handler ellipsis
+	// handler ellipsis, unpack argument
 	if c.IsEllipsis {
 		obj := c.Args[len(c.Args)-1].(ssa.User)
 		num := len(ssa.GetFields(obj))
@@ -275,6 +267,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		return
 	}
 
+	// inference call instruction type
 	if c.IsDropError {
 		if t, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok {
 			if t.Combination && t.FieldTypes[len(t.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {

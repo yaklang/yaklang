@@ -55,26 +55,6 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	}
 }
 
-/*
-if v.Type !match typ return true
-if v.Type match  typ return false
-*/
-func checkType(v ssa.Value, typ ssa.Type) bool {
-	if v.GetType() == nil {
-		v.SetType(typ)
-		return false
-	}
-	//TODO:type kind check should handler interfaceTypeKind
-	t := v.GetType()
-	if t.GetTypeKind() != typ.GetTypeKind() && t.GetTypeKind() != ssa.Any && typ.GetTypeKind() != ssa.Any {
-		if inst, ok := v.(ssa.Instruction); ok {
-			inst.NewError(ssa.Error, TypeCheckTAG, "type check failed, this should be %s", typ)
-		}
-	}
-	v.SetType(typ)
-	return true
-}
-
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefine) {
 	inst.NewError(ssa.Error, TypeCheckTAG, "this value undefine:%s", inst.GetVariable())
 }
@@ -84,10 +64,38 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	if !ok {
 		return
 	}
+	// check argument number
+	func() {
+		wantParaLen := len(funcTyp.Parameter)
+		gotParaLen := len(c.Args)
+		// not match
+		if wantParaLen == gotParaLen {
+			return
+		}
+		if funcTyp.IsVariadic {
+			// not match minimum length
+			if gotParaLen >= (wantParaLen - 1) {
+				return
+			}
+		}
+		str := ""
+		if f, ok := c.Method.(*ssa.Function); ok {
+			str = f.Name
+		} else if funcTyp.Name != "" {
+			str = funcTyp.Name
+		}
+		c.NewError(
+			ssa.Error, TypeCheckTAG,
+			`not enough arguments in call %s have (%s) want (%s)`,
+			str, c.Args, funcTyp.Parameter,
+		)
+	}()
+
 	if c.GetVariable() == "" {
 		return
 	}
 
+	// check return number
 	if objType, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
 		// a, b, err = fun()
 		rightLen := len(objType.FieldTypes)
@@ -101,14 +109,14 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 		leftLen := len(ssa.GetFields(c))
 		// a, b = fun()~
-		if leftLen != rightLen {
+		if leftLen != rightLen && leftLen > 1 {
 			// a = fun();
-			if leftLen == 0 {
-				leftLen = 1
-			}
+			// if leftLen == 0 {
+			// 	leftLen = 1
+			// }
 			c.NewError(
 				ssa.Error, TypeCheckTAG,
-				"assignment mismatch: %d variable but return %d values",
+				"function call assignment mismatch: left: %d variable but right return %d values",
 				leftLen, rightLen,
 			)
 		}
