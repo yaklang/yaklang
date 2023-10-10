@@ -54,14 +54,18 @@ func GetField(u User, key Value) *Field {
 }
 
 // get user without object
-func (f *Field) GetUserOnly() []User {
-	return lo.Filter(f.GetUsers(), func(u User, _ int) bool {
-		if u == f.Obj {
-			return false
-		} else {
-			return true
-		}
-	})
+func GetUserOnly(n Node) []User {
+	if f, ok := n.(*Field); ok {
+		return lo.Filter(f.GetUsers(), func(u User, _ int) bool {
+			if u == f.Obj {
+				return false
+			} else {
+				return true
+			}
+		})
+	} else {
+		return n.GetUsers()
+	}
 }
 
 func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *BasicBlock) *Make {

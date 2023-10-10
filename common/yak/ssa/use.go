@@ -100,7 +100,7 @@ func (f *Function) GetValues() []Value { return nil }
 func (f *Function) GetUsers() []User { return f.user }
 func (f *Function) AddUser(u User)   { f.user = append(f.user, u) }
 
-func (f *Function) RemoveUser(u User) { f.user = utils.Remove(f.user, u) }
+func (f *Function) RemoveUser(u User) { f.user = utils.RemoveSliceItem(f.user, u) }
 
 // ----------- BasicBlock
 func (b *BasicBlock) GetValues() []Value { return nil }
@@ -108,7 +108,7 @@ func (b *BasicBlock) GetValues() []Value { return nil }
 func (b *BasicBlock) GetUsers() []User { return b.user }
 func (b *BasicBlock) AddUser(u User)   { b.user = append(b.user, u) }
 
-func (b *BasicBlock) RemoveUser(u User) { b.user = utils.Remove(b.user, u) }
+func (b *BasicBlock) RemoveUser(u User) { b.user = utils.RemoveSliceItem(b.user, u) }
 
 // // ----------- Phi
 func (p *Phi) ReplaceValue(v Value, to Value) {

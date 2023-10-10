@@ -188,3 +188,45 @@ func TestCallParamReturn(t *testing.T) {
 	})
 }
 
+// for  "check alias type method"
+type AliasType int
+
+func (a AliasType) GetInt() int {
+	return int(a)
+}
+
+// for "check extern type recursive"
+type AStruct struct {
+	A []AStruct
+	B BStruct
+}
+type BStruct struct {
+	A *AStruct
+}
+
+func TestExternStruct(t *testing.T) {
+	t.Run("check alias type method", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			b = getAliasType()
+			b.GetInt()
+			`,
+			ExternInstance: map[string]any{
+				"getAliasType": func() AliasType { return AliasType(1) },
+			},
+		})
+	})
+
+	//TODO: handle type recursive
+	t.Run("check extern type recursive", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getA()
+			`,
+			ExternInstance: map[string]any{
+				"getA": func() *AStruct { return &AStruct{} },
+			},
+		})
+	})
+}
+
