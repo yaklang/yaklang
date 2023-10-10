@@ -46,6 +46,7 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"rdp":            rdpAuth,
 	"memcached":      memcachedAuth,
 	"mongodb":        mongoAuth,
+	"oracle":         oracleAuth,
 	"smb":            smbAuth,
 	"telnet":         telnetAuth,
 	"snmpv2":         snmp_v2Auth,
