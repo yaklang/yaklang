@@ -63,15 +63,28 @@ func (m *mitmReplacer) getRule(r *ypb.MITMContentReplacer) *regexp2.Regexp {
 
 	opt := regexp2.ECMAScript | regexp2.Multiline
 	var rule string
-	if strings.HasPrefix(r.Rule, "(?i)") {
-		rule = r.Rule[4:]
-		opt |= regexp2.IgnoreCase
-	} else if strings.HasPrefix(r.Rule, `(?s)`) {
-		rule = r.Rule[4:]
-		opt |= regexp2.Singleline
-	} else if strings.HasPrefix(r.Rule, `(?si)`) || strings.HasPrefix(r.Rule, `(?si)`) {
-		rule = r.Rule[5:]
-		opt |= regexp2.Singleline | regexp2.IgnoreCase
+	if strings.HasPrefix(r.Rule, "(?") {
+		rightParenIndex := strings.IndexRune(r.Rule, ')')
+		modes := r.Rule[2:rightParenIndex]
+		for _, mode := range strings.Split(modes, "") {
+			switch mode {
+			case "i":
+				opt |= regexp2.IgnoreCase
+			case "s":
+				opt |= regexp2.Singleline
+			case "m":
+				opt |= regexp2.Multiline
+			case "n":
+				opt |= regexp2.ExplicitCapture
+			case "c":
+				opt |= regexp2.Compiled
+			case "x":
+				opt |= regexp2.IgnorePatternWhitespace
+			case "r":
+				opt |= regexp2.RightToLeft
+			}
+		}
+		rule = r.Rule[rightParenIndex+1:]
 	} else {
 		rule = r.Rule
 	}
