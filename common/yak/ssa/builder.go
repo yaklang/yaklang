@@ -58,6 +58,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	}
 	if parent != nil {
 		b.buildExternValue = parent.buildExternValue
+		b.buildExternLib = parent.buildExternLib
 	}
 
 	b.PushBlockSymbolTable()
