@@ -176,5 +176,17 @@ func TargetUrlCheck(targetUrl string, proxy *url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.GetUrl(), nil
+	finalUrl := r.GetUrl()
+	tempTargetObj, err := url.Parse(tempTargetUrl)
+	if err != nil {
+		return "", err
+	}
+	finalUrlObj, err := url.Parse(finalUrl)
+	if err != nil {
+		return "", err
+	}
+	if tempTargetObj.Scheme == finalUrlObj.Scheme && tempTargetObj.Host == finalUrlObj.Host {
+		return tempTargetUrl, nil
+	}
+	return finalUrl, nil
 }
