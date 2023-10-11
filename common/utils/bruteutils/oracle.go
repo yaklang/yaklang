@@ -18,7 +18,7 @@ var oracleAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "oracle",
 	DefaultPorts:     "1521",
 	DefaultUsernames: []string{"sys", "system", "oracle"},
-	DefaultPasswords: []string{"sys", "system", "password", "123qwe", "123456", "oracle", "oracle001", "oracle.com", "admin123..", "adminroot123", "admin", "root"},
+	DefaultPasswords: []string{"sys", "sys123", "system", "password", "123qwe", "123456", "oracle", "oracle001", "oracle.com", "admin123..", "adminroot123", "admin", "root"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		return i.Result()
 	},
