@@ -151,8 +151,8 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 		// v = nil
 		if b.CanBuildFreeValue(variable) {
 			v = b.BuildFreeValue(variable)
-		} else if i := b.TryBuildExternValue(variable); i != nil {
-			v = i
+			// } else if i := b.TryBuildExternValue(variable); i != nil {
+			// 	v = i
 		} else if create {
 			un := NewUndefine(variable, block)
 			EmitInst(un)
