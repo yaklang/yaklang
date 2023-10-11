@@ -300,7 +300,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	}
 
 	if server.proxyUrl != nil {
-		log.Infof("server go proxy: %v", server.proxyUrl.String())
+		log.Infof("server go with proxy: %v", server.proxyUrl.String())
 		if server.httpTransport != nil {
 			server.httpTransport.Proxy = func(request *http.Request) (*url.URL, error) {
 				return server.proxyUrl, nil
@@ -310,4 +310,3 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 
 	return server, nil
 }
-
