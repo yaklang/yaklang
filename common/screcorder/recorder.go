@@ -248,9 +248,13 @@ func VideoCoverBase64(fileName string) (imgBase64 string, err error) {
 func ExampleReadFrameAsJpeg(inFileName string, frameNum int) (io.Reader, error) {
 	cmd := exec.CommandContext(context.Background(), consts.GetFfmpegPath(), "-i", inFileName, "-vf", fmt.Sprintf("select=gte(n\\,%d),scale=-1:600", frameNum), "-frames:v", "1", "-f", "image2", "-codec:v", "mjpeg", "pipe:1")
 	var out bytes.Buffer
+	var stderr bytes.Buffer
 	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
+		log.Warnf("ffmpeg exec failed, reason(stdout): \n%s", out.String())
+		log.Warnf("ffmpeg exec failed, reason(stderr): \n%s", stderr.String())
 		return nil, err
 	}
 	return &out, nil
