@@ -23,6 +23,12 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 		}
 	}()
 
+	if config.DisabledDomain != nil {
+		if config.DisabledDomain.Contains(host) {
+			return utils.Errorf("domain %s is disabled(forbidden by yaklang config, check WithDNSDisabledDomain)", host)
+		}
+	}
+
 	if config.Hosts != nil && len(config.Hosts) > 0 {
 		result, ok := config.Hosts[host]
 		if ok && result != "" {

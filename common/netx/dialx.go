@@ -12,156 +12,8 @@ import (
 	"time"
 )
 
-type dialXConfig struct {
-	Timeout   time.Duration
-	Proxy     []string
-	KeepAlive time.Duration
-
-	// EnableTLS is true, force to use TLS, auto upgrade
-	EnableTLS                 bool
-	ShouldOverrideTLSConfig   bool
-	TLSConfig                 *tls.Config
-	ShouldOverrideGMTLSConfig bool
-	GMTLSConfig               *gmtls.Config
-	GMTLSSupport              bool
-	GMTLSPrefer               bool
-	GMTLSOnly                 bool
-	TLSTimeout                time.Duration
-	ShouldOverrideSNI         bool
-	SNI                       string
-
-	// Retry
-	EnableTimeoutRetry  bool
-	TimeoutRetryMax     int64
-	TimeoutRetryMinWait time.Duration
-	TimeoutRetryMaxWait time.Duration
-
-	DNSOpts []DNSOption
-
-	Debug bool
-}
-
-type DialXOption func(c *dialXConfig)
-
-func DialX_WithTimeoutRetry(max int) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTimeoutRetry = true
-		c.TimeoutRetryMax = int64(max)
-	}
-}
-
-func DialX_WithDNSOptions(opt ...DNSOption) DialXOption {
-	return func(c *dialXConfig) {
-		c.DNSOpts = opt
-	}
-}
-
-func DialX_WithTimeoutRetryWait(timeout time.Duration) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTimeoutRetry = true
-		c.TimeoutRetryMinWait = timeout
-		c.TimeoutRetryMaxWait = timeout
-	}
-}
-
-func DialX_WithKeepAlive(aliveTime time.Duration) DialXOption {
-	return func(c *dialXConfig) {
-		c.KeepAlive = aliveTime
-	}
-}
-
-func DialX_WithTimeoutRetryWaitRange(min, max time.Duration) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTimeoutRetry = true
-		c.TimeoutRetryMinWait = min
-		c.TimeoutRetryMaxWait = max
-	}
-}
-
-func DialX_WithSNI(sni string) DialXOption {
-	return func(c *dialXConfig) {
-		c.ShouldOverrideSNI = true
-		c.SNI = sni
-	}
-}
-
-func DialX_WithTLSTimeout(t time.Duration) DialXOption {
-	return func(c *dialXConfig) {
-		c.TLSTimeout = t
-	}
-}
-
-func DialX_Debug(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		c.Debug = true
-	}
-}
-
-func DialX_WithTLS(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTLS = b
-	}
-}
-
-func DialX_WithGMTLSConfig(config *gmtls.Config) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTLS = true
-		c.ShouldOverrideGMTLSConfig = true
-		c.GMTLSConfig = config
-	}
-}
-
-func DialX_WithGMTLSPrefer(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		c.GMTLSSupport = true
-		c.GMTLSPrefer = b
-	}
-}
-
-func DialX_WithGMTLSOnly(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		c.GMTLSSupport = true
-		c.GMTLSOnly = b
-	}
-}
-
-func DialX_WithTimeout(timeout time.Duration) DialXOption {
-	return func(c *dialXConfig) {
-		c.Timeout = timeout
-	}
-}
-
-func DialX_WithProxy(proxy ...string) DialXOption {
-	return func(c *dialXConfig) {
-		c.Proxy = utils.StringArrayFilterEmpty(proxy)
-	}
-}
-
-func DialX_WithTLSConfig(tlsConfig *tls.Config) DialXOption {
-	return func(c *dialXConfig) {
-		c.EnableTLS = true
-		c.ShouldOverrideTLSConfig = true
-		c.TLSConfig = tlsConfig
-	}
-}
-
-func DialX_WithGMTLSSupport(b bool) DialXOption {
-	return func(c *dialXConfig) {
-		if b {
-			c.GMTLSSupport = true
-			c.EnableTLS = true
-		}
-	}
-}
-
-type TLSStrategy string
-
-const (
-	TLS_Strategy_GMDail                   TLSStrategy = "gmtls"
-	TLS_Strategy_GMDial_Without_GMSupport TLSStrategy = "gmtls-ns"
-	TLS_Strategy_Ordinary                 TLSStrategy = "tls"
-)
-
+// dialPlainTCPConnWithRetry just handle plain tcp connection
+// no tls here, but proxy here
 func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (net.Conn, error) {
 	var timeoutRetryMax int64 = 1
 	if config.EnableTimeoutRetry {
@@ -197,7 +49,7 @@ RETRY:
 	// handle plain
 	// not need to upgrade
 	var conn net.Conn
-	if len(config.Proxy) <= 0 {
+	if len(config.Proxy) <= 0 || config.ForceDisableProxy {
 		if config.Debug {
 			log.Infof("dial %s without proxy", target)
 		}
@@ -212,6 +64,13 @@ RETRY:
 		}
 		if ip == "" {
 			return nil, utils.Errorf("cannot resolve %v", target)
+		}
+
+		// handle ip address
+		if config.DisallowAddress != nil {
+			if config.DisallowAddress.Contains(ip) {
+				return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", ip)
+			}
 		}
 		conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
 		if err != nil {
@@ -269,8 +128,17 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		TimeoutRetryMax:     3,
 		TimeoutRetryMinWait: 100 * time.Millisecond,
 		TimeoutRetryMaxWait: 500 * time.Millisecond,
+		DisallowAddress:     utils.NewHostsFilter(),
 	}
 
+	// default init
+	defaultDialXOptionsMutex.Lock()
+	for _, o := range defaultDialXOptions {
+		o(config)
+	}
+	defaultDialXOptionsMutex.Unlock()
+
+	// user init
 	for _, o := range opt {
 		o(config)
 	}
@@ -378,4 +246,14 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		return nil, utils.Errorf("all tls strategy failed: %v", errs)
 	}
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
+}
+
+// DialTimeout is a shortcut for DialX with timeout
+func DialTimeout(connectTimeout time.Duration, target string, proxy ...string) (net.Conn, error) {
+	return DialX(target, DialX_WithProxy(proxy...), DialX_WithTimeout(connectTimeout))
+}
+
+// DialTLSTimeout is a shortcut for DialX with timeout
+func DialTLSTimeout(timeout time.Duration, target string, tlsConfig any, proxy ...string) (net.Conn, error) {
+	return DialX(target, DialX_WithProxy(proxy...), DialX_WithTimeout(timeout), DialX_WithTLS(true), DialX_WithTLSConfig(tlsConfig))
 }

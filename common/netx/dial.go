@@ -68,9 +68,6 @@ func NewDialContextFuncEx(config *dialXConfig) func(ctx context.Context, network
 }
 
 var defaultDialContextFunc = NewDialContextFunc(30 * time.Second)
-var defaultDialGMTLSContextFunc = NewDialGMTLSContextFunc(true, false, false, 30*time.Second)
-var defaultDialForceGMTLSContextFunc = NewDialGMTLSContextFunc(true, false, true, 30*time.Second)
-var defaultDialTLSContextFunc = NewDialGMTLSContextFunc(false, false, false, 30*time.Second)
 
 // DialTimeoutWithoutProxy dials a connection with a timeout.
 func DialTimeoutWithoutProxy(timeout time.Duration, network, addr string) (net.Conn, error) {
@@ -80,21 +77,6 @@ func DialTimeoutWithoutProxy(timeout time.Duration, network, addr string) (net.C
 // DialContextWithoutProxy dials a connection with a context.
 func DialContextWithoutProxy(ctx context.Context, network, addr string) (net.Conn, error) {
 	return defaultDialContextFunc(ctx, network, addr)
-}
-
-// DialTLSContextWithoutProxy dials a TLS connection with a context.
-func DialTLSContextWithoutProxy(ctx context.Context, network, addr string, tlsConfig *tls.Config) (net.Conn, error) {
-	return defaultDialTLSContextFunc(ctx, network, addr)
-}
-
-// DialAutoGMTLSContextWithoutProxy dials a GMTLS connection with a context.
-func DialAutoGMTLSContextWithoutProxy(ctx context.Context, network, addr string) (net.Conn, error) {
-	return defaultDialGMTLSContextFunc(ctx, network, addr)
-}
-
-// DialForceGMTLSContextWithoutProxy dials a GMTLS connection with a context.
-func DialForceGMTLSContextWithoutProxy(ctx context.Context, network, addr string) (net.Conn, error) {
-	return defaultDialGMTLSContextFunc(ctx, network, addr)
 }
 
 func NewDialGMTLSContextFunc(enableGM bool, preferGMTLS bool, onlyGMTLS bool, timeout time.Duration, opts ...DNSOption) func(ctx context.Context, network string, addr string) (net.Conn, error) {
