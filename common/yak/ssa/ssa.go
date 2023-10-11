@@ -680,6 +680,18 @@ var _ User = (*TypeCast)(nil)
 var _ Instruction = (*TypeCast)(nil)
 var _ InstructionValue = (*TypeCast)(nil)
 
+// ------------- type value
+type TypeValue struct {
+	anInstruction
+	anNode
+}
+
+var _ Node = (*TypeValue)(nil)
+var _ Value = (*TypeValue)(nil)
+var _ User = (*TypeValue)(nil)
+var _ Instruction = (*TypeValue)(nil)
+var _ InstructionValue = (*TypeValue)(nil)
+
 // ----------- assert
 type Assert struct {
 	anInstruction

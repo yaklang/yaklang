@@ -169,6 +169,15 @@ func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
 	return t
 }
 
+func NewTypeValue(typ Type, block *BasicBlock) *TypeValue {
+	t := &TypeValue{
+		anInstruction: newAnInstruction(block),
+		anNode:        NewNode(),
+	}
+	t.SetType(typ)
+	return t
+}
+
 func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 	a := &Assert{
 		anInstruction: newAnInstruction(block),
@@ -295,6 +304,7 @@ func (e *ErrorHandler) AddFinal(f *BasicBlock) {
 
 func (e *ErrorHandler) AddDone(d *BasicBlock) {
 	e.done = d
-	e.GetBlock().AddSucc(d)
+	// just mark in instruction
+	// e.GetBlock().AddSucc(d)
 	d.Handler = e
 }

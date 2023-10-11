@@ -348,6 +348,13 @@ func (t *TypeCast) String() string {
 	)
 }
 
+func (t *TypeValue) String() string {
+	return fmt.Sprintf(
+		"%s = type-value[%s]",
+		getStr(t), t.GetType(),
+	)
+}
+
 func (a *Assert) String() string {
 	msg := a.Msg
 	if a.MsgValue != nil {
