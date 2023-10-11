@@ -175,7 +175,7 @@ scan = func(bruteType) {
                 success++
                 yakit.StatusCard("成功次数: "+bruteType, success, bruteType, "success")
                 risk.NewRisk(
-                    riskTarget, risk.severity("high"), risk.type("weak-pass"),
+                    result.Target, risk.severity("high"), risk.type("weak-pass"),
                     risk.typeVerbose("弱口令"),
                     risk.title(sprintf("Weak Password[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
                     risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
