@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"golang.org/x/exp/slices"
 )
 
 type TestCase struct {
@@ -32,6 +33,8 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	prog.Show()
 	fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
+	slices.Sort(errs)
+	slices.Sort(tc.errs)
 	if len(errs) != len(tc.errs) {
 		t.Fatalf("error len not match %d vs %d", len(errs), len(tc.errs))
 	}
@@ -42,9 +45,10 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	}
 }
 
-func TestCfgEmptyBasic(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: `
+func TestUndefine(t *testing.T) {
+	t.Run("cfg empty basicBlock", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
 			for i {
 				if j {
 					return a  
@@ -54,12 +58,34 @@ func TestCfgEmptyBasic(t *testing.T) {
 				// unreachable
 			}
 			`,
-		errs: []string{
-			ssa4analyze.ValueUndefined("i"),
-			ssa4analyze.ValueUndefined("j"),
-			ssa4analyze.ValueUndefined("a"),
-			ssa4analyze.ValueUndefined("b"),
-		},
+			errs: []string{
+				ssa4analyze.ValueUndefined("i"),
+				ssa4analyze.ValueUndefined("j"),
+				ssa4analyze.ValueUndefined("a"),
+				ssa4analyze.ValueUndefined("b"),
+			},
+		})
+	})
+
+	t.Run("undefine field function", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = c
+			b = c
+			a = undefinePkg.undefineField
+			a = undefinePkg.undefineFunc(a); 
+			b = undefineFunc2("bb")
+			for i=0; i<10; i++ {
+				undefineFuncInLoop(i)
+			}
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("c"),
+				ssa4analyze.ValueUndefined("undefinePkg"),
+				ssa4analyze.ValueUndefined("undefineFunc2"),
+				ssa4analyze.ValueUndefined("undefineFuncInLoop"),
+			},
+		})
 	})
 
 }
@@ -116,6 +142,32 @@ func TestBasicExpression(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a"),
+			},
+		})
+	})
+}
+
+func TestAssign(t *testing.T) {
+	t.Run("multiple value assignment ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			// 1 = 1 
+			a = 1
+
+			// 1 = n
+			a = 1, 2
+			a = 1, 2, 3
+
+			// n = n
+			a, b, c = 1, 2, 3
+
+			// m = n 
+			a, b = 1, 2, 3       // err 2 != 3
+			a, b, c = 1, 2, 3, 4 // err 3 != 4
+			`,
+			errs: []string{
+				MultipleAssignFailed(2, 3),
+				MultipleAssignFailed(3, 4),
 			},
 		})
 	})
