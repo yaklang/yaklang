@@ -928,8 +928,8 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	if s := stmt.Identifier(); s != nil { // 解析变量
 		text := s.GetText()
 		if text == "_" {
-			b.NewError(ssa.Error, TAG, "cannot use _ as value")
-			return nil
+			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
+			// return nil
 		}
 		return b.ReadVariable(text, true)
 	}

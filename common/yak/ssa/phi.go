@@ -13,12 +13,14 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 
 func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
+		values := p.GetValues()
 		v := p.Build()
 		if inst, ok := v.(Instruction); ok {
 			inst.SetPosition(p.GetPosition())
 		}
 		if i, ok := v.(*Make); ok && i.buildField != nil {
-			for _, user := range i.GetValues() {
+			// just handler p values (not i value)
+			for _, user := range values {
 				if f, ok := user.(*Field); ok {
 					newF := i.buildField(f.Key.String())
 					f.RemoveUser(i)
