@@ -154,6 +154,29 @@ func TestFreeValue(t *testing.T) {
 	})
 }
 
+func TestPhi(t *testing.T) {
+	t.Run("test phi ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			for 1 {
+				b = str.F()
+			}
+			b = 2
+
+			for 2 {
+				str.F2() // only handler "field str[F2]" 
+			}
+			`,
+			ExternInstance: map[string]any{
+				"str": map[string]any{
+					"F":  func() int { return 1 },
+					"F2": func() {},
+				},
+			},
+		})
+	})
+}
+
 func TestMemberCall(t *testing.T) {
 	CheckTestCase(t, TestCase{
 		code: `

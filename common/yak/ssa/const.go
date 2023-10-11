@@ -14,7 +14,7 @@ func init() {
 	}
 
 	ConstMap[struct{}{}] = &Const{
-		anNode: anNode{},
+		anNode: NewNode(),
 		value:  struct{}{},
 		typ:    BasicTypes[Any],
 		str:    "any",
