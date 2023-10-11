@@ -91,6 +91,7 @@ func ConfigureNetX(c *ypb.GlobalNetworkConfig) {
 	netx.SetDefaultDialXConfig(
 		netx.DialX_WithDisallowAddress(c.GetDisallowIPAddress()...),
 		netx.DialX_WithProxy(c.GetGlobalProxy()...),
+		netx.DialX_WithEnableSystemProxyFromEnv(c.GetEnableSystemProxyFromEnv()),
 	)
 
 	for _, certs := range c.GetClientCertificates() {

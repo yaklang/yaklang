@@ -34,7 +34,7 @@ func FixProxy(i string) string {
 	return i
 }
 
-func GetProxyFromEnv() string {
+func getProxyFromEnv() string {
 	for _, k := range []string{
 		"YAK_PROXY", "yak_proxy",
 		"HTTP_PROXY", "http_proxy",

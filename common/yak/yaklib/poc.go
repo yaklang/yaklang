@@ -2,7 +2,6 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"reflect"
 	"strings"
@@ -573,10 +572,6 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
 		opt(config)
 	}
 
-	if len(config.Proxy) <= 0 && netx.GetProxyFromEnv() != "" {
-		config.Proxy = append(config.Proxy, netx.GetProxyFromEnv())
-	}
-
 	host, port, err := utils.ParseStringToHostPort(urlStr)
 	if err != nil {
 		return config, utils.Errorf("parse url failed: %s", err)
@@ -646,10 +641,6 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 
 	// 根据config修改packet
 	packet = fixPacketByConfig(packet, config)
-
-	if len(config.Proxy) <= 0 && netx.GetProxyFromEnv() != "" {
-		config.Proxy = append(config.Proxy, netx.GetProxyFromEnv())
-	}
 
 	// 最先应该修复数据包
 	if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
