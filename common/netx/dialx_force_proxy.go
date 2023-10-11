@@ -65,23 +65,6 @@ func DialContext(ctx context.Context, target string, proxies ...string) (net.Con
 	}
 }
 
-func DialTCPTimeout(timeout time.Duration, target string, proxies ...string) (net.Conn, error) {
-	proxies = utils.StringArrayFilterEmpty(proxies)
-	if len(proxies) <= 0 {
-		return DialTimeoutWithoutProxy(timeout, "tcp", target)
-	}
-
-	for _, proxy := range proxies {
-		conn, err := getConnForceProxy(target, proxy, timeout)
-		if err != nil {
-			log.Errorf("proxy conn failed: %s", err)
-			continue
-		}
-		return conn, nil
-	}
-	return nil, utils.Errorf("connect: %v failed: no proxy available (in %v)", target, proxies)
-}
-
 func getConnForceProxy(target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
 	return connectForceProxy(context.Background(), target, proxy, connectTimeout)
 }
