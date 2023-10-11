@@ -2,7 +2,6 @@ package bruteutils
 
 import (
 	"database/sql"
-	"fmt"
 
 	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/yaklang/yaklang/common/log"
@@ -18,8 +17,8 @@ var oracleServiceNames = []string{
 var oracleAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "oracle",
 	DefaultPorts:     "1521",
-	DefaultUsernames: []string{"sys"},
-	DefaultPasswords: []string{"sys", "123456", "oracle", "oracle001", "oracle.com", "admin123..", "adminroot123", "admin", "root"},
+	DefaultUsernames: []string{"sys", "system", "oracle"},
+	DefaultPasswords: []string{"sys", "system", "password", "123qwe", "123456", "oracle", "oracle001", "oracle.com", "admin123..", "adminroot123", "admin", "root"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		return i.Result()
 	},
@@ -27,7 +26,7 @@ var oracleAuth = &DefaultServiceAuthInfo{
 		i.Target = appendDefaultPort(i.Target, 1521)
 		res := i.Result()
 		urlOptions := map[string]string{
-			"CONNECTION TIMEOUT": fmt.Sprintf("%v", defaultTimeout),
+			"CONNECTION TIMEOUT": "10",
 		}
 		ip, port, err := utils.ParseStringToHostPort(i.Target)
 		if err != nil {
