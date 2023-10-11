@@ -776,6 +776,13 @@ message GlobalNetworkConfig {
 
   // certificates
   repeated Certificate ClientCertificates = 6;
+
+  // network
+  repeated string DisallowIPAddress = 7;
+  repeated string DisallowDomain = 8;
+
+  // default proxy
+  repeated string GlobalProxy = 9;
 }
 
 message DiagnoseNetworkRequest {

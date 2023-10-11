@@ -32,7 +32,7 @@ var DefaultCustomDoHServers = []string{
 	"https://8.8.4.4/resolve",
 }
 
-func SetDefaultOptions(opt ...DNSOption) {
+func SetDefaultDNSOptions(opt ...DNSOption) {
 	defaultYakDNSMutex.Lock()
 	defer defaultYakDNSMutex.Unlock()
 
@@ -89,6 +89,9 @@ type ReliableDNSConfig struct {
 	count int64
 
 	OnFinished func()
+
+	// blacklist
+	DisabledDomain *utils.HostsFilter
 }
 
 type DNSOption func(*ReliableDNSConfig)
@@ -149,6 +152,7 @@ func NewBackupInitilizedReliableDNSConfig() *ReliableDNSConfig {
 		mutex:              new(sync.Mutex),
 		SpecificDoH:        DefaultCustomDoHServers,
 		SpecificDNSServers: DefaultCustomDNSServers,
+		DisabledDomain:     utils.NewHostsFilter(),
 	}
 	return config
 }
@@ -247,5 +251,18 @@ func WithTemporaryHosts(i map[string]string) DNSOption {
 func WithDNSOnFinished(cb func()) DNSOption {
 	return func(config *ReliableDNSConfig) {
 		config.OnFinished = cb
+	}
+}
+
+func WithDNSDisabledDomain(domain ...string) DNSOption {
+	return func(config *ReliableDNSConfig) {
+		domain = utils.StringArrayFilterEmpty(domain)
+		if len(domain) <= 0 {
+			return
+		}
+		if config.DisabledDomain == nil {
+			config.DisabledDomain = utils.NewHostsFilter()
+		}
+		config.DisabledDomain.Add(domain...)
 	}
 }

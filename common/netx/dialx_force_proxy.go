@@ -19,43 +19,6 @@ func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string
 	return connectForceProxy(nil, target, proxy, timeout)
 }
 
-func DialTimeout(connectTimeout time.Duration, target string, proxy ...string) (net.Conn, error) {
-	if len(proxy) <= 0 {
-		return DialTimeoutWithoutProxy(connectTimeout, "tcp", target)
-	}
-	if len(proxy) > 0 {
-		proxy = utils.StringArrayFilterEmpty(proxy)
-		if len(proxy) > 0 {
-			for _, p := range proxy {
-				conn, err := DialTCPTimeoutForceProxy(connectTimeout, target, p)
-				if err != nil {
-					log.Infof("DialTimeoutForceProxy %s %s not available: %v", target, p, err)
-					continue
-				}
-				return conn, nil
-			}
-			return nil, utils.Errorf("DialTimeoutForceProxy %s %v all not available", target, proxy)
-		}
-	}
-	return DialTimeoutWithoutProxy(connectTimeout, "tcp", target)
-}
-
-func DialTLSTimeout(timeout time.Duration, target string, tlsConfig any, proxy ...string) (net.Conn, error) {
-	plainConn, err := DialTimeout(timeout, target, proxy...)
-	if err != nil {
-		return nil, err
-	}
-	if tlsConfig == nil {
-		tlsConfig = utils.NewDefaultTLSConfig()
-	}
-	conn, err := UpgradeToTLSConnection(plainConn, utils.ExtractHost(target), tlsConfig)
-	if err != nil {
-		plainConn.Close()
-		return nil, err
-	}
-	return conn, nil
-}
-
 func FixProxy(i string) string {
 	if i == "" {
 		return ""
@@ -102,11 +65,6 @@ func DialContext(ctx context.Context, target string, proxies ...string) (net.Con
 	}
 }
 
-/*
-DialTCPTimeout dial tcp with timeout
-
-1. if no proxy, dial directly, timeout for
-*/
 func DialTCPTimeout(timeout time.Duration, target string, proxies ...string) (net.Conn, error) {
 	proxies = utils.StringArrayFilterEmpty(proxies)
 	if len(proxies) <= 0 {
@@ -133,6 +91,8 @@ func getConnForceProxyContext(ctx context.Context, target, proxy string) (net.Co
 }
 
 func connectForceProxy(ctx context.Context, target string, proxy string, connectTimeout time.Duration) (net.Conn, error) {
+	// use dialx
+	// remember disallow proxy!!!
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -151,7 +111,11 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		if err != nil {
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
-		conn, err := DialTLSContextWithoutProxy(ctx, "tcp", proxyAddr, utils.NewDefaultTLSConfig())
+		conn, err := DialX(
+			proxyAddr,
+			DialX_WithDisableProxy(true),
+			DialX_WithTLS(true),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +164,8 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
 		}
 
-		conn, err := DialContextWithoutProxy(ctx, "tcp", proxyAddr)
+		// conn, err := DialContextWithoutProxy(ctx, "tcp", proxyAddr)
+		conn, err := DialX(proxyAddr, DialX_WithTLS(false), DialX_WithDisableProxy(true))
 		if err != nil {
 			return nil, err
 		}
