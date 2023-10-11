@@ -214,6 +214,8 @@ func TestExternStruct(t *testing.T) {
 			code: `
 			b = getAliasType()
 			b.GetInt()
+			b.GetInt()
+			b.GetInt()
 			`,
 			ExternInstance: map[string]any{
 				"getAliasType": func() AliasType { return AliasType(1) },
