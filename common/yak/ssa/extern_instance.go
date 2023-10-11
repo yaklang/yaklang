@@ -10,79 +10,71 @@ const (
 	MAXTYPELEVEL = 15
 )
 
-func IsExternInstance(v Value) bool {
-	if m, ok := v.(*Make); ok && m.buildField != nil {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (b *FunctionBuilder) WithExternInstance(vs map[string]any) {
-	b.buildExtern = func(id string, builder *FunctionBuilder) Value {
+func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
+	b.buildExternValue = func(id string, builder *FunctionBuilder) Value {
+		if v, ok := builder.externInstance[id]; ok {
+			return v
+		}
 		if v, ok := vs[id]; ok {
-			return builder.BuildValueFromAny("", id, v)
+			return builder.BuildValueFromAny(id, v)
 		}
 		return nil
 	}
 }
 
-func (b *FunctionBuilder) TryBuildExternInstance(id string) Value {
-	if b.buildExtern == nil {
+func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
+	b.buildExternLib = func(name string, builder *FunctionBuilder) func(string) Value {
+		if table, ok := lib[name]; ok {
+			return func(key string) Value {
+				if v, ok := table[key]; ok {
+					return builder.BuildValueFromAny(name+"."+key, v)
+				} else {
+					return nil
+				}
+			}
+		}
 		return nil
 	}
-	return b.buildExtern(id, b)
 }
 
-func (b *FunctionBuilder) BuildValueFromAny(libName, id string, v any) (value Value) {
-	if value, ok := b.externInstance[libName+id]; ok {
+func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
+	if b.buildExternValue == nil {
+		return nil
+	}
+	return b.buildExternValue(id, b)
+}
+
+func (b *FunctionBuilder) TryBuildExternLib(name string) func(string) Value {
+	if b.buildExternLib == nil {
+		return nil
+	}
+	return b.buildExternLib(name, b)
+}
+
+func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
+	if value, ok := b.externInstance[id]; ok {
 		return value
 	}
 
 	itype := reflect.TypeOf(v)
-
-	if itype == reflect.TypeOf(make(map[string]interface{})) {
-		i := NewMake(nil,
-			NewMapType(BasicTypes[String], BasicTypes[Any]),
-			nil, nil, nil, nil, nil, b.CurrentBlock)
-
-		vs := v.(map[string]interface{})
-		i.buildField = func(key string) Value {
-			if v, ok := vs[key]; ok {
-				return b.BuildValueFromAny(id, key, v)
-			}
-			return nil
-		}
-		str := id
-		if libName != "" {
-			str = libName + "." + id
-		}
-		i.SetVariable(str)
-		b.externInstance[str] = i
-		return i
-	} else {
-		if itype == nil {
-			return nil
-		}
-
-		if strings.HasPrefix(id, "$") || strings.HasPrefix(id, "_") {
-			return nil
-		}
-
-		str := id
-		if libName != "" {
-			str = libName + "." + id
-		}
-		switch itype.Kind() {
-		case reflect.Func:
-			value = NewFunctionWithType(str, b.CoverReflectFunctionType(itype, 0))
-		default:
-			value = NewParam(str, false, b.Function)
-			value.SetType(b.handlerType(itype, 0))
-		}
-		b.externInstance[str] = value
-		return
+	if itype == nil {
+		return nil
 	}
+
+	if strings.HasPrefix(id, "$") || strings.HasPrefix(id, "_") {
+		return nil
+	}
+
+	str := id
+	switch itype.Kind() {
+	case reflect.Func:
+		value = NewFunctionWithType(str, b.CoverReflectFunctionType(itype, 0))
+	default:
+		value = NewParam(str, false, b.Function)
+		value.SetType(b.handlerType(itype, 0))
+	}
+	b.externInstance[str] = value
+	return
 }
 
 func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {

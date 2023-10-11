@@ -608,9 +608,6 @@ type Make struct {
 
 	// when slice or map
 	Len, Cap Value
-
-	// for extern lib
-	buildField func(key string) Value
 }
 
 var _ Node = (*Make)(nil)

@@ -936,13 +936,37 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
+		// check extern
+		if v := b.TryBuildExternValue(stmt.GetText()); v != nil {
+			// check cache
+			return v
+		} else {
+			// try build
+			var name, key string
+			// before .
+			if s, ok := stmt.Expression(0).(*yak.ExpressionContext); ok {
+				if before := s.Identifier(); before != nil {
+					name = before.GetText()
+				}
+			}
+
+			// after .
+			after := s.Identifier()
+			if after != nil {
+				key = after.GetText()
+			}
+
+			if name != "" && key != "" {
+				if f := b.TryBuildExternLib(name); f != nil {
+					if v := f(key); v != nil {
+						return v
+					}
+				}
+			}
+		}
+
 		value := getValue(0)
 		var inter ssa.User
-		// inter, ok := value.(*ssa.Interface)
-		// inter, ok := getValue(0).(*ssa.Interface)
-		// if !ok {
-		// 	b.NewError(ssa.Error, TAG, "Expression: need a interface")
-		// 	// return nil
 		if user, ok := value.(ssa.User); ok {
 			inter = user
 		} else {
