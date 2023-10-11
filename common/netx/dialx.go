@@ -247,13 +247,3 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
 }
-
-// DialTimeout is a shortcut for DialX with timeout
-func DialTimeout(connectTimeout time.Duration, target string, proxy ...string) (net.Conn, error) {
-	return DialX(target, DialX_WithProxy(proxy...), DialX_WithTimeout(connectTimeout))
-}
-
-// DialTLSTimeout is a shortcut for DialX with timeout
-func DialTLSTimeout(timeout time.Duration, target string, tlsConfig any, proxy ...string) (net.Conn, error) {
-	return DialX(target, DialX_WithProxy(proxy...), DialX_WithTimeout(timeout), DialX_WithTLS(true), DialX_WithTLSConfig(tlsConfig))
-}
