@@ -188,17 +188,34 @@ func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
 	}
 	b.buildBlock(stmt.Block(1).(*yak.BlockContext))
 
+	var target *ssa.BasicBlock
+
 	if fblock, ok := stmt.Block(2).(*yak.BlockContext); ok {
 		b.CurrentBlock = enter
 		final = b.NewBasicBlock("error.final")
 		e.AddFinal(final)
 		b.CurrentBlock = final
 		b.buildBlock(fblock)
+
+		target = final
 	}
 
 	b.CurrentBlock = enter
 	done := b.NewBasicBlock("")
 	e.AddDone(done)
+
+	if target == nil {
+		target = done
+	}
+
+	b.CurrentBlock = try
+	b.EmitJump(target)
+	b.CurrentBlock = catch
+	b.EmitJump(target)
+	if target != done {
+		b.CurrentBlock = target
+		b.EmitJump(done)
+	}
 
 	b.CurrentBlock = done
 }

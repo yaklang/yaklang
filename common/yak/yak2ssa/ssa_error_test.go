@@ -335,3 +335,39 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 }
+
+func TestTryCatch(t *testing.T) {
+	t.Run("try catch cfg", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			try {
+				a = 1
+				a1 = 1
+			} catch err {
+				a = 2
+				// a1 = 2 // a1 undefine
+			}
+			b = a
+			b = a1
+
+			try {
+				a2 = 1
+				a3 = 1
+			} catch err {
+				a2 = 2
+				a3 = 2
+			} finally {
+				a2 = 3
+				// a3 = 3 // a3 undefine
+			}
+			b = a2
+			b = a3
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("a1"),
+				ssa4analyze.ValueUndefined("a3"),
+			},
+		})
+	})
+
+}
