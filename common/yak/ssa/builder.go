@@ -34,7 +34,8 @@ type FunctionBuilder struct {
 	parentSymbolBlock  *blockSymbolTable // parent symbol block for build FreeValue
 	parentCurrentBlock *BasicBlock       // parent build subFunction position
 
-	buildExtern func(string, *FunctionBuilder) Value
+	buildExternValue func(string, *FunctionBuilder) Value
+	buildExternLib   func(string, *FunctionBuilder) func(string) Value
 
 	parentBuilder *FunctionBuilder
 }
@@ -56,7 +57,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		parentBuilder: parent,
 	}
 	if parent != nil {
-		b.buildExtern = parent.buildExtern
+		b.buildExternValue = parent.buildExternValue
 	}
 
 	b.PushBlockSymbolTable()

@@ -2,6 +2,7 @@ package yak2ssa
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -11,19 +12,25 @@ import (
 )
 
 type TestCase struct {
-	code           string
-	errs           []string
-	ExternInstance map[string]any
+	code        string
+	errs        []string
+	ExternValue map[string]any
+	ExternLib   map[string]map[string]any
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
 	opts := make([]Option, 0)
-	if tc.ExternInstance != nil {
-		opts = append(opts, WithSymbolTable(tc.ExternInstance))
+	if tc.ExternValue != nil {
+		opts = append(opts, WithExternValue(tc.ExternValue))
+	}
+	if tc.ExternLib != nil {
+		for name, table := range tc.ExternLib {
+			opts = append(opts, WithExternLib(name, table))
+		}
 	}
 	prog := ParseSSA(tc.code, opts...)
-	// prog.Show()
-	// fmt.Println(prog.GetErrors().String())
+	prog.Show()
+	fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 	if len(errs) != len(tc.errs) {
 		t.Fatalf("error len not match %d vs %d", len(errs), len(tc.errs))
@@ -57,27 +64,6 @@ func TestCfgEmptyBasic(t *testing.T) {
 
 }
 
-func TestOnlyDeclareVariable(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: `
-			var a1 
-			if 1 {
-				a1 = 1
-			}
-			b = a1
-
-			// var a2 -> undefine
-			if 1 {
-				a2 = 1
-			}
-			c = a2
-			`,
-		errs: []string{
-			ssa4analyze.ValueUndefined("a2"),
-		},
-	})
-}
-
 func TestBasicExpression(t *testing.T) {
 	t.Run("basic assign", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
@@ -91,12 +77,33 @@ func TestBasicExpression(t *testing.T) {
 		})
 	})
 
+	t.Run("only declare variable ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			var a1 
+			if 1 {
+				a1 = 1
+			}
+			b = a1
+
+			// var a2 -> undefine
+			if 1 {
+				a2 = 1
+			}
+			c = a2
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("a2"),
+			},
+		})
+	})
+
 	t.Run("test type variable", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
 			typeof(1) == map[int]string
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"typeof": reflect.TypeOf,
 			},
 		})
@@ -120,11 +127,11 @@ func TestFreeValue(t *testing.T) {
 			code: `
 			param() // extern value 
 			param = "" // value
-			delayFuzz =() =>{
+			f =() =>{
 				param.a().b() // freeValue 
 			}
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"param": func() {},
 			},
 		})
@@ -167,7 +174,7 @@ func TestPhi(t *testing.T) {
 				str.F2() // only handler "field str[F2]" 
 			}
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"str": map[string]any{
 					"F":  func() int { return 1 },
 					"F2": func() {},
@@ -188,7 +195,7 @@ func TestMemberCall(t *testing.T) {
 			ssa4analyze.ValueUndefined("b"),
 			ssa4analyze.ValueUndefined("param"),
 		},
-		ExternInstance: map[string]any{
+		ExternValue: map[string]any{
 			"param": func() {},
 		},
 	})
@@ -220,7 +227,7 @@ func TestCallParamReturn(t *testing.T) {
 				ssa4analyze.NotEnoughArgument("func2", "", "number, number"),
 				ssa4analyze.NotEnoughArgument("func3", "", "number, ...number"),
 			},
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"func1": func(a int) {},
 				"func2": func(a, b int) {},
 				"func3": func(a int, b ...int) {},
@@ -256,7 +263,7 @@ func TestCallParamReturn(t *testing.T) {
 				ssa4analyze.CallAssignmentMismatch(2, 3),
 			},
 
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"func1": func() int { return 1 },
 				"func2": func() (a, b int) { return 1, 2 },
 				"func3": func() (a, b, c int) { return 1, 2, 3 },
@@ -290,7 +297,7 @@ func TestExternStruct(t *testing.T) {
 			b.GetInt()
 			b.GetInt()
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"getAliasType": func() AliasType { return AliasType(1) },
 			},
 		})
@@ -302,8 +309,31 @@ func TestExternStruct(t *testing.T) {
 			code: `
 			a = getA()
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"getA": func() *AStruct { return &AStruct{} },
+			},
+		})
+	})
+}
+
+func TestExternInstance(t *testing.T) {
+	t.Run("basic extern", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getInt()
+			b = lib.getString()
+			b = lib.getString()
+			for 1 {
+				b = lib.getString()
+			}
+			`,
+			ExternValue: map[string]any{
+				"getInt": func() int { return 1 },
+			},
+			ExternLib: map[string]map[string]any{
+				"lib": {
+					"getString": func() string { return "1" },
+				},
 			},
 		})
 	})
@@ -335,7 +365,7 @@ func TestErrorHandler(t *testing.T) {
 				ssa4analyze.ErrorUnhandled(),
 				ssa4analyze.ErrorUnhandled(),
 			},
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"getError1": func() error { return errors.New("err") },
 				"getError2": func() (int, error) { return 1, errors.New("err") },
 				"die":       func(error) {},
@@ -351,7 +381,7 @@ func TestErrorHandler(t *testing.T) {
 				print(err.Error())
 			}
 			`,
-			ExternInstance: map[string]any{
+			ExternValue: map[string]any{
 				"print": func(any) {},
 			},
 		})
