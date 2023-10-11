@@ -26,17 +26,20 @@ type FunctionBuilder struct {
 	deferExpr []*Call // defer function, reverse  for-range
 
 	// for build
-	currentDef   map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
-	CurrentBlock *BasicBlock                      // current block to build
-	CurrentPos   *Position                        // current position in source code
-	symbolBlock  *blockSymbolTable                //  blockId -> variable -> variableId
+	currentDef         map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
+	CurrentBlock       *BasicBlock                      // current block to build
+	CurrentPos         *Position                        // current position in source code
+	symbolBlock        *blockSymbolTable                //  blockId -> variable -> variableId
+	blockId            int
+	parentSymbolBlock  *blockSymbolTable // parent symbol block for build FreeValue
+	parentCurrentBlock *BasicBlock       // parent build subFunction position
 
 	buildExtern func(string, *FunctionBuilder) Value
 
-	prev *FunctionBuilder
+	parentBuilder *FunctionBuilder
 }
 
-func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
+func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
 		Function:     f,
 		target:       &target{},
@@ -45,11 +48,15 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
 		CurrentPos:   nil,
-		symbolBlock:  nil,
-		prev:         next,
+		symbolBlock: &blockSymbolTable{
+			symbol:  nil,
+			blockId: "main",
+		},
+		blockId:       0,
+		parentBuilder: parent,
 	}
-	if next != nil {
-		b.buildExtern = next.buildExtern
+	if parent != nil {
+		b.buildExtern = parent.buildExtern
 	}
 
 	b.PushBlockSymbolTable()
@@ -59,8 +66,8 @@ func NewBuilder(f *Function, next *FunctionBuilder) *FunctionBuilder {
 }
 
 // new function
-func (b *FunctionBuilder) NewFunc() *Function {
-	return b.Package.NewFunctionWithParent("", b.Function)
+func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
+	return b.Package.NewFunctionWithParent(name, b.Function), b.symbolBlock
 }
 
 // handler current function
@@ -73,7 +80,7 @@ func (b FunctionBuilder) HandlerEllipsis() {
 
 // get parent function
 func (b FunctionBuilder) GetParentBuilder() *FunctionBuilder {
-	return b.parent.builder
+	return b.parentBuilder
 }
 
 // add current function defer function
@@ -111,13 +118,15 @@ func (b *FunctionBuilder) AddSubFunction(builder func()) {
 }
 
 // function stack
-func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
+func (b *FunctionBuilder) PushFunction(newFunc *Function, symbol *blockSymbolTable, block *BasicBlock) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
+	build.parentSymbolBlock = symbol
+	build.parentCurrentBlock = block
 	return build
 }
 
 func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
-	return b.prev
+	return b.parentBuilder
 }
 
 // use in for/switch
@@ -181,13 +190,9 @@ type blockSymbolTable struct {
 	next    *blockSymbolTable
 }
 
-var (
-	blockId int = 0
-)
-
-func NewBlockId() string {
-	ret := fmt.Sprintf("block%d", blockId)
-	blockId += 1
+func (b *FunctionBuilder) NewBlockId() string {
+	ret := fmt.Sprintf("block%d", b.blockId)
+	b.blockId += 1
 	return ret
 }
 
@@ -195,7 +200,7 @@ func NewBlockId() string {
 func (b *FunctionBuilder) PushBlockSymbolTable() {
 	b.symbolBlock = &blockSymbolTable{
 		symbol:  make(map[string]string),
-		blockId: NewBlockId(),
+		blockId: b.NewBlockId(),
 		next:    b.symbolBlock,
 	}
 }
@@ -212,11 +217,14 @@ func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
 }
 
 func (b *FunctionBuilder) GetIdByBlockSymbolTable(id string) string {
-	for block := b.symbolBlock; block != nil; block = block.next {
-		if v, ok := block.symbol[id]; ok {
+	return GetIdByBlockSymbolTable(id, b.symbolBlock)
+}
+
+func GetIdByBlockSymbolTable(id string, symbolEnter *blockSymbolTable) string {
+	for symbol := symbolEnter; symbol != nil && symbol.blockId != "main"; symbol = symbol.next {
+		if v, ok := symbol.symbol[id]; ok {
 			return v
 		}
 	}
-
 	return id
 }
