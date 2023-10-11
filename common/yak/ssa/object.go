@@ -144,13 +144,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Value {
 	var fTyp Type
 	var isMethod bool
-	if I, ok := i.(*Make); ok {
-		if I.buildField != nil {
-			if v := I.buildField(key.String()); v != nil {
-				return v
-			}
-		}
-	}
+
 	if c, ok := key.(*Const); ok && c.IsString() {
 		if v := i.GetType().GetMethod(c.VarString()); v != nil {
 			isMethod = true

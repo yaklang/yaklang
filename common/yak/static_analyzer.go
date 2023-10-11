@@ -3,6 +3,7 @@ package yak
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -59,29 +60,49 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		}
 	}
 
+	opts := make([]yak2ssa.Option, 0)
+
 	// yak function table
-	functionTable := yaklang.New().GetFntable()
+	symbol := yaklang.New().GetFntable()
+	valueTable := make(map[string]interface{})
+	// libTable := make(map[string]interface{})
+	for name, item := range symbol {
+		itype := reflect.TypeOf(item)
+		if itype == reflect.TypeOf(make(map[string]interface{})) {
+			opts = append(opts, yak2ssa.WithExternLib(name, item.(map[string]interface{})))
+		} else {
+			valueTable[name] = item
+		}
+	}
+
+	//TODO:  this grpc later
 	// yak-main
-	functionTable["YAK_DIR"] = ""
-	functionTable["YAK_FILENAME"] = ""
-	functionTable["YAK_MAIN"] = false
-	functionTable["id"] = ""
+	valueTable["YAK_DIR"] = ""
+	valueTable["YAK_FILENAME"] = ""
+	valueTable["YAK_MAIN"] = false
+	valueTable["id"] = ""
 	// param
 	getParam := func(key string) interface{} {
 		return nil
 	}
-	functionTable["getParam"] = getParam
-	functionTable["getParams"] = getParam
-	functionTable["param"] = getParam
+	valueTable["getParam"] = getParam
+	valueTable["getParams"] = getParam
+	valueTable["param"] = getParam
 
 	// mitm
-	functionTable["MITM_PLUGIN"] = ""
-	functionTable["MITM_PARAMS"] = make(map[string]string)
+	valueTable["MITM_PLUGIN"] = ""
+	valueTable["MITM_PARAMS"] = make(map[string]string)
+
+	opts = append(opts, yak2ssa.WithExternValue(valueTable))
+
 	// ssa
 	prog := yak2ssa.ParseSSA(
-		code,
-		yak2ssa.WithSymbolTable(functionTable),
+		code, opts...,
 	)
+	if prog == nil {
+		return results
+	}
+
 	errs := prog.GetErrors()
 	for _, err := range errs {
 		var severity string

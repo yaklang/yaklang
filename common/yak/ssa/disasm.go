@@ -43,11 +43,6 @@ func getStrFlag(v Node, hasType bool) string {
 	}
 	switch v := v.(type) {
 	case Instruction:
-		if i, ok := v.(*Make); ok {
-			if i.buildField != nil {
-				return i.variable + "-extern"
-			}
-		}
 		if i, ok := v.(*Field); ok {
 			if i.OutCapture {
 				return i.Key.String() + "-capture"
