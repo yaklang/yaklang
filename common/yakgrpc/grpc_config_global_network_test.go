@@ -57,6 +57,68 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	}
 }
 
+func TestGRPCMUSTPASS_RPOXY_FROM_ENV(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	var triggerProxy = false
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		spew.Dump(req)
+		if strings.Contains(string(req), "CONNECT 8.8.8.8:80") {
+			triggerProxy = true
+		}
+		return nil
+	})
+
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	if err != nil {
+		panic(err)
+	}
+
+	config.GlobalProxy = nil
+	config.EnableSystemProxyFromEnv = true
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	}()
+	os.Unsetenv("http_proxy")
+	os.Unsetenv("https_proxy")
+	os.Unsetenv("all_proxy")
+	os.Unsetenv("proxy")
+	os.Unsetenv("HTTP_PROXY")
+	os.Unsetenv("HTTPS_PROXY")
+	os.Unsetenv("ALL_PROXY")
+
+	os.Setenv("HTTP_PROXY", "http://"+utils.HostPort(host, port))
+	_, err = yak.Execute(`
+try {
+	poc.Get("http://8.8.8.8")~
+	die("unexpected result")
+} catch e {
+	if f"${e}".Contains("no proxy available") {
+		dump(e)
+		return
+	} else{
+		die(e)
+	}
+}
+`)
+	if err != nil {
+		log.Error(err)
+		t.FailNow()
+	}
+
+	if !triggerProxy {
+		t.Fatal("proxy not triggered")
+	}
+}
+
 func TestGRPCMUSTPASS_GLOBAL_RPOXY(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {

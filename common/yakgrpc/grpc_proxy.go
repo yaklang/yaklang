@@ -2,8 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -23,8 +21,4 @@ func (s *Server) SetEngineDefaultProxy(ctx context.Context, d *ypb.DefaultProxyR
 		return nil, utils.Errorf("设置引擎默认扫描代理失败")
 	}
 	return &ypb.Empty{}, nil
-}
-
-func GetScanProxyEnviron() string {
-	return fmt.Sprintf("YAK_PROXY=%v", yakit.GetKey(consts.GetGormProfileDatabase(), YAK_ENGINE_DEFAULT_SCAN_PROXY))
 }

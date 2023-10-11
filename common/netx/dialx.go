@@ -49,6 +49,11 @@ RETRY:
 	// handle plain
 	// not need to upgrade
 	var conn net.Conn
+
+	if len(config.Proxy) == 0 && config.EnableSystemProxyFromEnv && FixProxy(getProxyFromEnv()) != "" {
+		config.Proxy = append(config.Proxy, FixProxy(getProxyFromEnv()))
+	}
+
 	if len(config.Proxy) <= 0 || config.ForceDisableProxy {
 		if config.Debug {
 			log.Infof("dial %s without proxy", target)

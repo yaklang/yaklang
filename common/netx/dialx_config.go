@@ -11,8 +11,11 @@ import (
 type dialXConfig struct {
 	Timeout           time.Duration
 	ForceDisableProxy bool
-	Proxy             []string
-	KeepAlive         time.Duration
+	// when empty proxy and EnableSystemProxyFromEnv(true),
+	// fetch via getProxyFromEnv()
+	EnableSystemProxyFromEnv bool
+	Proxy                    []string
+	KeepAlive                time.Duration
 
 	// EnableTLS is true, force to use TLS, auto upgrade
 	EnableTLS                 bool
@@ -193,6 +196,12 @@ func DialX_WithGMTLSSupport(b bool) DialXOption {
 			c.GMTLSSupport = true
 			c.EnableTLS = true
 		}
+	}
+}
+
+func DialX_WithEnableSystemProxyFromEnv(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.EnableSystemProxyFromEnv = b
 	}
 }
 

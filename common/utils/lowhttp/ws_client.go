@@ -224,9 +224,6 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	for _, p := range opt {
 		p(config)
 	}
-	if config.Proxy == "" && netx.GetProxyFromEnv() != "" {
-		config.Proxy = netx.GetProxyFromEnv()
-	}
 
 	var port = config.Port
 	var host = config.Host

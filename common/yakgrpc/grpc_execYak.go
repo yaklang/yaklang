@@ -193,7 +193,6 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 			fmt.Sprintf("YAK_BRIDGE_REMOTE_REVERSE_ADDR=%v", utils.HostPort(remoteReverseIP, remoteReversePort)),
 			fmt.Sprintf("YAK_BRIDGE_ADDR=%v", remoteAddr),
 			fmt.Sprintf("YAK_BRIDGE_SECRET=%v", remoteSecret),
-			GetScanProxyEnviron(),
 		)
 	}
 	// 添加环境变量 本地 YAK_BRIDGE_REMOTE_REVERSE_ADDR
