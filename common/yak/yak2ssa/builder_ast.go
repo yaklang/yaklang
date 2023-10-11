@@ -934,7 +934,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
 			// return nil
 		}
-		return b.ReadVariable(text, true)
+		v := b.ReadVariable(text, true)
+		if un, ok := v.(*ssa.Undefine); ok {
+			if e := b.TryBuildExternValue(un.GetVariable()); e != nil {
+				ssa.DeleteInst(un)
+				return e
+			}
+		}
+		return v
 	}
 
 	// member call

@@ -226,7 +226,7 @@ func TestPhi(t *testing.T) {
 				str.F2() // only handler "field str[F2]" 
 			}
 			`,
-			ExternValue: map[string]any{
+			ExternLib: map[string]map[string]any{
 				"str": map[string]any{
 					"F":  func() int { return 1 },
 					"F2": func() {},
@@ -377,6 +377,16 @@ func TestExternInstance(t *testing.T) {
 			b = lib.getString()
 			for 1 {
 				b = lib.getString()
+			}
+
+			// in function
+			f = () => {
+				a = getInt()
+				b = lib.getString()
+				b = lib.getString()
+				for 1 {
+					b = lib.getString()
+				}
 			}
 			`,
 			ExternValue: map[string]any{
