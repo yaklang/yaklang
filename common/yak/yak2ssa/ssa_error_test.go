@@ -77,31 +77,69 @@ func TestOnlyDeclareVariable(t *testing.T) {
 	})
 }
 
-func TestUndefinedLexical(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: `
+func TestBasicExpression(t *testing.T) {
+	t.Run("basic assign", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+				a = 1
+				b = a
+
+				a1 := 1
+				b = a1
+				`,
+		})
+	})
+
+	t.Run("undefined lexical", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
 			a == undefined
 			`,
-		errs: []string{
-			ssa4analyze.ValueUndefined("a"),
-		},
+			errs: []string{
+				ssa4analyze.ValueUndefined("a"),
+			},
+		})
 	})
 }
 
-func TestFreeValueAheadExternInstance(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: `
+func TestFreeValue(t *testing.T) {
+	t.Run("freeValue ahead ExternInstance", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
 			param() // extern value 
 			param = "" // value
 			delayFuzz =() =>{
 				param.a().b() // freeValue 
 			}
 			`,
-		ExternInstance: map[string]any{
-			"param": func() {},
-		},
+			ExternInstance: map[string]any{
+				"param": func() {},
+			},
+		})
 	})
 
+	t.Run("freeValue force assign in block", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			{
+				a  := 1
+				f = () => {
+					b := a
+				}
+			}
+
+			{
+				a := 1
+				if 1 {
+					b := 2
+					f = () => {
+						c = b // get b(2) FreeValue
+					}
+				}
+			}
+			`,
+		})
+	})
 }
 
 func TestMemberCall(t *testing.T) {
