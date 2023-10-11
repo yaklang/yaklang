@@ -182,14 +182,23 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 }
 
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
-	for parent := b.parent; parent != nil; parent = parent.parent {
-		if v := parent.builder.ReadVariable(variable, false); v != nil {
+	parent := b.parentBuilder
+	symbol := b.parentSymbolBlock
+	block := b.parentCurrentBlock
+	for parent != nil {
+		if v := parent.readVariableByBlock(GetIdByBlockSymbolTable(variable, symbol), block, false); v != nil {
 			if IsExternInstance(v) {
 				return false
 			} else {
 				return true
 			}
 		}
+
+		// parent symbol and block
+		symbol = parent.parentSymbolBlock
+		block = parent.parentCurrentBlock
+		// next parent
+		parent = parent.parentBuilder
 	}
 	return false
 }
