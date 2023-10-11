@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -58,7 +57,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 			return ssa.NewConst(byte(runeChar))
 		} else {
 			// unbelievable
-			log.Warnf("Character literal is rune: %s", stmt.CharacterLiteral().GetText())
+			// log.Warnf("Character literal is rune: %s", stmt.CharacterLiteral().GetText())
 			return ssa.NewConst(runeChar)
 		}
 	} else if s := stmt.MapLiteral(); s != nil {

@@ -11,8 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-const TAG ssa.ErrorTag = "yakast"
-
 // entry point
 func (b *astbuilder) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
@@ -94,7 +92,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _break := b.GetBreak(); _break != nil {
 			b.EmitJump(_break)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpected break stmt")
+			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
 		}
 		return
 	}
@@ -108,7 +106,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _continue := b.GetContinue(); _continue != nil {
 			b.EmitJump(_continue)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpected continue stmt")
+			b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 		}
 		return
 	}
@@ -117,7 +115,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		if _fall := b.GetFallthrough(); _fall != nil {
 			b.EmitJump(_fall)
 		} else {
-			b.NewError(ssa.Error, TAG, "unexpected fallthrough stmt")
+			b.NewError(ssa.Error, TAG, UnexpectedFallthroughStmt())
 		}
 		return
 	}
@@ -148,7 +146,7 @@ func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
 		if expr, ok := stmt.Expression(i).(*yak.ExpressionContext); ok {
 			return b.buildExpression(expr)
 		}
-		b.NewError(ssa.Error, TAG, "unexpected assert stmt, this not expression")
+		b.NewError(ssa.Error, TAG, UnexpectedAssertStmt())
 		return nil
 	}
 
@@ -602,7 +600,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 		} else if len(rvalues) == 1 {
 			if len(lvalues) == 0 {
 				// (0) = (1)
-				b.NewError(ssa.Error, TAG, "assign left side is empty")
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 				return nil
 			}
 
@@ -638,7 +636,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 						lvalues[i].Assign(vs[i], b.FunctionBuilder)
 					}
 				} else {
-					b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
+					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(lvalues), len(rvalues)))
 				}
 				return nil
 			}
@@ -654,7 +652,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 		} else if len(lvalues) == 1 {
 			if len(rvalues) == 0 {
 				// (1) = (0) undefine
-				b.NewError(ssa.Error, TAG, "assign right side is empty")
+				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return nil
 			}
 			// (1) = (n)
@@ -663,7 +661,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			lvalues[0].Assign(_interface, b.FunctionBuilder)
 		} else {
 			// (n) = (m) && n!=m
-			b.NewError(ssa.Error, TAG, "multi-assign failed: left value length[%d] != right value length[%d]", len(lvalues), len(rvalues))
+			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(lvalues), len(rvalues)))
 			return nil
 		}
 		return lo.Map(lvalues, func(lv ssa.LeftValue, _ int) ssa.Value { return lv.GetValue(b.FunctionBuilder) })
@@ -683,7 +681,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	if stmt.PlusPlus() != nil { // ++
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		if lvalue == nil {
-			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
 		rvalue := b.EmitBinOp(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
@@ -692,7 +690,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	} else if stmt.SubSub() != nil { // --
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		if lvalue == nil {
-			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
 		rvalue := b.EmitBinOp(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
@@ -703,7 +701,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
 		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
 		if lvalue == nil {
-			b.NewError(ssa.Error, TAG, "assign left side is undefine type")
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
 		rvalue := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
@@ -835,7 +833,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		expr := b.buildExpression(s)
 		if expr == nil {
-			b.NewError(ssa.Error, TAG, "left expression expression is nil")
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
 		//TODO: check interface type
@@ -843,8 +841,13 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		if expr, ok := expr.(ssa.User); ok {
 			inter = expr
 		} else {
-			b.NewError(ssa.Error, TAG, "left expression is not interface")
-			return nil
+			{
+				expr := stmt.Expression().(*yak.ExpressionContext)
+				recoverRange := b.SetRange(expr.BaseParserRuleContext)
+				text := expr.GetText()
+				inter = b.EmitUndefine(text)
+				recoverRange()
+			}
 		}
 
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
@@ -991,7 +994,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadVariable(id.GetText()[1:], true)
 			if key == nil {
-				b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
+				b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
 				return nil
 			}
 			return b.EmitField(inter, key)
@@ -1057,7 +1060,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		case "^":
 			opcode = ssa.OpBitwiseNot
 		default:
-			b.NewError(ssa.Error, TAG, "unary operator not support: %s", s.GetText())
+			b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(s.GetText()))
 			return nil
 		}
 		return b.EmitUnOp(opcode, x)
@@ -1141,7 +1144,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		case "==":
 			opcode = ssa.OpEq
 		default:
-			b.NewError(ssa.Error, TAG, "binary operator not support: %s", op.GetText())
+			b.NewError(ssa.Error, TAG, BinaryOperatorNotSupport(op.GetText()))
 			return nil
 		}
 		return b.EmitBinOp(opcode, op0, op1)
@@ -1287,7 +1290,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 		typ = b.buildTypeLiteral(s)
 	}
 	if typ == nil {
-		b.NewError(ssa.Error, TAG, "not set type in make expression")
+		b.NewError(ssa.Error, TAG, NotSetTypeInMakeExpression())
 		return nil
 	}
 
@@ -1307,7 +1310,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 			} else if len(exprs) == 2 {
 				return b.EmitMakeBuildWithType(typ, exprs[0], exprs[1])
 			} else {
-				b.NewError(ssa.Error, TAG, "make slice expression argument too much!")
+				b.NewError(ssa.Error, TAG, MakeSliceArgumentTooMuch())
 			}
 		case ssa.Map:
 			return b.EmitMakeBuildWithType(typ, zero, zero)
@@ -1320,7 +1323,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
 		}
 	default:
-		b.NewError(ssa.Error, TAG, "make unknown type")
+		b.NewError(ssa.Error, TAG, MakeUnknownType())
 	}
 	return nil
 }
@@ -1379,7 +1382,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 				v := b.buildExpression(expression)
 				b.EmitReturn([]ssa.Value{v})
 			} else {
-				b.NewError(ssa.Error, TAG, "BUG: arrow function need expression or block at least")
+				b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
 			}
 		} else {
 			// this global function
@@ -1471,11 +1474,11 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	exprs := stmt.AllExpression()
 	values := make([]ssa.Value, exprLen)
 	if len(exprs) == 0 {
-		b.NewError(ssa.Error, TAG, "slice call expression is zero")
+		b.NewError(ssa.Error, TAG, SliceCallExpressionIsEmpty())
 		return nil
 	}
 	if len(exprs) > 3 {
-		b.NewError(ssa.Error, TAG, "slice call expression too much")
+		b.NewError(ssa.Error, TAG, SliceCallExpressionTooMuch())
 		return nil
 	}
 	for i, expr := range exprs {
