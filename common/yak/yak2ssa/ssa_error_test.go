@@ -2,6 +2,7 @@ package yak2ssa
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/samber/lo"
@@ -87,6 +88,17 @@ func TestBasicExpression(t *testing.T) {
 				a1 := 1
 				b = a1
 				`,
+		})
+	})
+
+	t.Run("test type variable", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			typeof(1) == map[int]string
+			`,
+			ExternInstance: map[string]any{
+				"typeof": reflect.TypeOf,
+			},
 		})
 	})
 

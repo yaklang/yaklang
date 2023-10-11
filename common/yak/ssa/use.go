@@ -302,6 +302,10 @@ func (t *TypeCast) ReplaceValue(v, to Value) {
 	}
 }
 
+// ------------ type value
+func (t TypeValue) ReplaceValue(v, to Value) {
+}
+
 // ----------- Assert
 func (a *Assert) GetValues() []Value  { return []Value{a.Cond, a.MsgValue} }
 func (a *Assert) GetUsers() []User    { return nil }

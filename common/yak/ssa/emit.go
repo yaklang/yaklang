@@ -203,6 +203,13 @@ func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	return t
 }
 
+func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
+	t := NewTypeValue(typ, f.CurrentBlock)
+	fixupUseChain(t)
+	f.emit(t)
+	return t
+}
+
 func (f *FunctionBuilder) EmitNextOnly(iter Value) *Next {
 	n := NewNext(iter, f.CurrentBlock)
 	fixupUseChain(n)

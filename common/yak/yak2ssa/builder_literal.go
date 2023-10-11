@@ -88,9 +88,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 
 	//TODO: type literal
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
-		// b.buildTypeLiteral(s)
-		_ = s
-		b.NewError(ssa.Warn, TAG, "this expression is a type")
+		return b.EmitTypeValue(b.buildTypeLiteral(s))
 	}
 
 	// mixed
