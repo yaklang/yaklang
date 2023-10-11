@@ -26,7 +26,7 @@ func init() {
 			}
 			log.Infof("use config: %v", string(raw))
 			yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
-			loadConfig(defaultConfig)
+			ConfigureNetX(defaultConfig)
 			yakit.Set(GLOBAL_NETWORK_CONFIG_INIT, "1")
 			return nil
 		} else {
@@ -48,7 +48,10 @@ func init() {
 			log.Debugf("dns fallback doh: %v", config.DNSFallbackDoH)
 			log.Debugf("custom dns servers: %v", config.CustomDNSServers)
 			log.Debugf("custom doh servers: %v", config.CustomDoHServers)
-			loadConfig(&config)
+			log.Debugf("disallow ip address: %v", config.DisallowIPAddress)
+			log.Debugf("disallow domain: %v", config.DisallowDomain)
+			log.Debugf("global proxy: %v", config.GlobalProxy)
+			ConfigureNetX(&config)
 			return nil
 		}
 	})
@@ -71,17 +74,23 @@ func getDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	return defaultConfig
 }
 
-func loadConfig(c *ypb.GlobalNetworkConfig) {
+func ConfigureNetX(c *ypb.GlobalNetworkConfig) {
 	if c == nil {
 		return
 	}
 
-	netx.SetDefaultOptions(
+	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
 		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
 		netx.WithDNSDisableSystemResolver(c.DisableSystemDNS),
 		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
 		netx.WithDNSServers(c.CustomDNSServers...),
+		netx.WithDNSDisabledDomain(c.GetDisallowDomain()...),
+	)
+
+	netx.SetDefaultDialXConfig(
+		netx.DialX_WithDisallowAddress(c.GetDisallowIPAddress()...),
+		netx.DialX_WithProxy(c.GetGlobalProxy()...),
 	)
 
 	for _, certs := range c.GetClientCertificates() {
@@ -128,7 +137,7 @@ func (s *Server) SetGlobalNetworkConfig(ctx context.Context, req *ypb.GlobalNetw
 	if err != nil {
 		return nil, err
 	}
-	loadConfig(req)
+	ConfigureNetX(req)
 	yakit.Set(GLOBAL_NETWORK_CONFIG, string(defaultBytes))
 	return &ypb.Empty{}, nil
 }
@@ -140,6 +149,6 @@ func (s *Server) ResetGlobalNetworkConfig(ctx context.Context, req *ypb.ResetGlo
 		return nil, err
 	}
 	yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
-	loadConfig(defaultConfig)
+	ConfigureNetX(defaultConfig)
 	return &ypb.Empty{}, nil
 }

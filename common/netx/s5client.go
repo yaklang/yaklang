@@ -240,7 +240,6 @@ func DialSocksProxy(socksType int, proxy string, username string, password strin
 	} else {
 		return (&config{Proto: socksType, Host: proxy}).dialFunc()
 	}
-
 }
 
 func (c *config) dialFunc() func(string, string) (net.Conn, error) {
