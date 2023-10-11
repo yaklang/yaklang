@@ -1289,9 +1289,10 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	newfunc := b.Package.NewFunctionWithParent("", b.Function)
+	newFunc, symbol := b.NewFunc("")
+	current := b.CurrentBlock
 	buildFunc := func() {
-		b.FunctionBuilder = b.PushFunction(newfunc)
+		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
 
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			b.buildBlock(block)
@@ -1302,7 +1303,7 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	}
 	b.AddSubFunction(buildFunc)
 
-	return b.NewCall(newfunc, nil)
+	return b.NewCall(newFunc, nil)
 }
 
 // anonymous function decl
@@ -1313,9 +1314,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
 	}
-	newfunc := b.Package.NewFunctionWithParent(funcName, b.Function)
+	newFunc, symbol := b.NewFunc(funcName)
+	current := b.CurrentBlock
 	buildFunc := func() {
-		b.FunctionBuilder = b.PushFunction(newfunc)
+		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
 
 		if stmt.EqGt() != nil {
 			if stmt.LParen() != nil && stmt.RParen() != nil {
@@ -1353,9 +1355,9 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	b.AddSubFunction(buildFunc)
 
 	if funcName != "" {
-		b.WriteVariable(funcName, newfunc)
+		b.WriteVariable(funcName, newFunc)
 	}
-	return newfunc
+	return newFunc
 }
 
 // function param decl

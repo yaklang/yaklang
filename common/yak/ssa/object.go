@@ -170,9 +170,9 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 		return f
 	}
 
-	if parent := b.parent; parent != nil {
+	if parent := b.parentBuilder; parent != nil {
 		// find in parent
-		if field := parent.builder.ReadField(key.String()); field != nil {
+		if field := parent.ReadField(key.String()); field != nil {
 			return field
 		}
 	}
